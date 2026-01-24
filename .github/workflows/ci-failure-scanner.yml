@@ -1,0 +1,225 @@
+name: CI Failure Scanner & Auto-Issue Creator
+
+# Scans for failed CI on open PRs and creates GitHub issues
+# Runs on a schedule to catch recent failures
+# Can be manually triggered for immediate scanning
+
+on:
+  schedule:
+    # Check every 10 minutes during business hours (UTC)
+    - cron: '*/10 09-17 * * 1-5'
+    # Check every hour off-hours
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Specific PR to check (optional)'
+        required: false
+        type: number
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  scan-pr-failures:
+    name: Scan for PR CI Failures
+    runs-on: ubuntu-latest
+    outputs:
+      pr_list: ${{ steps.get-prs.outputs.pr_list }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get list of PRs with failures
+        id: get-prs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.pr_number }}" ]; then
+            # Check specific PR
+            PR_LIST='[${{ inputs.pr_number }}]'
+          else
+            # Get all open PRs created in last 24 hours with failures
+            PR_LIST=$(gh pr list \
+              --state open \
+              --limit 50 \
+              --json number,statusCheckRollup \
+              --jq '[.[] | select(.statusCheckRollup | any(.conclusion == "FAILURE")) | .number] | @json')
+          fi
+          
+          echo "pr_list=${PR_LIST}" >> "$GITHUB_OUTPUT"
+          echo "Found PRs with failures: ${PR_LIST}"
+
+  create-issue-for-failure:
+    name: Create Issue for PR ${{ matrix.pr }}
+    runs-on: ubuntu-latest
+    needs: scan-pr-failures
+    if: ${{ needs.scan-pr-failures.outputs.pr_list != '[]' && needs.scan-pr-failures.outputs.pr_list != '' }}
+    strategy:
+      matrix:
+        pr: ${{ fromJson(needs.scan-pr-failures.outputs.pr_list) }}
+      max-parallel: 3
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get PR details
+        id: pr-details
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ matrix.pr }}
+          
+          # Get PR information
+          PR_INFO=$(gh pr view "$PR_NUM" \
+            --json number,title,author,headRefName,statusCheckRollup,createdAt \
+            --jq '.')
+          
+          TITLE=$(echo "$PR_INFO" | jq -r '.title')
+          AUTHOR=$(echo "$PR_INFO" | jq -r '.author.login')
+          BRANCH=$(echo "$PR_INFO" | jq -r '.headRefName')
+          CREATED=$(echo "$PR_INFO" | jq -r '.createdAt')
+          
+          # Get failed checks summary
+          FAILED_CHECKS=$(echo "$PR_INFO" | jq -r '.statusCheckRollup | map(select(.conclusion == "FAILURE") | .name) | join("\n• ")')
+          FAILED_COUNT=$(echo "$FAILED_CHECKS" | grep -c .)
+          
+          echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "pr_title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "pr_author=$AUTHOR" >> "$GITHUB_OUTPUT"
+          echo "pr_branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "failed_count=$FAILED_COUNT" >> "$GITHUB_OUTPUT"
+          echo "failed_checks<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$FAILED_CHECKS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Check if issue exists
+        id: check-existing
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ steps.pr-details.outputs.pr_number }}
+          
+          # Search for existing issue linking to this PR
+          EXISTING=$(gh issue list \
+            --state all \
+            --limit 500 \
+            --json number,body \
+            --jq ".[] | select(.body | contains(\"PR #$PR_NUM\") or contains(\"https://github.com/${{ github.repository }}/pull/$PR_NUM\")) | .number" \
+            | head -1)
+          
+          if [ -n "$EXISTING" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "number=$EXISTING" >> "$GITHUB_OUTPUT"
+            echo "Found existing issue #$EXISTING"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No existing issue found, will create new one"
+          fi
+
+      - name: Create issue for CI failure
+        if: steps.check-existing.outputs.exists == 'false'
+        id: create-issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ steps.pr-details.outputs.pr_number }}
+          PR_TITLE="${{ steps.pr-details.outputs.pr_title }}"
+          PR_AUTHOR="${{ steps.pr-details.outputs.pr_author }}"
+          PR_BRANCH="${{ steps.pr-details.outputs.pr_branch }}"
+          FAILED_COUNT=${{ steps.pr-details.outputs.failed_count }}
+          
+          ISSUE_TITLE="🚨 CI Failure on PR #$PR_NUM: $PR_TITLE"
+          
+          ISSUE_BODY="## CI Failure Alert
+
+**PR**: [#$PR_NUM](${{ github.server_url }}/${{ github.repository }}/pull/$PR_NUM)
+**PR Title**: $PR_TITLE
+**Author**: @$PR_AUTHOR
+**Branch**: \`$PR_BRANCH\`
+**Failed Checks**: $FAILED_COUNT
+
+### Failed CI Checks
+\`\`\`
+${{ steps.pr-details.outputs.failed_checks }}
+\`\`\`
+
+### Next Steps
+1. Review the [PR checks](https://github.com/${{ github.repository }}/pull/$PR_NUM/checks)
+2. Click on failed checks to see detailed logs
+3. Fix the issues in your code
+4. Push corrected changes
+5. Verify all CI checks pass
+
+### Useful Commands
+\`\`\`bash
+# Checkout the PR branch locally
+git fetch origin $PR_BRANCH
+git checkout $PR_BRANCH
+
+# Run validation
+./run.sh validate
+./run.sh security
+
+# View logs
+gh run view --log  # Shows latest run logs
+\`\`\`
+
+### Auto-Remediation Tips
+- **Terraform issues**: Run \`terraform fmt -recursive\` and \`terraform validate\`
+- **Python issues**: Run \`black .\` and \`ruff check .\`
+- **YAML issues**: Use \`yamllint\` or your IDE linter
+- **File permissions**: Check \`git ls-files --stage\` for +x permissions
+
+---
+*This issue was auto-created by the CI Failure Scanner when your PR's checks failed.*
+*It will be closed automatically when all CI checks pass.*"
+          
+          # Create the issue
+          ISSUE_NUM=$(gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY" \
+            --label "ci-failure,automated,bug" \
+            --assignee "$PR_AUTHOR" \
+            --json number \
+            --jq '.number')
+          
+          echo "issue_number=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+          echo "✅ Created issue #$ISSUE_NUM"
+
+      - name: Comment on PR with issue link
+        if: steps.check-existing.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ steps.pr-details.outputs.pr_number }}
+          ISSUE_NUM=${{ steps.create-issue.outputs.issue_number }}
+          
+          gh pr comment "$PR_NUM" \
+            --body "🚨 **CI Failure Detected** - Issue [#$ISSUE_NUM](${{ github.server_url }}/${{ github.repository }}/issues/$ISSUE_NUM) created for tracking."
+
+      - name: Update existing issue
+        if: steps.check-existing.outputs.exists == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM=${{ steps.check-existing.outputs.number }}
+          
+          # Add comment to existing issue about ongoing failure
+          gh issue comment "$ISSUE_NUM" \
+            --body "📍 **Still Failing** - Redetected on $(date -u +'%Y-%m-%d %H:%M:%S UTC'). CI still showing failures."
+
+  summary:
+    name: Report Summary
+    runs-on: ubuntu-latest
+    needs: [scan-pr-failures, create-issue-for-failure]
+    if: always()
+    steps:
+      - name: Print results
+        run: |
+          echo "## CI Failure Scanner Results"
+          echo "✅ Scan completed at $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "📊 PRs scanned: ${{ needs.scan-pr-failures.outputs.pr_list }}"
