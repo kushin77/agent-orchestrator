@@ -1,0 +1,30 @@
+{
+  "assets": {
+    "core-guardrails": {
+      "content_sha256": "efaca7141bbb360d06d4dfc931a219334f1147a76e7e94c5d47559cfa2162183",
+      "kind": "vendored",
+      "local_path": "shared/core-guardrails.txt",
+      "sha": "efaca7141bbb360d06d4dfc931a219334f1147a76e7e94c5d47559cfa2162183",
+      "sha_kind": "content",
+      "source_path": "shared/core-guardrails.txt",
+      "source_repo": "kushin77/CMR",
+      "version": "1.0.0"
+    },
+    "portal-shell": {
+      "content_sha256": "4913c97e7b0a200898137c8da6e98420695353c69625138261ca7a2f5de8d7ba",
+      "kind": "vendored",
+      "local_path": "shared/portal-shell.txt",
+      "sha": "4913c97e7b0a200898137c8da6e98420695353c69625138261ca7a2f5de8d7ba",
+      "sha_kind": "content",
+      "source_path": "shared/portal-shell.txt",
+      "source_repo": "kushin77/control-plane",
+      "version": "3.0.0"
+    }
+  },
+  "consumer": {
+    "id": "nexus",
+    "repo": "nexus/nexus"
+  },
+  "generated": "2026-09-08T00:00:00Z",
+  "schema": "ao.sync/provenance-manifest-v1"
+}
