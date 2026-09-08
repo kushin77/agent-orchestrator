@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prompts — tenant</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Prompts</h1>
+    <span class="grow"></span>
+    <span class="badge info">versions + FP/FN</span>
+  </header>
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      var app = document.getElementById("app");
+      var tenantId = CP.tenant || "acme";
+      try {
+        var payload = await CP.get("/api/tenants/" + encodeURIComponent(tenantId) + "/prompts");
+        render(payload.data.prompts);
+      } catch (err) {
+        if (err.status === 401) { window.location.href = "/views/login.html"; return; }
+        CP.clear(app).appendChild(CP.el("div", { class: "empty error-text", text: err.message }));
+      }
+      function render(modules) {
+        CP.clear(app);
+        app.appendChild(CP.el("div", { class: "hint", style: "margin-bottom:10px",
+          text: "Prompt modules (registry/prompts) with per-version false-positive / false-negative " +
+                "volume — a new version should lower FP/FN on the same task." }));
+        modules.forEach(function (module) {
+          var card = CP.el("div", { class: "card" },
+            CP.el("div", { class: "spread" },
+              CP.el("h3", { text: module.moduleId }),
+              CP.el("span", { class: "badge ok", text: "active: " + module.activeVersion })));
+          var table = CP.el("table", { class: "tbl" });
+          table.appendChild(CP.el("thead", {},
+            CP.el("tr", {},
+              CP.el("th", { text: "Version" }), CP.el("th", { text: "Task" }),
+              CP.el("th", { class: "num", text: "FP" }),
+              CP.el("th", { class: "num", text: "FN" }),
+              CP.el("th", { class: "num", text: "Samples" }),
+              CP.el("th", { class: "num", text: "Accuracy" }),
+              CP.el("th", { text: "Status" }))));
+          var tbody = CP.el("tbody");
+          module.versions.forEach(function (version) {
+            var regress = (version.fp + version.fn) > 0 && version.status === "published";
+            tbody.appendChild(CP.el("tr", {},
+              CP.el("td", { class: "mono", text: version.version }),
+              CP.el("td", { class: "mono", text: version.taskType }),
+              CP.el("td", { class: "num", text: version.fp }),
+              CP.el("td", { class: "num", text: version.fn }),
+              CP.el("td", { class: "num", text: version.samples }),
+              CP.el("td", { class: "num", text: (version.accuracy * 100).toFixed(1) + "%" }),
+              CP.el("td", {}, CP.el("span", {
+                class: "badge " + (version.status === "active" ? "ok" : regress ? "warn" : "info"),
+                text: version.status }))));
+          });
+          table.appendChild(tbody);
+          card.appendChild(table);
+          app.appendChild(card);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

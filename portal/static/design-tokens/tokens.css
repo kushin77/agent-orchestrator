@@ -1,0 +1,187 @@
+/*
+ * agent-orchestrator console — Design Tokens (portal/static/design-tokens)
+ * =====================================================================
+ * Harvested, provenance-tracked design tokens for the admin/tenant
+ * control-plane console (issue #39). Twin file: tokens.json (machine
+ * readable). PROVENANCE.md carries the full source table.
+ *
+ * NAMESPACE   `--os-*` (harvested OS-portal vocabulary, kushin77 fleet).
+ * TWIN FILE   tokens.json mirrors this exact set (parity-checked in tests).
+ * RULE        No value is invented. Light values are the elevatediq-website
+ *             palette; dark surfaces are the OS-chrome blueprint canvas;
+ *             governance accents come from the Gov-AI-Scout dark cyan + the
+ *             OS chrome warning/success/accent (see group headers + README).
+ *
+ * Source repos & revs (git rev-parse --short HEAD at harvest):
+ *   elevatediq-website     ce01f9f
+ *   capital-underwriting   543e63b
+ *   Gov-AI-Scout           c8fc5c3
+ */
+
+:root {
+  /* COLOR — brand + semantic (light)
+     Source: elevatediq-website website/static-site/css/styles.css @ ce01f9f
+     (`--primary/--accent/--success/--warning/--error`), `info` from the same
+     repo's design-system/DESIGN_SYSTEM.md @ ce01f9f, `--os-color-primary-fg`
+     from capital-underwriting apps/frontend/vibe/src/index.css @ 543e63b. */
+  --os-color-primary:        #3b82f6;
+  --os-color-primary-strong: #1e40af;
+  --os-color-primary-soft:   #dbeafe;
+  --os-color-primary-fg:     #f8fafc;
+  --os-color-accent:         #8b5cf6;
+  --os-color-accent-soft:    #ede9fe;
+  --os-color-success:        #10b981;
+  --os-color-warning:        #f59e0b;
+  --os-color-error:          #ef4444;
+  --os-color-info:           #0ea5e9;
+
+  /* COLOR — text, surfaces, borders (light)
+     Source: elevatediq-website website/static-site/css/styles.css @ ce01f9f. */
+  --os-color-bg:             #ffffff;
+  --os-color-bg-subtle:      #f9fafb;
+  --os-color-fg:             #111827;
+  --os-color-fg-subtle:      #4b5563;
+  --os-color-muted:          #6b7280;
+  --os-color-muted-light:    #9ca3af;
+  --os-color-surface:        #ffffff;
+  --os-color-surface-hover:  #f9fafb;
+  --os-color-border:         #e5e7eb;
+  --os-color-border-subtle:  #f3f4f6;
+
+  /* COLOR — neutral ramp (elevatediq styles.css @ ce01f9f) */
+  --os-gray-50:  #f9fafb;
+  --os-gray-100: #f3f4f6;
+  --os-gray-200: #e5e7eb;
+  --os-gray-300: #d1d5db;
+  --os-gray-400: #9ca3af;
+  --os-gray-500: #6b7280;
+  --os-gray-600: #4b5563;
+  --os-gray-700: #374151;
+  --os-gray-800: #1f2937;
+  --os-gray-900: #111827;
+
+  /* SPACE — 4px grid (elevatediq styles.css @ ce01f9f, px verbatim) */
+  --os-space-1:  4px;
+  --os-space-2:  8px;
+  --os-space-3:  12px;
+  --os-space-4:  16px;
+  --os-space-5:  20px;
+  --os-space-6:  24px;
+  --os-space-8:  32px;
+  --os-space-10: 40px;
+  --os-space-12: 48px;
+  --os-space-16: 64px;
+
+  /* TYPOGRAPHY — font families (Inter stack from Gov-AI-Scout marketing
+     tailwind @ c8fc5c3; heading Poppins + mono Fira Code documented in
+     elevatediq DESIGN_SYSTEM.md @ ce01f9f) */
+  --os-font-ui:      'Inter', system-ui, sans-serif;
+  --os-font-heading: 'Poppins', sans-serif;
+  --os-font-mono:    'Fira Code', 'Courier New', monospace;
+
+  /* TYPOGRAPHY — type scale (elevatediq DESIGN_SYSTEM.md @ ce01f9f) */
+  --os-font-size-xs:   0.75rem;
+  --os-font-size-sm:   0.875rem;
+  --os-font-size-base: 1rem;
+  --os-font-size-lg:   1.125rem;
+  --os-font-size-xl:   1.25rem;
+  --os-font-size-2xl:  1.5rem;
+  --os-font-size-3xl:  1.875rem;
+  --os-font-size-4xl:  2.25rem;
+  --os-font-size-5xl:  3.5rem;
+
+  /* TYPOGRAPHY — weights + line heights (DESIGN_SYSTEM.md @ ce01f9f) */
+  --os-font-weight-regular:   400;
+  --os-font-weight-medium:    500;
+  --os-font-weight-semibold:  600;
+  --os-font-weight-bold:      700;
+  --os-font-weight-extrabold: 800;
+  --os-line-height-tight:   1.25;
+  --os-line-height-normal:  1.5;
+  --os-line-height-relaxed: 1.75;
+
+  /* RADIUS (DESIGN_SYSTEM.md @ ce01f9f; --os-radius-lg cross-checks
+     capital-underwriting `--radius: .75rem` @ 543e63b) */
+  --os-radius-xs:   0.125rem;
+  --os-radius-sm:   0.25rem;
+  --os-radius-md:   0.5rem;
+  --os-radius-lg:   0.75rem;
+  --os-radius-xl:   1rem;
+  --os-radius-2xl:  1.5rem;
+  --os-radius-full: 9999px;
+
+  /* SHADOW (elevatediq styles.css @ ce01f9f; 2xl cross-grounded with
+     Gov-AI-Scout boxShadow.xl @ c8fc5c3) */
+  --os-shadow-xs:    0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --os-shadow-sm:    0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --os-shadow-md:    0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --os-shadow-lg:    0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --os-shadow-xl:    0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --os-shadow-2xl:   0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --os-shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.1);
+
+  /* MOTION (elevatediq styles.css @ ce01f9f) */
+  --os-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --os-transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --os-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =====================================================================
+   BLUEPRINT / GOVERNANCE — schematic accents (mode-independent)
+   Source: OS chrome shell/src/styles.css (bg #0f1220 / surface #1a1f36 /
+   border #2c3454 / warning-strong #fbbf24 / success #6ee7b7 / accent
+   #5b8cff) harmonized with Gov-AI-Scout dark-cyan #22d3ee
+   (portal/app/globals.css @ c8fc5c3). A control-plane console layers a
+   schematic theme on the twin instead of shipping local colors.
+   ===================================================================== */
+:root {
+  --os-color-cyan:           #22d3ee;
+  --os-color-cyan-soft:      rgba(34, 211, 238, 0.14);
+  --os-color-drift:          #fbbf24;
+  --os-color-drift-soft:     rgba(251, 191, 36, 0.12);
+  --os-color-compliant:      #6ee7b7;
+  --os-color-compliant-soft: rgba(110, 231, 183, 0.12);
+  --os-color-schematic:      #5b8cff;
+  --os-color-schematic-soft: rgba(91, 140, 255, 0.14);
+
+  --os-blueprint-bg:           #0f1220;
+  --os-blueprint-bg-raised:    #1a1f36;
+  --os-blueprint-bg-subtle:    #232a47;
+  --os-blueprint-line:         #2c3454;
+  --os-blueprint-grid:         rgba(91, 140, 255, 0.08);
+  --os-blueprint-tick:         rgba(34, 211, 238, 0.55);
+}
+
+/* =====================================================================
+   DARK MODE — color overrides
+   ElevatedIQ ships NO dark palette, so dark surfaces come from the OS
+   chrome blueprint canvas (above); dark text tones are the OS-chrome fg
+   ramp (#e7f3f7 / #9db8c9 / #5d7c8e) and the destructive error keeps its
+   light signal value for legibility on dark (documented local choice).
+   The `[data-theme='dark']` hook is set by console.js (same-origin frames
+   each apply their own theme — no cross-frame cascade reliance).
+   ===================================================================== */
+.dark,
+:root[data-theme='dark'],
+:root[data-os-theme='dark'] {
+  --os-color-bg:             #0f1220;
+  --os-color-bg-subtle:      #232a47;
+  --os-color-surface:        #1a1f36;
+  --os-color-surface-hover:  #232a47;
+  --os-color-border:         #2c3454;
+  --os-color-border-subtle:  #1e2742;
+  --os-color-fg:             #e7f3f7;
+  --os-color-fg-subtle:      #aebfd0;
+  --os-color-muted:          #7c93a8;
+  --os-color-muted-light:    #5d7c8e;
+  --os-color-primary:        #5b8cff;
+  --os-color-primary-strong: #7aa2ff;
+  --os-color-primary-soft:   rgba(91, 140, 255, 0.16);
+  --os-color-primary-fg:     #0b1020;
+  --os-color-accent:         #22d3ee;
+  --os-color-accent-soft:    rgba(34, 211, 238, 0.14);
+  --os-color-success:        #6ee7b7;
+  --os-color-warning:        #fbbf24;
+  --os-color-error:          #ef4444;
+  --os-color-info:           #38bdf8;
+}

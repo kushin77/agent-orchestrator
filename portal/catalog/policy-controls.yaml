@@ -1,0 +1,41 @@
+# portal/catalog/policy-controls.yaml — console policy-control catalog (issue #39)
+#
+# Tenant-scale controls this console's Policies view flips. Every control here
+# ships `enabled: false` (AO-GR-6 default-OFF doctrine) and is a *server-side*
+# policy record: flipping it writes PolicyStateStore state which
+# `PolicyEnforcer.evaluate` turns into an enforcement decision (no UI-only
+# state). `implemented_by` records the merged pillar rail each control mirrors
+# (consumed vocabulary, never redefined).
+#
+# The three platform controls (model-call-budget, tool-use-guard,
+# data-egress-guard) are NOT duplicated here — the portal catalog loads them
+# from the authoritative guardrails/policy/controls.yaml (issue #26).
+
+version: 1
+controls:
+  - id: pause-rail
+    name: Pause rail (tenant dispatch cut-off)
+    description: >-
+      While enabled, agent dispatch for this tenant is refused at the console
+      boundary (mirrors the telemetry/budgets global kill-switch rail — spend
+      stops regardless of headroom).
+    enabled: false
+    mode: block
+    gated_actions:
+      - agent.dispatch
+    implemented_by:
+      - telemetry/budgets/killswitch.py
+    since: "issue #39"
+  - id: feedback-gate
+    name: Prompt promotion feedback gate
+    description: >-
+      While enabled, a prompt version whose FP/FN regression (measured by the
+      registry/prompts feedback loop) cannot be promoted to active in this
+      tenant.
+    enabled: false
+    mode: block
+    gated_actions:
+      - prompt.promote
+    implemented_by:
+      - registry/prompts/feedback.py
+    since: "issue #39"

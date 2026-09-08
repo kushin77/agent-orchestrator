@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit — tenant</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Audit</h1>
+    <span class="grow"></span>
+    <span id="verifyBadge" class="badge">…</span>
+    <button class="btn small" id="verifyBtn">verify chain</button>
+  </header>
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      var app = document.getElementById("app");
+      var tenantId = CP.tenant || "acme";
+      var badge = document.getElementById("verifyBadge");
+      var verifyBtn = document.getElementById("verifyBtn");
+      async function load() {
+        var payload = await CP.get("/api/tenants/" + encodeURIComponent(tenantId) + "/audit");
+        render(payload.data.records);
+      }
+      async function verifyChain() {
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = "verifying…";
+        try {
+          var payload = await CP.post("/api/tenants/" + encodeURIComponent(tenantId) + "/audit/verify", {});
+          var verdict = payload.data.verify;
+          badge.className = "badge " + (verdict.status === "OK" ? "ok" : "err");
+          badge.textContent = verdict.status + " · seq " + verdict.seq;
+        } catch (err) { badge.className = "badge err"; badge.textContent = err.message; }
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "verify chain";
+      }
+      verifyBtn.addEventListener("click", verifyChain);
+      try {
+        await load();
+        await verifyChain();
+      } catch (err) {
+        if (err.status === 401) { window.location.href = "/views/login.html"; return; }
+        CP.clear(app).appendChild(CP.el("div", { class: "empty error-text", text: err.message }));
+      }
+      function render(records) {
+        CP.clear(app);
+        app.appendChild(CP.el("div", { class: "hint", style: "margin-bottom:10px",
+          text: "Tamper-evident per-tenant chain (telemetry/ledger vocabulary): each record " +
+                "hashes the previous. " + records.length + " record(s)." }));
+        records.slice().reverse().forEach(function (record) {
+          app.appendChild(CP.el("div", { class: "chain-row" },
+            CP.el("span", { class: "seq", text: "#" + record.seq }),
+            CP.el("div", { style: "flex:1" },
+              CP.el("div", {},
+                CP.el("span", { class: "mono", style: "font-weight:600", text: record.action }),
+                CP.el("span", { class: "dim", text: "  by " + record.actor }),
+                CP.el("span", { class: "hint", text: "  " + record.ts })),
+              CP.el("div", { class: "hint mono", text:
+                (record.resource || "") + (record.detail ? " — " + record.detail : "") }),
+              CP.el("div", { class: "hash", text: "prev " + record.prevHash + "  ·  " + record.hash })),
+            CP.el("span", { class: "badge ok", text: "✓" })));
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

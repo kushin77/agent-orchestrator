@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>agent-orchestrator console</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body class="shell">
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark">AO</div>
+      <div>
+        <div class="brand-word">Control plane</div>
+        <div class="brand-sub">agent-orchestrator</div>
+      </div>
+    </div>
+    <div class="ng">Signed in</div>
+    <div style="padding:0 8px">
+      <div id="who" class="mono" style="font-size:12px"></div>
+      <div class="spread" style="margin-top:6px">
+        <span id="roleBadge" class="badge">…</span>
+      </div>
+    </div>
+    <div class="ng">Tenant</div>
+    <select id="tenantSwitcher" class="mono" style="display:none;margin:0 8px 4px;width:calc(100% - 16px)"></select>
+    <div id="nav"></div>
+    <div class="rail-sp"></div>
+    <button class="nav-btn" id="themeToggle">☾ dark</button>
+    <button class="nav-btn" id="logoutBtn">↩ sign out</button>
+  </aside>
+  <div class="stage">
+    <header class="view-topbar">
+      <span id="crumb" class="crumb mono">…</span>
+      <span class="grow"></span>
+      <span class="live-dot"></span><span class="hint" style="font-size:11px">console</span>
+    </header>
+    <iframe id="stageFrame" class="stage-frame" src="/views/tenants.html"
+            title="console view" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+  </div>
+  <script src="/js/api.js"></script>
+  <script src="/js/console.js"></script>
+</body>
+</html>
