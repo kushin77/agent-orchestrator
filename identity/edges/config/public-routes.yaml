@@ -1,0 +1,45 @@
+# identity/edges - default public API allowlist (issue #37).
+#
+# Declarative, operator-editable view of the public front door.  This file
+# MUST stay in parity with allowlist.DEFAULT_ROUTE_SPECS (the single source
+# of truth; a parity test keeps them in lockstep).  Additive only: a route
+# becomes public ONLY when it appears here AND in the code specs - the backend
+# (issue #38 REST server) hosts internal routes that are never published here.
+apiVersion: v1
+routes:
+  - route_id: tasks.create
+    method: POST
+    api_path: /v1/agents/{agentId}/tasks
+    backend_path: /v1/agents/{agentId}/tasks
+    authenticated: true
+    description: Create an agent task (gateway/proxy dispatch surface, issue #16)
+  - route_id: usage.me
+    method: GET
+    api_path: /v1/tenants/me/usage
+    backend_path: /v1/tenants/{tenantId}/usage
+    authenticated: true
+    description: Current tenant usage; {tenantId} filled from verified claims
+  - route_id: audit.export
+    method: GET
+    api_path: /v1/tenants/me/audit/export
+    backend_path: /v1/tenants/{tenantId}/audit/export
+    authenticated: true
+    description: Tamper-evident audit export (issue #31); tenant from claims
+  - route_id: admin.agents.list
+    method: GET
+    api_path: /v1/admin/agents
+    backend_path: /v1/admin/agents
+    authenticated: true
+    description: Admin agent list; the backend authorizes
+  - route_id: admin.tenants.create
+    method: POST
+    api_path: /v1/admin/tenants
+    backend_path: /v1/admin/tenants
+    authenticated: true
+    description: Admin tenant create; the backend authorizes
+  - route_id: health.live
+    method: GET
+    api_path: /healthz
+    backend_path: /healthz
+    authenticated: false
+    description: The single unauthenticated liveness probe
