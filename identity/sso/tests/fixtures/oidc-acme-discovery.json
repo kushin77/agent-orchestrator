@@ -1,0 +1,7 @@
+{
+  "issuer": "https://issuer.acme.example.com",
+  "authorization_endpoint": "https://issuer.acme.example.com/authorize",
+  "token_endpoint": "https://issuer.acme.example.com/token",
+  "jwks_uri": "https://issuer.acme.example.com/jwks",
+  "userinfo_endpoint": "https://issuer.acme.example.com/userinfo"
+}
