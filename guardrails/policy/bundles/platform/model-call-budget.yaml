@@ -1,0 +1,46 @@
+# guardrails/policy/bundles/platform/model-call-budget.yaml
+# Example platform policy — model call budget (FinOps guardrail).
+#
+# The platform metering surface publishes budget.utilization_ratio (already
+# spent / allowed) on each model.call context.  This deny-list policy:
+#   * BLOCKs a call whose utilization is >= 1.0 (budget exhausted),
+#   * WARNs at >= 0.8 (near budget),
+#   * otherwise contributes its default (log — allow and observe).
+#
+# Fail-closed: if a model.call arrives without budget.utilization_ratio the
+# engine cannot evaluate the rules and returns BLOCK (a call the gate could
+# not budget-check must not slip through).
+#
+# Gated behind the `model-call-budget` control (default OFF, AO-GR-6).
+
+id: model-call-budget
+version: 1
+name: Model call budget
+description: >-
+  Blocks model calls whose metered token utilization has exhausted the tenant
+  budget and warns when the call is near the budget ceiling.
+default: log
+controls:
+  - model-call-budget
+rules:
+  - id: over-budget-block
+    actions:
+      - model.call
+    decision: block
+    reason: "tenant {tenant} model call exceeds budget (utilization {budget.utilization_ratio})"
+    condition:
+      all:
+        - path: budget.utilization_ratio
+          op: gte
+          value: 1.0
+
+  - id: near-budget-warn
+    actions:
+      - model.call
+    decision: warn
+    reason: "tenant {tenant} model call is near budget (utilization {budget.utilization_ratio})"
+    condition:
+      all:
+        - path: budget.utilization_ratio
+          op: gte
+          value: 0.8

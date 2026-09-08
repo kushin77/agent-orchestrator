@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-orchestrator.internal/schemas/policy.schema.json",
+  "title": "agent-orchestrator guardrail policy document",
+  "description": "Schema for a single guardrail policy document (guardrails/policy, issue #26). A bundle file may hold one policy at the top level or a 'policies:' container whose elements must each conform to this schema. Startup validation checks every document against this schema so an invalid policy fails the deploy, never at runtime.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "rules"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Stable policy slug, unique within a bundle (duplicates are rejected by the assembler)."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Policy schema version. Defaults to 1."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Policy-level enablement. Defaults to true."
+    },
+    "default": {
+      "type": "string",
+      "enum": ["block", "warn", "log"],
+      "description": "Decision contributed when the policy governs an action but no rule fires. Defaults to 'log'."
+    },
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "uniqueItems": true,
+      "description": "Control ids that must all be ACTIVE for the policy to be enforced (flag-gated OFF doctrine, AO-GR-6). Referencing an unregistered control is a startup-validation error."
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/rule"
+      }
+    }
+  },
+  "definitions": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "actions", "decision"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Rule slug, unique within its policy."
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Action glob patterns this rule governs (e.g. model.call, tool.use, egress.send)."
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["block", "warn", "log"],
+          "description": "Decision emitted when the rule fires."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Audit explanation. A BLOCK rule MUST carry one (a block without an explanation is unauditable and rejected by semantic validation)."
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Optional subject globs; empty means any subject."
+        },
+        "tenants": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Optional tenant globs; empty means any tenant."
+        },
+        "condition": {
+          "type": "object",
+          "description": "Predicate tree consumed by policy.conditions (all/any/not + {path,op,value} leaves). Structure and operators are validated semantically at startup."
+        }
+      }
+    }
+  }
+}

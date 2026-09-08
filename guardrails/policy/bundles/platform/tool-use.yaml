@@ -1,0 +1,61 @@
+# guardrails/policy/bundles/platform/tool-use.yaml
+# Example platform policy — tool-use restrictions.
+#
+# Governs the tool.use action.  The agent's tool invocation context carries
+# tool.name; the tenant's capabilities are declared in the context under
+# tenant.grants.  This policy:
+#   * BLOCKs the shell tool unless the tenant granted it
+#     (tenant.grants.shell == true) — and if the grant attribute is ABSENT
+#     the engine fails closed to BLOCK (no grant information = no shell),
+#   * BLOCKs the exfiltration tool family outright,
+#   * WARNs on network probe tools,
+#   * otherwise contributes its default (log — allow and observe).
+#
+# Gated behind the `tool-use-guard` control (default OFF, AO-GR-6).
+
+id: tool-use-guard
+version: 1
+name: Tool use restrictions
+description: >-
+  Restricts which tools an agent may invoke: shell tools require an explicit
+  tenant grant, exfiltration-family tools are always blocked, network probes
+  warn, everything else is observed.
+default: log
+controls:
+  - tool-use-guard
+rules:
+  - id: block-shell-without-grant
+    actions:
+      - tool.use
+    decision: block
+    reason: "shell tool requested by {subject} without an explicit tenant grant"
+    condition:
+      all:
+        - path: tool.name
+          op: eq
+          value: shell
+        - path: tenant.grants.shell
+          op: ne
+          value: true
+
+  - id: block-exfiltration-family
+    actions:
+      - tool.use
+    decision: block
+    reason: "tool {tool.name} belongs to the blocked exfiltration family"
+    condition:
+      all:
+        - path: tool.name
+          op: regex
+          value: "^(exfil|data\\.exfil)\\."
+
+  - id: warn-network-probe
+    actions:
+      - tool.use
+    decision: warn
+    reason: "network probe tool {tool.name} requested by {subject}"
+    condition:
+      all:
+        - path: tool.name
+          op: regex
+          value: "^net\\.(scan|probe)"
