@@ -1,0 +1,3 @@
+alpha payload
+forbidden-alpha planted here
+omega payload

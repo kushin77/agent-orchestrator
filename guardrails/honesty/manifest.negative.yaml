@@ -1,0 +1,54 @@
+# Negative-control manifest (issue #28, acceptance criterion 2).
+#
+# Every guard ships controls that prove it is honest:
+#   * a NEGATIVE control (expect NOT-OK) plants a mutation the guard MUST fail
+#     on -- if the guard returns OK it is a no-false-green violation;
+#   * a POSITIVE control (expect OK) proves the guard still passes clean
+#     input (it discriminates, not just always-fails);
+#   * a CANNOT-ASSESS control (expect CANNOT-ASSESS) proves the UNKNOWN path
+#     never reads as a pass.
+#
+# Guard paths are relative to this file.  Run with:
+#     python3 -m honesty.cli negative manifest.negative.yaml --report out.json
+#     # or via pytest: tests/test_negative_control.py
+controls:
+  - id: blocklist_clean
+    guard: fixtures/honest/check_blocklist.sh
+    args: [fixtures/inputs/clean.txt]
+    expect: OK
+    description: clean input passes the blocklist guard
+  - id: blocklist_violation
+    guard: fixtures/honest/check_blocklist.sh
+    args: [fixtures/inputs/violation.txt]
+    expect: NOT-OK
+    description: a planted forbidden token must fail the blocklist guard
+  - id: blocklist_unreadable
+    guard: fixtures/honest/check_blocklist.sh
+    args: [fixtures/inputs/does-not-exist-xyz.txt]
+    expect: CANNOT-ASSESS
+    description: an unreadable input is CANNOT-ASSESS, never a pass
+  - id: artifacts_all_present
+    guard: fixtures/honest/check_all_artifacts.sh
+    args: [fixtures/inputs/clean.txt, fixtures/inputs/violation.txt]
+    expect: OK
+    description: all required artifacts present passes the counter guard
+  - id: artifacts_missing
+    guard: fixtures/honest/check_all_artifacts.sh
+    args: [fixtures/inputs/clean.txt, fixtures/inputs/does-not-exist-xyz.txt]
+    expect: NOT-OK
+    description: a missing required artifact must fail the counter guard
+  - id: artifacts_no_args
+    guard: fixtures/honest/check_all_artifacts.sh
+    args: []
+    expect: CANNOT-ASSESS
+    description: no artifacts supplied is CANNOT-ASSESS, never a pass
+  - id: tool_present
+    guard: fixtures/honest/check_tool_present.sh
+    args: [bash]
+    expect: OK
+    description: an available tool passes the presence guard
+  - id: tool_missing
+    guard: fixtures/honest/check_tool_present.sh
+    args: [definitely-not-a-real-tool-xyz]
+    expect: NOT-OK
+    description: a required tool that is absent must fail (FAIL, not SKIP)
