@@ -1,0 +1,11 @@
+# engine/queue — default queue tuning (offline; PyYAML; issue #22).
+# Override any key; missing keys fall back to these defaults.
+queue:
+  # claim lease without a heartbeat (renew) before the orphan reaper reclaims
+  lease_seconds: 300
+  # delivery attempts before a task is dead-lettered (FAILED/DEAD)
+  max_attempts: 5
+  # age after which a PENDING task earns a +1 selection-rank bump
+  age_bump_seconds: 86400
+  # backpressure bound: max open (PENDING+CLAIMED+RUNNING) tasks per tenant
+  per_tenant_max_pending: 100
