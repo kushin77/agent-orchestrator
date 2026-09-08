@@ -1,0 +1,9 @@
+taskType: classify-route
+version: v1
+description: Classify an inbound tenant request into a routing label and priority for the control-plane request dispatcher.
+modelTierHint: low
+status: published
+bodyRefs:
+  system: ../bodies/classify-route.v1.system.md
+  user: ../bodies/classify-route.v1.user.md
+outputSchema: ../output-schemas/classify-route.schema.json

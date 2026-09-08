@@ -1,0 +1,11 @@
+# Governance call plan (issue #13, deliverable 5).
+#
+# Every model call at runtime MUST reference a registered, published prompt
+# module (a taskType that resolves to a frozen version) and that module MUST
+# declare an output schema. No unversioned ad-hoc prompts at runtime. This file
+# is the compliant sample; the registry governance_check refuses any taskType
+# that does not resolve.
+calls:
+  - taskType: classify-route
+  - taskType: summarize
+  - taskType: code-review-verdict

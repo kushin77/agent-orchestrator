@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/summarize.schema.json",
+  "title": "SummarizeOutput",
+  "description": "Output contract for the summarize prompt module. The model must return exactly this JSON shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "summary",
+    "keyPoints",
+    "actionItems",
+    "wordCount"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Concise summary of the thread."
+    },
+    "keyPoints": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "description": "Key facts and decisions from the thread."
+    },
+    "actionItems": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "description": "Explicit owners/next steps named in the thread."
+    },
+    "wordCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of words in the source thread (for metering)."
+    }
+  }
+}

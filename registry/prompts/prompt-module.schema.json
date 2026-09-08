@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/prompt-module.schema.json",
+  "title": "PromptModule",
+  "description": "A versioned prompt/instruction module in the control-plane prompt library. Every model call at runtime must reference a PromptModule (a taskType pinned to a frozen version) plus its declared output schema; ad-hoc unversioned prompts are refused by the registry resolver. See registry/prompts/README.md for the full contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "taskType",
+    "version",
+    "bodyRefs",
+    "outputSchema",
+    "modelTierHint"
+  ],
+  "properties": {
+    "taskType": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Kebab-case task identifier; the registry key a runtime resolves on."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$",
+      "description": "Version label (v1, v2, ...). A published (taskType, version) is immutable."
+    },
+    "description": {
+      "type": "string",
+      "description": "What this module is for and when a caller should use it."
+    },
+    "modelTierHint": {
+      "type": "string",
+      "enum": [
+        "low",
+        "med",
+        "high"
+      ],
+      "description": "Cheapest model tier that can do the task: low=flash/LOW, med=balanced, high=pro/HIGH. Used by phase-2 model gateway for routing."
+    },
+    "modelFamilyHint": {
+      "type": "string",
+      "description": "Optional model-family preference, e.g. 'flash/LOW' or a specific vendor family."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "deprecated"
+      ],
+      "description": "Lifecycle state. Only 'published' versions may be resolved at runtime."
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Optional sampling parameters the gateway should use (adapted from the intelligence prompt_tuner LLMParameters pattern).",
+      "additionalProperties": false,
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "topP": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "bodyRefs": {
+      "type": "object",
+      "description": "Named pointers to prompt body content, relative to the module file's directory (the modules/ dir). At least one part is required; system and user are the conventional parts.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assistant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "examples": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference (relative path from the module file's directory) to the JSON Schema that the model output must satisfy."
+    }
+  }
+}

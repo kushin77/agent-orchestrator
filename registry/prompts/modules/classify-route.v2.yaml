@@ -1,0 +1,11 @@
+taskType: classify-route
+version: v2
+description: v2 adds explicit disambiguation rules for multi-label requests (money movement is billing, how-to is support, secrets are security) to cut the false positives observed against v1 in feedback.
+modelTierHint: low
+status: published
+parameters:
+  temperature: 0.1
+bodyRefs:
+  system: ../bodies/classify-route.v2.system.md
+  user: ../bodies/classify-route.v2.user.md
+outputSchema: ../output-schemas/classify-route.schema.json

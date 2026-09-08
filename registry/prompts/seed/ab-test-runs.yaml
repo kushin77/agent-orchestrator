@@ -1,0 +1,75 @@
+# Recorded A/B experiment outcomes for the prompt library (issue #13, deliverable 4).
+#
+# The same labeled eval cases are scored per variant; abtest.py report
+# aggregates each variant's FP/FN/accuracy and selects the winner. The outcome
+# labels below are exactly what the offline demo's deterministic stand-in model
+# produces (see abtest.py demo), so report and demo agree.
+runs:
+  - runId: ab-classify-route-v1-vs-v2
+    taskType: classify-route
+    baseline: baseline-classify-route-v1
+    description: >-
+      v2 adds money-movement/security disambiguation rules to cut false
+      positives on multi-label requests.
+    variants:
+      - id: baseline-classify-route-v1
+        label: v1 rules (no disambiguation)
+      - id: candidate-classify-route-v2
+        label: v2 disambiguation rules
+    cases:
+      - caseId: c1
+        variantId: baseline-classify-route-v1
+        predicted: [support]
+        expected: [billing]
+      - caseId: c1
+        variantId: candidate-classify-route-v2
+        predicted: [billing]
+        expected: [billing]
+      - caseId: c2
+        variantId: baseline-classify-route-v1
+        predicted: [support]
+        expected: [support]
+      - caseId: c2
+        variantId: candidate-classify-route-v2
+        predicted: [support]
+        expected: [support]
+      - caseId: c3
+        variantId: baseline-classify-route-v1
+        predicted: [security]
+        expected: [security]
+      - caseId: c3
+        variantId: candidate-classify-route-v2
+        predicted: [security]
+        expected: [security]
+      - caseId: c4
+        variantId: baseline-classify-route-v1
+        predicted: [sales]
+        expected: [sales]
+      - caseId: c4
+        variantId: candidate-classify-route-v2
+        predicted: [sales]
+        expected: [sales]
+      - caseId: c5
+        variantId: baseline-classify-route-v1
+        predicted: [noise]
+        expected: [noise]
+      - caseId: c5
+        variantId: candidate-classify-route-v2
+        predicted: [noise]
+        expected: [noise]
+      - caseId: c6
+        variantId: baseline-classify-route-v1
+        predicted: [billing]
+        expected: [billing]
+      - caseId: c6
+        variantId: candidate-classify-route-v2
+        predicted: [billing]
+        expected: [billing]
+      - caseId: c7
+        variantId: baseline-classify-route-v1
+        predicted: [support]
+        expected: [billing]
+      - caseId: c7
+        variantId: candidate-classify-route-v2
+        predicted: [billing]
+        expected: [billing]

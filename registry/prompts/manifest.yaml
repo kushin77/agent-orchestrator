@@ -1,0 +1,23 @@
+schema: prompt-manifest/v1
+taskTypes:
+  classify-route:
+    pinned: v2
+    published:
+    - digest: sha256:30cc060c6f4a48e2ce75316c490c97c281a8de7d87d34e674163aaa1a8a9de7e
+      publishedAt: '2026-09-08T18:04:47+00:00'
+      version: v1
+    - digest: sha256:161b4b06f943ff1a011e3ccfbb124e9fe995231783612d2c639ab2d865706b56
+      publishedAt: '2026-09-08T18:04:47+00:00'
+      version: v2
+  code-review-verdict:
+    pinned: v1
+    published:
+    - digest: sha256:8bdd1267964b8c52262de66cf099aba42d41ded020781ffe0050eb038dbc937b
+      publishedAt: '2026-09-08T18:04:47+00:00'
+      version: v1
+  summarize:
+    pinned: v1
+    published:
+    - digest: sha256:4c5743814b26d43a54773dd92f4d94e1ba3861f32a427ab094ba4f10a4e03536
+      publishedAt: '2026-09-08T18:04:47+00:00'
+      version: v1

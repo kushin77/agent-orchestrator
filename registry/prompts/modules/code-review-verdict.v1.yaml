@@ -1,0 +1,9 @@
+taskType: code-review-verdict
+version: v1
+description: Produce a merge verdict (approve or request_changes) plus blocking findings for a pull-request diff in the autonomous-merge pipeline.
+modelTierHint: med
+status: published
+bodyRefs:
+  system: ../bodies/code-review-verdict.v1.system.md
+  user: ../bodies/code-review-verdict.v1.user.md
+outputSchema: ../output-schemas/code-review-verdict.schema.json
