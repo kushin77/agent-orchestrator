@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agents — tenant</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Agents</h1>
+    <span id="tenantTag" class="mono dim"></span>
+    <span class="grow"></span>
+  </header>
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      var app = document.getElementById("app");
+      var tenantId = CP.tenant || "acme";
+      document.getElementById("tenantTag").textContent = tenantId + " · org tree + profiles";
+      var me = (await CP.get("/api/console/me")).data;
+      var role = roleIn(tenantId, me);
+      var mayWrite = me.superAdmin || role === "owner" || role === "admin";
+      try {
+        var payload = await CP.get("/api/tenants/" + encodeURIComponent(tenantId) + "/agents");
+        render(payload.data.teams);
+      } catch (err) {
+        if (err.status === 401) { window.location.href = "/views/login.html"; return; }
+        CP.clear(app).appendChild(CP.el("div", { class: "empty error-text", text: err.message }));
+      }
+      function roleIn(tenantId, me) {
+        var binding = (me.bindings || []).find(function (b) { return b.tenantId === tenantId; });
+        return binding ? binding.role : "";
+      }
+      function statusBadge(status) {
+        var cls = { active: "ok", paused: "warn", retired: "err", registered: "blue" }[status] || "";
+        return CP.el("span", { class: "badge " + cls, text: status });
+      }
+      function actions(agent) {
+        var row = CP.el("div", { class: "flex" });
+        if (agent.status === "registered" || agent.status === "paused") {
+          row.appendChild(CP.el("button", { class: "btn small", text: "activate",
+            onclick: act("activate", agent) }));
+        }
+        if (agent.status === "active") {
+          row.appendChild(CP.el("button", { class: "btn small", text: "pause",
+            onclick: act("pause", agent) }));
+        }
+        if (agent.status !== "retired") {
+          row.appendChild(CP.el("button", { class: "btn small danger", text: "retire",
+            onclick: act("retire", agent) }));
+        }
+        return row;
+      }
+      function act(action, agent) {
+        return async function () {
+          if (action === "retire" &&
+              !window.confirm("Retire " + agent.agentId + "? Retire is approval-gated.")) return;
+          try {
+            var res = await CP.post(
+              "/api/tenants/" + encodeURIComponent(tenantId) + "/agents/" +
+              encodeURIComponent(agent.agentId) + "/" + action, {});
+            if (res.status === 202) {
+              window.alert("Approval required: " + res.data.message +
+                " (see the Approvals feed to approve).");
+            } else if (res.data && res.data.status === "retired") {
+              window.alert("Retire approved and executed.");
+            }
+            location.reload();
+          } catch (err) {
+            window.alert("Action failed: " + err.message);
+          }
+        };
+      }
+      function render(teams) {
+        CP.clear(app);
+        if (!mayWrite) {
+          app.appendChild(CP.el("div", { class: "card hint", text:
+            "Your role (" + (role || "none") + ") is read-only for agents here — mutations are refused server-side." }));
+        }
+        teams.forEach(function (team) {
+          var card = CP.el("div", { class: "card" },
+            CP.el("div", { class: "spread" },
+              CP.el("h3", { text: team.team }),
+              CP.el("span", { class: "badge", text: team.agents.length + " agents" })));
+          var table = CP.el("table", { class: "tbl" });
+          table.appendChild(CP.el("thead", {},
+            CP.el("tr", {},
+              CP.el("th", { text: "Agent" }), CP.el("th", { text: "Profile" }),
+              CP.el("th", { text: "Tier" }), CP.el("th", { text: "Capabilities" }),
+              CP.el("th", { text: "Status" }), CP.el("th", {}))));
+          var tbody = CP.el("tbody");
+          team.agents.forEach(function (agent) {
+            var tr = CP.el("tr", {},
+              CP.el("td", { html: "<b>" + CP.esc(agent.agentId) + "</b>" }),
+              CP.el("td", { class: "mono", text: agent.profileId }),
+              CP.el("td", { class: "mono", text: agent.modelTier }),
+              CP.el("td", {}, (agent.capabilities || []).map(function (c) {
+                return CP.el("span", { class: "chip", text: c });
+              })),
+              CP.el("td", {}, statusBadge(agent.status)),
+              CP.el("td", {}, mayWrite ? actions(agent) : CP.el("span", {})));
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          card.appendChild(table);
+          app.appendChild(card);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

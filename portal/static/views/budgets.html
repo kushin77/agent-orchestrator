@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budgets — tenant</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Budgets &amp; quotas</h1>
+    <span class="grow"></span>
+    <span id="pauseBtn"></span>
+  </header>
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      var app = document.getElementById("app");
+      var tenantId = CP.tenant || "acme";
+      var me = (await CP.get("/api/console/me")).data;
+      var role = roleIn(tenantId, me);
+      var mayManage = me.superAdmin || role === "owner" || role === "admin";
+      try {
+        var payload = await CP.get("/api/tenants/" + encodeURIComponent(tenantId) + "/budgets");
+        render(payload.data);
+      } catch (err) {
+        if (err.status === 401) { window.location.href = "/views/login.html"; return; }
+        CP.clear(app).appendChild(CP.el("div", { class: "empty error-text", text: err.message }));
+      }
+      function roleIn(tenantId, me) {
+        var binding = (me.bindings || []).find(function (b) { return b.tenantId === tenantId; });
+        return binding ? binding.role : "";
+      }
+      function meterClass(pct) { return pct >= 100 ? "err" : pct >= 80 ? "warn" : "ok"; }
+      async function pauseResume(nowPaused) {
+        var action = nowPaused ? "resume" : "pause";
+        try {
+          var res = await CP.post("/api/tenants/" + encodeURIComponent(tenantId) +
+            "/budgets/" + action, {});
+          if (res.status === 202) {
+            window.alert("Approval required: tenant pause is approval-gated for this tenant " +
+              "(see Approvals feed).");
+          }
+          location.reload();
+        } catch (err) { window.alert("Failed: " + err.message); }
+      }
+      function render(data) {
+        CP.clear(app);
+        var paused = data.paused;
+        var holder = document.getElementById("pauseBtn");
+        CP.clear(holder);
+        if (mayManage) {
+          holder.appendChild(CP.el("button", {
+            class: "btn small " + (paused ? "primary" : "danger"),
+            text: paused ? "resume tenant" : "pause tenant",
+            onclick: function () { pauseResume(paused); }
+          }));
+        }
+        app.appendChild(CP.el("div", { class: "card" },
+          CP.el("div", { class: "spread" },
+            CP.el("h3", { text: "Monthly budget" }),
+            CP.el("span", { class: "badge " + (paused ? "warn" : "ok"), text: paused ? "paused" : "active" })),
+          CP.el("div", { class: "spread", style: "margin:8px 0 4px" },
+            CP.el("span", { class: "mono", text: CP.money(data.usageMonthUsd) + " / " + CP.money(data.monthlyBudgetUsd) }),
+            CP.el("span", { class: "mono", text: data.budgetUtilizationPct + "%" })),
+          CP.el("div", { class: "meter" },
+            CP.el("i", { class: meterClass(data.budgetUtilizationPct),
+              style: "width:" + Math.min(data.budgetUtilizationPct, 100) + "%" })),
+          CP.el("div", { class: "hint", style: "margin-top:6px",
+            text: "80% → warn, 100% → block (budget ladder). Enforcement requires the " +
+                  "model-call-budget control ON in Policies." })));
+        app.appendChild(CP.el("div", { class: "card" },
+          CP.el("h3", { text: "Daily tokens" }),
+          CP.el("div", { class: "spread", style: "margin:8px 0 4px" },
+            CP.el("span", { class: "mono", text: CP.num(data.usageTodayTokens) + " / " + CP.num(data.dailyTokenLimit) }),
+            CP.el("span", { class: "mono", text: data.tokenUtilizationPct + "%" })),
+          CP.el("div", { class: "meter" },
+            CP.el("i", { class: meterClass(data.tokenUtilizationPct),
+              style: "width:" + Math.min(data.tokenUtilizationPct, 100) + "%" }))));
+        app.appendChild(quotaTable(data.quota));
+      }
+      function quotaTable(quota) {
+        var card = CP.el("div", { class: "card" },
+          CP.el("h3", { text: "Quotas (soft / hard)" }),
+          CP.el("table", { class: "tbl" }),
+          CP.el("span", {}));
+        var table = card.querySelector("table");
+        table.appendChild(CP.el("thead", {},
+          CP.el("tr", {}, CP.el("th", { text: "Dimension" }),
+            CP.el("th", { class: "num", text: "Soft" }),
+            CP.el("th", { class: "num", text: "Hard" }),
+            CP.el("th", { class: "num", text: "Used" }))));
+        var tbody = CP.el("tbody");
+        Object.keys(quota).forEach(function (dim) {
+          var q = quota[dim];
+          var pct = q.hard ? Math.round(100 * q.used / q.hard) : 0;
+          tbody.appendChild(CP.el("tr", {},
+            CP.el("td", { text: dim }),
+            CP.el("td", { class: "num", text: CP.num(q.soft) }),
+            CP.el("td", { class: "num", text: CP.num(q.hard) }),
+            CP.el("td", { class: "num", text: CP.num(q.used) + " (" + pct + "%)" })));
+        });
+        table.appendChild(tbody);
+        card.appendChild(table);
+        return card;
+      }
+    })();
+  </script>
+</body>
+</html>

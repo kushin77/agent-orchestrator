@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tenants — agent-orchestrator console</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Tenants</h1>
+    <span class="grow"></span>
+    <span class="badge info">super-admin</span>
+  </header>
+  <main class="view-main" id="app"><div class="empty">loading tenants…</div></main>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      var app = document.getElementById("app");
+      try {
+        var payload = await CP.get("/api/tenants");
+        render(payload.data.tenants);
+      } catch (err) {
+        if (err.status === 401) { window.location.href = "/views/login.html"; return; }
+        CP.clear(app).appendChild(CP.el("div", { class: "empty error-text", text: err.message }));
+      }
+      function statusBadge(row) {
+        if (row.paused) return CP.el("span", { class: "badge warn", text: "paused" });
+        if (row.subscriptionStatus !== "active")
+          return CP.el("span", { class: "badge", text: row.subscriptionStatus });
+        return CP.el("span", { class: "badge ok", text: "active" });
+      }
+      function render(rows) {
+        CP.clear(app);
+        if (!rows.length) { app.appendChild(CP.el("div", { class: "empty", text: "no tenants in scope" })); return; }
+        app.appendChild(CP.el("div", { class: "card spread" },
+          CP.el("div", { class: "dim", text: rows.length + " tenant(s) in scope" })));
+        rows.forEach(function (row) {
+          var card = CP.el("div", { class: "card" },
+            CP.el("div", { class: "spread" },
+              CP.el("div", { class: "flex" },
+                CP.el("div", { class: "brand-mark", style: "width:22px;height:22px;font-size:12px", text: row.name.slice(0, 2).toUpperCase() }),
+                CP.el("a", { href: "/views/shell.html?view=overview&tenant=" + encodeURIComponent(row.tenantId), text: row.name }),
+                CP.el("span", { class: "mono dim", style: "font-size:12px", text: " · " + row.tenantId + " · " + row.plan })),
+              statusBadge(row)),
+            CP.el("div", { class: "grid stats", style: "margin-top:12px" },
+              stat("Agents", row.agents, "active " + row.agentsActive + " / reg " + row.agentsRegistered + " / paused " + row.agentsPaused),
+              stat("Budget usage", CP.money(row.usageUsd) + " / " + CP.money(row.budgetUsd), ""),
+              stat("Utilization", row.budgetUtilizationPct + "%", ""),
+              stat("Pending approvals", row.pendingApprovals, "")));
+          app.appendChild(card);
+        });
+      }
+      function stat(k, v, s) {
+        return CP.el("div", { class: "stat" },
+          CP.el("div", { class: "k", text: k }),
+          CP.el("div", { class: "v", text: v }),
+          CP.el("div", { class: "s", text: s }));
+      }
+    })();
+  </script>
+</body>
+</html>

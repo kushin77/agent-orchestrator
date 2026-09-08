@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Approvals — tenant</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Approvals</h1>
+    <span class="grow"></span>
+    <span class="live-dot"></span><span class="hint" style="font-size:11px">live feed · 3s</span>
+  </header>
+  <main class="view-main" id="app"><div class="empty">connecting to approvals feed…</div></main>
+  <script src="/js/api.js"></script>
+  <script>
+    (function () {
+      var app = document.getElementById("app");
+      var tenantId = CP.tenant || "acme";
+      var me = null;
+      var mayApprove = false;
+      var seen = {};
+      var timer = null;
+      async function init() {
+        try {
+          me = (await CP.get("/api/console/me")).data;
+          var role = roleIn(tenantId);
+          mayApprove = me.superAdmin || role === "owner" || role === "admin";
+          await poll();
+          timer = setInterval(poll, 3000);
+        } catch (err) {
+          if (err.status === 401) { window.location.href = "/views/login.html"; return; }
+          CP.clear(app).appendChild(CP.el("div", { class: "empty error-text", text: err.message }));
+        }
+      }
+      function roleIn(tenantId) {
+        var binding = (me.bindings || []).find(function (b) { return b.tenantId === tenantId; });
+        return binding ? binding.role : "";
+      }
+      async function poll() {
+        var payload = await CP.get("/api/tenants/" + encodeURIComponent(tenantId) + "/approvals");
+        render(payload.data.approvals);
+      }
+      async function decide(approval, verdict) {
+        if (!mayApprove) { window.alert("Your role cannot approve."); return; }
+        try {
+          await CP.post("/api/tenants/" + encodeURIComponent(tenantId) +
+            "/approvals/" + encodeURIComponent(approval.approvalId) + "/" + verdict, {});
+          await poll();
+        } catch (err) { window.alert("Failed: " + err.message); }
+      }
+      function statusBadge(status) {
+        var cls = { pending: "warn", approved: "ok", denied: "err" }[status] || "";
+        return CP.el("span", { class: "badge " + cls, text: status });
+      }
+      function render(approvals) {
+        var firstRender = !app.firstChild;
+        CP.clear(app);
+        var pending = approvals.filter(function (a) { return a.status === "pending"; });
+        var decided = approvals.filter(function (a) { return a.status !== "pending"; });
+        var header = CP.el("div", { class: "card spread" },
+          CP.el("h3", { text: "Approval feed" }),
+          CP.el("span", { class: "badge " + (pending.length ? "warn" : "ok"),
+            text: pending.length + " pending" }));
+        app.appendChild(header);
+        pending.forEach(function (approval) {
+          if (!firstRender && !seen[approval.approvalId]) flash(approval.approvalId);
+          seen[approval.approvalId] = true;
+          app.appendChild(CP.el("div", { class: "card feed-item" },
+            CP.el("span", { class: "feed-dot warn" }),
+            CP.el("div", { style: "flex:1" },
+              CP.el("div", {},
+                CP.el("span", { class: "mono", style: "font-weight:600",
+                  text: approval.action + " " + approval.resource }),
+                CP.el("span", { class: "hint", text: "  by " + approval.requestedBy })),
+              CP.el("div", { class: "dim", text: approval.reason || "" }),
+              CP.el("div", { class: "hint mono", text: approval.approvalId })),
+            CP.el("div", { class: "flex" },
+              CP.el("button", { class: "btn small primary", text: "approve",
+                disabled: !mayApprove, onclick: function () { decide(approval, "approve"); } }),
+              CP.el("button", { class: "btn small danger", text: "deny",
+                disabled: !mayApprove, onclick: function () { decide(approval, "deny"); } })))));
+        });
+        if (decided.length) {
+          app.appendChild(CP.el("div", { class: "card" },
+            CP.el("h3", { text: "History" }),
+            CP.el("div", { style: "margin-top:6px" })));
+          var holder = app.querySelectorAll(".card")[app.querySelectorAll(".card").length - 1].querySelector("div");
+          decided.forEach(function (approval) {
+            holder.appendChild(CP.el("div", { class: "feed-item" },
+              CP.el("span", { class: "feed-dot " + (approval.status === "approved" ? "ok" : "err") }),
+              CP.el("div", { style: "flex:1" },
+                CP.el("div", {},
+                  CP.el("span", { class: "mono", text: approval.action + " " + approval.resource }),
+                  CP.el("span", { class: "hint", text: "  by " + approval.decidedBy })),
+                CP.el("div", { class: "hint mono", text: approval.approvalId })),
+              statusBadge(approval.status)));
+          });
+        }
+        if (!approvals.length) {
+          app.appendChild(CP.el("div", { class: "empty", text: "no approvals yet" }));
+        }
+      }
+      function flash(approvalId) {
+        var el = CP.el("div", {
+          style: "position:fixed;top:16px;right:16px;z-index:60;padding:8px 12px;border-radius:8px;" +
+                 "background:var(--os-color-surface);border:1px solid var(--os-color-schematic,var(--os-color-primary));",
+          text: "new approval " + approvalId
+        });
+        document.body.appendChild(el);
+        setTimeout(function () { el.remove(); }, 3000);
+      }
+      init();
+      window.addEventListener("beforeunload", function () { if (timer) clearInterval(timer); });
+    })();
+  </script>
+</body>
+</html>

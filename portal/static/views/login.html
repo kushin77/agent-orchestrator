@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — agent-orchestrator console</title>
+  <!-- each frame links the design-token twin + console css independently -->
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body class="login-wrap">
+  <form class="card login-card" id="loginForm">
+    <div class="brand" style="border:none;padding:0">
+      <div class="brand-mark">AO</div>
+      <div>
+        <div class="brand-word">agent-orchestrator</div>
+        <div class="brand-sub">control-plane console</div>
+      </div>
+    </div>
+    <h1>Sign in</h1>
+    <p>Console SSO via the os-session-token (RS256, relay + allowlist).</p>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required
+             placeholder="you@example.com" value="">
+    </div>
+    <div class="field">
+      <label for="tenant">Tenant (agent org)</label>
+      <select id="tenant" name="tenant" required>
+        <option value="acme">acme</option>
+        <option value="globex">globex</option>
+        <option value="initech">initech</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="reason">Why this gate</label>
+      <div class="hint" id="gateHint">Allowlisted emails sign in as <b>root_admin</b>
+        (super-admin); org-bound users sign in as a scoped tenant admin/operator.</div>
+    </div>
+    <button class="btn primary" type="submit" id="submitBtn" style="width:100%;justify-content:center">Sign in with SSO</button>
+    <div class="error-text" id="error" style="margin-top:10px"></div>
+    <div class="hint" style="margin-top:14px">
+      Demo identities (offline):<br>
+      <b>root@platform.example.com</b> · super-admin<br>
+      <b>alice@acme.example.com</b> · acme owner<br>
+      <b>bob@acme.example.com</b> · acme admin<br>
+      <b>carol@globex.example.com</b> · globex owner<br>
+      <b>dan@initech.example.com</b> · initech owner
+    </div>
+  </form>
+  <script src="/js/api.js"></script>
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var email = document.getElementById("email").value.trim();
+      var tenantId = document.getElementById("tenant").value;
+      var error = document.getElementById("error");
+      var button = document.getElementById("submitBtn");
+      error.textContent = "";
+      button.disabled = true;
+      button.textContent = "Signing in…";
+      try {
+        var relay = await CP.get("/api/console/relay-state");
+        await CP.post("/api/console/login",
+          { email: email, tenantId: tenantId, state: relay.data.state });
+        window.location.href = "/views/shell.html";
+      } catch (err) {
+        error.textContent = "Sign in failed: " + err.message;
+        button.disabled = false;
+        button.textContent = "Sign in with SSO";
+      }
+    });
+  </script>
+</body>
+</html>
