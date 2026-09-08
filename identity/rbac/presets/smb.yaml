@@ -1,0 +1,74 @@
+# SMB role pack - mid-size tenants with a few teams that manage their own agents.
+#
+# `role_admin_permission: roles:manage` is granted by `owner` (*:* counts) and
+# `admin` (role:manage). Schema documented in identity/rbac/README.md.
+key: smb
+name: Small / Medium Business
+description: Owner, admin and team-admin roles for tenants with a handful of teams.
+role_admin_permission: roles:manage
+roles:
+  - key: owner
+    name: Owner
+    description: Full control over the org, including role administration and budgets.
+    level: org
+    permissions: ["*:*"]
+    is_system: true
+  - key: admin
+    name: Admin
+    description: Manages org, teams, members, roles, agents and sessions.
+    level: org
+    permissions:
+      - org:read
+      - org:manage
+      - team:read
+      - team:manage
+      - member:read
+      - member:invite
+      - member:remove
+      - roles:read
+      - roles:manage
+      - agent:read
+      - agent:create
+      - agent:write
+      - agent:delete
+      - agent:run
+      - session:read
+      - session:manage
+      - prompt:read
+      - prompt:write
+      - model:read
+      - model:manage
+      - budget:read
+      - budget:manage
+      - tool:manage
+      - audit:read
+    is_system: true
+  - key: team-admin
+    name: Team Admin
+    description: Manages one team's members, agents and sessions within the team scope.
+    level: team
+    permissions:
+      - team:read
+      - member:read
+      - member:invite
+      - member:remove
+      - agent:read
+      - agent:create
+      - agent:write
+      - agent:delete
+      - agent:run
+      - session:read
+      - session:manage
+      - tool:call
+    is_system: true
+  - key: member
+    name: Member
+    description: Read access to org, team, agent and prompt state.
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+      - session:read
+      - prompt:read
+    is_system: true

@@ -1,0 +1,99 @@
+# Platform default role pack - the agent-org RBAC contract (issue #12).
+#
+# Every Org is seeded from exactly one pack; this is the default for the
+# platform itself and for general-purpose tenants. Schema documented in
+# identity/rbac/README.md. `level: org` roles may be granted org-wide or to a
+# single team; `level: team` roles (team-admin, agent-operator) may only be
+# granted inside a team.
+key: platform
+name: Platform Default
+description: Default agent-org pack - org-wide administration plus team-scoped operational roles.
+role_admin_permission: roles:manage
+roles:
+  - key: owner
+    name: Owner
+    description: Full control over the org, including role administration and budgets.
+    level: org
+    permissions: ["*:*"]
+    is_system: true
+  - key: admin
+    name: Admin
+    description: Manages org, teams, members, roles, agents and sessions.
+    level: org
+    permissions:
+      - org:read
+      - org:manage
+      - team:read
+      - team:manage
+      - member:read
+      - member:invite
+      - member:remove
+      - roles:read
+      - roles:manage
+      - agent:read
+      - agent:create
+      - agent:write
+      - agent:delete
+      - agent:run
+      - session:read
+      - session:manage
+      - prompt:read
+      - prompt:write
+      - model:read
+      - model:manage
+      - budget:read
+      - budget:manage
+      - tool:manage
+      - audit:read
+    is_system: true
+  - key: team-admin
+    name: Team Admin
+    description: Manages one team's members, agents and sessions within the team scope.
+    level: team
+    permissions:
+      - team:read
+      - member:read
+      - member:invite
+      - member:remove
+      - agent:read
+      - agent:create
+      - agent:write
+      - agent:delete
+      - agent:run
+      - session:read
+      - session:manage
+      - tool:call
+    is_system: true
+  - key: agent-operator
+    name: Agent Operator
+    description: Runs agents and drives their sessions and tools within scope.
+    level: team
+    permissions:
+      - agent:read
+      - agent:run
+      - session:read
+      - session:start
+      - session:stop
+      - tool:call
+      - prompt:read
+    is_system: true
+  - key: member
+    name: Member
+    description: Read access to org, team, agent and prompt state.
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+      - session:read
+      - prompt:read
+    is_system: true
+  - key: viewer
+    name: Viewer
+    description: Minimal read-only access to org, team and agent state.
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+    is_system: true
