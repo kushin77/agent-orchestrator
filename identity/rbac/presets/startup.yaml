@@ -1,0 +1,56 @@
+# Startup role pack - lean agent orgs (typically a single team, few members).
+#
+# `role_admin_permission: roles:manage` is granted by both `owner` (*:* counts)
+# and `admin` (role:manage). Schema documented in identity/rbac/README.md.
+key: startup
+name: Startup
+description: Lean pack for early-stage tenants - owner, admin and member only.
+role_admin_permission: roles:manage
+roles:
+  - key: owner
+    name: Owner
+    description: Full control over the org, including role administration and budgets.
+    level: org
+    permissions: ["*:*"]
+    is_system: true
+  - key: admin
+    name: Admin
+    description: Manages org, teams, members, roles, agents and sessions.
+    level: org
+    permissions:
+      - org:read
+      - org:manage
+      - team:read
+      - team:manage
+      - member:read
+      - member:invite
+      - member:remove
+      - roles:read
+      - roles:manage
+      - agent:read
+      - agent:create
+      - agent:write
+      - agent:delete
+      - agent:run
+      - session:read
+      - session:manage
+      - prompt:read
+      - prompt:write
+      - model:read
+      - model:manage
+      - budget:read
+      - budget:manage
+      - tool:manage
+      - audit:read
+    is_system: true
+  - key: member
+    name: Member
+    description: Read access to org, team, agent and prompt state.
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+      - session:read
+      - prompt:read
+    is_system: true
