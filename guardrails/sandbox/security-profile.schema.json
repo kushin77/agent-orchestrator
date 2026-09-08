@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/blob/master/guardrails/sandbox/security-profile.schema.json",
+  "title": "guardrails/sandbox security profile",
+  "description": "One agent tool-execution security profile (restricted / standard / privileged). Isolation knobs adapted from the elevatedIQ ai-chatbot-orchestrator sandbox pattern (spike #48): read-only rootfs, no-new-privileges, dropped Linux capabilities, network mode, run user, and CPU / memory / PID / timeout quotas. cpuQuota is the Linux CFS quota in microseconds per 100 ms period (50000 = 50% of one core).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "readOnlyRootfs",
+    "noNewPrivs",
+    "capDrop",
+    "networkMode",
+    "user",
+    "workDir",
+    "cpuQuota",
+    "memoryMb",
+    "pidsLimit",
+    "timeoutSeconds"
+  ],
+  "properties": {
+    "readOnlyRootfs": { "type": "boolean", "description": "Root filesystem is read-only." },
+    "noNewPrivs": { "type": "boolean", "description": "no_new_privs is set; privilege escalation inside the sandbox is refused." },
+    "capDrop": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Linux capabilities dropped (\"ALL\" drops every capability)."
+    },
+    "networkMode": {
+      "type": "string",
+      "enum": ["none", "bridge", "host"],
+      "description": "none blocks all network; bridge grants a private bridge; host shares the host network."
+    },
+    "user": { "type": "string", "description": "Run user (uid:gid) inside the sandbox." },
+    "workDir": { "type": "string", "description": "Working directory inside the sandbox." },
+    "cpuQuota": { "type": "integer", "minimum": 0, "description": "CFS CPU quota in microseconds per 100 ms period." },
+    "memoryMb": { "type": "integer", "minimum": 1, "description": "Memory ceiling in MiB." },
+    "pidsLimit": { "type": "integer", "minimum": 1, "description": "Maximum number of processes." },
+    "timeoutSeconds": { "type": "integer", "minimum": 1, "description": "Execution timeout in seconds." }
+  }
+}
