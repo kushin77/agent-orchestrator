@@ -1,0 +1,185 @@
+# Scrub Rule Catalog — guardrails/dlp (External-LLM egress scrub gate)
+#
+# Single source of truth for the outbound scrub gate defined by
+# guardrails/dlp/README.md and the fleet's external-LLM egress doctrine
+# (shared-governance GLOBAL_STANDARDS/external-llm-egress-policy.md —
+# "scrub then re-validate"). Loaded by guardrails.dlp.catalog.RuleCatalog and
+# applied by guardrails.dlp.engine.ScrubEngine before any outbound
+# commercial-model call may be dispatched.
+#
+# Each rule:
+#   id          - stable identifier (referenced in audit + telemetry records)
+#   class       - sensitivity class from the egress policy (secret,
+#                 private_key, cloud_cred, secret_store, pii, internal_infra)
+#   severity    - critical | high | medium | low (operational priority)
+#   action      - block  -> abort the egress (fail closed, raise incident)
+#                 redact -> replace the match with `placeholder`, continue
+#   pattern     - Python `re` regex matched against the payload
+#   placeholder - token substituted for redact actions
+#   luhn        - optional boolean: only count matches whose digits pass the
+#                 Luhn checksum (used by credit-card detection to cut
+#                 false positives on long random digit runs)
+#
+# Quote characters inside patterns are written as \x22 (") and \x27 (') so the
+# single-quoted YAML scalars stay unambiguous.
+#
+# Patterns are intentionally conservative: prefer a false positive (over-scrub)
+# to a leaked secret. Never relax below `block` for the secret/cloud/private-key
+# classes.
+
+schema_version: "1"
+ruleset_version: "1.0.0"
+
+rules:
+  # ---------------------------------------------------------------------------
+  # Secrets: generic API keys and bearer tokens
+  # ---------------------------------------------------------------------------
+  - id: secret.generic_api_key
+    class: secret
+    severity: critical
+    action: block
+    pattern: '(?i)\b(?:api[_-]?key|secret|token|access[_-]?key|client[_-]?secret)\s*[:=]\s*[\x22\x27]?[A-Za-z0-9/+_\-]{20,}'
+
+  - id: secret.bearer_token
+    class: secret
+    severity: critical
+    action: block
+    pattern: '(?i)\bbearer\s+[A-Za-z0-9._~+\-]{20,}\b'
+
+  - id: secret.jwt
+    class: secret
+    severity: high
+    action: block
+    pattern: '\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b'
+
+  - id: secret.github_token
+    class: secret
+    severity: critical
+    action: block
+    pattern: '\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b'
+
+  - id: secret.github_fine_grained
+    class: secret
+    severity: critical
+    action: block
+    pattern: '\bgithub_pat_[A-Za-z0-9_]{22,}\b'
+
+  - id: secret.slack_token
+    class: secret
+    severity: high
+    action: block
+    pattern: '\bxox[baprs]-[A-Za-z0-9\-]{10,}\b'
+
+  - id: secret.openai_api_key
+    class: secret
+    severity: critical
+    action: block
+    pattern: '\bsk(?:-ant|-proj)?-[A-Za-z0-9_\-]{16,}\b'
+
+  - id: secret.google_api_key
+    class: secret
+    severity: high
+    action: block
+    pattern: '\bAIza[0-9A-Za-z_\-]{35}\b'
+
+  # ---------------------------------------------------------------------------
+  # Private keys (PEM / OpenSSH / PGP blocks)
+  # ---------------------------------------------------------------------------
+  - id: privatekey.pem_block
+    class: private_key
+    severity: critical
+    action: block
+    pattern: '-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY(?: BLOCK)?-----'
+
+  # ---------------------------------------------------------------------------
+  # Cloud credentials: AWS and GCP
+  # ---------------------------------------------------------------------------
+  - id: cloud.aws_access_key_id
+    class: cloud_cred
+    severity: critical
+    action: block
+    pattern: '\b(?:AKIA|ASIA|AGPA|AIDA|AROA|ANPA|ANVA)[0-9A-Z]{16}\b'
+
+  - id: cloud.aws_secret_access_key
+    class: cloud_cred
+    severity: critical
+    action: block
+    pattern: '(?i)\baws_secret_access_key\b\s*[:=]\s*[\x22\x27]?[A-Za-z0-9/+]{40}'
+
+  - id: cloud.gcp_service_account
+    class: cloud_cred
+    severity: critical
+    action: block
+    pattern: '\x22type\x22\s*:\s*\x22service_account\x22'
+
+  # ---------------------------------------------------------------------------
+  # Secret stores: HashiCorp Vault paths and references
+  # ---------------------------------------------------------------------------
+  - id: vault.path
+    class: secret_store
+    severity: high
+    action: block
+    pattern: '(?i)\b(?:vault\s+(?:read|write|kv\s+get)\s+)?(?:secret|kv)/(?:data/)?[A-Za-z0-9._/\-]+'
+
+  - id: vault.address
+    class: secret_store
+    severity: medium
+    action: redact
+    placeholder: '<REDACTED_VAULT_ADDR>'
+    pattern: '(?i)\bVAULT_ADDR\b\s*[:=]\s*[\x22\x27]?https?://[^\s\x22\x27]+'
+
+  # ---------------------------------------------------------------------------
+  # PII: email, phone, credit card (Luhn-validated), US SSN
+  # ---------------------------------------------------------------------------
+  - id: pii.email
+    class: pii
+    severity: medium
+    action: redact
+    placeholder: '<REDACTED_EMAIL>'
+    pattern: '\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b'
+
+  - id: pii.phone
+    class: pii
+    severity: medium
+    action: redact
+    placeholder: '<REDACTED_PHONE>'
+    pattern: '\b(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b'
+
+  - id: pii.credit_card
+    class: pii
+    severity: medium
+    action: redact
+    placeholder: '<REDACTED_CCN>'
+    luhn: true
+    pattern: '\b(?:\d[ -]*?){13,19}\b'
+
+  - id: pii.ssn_us
+    class: pii
+    severity: high
+    action: redact
+    placeholder: '<REDACTED_SSN>'
+    pattern: '\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b'
+
+  # ---------------------------------------------------------------------------
+  # Internal infrastructure: private hostnames, RFC1918 / link-local IPs, URLs
+  # ---------------------------------------------------------------------------
+  - id: infra.internal_hostname
+    class: internal_infra
+    severity: medium
+    action: redact
+    placeholder: '<REDACTED_INTERNAL_HOST>'
+    pattern: '(?i)\b[a-z0-9.-]+\.(?:internal|local|corp|svc\.cluster\.local|intranet)\b'
+
+  - id: infra.rfc1918_ip
+    class: internal_infra
+    severity: medium
+    action: redact
+    placeholder: '<REDACTED_PRIVATE_IP>'
+    pattern: '\b(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})\b'
+
+  - id: infra.internal_url
+    class: internal_infra
+    severity: medium
+    action: redact
+    placeholder: '<REDACTED_INTERNAL_URL>'
+    pattern: '(?i)https?://[a-z0-9.-]+\.(?:internal|local|corp|intranet|svc\.cluster\.local)(?::\d+)?[^\s\x22\x27]*'
