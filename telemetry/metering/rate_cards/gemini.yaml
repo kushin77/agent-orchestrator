@@ -1,0 +1,25 @@
+# telemetry/metering rate card — Google Gemini
+#
+# POINT-IN-TIME USD list prices per 1,000,000 tokens (input/output split),
+# for COST ESTIMATION ONLY — not live pricing, not customer billing.
+#
+# gemini-2.5-pro carries a LONG-CONTEXT TIER (Vertex AI convention): once the
+# prompt/input exceeds 200,000 tokens, BOTH input and output rates step up to
+# the long-context rates.  Rates adapted verbatim from capital-underwriting
+# apps/server/src/lib/aiCostRates.ts (point-in-time sourced 2026-08-27).
+schemaVersion: 1
+provider: gemini
+note: "Google Gemini/Vertex, USD per 1M tokens. Point-in-time 2026-09."
+models:
+  gemini-2.5-flash:
+    standard:
+      inputUsdPerMillion: 0.30
+      outputUsdPerMillion: 2.50
+  gemini-2.5-pro:
+    standard:
+      inputUsdPerMillion: 1.25
+      outputUsdPerMillion: 10.00
+    longContext:
+      inputUsdPerMillion: 2.50
+      outputUsdPerMillion: 15.00
+    longContextThresholdTokens: 200000
