@@ -1,0 +1,17 @@
+# telemetry/metering rate card — OpenAI (GPT / Copilot)
+#
+# POINT-IN-TIME USD list prices per 1,000,000 tokens (input/output split),
+# for COST ESTIMATION ONLY — not live pricing, not customer billing.
+# Verify against https://platform.openai.com/docs/pricing.
+schemaVersion: 1
+provider: openai
+note: "OpenAI GPT, USD per 1M tokens. Point-in-time 2026-09."
+models:
+  gpt-4o-mini:
+    standard:
+      inputUsdPerMillion: 0.15
+      outputUsdPerMillion: 0.60
+  gpt-4o:
+    standard:
+      inputUsdPerMillion: 2.50
+      outputUsdPerMillion: 10.00

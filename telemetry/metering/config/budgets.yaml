@@ -1,0 +1,20 @@
+# telemetry/metering budget config — per-tenant daily token budgets.
+#
+# Safe-rollout doctrine: every tenant defaults to `observe` (report what
+# WOULD be blocked, never block). Flip a tenant to `enforce` only after a
+# recorded track record exists — no blocking control ships enabled by default.
+#
+# The seeded tenants are illustrative examples for the offline CLI/evidence;
+# a real deployment injects the tenant's policy via the control plane.
+schemaVersion: 1
+defaultMode: observe
+policies:
+  - tenantId: acme
+    dailyTokenLimit: 2000000
+    mode: observe
+  - tenantId: globex
+    dailyTokenLimit: 1000000
+    mode: enforce
+  - tenantId: tenant-beta
+    dailyTokenLimit: 500000
+    mode: enforce

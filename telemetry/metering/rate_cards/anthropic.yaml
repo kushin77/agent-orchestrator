@@ -1,0 +1,29 @@
+# telemetry/metering rate card — Anthropic (Claude)
+#
+# POINT-IN-TIME USD list prices per 1,000,000 tokens (input/output split),
+# for COST ESTIMATION ONLY — not live pricing, not customer billing.
+# Providers change prices without notice; re-verify before relying on this.
+#
+# Provenance:
+# - claude-haiku-4-5 and claude-sonnet-4-5 rates adapted verbatim from
+#   capital-underwriting apps/server/src/lib/aiCostRates.ts
+#   (point-in-time sourced 2026-08-27 from Anthropic published pricing /
+#   the claude-api cached model table).
+# - claude-opus-4-5 is an Opus-class point-in-time estimate ($15/$75 per 1M,
+#   the Opus 4/4.1 list shape); verify against platform.claude.com pricing.
+schemaVersion: 1
+provider: anthropic
+note: "Anthropic Claude, USD per 1M tokens. Point-in-time 2026-09."
+models:
+  claude-haiku-4-5:
+    standard:
+      inputUsdPerMillion: 1.00
+      outputUsdPerMillion: 5.00
+  claude-sonnet-4-5:
+    standard:
+      inputUsdPerMillion: 3.00
+      outputUsdPerMillion: 15.00
+  claude-opus-4-5:
+    standard:
+      inputUsdPerMillion: 15.00
+      outputUsdPerMillion: 75.00

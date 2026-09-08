@@ -1,0 +1,22 @@
+# telemetry/metering rate card — Ollama (local, self-hosted)
+#
+# POINT-IN-TIME USD list prices per 1,000,000 tokens.  Ollama models run
+# locally/self-hosted, so they are priced at an EXPLICIT $0.00 per 1M tokens
+# (a deliberate rate-card decision, flagged `local: true`) — NOT an "unknown
+# model" silent-zero.  Local calls still count as metered usage (tokens,
+# calls) so the SaaS can account for self-hosted capacity and the
+# cloud->local fallback path without fabricating a cloud price.
+schemaVersion: 1
+provider: ollama
+note: "Local Ollama models, USD per 1M tokens (explicit $0 local price). Point-in-time 2026-09."
+models:
+  llama3.2:
+    local: true
+    standard:
+      inputUsdPerMillion: 0.0
+      outputUsdPerMillion: 0.0
+  qwen2.5:
+    local: true
+    standard:
+      inputUsdPerMillion: 0.0
+      outputUsdPerMillion: 0.0

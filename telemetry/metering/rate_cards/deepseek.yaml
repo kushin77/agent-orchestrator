@@ -1,0 +1,17 @@
+# telemetry/metering rate card — DeepSeek
+#
+# POINT-IN-TIME USD list prices per 1,000,000 tokens (input/output split),
+# for COST ESTIMATION ONLY — not live pricing, not customer billing.
+# Verify against https://api-docs.deepseek.com/quick_start/pricing.
+schemaVersion: 1
+provider: deepseek
+note: "DeepSeek, USD per 1M tokens. Point-in-time 2026-09."
+models:
+  deepseek-chat:
+    standard:
+      inputUsdPerMillion: 0.27
+      outputUsdPerMillion: 1.10
+  deepseek-reasoner:
+    standard:
+      inputUsdPerMillion: 0.55
+      outputUsdPerMillion: 2.19
