@@ -1,0 +1,121 @@
+# Plan catalog -> entitlement tiering (issue #36, work item 32).
+#
+# This file is product configuration: which commercial tier unlocks which
+# catalog features, at which limits, and - through each feature's `grants` -
+# which RBAC `resource:action` permissions an entitled feature unlocks (the
+# entitlement -> RBAC mapping). It lives with the code that enforces it so a
+# change is reviewed, versioned and deployed like code (saas-rbac
+# `entitlements.ts` doctrine), and it is the ONLY place a feature/plan is
+# defined: an override may only grant a feature declared here, and an
+# evaluation for an unknown plan/feature fails closed.
+#
+# Schema documented in identity/entitlements/catalog.py and README.md.
+#
+# Layering: a tenant's plan assignment (identity/entitlements engine,
+# `assign_plan`) selects one plan; the plan's toggles plus any non-expired,
+# authority-granted overrides determine the org's entitled features; a
+# subject's effective permissions are the intersection of what its RBAC roles
+# grant (identity/rbac presets) and what the entitled features unlock, plus
+# the org self-administration core (never plan-stripped).
+version: 1
+
+# --- feature registry (entitlement -> RBAC mapping) --------------------------
+features:
+  - key: managed_agents
+    kind: limit
+    description: Managed-agent fleet capacity; unlocks agent lifecycle management.
+    grants: [agent:create, agent:write, agent:delete]
+  - key: multi_team
+    kind: feature
+    description: Teams and member administration beyond a single founding team.
+    grants: [team:manage, member:invite, member:remove]
+  - key: budgets
+    kind: feature
+    description: Per-tenant budgets, quotas and chargeback (control-plane phase 5).
+    grants: [budget:read, budget:manage]
+  - key: model_routing
+    kind: feature
+    description: Model gateway routing and provider/model selection.
+    grants: [model:read, model:manage]
+  - key: tool_governance
+    kind: feature
+    description: Tool registry administration and prompt authoring.
+    grants: [tool:manage, prompt:write]
+  - key: audit_log
+    kind: feature
+    description: Tamper-evident audit ledger retention and read-back.
+    grants: [audit:read]
+  - key: api_access
+    kind: feature
+    description: Public REST/SDK/MCP consumer surface (surface gate only).
+    grants: []
+  - key: sso
+    kind: feature
+    description: Single sign-on through the tenant IdP (identity phase 6).
+    grants: []
+
+# --- commercial plans --------------------------------------------------------
+plans:
+  - key: free
+    name: Free
+    description: Single-team evaluation tier - operate a small managed-agent fleet.
+    entitlements:
+      - feature: managed_agents
+        enabled: true
+        limit: 3
+      - feature: multi_team
+        enabled: false
+      - feature: budgets
+        enabled: false
+      - feature: model_routing
+        enabled: false
+      - feature: tool_governance
+        enabled: false
+      - feature: audit_log
+        enabled: false
+      - feature: api_access
+        enabled: false
+      - feature: sso
+        enabled: false
+  - key: pro
+    name: Pro
+    description: Multi-team tier with budgets, model routing, tool governance and audit.
+    entitlements:
+      - feature: managed_agents
+        enabled: true
+        limit: 25
+      - feature: multi_team
+        enabled: true
+      - feature: budgets
+        enabled: true
+      - feature: model_routing
+        enabled: true
+      - feature: tool_governance
+        enabled: true
+      - feature: audit_log
+        enabled: true
+      - feature: api_access
+        enabled: true
+      - feature: sso
+        enabled: false
+  - key: enterprise
+    name: Enterprise
+    description: Unlimited fleet, full governance surface and SSO.
+    entitlements:
+      - feature: managed_agents
+        enabled: true
+        limit: null
+      - feature: multi_team
+        enabled: true
+      - feature: budgets
+        enabled: true
+      - feature: model_routing
+        enabled: true
+      - feature: tool_governance
+        enabled: true
+      - feature: audit_log
+        enabled: true
+      - feature: api_access
+        enabled: true
+      - feature: sso
+        enabled: true
