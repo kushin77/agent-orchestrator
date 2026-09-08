@@ -1,0 +1,23 @@
+# telemetry/budgets kill-switch config — the platform-wide global pause.
+#
+# The GLOBAL KILL SWITCH: a single switch that halts all NON-CRITICAL
+# billable model calls platform-wide (cannibalized from shared-services
+# `automation/telemetry/global_pause.py`: check-before-act, owner-triggerable
+# set/clear, hard-stop that blocks even approved actions).
+#
+# Safe-rollout doctrine (new controls default OFF): the switch ships
+# `globalPause: false`.  An operator engages it with `pause` (recording
+# reason + who + timestamp) and it stays engaged until `clear`.  While
+# paused, every model call that is not explicitly critical (or on an exempt
+# service) is REFUSED before dispatch — spend stops instantly.
+#
+# `exemptServices` are platform-internal services allowed through a pause
+# (e.g. an in-flight security/refund path); everything else is refused.  A
+# real deployment may also set the `GLOBAL_PAUSE` env var (true/1/yes) to
+# engage the switch at boot before the state store is reachable.
+schemaVersion: 1
+globalPause: false
+reason: null
+pausedBy: null
+timestamp: null
+exemptServices: []
