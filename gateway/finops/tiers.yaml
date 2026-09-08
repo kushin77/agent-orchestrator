@@ -1,0 +1,104 @@
+# gateway/finops/tiers.yaml — FinOps model-tier table (cheapest-capable ladder).
+#
+# Declarative contract for the model chooser (issue kushin77/agent-orchestrator#17).
+# Adapted from the fleet MODEL-PROFILES L0/L1/L2 ladder, the leaderboard
+# finops-budget.yaml tier budgets, the hermes model_tiering / complexity scorer,
+# and the capital-underwriting finops-router. It CONSUMES the platform tier
+# vocabulary defined by earlier lanes (modelTierHint low|med|high from
+# registry/prompts; the LOW/MED/HIGH/MAX registry profile tiers and the
+# capability ids in registry/profiles/catalog.yaml) and maps this table onto
+# those ids — it never redefines them.
+#
+# costPerMTok values are default illustrative configuration, ordered
+# cheapest-first within a tier. The chooser relies only on the RELATIVE
+# ordering inside a tier; operators override the actual numbers via deployment
+# config and per-tenant budgets (budgets.yaml). Tests assert ordering and
+# behavior, never the absolute prices.
+#
+# The gateway proxy (issue #16, later wave) and the state-machine engine
+# consume this table through gateway/finops/chooser.py; cost attribution flows
+# to the Phase-5 metering store through gateway/finops/metering.py.
+
+schemaVersion: 1
+
+# ── Ladder: cheapest-capable model tiers ─────────────────────────────
+# L0 < L1 < L2 by cost (rank = insertion order). Each tier carries the
+# platform tier ids it maps to (modelTierHint + registryTier) and the
+# candidate commercial models that can serve it, cheapest-first. Candidates in
+# the same tier are capability-equivalent; the chooser picks the cheapest
+# HEALTHY one and treats the rest as fallbacks when the primary is unhealthy.
+ladder:
+  L0:
+    label: mechanical
+    modelTierHint: low
+    registryTier: LOW
+    description: >-
+      Cheapest capable tier for mechanical, well-scoped, deterministic work
+      (lookups, file scans, mechanical edits, verification runs, routine
+      docs/comments). Never eligible for security/IaC/governance task classes.
+    models:
+      - { id: deepseek-v4-flash, provider: deepseek, costPerMTok: 0.21, role: primary }
+      - { id: gemini-2.5-flash, provider: google, costPerMTok: 0.30, role: fallback }
+  L1:
+    label: implementation
+    modelTierHint: med
+    registryTier: MED
+    description: >-
+      Default implementation tier for multi-step work needing light judgment
+      (multi-file features, non-trivial debugging, code review). This is the
+      security floor: security/IaC/governance task classes never route below
+      this tier.
+    models:
+      - { id: deepseek-v4-pro, provider: deepseek, costPerMTok: 0.28, role: primary }
+      - { id: claude-sonnet-4-5, provider: anthropic, costPerMTok: 3.00, role: fallback }
+  L2:
+    label: architecture
+    modelTierHint: high
+    registryTier: HIGH
+    description: >-
+      Escalated top routing tier for architecture tradeoffs, adversarial
+      verification, ambiguous specs and high-complexity judgment. Consumed,
+      never the default: a task escalates here on observed difficulty or
+      failure only. The MAX registry tier (advisor-only, decisions-only) is
+      out of scope for the chooser and is never returned as a routing target.
+    models:
+      - { id: deepseek-v4-pro-thinking, provider: deepseek, costPerMTok: 0.46, role: primary }
+      - { id: claude-opus-4-1, provider: anthropic, costPerMTok: 15.00, role: fallback }
+
+# ── Task classes: cheapest-capable default tier + escalation cap ─────
+# capability references a registry/profiles catalog capability id (consumed,
+# not redefined). defaultTier is the cheapest tier that can do a typical task
+# of this class; maxTier caps how far difficulty or failure may escalate it
+# (per-task-type tier caps). guardrail marks classes that must NEVER route
+# below security.floorTier, even if a caller asks for a cheaper tier.
+taskClasses:
+  code-author:           { capability: code-author, defaultTier: L0, maxTier: L1 }
+  test-author:           { capability: test-author, defaultTier: L0, maxTier: L1 }
+  test-run:              { capability: test-run, defaultTier: L0, maxTier: L1 }
+  docs-authoring:        { capability: docs-authoring, defaultTier: L0, maxTier: L1 }
+  data-analysis:         { capability: data-analysis, defaultTier: L0, maxTier: L2 }
+  classify-route:        { capability: orchestrate, defaultTier: L0, maxTier: L1 }
+  memory-ops:            { capability: memory-ops, defaultTier: L0, maxTier: L0 }
+  finops-meter:          { capability: finops-meter, defaultTier: L0, maxTier: L0 }
+  research:              { capability: research, defaultTier: L0, maxTier: L2 }
+  code-review:           { capability: code-review, defaultTier: L1, maxTier: L2 }
+  security-review:       { capability: security-review, defaultTier: L1, maxTier: L2, guardrail: security }
+  infra-authoring:       { capability: infra-authoring, defaultTier: L1, maxTier: L2, guardrail: iac }
+  governance-audit:      { capability: audit, defaultTier: L1, maxTier: L2, guardrail: governance }
+  architecture-decision: { capability: architecture-decision, defaultTier: L2, maxTier: L2, guardrail: governance }
+
+# ── Security guardrail ───────────────────────────────────────────────
+# security/IaC/governance work never routes below this tier (enforced in the
+# chooser at route time, so even a misconfigured low default cannot drop a
+# guarded class below the floor).
+security:
+  floorTier: L1
+
+# ── Escalation (drives difficulty-based tier choice) ─────────────────
+# thresholds maps a ladder tier to the difficulty score (0-100) at/above which
+# that tier is no longer sufficient and the task should route one tier higher.
+# Adapted from the hermes complexity-scorer thresholds (fast/standard/deep).
+escalation:
+  thresholds:
+    L0: 40.0   # difficulty >= 40  -> route at least L1
+    L1: 70.0   # difficulty >= 70  -> route at least L2

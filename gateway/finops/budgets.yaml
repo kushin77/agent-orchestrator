@@ -1,0 +1,46 @@
+# gateway/finops/budgets.yaml — per-tenant budget configuration (seed shape).
+#
+# The runtime per-tenant budget set is provisioned by the control plane
+# (tenant identity / billing); this file ships the loader's seed/default shape
+# and documents the supported policy vocabulary that the budget enforcer
+# (budget.py) understands. Adapted from the leaderboard finops-budget.yaml and
+# finops-governor.sh pre-flight exit codes (0 OK / 1 DEGRADED / 2 BLOCKED).
+#
+# Supported per-tenant policies:
+#   stop     - block spend once projected use reaches warnAtPct of the budget
+#              (strictest; spend is refused at the soft threshold).
+#   warn     - allow spend up to hardCapPct but attach a warning from
+#              warnAtPct on.
+#   fallback - from warnAtPct on, downgrade the model tier toward the task
+#              class's cheapest-capable tier instead of blocking; a hard stop
+#              still applies at hardCapPct.
+#
+# hardCapPct is absolute: projected spend at/above it always stops, whatever
+# the policy. Values are in USD per tenant per budget period (calendar month by
+# default; period semantics are owned by the metering/telemetry pillar).
+
+schemaVersion: 1
+
+# Default policy applied when a tenant has no explicit budget entry (an
+# unprovisioned tenant is allowed but every call is flagged against the
+# default policy so unbudgeted spend stays visible to the metering store).
+defaultPolicy: warn
+
+# Per-tenant budgets. The chooser consults these through budget.py before any
+# model call and records every decision in the metering store.
+budgets:
+  tenant-acme:
+    monthlyBudgetUsd: 100.00
+    policy: fallback
+    warnAtPct: 80
+    hardCapPct: 100
+  tenant-beta:
+    monthlyBudgetUsd: 50.00
+    policy: stop
+    warnAtPct: 80
+    hardCapPct: 100
+  tenant-gamma:
+    monthlyBudgetUsd: 25.00
+    policy: warn
+    warnAtPct: 85
+    hardCapPct: 100
