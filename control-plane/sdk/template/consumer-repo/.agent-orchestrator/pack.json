@@ -1,0 +1,51 @@
+{
+  "schema": "ao.pack/v1",
+  "id": "example-governed-agents",
+  "version": "1.0.0",
+  "name": "Example governed agents pack",
+  "upstream": {
+    "org": "acme",
+    "repo": "acme-platform",
+    "ref": "pack-v1.0.0"
+  },
+  "agents": [
+    {
+      "id": "coder-agent",
+      "profileRef": "coder",
+      "capabilities": ["code-author", "code-review", "test-run"]
+    },
+    {
+      "id": "reviewer-agent",
+      "profileRef": "reviewer",
+      "capabilities": ["code-review", "audit", "summarize"]
+    }
+  ],
+  "instructions": [
+    {
+      "path": ".agent-orchestrator/instructions/00-platform.md",
+      "layer": "platform",
+      "managed": true
+    },
+    {
+      "path": ".agent-orchestrator/instructions/10-governed-agents.md",
+      "layer": "agent-pack",
+      "managed": true
+    },
+    {
+      "path": ".agent-orchestrator/instructions/20-local.md",
+      "layer": "local",
+      "managed": false
+    }
+  ],
+  "governance": {
+    "gate": "make verify",
+    "secretScan": true,
+    "unfinishedMarkers": true,
+    "driftDetection": "sha256 manifest"
+  },
+  "sync": {
+    "endpoint": "https://edge.example.test",
+    "tokenEnv": "AGENTORCH_SESSION_TOKEN",
+    "interval": "daily"
+  }
+}

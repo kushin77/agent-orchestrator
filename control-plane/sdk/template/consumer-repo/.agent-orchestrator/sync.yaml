@@ -1,0 +1,28 @@
+# Consumer-side sync wiring (ao.sync-config/v1): where this repo's governed
+# instruction layers come from and how local parity is verified.  `make sync`
+# refreshes the managed (auto-synced) layers; local layers are never touched.
+schema: ao.sync-config/v1
+pack:
+  id: example-governed-agents
+  version: 1.0.0
+source:
+  endpoint: https://edge.example.test
+  instructionsPath: /v1/tenants/me/packs/example-governed-agents/instructions
+auth:
+  tokenEnv: AGENTORCH_SESSION_TOKEN
+targets:
+  - path: .agent-orchestrator/instructions/00-platform.md
+    layer: platform
+    managed: true
+    marker: "managed: ao-platform"
+  - path: .agent-orchestrator/instructions/10-governed-agents.md
+    layer: agent-pack
+    managed: true
+    marker: "managed: ao-agent-pack"
+  - path: .agent-orchestrator/instructions/20-local.md
+    layer: local
+    managed: false
+    marker: "local: tenant-owned"
+verify:
+  command: make verify
+  manifest: .agent-orchestrator/instructions/MANIFEST
