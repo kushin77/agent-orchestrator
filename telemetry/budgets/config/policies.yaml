@@ -1,0 +1,59 @@
+# telemetry/budgets budget policy config — per-tenant cost + token budgets.
+#
+# Safe-rollout doctrine (fleet golden rule: new controls default OFF): a
+# tenant in `observe` mode is REPORTED (would_warn / would_block) and never
+# refused; flip a tenant to `enforce` only after a recorded track record
+# exists.  The seeded `enforce` tenants below are illustrative examples for
+# the offline CLI/evidence — a real deployment injects the tenant's policy
+# via the control plane (phase 7).
+#
+# Vocabulary (consumed, never redefined):
+#   - decision ladder allow -> warn -> block and warnAtPct (gateway/finops #17)
+#   - cost window `month` / token window `day` (metering feed #33)
+#   - per-vendor caps use the monthly per-vendor rollup (metering #33)
+schemaVersion: 1
+defaultMode: observe
+policies:
+  # ---- observe (default rollout: report what WOULD be blocked) ----
+  - tenantId: tenant-omega
+    mode: observe
+    cost:
+      window: month
+      limitUsd: 500.0
+      warnAtPct: 0.8
+    tokens:
+      limit: 5000000
+      warnAtPct: 0.8
+    vendorCaps:
+      - vendor: anthropic
+        limitUsd: 200.0
+        warnAtPct: 0.8
+
+  # ---- enforce (track record exists; over-budget calls are refused) ----
+  - tenantId: acme
+    mode: enforce
+    cost:
+      window: month
+      limitUsd: 120.0
+      warnAtPct: 0.8
+    tokens:
+      limit: 2000000
+      warnAtPct: 0.8
+    vendorCaps:
+      - vendor: anthropic
+        limitUsd: 50.0
+        warnAtPct: 0.8
+
+  - tenantId: globex
+    mode: enforce
+    cost:
+      window: month
+      limitUsd: 250.0
+      warnAtPct: 0.7
+    tokens:
+      limit: 1000000
+      warnAtPct: 0.7
+    vendorCaps:
+      - vendor: openai
+        limitUsd: 100.0
+        warnAtPct: 0.7

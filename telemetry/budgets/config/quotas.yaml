@@ -1,0 +1,51 @@
+# telemetry/budgets quota config — per-tenant soft/hard resource quotas.
+#
+# Soft limits warn; hard limits refuse the request.  Effective limits =
+# plan defaults < per-tenant explicit overrides.  A tenant references a
+# `plan` key (entitlements link, phase 6 — the later entitlements lane will
+# drive plan membership; this lane ships the plan-keyed override mechanics).
+#
+# Resources (issue #34 acceptance): requests (calls/day), tokens (day),
+# concurrency (in-flight, window-less), storage (bytes, window-less).
+# Requests/tokens usage is read from the durable metering feed (#33);
+# concurrency/storage come from an injected live probe (gateway/control
+# plane).
+schemaVersion: 1
+planDefaults:
+  free:
+    requests:     { window: day, softLimit: 100,    hardLimit: 500 }
+    tokens:       { window: day, softLimit: 100000, hardLimit: 500000 }
+    concurrency:  { softLimit: 2,  hardLimit: 5 }
+    storage:      { softLimit: 1073741824, hardLimit: 5368709120 }   # 1 GiB / 5 GiB
+  standard:
+    requests:     { window: day, softLimit: 1000,   hardLimit: 5000 }
+    tokens:       { window: day, softLimit: 500000, hardLimit: 2500000 }
+    concurrency:  { softLimit: 8,   hardLimit: 20 }
+    storage:      { softLimit: 10737418240, hardLimit: 53687091200 } # 10 GiB / 50 GiB
+  premium:
+    requests:     { window: day, softLimit: 5000,   hardLimit: 25000 }
+    tokens:       { window: day, softLimit: 2500000, hardLimit: 12500000 }
+    concurrency:  { softLimit: 16,  hardLimit: 40 }
+    storage:      { softLimit: 107374182400, hardLimit: 536870912000 } # 100 GiB / 500 GiB
+  enterprise:
+    requests:     { window: day, softLimit: 20000,  hardLimit: 100000 }
+    tokens:       { window: day, softLimit: 10000000, hardLimit: 50000000 }
+    concurrency:  { softLimit: 32,  hardLimit: 100 }
+    storage:      { softLimit: 1099511627776, hardLimit: 5497558138880 } # 1 TiB / 5 TiB
+tenantQuotas:
+  # enterprise tenant: inherits enterprise plan defaults, overrides requests
+  # upward (per-tenant override wins).
+  - tenantId: acme
+    plan: enterprise
+    quotas:
+      requests: { window: day, softLimit: 4000, hardLimit: 20000 }
+      concurrency: { softLimit: 24, hardLimit: 60 }
+  # standard tenant: full plan defaults, no explicit override.
+  - tenantId: globex
+    plan: standard
+  # premium tenant with a storage override upward and a tokens override down.
+  - tenantId: nimbus
+    plan: premium
+    quotas:
+      tokens: { window: day, softLimit: 1000000, hardLimit: 5000000 }
+      storage: { softLimit: 214748364800, hardLimit: 1099511627776 } # 200 GiB / 1 TiB
