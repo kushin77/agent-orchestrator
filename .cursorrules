@@ -1,0 +1,36 @@
+# agent-orchestrator — Cursor rules (terse)
+
+agent-orchestrator = the **AI-agent-orchestration service control plane**
+(EPIC-00, issue #4): multi-tenant SaaS that organizes/governs/manages
+commercial AI agents (Claude, DeepSeek, Copilot, Gemini, local Ollama).
+Five pillars: `registry/` (Agent Registry & Profiling), `gateway/` (Model
+Gateways), `engine/` (State-machine execution), `guardrails/` (Security &
+guardrails), `telemetry/` (Observability); cross-cutting `identity/` (phase 6),
+`control-plane/` + `portal/` (phase 7), autonomous ops (phase 8). Default
+branch = `master`.
+
+Canonical doctrine: `AGENTS.md` (single source) → `docs/ARCHITECTURE.md` →
+`docs/EXECUTION-PLAN.md` → `docs/GOVERNANCE.md` → GitHub issues board. Never
+contradict `AGENTS.md`; `CLAUDE.md`/`.cursorrules` are thin mirrors.
+
+## Workflow
+1. Read the issue: note its `Verify:` command and lane ownership (one issue =
+   one lane, no shared files per `docs/EXECUTION-PLAN.md`).
+2. Touch only your lane's files; smallest focused diff; match style; no
+   unfinished markers or debug leftovers.
+3. Run the issue's `Verify:` command **and** `make verify` (gate of record).
+   Report actual command + output as evidence — never an unverified "done".
+4. Declare AI-assistance + runtime on the PR.
+
+## DON'T
+- No direct pushes to `master`; changes land via PR + squash merge.
+- No secrets/tokens in code or history (env only); the secret scan runs in
+  `make verify`.
+- No ad-hoc `terraform apply` / console clicks; new infra flag-gated OFF.
+- No merging failing work — green `make verify` evidence required first.
+- No editing `vendor/` (pinned submodule) or committing `.research/` clones.
+- No unfinished markers or debug `console.log`/print statements.
+- No orchestrator writing lane code inline — delegate to a lane agent.
+
+## Verify
+`make verify` · `bash -n <script>` · `python3 -m json.tool <file>.json`

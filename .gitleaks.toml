@@ -1,0 +1,28 @@
+# agent-orchestrator gitleaks configuration (issue #5).
+#
+# gitleaks v8. The allowlist is deliberately narrow — nothing here may
+# silently pass a planted secret. Smoke test:
+#
+#   gitleaks detect -c .gitleaks.toml --no-git --source . -v
+#
+# A planted `aws_secret_access_key = "AKIA..."` MUST fail the scan.
+# `make verify` runs a mechanical secret scan so the gate never depends on the
+# gitleaks binary being installed; this file is consumed by the optional
+# `make gitleaks` target and by the pre-commit gitleaks hook.
+
+title = "agent-orchestrator gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "agent-orchestrator allowlist — placeholder/example markers only; no blanket passes."
+regexTarget = "line"
+regexes = [
+  '(?i)\b(example|sample|placeholder|dummy|fake|your-?key|xxx|changeme|replace-me)\b.*\b(key|secret|token|password|api[-_.]?key)\b',
+]
+
+paths = [
+  # Vendored submodule + local research scratch are not authored here.
+  '(^|/)(vendor|\.research|node_modules|\.terraform|\.venv|venv)/',
+]

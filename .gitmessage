@@ -1,0 +1,17 @@
+# agent-orchestrator commit message template (issue #5).
+# Enable with:  git config commit.template .gitmessage
+# Lines starting with '#' are stripped from the final message.
+
+<type>(<scope>): <short summary>
+# imperative, <= 72 chars. Types: feat / fix / refactor / docs / chore / test.
+# Example:  feat(foundation): add repo scaffold + agent-instruction layering
+
+<why: motivation / context>
+<what: the change>
+
+Refs kushin77/agent-orchestrator#<issue>
+# Every commit references its issue (GR-2).
+# Example:  Refs kushin77/agent-orchestrator#5
+
+AI-assistance: <runtime> (<mode>)
+# Example:  AI-assistance: Copilot (Relentless, flash/LOW)
