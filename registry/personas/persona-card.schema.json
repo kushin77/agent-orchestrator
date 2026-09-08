@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:persona-card.schema:v1",
+  "title": "PersonaCard",
+  "description": "Declarative SME-persona card (EPIC-00, issue #4; issue #11): the packaged, tenant-scoped definition of a subject-matter-expert persona (name, expertise, owned lanes, default model tier, guardrails) that maps onto an AgentProfile (issue #9). A persona belongs to a tenant or to the platform default ('tenant: platform'); tenants extend the library by adding their own card files under registry/personas/cards/ (one file per persona — the loader discovers all cards by scanning the directory, so adding a file adds a persona with no code change). The vocabulary enums below are a snapshot of the CLOSED platform vocabulary owned by registry/profiles/catalog.yaml (issue #9); registry/personas/registry.py additionally enforces fail-closed membership against the LIVE catalog so the two can never silently drift. Lifecycle state (draft/published/retired) is NOT a card field: publish/retire are recorded in the append-only versions/manifest.yaml ledger (registry.py), keeping published card content immutable via sha256.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "tenant",
+    "name",
+    "summary",
+    "expertise",
+    "ownedLanes",
+    "posture",
+    "defaultModelTier",
+    "guardrailPolicyRef",
+    "systemPromptRef",
+    "toolAllowlist",
+    "capabilitySet",
+    "constraintSet",
+    "memoryScope",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Stable persona id (lowercase, dash-separated, e.g. security-sme, orchestrator). Must equal the card filename stem (<id>.yaml). A persona maps to an AgentProfile whose id is this value."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "SemVer version of THIS persona card (X.Y.Z). A published (tenant, persona, version) is immutable: the registry records the card's sha256 in versions/manifest.yaml and refuses to resolve a published card whose content no longer matches. Improving a published persona means authoring a new card version and publishing it."
+    },
+    "tenant": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The tenant that owns this persona. 'platform' is reserved for platform-default personas shared with every tenant. Any other value is a tenant id: that tenant may extend the library with its own cards (and may shadow a platform-default persona of the same id). A persona is resolved tenant-first with a documented platform fallback — never across other tenants."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Display name of the persona (e.g. 'Security SME')."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-line summary of what this persona is for and when to dispatch it."
+    },
+    "expertise": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Areas of expertise this persona brings (stack, disciplines, standards). Used by review assignment for domain scoring."
+    },
+    "ownedLanes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+      "description": "The lanes / issue families this persona owns (e.g. security, guardrails). SME-card convention (shared-frontend SME-PROFILES). Free-form lane ids are open across tenants."
+    },
+    "posture": {
+      "type": "string",
+      "enum": ["executor", "reviewer", "auditor"],
+      "description": "Operational class, enforcing separation of duties: 'executor' performs primary work (write/run/ship); 'reviewer' independently reviews an executor's PR/verdict; 'auditor' adversarially audits claims/evidence. An auditor persona is never the executing persona of the task it audits (registry/personas/mapping.py guard_dispatch rejects it)."
+    },
+    "defaultModelTier": {
+      "type": "string",
+      "enum": ["LOW", "MED", "HIGH", "MAX"],
+      "description": "Default dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro). Closed platform vocabulary (issue #9 catalog tiers). Security/architecture personas carry HIGH/MAX floors; reviewers with verification duty default LOW/MED."
+    },
+    "guardrailPolicyRef": {
+      "type": "string",
+      "enum": [
+        "no-secrets",
+        "no-direct-push-master",
+        "no-unverified-merge",
+        "no-adhoc-iac-apply",
+        "dlp-redact",
+        "prompt-injection-defense",
+        "budget-finops-cap",
+        "audit-trail-everywhere",
+        "flag-gated-off",
+        "tool-allowlist-enforcement",
+        "capability-bounds-enforcement",
+        "worker-bundle",
+        "reviewer-bundle"
+      ],
+      "description": "Single guardrail policy bound to this persona (atomic id or bundle id from the issue #9 guardrail-policy catalog). Executor workers bind worker-bundle; reviewer/auditor personas bind reviewer-bundle."
+    },
+    "systemPromptRef": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)*@v[0-9]+$",
+      "description": "Pinned reference to the persona's primary system-prompt module in the prompt library (issue #13), shape <module>/<name>@v<n> (e.g. security-sme/primary@v1). Matches the AgentProfile systemPromptRef convention (issue #9 seeds use <role>/primary@v1). Module publication is owned by the prompt-library lane; the mapping pins the reference shape."
+    },
+    "toolAllowlist": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "gh_issue",
+          "gh_pr",
+          "board_sync",
+          "git_worktree",
+          "file_read",
+          "file_write",
+          "shell_exec",
+          "search_memory",
+          "store_memory",
+          "web_fetch",
+          "sql_query",
+          "mail_read",
+          "mail_send",
+          "calendar_query",
+          "crm_contact",
+          "crm_task",
+          "sms_send"
+        ]
+      },
+      "description": "Closed allowlist of platform tool ids this persona may invoke (issue #9 catalog). Unknown tool => rejected (fail closed). Reviewer/auditor personas use a verify-only tool set."
+    },
+    "capabilitySet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "task-claim",
+          "orchestrate",
+          "code-author",
+          "test-author",
+          "test-run",
+          "code-review",
+          "security-review",
+          "architecture-decision",
+          "research",
+          "data-analysis",
+          "infra-authoring",
+          "docs-authoring",
+          "audit",
+          "finops-meter",
+          "memory-ops"
+        ]
+      },
+      "description": "Closed capability set this persona may exercise (issue #9 catalog). Unknown capability => rejected (fail closed)."
+    },
+    "constraintSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "issue-first",
+          "stay-in-lane",
+          "no-unrelated-edits",
+          "verify-before-done",
+          "evidence-on-pr",
+          "no-direct-push",
+          "no-secrets",
+          "no-adhoc-iac",
+          "no-unverified-merge",
+          "no-debug-leftovers"
+        ]
+      },
+      "description": "Boundary constraints (deny/require rules) this persona operates under (issue #9 catalog). Unknown constraint => rejected (fail closed)."
+    },
+    "memoryScope": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["user", "session", "repository"]
+      },
+      "description": "Memory scopes this persona may read/write (issue #9 catalog memory scopes). At least one scope required."
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Record of the read-only source(s) this persona card was derived from, as '<repo> <path>' strings (GR-10 provenance doctrine, docs/CANNIBALIZATION.md)."
+    },
+    "description": {
+      "type": "string",
+      "description": "Longer narrative of the persona's role, discriminating focus and doctrine (optional)."
+    },
+    "guardrails": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Human-readable non-negotiables this persona operates under (the SME card 'Guardrails' section; optional — machine enforcement rides on guardrailPolicyRef + constraintSet)."
+    }
+  }
+}
