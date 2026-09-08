@@ -1,0 +1,58 @@
+# guardrails/policy/bundles/platform/data-egress.yaml
+# Example platform policy — data egress guard.
+#
+# Applies the external-LLM egress doctrine to the egress.send action
+# (shared-governance external-llm-egress-policy, adapted): outbound payloads
+# are classified by the egress guard surface before sending.  This policy:
+#   * BLOCKs egress carrying a pii/secret classification,
+#   * BLOCKs egress travelling over cleartext http (external destinations),
+#   * WARNs on sensitive-classified egress,
+#   * otherwise contributes its default (log — allow and observe).
+#
+# Fail-closed: egress without a classification or destination cannot be
+# evaluated and is BLOCKed rather than silently allowed.
+#
+# Gated behind the `data-egress-guard` control (default OFF, AO-GR-6).
+
+id: data-egress-guard
+version: 1
+name: Data egress guard
+description: >-
+  Blocks outbound egress carrying pii/secret classifications or using
+  cleartext http, warns on sensitive payloads, and observes the rest.
+default: log
+controls:
+  - data-egress-guard
+rules:
+  - id: block-pii-secret-egress
+    actions:
+      - egress.send
+    decision: block
+    reason: "egress to {egress.destination} carries blocked classification {egress.classification}"
+    condition:
+      all:
+        - path: egress.classification
+          op: in
+          value: ["pii", "secret"]
+
+  - id: block-cleartext-egress
+    actions:
+      - egress.send
+    decision: block
+    reason: "egress to {egress.destination} uses cleartext http"
+    condition:
+      all:
+        - path: egress.destination
+          op: glob
+          value: "http://*"
+
+  - id: warn-sensitive-egress
+    actions:
+      - egress.send
+    decision: warn
+    reason: "egress to {egress.destination} carries sensitive classification"
+    condition:
+      all:
+        - path: egress.classification
+          op: eq
+          value: sensitive

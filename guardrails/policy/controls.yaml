@@ -1,0 +1,51 @@
+# guardrails/policy/controls.yaml — controls registry for the guardrail
+# policy gates (issue #26 acceptance #3).
+#
+# Each control is the smallest rollout unit — "a thing a web toggle flips"
+# (shape adapted from kushin77/CMR guardrails/policy/controls.yaml).  Every
+# control ships enabled: false by default (AO-GR-6, flag-gated OFF doctrine);
+# flipping one ON is the deliberate, reviewed act that activates the policies
+# gated behind it.  The engine enforces a policy only when every control id
+# it declares is registered AND enabled.
+#
+# Schema: schema/controls.schema.json  ·  Validator: policy/controls.py
+# (fails on duplicate ids, mode/off inconsistency, and an enabled control
+# that does not document on_since_rationale).
+
+version: 1
+controls:
+  - id: model-call-budget
+    name: Model call budget enforcement
+    description: >-
+      Activates the model-call-budget policy: model calls whose metered
+      token utilization crosses the tenant budget are warned at 80% and
+      blocked at 100%.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/model-call-budget.yaml
+    since: "issue #26"
+    notes: >
+      (informational) Default OFF; a tenant enables budget enforcement when
+      its metering surface publishes budget.utilization_ratio.
+  - id: tool-use-guard
+    name: Tool-use restrictions
+    description: >-
+      Activates the tool-use-guard policy: shell and exfiltration-family
+      tools are blocked unless the tenant granted them; risky probes warn.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/tool-use.yaml
+    since: "issue #26"
+  - id: data-egress-guard
+    name: Data egress guard
+    description: >-
+      Activates the data-egress-guard policy: outbound egress carrying
+      pii/secret classifications or travelling over cleartext http is
+      blocked; sensitive egress warns.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/data-egress.yaml
+    since: "issue #26"
