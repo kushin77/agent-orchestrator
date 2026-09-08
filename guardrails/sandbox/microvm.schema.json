@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/blob/master/guardrails/sandbox/microvm.schema.json",
+  "title": "guardrails/sandbox Firecracker microVM spec",
+  "description": "Declared microVM specification for the optional Firecracker executor (flag-gated OFF, IaC doctrine). The executor ships as a declared seam only - no real Firecracker-go-sdk lifecycle is implemented; this schema is the contract a deployment would instantiate when the flag is turned on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kernelPath", "kernelArgs", "rootfsPath", "vcpuCount", "memSizeMib", "stateDir"],
+  "properties": {
+    "kernelPath": { "type": "string", "description": "Path to the uncompressed kernel image." },
+    "kernelArgs": { "type": "string", "description": "Kernel command line (console, root device, ...)." },
+    "rootfsPath": { "type": "string", "description": "Path to the root filesystem image." },
+    "vcpuCount": { "type": "integer", "minimum": 1, "description": "Number of vCPUs." },
+    "memSizeMib": { "type": "integer", "minimum": 64, "description": "Guest memory in MiB." },
+    "stateDir": { "type": "string", "description": "Directory for Firecracker socket / state files." },
+    "network": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["iface", "hostDevName"],
+      "properties": {
+        "iface": { "type": "string", "description": "Guest interface name (e.g. eth0)." },
+        "hostDevName": { "type": "string", "description": "Host tap device name (e.g. tap0); null/absent for no network." }
+      }
+    },
+    "jailer": { "type": ["string", "null"], "description": "Optional jailer binary path for the microVM." }
+  }
+}

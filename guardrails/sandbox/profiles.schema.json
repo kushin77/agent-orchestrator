@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/blob/master/guardrails/sandbox/profiles.schema.json",
+  "title": "guardrails/sandbox profiles document",
+  "description": "The profiles.yaml contract: a default profile name plus the closed restricted / standard / privileged profile set. Each profile must conform to security-profile.schema.json (see definitions.profile).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["defaultProfile", "profiles"],
+  "properties": {
+    "defaultProfile": {
+      "type": "string",
+      "enum": ["restricted", "standard", "privileged"],
+      "description": "The fail-closed profile used when nothing more specific applies."
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["restricted", "standard", "privileged"],
+      "properties": {
+        "restricted": { "$ref": "#/definitions/profile" },
+        "standard": { "$ref": "#/definitions/profile" },
+        "privileged": { "$ref": "#/definitions/profile" }
+      }
+    }
+  },
+  "definitions": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readOnlyRootfs",
+        "noNewPrivs",
+        "capDrop",
+        "networkMode",
+        "user",
+        "workDir",
+        "cpuQuota",
+        "memoryMb",
+        "pidsLimit",
+        "timeoutSeconds"
+      ],
+      "properties": {
+        "readOnlyRootfs": { "type": "boolean" },
+        "noNewPrivs": { "type": "boolean" },
+        "capDrop": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "networkMode": {
+          "type": "string",
+          "enum": ["none", "bridge", "host"]
+        },
+        "user": { "type": "string" },
+        "workDir": { "type": "string" },
+        "cpuQuota": { "type": "integer", "minimum": 0 },
+        "memoryMb": { "type": "integer", "minimum": 1 },
+        "pidsLimit": { "type": "integer", "minimum": 1 },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

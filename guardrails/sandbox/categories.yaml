@@ -1,0 +1,21 @@
+# guardrails/sandbox/categories.yaml — tool category -> security profile map.
+#
+# Contract: categories.schema.json. Each closed agent tool category (the
+# elevatedIQ CategoryProfiles keys: file/exec/network/db/cloud/git/docker/k8s)
+# is bound to a profile. Any category NOT listed here - and any tool whose
+# category cannot be determined - fails closed to defaultProfile (restricted):
+# unknown never means "less safe".
+#
+# file/exec -> restricted   (read files, run commands: no network, RO rootfs)
+# network/db/cloud/git/k8s -> standard  (needs network via a private bridge)
+# docker -> privileged      (needs the docker socket: host network, writable)
+defaultProfile: restricted
+categories:
+  file: restricted
+  exec: restricted
+  network: standard
+  db: standard
+  cloud: standard
+  git: standard
+  docker: privileged
+  k8s: standard
