@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "telemetry/ledger/audit_event.schema.json",
+  "title": "AuditEvent",
+  "description": "One stored record of the per-tenant tamper-evident audit ledger (issue #31). Each record is chained to the previous by prevHash; hash is the sha256 of the canonical JSON of every other field. Sensitive payloads are stored only as the encrypted payloadEnc envelope (AES-256-GCM); clear payloads never appear in the ledger. The authoritative python-side validator is telemetry/ledger/schema.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "seq",
+    "ts",
+    "tenantId",
+    "actor",
+    "action",
+    "prevHash",
+    "hash"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Record-contract version (hashed into the record).",
+      "const": 1
+    },
+    "seq": {
+      "description": "Monotonic per-tenant sequence; 1, 2, 3, ... no gaps.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "ts": {
+      "description": "When the action happened, RFC 3339 UTC.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "tenantId": {
+      "description": "The tenant (agent org) whose chain this record belongs to.",
+      "type": "string",
+      "minLength": 1
+    },
+    "actor": {
+      "description": "Canonical 'kind:id' principal that caused the action.",
+      "type": "string",
+      "pattern": "^(user|agent|system):.+"
+    },
+    "impersonatedBy": {
+      "description": "Optional impersonation stamp - the principal the actor acted on behalf of.",
+      "type": ["string", "null"],
+      "pattern": "^(user|agent|system):.+"
+    },
+    "action": {
+      "description": "What was done, e.g. model.call, registry.register, policy.decision.",
+      "type": "string",
+      "minLength": 1
+    },
+    "resource": {
+      "description": "What resource the action concerned, e.g. gateway/proxy.",
+      "type": ["string", "null"]
+    },
+    "evidence": {
+      "description": "Optional pointer to external supporting evidence (e.g. a source log hash).",
+      "type": ["string", "null"]
+    },
+    "modelUsed": {
+      "description": "Model id when the action was a model call.",
+      "type": ["string", "null"]
+    },
+    "costUsd": {
+      "description": "Cost in USD when relevant (number or decimal string).",
+      "type": ["number", "string", "null"]
+    },
+    "payloadEnc": {
+      "description": "Encrypted envelope of the sensitive payload (AES-256-GCM); null when no payload. The clear payload is never stored.",
+      "type": ["object", "null"],
+      "properties": {
+        "v": { "const": 1 },
+        "alg": { "const": "AES-256-GCM" },
+        "keyId": { "type": "string", "minLength": 1 },
+        "nonce": { "type": "string", "minLength": 1 },
+        "ct": { "type": "string", "minLength": 1 }
+      },
+      "required": ["v", "alg", "keyId", "nonce", "ct"],
+      "additionalProperties": false
+    },
+    "prevHash": {
+      "description": "Hash of the previous record in this tenant's chain; the fixed genesis hash for seq 1.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hash": {
+      "description": "sha256 of the canonical JSON of every other field.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
