@@ -1,0 +1,20 @@
+{
+  "assets": {
+    "unrelated-asset": {
+      "content_sha256": "a9c75793f6acf2727c397ae67f637ba4c35aaf18b4bffde2ff688193d1054acc",
+      "kind": "vendored",
+      "local_path": "vendor/unrelated-asset.txt",
+      "sha": "a9c75793f6acf2727c397ae67f637ba4c35aaf18b4bffde2ff688193d1054acc",
+      "sha_kind": "content",
+      "source_path": "vendor/unrelated-asset.txt",
+      "source_repo": "kushin77/other-repo",
+      "version": "0.1.0"
+    }
+  },
+  "consumer": {
+    "id": "rogue",
+    "repo": "rogue/rogue"
+  },
+  "generated": "2026-09-08T00:00:00Z",
+  "schema": "ao.sync/provenance-manifest-v1"
+}

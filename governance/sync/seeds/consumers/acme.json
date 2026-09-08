@@ -1,0 +1,40 @@
+{
+  "assets": {
+    "core-guardrails": {
+      "content_sha256": "efaca7141bbb360d06d4dfc931a219334f1147a76e7e94c5d47559cfa2162183",
+      "kind": "vendored",
+      "local_path": "shared/core-guardrails.txt",
+      "sha": "efaca7141bbb360d06d4dfc931a219334f1147a76e7e94c5d47559cfa2162183",
+      "sha_kind": "content",
+      "source_path": "shared/core-guardrails.txt",
+      "source_repo": "kushin77/CMR",
+      "version": "1.0.0"
+    },
+    "design-tokens": {
+      "content_sha256": "409e86fcebb19e4b0567847042395a1cc36182cdf505d0724ad5f593829a09d8",
+      "kind": "vendored",
+      "local_path": "shared/design-tokens.txt",
+      "sha": "409e86fcebb19e4b0567847042395a1cc36182cdf505d0724ad5f593829a09d8",
+      "sha_kind": "content",
+      "source_path": "shared/design-tokens.txt",
+      "source_repo": "kushin77/shared-frontend",
+      "version": "1.4.0"
+    },
+    "pack-sync-engine": {
+      "content_sha256": "6b64adc6a03951e91de776acbb24ec6877e5f9e6fc54661795ee6cb9d71541fd",
+      "kind": "vendored",
+      "local_path": "shared/pack-sync-engine.txt",
+      "sha": "6b64adc6a03951e91de776acbb24ec6877e5f9e6fc54661795ee6cb9d71541fd",
+      "sha_kind": "content",
+      "source_path": "shared/pack-sync-engine.txt",
+      "source_repo": "kushin77/CMR",
+      "version": "2.1.0"
+    }
+  },
+  "consumer": {
+    "id": "acme",
+    "repo": "acme/acme"
+  },
+  "generated": "2026-09-08T00:00:00Z",
+  "schema": "ao.sync/provenance-manifest-v1"
+}

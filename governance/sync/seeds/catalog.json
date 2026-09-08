@@ -1,0 +1,22 @@
+{
+  "assets": {
+    "core-guardrails": {
+      "dependencies": []
+    },
+    "design-tokens": {
+      "dependencies": []
+    },
+    "pack-sync-engine": {
+      "dependencies": [
+        "core-guardrails"
+      ]
+    },
+    "portal-shell": {
+      "dependencies": [
+        "core-guardrails",
+        "pack-sync-engine"
+      ]
+    }
+  },
+  "schema": "ao.sync/dependency-catalog-v1"
+}
