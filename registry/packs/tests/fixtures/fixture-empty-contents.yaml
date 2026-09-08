@@ -1,0 +1,19 @@
+# Deliberately broken fixture: fixture-empty-contents.yaml (must be rejected)
+schema: agent-pack/v1
+id: worker-platform
+version: 1.0.0
+name: Fixture pack
+category: coding
+upstream: https://github.com/kushin77/agent-orchestrator
+publisher: platform/execution
+lifecycle: live
+description: deliberately broken fixture (must be rejected)
+tags:
+  - fixture
+dependencies: []
+contents: {}
+attestation:
+  kid: ao-pack-publisher-v1
+  alg: PS256
+  signedAt: 2026-09-08T00:00:00Z
+  signature: QUFBQUFBQUFBQUFBQUFBQQ==

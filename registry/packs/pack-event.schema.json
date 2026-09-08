@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:pack-event.schema:v1",
+  "title": "AgentPack Registry Event (v1)",
+  "description": "A single agent-pack registry event, serialized as one JSON object per line in the pack registry's append-only log (registry/packs, issue #40). The event enum is closed; the status vocabulary per kind is documented in registry/packs/README.md. Record shape consumed from the CMR registry events.schema.json (ts/event/module/version/consumer/status) plus the repo's own hash-chained append-only audit log (registry/events, issue #10): seq/prevHash/hash.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "seq",
+    "ts",
+    "event",
+    "status",
+    "pack",
+    "version",
+    "tenantId",
+    "actor",
+    "detail",
+    "prevHash",
+    "hash"
+  ],
+  "properties": {
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic sequence; 1, 2, 3, ... with no gaps or duplicates."
+    },
+    "ts": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+      "description": "Event timestamp, RFC 3339 UTC (e.g. 2026-09-08T12:00:00Z)."
+    },
+    "event": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "publish",
+        "pause",
+        "resume",
+        "retire",
+        "install",
+        "upgrade",
+        "rollback",
+        "drift",
+        "consume"
+      ],
+      "description": "Closed pack registry event kind. plan = a pack version entered the registry; publish/pause/resume/retire = lifecycle transitions; install/upgrade/rollback = tenant install path; drift = installed-content drift detected; consume = catalog consumption recorded."
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Outcome/state per kind. Conventional values: plan->planned; publish->live; pause->paused; resume->live; retire->retired; install->installed|failed; upgrade->upgraded|failed; rollback->rolled_back; drift->detected; consume->consumed."
+    },
+    "pack": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Pack id the event concerns."
+    },
+    "version": {
+      "type": ["string", "null"],
+      "pattern": "^([0-9]+\\.[0-9]+\\.[0-9]+)?$",
+      "description": "Pack version the event concerns; null for pack-level lifecycle events without a specific version."
+    },
+    "tenantId": {
+      "type": ["string", "null"],
+      "description": "Tenant for install/upgrade/rollback/consume events; null for pack-level lifecycle events."
+    },
+    "actor": {
+      "type": ["string", "null"],
+      "description": "Optional principal that caused the event."
+    },
+    "detail": {
+      "type": ["object", "null"],
+      "description": "Per-kind payload (e.g. {from, to, reason} for rollback)."
+    },
+    "prevHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Hash of the previous record (all-zero genesis hash for seq 1)."
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 over the record's canonical JSON, hash field excluded."
+    }
+  }
+}

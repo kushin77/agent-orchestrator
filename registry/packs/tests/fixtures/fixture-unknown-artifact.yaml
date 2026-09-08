@@ -1,0 +1,23 @@
+# Deliberately broken fixture: fixture-unknown-artifact.yaml (must be rejected)
+schema: agent-pack/v1
+id: worker-platform
+version: 1.0.0
+name: Fixture pack
+category: coding
+upstream: https://github.com/kushin77/agent-orchestrator
+publisher: platform/execution
+lifecycle: live
+description: deliberately broken fixture (must be rejected)
+tags:
+  - fixture
+dependencies: []
+contents:
+  widgets:
+    - ref: w1
+      data: a2luZDogdG9vbApuYW1lOiBnaF9pc3N1ZQo=
+      sha256: 491b7de9fb21dcf99b4b16c4f6c6a76b371fcac4d33695bf5eea6df1848db9dd
+attestation:
+  kid: ao-pack-publisher-v1
+  alg: PS256
+  signedAt: 2026-09-08T00:00:00Z
+  signature: QUFBQUFBQUFBQUFBQUFBQQ==

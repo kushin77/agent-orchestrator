@@ -1,0 +1,22 @@
+# registry/packs/versions/manifest.yaml — AgentPack published-version ledger
+#
+# Immutable-published pack registry (issue #40). Every release file under
+# registry/packs/releases/ MUST be listed here with (pack, version, file, sha256).
+# The validator refuses: mutation of a published release (on-disk sha256 change),
+# duplicate (pack, version), release files missing from the ledger, and ledger
+# entries whose file is missing or not named <pack>.<version>.yaml.
+
+schemaVersion: 1
+published:
+  - pack: data-ops
+    version: 1.0.0
+    file: releases/data-ops.1.0.0.yaml
+    sha256: a19295faa16eb6ebc8251148c10b82b0502f6769c681b3e93f8dd252c24ce96b
+  - pack: orchestrator-ops
+    version: 1.0.0
+    file: releases/orchestrator-ops.1.0.0.yaml
+    sha256: 8907efb66be0dde9fbc90e8794e4470a6f04e261195cd5ae3be2082a6ff3df31
+  - pack: worker-platform
+    version: 1.0.0
+    file: releases/worker-platform.1.0.0.yaml
+    sha256: 7c2695025ec8ffeab7e68b01f31044904efec569c024bd8fc783b8dcc04409e3
