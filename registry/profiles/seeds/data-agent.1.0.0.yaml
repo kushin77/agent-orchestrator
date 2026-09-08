@@ -1,0 +1,38 @@
+# AgentProfile seed: data-agent v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/capital-underwriting infra/docker/worker-fleet/personas.yaml (ds-worker-* pool:
+#     analytics/data work routed by domain, sql_query posture)
+#   - kushin77/hermes-agents src/hermes_agent/models/capability_registry.py (capability-tagged
+#     task routing -> data-analysis)
+#   - kushin77/agent-orchestrator docs/ARCHITECTURE.md (observability/FinOps data plane)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: data-agent
+version: 1.0.0
+owner: platform/data
+systemPromptRef: data-agent/primary@v1
+toolAllowlist:
+  - gh_issue
+  - file_read
+  - file_write
+  - shell_exec
+  - sql_query
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - verify-before-done
+  - no-secrets
+  - no-debug-leftovers
+  - no-unverified-merge
+capabilitySet:
+  - data-analysis
+  - research
+  - test-run
+  - docs-authoring
+  - memory-ops
+defaultModelTier: MED
+memoryScope:
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

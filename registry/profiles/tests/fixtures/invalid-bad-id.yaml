@@ -1,0 +1,17 @@
+# DELIBERATELY BROKEN fixture: id 'Orchestrator' (uppercase) violates the id
+# pattern ^[a-z][a-z0-9-]*$. Profile ids are lowercase, dash-separated.
+# Must be rejected.
+id: Orchestrator
+version: 1.0.0
+owner: platform/orchestration
+systemPromptRef: orchestrator/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - orchestrate
+defaultModelTier: MED
+memoryScope:
+  - user
+guardrailPolicyRef: worker-bundle

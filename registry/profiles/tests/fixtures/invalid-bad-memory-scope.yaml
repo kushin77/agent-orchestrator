@@ -1,0 +1,16 @@
+# DELIBERATELY BROKEN fixture: memoryScope 'global' is not a known memory scope
+# (valid: user, session, repository). Must be rejected.
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - global
+guardrailPolicyRef: worker-bundle

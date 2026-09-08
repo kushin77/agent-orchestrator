@@ -1,0 +1,17 @@
+# DELIBERATELY BROKEN fixture: capabilitySet references an unknown capability
+# id ('time-travel') that is not in the closed catalog. Must be rejected.
+id: researcher
+version: 1.0.0
+owner: platform/research
+systemPromptRef: researcher/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - research
+  - time-travel
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle

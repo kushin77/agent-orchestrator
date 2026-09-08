@@ -1,0 +1,41 @@
+# AgentProfile seed: coder v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/hermes-agents src/hermes_agent/models/capability_registry.py (capabilities
+#     code-gen/refactor -> code-author; task routing)
+#   - kushin77/leaderboard docker/worker-fleet/personas.yaml (executor / ds-worker pool: claims,
+#     writes, verifies)
+#   - kushin77/CMR onboarding/agent-profiles/profiles/general.json (flash/LOW default worker)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+  - gh_pr
+  - git_worktree
+  - file_read
+  - file_write
+  - shell_exec
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - stay-in-lane
+  - no-unrelated-edits
+  - verify-before-done
+  - no-direct-push
+  - no-secrets
+  - no-unverified-merge
+  - no-debug-leftovers
+capabilitySet:
+  - code-author
+  - test-author
+  - test-run
+  - memory-ops
+defaultModelTier: LOW
+memoryScope:
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

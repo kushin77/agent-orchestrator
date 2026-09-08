@@ -1,0 +1,37 @@
+# AgentProfile seed: orchestrator (orchestrator/planner) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/leaderboard docker/worker-fleet/personas.yaml (orchestrator persona: routes soldier
+#     output, claims tasks, never idles)
+#   - kushin77/shared-governance GLOBAL_STANDARDS/schemas/agent-task.schema.json (agent_class=orchestrator)
+#   - kushin77/CMR onboarding/agent-profiles/profiles/architecture-sme.json (planner/decisions,
+#     decompose-into-parallel-lanes posture)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: orchestrator
+version: 1.0.0
+owner: platform/orchestration
+systemPromptRef: orchestrator/primary@v1
+toolAllowlist:
+  - gh_issue
+  - board_sync
+  - git_worktree
+  - file_read
+  - shell_exec
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - stay-in-lane
+  - verify-before-done
+  - evidence-on-pr
+  - no-debug-leftovers
+capabilitySet:
+  - orchestrate
+  - task-claim
+  - research
+  - memory-ops
+defaultModelTier: MED
+memoryScope:
+  - user
+  - repository
+guardrailPolicyRef: worker-bundle

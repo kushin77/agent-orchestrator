@@ -1,0 +1,17 @@
+# DELIBERATELY BROKEN fixture: systemPromptRef 'coder/primary' is missing the
+# pinned @v<n> version suffix. The contract requires a versioned prompt-module
+# reference. Must be rejected.
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle

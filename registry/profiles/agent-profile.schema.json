@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:agent-profile.schema:v1",
+  "title": "AgentProfile",
+  "description": "Declarative Agent Profile: the unit every other pillar operates on (EPIC-00, issue #4; issue #9). Declares id, version, owner, the pinned system-prompt reference, the closed tool allowlist, constraint set, capability set, default model tier, memory scope, and the bound guardrail policy. The vocabulary enums in definitions are the CLOSED platform vocabulary: an unknown tool/capability/constraint/guardrail reference is rejected by the schema itself, and registry/profiles/validate.py additionally enforces fail-closed membership against registry/profiles/catalog.yaml (with a schema<->catalog parity gate). Seed profiles live under registry/profiles/seeds/; immutable published snapshots are recorded in registry/profiles/versions/manifest.yaml. See registry/profiles/README.md (the contract doc).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "owner",
+    "systemPromptRef",
+    "toolAllowlist",
+    "constraintSet",
+    "capabilitySet",
+    "defaultModelTier",
+    "memoryScope",
+    "guardrailPolicyRef"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Stable profile id (lowercase, dash-separated, e.g. orchestrator, data-agent). Must equal the seed filename stem. Later lanes (registry service, persona mapping) address agents by this id."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "SemVer version of THIS profile (X.Y.Z). A published (id, version) is immutable: once recorded in versions/manifest.yaml, editing the file that carries it is refused by the validator (sha256 mismatch)."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Accountable owner of the profile lifecycle, expressed as namespace/team (e.g. platform/quality). Identity/RBAC (phase 6) consumes this as a principal/team reference."
+    },
+    "systemPromptRef": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)*@v[0-9]+$",
+      "description": "Pinned reference to a versioned prompt module in the prompt library (phase 1 issue #13), format <module>/<name>@v<n> (e.g. coder/primary@v1). Mirrors the harvested gmail-agent prompts/<task>/v1.ts convention. Resolution is owned by the prompt-library lane; this schema pins the reference shape only."
+    },
+    "toolAllowlist": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/toolId" },
+      "description": "Closed allowlist of tool ids this profile may invoke. Any tool not in the platform tool catalog is rejected (fail closed). The catalog (catalog.yaml) is the extensible registry; unknown ids are refused until the registry lane adds them."
+    },
+    "constraintSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/constraintId" },
+      "description": "Boundary constraints (deny/require rules) this profile operates under, drawn from the closed constraint catalog (catalog.yaml). Enforced by the guardrails pillar at runtime."
+    },
+    "capabilitySet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/capabilityId" },
+      "description": "Closed set of capabilities this profile may exercise (hermes capability-registry pattern: {\"code-gen\": true, ...}). Any capability not in the catalog is rejected (fail closed); the registry/gateway routes only declared capabilities."
+    },
+    "defaultModelTier": {
+      "$ref": "#/definitions/modelTier",
+      "description": "Default dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro; CMR docs/MODEL-PROFILES.md). Model routing (phase 2) consumes this."
+    },
+    "memoryScope": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/memoryScopeValue" },
+      "description": "Memory scopes this profile may read/write (vscode-memory MemoryType pattern: repository/session/user). At least one scope is required."
+    },
+    "guardrailPolicyRef": {
+      "$ref": "#/definitions/guardrailPolicyId",
+      "description": "Single reference to the guardrail policy (atomic or bundle id from the guardrail-policy catalog) bound to this profile. Unknown policy ids are rejected (fail closed). Atomic ids name one policy; bundle ids expand to a policy list (catalog.yaml bundles)."
+    }
+  },
+  "definitions": {
+    "toolId": {
+      "type": "string",
+      "enum": [
+        "gh_issue",
+        "gh_pr",
+        "board_sync",
+        "git_worktree",
+        "file_read",
+        "file_write",
+        "shell_exec",
+        "search_memory",
+        "store_memory",
+        "web_fetch",
+        "sql_query",
+        "mail_read",
+        "mail_send",
+        "calendar_query",
+        "crm_contact",
+        "crm_task",
+        "sms_send"
+      ],
+      "description": "Closed platform tool catalog. Keep in sync with catalog.yaml tools (validate.py parity gate enforces it)."
+    },
+    "capabilityId": {
+      "type": "string",
+      "enum": [
+        "task-claim",
+        "orchestrate",
+        "code-author",
+        "test-author",
+        "test-run",
+        "code-review",
+        "security-review",
+        "architecture-decision",
+        "research",
+        "data-analysis",
+        "infra-authoring",
+        "docs-authoring",
+        "audit",
+        "finops-meter",
+        "memory-ops"
+      ],
+      "description": "Closed platform capability catalog. Keep in sync with catalog.yaml capabilities (validate.py parity gate enforces it)."
+    },
+    "constraintId": {
+      "type": "string",
+      "enum": [
+        "issue-first",
+        "stay-in-lane",
+        "no-unrelated-edits",
+        "verify-before-done",
+        "evidence-on-pr",
+        "no-direct-push",
+        "no-secrets",
+        "no-adhoc-iac",
+        "no-unverified-merge",
+        "no-debug-leftovers"
+      ],
+      "description": "Closed platform constraint catalog. Keep in sync with catalog.yaml constraints (validate.py parity gate enforces it)."
+    },
+    "guardrailPolicyId": {
+      "type": "string",
+      "enum": [
+        "no-secrets",
+        "no-direct-push-master",
+        "no-unverified-merge",
+        "no-adhoc-iac-apply",
+        "dlp-redact",
+        "prompt-injection-defense",
+        "budget-finops-cap",
+        "audit-trail-everywhere",
+        "flag-gated-off",
+        "tool-allowlist-enforcement",
+        "capability-bounds-enforcement",
+        "worker-bundle",
+        "reviewer-bundle"
+      ],
+      "description": "Closed guardrail-policy catalog: atomic policy ids plus named bundle ids (bundles expand to atomic policy lists in catalog.yaml). Keep in sync with catalog.yaml guardrailPolicies (validate.py parity gate enforces it)."
+    },
+    "modelTier": {
+      "type": "string",
+      "enum": ["LOW", "MED", "HIGH", "MAX"],
+      "description": "Dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro)."
+    },
+    "memoryScopeValue": {
+      "type": "string",
+      "enum": ["user", "session", "repository"],
+      "description": "Memory scope (vscode-memory MemoryType: USER/SESSION/REPOSITORY)."
+    }
+  }
+}

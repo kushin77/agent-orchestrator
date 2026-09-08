@@ -1,0 +1,16 @@
+# DELIBERATELY BROKEN fixture: version '1.0' is not semantic X.Y.Z. Published
+# versions must be immutable, named, semantic versions. Must be rejected.
+id: coder
+version: "1.0"
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle

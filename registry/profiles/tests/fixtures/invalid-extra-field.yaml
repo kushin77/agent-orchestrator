@@ -1,0 +1,19 @@
+# DELIBERATELY BROKEN fixture: an undeclared field 'bogusField' is present.
+# The schema sets additionalProperties:false — unknown fields are rejected so
+# the contract stays strict (a later lane cannot silently add semantics).
+# Must be rejected.
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle
+bogusField: true
