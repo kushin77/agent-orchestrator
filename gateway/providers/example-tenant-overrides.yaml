@@ -1,0 +1,20 @@
+# Example per-tenant model mappings (issue #15, criterion 5).
+#
+# Each tenant entry remaps *logical* keys - an issue-#9 tier (LOW/MED/HIGH/MAX)
+# or any task key the tenant defines - to a target of the form:
+#   "provider"          -> use that provider's default model for the tier
+#   "provider/model"    -> pin an exact model id
+#
+# Values here are placeholders for illustration only; no real keys or tokens.
+# Load with:  registry.load_tenant_overrides("gateway/providers/example-tenant-overrides.yaml")
+
+tenants:
+  - tenantId: acme
+    mappings:
+      LOW: anthropic
+      MAX: anthropic/claude-opus-4-5
+      summarize: ollama/llama3.2
+  - tenantId: globex
+    mappings:
+      MED: openai/gpt-4o-mini
+      HIGH: gemini/gemini-2.5-pro

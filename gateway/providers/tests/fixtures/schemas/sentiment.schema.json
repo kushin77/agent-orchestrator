@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sentiment",
+  "description": "Structured sentiment verdict - the typed-output contract used across the provider adapter tests (fail-closed validation).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "sentiment": {
+      "type": "string",
+      "enum": ["positive", "negative", "neutral"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "required": ["sentiment", "confidence"]
+}
