@@ -1,0 +1,41 @@
+# AgentProfile seed: reviewer (reviewer/auditor, SME-lens) v1.0.0
+#
+# SME-lens reviewer/auditor: modeled on the CMR SME persona cards that REVIEW and
+# VERIFY rather than author (independent-verification posture, GR-13), combined
+# with the fleet auditor roles that run the decisive mechanical check.
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/CMR onboarding/agent-profiles/profiles/qa-sme.json + security-sme.json
+#     (SME-lens review persona; evidence-carrying gates)
+#   - kushin77/shared-governance GLOBAL_STANDARDS/schemas/agent-task.schema.json (agent_class=reviewer)
+#   - kushin77/capital-underwriting infra/docker/worker-fleet/personas.yaml (auditor,
+#     continuous-audit: verifies output, runs gates)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: reviewer
+version: 1.0.0
+owner: platform/quality
+systemPromptRef: reviewer/primary@v1
+toolAllowlist:
+  - gh_issue
+  - gh_pr
+  - git_worktree
+  - file_read
+  - shell_exec
+  - search_memory
+  - store_memory
+  - sql_query
+constraintSet:
+  - issue-first
+  - verify-before-done
+  - evidence-on-pr
+  - no-unverified-merge
+  - no-debug-leftovers
+  - no-secrets
+capabilitySet:
+  - code-review
+  - test-run
+  - audit
+defaultModelTier: MED
+memoryScope:
+  - session
+guardrailPolicyRef: reviewer-bundle

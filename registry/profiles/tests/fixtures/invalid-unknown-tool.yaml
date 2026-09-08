@@ -1,0 +1,17 @@
+# DELIBERATELY BROKEN fixture: toolAllowlist references an unknown tool id
+# ('mindreader') that is not in the closed catalog. Must be rejected.
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+  - mindreader
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle

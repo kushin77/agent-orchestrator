@@ -1,0 +1,15 @@
+# DELIBERATELY BROKEN fixture: the required field 'owner' is missing. The
+# schema requires every field of the contract; omission must be rejected.
+id: coder
+version: 1.0.0
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle

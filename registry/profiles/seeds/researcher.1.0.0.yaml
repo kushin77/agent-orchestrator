@@ -1,0 +1,38 @@
+# AgentProfile seed: researcher v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/shared-governance GLOBAL_STANDARDS/schemas/agent-task.schema.json
+#     (agent_class=investigator)
+#   - kushin77/capital-underwriting infra/docker/worker-fleet/personas.yaml (ds-worker-debugging:
+#     investigation and root-cause analysis)
+#   - kushin77/gmail-agent src/agent/tools.ts (search_memory / store_memory evidence capture)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: researcher
+version: 1.0.0
+owner: platform/research
+systemPromptRef: researcher/primary@v1
+toolAllowlist:
+  - gh_issue
+  - git_worktree
+  - file_read
+  - shell_exec
+  - search_memory
+  - store_memory
+  - web_fetch
+  - sql_query
+constraintSet:
+  - issue-first
+  - stay-in-lane
+  - verify-before-done
+  - no-debug-leftovers
+  - no-secrets
+capabilitySet:
+  - research
+  - data-analysis
+  - docs-authoring
+  - memory-ops
+defaultModelTier: LOW
+memoryScope:
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

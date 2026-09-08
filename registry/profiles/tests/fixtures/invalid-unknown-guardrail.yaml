@@ -1,0 +1,17 @@
+# DELIBERATELY BROKEN fixture: guardrailPolicyRef references an unknown policy
+# id ('no-such-policy') that is neither an atomic policy nor a bundle in the
+# catalog. Must be rejected (fail closed).
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: no-such-policy

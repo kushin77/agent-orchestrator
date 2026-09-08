@@ -1,0 +1,102 @@
+# registry/profiles/catalog.yaml — AgentProfile platform vocabulary (v1)
+#
+# Canonical, CLOSED vocabulary registry for the AgentProfile contract (issue #9).
+# agent-profile.schema.json embeds the same ids as $defs enums; validate.py runs
+# a schema<->catalog PARITY gate so the two can never drift (add an id to BOTH
+# when extending the platform vocabulary — the gate fails if you update only one).
+#
+# A profile that references any id not listed here is REJECTED (fail closed):
+# unknown tools, capabilities, constraints, guardrail policies, tiers and memory
+# scopes are never silently allowed. The registry lane owns extension of this
+# vocabulary; downstream lanes consume the ids, never the file.
+#
+# Every entry records provenance (repo/path it was derived from) per the repo
+# provenance doctrine (GR-10, docs/CANNIBALIZATION.md).
+
+schemaVersion: 1
+
+tiers:
+  LOW:  { model: flash, summary: "Default for mechanical/well-scoped work (DeepSeek Flash)." }
+  MED:  { model: flash, summary: "Default for multi-step work needing light judgment (DeepSeek Flash)." }
+  HIGH: { model: pro,   summary: "Escalated tier for security/authn/architecture judgment (DeepSeek Pro)." }
+  MAX:  { model: pro,   summary: "Pinned top tier, decisions-only, advisor mode (DeepSeek Pro)." }
+
+memoryScopes:
+  user:       { summary: "User-scoped memory, persists across sessions and repositories.", source: "kushin77/vscode-memory scripts/memory_system_v2.py MemoryType.USER" }
+  session:    { summary: "Session-scoped memory, scoped to the current conversation.",       source: "kushin77/vscode-memory scripts/memory_system_v2.py MemoryType.SESSION" }
+  repository: { summary: "Repository-scoped memory, stored with the working tree.",          source: "kushin77/vscode-memory scripts/memory_system_v2.py MemoryType.REPOSITORY" }
+
+tools:
+  gh_issue:       { summary: "Read/create/list/close GitHub issues (issue-first doctrine).",              source: "AGENTS.md AO-GR-1; kushin77/CMR + fleet repos (gh issue)" }
+  gh_pr:          { summary: "Open/comment/merge GitHub PRs (PR-gated master).",                          source: "AGENTS.md (PR-gated master, GR-4); fleet gh pr usage" }
+  board_sync:     { summary: "Poll and claim queue/board tasks (never-idle doctrine).",                   source: "kushin77/leaderboard docker/worker-fleet/personas.yaml (fanout, qa-loop)" }
+  git_worktree:   { summary: "Create/remove isolated git worktrees (one issue = one lane).",              source: "AGENTS.md GR-3 dispatch contract; fleet worktree dispatch" }
+  file_read:      { summary: "Read files in the working tree.",                                           source: "generic coding/memory agents; vscode-memory" }
+  file_write:     { summary: "Create/edit files in the working tree.",                                    source: "kushin77/leaderboard executor; coding agents" }
+  shell_exec:     { summary: "Run commands and gates in a sandboxed terminal.",                           source: "scripts/verify.sh; kushin77/leaderboard executor" }
+  search_memory:  { summary: "Read scoped memory (repository/session/user).",                             source: "kushin77/gmail-agent src/agent/tools.ts search_memory; vscode-memory" }
+  store_memory:   { summary: "Write scoped memory (repository/session/user).",                            source: "kushin77/gmail-agent src/agent/tools.ts store_memory; vscode-memory" }
+  web_fetch:      { summary: "Fetch/read web content for research.",                                      source: "research/investigator agents; gov-ai-scout/kushin77 ai agents" }
+  sql_query:      { summary: "Run read-only SQL analytics queries.",                                      source: "kushin77/capital-underwriting infra/docker/worker-fleet/personas.yaml (ds-worker); session store" }
+  mail_read:      { summary: "Read inbound mail threads.",                                                source: "kushin77/gmail-agent src/agent/tools.ts get_gmail_thread" }
+  mail_send:      { summary: "Draft and send mail replies.",                                              source: "kushin77/gmail-agent src/agent/tools.ts draft_gmail_reply / send_gmail_draft" }
+  calendar_query: { summary: "Read calendar availability and events.",                                    source: "kushin77/gmail-agent src/agent/tools.ts get_calendar_availability / create_calendar_event" }
+  crm_contact:    { summary: "Read/update CRM contacts.",                                                 source: "kushin77/gmail-agent src/agent/tools.ts get/update_ghl_contact" }
+  crm_task:       { summary: "Create/update CRM tasks.",                                                  source: "kushin77/gmail-agent src/agent/tools.ts create_ghl_task" }
+  sms_send:       { summary: "Send SMS messages.",                                                       source: "kushin77/gmail-agent src/agent/tools.ts send_ghl_sms" }
+
+capabilities:
+  task-claim:             { summary: "Pull and claim tasks from a queue/board continuously.",                        source: "kushin77/leaderboard personas.yaml (fanout, pmo-soldier)" }
+  orchestrate:            { summary: "Plan, decompose and dispatch work across agents; route and escalate.",         source: "kushin77/shared-governance agent-task.schema.json agent_class=orchestrator; leaderboard orchestrator persona" }
+  code-author:            { summary: "Author code changes and pull requests.",                                       source: "kushin77/hermes-agents capability_registry (code-gen, refactor)" }
+  test-author:            { summary: "Author tests (unit, integration, mutation).",                                 source: "kushin77/hermes-agents capability_registry (test-gen); capital-underwriting ds-worker-testing" }
+  test-run:               { summary: "Execute gates and verification with real evidence.",                          source: "kushin77/leaderboard qa-loop; AGENTS.md GR-12" }
+  code-review:            { summary: "Review code correctness and quality.",                                         source: "kushin77/shared-governance agent_class=reviewer; CMR onboarding/agent-profiles qa-sme" }
+  security-review:        { summary: "SAST, secret scanning, authN/Z review.",                                       source: "kushin77/capital-underwriting ds-worker-security; CMR security-sme" }
+  architecture-decision:  { summary: "ADR-grade architecture decisions (advisor/consulted, decisions only).",        source: "CMR onboarding/agent-profiles/profiles/architecture-sme.json (MAX/advisor)" }
+  research:               { summary: "Investigate, root-cause analysis, evidence gathering.",                       source: "kushin77/shared-governance agent_class=investigator; capital-underwriting ds-worker-debugging" }
+  data-analysis:          { summary: "Analytics, reporting, data pipelines.",                                        source: "kushin77/capital-underwriting ds-worker-*; data agents" }
+  infra-authoring:        { summary: "Declare infrastructure (Terraform, Cloud Build).",                            source: "CMR iac-sme; capital-underwriting ds-worker-infra" }
+  docs-authoring:         { summary: "Documentation and knowledge-base writing.",                                   source: "kushin77/capital-underwriting ds-worker-docs" }
+  audit:                  { summary: "Independently verify another agent's output with the decisive check.",        source: "kushin77/capital-underwriting auditor / continuous-audit; AGENTS.md GR-13" }
+  finops-meter:           { summary: "Meter token/cost and enforce budgets (FinOps).",                              source: "kushin77/capital-underwriting finops persona; observability pillar" }
+  memory-ops:             { summary: "Read/write scoped memory (repository/session/user).",                         source: "kushin77/vscode-memory scripts/memory_system_v2.py" }
+
+# Constraints: boundary rules. effect is deny (forbidden action) or require
+# (mandatory behavior); the guardrails pillar enforces them at runtime.
+constraints:
+  issue-first:         { effect: require, summary: "Every change is tracked in a GitHub issue before the work (AO-GR-1).",                 source: "AGENTS.md AO-GR-1 / GOLDEN-RULES.md GR-2" }
+  stay-in-lane:        { effect: deny,    summary: "Never touch files another lane owns (one issue = one lane).",                            source: "AGENTS.md GR-3 / AO-GR-2" }
+  no-unrelated-edits:  { effect: deny,    summary: "Smallest focused diff; no unrelated edits in a change.",                                source: "AGENTS.md (smallest focused diff)" }
+  verify-before-done:  { effect: require, summary: "Run the gate and report actual output before claiming done (GR-12).",                    source: "AGENTS.md GR-12 / AO-GR-3" }
+  evidence-on-pr:      { effect: require, summary: "Paste real verification output as evidence on the PR.",                                source: "GOLDEN-RULES.md AO-GR-3" }
+  no-direct-push:      { effect: deny,    summary: "Never push straight to master; PR-gated only.",                                         source: "AGENTS.md hard DON'Ts / GR-4" }
+  no-secrets:          { effect: deny,    summary: "Never commit a token/key; env/secret manager only (GR-6).",                            source: "AGENTS.md hard DON'Ts / GR-6" }
+  no-adhoc-iac:        { effect: deny,    summary: "No ad-hoc terraform apply or console clicks; infra is declared (GR-5).",                 source: "AGENTS.md hard DON'Ts / GR-5" }
+  no-unverified-merge: { effect: deny,    summary: "Never merge failing or unverified work; green evidence first (owner merge mandate).",    source: "AGENTS.md / GOLDEN-RULES.md AO-GR-11" }
+  no-debug-leftovers:  { effect: deny,    summary: "No debug prints or unfinished markers in committed code.",                               source: "AGENTS.md (no-leftovers discipline)" }
+
+# Guardrail policies: atomic policy ids (the security/guardrails pillar owns
+# their runtime implementation, phase 4 issues #26-#30) plus named bundles that
+# expand to a list of atomic policy ids. A profile binds ONE policy id (atomic
+# or bundle) via guardrailPolicyRef.
+guardrailPolicies:
+  atomics:
+    no-secrets:                    { summary: "No secrets in code or git history; env/secret manager only (GR-6).",          source: "AGENTS.md / GOLDEN-RULES.md GR-6" }
+    no-direct-push-master:         { summary: "Master is protected; every change lands via a PR (GR-4).",                    source: "AGENTS.md / GOLDEN-RULES.md GR-4" }
+    no-unverified-merge:           { summary: "Merge only after green verification evidence (GR-12 / owner merge mandate).", source: "AGENTS.md GR-12" }
+    no-adhoc-iac-apply:            { summary: "Terraform apply is gated; new infra ships flag-gated OFF (GR-5 / GR-28).",     source: "AGENTS.md GR-5 / IaC mandate" }
+    dlp-redact:                    { summary: "DLP: redact sensitive data at every boundary.",                                source: "guardrails pillar (phase 4, issues #26-#30)" }
+    prompt-injection-defense:      { summary: "Neutralize prompt-injection at model-call boundaries.",                        source: "guardrails pillar (phase 4)" }
+    budget-finops-cap:             { summary: "Enforce token/cost budgets (FinOps metering).",                                source: "observability/telemetry pillar (phase 5, #31)" }
+    audit-trail-everywhere:        { summary: "Full-trace audit of agent actions.",                                           source: "observability/telemetry pillar (phase 5)" }
+    flag-gated-off:                { summary: "Every new surface ships invisible until deliberately enabled (AO-GR-6).",      source: "GOLDEN-RULES.md AO-GR-6 / IaC mandate GR-28" }
+    tool-allowlist-enforcement:    { summary: "Fail closed on any tool invocation outside the profile allowlist.",           source: "guardrails pillar (phase 4); issue #9 fail-closed doctrine" }
+    capability-bounds-enforcement: { summary: "Fail closed on any capability use not declared in the profile.",              source: "hermes capability registry pattern; guardrails pillar" }
+  bundles:
+    worker-bundle:
+      summary: "Default guardrail set for agents that author and ship changes (orchestrator, coder, researcher, data-agent)."
+      policies: [no-secrets, no-direct-push-master, no-unverified-merge, tool-allowlist-enforcement, audit-trail-everywhere]
+    reviewer-bundle:
+      summary: "Guardrail set for independent reviewer/auditor agents: verify-only posture with capability bounds."
+      policies: [no-secrets, no-unverified-merge, audit-trail-everywhere, tool-allowlist-enforcement, capability-bounds-enforcement]

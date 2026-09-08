@@ -1,0 +1,39 @@
+# registry/profiles/versions/manifest.yaml — AgentProfile published-version ledger
+#
+# Immutable-published version registry (issue #9, deliverable 3). Every seed
+# file under registry/profiles/seeds/ that carries a published profile MUST be
+# listed here with its (id, version, file, sha256). The validator refuses:
+#   - any seed file whose on-disk sha256 differs from the recorded sha256
+#     (a published version is IMMUTABLE: editing it without bumping the version
+#     is a violation, caught by the gate — no-false-green),
+#   - any duplicate (id, version) pair,
+#   - any seed file missing from the ledger (nothing ships unpublished),
+#   - any ledger entry whose file is missing or whose basename does not match
+#     <id>.<version>.yaml.
+#
+# To publish a NEW version of a profile: add registry/profiles/seeds/<id>.<ver>.yaml
+# (content), append one entry below with `sha256sum seeds/<id>.<ver>.yaml`, and
+# re-run `python3 registry/profiles/validate.py`. Never edit a published file.
+
+schemaVersion: 1
+published:
+  - profile: orchestrator
+    version: 1.0.0
+    file: seeds/orchestrator.1.0.0.yaml
+    sha256: 7febf1bb5e0b11b32e4a65d648bc06f3ed26e77a68a3a62d306b7cbfc52ffda2
+  - profile: coder
+    version: 1.0.0
+    file: seeds/coder.1.0.0.yaml
+    sha256: c8e19ed09b29f03dc3251bb84bb28e765b82f49ad50010dfbd5718aaba0c875a
+  - profile: reviewer
+    version: 1.0.0
+    file: seeds/reviewer.1.0.0.yaml
+    sha256: 5b2892b82aa83b8ce2df76feb0ce098968088cd024e96bc9c4e1f337d2514a49
+  - profile: researcher
+    version: 1.0.0
+    file: seeds/researcher.1.0.0.yaml
+    sha256: 933a1466120d043d1590396fead8faaaf18aa78fc3ed58fba0c84b478abc12ec
+  - profile: data-agent
+    version: 1.0.0
+    file: seeds/data-agent.1.0.0.yaml
+    sha256: 7bc4196f07a38f3133725d3dcf785cbcbde7c150b5cc10be367f2b7f137468f5

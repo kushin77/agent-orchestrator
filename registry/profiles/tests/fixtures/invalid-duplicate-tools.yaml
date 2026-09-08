@@ -1,0 +1,17 @@
+# DELIBERATELY BROKEN fixture: toolAllowlist contains a duplicate id
+# ('gh_issue' twice). Allowlists are unique sets. Must be rejected.
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle
