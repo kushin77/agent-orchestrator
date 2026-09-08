@@ -114,9 +114,10 @@ repository-root-relative module per line (its suite lives at `<module>/tests`).
 - declared suite directory missing → NOT-OK (coverage silently lost).
 
 Each suite's own `tests/conftest.py` handles its `sys.path` bootstrap, so the
-isolated invocation is correct for all current suites (verified: 36/36 pass on
-master). `scripts/check-drift.sh` additionally warns about committed `tests/`
-dirs that are not declared, so coverage can never grow off the books.
+isolated invocation is correct for all current suites (verified: 39/39 pass on
+master after the issue-#46 E2E lane registered `e2e`, `governance/sync` and
+`infra/rollout`). `scripts/check-drift.sh` additionally warns about committed
+`tests/` dirs that are not declared, so coverage can never grow off the books.
 
 **To add a new suite:**
 
