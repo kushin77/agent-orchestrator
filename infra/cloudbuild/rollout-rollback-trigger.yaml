@@ -1,0 +1,16 @@
+# Importable Cloud Build trigger for the automatic rollback pipeline - the
+# declared rollback path (no console path).
+#
+# Ships DISABLED (GR-5 / flag-gated OFF): rollback automation does not fire
+# until a reviewed go-live imports this trigger with `disabled: false` and the
+# rollout flag is on. The pipeline is fail-closed and takes no action on a
+# healthy signal; on a canary-health-fail pubsub message it auto-rolls the
+# flagged surface OFF and the apply pipeline reverts the deployment.
+name: control-plane-rollout-rollback
+disabled: true
+description: Auto-rollback on canary/gradual health failure (flag to off).
+pubsub:
+  topic: projects/agent-orchestrator-control-plane/topics/canary-health-fail
+filename: infra/cloudbuild/rollout-rollback.yaml
+substitutions:
+  _ENABLE_ROLLOUT: "false"

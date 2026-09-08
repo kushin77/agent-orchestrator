@@ -1,0 +1,22 @@
+# Importable Cloud Build trigger for the flag promotion pipeline - the ONLY
+# promotion route (no console path).
+#
+# Ships DISABLED (GR-5 / flag-gated OFF): no promotion happens until a
+# reviewed go-live imports this trigger with `disabled: false` and flips
+# ci_cd.rollout_promote on in infra/feature-flags/registry.yaml (the #6-owned
+# registry; add the ci_cd entry at go-live). The pipeline itself is
+# fail-closed (refuses to promote while _ENABLE_ROLLOUT != "true").
+#
+# The trigger fires on an approved go-live tag (^go-live/...) so promotion is
+# an auditable, reviewed event - never a console click.
+name: control-plane-rollout-promote
+disabled: true
+description: Flag-gated promotion pipeline (off -> canary -> gradual -> full).
+github:
+  owner: kushin77
+  name: agent-orchestrator
+  push:
+    tag: ^go-live/.*$
+filename: infra/cloudbuild/rollout-promote.yaml
+substitutions:
+  _ENABLE_ROLLOUT: "false"

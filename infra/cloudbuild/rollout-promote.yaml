@@ -1,0 +1,77 @@
+# Build config: flag promotion pipeline (issue #45 / work item 41).
+#
+# Promotion is ONLY via this automated path - never a console click (AO-GR-5,
+# fully-IaC mandate). The pipeline is fail-closed: invoked with the rollout
+# flag OFF it fails loudly instead of promoting or silently skipping. It runs
+# as the deployer service account, confirms the promotion gate (repo gate
+# green + an approval-as-code record with a distinct approver), executes the
+# declarative promotion through the rollout engine, commits the flipped
+# rollout state, and hands off to the flag-gated apply pipeline
+# (infra/cloudbuild/apply.yaml) which performs the terraform apply.
+#
+# Never run by hand. Ships OFF (_ENABLE_ROLLOUT=false). Imported only at a
+# reviewed go-live via rollout-promote-trigger.yaml.
+
+options:
+  # The deployer SA (created by infra/terraform/modules/deployer-sa at
+  # promotion) is the only identity that applies. Populated via substitution
+  # at go-live; never hard-coded (GR-6).
+  serviceAccount: $_DEPLOYER_SA
+
+steps:
+  # Fail-closed gate: only proceed when the rollout flag is deliberately on.
+  - id: gate-flag
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        if [ "$_ENABLE_ROLLOUT" != "true" ]; then
+          echo "rollout promotion is flag-gated OFF (_ENABLE_ROLLOUT=$_ENABLE_ROLLOUT); refusing to promote" >&2
+          exit 1
+        fi
+        echo "rollout flag ON; promotion pipeline proceeds"
+
+  # Promotion gate (GR-12): the repo gate must be green on the exact commit.
+  - id: gate-repo
+    name: 'python:3.12'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        python3 infra/rollout/checks/check_rollout.py || exit 1
+        make verify || exit 1
+        echo "repo gate green; promotion may proceed"
+
+  # Approval-as-code: a promotion requires a recorded approval for this exact
+  # flag and target stage, granted by an approver distinct from the executing
+  # actor (AO-GR-14 separation of duties; issue #43 merge_verdict semantics
+  # applied to rollout). Fail-closed when absent or self-granted.
+  - id: require-approval
+    name: 'python:3.12'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        python3 -m infra.rollout.cli validate-approval \
+          "$_FLAG" "$_TO_STAGE" "$_APPROVAL_ID" --actor "$_ACTOR" \
+          --approvals-dir "$_APPROVALS_DIR" || exit 1
+        echo "approval-as-code verified for $_FLAG -> $_TO_STAGE"
+
+  # Execute the declarative promotion (offline engine; audit-logged). The
+  # flipped rollout-state.yaml is written and committed so the apply pipeline
+  # deploys the now-enabled surface.
+  - id: promote
+    name: 'python:3.12'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        python3 -m infra.rollout.cli promote "$_FLAG" --to "$_TO_STAGE" \
+          --verify-green --approval "$_APPROVAL_ID" --actor "$_ACTOR" \
+          --approvals-dir "$_APPROVALS_DIR" \
+          --state-out infra/rollout/rollout-state.yaml || exit 1
+        git add infra/rollout/rollout-state.yaml
+        git -c user.name=deployer-sa -c user.email=deployer-sa@agent-orchestrator \
+          commit -m "rollout: promote $_FLAG to $_TO_STAGE (issue #45)"
+        echo "promotion committed; apply pipeline performs the deploy"

@@ -1,0 +1,60 @@
+# Declarative current rollout state - agent-orchestrator rollout pipeline
+# (issue #45). This is the CURRENT promotion state of every gated flag; it is
+# separate from infra/feature-flags/registry.yaml (issue #6, the read-only
+# flag registry this state mirrors) and from go-live-plan.yaml (the declared
+# INTENT). infra/rollout/checks/check_rollout.py rejects any flag whose
+# current stage is not "off", so a new surface can never ship on by accident.
+#
+# The rollout engine (infra/rollout/engine.py) and CLI transition this state;
+# a real promotion flips a flag here through the automated pipeline and the
+# apply path deploys the now-enabled surface. Every transition is appended to
+# an audit log.
+
+schema_version: 1
+default_policy: "off"
+
+flags:
+  ci_cd.verify_trigger:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  ci_cd.apply_trigger:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.registry:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.gateway:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.engine:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.guardrails:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.telemetry:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.identity:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.portal:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  rollout.pipeline:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  rollout.governance:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []

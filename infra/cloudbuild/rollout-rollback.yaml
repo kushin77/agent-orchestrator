@@ -1,0 +1,61 @@
+# Build config: automatic rollback pipeline (issue #45 / work item 41).
+#
+# Declares the rollback path: when a canary/gradual health check fails, the
+# flag is auto-reverted OFF and the IaC change is reverted through the apply
+# pipeline - the flag NEVER silently stays on. The health verdict is injected
+# by the canary-health-fail pubsub trigger (rollout-rollback-trigger.yaml);
+# this build config is fail-closed: with the rollout flag OFF it refuses to
+# act, and with a healthy signal it takes no action (reports, exits 0).
+#
+# Never run by hand. Ships OFF (_ENABLE_ROLLOUT=false).
+
+options:
+  serviceAccount: $_DEPLOYER_SA
+
+steps:
+  # Fail-closed gate: rollback tooling is also flag-gated OFF by default.
+  - id: gate-flag
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        if [ "$_ENABLE_ROLLOUT" != "true" ]; then
+          echo "rollback pipeline is flag-gated OFF (_ENABLE_ROLLOUT=$_ENABLE_ROLLOUT); refusing" >&2
+          exit 1
+        fi
+        echo "rollout flag ON; rollback pipeline may act"
+
+  # Health verdict drives the decision. $_CANARY_HEALTH is "ok" or "fail".
+  - id: decide
+    name: 'python:3.12'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        if [ "$_CANARY_HEALTH" = "ok" ]; then
+          echo "canary healthy; no rollback needed"
+          exit 0
+        fi
+        if [ "$_CANARY_HEALTH" != "fail" ]; then
+          echo "unknown health verdict '$_CANARY_HEALTH' (expected ok|fail)" >&2
+          exit 1
+        fi
+        echo "canary health FAILED for $_FLAG; auto-rolling back to off"
+
+  # Auto-rollback: flip the flag OFF (audit-logged, reason
+  # canary_health_failure), persist the declarative state and commit the
+  # revert for the apply pipeline.
+  - id: rollback
+    name: 'python:3.12'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        python3 -m infra.rollout.cli rollback "$_FLAG" \
+          --reason canary_health_failure --actor deployer-sa \
+          --state-out infra/rollout/rollout-state.yaml || exit 1
+        git add infra/rollout/rollout-state.yaml
+        git -c user.name=deployer-sa -c user.email=deployer-sa@agent-orchestrator \
+          commit -m "rollout: auto-rollback $_FLAG to off (canary health failure) (issue #45)"
+        echo "rollback committed; apply pipeline reverts the deployment"
