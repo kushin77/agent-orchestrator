@@ -21,6 +21,8 @@
 guardrails/dlp
 guardrails/policy
 guardrails/honesty
+guardrails/isolation
+guardrails/sandbox
 gateway/finops
 gateway/health
 gateway/providers
