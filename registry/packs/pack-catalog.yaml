@@ -1,0 +1,64 @@
+# registry/packs/pack-catalog.yaml — closed AgentPack vocabulary
+#
+# The canonical closed vocabulary for the agent-pack registry + catalog
+# (issue #40): the pack categories a pack may declare and the artifact types a
+# pack's contents manifest may bundle. registry/packs/agent-pack.schema.json
+# embeds the same ids in its definitions enums; registry/packs/validate.py
+# runs a schema<->catalog parity gate so the two can never drift.
+#
+# Vocabulary consumption (GR-10, provenance in releases/PROVENANCE.md):
+#   - shared-frontend modules/schema.json  -> the id/category/status/upstream
+#     module-registry field pattern; status lifecycle planned/live/paused/
+#     retired
+#   - CMR catalog/schemas/module.schema.json -> namespaced module identity,
+#     versions, dependencies/consumers (catalog crossref model)
+#   - CMR registry/attestation.sh -> signed, auditable bundle per version
+#   - CMR catalog/events (events.schema.json) -> closed registry event kinds
+#     (publish/consume/upgrade/drift)
+#
+# The pack category set is agent-pack-domain specific (the registry's own
+# catalog of tenant-consumable capability bundles); it is NOT the portal
+# launcher grouping from shared-frontend (landing/portal/mobile/shared/system)
+# and deliberately does not redefine the pillar catalogs (profiles/catalog.yaml
+# tools/capabilities/constraints, personas, prompts, guardrails/policy,
+# identity/rbac) — packs reference those artifacts by id; they never re-declare
+# them here.
+
+categories:
+  coding:
+    summary: "Code-authoring worker bundles (profiles, personas, prompts, tools)."
+  data:
+    summary: "Data and analytics agent bundles."
+  orchestration:
+    summary: "Orchestrator / planner bundles."
+  review:
+    summary: "Review and audit SME bundles."
+  research:
+    summary: "Investigation / research agent bundles."
+  security:
+    summary: "Security-guardrail-centric bundles."
+  integration:
+    summary: "Integration / connector agent bundles."
+
+artifactTypes:
+  profile:
+    summary: "Registry profile (AgentProfile seed) bundled by id@version."
+    refSource: "registry/profiles/seeds (issue #9; immutable published snapshots)"
+  persona:
+    summary: "Persona card bundled by id."
+    refSource: "registry/personas/cards (issue #11)"
+  prompt:
+    summary: "Prompt module bundled by module/name@vN ref."
+    refSource: "registry/prompts modules (issue #13)"
+  policy:
+    summary: "Guardrail policy (atomic or bundle) manifest."
+    refSource: "guardrails/policy (issue #26)"
+  tool:
+    summary: "Tool manifest (allowlisted tool id)."
+    refSource: "identity/rbac tool manifests (issue #37/#38) + profile tool catalog"
+
+lifecycleStates:
+  - planned
+  - live
+  - paused
+  - retired
