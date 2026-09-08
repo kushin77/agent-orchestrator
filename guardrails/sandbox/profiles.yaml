@@ -1,0 +1,49 @@
+# guardrails/sandbox/profiles.yaml — the closed security-profile set.
+#
+# Contract: profiles.schema.json (each profile also validates against
+# security-profile.schema.json). Values are adapted from the elevatedIQ
+# ai-chatbot-orchestrator internal/sandbox pattern (spike #48, issue #58):
+# restricted = maximum security (no network, read-only rootfs, all caps
+# dropped); standard = moderate (bridge network, read-only rootfs, all caps
+# dropped); privileged = minimal restrictions for trusted tools (host
+# network, writable rootfs, only the dangerous caps dropped).
+#
+# cpuQuota is the Linux CFS quota in microseconds per 100 ms period
+# (50000 = 50% of one core). Changing a value here changes what the offline
+# enforcement model (offline.py) and the docker flag mapping (docker.py)
+# enforce - enforcement derives from these fields, never from a parallel copy.
+defaultProfile: restricted
+profiles:
+  restricted:
+    readOnlyRootfs: true
+    noNewPrivs: true
+    capDrop: ["ALL"]
+    networkMode: none
+    user: "1000:1000"
+    workDir: /workspace
+    cpuQuota: 50000
+    memoryMb: 512
+    pidsLimit: 100
+    timeoutSeconds: 30
+  standard:
+    readOnlyRootfs: true
+    noNewPrivs: true
+    capDrop: ["ALL"]
+    networkMode: bridge
+    user: "1000:1000"
+    workDir: /workspace
+    cpuQuota: 100000
+    memoryMb: 1024
+    pidsLimit: 200
+    timeoutSeconds: 60
+  privileged:
+    readOnlyRootfs: false
+    noNewPrivs: true
+    capDrop: ["SYS_ADMIN", "SYS_PTRACE"]
+    networkMode: host
+    user: root
+    workDir: /workspace
+    cpuQuota: 200000
+    memoryMb: 2048
+    pidsLimit: 500
+    timeoutSeconds: 120

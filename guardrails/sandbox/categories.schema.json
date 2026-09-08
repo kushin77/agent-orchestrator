@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/blob/master/guardrails/sandbox/categories.schema.json",
+  "title": "guardrails/sandbox tool-category map document",
+  "description": "The categories.yaml contract: binds each closed agent tool category (file/exec/network/db/cloud/git/docker/k8s) to a security profile, with a fail-closed default profile for any undeclared category. Tool categories mirror the elevatedIQ CategoryProfiles keys.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["defaultProfile", "categories"],
+  "properties": {
+    "defaultProfile": {
+      "type": "string",
+      "enum": ["restricted", "standard", "privileged"],
+      "description": "Profile for undeclared/unknown categories - fail closed (restricted)."
+    },
+    "categories": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["restricted", "standard", "privileged"]
+      },
+      "required": ["file", "exec", "network", "db", "cloud", "git", "docker", "k8s"],
+      "properties": {
+        "file": { "type": "string", "enum": ["restricted", "standard", "privileged"] },
+        "exec": { "type": "string", "enum": ["restricted", "standard", "privileged"] },
+        "network": { "type": "string", "enum": ["restricted", "standard", "privileged"] },
+        "db": { "type": "string", "enum": ["restricted", "standard", "privileged"] },
+        "cloud": { "type": "string", "enum": ["restricted", "standard", "privileged"] },
+        "git": { "type": "string", "enum": ["restricted", "standard", "privileged"] },
+        "docker": { "type": "string", "enum": ["restricted", "standard", "privileged"] },
+        "k8s": { "type": "string", "enum": ["restricted", "standard", "privileged"] }
+      }
+    }
+  }
+}
