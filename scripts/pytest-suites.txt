@@ -1,0 +1,41 @@
+# Authoritative pytest suite manifest (issue #29 — Verification / QA gate stack).
+#
+# Every suite in this repo's per-suite test corpus is declared here, one
+# repository-root-relative directory per line (blank lines and `#` comments
+# ignored). `make gate` runs each declared suite in ISOLATION
+# (scripts/run-pytest-suites.sh) because the suites cannot share a single
+# `pytest` invocation: sibling suites collide on `conftest.py` sys.path
+# bootstrap and duplicate test-module basenames (e.g. test_budget.py,
+# test_events.py) — a combined run errors during collection.
+#
+# The manifest is authoritative and drift-checked (scripts/check-drift.sh):
+#   * a declared suite that disappears   -> gate FAIL (coverage silently lost)
+#   * a failing declared suite           -> gate FAIL
+#   * a suite that is never declared     -> gate WARN (register it here)
+#
+# To add a suite: create <module>/tests/ and add <module> to this file (see
+# docs/QA-GATE.md "How to add a new suite").
+#
+# Each directory is a pytest suite located at <entry>/tests.
+
+guardrails/dlp
+guardrails/policy
+guardrails/honesty
+gateway/finops
+gateway/health
+gateway/providers
+gateway/limits
+gateway/mcp
+gateway/proxy
+registry/profiles
+registry/prompts
+registry/personas
+registry/events
+registry/service
+identity/onboarding
+identity/rbac
+engine/loop
+engine/multiagent
+engine/memory
+engine/queue
+engine/core

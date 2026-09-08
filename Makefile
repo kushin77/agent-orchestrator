@@ -14,7 +14,8 @@
 
 SHELL := /bin/bash
 
-.PHONY: help verify lint gate shell-syntax yaml-lint json-lint docs-lint \
+.PHONY: help verify lint gate merge-gate qa-loop tests \
+        shell-syntax yaml-lint json-lint docs-lint \
         secrets feature-flags cloudbuild terraform tf-fmt tf-validate \
         shellcheck gitleaks pre-commit
 
@@ -30,7 +31,13 @@ help:
 	@echo "  help          List targets with one-line descriptions"
 	@echo "  verify        Gate of record (with attestation); run before every PR/merge"
 	@echo "  lint          Shell + YAML + JSON + docs (no secret scan)"
-	@echo "  gate          Verify + machine-readable GATE PASS/FAIL line"
+	@echo "  gate          Full QA gate: verify + policy-schema + guard"
+	@echo "                negative-controls + per-suite tests + drift +"
+	@echo "                merge-gate wiring (tri-state, attestation)"
+	@echo "  merge-gate    Pre-merge contract: clean tree + verify + full"
+	@echo "                per-suite tests + controls + policy-schema"
+	@echo "  qa-loop       fix -> verify -> re-check until the gate is green"
+	@echo "  tests         Run every declared pytest suite in isolation"
 	@echo "  shellcheck    Run shellcheck on scripts/ (skipped if not installed)"
 	@echo "  gitleaks      Run gitleaks with .gitleaks.toml (skipped if absent)"
 	@echo "  pre-commit    Run pre-commit on all files (skipped if absent)"
@@ -56,9 +63,25 @@ lint: shell-syntax yaml-lint json-lint docs-lint
 	@echo ""
 	@echo "lint: OK"
 
-## gate — verify + machine-readable GATE PASS/FAIL line (attestation on the gate)
+## gate — full QA gate (issue #29): verify composite + policy-schema + guard
+## negative-controls + per-suite isolated tests + drift + merge-gate wiring.
+## Honest tri-state aggregation (issue #28) + .verify/gate-attestation.json.
 gate:
-	@bash scripts/verify.sh gate
+	@bash scripts/gate.sh gate
+
+## merge-gate — pre-merge contract (issue #29): refuses on a dirty tree, runs
+## verify + drift + every declared pytest suite in isolation + guard
+## negative-controls + policy-schema, and writes .verify/merge-attestation.json.
+merge-gate:
+	@bash scripts/merge-gate.sh run
+
+## qa-loop — continuous fix -> verify -> re-check until the gate is green
+qa-loop:
+	@bash scripts/qa-loop.sh
+
+## tests — run every declared pytest suite in isolation (per-suite, issue #29)
+tests:
+	@bash scripts/run-pytest-suites.sh
 
 ## shell-syntax — bash -n on every *.sh outside vendor/
 shell-syntax:
