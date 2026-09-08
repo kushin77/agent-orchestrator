@@ -1,0 +1,83 @@
+# Per-phase go-live plan - maps every Phase 0-8 control-plane surface to the
+# flag that gates it and the rollout stage that marks the surface live
+# (issue #45 / work item 41). EPIC-00 phases 0-8:
+#
+#   phase 0 foundations (IaC + CI/CD), phase 1 registry, phase 2 gateway,
+#   phase 3 engine, phase 4 guardrails, phase 5 telemetry, phase 6 identity,
+#   phase 7 control-plane + portal, phase 8 autonomous operations.
+#
+# This file declares INTENT (what go-live looks like). CURRENT state lives in
+# rollout-state.yaml and is always OFF until a promotion runs; promotion of
+# every flag still travels OFF -> CANARY -> GRADUAL -> FULL through the
+# automated pipeline. infra/rollout/checks/check_rollout.py asserts the plan
+# covers every phase 0-8, that each flag resolves, and that every declared
+# stage is part of the closed stage vocabulary.
+
+schema_version: 1
+default_stage: "off"
+
+phase_order: ["0", "1", "2", "3", "4", "5", "6", "7", "8"]
+
+phases:
+  "0":
+    name: foundations (IaC + CI/CD)
+    note: The verify and apply triggers open the only apply route.
+    surfaces:
+      - flag: ci_cd.verify_trigger
+        go_live_stage: full
+      - flag: ci_cd.apply_trigger
+        go_live_stage: full
+  "1":
+    name: agent registry and profiling
+    note: Agent profiles, personas, prompts, packs, service.
+    surfaces:
+      - flag: services.registry
+        go_live_stage: full
+  "2":
+    name: model gateways
+    note: Multi-provider proxy, routing, limits, finops metering.
+    surfaces:
+      - flag: services.gateway
+        go_live_stage: full
+  "3":
+    name: state-machine execution engine
+    note: Durable orchestration engine, agent loop, memory, queue.
+    surfaces:
+      - flag: services.engine
+        go_live_stage: full
+  "4":
+    name: security and guardrails
+    note: DLP, isolation, policy gates, sandboxing.
+    surfaces:
+      - flag: services.guardrails
+        go_live_stage: full
+  "5":
+    name: observability
+    note: Full-trace telemetry, audit, budgets.
+    surfaces:
+      - flag: services.telemetry
+        go_live_stage: full
+  "6":
+    name: tenant identity and RBAC
+    note: Tenants, orgs, roles, entitlements, SSO.
+    surfaces:
+      - flag: services.identity
+        go_live_stage: full
+  "7":
+    name: control plane and portal
+    note: Management API + admin portal surface.
+    surfaces:
+      - flag: services.portal
+        go_live_stage: full
+  "8":
+    name: autonomous operations and governance
+    note: This rollout pipeline (dogfooded first) and merge governance.
+    surfaces:
+      - flag: rollout.pipeline
+        go_live_stage: canary
+      - flag: rollout.governance
+        go_live_stage: canary
+
+# Phase sequencing rule enforced by check_rollout.py: a phase may only reach
+# go-live after every earlier phase has reached its go-live stage.
+promotion_order: strict-by-phase

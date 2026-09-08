@@ -1,0 +1,76 @@
+# Flag-rollout stage model - agent-orchestrator rollout and deployment
+# pipeline (issue #45 / work item 41, EPIC-00 phase 8).
+#
+# The canonical, declarative vocabulary every control-plane surface rollout is
+# expressed in. A surface ships OFF (AO-GR-6) and is promoted strictly forward
+# OFF -> CANARY -> GRADUAL -> FULL by the automated rollout pipeline
+# (infra/cloudbuild/rollout-promote.yaml + rollout-rollback.yaml) - never by a
+# console click (AO-GR-5 / fully-IaC mandate).
+#
+# This file is data (schema + rules), not code. The engine
+# (infra/rollout/engine.py) and the honest gate
+# (infra/rollout/checks/check_rollout.py) consume it; both treat any unknown
+# stage or transition as a failure (closed vocabulary, no-false-green).
+# Stage tokens are quoted ("off") so YAML 1.1 boolean coercion cannot turn
+# them into true/false scalars.
+
+schema_version: 1
+
+# Every new flag defaults OFF (AO-GR-6); infra/rollout/checks/check_rollout.py
+# rejects any flag whose declared default is on.
+default_policy: "off"
+
+stages:
+  "off":
+    order: 0
+    rollout_pct: 0
+    exposed: false
+    description: Not exposed. Terraform declares but creates nothing; the
+      registry flag is off. Every surface begins here.
+  canary:
+    order: 1
+    rollout_pct: 5
+    exposed: true
+    audiences: ["targeted", "percentage"]
+    description: A small deterministic slice (5% by default) plus any
+      explicitly targeted tenants or users. Health must be green before the
+      flag may leave this stage.
+  gradual:
+    order: 2
+    rollout_pct: 100
+    exposed: true
+    audiences: ["percentage"]
+    ramp:
+      steps: [10, 25, 50, 100]
+      dwell: 24h
+    description: Percentage ramps toward 100 with a health gate and an audit
+      record at every step.
+  full:
+    order: 3
+    rollout_pct: 100
+    exposed: true
+    audiences: ["all"]
+    description: 100% of tenants. Still declared and reversible - never an
+      ambient side effect of a deploy.
+
+promotion_rules:
+  mode: strict-forward
+  jump_allowed: false
+  # Requirements applied to every promotion, in addition to the per-target
+  # requirements below. The engine turns each into a hard gate.
+  every_transition_requires:
+    - verify_green
+    - approval_code
+    - audit_record
+  to_canary_requires: []
+  to_gradual_requires:
+    - canary_health_ok
+  to_full_requires:
+    - canary_health_ok
+    - gradual_complete
+
+rollback_rules:
+  mode: auto
+  trigger: health_failure
+  target: "off"
+  audited: true
