@@ -54,3 +54,8 @@ portal
 control-plane/instructions
 control-plane/sdk/python
 governance/merge
+# Final registration (issue #46, E2E lane): the top-level negative-control +
+# smoke suite plus the remaining merged suites that ship a tests/ dir.
+e2e
+governance/sync
+infra/rollout
