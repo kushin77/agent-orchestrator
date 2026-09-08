@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:event.schema:v1",
+  "title": "Agent lifecycle registry event (v1)",
+  "description": "A single record of the append-only agent lifecycle event log (registry/events, issue #10), serialized as one JSON object per line in a JSON Lines log file. Every record carries a monotonic sequence number and a sha256 hash over its canonical content linked to the previous record's hash, so editing, deleting or reordering any past record is detected. The event-kind enum is closed; the status vocabulary is documented in registry/events/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "seq",
+    "ts",
+    "event",
+    "status",
+    "tenantId",
+    "prevHash",
+    "hash"
+  ],
+  "properties": {
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic sequence number; records must be 1, 2, 3, ... with no gaps or duplicates."
+    },
+    "ts": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:?\\d{2})$",
+      "description": "Event timestamp in RFC 3339 UTC, e.g. 2026-09-08T12:00:00Z."
+    },
+    "event": {
+      "type": "string",
+      "enum": ["register", "activate", "pause", "retire", "route", "session"],
+      "description": "Registry lifecycle / audit event kind. register/activate/pause/retire = agent lifecycle transitions; route = a task-route was set; session = identity credentials were issued."
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Outcome/state the event records. Conventional values per kind - register: registered; activate: active; pause: paused; retire: retired; route: set; session: issued."
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The tenant (agent org) the event concerns. Registry events are always tenant-scoped; there is no global record."
+    },
+    "agentId": {
+      "type": ["string", "null"],
+      "description": "Agent id the event concerns; null for a route event (which names multiple agents in its detail)."
+    },
+    "actor": {
+      "type": ["string", "null"],
+      "description": "Optional principal that caused the event (operator or parent agent id)."
+    },
+    "detail": {
+      "type": ["object", "null"],
+      "description": "Optional per-kind payload (e.g. taskType and agentIds for a route event)."
+    },
+    "prevHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 hash of the previous record (the fixed genesis hash for seq 1). Links the chain."
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 over the record's canonical JSON excluding this hash field. Any content change breaks verification."
+    }
+  }
+}
