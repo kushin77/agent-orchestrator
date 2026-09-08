@@ -1,0 +1,60 @@
+# gateway/proxy/config/routing.yaml — proxy routing policy (issue #16).
+#
+# Declarative routing contract for the model-gateway proxy funnel:
+#
+#   task-type -> capability -> FinOps ladder tier -> registry tier
+#                  -> provider fallback chain (primary -> fallback -> local)
+#
+# Vocabulary is CONSUMED from the merged sibling contracts, never redefined:
+# taskType ids are published prompt modules (registry/prompts, issue #13),
+# capability ids come from the registry/profiles catalog (issue #9), and
+# taskClass names are the FinOps tier-table task classes (gateway/finops
+# tiers.yaml, issue #17).  Registry tier ids are LOW/MED/HIGH/MAX.
+
+schemaVersion: 1
+
+# taskType -> { capability, taskClass }.
+# The proxy routes each published prompt-module task type to the platform
+# capability it requires and the FinOps task class whose default tier is the
+# cheapest capable rung for it.  Adding a route here (with the matching
+# registry/prompts module and catalog capability) routes a new task type.
+routes:
+  classify-route:
+    capability: orchestrate
+    taskClass: classify-route
+  code-review-verdict:
+    capability: code-review
+    taskClass: code-review
+  summarize:
+    capability: research
+    taskClass: research
+
+# FinOps ladder tier (L0/L1/L2) -> registry profile tier (LOW/MED/HIGH/MAX).
+# The chooser picks the ladder tier; the proxy maps it onto the registry
+# vocabulary the providers and limits layers route on.
+tierMap:
+  L0: LOW
+  L1: MED
+  L2: HIGH
+
+# Ordered provider fallback chains per registry tier: primary -> fallback ->
+# local (Ollama).  Health filtering (injected signal) picks the first healthy
+# provider; local Ollama is the terminal keyless fallback of every chain
+# (cloud -> local graceful degradation).
+providerChains:
+  LOW:
+    - deepseek
+    - openai
+    - ollama
+  MED:
+    - deepseek
+    - anthropic
+    - ollama
+  HIGH:
+    - deepseek
+    - anthropic
+    - ollama
+  MAX:
+    - deepseek
+    - anthropic
+    - ollama
