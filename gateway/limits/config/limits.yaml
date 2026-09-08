@@ -1,0 +1,89 @@
+# gateway/limits default configuration (cost/capacity control layer, issue #19)
+#
+# SchemaVersion 1. This file is consumed by limits/config.py (load_config) and
+# overridable at runtime by pointing load_config(path=...) at a tenant or
+# environment override file with the same shape. Everything here is offline
+# configuration for the per-tenant cost controls; it is NOT secrets material
+# (no keys or tokens live in this file).
+#
+# Safe-rollout doctrine: every limiter defaults to mode: observe (log-only).
+# Flip a scope to mode: enforce only after observing real usage. New surfaces
+# stay flag-gated off until deliberately enabled (repo doctrine).
+
+schemaVersion: 1
+
+# --- Semantic cache ---------------------------------------------------------
+cache:
+  enabled: true
+  store: memory            # memory | file (file requires file_dir)
+  file_dir: ""             # e.g. data/limits/cache when store=file
+  default_ttl_seconds: 3600
+  max_entries: 10000
+  lowercase: false         # normalize prompts to lowercase before hashing?
+  strip_punctuation: false # drop punctuation before hashing?
+
+# --- Token budget (per tenant/agent/tier; observe -> enforce rollout) --------
+budget:
+  default_cap_tokens: 200000      # rolling-window cap when no specific policy
+  default_window_seconds: 86400   # 24h rolling window
+  default_mode: observe           # observe | enforce (safe-rollout default)
+  # Optional per-scope overrides. Scope keys are "<tenant>::<agent>::<TIER>";
+  # a tenant-wide cap uses the bare tenant id. Both accept a full policy:
+  #   cap_tokens / window_seconds / mode
+  scope_overrides: {}
+  tenant_overrides: {}
+
+# --- Token-bucket rate limiter (per scope key) -------------------------------
+rate:
+  default_limit: 100              # allowed calls per window per scope
+  default_window_seconds: 60
+  default_burst: 20               # token-bucket capacity (burst allowance)
+  scope_overrides: {}
+
+# --- Output throttle (per taskType, prevents runaway loops) ------------------
+throttle:
+  default_cap: 2000               # tokens when taskType has no explicit cap
+  mode: trim                      # trim | refuse (refuse drops over-cap output)
+  chars_per_token: 4              # offline token estimate divisor
+  # Token caps by taskType (kebab-case; consumed from the fleet task taxonomy).
+  # Boolean / minimal decision tasks are cheapest; architecture/deep reasoning
+  # is the most expensive class and gets the largest cap.
+  caps:
+    boolean: 100
+    classify: 100
+    check: 100
+    verify: 100
+    lint: 100
+    triage: 100
+    typo: 300
+    format: 300
+    style: 300
+    comment: 300
+    patch: 500
+    fix: 500
+    bug-fix: 500
+    commit-code: 500
+    summarize: 800
+    route-task: 2000
+    code-gen: 2000
+    refactor: 2000
+    test-gen: 1500
+    run-test: 1500
+    devops: 2000
+    migration: 2000
+    documentation: 2000
+    document-review: 1500
+    code-review-verdict: 1500
+    classify-route: 1000
+    orchestrate: 3000
+    diagnose-failure: 3000
+    architecture: 4000
+    design: 4000
+    security: 3000
+    audit: 3000
+    advisor: 3000
+
+# --- Backpressure when a budget is exhausted (enforce mode) ------------------
+backpressure:
+  strategy: degrade               # degrade | queue (both are explicit decisions)
+  queue_capacity: 1000            # bound on the in-process backpressure queue
