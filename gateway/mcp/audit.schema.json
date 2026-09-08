@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/blob/master/gateway/mcp/audit.schema.json",
+  "title": "gateway/mcp tool-call audit record",
+  "description": "One append-only, hash-chained audit record per MCP tool call (allowed or denied). Field shape consumed from the registry/events append-only event contract (issue #10); who/what/tenant/result are carried in actor/agentId, detail, tenantId, and status + detail.result.",
+  "type": "object",
+  "required": ["seq", "ts", "event", "status", "tenantId", "agentId", "actor", "detail", "prevHash", "hash"],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 1, "description": "Monotonic sequence; 1, 2, 3, ... no gaps or duplicates." },
+    "ts": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$", "description": "RFC 3339 UTC timestamp." },
+    "event": { "type": "string", "enum": ["tool_call", "tool_call_denied"] },
+    "status": { "type": "string", "description": "ok | error for tool_call; context | authn | authz | allowlist | rate | unknown for tool_call_denied." },
+    "tenantId": { "type": ["string", "null"], "description": "The tenant the call was made in; null when no identity could be resolved (context/authn denials)." },
+    "agentId": { "type": ["string", "null"] },
+    "actor": { "type": ["string", "null"], "description": "who - the session subject that caused the call." },
+    "detail": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "tool": { "type": ["string", "null"], "description": "what - the tool invoked." },
+        "permission": { "type": ["string", "null"] },
+        "arguments": { "type": "object" },
+        "result": { "type": "object", "description": "result - outcome summary of the call." },
+        "reason": { "type": "string" }
+      },
+      "required": ["requestId"]
+    },
+    "prevHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
