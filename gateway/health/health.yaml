@@ -1,0 +1,74 @@
+# gateway/health/health.yaml — model-health monitoring configuration (issue #18).
+#
+# Declarative tuning for the health monitor (kushin77/agent-orchestrator#18,
+# "14 Model-health monitoring + auto-degradation + local fallback"). Loaded by
+# gateway/health/config.py (the ``monitor:`` section -> HealthConfig) and
+# gateway/health/fallback.py (the ``chains:`` section -> ChainRegistry).
+#
+# Thresholds are cannibalized from the leaderboard model-health.sh
+# degradation policy (degrade > 20%, auto-recover <= 10%) and its
+# circuit-breaker stop threshold (> 50%):
+#   - degradeFailurePct : window failure rate above this -> the model is
+#     reported degraded (routing avoids it; is_healthy is False).
+#   - tripFailurePct    : window failure rate above this -> QUARANTINED
+#     (hard stop; only a cool-off + recovery probe restores it).
+#   - recoverFailurePct : a degraded model returns to healthy only once its
+#     window rate falls to/below this (hysteresis - no flapping).
+#   - minSamples        : no degradation/quarantine decision is made until the
+#     window holds at least this many outcomes. No data is never "healthy";
+#     but an empty window is *admitted* (treated healthy for routing) and can
+#     never clear an active quarantine (no-false-green).
+#   - windowSize        : rolling window of the most recent outcomes kept per
+#     (provider, model); failure rate + latency percentiles are computed over
+#     it (fixed-size sliding window, no time aging - deterministic offline).
+#   - coolOffSeconds    : how long a quarantined model waits before a recovery
+#     probe is authorized (may_probe becomes True).
+#   - probeSuccessThreshold : consecutive successful probes that restore a
+#     quarantined model to healthy (ollama circuit-breaker HALF_OPEN rule).
+#   - slowThresholdMs   : window p95 latency above this labels the model
+#     "slow" (advisory in the status; the state machine is failure-driven).
+#
+# chains:
+#   - localLastResort is the final rung of every fallback chain (the local
+#     Ollama model; local: true). Ollama is tracked like any provider and can
+#     be marked healthy/unhealthy; resolve() only lands on it when healthy.
+#   - explicit chains list a primary route and its ordered rungs (primary ->
+#     alternate commercial -> local last resort). An unlisted route falls back
+#     to [primary, localLastResort] (every provider degrades to Ollama, the
+#     providers #15 default).
+
+schemaVersion: 1
+
+monitor:
+  windowSize: 100
+  minSamples: 10
+  degradeFailurePct: 20.0
+  tripFailurePct: 50.0
+  recoverFailurePct: 10.0
+  coolOffSeconds: 60.0
+  probeSuccessThreshold: 2
+  slowThresholdMs: 30000.0
+
+chains:
+  localLastResort: ollama/llama3.2
+  explicit:
+    - key: deepseek/deepseek-chat
+      rungs:
+        - { provider: deepseek, model: deepseek-chat }
+        - { provider: anthropic, model: claude-haiku-4-5 }
+        - { provider: ollama, model: llama3.2, local: true }
+    - key: anthropic/claude-sonnet-4-5
+      rungs:
+        - { provider: anthropic, model: claude-sonnet-4-5 }
+        - { provider: deepseek, model: deepseek-reasoner }
+        - { provider: ollama, model: llama3.2, local: true }
+    - key: gemini/gemini-2.5-flash
+      rungs:
+        - { provider: gemini, model: gemini-2.5-flash }
+        - { provider: openai, model: gpt-4o-mini }
+        - { provider: ollama, model: llama3.2, local: true }
+    - key: openai/gpt-4o-mini
+      rungs:
+        - { provider: openai, model: gpt-4o-mini }
+        - { provider: gemini, model: gemini-2.5-flash }
+        - { provider: ollama, model: llama3.2, local: true }
