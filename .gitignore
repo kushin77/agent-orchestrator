@@ -1,0 +1,31 @@
+# Local research/cannibalization scratch (never commit cloned fleet repos)
+.research/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Go
+bin/
+
+# Node
+node_modules/
+
+# Terraform state (never commit)
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# Local environment / secrets
+.env
+.env.*
