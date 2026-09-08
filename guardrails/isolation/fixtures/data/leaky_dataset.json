@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "tenants": {
+    "acme": {},
+    "globex": {}
+  },
+  "fallback_tenant": "__fallback__",
+  "quarantine_tenant": "__quarantine__",
+  "records": {
+    "acme": {
+      "agent-1": {
+        "tenant_id": "acme",
+        "record_id": "agent-1",
+        "name": "alpha"
+      },
+      "agent-2": {
+        "tenant_id": "acme",
+        "record_id": "agent-2",
+        "name": "beta"
+      },
+      "agent-dup": {
+        "tenant_id": "globex",
+        "record_id": "agent-dup",
+        "name": "denormalized-stray"
+      }
+    },
+    "globex": {
+      "agent-1": {
+        "tenant_id": "globex",
+        "record_id": "agent-1",
+        "name": "alpha-copy"
+      },
+      "agent-9": {
+        "tenant_id": "globex",
+        "record_id": "agent-9",
+        "name": "omega"
+      }
+    },
+    "ghost": {
+      "agent-77": {
+        "tenant_id": "ghost",
+        "record_id": "agent-77",
+        "name": "orphaned-row"
+      }
+    },
+    "__fallback__": {
+      "agent-5": {
+        "tenant_id": "__fallback__",
+        "record_id": "agent-5",
+        "name": "unscoped-with-hint",
+        "owner_hint": "globex"
+      },
+      "agent-6": {
+        "tenant_id": "__fallback__",
+        "record_id": "agent-6",
+        "name": "unscoped-no-hint"
+      }
+    }
+  }
+}

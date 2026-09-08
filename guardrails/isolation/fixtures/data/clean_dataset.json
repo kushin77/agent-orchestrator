@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "tenants": {
+    "acme": {},
+    "globex": {}
+  },
+  "fallback_tenant": "__fallback__",
+  "quarantine_tenant": "__quarantine__",
+  "records": {
+    "acme": {
+      "agent-1": {
+        "tenant_id": "acme",
+        "record_id": "agent-1",
+        "name": "alpha"
+      },
+      "agent-2": {
+        "tenant_id": "acme",
+        "record_id": "agent-2",
+        "name": "beta"
+      }
+    },
+    "globex": {
+      "agent-9": {
+        "tenant_id": "globex",
+        "record_id": "agent-9",
+        "name": "omega"
+      }
+    }
+  }
+}
