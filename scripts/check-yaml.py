@@ -21,14 +21,12 @@ except ImportError as exc:  # pragma: no cover
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKIP_DIRS = {".git", ".research", "vendor", "node_modules", ".venv", "venv", ".terraform"}
 
-# Legacy artifacts preserved as-is (issue #5 constraint) that are not valid
-# YAML: ci-failure-scanner.yml's `run: |` shell body is not block-indented, so
-# no YAML parser (including GitHub Actions) can load it. It is skipped with a
-# visible NOTICE, never silently — repairing/replacing it is owned by the
-# CI/CD build-out (issue #6). Every other YAML file is parsed and must be valid.
-KNOWN_BROKEN = {
-    ".github/workflows/ci-failure-scanner.yml",
-}
+# No known-broken files remain: the legacy ci-failure-scanner.yml (issue #5)
+# was repaired by issue #6 (the `run: |` body was re-indented into its literal
+# block) and is now parsed and must be valid like every other YAML file. If a
+# file is ever intentionally preserved as a non-YAML artifact it must be
+# declared here with a visible NOTICE — never silently.
+KNOWN_BROKEN: set[str] = set()
 
 
 def iter_yaml_files():

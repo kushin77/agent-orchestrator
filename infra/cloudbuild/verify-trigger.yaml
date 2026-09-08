@@ -1,0 +1,16 @@
+# Importable Cloud Build pull_request trigger for the control-plane verify build.
+#
+# Ships DISABLED (GR-5 / flag-gated OFF): nothing fires until a reviewed go-live
+# imports this trigger with `disabled: false` and flips ci_cd.verify_trigger on
+# in infra/feature-flags/registry.yaml. Never imported ad-hoc.
+name: control-plane-verify
+disabled: true
+description: Run make verify on pull requests against master (code-native CI status).
+github:
+  owner: kushin77
+  name: agent-orchestrator
+  pullRequest:
+    branch: ^master$
+filename: infra/cloudbuild/verify.yaml
+substitutions:
+  _ENABLE_VERIFY: "false"

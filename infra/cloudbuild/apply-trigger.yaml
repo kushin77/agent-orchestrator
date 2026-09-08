@@ -1,0 +1,18 @@
+# Importable Cloud Build push trigger for the flag-gated control-plane apply
+# pipeline — the ONLY apply route (no console path).
+#
+# Ships DISABLED (GR-5 / flag-gated OFF): nothing applies until a reviewed
+# go-live imports this trigger with `disabled: false` and flips
+# ci_cd.apply_trigger on in infra/feature-flags/registry.yaml. The pipeline is
+# fail-closed (refuses to apply while _ENABLE_APPLY != "true").
+name: control-plane-apply
+disabled: true
+description: Flag-gated terraform apply as the deployer SA (only apply route).
+github:
+  owner: kushin77
+  name: agent-orchestrator
+  push:
+    branch: ^master$
+filename: infra/cloudbuild/apply.yaml
+substitutions:
+  _ENABLE_APPLY: "false"
