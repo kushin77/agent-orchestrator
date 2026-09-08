@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/code-review-verdict.schema.json",
+  "title": "CodeReviewVerdictOutput",
+  "description": "Output contract for the code-review-verdict prompt module. The model must return exactly this JSON shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "blockingFindings",
+    "summary"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "request_changes"
+      ],
+      "description": "Whether the reviewed diff may merge."
+    },
+    "blockingFindings": {
+      "type": "array",
+      "description": "Findings that must be resolved before merge.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "severity",
+          "message"
+        ],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One-paragraph review summary."
+    }
+  }
+}

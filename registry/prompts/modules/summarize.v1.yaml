@@ -1,0 +1,9 @@
+taskType: summarize
+version: v1
+description: Summarize a conversation thread into a factual summary, key points, and explicit action items for the control-plane portal.
+modelTierHint: med
+status: published
+bodyRefs:
+  system: ../bodies/summarize.v1.system.md
+  user: ../bodies/summarize.v1.user.md
+outputSchema: ../output-schemas/summarize.schema.json

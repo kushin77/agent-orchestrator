@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/classify-route.schema.json",
+  "title": "ClassifyRouteOutput",
+  "description": "Output contract for the classify-route prompt module. The model must return exactly this JSON shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "route",
+    "priority",
+    "confidence",
+    "reasoning"
+  ],
+  "properties": {
+    "route": {
+      "type": "string",
+      "enum": [
+        "billing",
+        "support",
+        "sales",
+        "security",
+        "noise"
+      ],
+      "description": "Routing label assigned to the tenant request."
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "normal",
+        "low"
+      ],
+      "description": "Handling priority for the routed request."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Model confidence in the assigned route."
+    },
+    "reasoning": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "One-sentence justification for the routing decision."
+    }
+  }
+}

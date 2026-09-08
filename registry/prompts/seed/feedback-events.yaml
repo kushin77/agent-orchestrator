@@ -1,0 +1,97 @@
+# Outcome feedback events for the prompt library (issue #13, deliverable 3).
+#
+# Each event pairs the labels a published prompt version actually produced
+# (predicted) with the ground-truth labels (truth) for one evaluated call.
+# A label is a false positive when predicted but not true; a false negative
+# when true but not predicted. The feedback.py report aggregates these into
+# per-prompt-version FP/FN metrics. The classify-route v2 events show the
+# disambiguation edit reducing the FP/FN volume observed on v1.
+events:
+  - promptId: classify-route@v1
+    caseId: case-0001
+    predicted: [billing]
+    truth: [billing]
+  - promptId: classify-route@v1
+    caseId: case-0002
+    predicted: [billing]
+    truth: [support]
+  - promptId: classify-route@v1
+    caseId: case-0003
+    predicted: [support]
+    truth: [support]
+  - promptId: classify-route@v1
+    caseId: case-0004
+    predicted: [support]
+    truth: [billing]
+  - promptId: classify-route@v1
+    caseId: case-0005
+    predicted: [security]
+    truth: [security]
+  - promptId: classify-route@v1
+    caseId: case-0006
+    predicted: [support]
+    truth: [billing]
+  - promptId: classify-route@v1
+    caseId: case-0007
+    predicted: [noise]
+    truth: [noise]
+  - promptId: classify-route@v1
+    caseId: case-0008
+    predicted: [sales]
+    truth: [sales]
+  - promptId: classify-route@v2
+    caseId: case-0201
+    predicted: [billing]
+    truth: [billing]
+  - promptId: classify-route@v2
+    caseId: case-0202
+    predicted: [support]
+    truth: [support]
+  - promptId: classify-route@v2
+    caseId: case-0203
+    predicted: [billing]
+    truth: [billing]
+  - promptId: classify-route@v2
+    caseId: case-0204
+    predicted: [security]
+    truth: [security]
+  - promptId: classify-route@v2
+    caseId: case-0205
+    predicted: [billing]
+    truth: [billing]
+  - promptId: classify-route@v2
+    caseId: case-0206
+    predicted: [support]
+    truth: [billing]
+  - promptId: classify-route@v2
+    caseId: case-0207
+    predicted: [noise]
+    truth: [noise]
+  - promptId: classify-route@v2
+    caseId: case-0208
+    predicted: [sales]
+    truth: [sales]
+  - promptId: code-review-verdict@v1
+    caseId: review-0001
+    predicted: [approve]
+    truth: [approve]
+  - promptId: code-review-verdict@v1
+    caseId: review-0002
+    predicted: [request_changes]
+    truth: [request_changes]
+  - promptId: code-review-verdict@v1
+    caseId: review-0003
+    predicted: [approve]
+    truth: [request_changes]
+  - promptId: code-review-verdict@v1
+    caseId: review-0004
+    predicted: [request_changes]
+    truth: [request_changes]
+  - promptId: code-review-verdict@v1
+    caseId: review-0005
+    predicted: [approve]
+    truth: [approve]
+  - promptId: code-review-verdict@v1
+    caseId: review-0006
+    predicted: [request_changes]
+    truth: [approve]
