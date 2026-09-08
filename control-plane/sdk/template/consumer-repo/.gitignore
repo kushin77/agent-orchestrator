@@ -1,0 +1,21 @@
+# Governed consumer repo — local hygiene (issue #41 template)
+# Environment / secrets — never committed (short-lived session token lives in env)
+.env
+.env.*
+*.local.env
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+# Node
+node_modules/
+# Sync scratch (never commit transient sync state)
+*.sync.tmp
+*.sync.tmp.*

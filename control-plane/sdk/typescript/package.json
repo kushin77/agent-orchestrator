@@ -1,0 +1,28 @@
+{
+  "name": "@kushin77/agent-orchestrator-sdk",
+  "version": "0.1.0",
+  "description": "Consumer SDK (TypeScript) for the agent-orchestrator platform: typed gateway tasks + streaming, control-plane usage/audit/policy, and an MCP client bootstrap. Issue kushin77/agent-orchestrator#41.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "types"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

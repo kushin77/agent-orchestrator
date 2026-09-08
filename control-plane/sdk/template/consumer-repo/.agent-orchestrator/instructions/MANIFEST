@@ -1,0 +1,7 @@
+# Managed instruction layer manifest (ao.pack/v1) — <path> <sha256>
+# Auto-synced layers are immutable at the consumer side: `make verify` fails
+# when a managed file's sha256 differs from this manifest (drift), and
+# `make sync` regenerates this file after a platform refresh.  The local
+# (tenant-owned) layer is not listed here and is never synced.
+.agent-orchestrator/instructions/00-platform.md 4872155c2a7fa91be18265ebb01e9be3662f6a989f1e22a1415d81a583de9c74
+.agent-orchestrator/instructions/10-governed-agents.md 8b43e67dffc2041120b17cff21b7e7a5cd05f74fef49c654dba5b832cc697aec
