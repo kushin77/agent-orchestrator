@@ -1,0 +1,20 @@
+---
+# Per-tenant latency SLO template (issue #32 — observability/telemetry).
+# Parameterized from the monitoring-stack Sloth latency-p95 template: the
+# p95 latency of completed serve attempts must stay under targetMs; the
+# allowance (1 - percentile) bounds the fraction of slower attempts.
+apiVersion: telemetry.observability/v1
+kind: SloTemplate
+metadata:
+  name: latency-p95
+  description: P95 model-call latency within target over the rolling window
+  labels:
+    source: monitoring-stack/slo-framework/templates/latency-p95-api-response-slo.yaml
+    owner: telemetry-lane
+spec:
+  sloKind: latency
+  description: The 95th-percentile latency of completed attempts must not exceed targetMs
+  windowSeconds: 3600
+  targetMs: 250.0
+  percentile: 0.95
+  severity: warning

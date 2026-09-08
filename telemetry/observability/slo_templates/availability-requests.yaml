@@ -1,0 +1,19 @@
+---
+# Per-tenant availability SLO template (issue #32 — observability/telemetry).
+# Parameterized from the monitoring-stack Sloth templates (availability
+# objective + error budget), adapted to evaluate against the offline span
+# store's actual outcomes (success/cache_hit over serve attempts).
+apiVersion: telemetry.observability/v1
+kind: SloTemplate
+metadata:
+  name: availability-requests
+  description: Serve-attempt availability over the rolling window
+  labels:
+    source: monitoring-stack/slo-framework/templates
+    owner: telemetry-lane
+spec:
+  sloKind: availability
+  description: Fraction of completed serve attempts that were served (success/cache_hit)
+  windowSeconds: 3600
+  targetRatio: 0.95
+  severity: warning

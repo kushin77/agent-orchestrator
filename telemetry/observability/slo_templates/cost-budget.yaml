@@ -1,0 +1,19 @@
+---
+# Per-tenant cost SLO template (issue #32 — observability/telemetry).
+# Parameterized from the monitoring-stack cost templates + finops burn-rate
+# dashboard: recorded estimated spend over the window must stay within the
+# per-tenant budget (the error budget / burn-rate view).
+apiVersion: telemetry.observability/v1
+kind: SloTemplate
+metadata:
+  name: cost-budget
+  description: Per-tenant estimated spend within budget over the rolling window
+  labels:
+    source: monitoring-stack/slo-framework/templates/cost-monitoring-slo.yaml
+    owner: telemetry-lane
+spec:
+  sloKind: cost
+  description: Total recorded estimated cost across the window must not exceed budgetUsd
+  windowSeconds: 86400
+  budgetUsd: 25.0
+  severity: warning
