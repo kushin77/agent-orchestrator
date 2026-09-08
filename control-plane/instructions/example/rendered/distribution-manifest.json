@@ -1,0 +1,13 @@
+{
+  "canonical": {
+    "id": "example-governed-repo",
+    "version": "1.0.0"
+  },
+  "mirrors": {
+    ".cursorrules": "0437d0703323b3ddef243968278a0d36070342d4bb47fac95369bef3b9a2ff5c",
+    "AGENTS.md": "4fa57fb613d2b6a3e9420ed1a5b99b499f60fc35feb55cc38420001894566906",
+    "CLAUDE.md": "ec57900fd0134c594be9840a8f440eed407cd1575d9ea89c45d0338716a602b0",
+    "copilot-instructions.md": "f2b234b42db627b02f63bfd5dca65e192c960dfc3061742d5cf2b1413213707d"
+  },
+  "schema": "ao.instructions.distribution/v1"
+}

@@ -1,0 +1,61 @@
+# Canonical instruction source — worked example (issue #42).
+#
+# ONE model-agnostic source of truth for a governed instruction set.  Layers
+# are ordered most-governing first; managed layers are platform-governed and
+# FROZEN to tenants (a tenant override may never redefine them).  Tenant
+# customisation is bounded by the frozen override contract
+# (../schema/tenant-override.schema.json): branding + extra local-layer rules.
+#
+# Edit this file, then regenerate every per-tool mirror:
+#
+#   python3 -m aoi render --canonical canonical.yaml \
+#       --override tenant-override.json --out rendered
+#
+# Mirrors are generated — never hand-forked.  A hand edit is caught by
+# `render --check` (byte-stable regeneration) and by the drift detector.
+schema: ao.instructions.canonical/v1
+id: example-governed-repo
+version: "1.0.0"
+title: Example governed repository
+summary: >-
+  A minimal canonical instruction set demonstrating the model-agnostic
+  instruction layer: governed platform and agent-pack layers with tenant local
+  rules supplied through the frozen override contract, rendered to every
+  per-tool mirror.
+layers:
+  - id: platform
+    label: Platform governed layer
+    managed: true
+    rules:
+      - id: issue-first
+        text: >-
+          Work is tracked in an issue before it is done; every change carries a
+          reference to the issue it serves.
+      - id: verify-before-done
+        text: >-
+          A task is done only when its verification gate is green and the
+          actual output is reported; never an unverified claim.
+      - id: no-secrets
+        text: >-
+          Credentials and tokens come from the environment or a secret manager;
+          nothing is hardcoded, committed, or echoed to logs.
+      - id: stay-in-lane
+        text: >-
+          Make the smallest focused change for your lane; no unrelated edits,
+          no unfinished markers, no debug leftovers.
+      - id: no-direct-push
+        text: >-
+          Never push directly to the protected branch; changes land through a
+          reviewable pull request with a green gate.
+  - id: agent-pack
+    label: Agent-pack governed layer
+    managed: true
+    rules:
+      - id: scope-to-tenant
+        text: >-
+          A session token scopes every governed-agent call to exactly one
+          tenant; there is no fallback to another tenant.
+      - id: allowlist-tools
+        text: >-
+          Governed agents call tools on an explicit allowlist; an unknown tool
+          is a denial, never a silent pass.

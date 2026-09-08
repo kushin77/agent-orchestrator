@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.instructions.distribution/v1",
+  "title": "Instruction distribution manifest",
+  "description": "Versioned standards distribution record produced by rendering a canonical source: the canonical id + SemVer version and the sha256 of every generated mirror. Consumers pin this state; aoi.versioning.check_drift compares a consumer state against it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "canonical", "mirrors"],
+  "properties": {
+    "schema": {
+      "const": "ao.instructions.distribution/v1"
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "mirrors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.instructions.override/v1",
+  "title": "Tenant instruction override — frozen customization contract",
+  "description": "The ONLY surface a tenant may customise on a governed instruction set: branding (repository + subtitle) and extra local-layer rules. The contract is closed (additionalProperties: false at every level): any field outside it is REJECTED. Semantic freezes enforced by aoi.override: extra rule ids must not collide with governed rule ids, and the override must target the exact canonical id + version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "tenant", "canonical"],
+  "properties": {
+    "schema": {
+      "const": "ao.instructions.override/v1"
+    },
+    "tenant": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "branding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "maxLength": 200
+        },
+        "subtitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      }
+    },
+    "local": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extraRules"],
+      "properties": {
+        "extraRules": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 2000
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

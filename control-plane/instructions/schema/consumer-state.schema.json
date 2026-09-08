@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.instructions.consumer/v1",
+  "title": "Consumer instruction state (version pin)",
+  "description": "A consumer repository's pinned instruction state: the canonical id + SemVer version it installed and the sha256 of each mirror it carries. aoi.versioning.check_drift flags a consumer behind/ahead of the distribution, missing a mirror, or carrying a locally drifted mirror.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "consumer", "canonical", "mirrors"],
+  "properties": {
+    "schema": {
+      "const": "ao.instructions.consumer/v1"
+    },
+    "consumer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "mirrors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}

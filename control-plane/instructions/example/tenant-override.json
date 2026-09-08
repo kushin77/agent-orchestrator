@@ -1,0 +1,24 @@
+{
+  "schema": "ao.instructions.override/v1",
+  "tenant": "acme",
+  "canonical": {
+    "id": "example-governed-repo",
+    "version": "1.0.0"
+  },
+  "branding": {
+    "repository": "acme/example-governed-repo",
+    "subtitle": "Acme's governed agent repository"
+  },
+  "local": {
+    "extraRules": [
+      {
+        "id": "acme-feature-branches",
+        "text": "Feature work lands on short-lived branches and merges via pull request only."
+      },
+      {
+        "id": "acme-reviewer-required",
+        "text": "Every pull request is reviewed by a second pair of eyes before merge."
+      }
+    ]
+  }
+}
