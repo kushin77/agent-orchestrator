@@ -1,18 +1,22 @@
 # agent-orchestrator — gate of record
 #
-# `make verify` is the honest composite gate (GR-12). Every check produces a
-# REAL exit code and can genuinely fail: shell syntax errors, unparseable
-# YAML/JSON, unresolved doc links, missing foundation files, unfinished
-# markers, or a leaked secret all fail the gate. A gate that cannot fail is a
-# formality and is rejected (fleet no-false-green doctrine).
+# `make verify` is the honest composite gate (GR-12), orchestrated by
+# scripts/verify.sh with attestation. Every check produces a REAL exit code
+# and can genuinely fail: shell syntax errors, unparseable YAML/JSON, broken
+# doc links, missing foundation files, unfinished markers, leaked secrets,
+# feature flags that ship ON, cloudbuild triggers that ship enabled, or
+# terraform fmt/validate failures all fail the gate. A gate that cannot fail
+# is a formality and is rejected (fleet no-false-green doctrine).
 #
-# Run `make verify` before every PR and every merge; paste its output as
-# evidence (GR-12). No network and no containers are required.
+# The gate writes .verify/verify.log + .verify/attestation.json (the verify
+# record / attestation). Run `make verify` before every PR and every merge;
+# paste its output as evidence (GR-12). No network and no containers required.
 
 SHELL := /bin/bash
 
 .PHONY: help verify lint gate shell-syntax yaml-lint json-lint docs-lint \
-        secrets shellcheck gitleaks pre-commit
+        secrets feature-flags cloudbuild terraform tf-fmt tf-validate \
+        shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
 
@@ -24,33 +28,37 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  help          List targets with one-line descriptions"
-	@echo "  verify        Gate of record: shell + YAML + JSON + docs + secrets"
+	@echo "  verify        Gate of record (with attestation); run before every PR/merge"
 	@echo "  lint          Shell + YAML + JSON + docs (no secret scan)"
-	@echo "  gate          Alias for verify"
+	@echo "  gate          Verify + machine-readable GATE PASS/FAIL line"
 	@echo "  shellcheck    Run shellcheck on scripts/ (skipped if not installed)"
 	@echo "  gitleaks      Run gitleaks with .gitleaks.toml (skipped if absent)"
 	@echo "  pre-commit    Run pre-commit on all files (skipped if absent)"
 	@echo ""
-	@echo "Fine-grained checks (used by verify/lint):"
+	@echo "Fine-grained checks (used by verify):"
 	@echo "  shell-syntax  bash -n on every *.sh outside vendor/"
 	@echo "  yaml-lint     Parse every .yml/.yaml outside vendor/ (PyYAML)"
 	@echo "  json-lint     Validate every *.json outside vendor/"
 	@echo "  docs-lint     Foundation files + md links + whitespace + markers"
 	@echo "  secrets       Mechanical secret scan (always on)"
+	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
+	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
+	@echo "  terraform     infra/terraform fmt + offline validate (SKIP if absent)"
+	@echo "  tf-fmt        terraform fmt -check only"
+	@echo "  tf-validate   offline terraform validate only"
 
-## verify — gate of record: shell + YAML + JSON + docs + secrets
-verify: shell-syntax yaml-lint json-lint docs-lint secrets
-	@echo ""
-	@echo "verify: OK"
+## verify — gate of record (orchestrated by scripts/verify.sh, with attestation)
+verify:
+	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
 lint: shell-syntax yaml-lint json-lint docs-lint
 	@echo ""
 	@echo "lint: OK"
 
-## gate — alias for verify
-gate: verify
-	@:
+## gate — verify + machine-readable GATE PASS/FAIL line (attestation on the gate)
+gate:
+	@bash scripts/verify.sh gate
 
 ## shell-syntax — bash -n on every *.sh outside vendor/
 shell-syntax:
@@ -71,6 +79,28 @@ docs-lint:
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
 	@bash scripts/check-secrets.sh
+
+## feature-flags — feature-flag registry: every surface defaults OFF (issue #6)
+feature-flags:
+	@python3 scripts/check-feature-flags.py
+
+## cloudbuild — infra/cloudbuild YAML parses; every trigger ships disabled (issue #6)
+cloudbuild:
+	@bash scripts/check-cloudbuild.sh
+
+## terraform — infra/terraform fmt + offline validate (issue #6; SKIP if absent)
+terraform:
+	@bash scripts/check-terraform.sh all
+
+## tf-fmt — terraform fmt -check -recursive on infra/terraform
+## (visible SKIP if the terraform binary is not installed)
+tf-fmt:
+	@bash scripts/check-terraform.sh fmt
+
+## tf-validate — offline terraform validate of infra/terraform
+## (visible SKIP if terraform is absent or no local provider cache exists)
+tf-validate:
+	@bash scripts/check-terraform.sh validate
 
 ## shellcheck — optional lint (not part of verify; skipped if not installed)
 shellcheck:

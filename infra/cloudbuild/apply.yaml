@@ -1,0 +1,55 @@
+# Build config for the flag-gated control-plane apply pipeline.
+#
+# This is the ONLY apply route for infrastructure changes (no console path).
+# The pipeline runs as the deployer service account and is fail-closed: if it
+# is ever invoked with the apply flag OFF, it fails loudly instead of applying
+# or silently skipping. `_ENABLE_APPLY` mirrors `ci_cd.apply_trigger` in
+# infra/feature-flags/registry.yaml and defaults to "false".
+#
+# Never run by hand. Never applied from a console. Ships OFF.
+
+options:
+  # Run as the deployer SA (created by modules/deployer-sa at promotion).
+  # Populated via substitution at go-live; never hard-coded (GR-6).
+  serviceAccount: $_DEPLOYER_SA
+
+steps:
+  # Fail-closed gate: only proceed when the apply flag is deliberately on.
+  - id: gate-flag
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        if [ "$_ENABLE_APPLY" != "true" ]; then
+          echo "apply is flag-gated OFF (_ENABLE_APPLY=$_ENABLE_APPLY); refusing to apply" >&2
+          exit 1
+        fi
+        echo "apply flag ON; proceeding"
+
+  - id: terraform-init
+    name: 'hashicorp/terraform:1.6'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        cd infra/terraform
+        terraform init -input=false
+
+  - id: terraform-plan
+    name: 'hashicorp/terraform:1.6'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        cd infra/terraform
+        terraform plan -out=/workspace/tfplan
+
+  - id: terraform-apply
+    name: 'hashicorp/terraform:1.6'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        cd infra/terraform
+        terraform apply -auto-approve /workspace/tfplan

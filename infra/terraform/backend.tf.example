@@ -1,0 +1,12 @@
+# Remote state for the control-plane environment (GCS).
+#
+# Copy this file to infra/terraform/backend.tf and fill in the bucket/prefix
+# before any apply. The bucket is created out-of-band (bootstrap) — never from
+# inside this configuration's own state.
+#
+# terraform {
+#   backend "gcs" {
+#     bucket = "agent-orchestrator-tfstate"
+#     prefix = "control-plane"
+#   }
+# }

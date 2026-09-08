@@ -1,0 +1,29 @@
+# Build config for the control-plane verify trigger (code-native CI status).
+#
+# Runs the repo gate of record (`make verify`) when a pull_request trigger
+# fires. The runner image must provide bash, make, python3 + PyYAML, and
+# terraform (the same toolchain `make verify` requires locally). This file is
+# declarative scaffolding — the trigger that executes it ships disabled until a
+# reviewed go-live (see README.md and the feature-flag registry).
+
+steps:
+  # Attestation of the toolchain so a misconfigured runner fails loudly rather
+  # than skipping the gate (no-false-green).
+  - id: toolchain
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        command -v make >/dev/null || { echo "make missing"; exit 1; }
+        command -v python3 >/dev/null || { echo "python3 missing"; exit 1; }
+        python3 -c 'import yaml' || { echo "PyYAML missing"; exit 1; }
+        echo "toolchain OK"
+
+  # The gate itself. Fails the build when any check fails.
+  - id: verify
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - 'make verify'

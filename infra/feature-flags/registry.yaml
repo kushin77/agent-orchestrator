@@ -1,0 +1,83 @@
+# Feature-flag registry — agent-orchestrator control plane
+#
+# The declarative record that every control-plane surface (service, endpoint,
+# CI/CD trigger) ships **OFF** until a reviewed go-live promotes it (IaC
+# mandate / flag-gated OFF default). Nothing in this repo is tenant-visible or
+# applied while its flag is off.
+#
+# scripts/check-feature-flags.py enforces this file mechanically and keeps it
+# in lock-step with infra/terraform/variables.tf (every `enable_*` flag must
+# default to `false`). A new surface cannot ship on by accident.
+
+schema_version: 1
+
+# New entries MUST default to "off". A check fails if any entry defaults on.
+default_policy: off
+
+description: >
+  Each control-plane service and CI/CD trigger is declared here with its
+  promotion state. Promotion = a reviewed go-live that flips the flag, runs
+  `make verify` + `terraform plan`, then applies via the deployer SA through
+  the flag-gated Cloud Build apply pipeline — never the console.
+
+# The ONLY apply route. No console path is acceptable.
+apply_path:
+  only: flag-gated automated apply (deployer SA via Cloud Build)
+  trigger: infra/cloudbuild/apply-trigger.yaml
+  deployer_module: infra/terraform/modules/deployer-sa
+  build_config: infra/cloudbuild/apply.yaml
+
+# CI/CD trigger flags (all OFF until promoted).
+ci_cd:
+  verify_trigger:
+    default: off
+    description: PR verify trigger runs `make verify` as a code-native CI status.
+  apply_trigger:
+    default: off
+    description: Flag-gated terraform apply trigger; the only apply route.
+
+# Per-service promotion state. `tf_flag` maps to the matching variable in
+# infra/terraform/variables.tf (all default false).
+services:
+  registry:
+    default: off
+    promoted: false
+    phase: 1
+    tf_flag: enable_registry
+    description: Agent Registry & Profiling.
+  gateway:
+    default: off
+    promoted: false
+    phase: 2
+    tf_flag: enable_gateway
+    description: Model Gateways (multi-provider proxy/router).
+  engine:
+    default: off
+    promoted: false
+    phase: 3
+    tf_flag: enable_engine
+    description: State-machine execution engine.
+  guardrails:
+    default: off
+    promoted: false
+    phase: 4
+    tf_flag: enable_guardrails
+    description: Security & guardrails (DLP, prompt-injection defense, budgets).
+  telemetry:
+    default: off
+    promoted: false
+    phase: 5
+    tf_flag: enable_telemetry
+    description: Observability, audit, FinOps metering.
+  identity:
+    default: off
+    promoted: false
+    phase: 6
+    tf_flag: enable_identity
+    description: Tenant identity / RBAC.
+  portal:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_portal
+    description: Admin control-plane portal.
