@@ -1,0 +1,865 @@
+openapi: 3.0.3
+info:
+  title: Agent Orchestrator — Control-plane REST API
+  version: 1.0.0
+  description: |
+    The phase-6 control-plane management surface (issue #38): manage tenants,
+    agents, profiles, personas, prompt modules, guardrail policies, budgets and
+    the pause rail, query the audit ledger, and consume the append-only
+    domain-event outbox. Every response uses the standardized envelope
+    {ok,status,requestId,data,error}; every route enforces a resource:action
+    permission at the caller's tenant (RBAC two-gate guard); every mutation
+    appends to the audit ledger; destructive operations are approval-gated.
+    This spec is the contract the generated clients in clients/ are built
+    against (offline; no network calls required).
+servers:
+  - url: https://api.agent-orchestrator.example/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: tenants
+    description: Tenant/org + budget/usage + pause rail
+  - name: agents
+    description: Agent identity, lifecycle, task dispatch
+  - name: registry
+    description: Profiles, personas, prompt modules, policies (read)
+  - name: governance
+    description: Audit query, outbox consumer contract, approvals
+paths:
+  /tenants/{tenantId}:
+    get:
+      tags: [tenants]
+      operationId: getTenant
+      summary: Tenant/org view (plan, type, kill-switch state)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Tenant view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /tenants/{tenantId}/usage:
+    get:
+      tags: [tenants]
+      operationId: getUsage
+      summary: Current usage + budget positions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Usage view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /tenants/{tenantId}/quotas:
+    get:
+      tags: [tenants]
+      operationId: getQuotas
+      summary: Quota state (plan defaults + per-tenant overrides)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Quota view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /tenants/{tenantId}/pause:
+    post:
+      tags: [tenants]
+      operationId: pauseTenant
+      summary: Engage the tenant kill-switch rail (destructive — approval-gated)
+      description: |
+        Returns 202 approval_required with an approval request until an
+        authorized approver approves; on approval the action executes and a
+        control.pause event is published to the outbox.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TenantActionRequest"
+      responses:
+        "200":
+          description: Tenant paused (killSwitch true)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "202":
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /tenants/{tenantId}/resume:
+    post:
+      tags: [tenants]
+      operationId: resumeTenant
+      summary: Clear the tenant kill-switch rail
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TenantActionRequest"
+      responses:
+        "200":
+          description: Tenant resumed (killSwitch false)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /agents:
+    get:
+      tags: [agents]
+      operationId: listAgents
+      summary: List the caller tenant's agents (optional status filter)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [registered, active, paused, retired]
+      responses:
+        "200":
+          description: List of agent views
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+    post:
+      tags: [agents]
+      operationId: registerAgent
+      summary: Register an agent from a frozen profile seed
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterAgentRequest"
+      responses:
+        "201":
+          description: Agent registered (agent.registered + agent.provision events)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /agents/{agentId}:
+    get:
+      tags: [agents]
+      operationId: getAgent
+      summary: Get one agent of the caller tenant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /agents/{agentId}/activate:
+    post:
+      tags: [agents]
+      operationId: activateAgent
+      summary: Activate a registered/paused agent
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleRequest"
+      responses:
+        "200":
+          description: Agent view (active)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "422":
+          $ref: "#/components/responses/Refused"
+  /agents/{agentId}/pause:
+    post:
+      tags: [agents]
+      operationId: pauseAgent
+      summary: Pause an active agent
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleRequest"
+      responses:
+        "200":
+          description: Agent view (paused)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /agents/{agentId}/retire:
+    post:
+      tags: [agents]
+      operationId: retireAgent
+      summary: Retire an agent (destructive — approval-gated)
+      description: |
+        Returns 202 approval_required with an approval request until an
+        authorized approver approves the agent.retire action; then the retire
+        executes (terminal, never re-activated) and agent.retired is published.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleRequest"
+      responses:
+        "200":
+          description: Agent view (retired)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "202":
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /agents/{agentId}/tasks:
+    post:
+      tags: [agents]
+      operationId: dispatchTask
+      summary: Dispatch a task to an agent (published prompt-module taskType)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DispatchTaskRequest"
+      responses:
+        "202":
+          description: Task accepted (task.dispatched event)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "422":
+          $ref: "#/components/responses/Refused"
+  /agents/{agentId}/tasks/{taskId}:
+    get:
+      tags: [agents]
+      operationId: getTaskStatus
+      summary: Task status
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Task view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /profiles:
+    get:
+      tags: [registry]
+      operationId: listProfiles
+      summary: List frozen AgentProfile seeds
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of profile views
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /profiles/{profileId}:
+    get:
+      tags: [registry]
+      operationId: getProfile
+      summary: Get one AgentProfile
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ProfileId"
+      responses:
+        "200":
+          description: Profile view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /personas:
+    get:
+      tags: [registry]
+      operationId: listPersonas
+      summary: List persona cards
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of persona views
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /personas/{personaId}:
+    get:
+      tags: [registry]
+      operationId: getPersona
+      summary: Get one persona card
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PersonaId"
+      responses:
+        "200":
+          description: Persona view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /prompts:
+    get:
+      tags: [registry]
+      operationId: listPromptModules
+      summary: List published prompt modules
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of prompt-module views
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /prompts/{moduleId}:
+    get:
+      tags: [registry]
+      operationId: getPromptModule
+      summary: Get one prompt module
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ModuleId"
+      responses:
+        "200":
+          description: Prompt-module view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /policies:
+    get:
+      tags: [registry]
+      operationId: listPolicies
+      summary: List guardrail policies
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of policy views
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /policies/{policyId}:
+    get:
+      tags: [registry]
+      operationId: getPolicy
+      summary: Get one guardrail policy
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PolicyId"
+      responses:
+        "200":
+          description: Policy view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /audit:
+    get:
+      tags: [governance]
+      operationId: queryAudit
+      summary: Query the tenant audit ledger (newest first)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: action
+          in: query
+          required: false
+          schema: { type: string }
+        - name: actor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 100 }
+      responses:
+        "200":
+          description: List of audit records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /outbox/events:
+    get:
+      tags: [governance]
+      operationId: listOutboxEvents
+      summary: List the caller tenant's domain events
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 100 }
+      responses:
+        "200":
+          description: List of event views
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /outbox/poll:
+    post:
+      tags: [governance]
+      operationId: pollOutbox
+      summary: Claim pending domain events for a consumer (dispatch contract)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consumer:
+                  type: string
+                  description: Lease holder id (defaults to the caller actor)
+                limit:
+                  type: integer
+                  default: 10
+      responses:
+        "200":
+          description: Claimed events (state dispatched)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /outbox/{eventId}/ack:
+    post:
+      tags: [governance]
+      operationId: ackOutboxEvent
+      summary: Acknowledge a dispatched event (delivered)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consumer:
+                  type: string
+      responses:
+        "200":
+          description: Event view (delivered)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /outbox/{eventId}/fail:
+    post:
+      tags: [governance]
+      operationId: failOutboxEvent
+      summary: Report a processing failure (redeliver or dead-letter)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consumer:
+                  type: string
+                error:
+                  type: string
+      responses:
+        "200":
+          description: Event view (pending redelivery or dead)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /approvals:
+    get:
+      tags: [governance]
+      operationId: listApprovals
+      summary: List approval requests (optional status filter)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, denied, consumed]
+      responses:
+        "200":
+          description: List of approval views
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /approvals/{approvalId}/approve:
+    post:
+      tags: [governance]
+      operationId: approveApproval
+      summary: Approve a pending destructive-action request
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+      responses:
+        "200":
+          description: Approval view (approved)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+  /approvals/{approvalId}/deny:
+    post:
+      tags: [governance]
+      operationId: denyApproval
+      summary: Deny a pending destructive-action request
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+      responses:
+        "200":
+          description: Approval view (denied)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        A tenant-scoped session token (SAML/OIDC console session or agent
+        session). Verification is injected at deployment (identity/sso or
+        registry/service); the token must carry a tenant claim.
+  parameters:
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      schema: { type: string }
+      description: The tenant (agent org). Must equal the session tenant.
+    AgentId:
+      name: agentId
+      in: path
+      required: true
+      schema: { type: string }
+    ProfileId:
+      name: profileId
+      in: path
+      required: true
+      schema: { type: string }
+    PersonaId:
+      name: personaId
+      in: path
+      required: true
+      schema: { type: string }
+    ModuleId:
+      name: moduleId
+      in: path
+      required: true
+      schema: { type: string }
+    PolicyId:
+      name: policyId
+      in: path
+      required: true
+      schema: { type: string }
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string }
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    Unauthorized:
+      description: Missing/invalid session token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    Forbidden:
+      description: Scope or permission denial
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    NotFound:
+      description: Unknown resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    Conflict:
+      description: Duplicate/conflicting state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    Refused:
+      description: Fail-closed refusal (e.g. invalid lifecycle transition)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+  schemas:
+    Envelope:
+      type: object
+      required: [ok, status, requestId, data, error]
+      properties:
+        ok:
+          type: boolean
+        status:
+          type: integer
+        requestId:
+          type: string
+        data:
+          nullable: true
+        error:
+          nullable: true
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+    RegisterAgentRequest:
+      type: object
+      required: [agentId, profileRef]
+      properties:
+        agentId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        profileRef:
+          type: string
+          description: A frozen AgentProfile id (registry/profiles seeds)
+        role:
+          type: string
+          nullable: true
+    DispatchTaskRequest:
+      type: object
+      required: [taskType]
+      properties:
+        taskType:
+          type: string
+          pattern: "^[a-z][a-z0-9-]*$"
+          description: A published prompt-module taskType (registry/prompts)
+        input:
+          type: object
+          additionalProperties: true
+        idempotencyKey:
+          type: string
+          nullable: true
+    LifecycleRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+    TenantActionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+    AgentView:
+      type: object
+      properties:
+        agentId: { type: string }
+        tenantId: { type: string }
+        profileRef: { type: string }
+        profileVersion: { type: string }
+        status: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        modelTier: { type: string }
+        owner: { type: string }
+        lastSeen: { type: string, nullable: true }
+        registeredAt: { type: string }
+    ProfileView:
+      type: object
+      properties:
+        id: { type: string }
+        version: { type: string }
+        owner: { type: string }
+        systemPromptRef: { type: string }
+        toolAllowlist:
+          type: array
+          items: { type: string }
+        capabilitySet:
+          type: array
+          items: { type: string }
+        defaultModelTier: { type: string }
+        guardrailPolicyRef: { type: string }
+    PersonaView:
+      type: object
+      properties:
+        id: { type: string }
+        version: { type: string }
+        tenant: { type: string }
+        name: { type: string }
+        posture: { type: string }
+        defaultModelTier: { type: string }
+        systemPromptRef: { type: string }
+        ownedLanes:
+          type: array
+          items: { type: string }
+    PromptModuleView:
+      type: object
+      properties:
+        taskType: { type: string }
+        version: { type: string }
+        status: { type: string }
+        description: { type: string }
+        modelTierHint: { type: string }
+    PolicyView:
+      type: object
+      properties:
+        id: { type: string }
+        description: { type: string }
+        mode: { type: string }
+        controls: { type: integer }
+    TenantView:
+      type: object
+      properties:
+        tenantId: { type: string }
+        name: { type: string }
+        tenantType: { type: string }
+        plan: { type: string }
+        subscriptionStatus: { type: string }
+        killSwitch: { type: boolean }
+    UsageView:
+      type: object
+      properties:
+        tenantId: { type: string }
+        usage:
+          type: object
+          additionalProperties: true
+        budgetPositions:
+          type: object
+          additionalProperties: true
+        warnAtPct: { type: number }
+    QuotaView:
+      type: object
+      properties:
+        tenantId: { type: string }
+        plan: { type: string }
+        quotas:
+          type: object
+          additionalProperties: true
+    TaskView:
+      type: object
+      properties:
+        taskId: { type: string }
+        tenantId: { type: string }
+        agentId: { type: string }
+        taskType: { type: string }
+        status: { type: string }
+    AuditRecordView:
+      type: object
+      properties:
+        seq: { type: integer }
+        ts: { type: string }
+        tenantId: { type: string }
+        actor: { type: string }
+        action: { type: string }
+        resource: { type: string, nullable: true }
+        detail:
+          type: object
+          nullable: true
+    EventView:
+      type: object
+      properties:
+        seq: { type: integer }
+        eventId: { type: string }
+        type: { type: string }
+        tenantId: { type: string }
+        aggregateId: { type: string, nullable: true }
+        createdAt: { type: string }
+        state: { type: string }
+        attempts: { type: integer }
+        payload:
+          type: object
+          additionalProperties: true
+    ApprovalView:
+      type: object
+      properties:
+        approvalId: { type: string }
+        action: { type: string }
+        resource: { type: string }
+        requester: { type: string }
+        reason: { type: string }
+        status: { type: string }
+        approver: { type: string, nullable: true }
+        decidedAt: { type: string, nullable: true }
