@@ -1,0 +1,33 @@
+# Default tenant-starter seed pack for provisioning (issue #14).
+#
+# Every provisioned tenant starts with this starter set. Entries are resolved
+# against the platform registries on the checkout (read-only):
+#   - profiles: registry/profiles/seeds/<id>.<version>.yaml  (issue #9)
+#   - prompts:  registry/prompts/modules/<taskType>.v<n>.yaml (issue #13)
+#   - personas: registry/personas/cards/<id>.yaml (issue #11)
+#
+# The persona ids below are platform-default persona cards shipped by the
+# persona registry (registry/personas/cards, issue #11) - a starter set that
+# parallels the starter profiles plus core SME reviewers. If the persona
+# registry directory is absent on a given checkout, provisioning records these
+# persona seeds as deferred-by-contract instead of failing; when it IS present,
+# an expected persona id that cannot be found aborts provisioning (fail
+# closed).
+pack: tenant-starter
+description: Default tenant starter seed pack (profiles, personas, prompts).
+profiles:
+  - orchestrator@1.0.0
+  - coder@1.0.0
+  - reviewer@1.0.0
+personas:
+  - orchestrator
+  - coder
+  - reviewer
+  - architecture-sme
+  - security-sme
+  - iac-sme
+  - qa-sme
+prompts:
+  - classify-route@v2
+  - summarize@v1
+  - code-review-verdict@v1
