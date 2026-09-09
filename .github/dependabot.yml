@@ -1,0 +1,31 @@
+# Dependabot configuration — agent-orchestrator
+#
+# Governed-repo dependency automation (hub GR-9/GR-13, conformance `dependabot`
+# signal). Kept simple: weekly grouped updates for the Python dependency
+# surface and the (legacy, pre-ratification) GitHub Actions surface. The repo's
+# automation is code-native (`make verify`); dependabot PRs land via the
+# normal PR gate on `master` and are never auto-merged.
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"

@@ -1,0 +1,141 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "agent-orchestrator",
+  "name": "agent-orchestrator",
+  "type": "service",
+  "class": ["backend", "service", "saas", "control-plane"],
+  "source": {
+    "repo": "kushin77/agent-orchestrator",
+    "default_branch": "master"
+  },
+  "versions": {
+    "latest": "v0.1.0"
+  },
+  "distribution": {
+    "language": "python"
+  },
+  "license": "MIT",
+  "export_eligibility": "private",
+  "features": [
+    {
+      "id": "agent-registry",
+      "default": "off",
+      "flags": ["enable_registry"]
+    },
+    {
+      "id": "agent-packs",
+      "default": "off",
+      "flags": ["enable_registry"]
+    },
+    {
+      "id": "model-gateway",
+      "default": "off",
+      "flags": ["enable_gateway"]
+    },
+    {
+      "id": "finops-chooser",
+      "default": "off",
+      "flags": ["enable_gateway"]
+    },
+    {
+      "id": "state-machine-engine",
+      "default": "off",
+      "flags": ["enable_engine"]
+    },
+    {
+      "id": "policy-gate",
+      "default": "off",
+      "flags": ["enable_guardrails"]
+    },
+    {
+      "id": "dlp-egress-guard",
+      "default": "off",
+      "flags": ["enable_guardrails"]
+    },
+    {
+      "id": "audit-ledger",
+      "default": "off",
+      "flags": ["enable_telemetry"]
+    },
+    {
+      "id": "usage-metering",
+      "default": "off",
+      "flags": ["enable_telemetry"]
+    },
+    {
+      "id": "tenant-budgets",
+      "default": "off",
+      "flags": ["enable_telemetry"]
+    },
+    {
+      "id": "tenant-sso",
+      "default": "off",
+      "flags": ["enable_identity"]
+    },
+    {
+      "id": "rbac",
+      "default": "off",
+      "flags": ["enable_identity"]
+    },
+    {
+      "id": "control-plane-api",
+      "default": "off",
+      "flags": ["enable_identity"]
+    },
+    {
+      "id": "portal",
+      "default": "off",
+      "flags": ["enable_portal"]
+    },
+    {
+      "id": "consumer-sdk",
+      "default": "off"
+    },
+    {
+      "id": "sync-drift",
+      "default": "off"
+    },
+    {
+      "id": "flag-gated-rollout",
+      "default": "off"
+    }
+  ],
+  "integrations": [
+    {
+      "id": "anthropic",
+      "type": "api"
+    },
+    {
+      "id": "deepseek",
+      "type": "api"
+    },
+    {
+      "id": "openai",
+      "type": "api"
+    },
+    {
+      "id": "gemini",
+      "type": "api"
+    },
+    {
+      "id": "ollama",
+      "type": "api"
+    },
+    {
+      "id": "oidc",
+      "type": "oidc"
+    },
+    {
+      "id": "saml",
+      "type": "saml"
+    }
+  ],
+  "governance": {
+    "branch_protection": "standard",
+    "security": ["dependabot", "secret-scan"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": null
+  }
+}
