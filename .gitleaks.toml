@@ -25,4 +25,9 @@ regexes = [
 paths = [
   # Vendored submodule + local research scratch are not authored here.
   '(^|/)(vendor|\.research|node_modules|\.terraform|\.venv|venv)/',
+  # Inert synthetic SSO test fixture (verified 2026-09-08): a fake acme.example
+  # tenant OIDC identity-token JWT (alice@acme.example.com,
+  # issuer.acme.example.com, exp ~2027) used by identity/sso tests — no real
+  # credential. Allowlisted so gitleaks' default `jwt` rule does not re-flag it.
+  'identity/sso/tests/fixtures/oidc-acme-idtoken\.jwt$',
 ]
