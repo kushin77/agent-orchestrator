@@ -793,12 +793,8 @@ def loop(args: argparse.Namespace) -> int:
         write_heartbeat("working", started_at=started_at, commit=commit, issue=issue, agent=agent_id)
         mark_run(directive_id, issue, agent_id)
         beater = start_beating(started_at, commit, issue, agent_id)
-<<<<<<< HEAD
         lane = (directive.get("task") or {}).get("lane") or ""
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
-=======
-        lane = (directive.get("task") or {}).get("lane") or ""        claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
->>>>>>> origin/master
         if not claimed:
             print(f"[terminal] claim refused for #{issue}: {claim_output}", file=sys.stderr, flush=True)
             subprocess.run(
