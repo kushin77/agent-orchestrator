@@ -8,7 +8,7 @@ it gets fixed.
 
 from __future__ import annotations
 
-from .audit import Finding, Quarantine, audit, audit_item, hygiene, load_quarantine
+from .audit import Finding, Quarantine, audit, audit_item, hygiene, in_scope, load_quarantine
 from .closeout import CloseOutResult, Step, closeout, describe
 from .model import INVARIANTS, INVARIANTS_BY_CODE, ITEM_INVARIANTS, STAGES, TERMINAL_STAGE, invariant, stage_of
 
@@ -27,6 +27,7 @@ __all__ = [
     "closeout",
     "describe",
     "hygiene",
+    "in_scope",
     "invariant",
     "load_quarantine",
     "stage_of",

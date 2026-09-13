@@ -176,6 +176,33 @@ def audit_item(item: dict) -> list[Finding]:
     return _filing_findings(item)
 
 
+def in_scope(
+    *,
+    lane: dict | None = None,
+    claim: str | None = None,
+    directive: dict | None = None,
+    journal: dict | None = None,
+    closed: bool = True,
+    milestone: str | None = None,
+) -> bool:
+    """Whether the lifecycle audit owns this item.
+
+    Ownership is the process's own durable record - a lane, a claim, a directive
+    or a journal - not "has a pull request". A historical item closed before the
+    lifecycle existed has a PR but none of those, and charging it a closure
+    invariant it never had a chance to satisfy floods the report with noise and
+    buries the items the process actually owns. Legacy is therefore out of scope;
+    the audit states its scope in every report and enforces what it owns going
+    forward. Open, milestoned items remain in scope so the filing rule still
+    catches new work filed without its declaring labels.
+    """
+    if lane or claim or directive or journal:
+        return True
+    if not closed and milestone:
+        return True
+    return False
+
+
 def _tracking_state(record: dict, tracked_by: str) -> str:
     return str((record.get("tracking") or {}).get(tracked_by, "unknown"))
 
