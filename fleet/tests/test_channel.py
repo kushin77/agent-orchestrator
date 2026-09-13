@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+from datetime import datetime, timedelta, timezone
 
 import channel
 from channel import EXIT_NOT_OK, EXIT_OK, validate
@@ -184,6 +185,67 @@ def test_wait_matches_by_correlation_id(tmp_path, monkeypatch):
     (channel.OUTBOX / "r-9.json").write_text(json.dumps(result), encoding="utf-8")
     args = type("Args", (), {"id": "d-1", "timeout_seconds": 1.0, "interval": 0.01})()
     assert channel.cmd_wait(args) == EXIT_OK
+
+
+def test_status_reports_liveness_and_a_running_commit(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    monkeypatch.setattr(channel, "head_commit", lambda: "abc1234")
+    channel.HEARTBEAT.write_text(
+        json.dumps({"pid": 111, "state": "idle", "commit": "abc1234", "ts": channel.now_iso()}),
+        encoding="utf-8",
+    )
+    assert channel.cmd_status(type("Args", (), {})()) == EXIT_OK
+    out = capsys.readouterr().out
+    assert "sister: live" in out and "running commit abc1234 | HEAD abc1234" in out
+
+
+def test_status_flags_a_loop_running_stale_code(tmp_path, monkeypatch, capsys):
+    """The failure of 2026-09-13: a healthy loop on pre-fix code looked dead."""
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    monkeypatch.setattr(channel, "head_commit", lambda: "beef999")
+    channel.HEARTBEAT.write_text(
+        json.dumps({"pid": 111, "state": "working", "commit": "old0000", "ts": channel.now_iso()}),
+        encoding="utf-8",
+    )
+    assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
+    assert "CODE DRIFT" in capsys.readouterr().out
+
+
+def test_status_reports_no_heartbeat_as_not_running(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "missing.json")
+    assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
+    assert "NO HEARTBEAT" in capsys.readouterr().out
+
+
+def test_status_flags_a_stale_heartbeat(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    monkeypatch.setattr(channel, "head_commit", lambda: "abc1234")
+    stale = datetime.now(timezone.utc) - timedelta(seconds=channel.STALE_HEARTBEAT_SECONDS + 30)
+    channel.HEARTBEAT.write_text(
+        json.dumps(
+            {
+                "pid": 111,
+                "state": "idle",
+                "commit": "abc1234",
+                "ts": stale.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    channel.cmd_status(type("Args", (), {})())
+    assert "STALE" in capsys.readouterr().out
 
 
 def test_send_accepts_inline_json(tmp_path, monkeypatch):
