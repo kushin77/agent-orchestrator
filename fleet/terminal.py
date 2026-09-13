@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -258,7 +259,12 @@ def release_issue(issue: int, agent_id: str) -> tuple[bool, str]:
     """Release a claim; report the outcome rather than swallowing it.
 
     A silent release failure is how a finished run left #167 held for the next
-    operator to find, so the caller now gets the channel's own words.
+    operator to find, so the caller now gets the channel's own words. A claim
+    that is *already* free is not a failure, though: ``not-claimed`` is a benign
+    no-op (the graceful-stop path releases once and the run's ``finally`` used to
+    report the second, refused release as "release FAILED" — #281).
+    ``not-owner`` — a release of someone else's claim — is still a real failure
+    and is surfaced.
     """
     result = subprocess.run(
         [
@@ -269,7 +275,34 @@ def release_issue(issue: int, agent_id: str) -> tuple[bool, str]:
         capture_output=True,
         text=True,
     )
-    return result.returncode == 0, (result.stdout + result.stderr).strip()
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode == 0:
+        return True, output
+    if "not-claimed" in output:
+        return True, f"already released (benign): {output}"
+    return False, output
+
+
+def release_in_flight(issue: int, agent_id: str, directive_id: str) -> None:
+    """Release the run's claim exactly once, whichever path gets there first.
+
+    Two writers race for one claim on a graceful stop — ``stop_and_release`` (the
+    signal handler) and the run's ``finally`` — and ``release`` is deliberately
+    not idempotent, so the loser logged ``release of #N FAILED`` plus a spurious
+    warn on *every* graceful stop (#281). The ``released`` flag makes this the
+    single owner: the first caller releases, the second is a no-op.
+    """
+    if IN_FLIGHT.get("released"):
+        return
+    IN_FLIGHT["released"] = True
+    released, release_output = release_issue(issue, agent_id)
+    if not released:
+        print(f"[terminal] release of #{issue} FAILED: {release_output}", file=sys.stderr, flush=True)
+        subprocess.run(
+            ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+             "--severity", "warn", "--body", f"release of #{issue} failed: {release_output[-400:]}"],
+            cwd=ROOT,
+        )
 
 
 def closeout_issue(issue: int) -> str:
@@ -311,6 +344,10 @@ def stop_and_release(reason: str) -> None:
     issue, agent_id, directive_id = IN_FLIGHT.get("issue"), IN_FLIGHT.get("agent_id"), IN_FLIGHT.get("directive")
     if issue is None or not agent_id:
         return
+    # Single owner: this handler releases the claim, and the run's own `finally`
+    # must not release it a second time (the second was always refused and logged
+    # a false "release FAILED" on every graceful stop — #281).
+    IN_FLIGHT["released"] = True
     held = subprocess.run(
         ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
         cwd=ROOT,
@@ -354,16 +391,150 @@ def directive_issue(directive: dict) -> int | None:
     return issue
 
 
+#: The repository whose board carries the truth about whether a run's work landed.
+REPO = "kushin77/agent-orchestrator"
+#: The gate of record, run by the loop itself — never inferred from model prose.
+GATE_OF_RECORD = "make verify"
+#: A ``Verify:`` line is only executed when it is command-shaped: its first token
+#: must be an executable the fleet can run. Issue bodies mix real commands with
+#: prose ("Verify: the new test fails against today's code"), and running a
+#: sentence as a command would manufacture the false verdict this code removes.
+COMMAND_PREFIXES = frozenset(
+    {
+        "make", "bash", "sh", "python3", "python", "pytest", "node", "npm",
+        "npx", "git", "gh", "go", "cargo", "terraform", "docker",
+    }
+)
+
+
 def looks_refused(output: str) -> bool:
-    """A subagent that stopped on a refusal must not read as success."""
+    """A *hint* that a subagent stopped on a refusal — never the verdict.
+
+    Kept deliberately as a hint only (#279): used as a verdict it matched a
+    quoted ``REFUSED`` in an otherwise successful run and downgraded it, while
+    matching nothing in a run that printed confident prose and did no work. The
+    verdict is ``verdict()``, derived from evidence the loop runs itself.
+    """
     upper = output.upper()
     return "REFUSED" in upper or "NO WORK DONE" in upper or "NO REAL ISSUE" in upper
+
+
+def extract_verify_command(body: str) -> str | None:
+    """The issue's own ``Verify:`` command — only when it is command-shaped.
+
+    A body that declares no runnable command (or declares prose) yields None, so
+    the loop falls back to ``make verify`` rather than executing a sentence.
+    """
+    match = re.search(r"^[\s>*`-]*Verify:\s*(.*)$", body or "", re.IGNORECASE | re.MULTILINE)
+    if not match:
+        return None
+    candidate = re.sub(r"^[`\s]+|[`\s]+$", "", match.group(1))
+    if not candidate:
+        for line in (body or "")[match.end():].splitlines():
+            candidate = re.sub(r"^[`\s]+|[`\s]+$", "", line)
+            if candidate:
+                break
+    if not candidate or "\n" in candidate:
+        return None
+    first = candidate.split()[0]
+    if first not in COMMAND_PREFIXES and not first.startswith(("./", "/")):
+        return None
+    return candidate
+
+
+def gh_issue_field(issue: int, jq: str) -> str | None:
+    """Read one field of issue #issue from the real board; None when unreachable.
+
+    The loop reads the board itself so the verdict rests on GitHub's state, not
+    on a subagent's claim about it. ``None`` means "cannot assess", which is
+    never a pass.
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "api", f"repos/{REPO}/issues/{issue}", "--jq", jq],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    read = (result.stdout or "").strip()
+    return read if read else None
+
+
+def issue_verify_command(issue: int) -> str | None:
+    """The issue's own ``Verify:`` command, read from the board the loop trusts."""
+    return extract_verify_command(gh_issue_field(issue, ".body") or "")
+
+
+def run_gate(command: str, cwd: str, timeout: float) -> tuple[bool, str]:
+    """Run one gate the loop owns; its exit code — not the prose — is the signal."""
+    try:
+        done = subprocess.run(
+            ["bash", "-lc", command], cwd=cwd, capture_output=True, text=True, timeout=timeout
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"`{command}` could not run ({exc})"
+    tail = ((done.stdout or "") + (done.stderr or "")).strip()[-300:]
+    return done.returncode == 0, f"`{command}` rc={done.returncode}: {tail or 'no output'}"
+
+
+def gate_evidence(issue: int, worktree: Path | None, timeout: float) -> tuple[bool, str]:
+    """Run the gates the loop checks itself: the issue's Verify: and ``make verify``.
+
+    The runner's own text is never consulted here — a run that only *says* it
+    verified the work cannot make either gate exit 0.
+    """
+    cwd = str(worktree) if worktree is not None else str(ROOT)
+    declared = issue_verify_command(issue)
+    commands = [declared] if declared else []
+    if GATE_OF_RECORD not in commands:
+        commands.append(GATE_OF_RECORD)
+    pieces = [f"issue Verify: `{declared}`" if declared else "issue declares no runnable Verify: command"]
+    ok = True
+    for command in commands:
+        passed, detail = run_gate(command, cwd, timeout)
+        pieces.append(detail)
+        ok = ok and passed
+    return ok, " | ".join(pieces)
+
+
+def landed_evidence(issue: int) -> tuple[bool, str]:
+    """The real board state: #issue is closed, so the work actually landed.
+
+    GitHub reports its canonical casing (``OPEN``/``CLOSED``), so the state is
+    lower-cased before comparison — the trap fixed fleet-wide by #290, where an
+    uppercase ``CLOSED`` read as "not landed" and a landed change was misread.
+    """
+    state = gh_issue_field(issue, ".state")
+    if state is None:
+        return False, f"issue #{issue} state unavailable (gh could not read the board)"
+    normalised = state.strip().lower()
+    return normalised == "closed", f"issue #{issue} is {normalised}"
+
+
+def verdict(rc: int, output: str, gate_ok: bool, landed: bool) -> tuple[str, str]:
+    """The run's status — ``done`` only on evidence the loop established itself.
+
+    ``done`` requires the runner to have exited 0 *and* the loop's own gates to
+    have passed *and* the issue to be closed. The model's prose is carried as a
+    labelled hint, never as the basis: confident prose with no work is not a
+    success, and a run that merely quotes ``REFUSED`` is not a failure (#279).
+    """
+    verified = rc == 0 and gate_ok and landed
+    hint = "refusal language present" if looks_refused(output) else "none"
+    return ("done" if verified else "failed"), hint
 
 
 HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
 WORKTREE_ROOT = Path(os.environ.get("AO_WORKTREE_ROOT", str(Path.home() / "ao-worktrees")))
 # What the loop is currently executing, so a stop signal can free the claim.
-IN_FLIGHT: dict[str, object] = {"issue": None, "agent_id": None, "directive": None, "child": None}
+IN_FLIGHT: dict[str, object] = {
+    "issue": None, "agent_id": None, "directive": None, "child": None, "released": False,
+}
 # Run registry: who is tracking which directive. Without it a claim's holder is
 # just a string — indistinguishable from an agent that died mid-run, which is how
 # a directive got consumed as "already in-flight" while nothing was running.
@@ -465,7 +636,7 @@ def record_run(
                 detail=detail,
             ),
         )
-    except telemetry.TelemetryError as exc:
+    except (telemetry.TelemetryError, OSError) as exc:
         print(f"[terminal] telemetry record for {directive_id} rejected: {exc}", file=sys.stderr, flush=True)
 
 
@@ -890,6 +1061,7 @@ def loop(args: argparse.Namespace) -> int:
         IN_FLIGHT["issue"] = issue
         IN_FLIGHT["agent_id"] = agent_id
         IN_FLIGHT["directive"] = directive_id
+        IN_FLIGHT["released"] = False
         held = subprocess.run(
             ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
             cwd=ROOT,
@@ -1000,41 +1172,40 @@ def loop(args: argparse.Namespace) -> int:
             IN_FLIGHT["agent_id"] = None
             IN_FLIGHT["directive"] = None
             clear_run(directive_id)
-            released, release_output = release_issue(issue, agent_id)
-            if not released:
-                print(f"[terminal] release of #{issue} FAILED: {release_output}", file=sys.stderr, flush=True)
-                subprocess.run(
-                    ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
-                     "--severity", "warn", "--body", f"release of #{issue} failed: {release_output[-400:]}"],
-                    cwd=ROOT,
-                )
+            # Single owner (#281): a graceful stop already released the claim and
+            # set the flag, so this must not release it a second time.
+            release_in_flight(issue, agent_id, directive_id)
+            IN_FLIGHT["released"] = False
         where = f"worktree {worktree}" if worktree else "shared checkout"
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
         tail = f"[{where}] {tail}"
-        refused = looks_refused(output)
-        run_status = "done" if (rc == 0 and not refused) else "failed"
+        # The verdict comes from evidence the loop runs itself — the issue's own
+        # Verify: command, `make verify`, and the real board state — never from
+        # the runner's prose (#279).
+        gate_ok, gate_detail = gate_evidence(issue, worktree, args.timeout)
+        # "The PR is merged" is not "the item is closed": at this point the branch,
+        # the claim, the directive and the lane are still live. Close them out and
+        # carry the verdict, so a partial close is visible. Only a run whose gates
+        # passed is worth closing out.
+        closeout = closeout_issue(issue) if (rc == 0 and gate_ok) else "SKIPPED (gates did not pass)"
+        landed, landing_detail = landed_evidence(issue)
+        run_status, prose_hint = verdict(rc, output, gate_ok, landed)
+        tail = f"{tail} | {gate_detail} | {landing_detail} | close-out: {closeout} | prose-hint: {prose_hint}"
         record_run(directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200])
         clear_reported(directive_id)
-        if rc == 0 and not refused:
-            # "The PR is merged" is not "the item is closed": at this point the
-            # branch, the claim, the directive and the lane are still live. Close
-            # them out and carry the verdict, so a partial close is visible.
-            tail = f"{tail} | close-out: {closeout_issue(issue)}"
+        if run_status == "done":
             subprocess.run(
                 ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
-                 "--type", "result", "--body", tail],
-                cwd=ROOT,
-            )
-        elif refused:
-            subprocess.run(
-                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
-                 "--severity", "warn", "--body", tail],
+                 "--type", "result", "--body", tail[:2000]],
                 cwd=ROOT,
             )
         else:
+            # The runner's exit code picks the severity; the *evidence* decides
+            # whether this is a success at all. Prose no longer picks either.
+            severity = "warn" if rc == 0 else "critical"
             subprocess.run(
                 ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
-                 "--severity", "critical", "--body", tail],
+                 "--severity", severity, "--body", tail[:2000]],
                 cwd=ROOT,
             )
         if args.once:

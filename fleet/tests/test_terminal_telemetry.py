@@ -47,6 +47,21 @@ def test_record_run_swallows_a_bad_status_instead_of_crashing_the_loop(tmp_path,
     assert "rejected" in capsys.readouterr().err
 
 
+def test_record_run_survives_an_unwritable_log(tmp_path, monkeypatch, capsys):
+    """#285: an OSError (disk full / bad permission) must not kill the loop.
+
+    `append_record` mkdirs the parent then opens the file, so pointing the log
+    under a *file* raises FileExistsError (an OSError) — deterministic, no chmod.
+    """
+    blocker = tmp_path / "afile"
+    blocker.write_text("not a directory", encoding="utf-8")
+    monkeypatch.setattr(telemetry, "RUNS_LOG", blocker / "runs.jsonl")
+
+    terminal.record_run("d-285", 285, "subagent-abc", "done", "2026-09-13T00:00:00Z", "2026-09-13T00:05:00Z")
+
+    assert "rejected" in capsys.readouterr().err
+
+
 def test_loop_wires_record_run_into_the_run_path():
     """The run path must call record_run for both the start and the outcome."""
     import inspect
