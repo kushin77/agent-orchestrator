@@ -147,6 +147,17 @@ def cmd_status(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_held(args: argparse.Namespace) -> int:
+    """Exit 0 and print the holder when the issue has a live claim; exit 1 when it does not."""
+    live = claims.active_claims(claims.read_ledger(args.ledger))
+    holder = live.get(args.issue)
+    if holder is None:
+        print(json.dumps({"issue": args.issue, "agent": None}))
+        return EXIT_NOT_OK
+    print(json.dumps({"issue": args.issue, "agent": holder.agent, "at": holder.at, "reason": holder.reason}))
+    return EXIT_OK
+
+
 def cmd_snapshot(args: argparse.Namespace) -> int:
     if not args.from_github:
         print("snapshot: pass --from-github (this is the only network-touching path)", file=sys.stderr)
@@ -203,6 +214,11 @@ def build_parser() -> argparse.ArgumentParser:
     status = sub.add_parser("status", help="show the active milestone, frontier and live claims")
     add_paths(status)
     status.set_defaults(func=cmd_status)
+
+    held = sub.add_parser("held", help="print the live claim holder of an issue (exit 0 = held, 1 = free)")
+    add_paths(held)
+    held.add_argument("--issue", type=int, required=True)
+    held.set_defaults(func=cmd_held)
 
     snap = sub.add_parser("snapshot", help="refresh .board/snapshot.json from GitHub")
     snap.add_argument("--from-github", action="store_true")

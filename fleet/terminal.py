@@ -59,7 +59,7 @@ def extract_json(text: str) -> dict:
     return {}
 
 
-def build_prompt(directive: dict) -> str:
+def build_prompt(directive: dict, agent_id: str = "subagent") -> str:
     """The subagent prompt: one issue, claim-first, evidence over assertion."""
     task = directive.get("task") or {}
     issue = task.get("issue")
@@ -73,7 +73,7 @@ def build_prompt(directive: dict) -> str:
         "Work in the repo checkout; disk worktrees under ~/ao-worktrees, never /tmp.\n\n"
         f"BRAIN DIRECTIVE {directive_id} — model {model.get('tier', 'flash')}/{model.get('thinking', 'none')}:\n{body}\n\n"
         "Do exactly this, nothing else:\n"
-        f"1. Claim it: python3 governance/dispatch/cli.py claim --issue {issue} --agent subagent --lane {lane} --directive {directive_id}\n"
+        f"1. Claim it: python3 governance/dispatch/cli.py claim --issue {issue} --agent {agent_id} --lane {lane} --directive {directive_id}\n"
         "   (a REFUSED claim means STOP and report the exact reason — never work around it).\n"
         f"2. Implement issue #{issue} to completion; open a PR whose body carries 'Closes #{issue}' and the ACTUAL 'make verify' output as evidence.\n"
         "3. Release the claim when done.\n"
@@ -82,14 +82,14 @@ def build_prompt(directive: dict) -> str:
     )
 
 
-def build_command(directive: dict, runner: str) -> list[str]:
+def build_command(directive: dict, runner: str, agent_id: str) -> list[str]:
     """Runner must accept the prompt as its final argument (e.g. `claude -p`)."""
-    return shlex.split(runner) + [build_prompt(directive)]
+    return shlex.split(runner) + [build_prompt(directive, agent_id)]
 
 
-def run_once(directive: dict, runner: str, timeout: float, dry_run: bool) -> tuple[int, str]:
+def run_once(directive: dict, runner: str, timeout: float, dry_run: bool, agent_id: str) -> tuple[int, str]:
     """Run one subagent for one directive; return (exit code, captured output)."""
-    command = build_command(directive, runner)
+    command = build_command(directive, runner, agent_id)
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
         return 0, "DRY-RUN (not executed)"
@@ -213,8 +213,30 @@ def loop(args: argparse.Namespace) -> int:
                 return 1
             continue
 
+        agent_id = f"subagent-{directive_id[:8]}"
+        held = subprocess.run(
+            ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        if held.returncode == 0:
+            try:
+                holder = json.loads(held.stdout).get("agent")
+            except json.JSONDecodeError:
+                holder = "unknown"
+            print(f"[terminal] #{issue} already held by {holder} — not re-dispatching", flush=True)
+            subprocess.run(
+                ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                 "--type", "result", "--body", f"#{issue} already in-flight (held by {holder}) — not re-dispatched"],
+                cwd=ROOT,
+            )
+            if args.once:
+                return 0
+            continue
+
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
-        rc, output = run_once(directive, args.runner, args.timeout, args.dry_run)
+        rc, output = run_once(directive, args.runner, args.timeout, args.dry_run, agent_id)
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
         refused = looks_refused(output)
         if rc == 0 and not refused:

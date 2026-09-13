@@ -29,17 +29,24 @@ def test_extract_json_returns_empty_for_garbage():
 
 
 def test_build_command_appends_the_prompt_as_the_final_argument():
-    command = terminal.build_command({"id": "d-1", "task": {"issue": 163}, "body": "x"}, "claude -p")
+    command = terminal.build_command({"id": "d-1", "task": {"issue": 163}, "body": "x"}, "claude -p", "subagent-d1")
     assert command[0] == "claude"
     assert command[1] == "-p"
     assert "issue #163" in command[-1]
+    assert "--agent subagent-d1" in command[-1]
 
 
 def test_run_once_dry_run_prints_and_returns_zero():
     directive = {"id": "d-1", "task": {"issue": 163}, "body": "x"}
-    rc, output = terminal.run_once(directive, "claude -p", 10.0, dry_run=True)
+    rc, output = terminal.run_once(directive, "claude -p", 10.0, dry_run=True, agent_id="subagent-d1")
     assert rc == 0
     assert "DRY-RUN" in output
+
+
+def test_build_prompt_uses_the_unique_agent_id():
+    directive = {"id": "d-abc12345", "task": {"issue": 163, "lane": "fleet"}, "body": "x"}
+    prompt = terminal.build_prompt(directive, "subagent-dabc1234")
+    assert "--agent subagent-dabc1234" in prompt
 
 
 def test_directive_issue_rejects_missing_or_invalid_issue():
