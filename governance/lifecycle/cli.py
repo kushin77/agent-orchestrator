@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.lifecycle.audit import audit, hygiene, load_quarantine  # noqa: E402
+from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
 from governance.lifecycle.closeout import CloseOutResult, closeout, describe  # noqa: E402
 from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
 
@@ -173,10 +173,20 @@ def collect_from_github(root: Path | None = None) -> dict:
         pull = by_issue.get(number)
         claimed_by = claims.get(number)
         closed = issue.get("state") == "closed"
-        # Scope: work the fleet touched, plus open milestoned work (the filing rule).
-        if not (lane or pull or claimed_by or (not closed and issue.get("milestone"))):
-            continue
+        directive = _directive_for(number, root)
         journal = journals.get(number) or {}
+        # Scope: items the process owns (lane/claim/directive/journal), plus open
+        # milestoned work for the filing rule. A PR alone is NOT ownership - a
+        # historical item closed before the lifecycle existed has one.
+        if not in_scope(
+            lane=lane,
+            claim=claimed_by,
+            directive=directive,
+            journal=journal,
+            closed=closed,
+            milestone=(issue.get("milestone") or {}).get("title"),
+        ):
+            continue
         items.append(
             {
                 "issue": number,
@@ -197,7 +207,7 @@ def collect_from_github(root: Path | None = None) -> dict:
                 ),
                 "branch_deleted": not _branch_exists(str((pull or {}).get("headRefName") or "")),
                 "claim": {"agent": claimed_by, "live": bool(claimed_by)},
-                "directive": _directive_for(number, root),
+                "directive": directive,
                 "lane": lane or {},
                 "verify": journal.get("verify") or {},
                 "closing_evidence": bool(journal.get("closing_evidence", False)),

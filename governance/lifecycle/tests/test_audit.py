@@ -8,7 +8,7 @@ grandfathered" into "nothing is ever enforced".
 
 from __future__ import annotations
 
-from governance.lifecycle.audit import Quarantine, audit, audit_item, hygiene
+from governance.lifecycle.audit import Quarantine, audit, audit_item, hygiene, in_scope
 
 from conftest import HEAD_COMMIT, MERGE_COMMIT, clean_item, record  # noqa: E402
 
@@ -129,6 +129,32 @@ def test_findings_are_reported_per_item_not_merged_together():
     report = hygiene(record(clean_item(), broken))
     assert {finding["subject"] for finding in report["findings"]} == {"#300"}
     assert len(report["findings"]) == 2
+
+
+def test_a_pr_alone_is_not_ownership():
+    """A historical item closed before the lifecycle existed has a PR, nothing else."""
+    assert in_scope(closed=True) is False
+    assert in_scope(closed=False) is False
+
+
+def test_an_item_the_process_owns_is_in_scope():
+    for owned in (
+        {"lane": {"session_id": "s", "present": True}},
+        {"claim": "copilot-brain"},
+        {"directive": {"id": "d", "state": "done"}},
+        {"journal": {"verify": {"ok": True, "commit": HEAD_COMMIT}}},
+    ):
+        assert in_scope(closed=True, **owned) is True
+
+
+def test_open_milestoned_work_is_in_scope_for_the_filing_rule():
+    assert in_scope(closed=False, milestone="M26 - Session Fleet Operating Model") is True
+    assert in_scope(closed=False) is False
+
+
+def test_a_closed_item_out_of_scope_never_reaches_the_audit():
+    """The collector drops it, so this is about the predicate boundary."""
+    assert in_scope(closed=True) is False
 
 
 def test_a_quarantined_item_is_excused_while_its_tracking_issue_is_open():
