@@ -60,20 +60,25 @@ field name, never the files.
 
 ## 4. Dispatch contract (per soldier/agent)
 
-1. Work in your **own git worktree** under `$TMPDIR` (never the shared main
+1. **Claim the issue.** `python3 governance/dispatch/cli.py claim --issue <n>
+   --agent <id> --lane <lane>` — refused unless the issue is the next step in the
+   active chain (frontier of the active milestone, a child of an issue you hold,
+   or the successor of one you advanced). A second claim on an in-flight issue is
+   refused too. Release the claim when the chain advances.
+2. Work in your **own git worktree** under `$TMPDIR` (never the shared main
    checkout).
-2. Read the issue spec (`gh api` is authoritative — `gh issue view` trips the
+3. Read the issue spec (`gh api` is authoritative — `gh issue view` trips the
    classic-Projects GraphQL bug on this org); implement the acceptance criteria
    to completion.
-3. Stay in your lane; smallest focused diff; no unfinished markers or debug
+4. Stay in your lane; smallest focused diff; no unfinished markers or debug
    leftovers.
-4. Commit with `Refs kushin77/agent-orchestrator#<n>`; push; open a PR whose
+5. Commit with `Refs kushin77/agent-orchestrator#<n>`; push; open a PR whose
    body includes `Closes #<n>` and an AI-assistance declaration.
-5. **Verify before done (GR-12):** run the issue's `Verify:` command and
+6. **Verify before done (GR-12):** run the issue's `Verify:` command and
    `make verify`; paste the **actual output** as evidence on the PR.
-6. **Merge after green** (owner autonomous-merge mandate) — never merge failing
+7. **Merge after green** (owner autonomous-merge mandate) — never merge failing
    work.
-7. Close the issue with the evidence comment; re-check the board before
+8. Close the issue with the evidence comment; re-check the board before
    standing down (never idle).
 
 ## 5. Chronological dispatch rule (mandatory)

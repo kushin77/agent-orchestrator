@@ -1,0 +1,1411 @@
+{
+  "generated_at": "2026-09-13T17:46:59Z",
+  "source": "kushin77/agent-orchestrator",
+  "issues": [
+    {
+      "number": 1,
+      "title": "Pilot: Invitation \u2014 validate Investigation Canvas prototype",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 2,
+      "title": "Pilot Invitation: Investigation Canvas",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 3,
+      "title": "Orchestrator",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 4,
+      "title": "EPIC-00 AI Agent Orchestration SaaS \u2014 E2E blueprint & backlog index",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:0-foundations",
+        "pillar:control-plane",
+        "priority:P0",
+        "source:decision",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 5,
+      "title": "01 Repo foundation: layout + agent-instruction layering (AGENTS/CLAUDE/.cursorrules)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:0-foundations",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "source:cannibalized",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 6,
+      "title": "02 CI/CD + IaC foundation (flag-gated OFF default, make verify)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:0-foundations",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 7,
+      "title": "03 Golden rules + policy spine (rule format with rationale + verification)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:0-foundations",
+        "pillar:guardrails-security",
+        "priority:P0",
+        "source:cannibalized",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 8,
+      "title": "04 Commit CANNIBALIZATION.md index (24-repo harvest map)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:0-foundations",
+        "pillar:control-plane",
+        "priority:P0",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 9,
+      "title": "05 Agent Profile schema (declarative) + validator + versioning",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 10,
+      "title": "06 Agent Identity + Registry service (capability / task-route catalog)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 11,
+      "title": "07 SME persona registry + library (persona cards, tenant-extensible)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 12,
+      "title": "08 Agent Org RBAC / role model (scope gate separate from permission)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:1-agent-registry",
+        "pillar:identity-rbac",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 13,
+      "title": "09 Versioned prompt / instruction library + feedback loop",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 14,
+      "title": "10 Tenant onboarding + provisioning controller (idempotent)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:1-agent-registry",
+        "pillar:identity-rbac",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 15,
+      "title": "11 Multi-provider client adapters (Claude/DeepSeek/Copilot/Gemini/Ollama)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 16,
+      "title": "12 Model gateway proxy (route/dispatch/log funnel, typed outputs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 17,
+      "title": "13 FinOps model chooser (L0/L1/L2 cheapest-capable + escalate)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 18,
+      "title": "14 Model-health monitoring + auto-degradation + local fallback",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 19,
+      "title": "15 Semantic cache + token budget + rate limit + output throttle",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 20,
+      "title": "16 Tenant-scoped MCP tool gateway (allowlist + audit)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 21,
+      "title": "17 Durable state-machine orchestration engine (Temporal, namespaces, saga)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:3-state-machine",
+        "pillar:state-machine",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 22,
+      "title": "18 Task lifecycle state machine + job queue (claim/ack/fail/reap)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:3-state-machine",
+        "pillar:state-machine",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 23,
+      "title": "19 Deterministic agent-loop runtime (bounded actor loop + escalation)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:3-state-machine",
+        "pillar:state-machine",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 24,
+      "title": "20 Multi-agent orchestration (hierarchical lanes + consensus/voting)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:3-state-machine",
+        "pillar:state-machine",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 25,
+      "title": "21 Scoped agent memory store (tenant/agent/session + TTL)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:3-state-machine",
+        "pillar:state-machine",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 26,
+      "title": "22 Policy-as-code + gate engine (BLOCK/WARN/LOG, startup validation)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 27,
+      "title": "23 DLP + prompt-injection defense + egress guard (HMAC per-call)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 28,
+      "title": "24 Guard honesty: tri-state status + no-false-green + negative controls",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 29,
+      "title": "25 Verification / QA gate stack (make gate, qa-loop, merge gate)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 30,
+      "title": "26 Tenant isolation integrity (detect-first / opt-in repair)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 31,
+      "title": "27 Tamper-evident audit ledger (per-tenant hash chain, encrypted payloads)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 32,
+      "title": "28 Observability / telemetry + per-tenant SLOs + dashboards",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 33,
+      "title": "29 Usage metering + cost engine (multi-provider rate cards)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 34,
+      "title": "30 Per-tenant budgets + quotas + global kill switch + SLO exporter",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 35,
+      "title": "31 Tenant identity + SSO (tenant-to-IdP mapping, SAML/OIDC)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:6-identity-rbac",
+        "pillar:identity-rbac",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 36,
+      "title": "32 RBAC + plan-to-entitlement-to-override tiering",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:6-identity-rbac",
+        "pillar:identity-rbac",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 37,
+      "title": "33 Public API + proxy allowlist boundary (authn never authz)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:6-identity-rbac",
+        "pillar:control-plane",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 38,
+      "title": "34 Control-plane REST API + event/outbox bus",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:6-identity-rbac",
+        "pillar:control-plane",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 39,
+      "title": "35 Admin / tenant control-plane portal (design tokens + SSO)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 40,
+      "title": "36 Agent-pack registry + catalog (signed attestation, lifecycle)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:7-control-plane",
+        "pillar:registry-profiling",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 41,
+      "title": "37 Consumer SDK + born-compliant templates (TS/Python + MCP)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 42,
+      "title": "38 Model-agnostic instruction layer + per-tool mirrors",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:7-control-plane",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 43,
+      "title": "39 Merge / PR governance + independent SME reviewer + verify-gate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 44,
+      "title": "40 Sync / drift engine + provenance manifests (blast-radius aware)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 45,
+      "title": "41 Flag-gated rollout + deployment pipeline (fully IaC)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 46,
+      "title": "42 E2E negative-control + smoke verification (multi-provider golden path)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:8-autonomous-ops",
+        "pillar:guardrails-security",
+        "priority:P0",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 47,
+      "title": "43 Canonical-copy ownership (MODEL/SME/SOLUTION-CLASSES trio + identity standards)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:8-autonomous-ops",
+        "pillar:registry-profiling",
+        "priority:P2",
+        "source:decision",
+        "type:spike"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 48,
+      "title": "44 Spike: deep-extract elevatediq monorepo orchestration assets",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P2",
+        "source:decision",
+        "type:spike"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 49,
+      "title": "45 Spike: recover eiq-ai upstream for stub agent repos",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:0-foundations",
+        "pillar:registry-profiling",
+        "priority:P2",
+        "source:decision",
+        "type:spike"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 58,
+      "title": "Sandboxed agent tool execution (Docker/Firecracker isolation + per-category security profiles)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P2",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 98,
+      "title": "CMR:ONBOARD-0012 \u00b7 Onboard agent-orchestrator as a CMR vendor module",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "cmr:direction",
+        "vendor:onboarding"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 101,
+      "title": "Agent-to-Agent (A2A) Communication: Protocol Spec, Business Case & Project Plan",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 102,
+      "title": "Agent-to-Agent (A2A) Communication: Protocol Spec, Business Case & Project Plan",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 103,
+      "title": "A2A protocol contract and Agent Card schema",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 104,
+      "title": "Agent registry and discovery for A2A capabilities",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 105,
+      "title": "A2A transport and message gateway",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 106,
+      "title": "Agent task lifecycle, artifacts, and orchestration",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 107,
+      "title": "Trust, auth, and policy controls for cross-agent execution",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 108,
+      "title": "Observability, tracing, and FinOps for A2A traffic",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 109,
+      "title": "Control plane and portal for A2A discovery and rollout",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 110,
+      "title": "Pilot local Ollama agents and launch readiness",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 111,
+      "title": "Agent-to-Agent (A2A) Communication: Protocol Spec, Business Case & Project Plan",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 112,
+      "title": "A2A protocol contract and Agent Card schema",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 113,
+      "title": "Agent registry and discovery for A2A capabilities",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 114,
+      "title": "A2A transport and message gateway",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 115,
+      "title": "Agent task lifecycle, artifacts, and orchestration",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 116,
+      "title": "Trust, auth, and policy controls for cross-agent execution",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 117,
+      "title": "Observability, tracing, and FinOps for A2A traffic",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 118,
+      "title": "Control plane and portal for A2A discovery and rollout",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 119,
+      "title": "Pilot local Ollama agents and launch readiness",
+      "state": "CLOSED",
+      "milestone": "M9 - A2A & Inter-Agent Interop",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 120,
+      "title": "EPIC: Fact-accurate code-indexing KB + module health for all CMR modules",
+      "state": "CLOSED",
+      "milestone": "KB + Module Health",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 121,
+      "title": "Deploy shared-frontend at ai.purebliss.app as the agent ecosystem web UI",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 122,
+      "title": "Module health gate: code-indexing + shared-frontend must be running and verified",
+      "state": "CLOSED",
+      "milestone": "KB + Module Health",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 123,
+      "title": "E2E portal visibility: index truth + frontend UI + operator control plane",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 124,
+      "title": "Vendored module catalog: DeepSeek + Ollama + Hermes + Paperclip",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 125,
+      "title": "EPIC: CMR vendor compliance remediation backlog (all violators)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 126,
+      "title": "CMR vendor compliance gap: saas-rbac",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 127,
+      "title": "CMR vendor compliance gap: github-workflow",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 128,
+      "title": "CMR vendor compliance gap: shared-temporal",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 129,
+      "title": "CMR vendor compliance gap: Shared_Integrations",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 130,
+      "title": "CMR vendor compliance gap: shared-frontend",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 131,
+      "title": "CMR vendor compliance gap: shared-governance",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 132,
+      "title": "CMR vendor compliance gap: shared-services",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 133,
+      "title": "CMR vendor compliance gap: googleworkspace",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 134,
+      "title": "CMR vendor compliance gap: SharedFeatures",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 135,
+      "title": "CMR vendor compliance gap: ERP-CRM",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 136,
+      "title": "CMR vendor compliance gap: code-indexing",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 137,
+      "title": "CMR vendor compliance gap: diagrams",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 138,
+      "title": "EPIC-XX: CMR/GDC Enterprise Knowledge Indexing & Cross-Reference Spine",
+      "state": "OPEN",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 139,
+      "title": "Implement the CMR/GDC institutional knowledge indexer",
+      "state": "OPEN",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
+      "labels": [
+        "area:knowledge-index",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 138,
+      "blocked_by": []
+    },
+    {
+      "number": 140,
+      "title": "Enforce CMR class, pattern, and template conformance across repos",
+      "state": "OPEN",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 138,
+      "blocked_by": [
+        139
+      ]
+    },
+    {
+      "number": 141,
+      "title": "Enforce RCA and lessons capture for all failures, incidents, and corrective actions",
+      "state": "OPEN",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
+      "labels": [
+        "area:incident-response",
+        "area:lessons",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 138,
+      "blocked_by": []
+    },
+    {
+      "number": 142,
+      "title": "Automatically generate violator remediation issues from policy drift and non-compliance",
+      "state": "OPEN",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
+      "labels": [
+        "area:remediation",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:automation"
+      ],
+      "parent": 138,
+      "blocked_by": [
+        140
+      ]
+    },
+    {
+      "number": 143,
+      "title": "Establish the governance board and enforcement gate for CMR/GDC knowledge compliance",
+      "state": "OPEN",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
+      "labels": [
+        "area:board",
+        "class:elite",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 138,
+      "blocked_by": [
+        142
+      ]
+    },
+    {
+      "number": 144,
+      "title": "EPIC: Per-Repo Agent Fleet \u2014 Personal CTO Engineering Team with Enterprise Roll-up",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 145,
+      "title": "Cannibalize mature agent-profile / SME / persona code into the registry",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:agent-profiles",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 146,
+      "title": "Ship the per-repo agent fleet template (fleet-composition-as-template)",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 147,
+      "title": "Port the CTO overlay as a per-repo drop-in governance layer",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:cto-overlay",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 148,
+      "title": "Port the leaderboard coordination protocol into the engine state machine",
+      "state": "CLOSED",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 149,
+      "title": "Port SME-squad routing + capability/route/tier FinOps configs into the gateway",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "source:cannibalized",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 150,
+      "title": "Enforce repo separation, admin rights, and end-to-end issue closure",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:board",
+        "class:elite",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 151,
+      "title": "Provide the enterprise/GDC roll-up \u2014 tenant hierarchy and org aggregate view",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 152,
+      "title": "Enforce chronological issue dispatch across all agents",
+      "state": "CLOSED",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:board",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 154,
+      "title": "Chronological-dispatch gate is red on a clean checkout: contract docs were never committed (#152)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "bug",
+        "class:elite",
+        "pillar:governance",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 157,
+      "title": "Enforce issue order at claim time (behavioral, not just declared): eligibility check + single-claim lock",
+      "state": "OPEN",
+      "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 144,
+      "blocked_by": []
+    }
+  ]
+}

@@ -106,3 +106,26 @@ free-form board queue.
 
 This prevents "issue scavenging" and ensures the board behaves like a governed
 execution plan instead of a generic kanban.
+
+### 8.1 Claim-time enforcement (code, not advice)
+
+A rule that only exists in prose is advisory (GR-29), so the dispatch order is
+enforced by code:
+
+- **Claim before working.** `python3 governance/dispatch/cli.py claim --issue
+  <n> --agent <id> --lane <lane>` validates the issue against the committed
+  board snapshot (`.board/snapshot.json`) and writes the claim to the append-only
+  ledger (`.board/claims.jsonl`) with the reason it was accepted.
+- **Refusal reasons.** `unknown-issue`, `issue-closed`, `blocked`,
+  `already-claimed`, `epic-not-workable` and `no-chain-edge` (kanban
+  scavenging). The last one is the rule in action: a visible board item that is
+  not the next step is not work.
+- **Single claim.** An in-flight issue is locked; a second agent's claim fails
+  loudly. A claim whose TTL elapsed may be taken over, so a dead agent cannot
+  wedge the chain.
+- **Gate.** `make issue-claims` (part of `make verify` and `make lint`) replays
+  the ledger against the snapshot and fails on any violation. The audit runs its
+  own mutants first, so it cannot pass vacuously.
+
+See `governance/dispatch/README.md` for the reason table, the chain markers
+(`Parent: #n`, `Blocked-by: #n`) and the CLI.

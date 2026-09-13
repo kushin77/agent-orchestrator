@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""Claim-time issue-order enforcement — command line (issue #157).
+
+Exit codes follow the repo's tri-state convention (guardrails/honesty):
+
+* ``0`` — OK
+* ``1`` — NOT-OK (a claim was refused, or the audit found a violation)
+* ``2`` — CANNOT-ASSESS (no snapshot / no ledger to audit against)
+
+Typical agent flow::
+
+    python3 governance/dispatch/cli.py eligible --issue 157 --agent me   # check first
+    python3 governance/dispatch/cli.py claim --issue 157 --agent me --lane governance
+    ...do the work, open the PR...
+    python3 governance/dispatch/cli.py release --issue 157 --agent me
+
+The gate runs ``audit``, which always includes the self-control mutants: if the
+audit cannot fail, ``audit`` fails.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import claims  # noqa: E402
+import order  # noqa: E402
+import snapshot as snapshot_mod  # noqa: E402
+
+EXIT_OK = 0
+EXIT_NOT_OK = 1
+EXIT_CANNOT_ASSESS = 2
+
+
+def _load_snapshot(path: Path) -> snapshot_mod.Snapshot:
+    return snapshot_mod.load(path)
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    snapshot_path = Path(args.snapshot)
+    ledger_path = Path(args.ledger)
+    if not snapshot_path.exists():
+        print(
+            f"audit: CANNOT-ASSESS — {snapshot_path} is missing "
+            "(refresh it with: python3 governance/dispatch/cli.py snapshot --from-github)",
+            file=sys.stderr,
+        )
+        return EXIT_CANNOT_ASSESS
+    try:
+        snapshot = _load_snapshot(snapshot_path)
+    except ValueError as exc:
+        print(f"audit: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    problems = claims.self_control()
+    problems.extend(claims.audit_text(ledger_path.read_text(encoding="utf-8") if ledger_path.exists() else "", snapshot))
+
+    if problems:
+        print(f"issue-claims: FAIL ({len(problems)} problem(s))", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return EXIT_NOT_OK
+    print("issue-claims: OK (no violations; self-control mutants all rejected)")
+    return EXIT_OK
+
+
+def cmd_eligible(args: argparse.Namespace) -> int:
+    snapshot_path = Path(args.snapshot)
+    if not snapshot_path.exists():
+        print(f"eligible: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    snapshot = _load_snapshot(snapshot_path)
+    events = claims.read_ledger(args.ledger)
+    live = claims.active_claims(events)
+    held_by_self = frozenset(number for number, claim in live.items() if claim.agent == args.agent)
+    history = frozenset(event.issue for event in events if event.is_claim and event.agent == args.agent)
+    others = frozenset(number for number, claim in live.items() if claim.agent != args.agent)
+    verdict = order.eligible(
+        snapshot,
+        args.issue,
+        active_claims=held_by_self,
+        agent_history=history,
+        claimed_by_others=others,
+    )
+    print(json.dumps(verdict.to_json(), indent=2))
+    return EXIT_OK if verdict.eligible else EXIT_NOT_OK
+
+
+def cmd_claim(args: argparse.Namespace) -> int:
+    snapshot_path = Path(args.snapshot)
+    if not snapshot_path.exists():
+        print(f"claim: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    snapshot = _load_snapshot(snapshot_path)
+    digest = snapshot_mod.content_sha256(snapshot_path)
+    try:
+        event = claims.claim(
+            args.issue,
+            args.agent,
+            args.lane,
+            snapshot,
+            ledger=args.ledger,
+            lock_dir=args.locks,
+            base_commit=args.base_commit,
+            snapshot_sha256=digest,
+            ttl_hours=args.ttl_hours,
+        )
+    except claims.ClaimRefused as exc:
+        print(f"claim REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
+        return EXIT_NOT_OK
+    print(json.dumps(event.to_json(), indent=2))
+    print(f"claim accepted: #{event.issue} as {event.agent} ({event.reason})")
+    return EXIT_OK
+
+
+def cmd_release(args: argparse.Namespace) -> int:
+    try:
+        event = claims.release(args.issue, args.agent, ledger=args.ledger, lock_dir=args.locks)
+    except claims.ClaimRefused as exc:
+        print(f"release REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
+        return EXIT_NOT_OK
+    print(json.dumps(event.to_json(), indent=2))
+    return EXIT_OK
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    snapshot_path = Path(args.snapshot)
+    if not snapshot_path.exists():
+        print(f"status: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    snapshot = _load_snapshot(snapshot_path)
+    events = claims.read_ledger(args.ledger)
+    live = claims.active_claims(events)
+    milestone = order.active_milestone(snapshot, frozenset())
+    frontier = order.frontier(snapshot, milestone) if milestone else None
+    print(f"snapshot: {snapshot.source} generated {snapshot.generated_at} ({len(snapshot.issues)} issues)")
+    print(f"active milestone: {milestone or '<none>'}")
+    print(f"frontier: #{frontier.number} {frontier.title}" if frontier else "frontier: <none>")
+    print(f"live claims: {len(live)}")
+    for issue, claim in sorted(live.items()):
+        print(f"  #{issue} held by {claim.agent} ({claim.lane}) since {claim.at} reason={claim.reason}")
+    return EXIT_OK
+
+
+def cmd_snapshot(args: argparse.Namespace) -> int:
+    if not args.from_github:
+        print("snapshot: pass --from-github (this is the only network-touching path)", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    try:
+        records = snapshot_mod.github_records(args.repo)
+    except RuntimeError as exc:
+        print(f"snapshot: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    built = snapshot_mod.build_snapshot(records, source=args.repo)
+    target = snapshot_mod.save(built, args.out)
+    edged = [issue for issue in built.issues.values() if issue.parent or issue.blocked_by]
+    print(f"snapshot: wrote {target} ({len(built.issues)} issues, {len(edged)} with declared chain edges)")
+    return EXIT_OK
+
+
+def add_paths(parser: argparse.ArgumentParser) -> None:
+    """Board artifacts every subcommand reads (after the subcommand, e.g. `audit --ledger x`)."""
+    parser.add_argument("--snapshot", default=str(snapshot_mod.DEFAULT_PATH))
+    parser.add_argument("--ledger", default=str(claims.DEFAULT_LEDGER))
+    parser.add_argument("--locks", default=str(claims.DEFAULT_LOCK_DIR))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="dispatch", description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    audit = sub.add_parser("audit", help="audit the ledger + run the self-control mutants")
+    add_paths(audit)
+    audit.set_defaults(func=cmd_audit)
+
+    eligible = sub.add_parser("eligible", help="is this issue the next step for this agent?")
+    add_paths(eligible)
+    eligible.add_argument("--issue", type=int, required=True)
+    eligible.add_argument("--agent", default="agent")
+    eligible.set_defaults(func=cmd_eligible)
+
+    claim = sub.add_parser("claim", help="claim an issue (refuses out-of-order claims)")
+    add_paths(claim)
+    claim.add_argument("--issue", type=int, required=True)
+    claim.add_argument("--agent", required=True)
+    claim.add_argument("--lane", default="")
+    claim.add_argument("--ttl-hours", type=int, default=claims.DEFAULT_TTL_HOURS)
+    claim.add_argument("--base-commit", default="")
+    claim.set_defaults(func=cmd_claim)
+
+    release = sub.add_parser("release", help="release a claim")
+    add_paths(release)
+    release.add_argument("--issue", type=int, required=True)
+    release.add_argument("--agent", required=True)
+    release.set_defaults(func=cmd_release)
+
+    status = sub.add_parser("status", help="show the active milestone, frontier and live claims")
+    add_paths(status)
+    status.set_defaults(func=cmd_status)
+
+    snap = sub.add_parser("snapshot", help="refresh .board/snapshot.json from GitHub")
+    snap.add_argument("--from-github", action="store_true")
+    snap.add_argument("--repo", default="kushin77/agent-orchestrator")
+    snap.add_argument("--out", default=str(snapshot_mod.DEFAULT_PATH))
+    snap.set_defaults(func=cmd_snapshot)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

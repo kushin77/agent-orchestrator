@@ -94,7 +94,11 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     item in the milestone/phase sequence, or a child issue required to close an
     already open parent. A board item is not valid work unless it is directly
     tied to closing the active issue or advancing the current dependency chain.
-    Kanban-style scavenging is forbidden.
+    Kanban-style scavenging is forbidden. **Claim before working** —
+    `python3 governance/dispatch/cli.py claim --issue <n> --agent <id> --lane
+    <lane>` refuses an out-of-order or duplicate claim; `make issue-claims`
+    audits the ledger against the committed board snapshot
+    (`governance/dispatch/README.md`).
 
 ## Directory layout (pillar-aligned)
 
@@ -117,19 +121,23 @@ describing what will land there; later issues fill the directories in.
 
 ## How to work in this repo
 
-1. **Read the issue.** Note its `Verify:` command (if present) and the
+1. **Claim the issue** — `python3 governance/dispatch/cli.py claim --issue <n>
+   --agent <id> --lane <lane>`. The claim is refused unless the issue is the
+   next step in the active chain (see `governance/dispatch/README.md`), and a
+   second claim on an in-flight issue is refused too. Release it when done.
+2. **Read the issue.** Note its `Verify:` command (if present) and the
    lane/pillar it owns.
-2. **Stay in your lane.** Edit only files your issue owns (GR-3,
+3. **Stay in your lane.** Edit only files your issue owns (GR-3,
    `docs/EXECUTION-PLAN.md`). Smallest focused diff; no unrelated edits; no
    unfinished markers or debug leftovers.
-3. **Implement** the acceptance criteria to completion — no partial work.
-4. **Verify:** run the issue's `Verify:` command **and** `make verify`; run
+4. **Implement** the acceptance criteria to completion — no partial work.
+5. **Verify:** run the issue's `Verify:` command **and** `make verify`; run
    `bash -n` on any shell file you add; validate any YAML/JSON you add.
-5. **Report evidence,** never an unverified "done": exact command + output,
+6. **Report evidence,** never an unverified "done": exact command + output,
    files touched, and the issue closed (GR-12).
-6. **Open a PR** that closes the issue; declare AI-assistance + runtime
+7. **Open a PR** that closes the issue; declare AI-assistance + runtime
    (e.g. `AI-assistance: Copilot (Relentless, flash/LOW)`).
-7. **Merge after green** per the autonomous-merge doctrine, then close the
+8. **Merge after green** per the autonomous-merge doctrine, then close the
    issue with the evidence comment.
 
 ## Hard DON'Ts

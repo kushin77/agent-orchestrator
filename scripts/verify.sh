@@ -29,6 +29,7 @@ checks=(
   'json-lint|bash scripts/check-json.sh'
   'docs-lint|bash scripts/check-docs.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
+  'issue-claims|bash scripts/check-issue-claims.sh'
   'secrets|bash scripts/check-secrets.sh'
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'

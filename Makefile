@@ -16,8 +16,8 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        secrets feature-flags cloudbuild terraform tf-fmt tf-validate \
-        shellcheck gitleaks pre-commit
+        issue-claims secrets feature-flags cloudbuild terraform tf-fmt \
+        tf-validate shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
 
@@ -49,6 +49,8 @@ help:
 	@echo "  docs-lint     Foundation files + md links + whitespace + markers"
 	@echo "  chronological-dispatch  Governance docs declare dependency-ordered"
 	@echo "                issue selection (GR-20, cannot drift to kanban picking)"
+	@echo "  issue-claims  Claim-time order enforcement (#157): ledger replayed"
+	@echo "                against the board snapshot + self-control mutants"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -61,7 +63,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims
 	@echo ""
 	@echo "lint: OK"
 
@@ -105,6 +107,12 @@ docs-lint:
 ## issue selection (GR-20); a doc-only rule is advisory, so this gate fails it
 chronological-dispatch:
 	@bash scripts/check-chronological-dispatch.sh
+
+## issue-claims — claim-time order enforcement (issue #157): the ledger is
+## replayed against the committed board snapshot and every violation fails; the
+## audit always runs its own mutants, so it cannot pass vacuously
+issue-claims:
+	@bash scripts/check-issue-claims.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
