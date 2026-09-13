@@ -8,6 +8,9 @@
 # present in each. Removing a section, or renaming a rule so the statement no
 # longer exists, fails the gate.
 #
+# Scope note: this asserts the rule is *declared* in the contract documents. It
+# is a declaration check, not behavioural enforcement of an agent's issue choice.
+#
 # Usage: bash scripts/check-chronological-dispatch.sh
 set -uo pipefail
 
@@ -32,19 +35,23 @@ declare -a required_markers_agents=(
 
 fail=0
 checked=0
+nonconforming=0
 
 for doc in "${docs[@]}"; do
   if [ ! -f "$doc" ]; then
     printf '  FAIL  %s (missing file)\n' "$doc"
     fail=1
+    nonconforming=$((nonconforming + 1))
     continue
   fi
   checked=$((checked + 1))
+  doc_failed=0
 
   for marker in "${required_markers[@]}"; do
     if ! grep -qi -- "$marker" "$doc"; then
       printf '  FAIL  %s (missing rule marker: %s)\n' "$doc" "$marker"
       fail=1
+      doc_failed=1
     fi
   done
 
@@ -54,14 +61,19 @@ for doc in "${docs[@]}"; do
       if ! grep -q -- "$marker" "$doc"; then
         printf '  FAIL  %s (missing rule marker: %s)\n' "$doc" "$marker"
         fail=1
+        doc_failed=1
       fi
     done
+  fi
+
+  if [ "$doc_failed" -ne 0 ]; then
+    nonconforming=$((nonconforming + 1))
   fi
 done
 
 if [ "$fail" -ne 0 ]; then
   printf 'chronological-dispatch: FAIL (%d of %d contract doc(s) non-conforming)\n' \
-    "$fail" "${#docs[@]}" >&2
+    "$nonconforming" "${#docs[@]}" >&2
   exit 1
 fi
 

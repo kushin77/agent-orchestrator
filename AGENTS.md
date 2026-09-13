@@ -88,6 +88,13 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     a default is genuinely absent.
 13. **Never idle (board doctrine).** Re-check the GitHub issues board before
     standing down; new issues get claimed immediately.
+14. **Chronological, dependency-gated issue selection (GR-20).** Agents do not
+    pick GitHub issues ad hoc from the board. Work proceeds in dependency order:
+    the next issue must be either the current blocker in an open chain, the next
+    item in the milestone/phase sequence, or a child issue required to close an
+    already open parent. A board item is not valid work unless it is directly
+    tied to closing the active issue or advancing the current dependency chain.
+    Kanban-style scavenging is forbidden.
 
 ## Directory layout (pillar-aligned)
 
