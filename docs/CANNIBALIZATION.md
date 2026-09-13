@@ -416,5 +416,35 @@ cannot pass vacuously (GR-12).
 internal use only, no code copied.
 
 
+## 9. Never-idle dispatcher harvest (issue #163)
+
+The dispatcher loop, its whitelist enforcement and the "never picks its own
+work" doctrine were **already shipped** under adjacent issue numbers before
+this issue's implementing agent was assigned: `fleet/terminal.py` (issues
+#186/#189/#190/#192) is the persistent `while True` poll loop that never exits
+on IDLE, `fleet/channel.py` `validate()` is the whitelist enforcement (message
+type, control action, and FinOps vocabulary allowlists — an out-of-vocabulary
+directive is refused with a named reason, not silently dropped), and
+`governance/dispatch/cli.py held` is the "never re-dispatch in-flight work"
+check `terminal.py` calls before spawning. This section records the one piece
+of the issue's acceptance criteria those PRs did not cover: the **health
+signal**.
+
+| Source (repo-relative) | Asset | Verdict | Feeds |
+|---|---|---|---|
+| `leaderboard/docker/worker-fleet/personas.yaml` | `fleet-health` persona: a health-report daemon kept separate from the fanout/executor/supervisor roles, polling on its own interval | PATTERN | `fleet/health.py` — a standalone read-only check, not folded into `terminal.py`'s loop |
+| `capital-underwriting/config/leaderboard/capability-registry.json` | agent role / tool / tier registry with per-role `latency_tier` and `cost_tier` | REFERENCE only | **not harvested as PATTERN** — that registry's roles (`planner`/`executor`/`verifier`/`critic`) are a different role vocabulary than this repo's contract (`brain`/`sister`/`subagent`, `fleet/CONTRACT.md` §1), so importing its shape would create a second, drifting taxonomy. `governance/finops/policy.json` (issue #164) is already this repo's role/tier registry. |
+
+`fleet/health.py` implements the cmr-style tri-state the issue names
+(`0 healthy / 1 degraded / 2 failing`, matching the repo's existing exit-code
+convention documented in `fleet/channel.py`'s module docstring): `2` when the
+`terminal.py` process is not running at all, `1` when it is running but the
+slog has gone stale or a claim has been held past the staleness window
+(wedged — the same condition `governance/dispatch cli.py reap` recovers from),
+`0` otherwise. It is read-only: it never spawns a subagent and never touches
+the mailbox, so it cannot itself become a second dispatcher. Wired into
+`fleet/control.py health` for operator use; `fleet/tests/test_health.py`
+covers all three signal levels.
+
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*

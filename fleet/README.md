@@ -137,7 +137,7 @@ Escalations must carry `correlation_id` and a `severity` (`info`/`warn`/
 `critical`) and may only come from the sister or a subagent, never the brain
 (enforced by the gate).
 
-## Control plane (refresh / update / poke / halt / debug / watch)
+## Control plane (refresh / update / poke / halt / debug / watch / health)
 
 From the brain/human terminal — without stopping the sister loop:
 
@@ -148,7 +148,15 @@ python3 fleet/control.py poke       # ping the sister: it acks (liveness)
 python3 fleet/control.py halt       # stop the sister loop cleanly
 python3 fleet/control.py debug      # channel + board + slog tail + loop process
 python3 fleet/control.py watch      # idle-watch the slog (same as listen)
+python3 fleet/control.py health     # tri-state signal: 0 healthy / 1 degraded / 2 failing
 ```
+
+`health` (issue #163) is read-only: it never spawns a subagent or touches the
+mailbox. It reports `2 failing` when `fleet/terminal.py` is not running at
+all, `1 degraded` when the loop runs but `.fleet/slog.jsonl` has gone stale or
+a claim is wedged past the staleness window, `0 healthy` otherwise. Run it
+directly for the raw JSON and exit code: `python3 fleet/health.py check
+[--stale-minutes N]`.
 
 `refresh` on the sister side is a **self-update**: the loop pulls, runs
 `make verify`, then re-executes itself with the new code — so the terminal can
