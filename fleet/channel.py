@@ -211,6 +211,7 @@ def replay_conflict(message: dict) -> str | None:
 
 def _slog(message: dict) -> None:
     """Append one structured line to .fleet/slog.jsonl — the audit + live tail."""
+    task = message.get("task") or {}
     entry = {
         "ts": message.get("ts") or now_iso(),
         "id": message.get("id", ""),
@@ -218,6 +219,7 @@ def _slog(message: dict) -> None:
         "to": message.get("to", ""),
         "type": message.get("type", ""),
         "correlation_id": message.get("correlation_id", ""),
+        "issue": message.get("issue") or task.get("issue"),
         "severity": message.get("severity", ""),
         "body": (message.get("body") or "")[:200],
     }
@@ -360,12 +362,14 @@ def cmd_listen(args: argparse.Namespace) -> int:
                 except json.JSONDecodeError:
                     print(f"channel listen: {line}", flush=True)
                 else:
-                    print(json.dumps(entry, indent=2), flush=True)
                     print(
-                        f"channel listen: {entry.get('type')} from {entry.get('from')}"
-                        f" (severity {entry.get('severity') or '-'})",
+                        f"channel listen: {entry.get('ts', '-')} {entry.get('type', '-')} "
+                        f"from {entry.get('from', '-')} -> {entry.get('to', '-')} "
+                        f"(issue {entry.get('issue') or (entry.get('task') or {}).get('issue') or '-'}, "
+                        f"severity {entry.get('severity') or '-'})",
                         flush=True,
                     )
+                    print(json.dumps(entry, indent=2), flush=True)
                 seen += 1
                 if args.max_messages and seen >= args.max_messages:
                     return EXIT_OK
