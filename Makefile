@@ -17,7 +17,7 @@ SHELL := /bin/bash
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
         issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index knowledge-index-build \
-        conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
+        brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees
 
 .DEFAULT_GOAL := help
@@ -68,6 +68,10 @@ help:
 	@echo "  fleet-runbook  Bootstrap runbook gate (M26 #166): the only human step"
 	@echo "                is the model switch, and the recovery paths stay documented"
 
+	@echo "  brain-profile  Brain profile gate (M26 #160): the elite profile"
+	@echo "                declares mission/KB/floors/controls/escalation and the"
+	@echo "                brain derives its doctrine from it, not from a copy"
+
 	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
@@ -91,9 +95,8 @@ verify:
 ## worktrees — reclaim stale lane worktrees (dry run by default)
 worktrees:
 	@bash scripts/prune-worktrees.sh
-
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index lessons
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 

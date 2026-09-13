@@ -57,7 +57,22 @@ BRAIN_HEARTBEAT = ROOT / ".fleet" / "brain.heartbeat.json"
 # these constants, the message schema and the policy stop agreeing.
 MESSAGE_TYPES = ("directive", "ack", "result", "halt", "escalate")
 SEVERITIES = ("info", "warn", "critical")
-CONTROL_ACTIONS = ("poke", "refresh", "halt")
+CONTROL_ACTIONS = (
+    "poke",
+    "status",
+    "pause",
+    "resume",
+    "refresh",
+    "restart",
+    "stop",
+    "kill",
+    "halt",
+    "override",
+)
+# Controls that act on the loop process itself rather than on the work queue.
+PROCESS_CONTROLS = ("refresh", "restart", "stop", "kill", "halt")
+# Control actions whose whole point is to re-dispatch a named issue.
+TASK_CONTROLS = ("override",)
 MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
 # Order kinds (schema v1, additive): `work` needs an issue; the others are
@@ -153,6 +168,8 @@ def validate(message: dict) -> list[str]:
             problems.append("only the brain may issue control")
         if control not in CONTROL_ACTIONS:
             problems.append(f"control must be one of {', '.join(CONTROL_ACTIONS)}")
+        if control in TASK_CONTROLS and not (message.get("task") or {}).get("issue"):
+            problems.append(f"control '{control}' must name the task.issue it overrides")
     model = message.get("model")
     if model is not None:
         if not isinstance(model, dict):

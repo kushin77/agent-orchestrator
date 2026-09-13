@@ -4,17 +4,27 @@
 Run these from the brain/human terminal to steer and maintain the fleet without
 stopping it:
 
-    python3 fleet/control.py refresh    # git pull --ff-only + snapshot + verify
+    python3 fleet/control.py start      # start both rungs (brain + sister)
+    python3 fleet/control.py status     # rungs, pause/stop flags, tracked runs
+    python3 fleet/control.py pause      # hold the queue (the run in flight finishes)
+    python3 fleet/control.py resume     # pull the next order again
+    python3 fleet/control.py stop       # exit after the current run, cleanly
+    python3 fleet/control.py kill       # terminate the run, release its claim, escalate
+    python3 fleet/control.py restart    # re-exec the same code (fast)
+    python3 fleet/control.py refresh    # git pull --ff-only + snapshot + verify + re-exec
     python3 fleet/control.py update     # refresh + rebuild the knowledge index
+    python3 fleet/control.py override --issue N   # force #N past a live claim
     python3 fleet/control.py poke       # ping the sister; it acks (liveness)
-    python3 fleet/control.py halt       # stop the sister loop cleanly
+    python3 fleet/control.py halt       # stop the fleet
     python3 fleet/control.py debug      # full non-destructive state dump
     python3 fleet/control.py watch      # idle-watch the slog (same as listen)
     python3 fleet/control.py health     # tri-state signal: 0 healthy/1 degraded/2 failing
 
-Roles (see fleet/directive.json): the sister is a dumb terminal (DeepSeek v4.1
-Flash, no thinking); the brain is DSv4PM with human override; THIS terminal is
-where the human overrides the entire fleet.
+Roles (see fleet/profiles/brain.md and fleet/directive.json): the sister is a
+DUMB terminal (DeepSeek v4.1 Flash, no thinking); the brain is DSv4PM with human
+override and issues every order; THIS terminal is where the operator overrides
+the entire fleet. The operator orders the brain — never the sister directly
+(the channel refuses it).
 """
 
 from __future__ import annotations
@@ -77,6 +87,87 @@ def cmd_poke(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_start(args: argparse.Namespace) -> int:
+    """Start both rungs. The rung locks make a second start harmless (refused)."""
+    running = subprocess.run(["pgrep", "-f", "fleet/(brain|terminal)\\.py"], capture_output=True, text=True)
+    if running.returncode == 0:
+        print("fleet already running:")
+        print(running.stdout.strip())
+        print("use `fleet/control.py status` for state, or stop/kill/restart")
+        return 0
+    print("== start: brain + sister ==")
+    # Detached so the loops outlive this terminal; the rung locks enforce one each.
+    for script in ("fleet/brain.sh", "fleet/terminal.sh"):
+        subprocess.Popen(
+            ["setsid", "bash", script], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        print(f"  started {script}")
+    time.sleep(3)
+    _run(["python3", CHANNEL, "status"], check=False)
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    print("== status: rungs, flags, runs ==")
+    _run(["python3", CHANNEL, "status"], check=False)
+    fleet = ROOT / ".fleet"
+    for flag, label in (("paused", "PAUSED"), ("stopping", "STOPPING")):
+        print(f"  {label if (fleet / flag).exists() else label.lower() + ' off'}")
+    runs = sorted(p.name for p in (fleet / "runs").glob("*.json")) if (fleet / "runs").exists() else []
+    print(f"  tracked runs: {', '.join(runs) if runs else 'none'}")
+    return 0
+
+
+def cmd_pause(args: argparse.Namespace) -> int:
+    _send_control("pause")
+    print("pause sent — the loop stops pulling new orders; the run in flight finishes")
+    return 0
+
+
+def cmd_resume(args: argparse.Namespace) -> int:
+    _send_control("resume")
+    print("resume sent — the loop pulls the next order again")
+    return 0
+
+
+def cmd_stop(args: argparse.Namespace) -> int:
+    _send_control("stop")
+    print("stop sent — the loop exits after the current run (never mid-run)")
+    return 0
+
+
+def cmd_kill(args: argparse.Namespace) -> int:
+    _send_control("kill")
+    print("kill sent — the loop terminates the run, releases its claim and escalates")
+    return 0
+
+
+def cmd_restart(args: argparse.Namespace) -> int:
+    _send_control("restart")
+    print("restart sent — the loop re-execs the same code (no pull; use `refresh` for that)")
+    return 0
+
+
+def cmd_override(args: argparse.Namespace) -> int:
+    """Operator override: order the BRAIN to force a named issue past a live claim.
+
+    The hierarchy holds even for an override — the operator orders the brain, the
+    brain issues the control. The brain reaps the holder and the loop dispatches.
+    """
+    order = {
+        "type": "directive",
+        "task": {"issue": args.issue, "lane": args.lane or "override", "override": True},
+        "body": args.body or f"operator override: dispatch #{args.issue} now, taking over any live claim",
+    }
+    path = ROOT / ".fleet" / f"override-{uuid.uuid4().hex[:8]}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(order))
+    _run(["python3", CHANNEL, "order", "--message", str(path)])
+    path.unlink(missing_ok=True)
+    print(f"override for #{args.issue} ordered through the brain")
+    return 0
+
+
 def cmd_halt(args: argparse.Namespace) -> int:
     _send_control("halt")
     print("halt sent — the sister loop will stop cleanly")
@@ -117,10 +208,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-control", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     for name, func in (
+        ("start", cmd_start),
+        ("status", cmd_status),
         ("refresh", cmd_refresh),
         ("update", cmd_update),
         ("poke", cmd_poke),
+        ("pause", cmd_pause),
+        ("resume", cmd_resume),
+        ("stop", cmd_stop),
+        ("kill", cmd_kill),
+        ("restart", cmd_restart),
         ("halt", cmd_halt),
+        ("override", cmd_override),
         ("debug", cmd_debug),
         ("watch", cmd_watch),
         ("health", cmd_health),
@@ -128,6 +227,10 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_parser(name, help=f"control.{name}").set_defaults(func=func)
     debug = sub.choices["debug"]
     debug.add_argument("--tail", type=int, default=20)
+    override = sub.choices["override"]
+    override.add_argument("--issue", type=int, required=True)
+    override.add_argument("--lane", default=None)
+    override.add_argument("--body", default=None)
     health = sub.choices["health"]
     health.add_argument("--stale-minutes", type=float, default=30.0)
     return parser
