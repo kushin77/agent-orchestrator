@@ -67,6 +67,12 @@ variable "enable_portal" {
   default     = false
 }
 
+variable "enable_web" {
+  description = "Deploy the public web surface (portal + shared-frontend) at the custom domain. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
 # --- Deployer service account (the ONLY apply route) ------------------------
 
 variable "deployer_enabled" {
@@ -127,4 +133,16 @@ variable "portal_image" {
   description = "Container image for the portal service. Placeholder until phase 7 promotes a build."
   type        = string
   default     = "us-docker.pkg.dev/example-control-plane/portal:placeholder"
+}
+
+variable "web_image" {
+  description = "Container image for the public web surface. Placeholder until the web build promotes a real artifact."
+  type        = string
+  default     = "us-docker.pkg.dev/example-control-plane/web:placeholder"
+}
+
+variable "web_domain" {
+  description = "Public hostname served by the web surface (custom domain + Google-managed TLS)."
+  type        = string
+  default     = "ai.purebliss.app"
 }

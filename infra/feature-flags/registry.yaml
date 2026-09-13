@@ -81,3 +81,9 @@ services:
     phase: 7
     tf_flag: enable_portal
     description: Admin control-plane portal.
+  web:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_web
+    description: Public web surface (portal + shared-frontend) served at ai.purebliss.app.

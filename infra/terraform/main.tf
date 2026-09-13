@@ -39,3 +39,14 @@ module "deployer" {
   project_id   = var.project_id
   roles        = var.deployer_roles
 }
+
+module "web_surface" {
+  source = "./modules/web-surface"
+
+  enabled    = var.enable_web
+  name       = "${var.env}-web"
+  image      = var.web_image
+  project_id = var.project_id
+  region     = var.region
+  domain     = var.web_domain
+}

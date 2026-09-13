@@ -34,6 +34,14 @@ containers. When a real GCP project exists (a later deploy concern), the
 only way infrastructure changes reach GCP — executed by the deployer SA, never
 by a human in a console.
 
+## Web surface (issue #258)
+
+The public web UI served at ai.purebliss.app (`infra/terraform/modules/web-surface`, flag `enable_web`, OFF by default) rides the **same** `apply.yaml`
+pipeline: it is declared in Terraform and deployed by the flag-gated apply
+route like every other surface. There is no separate apply build config —
+`apply.yaml` remains the only apply route, and the web surface ships inert
+until its flag is promoted.
+
 ## Apply (go-live only — never run from this task)
 
 ```bash

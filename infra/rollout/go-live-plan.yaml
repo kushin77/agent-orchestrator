@@ -65,9 +65,11 @@ phases:
         go_live_stage: full
   "7":
     name: control plane and portal
-    note: Management API + admin portal surface.
+    note: Management API + admin portal surface + public web UI.
     surfaces:
       - flag: services.portal
+        go_live_stage: full
+      - flag: services.web
         go_live_stage: full
   "8":
     name: autonomous operations and governance
