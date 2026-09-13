@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index knowledge-index-build \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation knowledge-index knowledge-index-build \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -71,6 +71,10 @@ help:
 	@echo "  fleet-runbook  Bootstrap runbook gate (M26 #166): the only human step"
 	@echo "                is the model switch, and the recovery paths stay documented"
 
+	@echo "  session-isolation  Lane isolation (M26 #263): one session identity per"
+	@echo "                issue, its own worktree on issue-<n>, a worktree-scoped"
+	@echo "                commit signature, and a ticket ref on every commit"
+
 	@echo "  brain-profile  Brain profile gate (M26 #160): the elite profile"
 	@echo "                declares mission/KB/floors/controls/escalation and the"
 	@echo "                brain derives its doctrine from it, not from a copy"
@@ -99,7 +103,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -183,6 +187,15 @@ fleet-contract:
 ## mutates its own input, so it cannot pass vacuously
 fleet-runbook:
 	@bash scripts/check-fleet-runbook.sh
+
+
+## session-isolation — institutional lane isolation (issue #263): a session
+## identity is minted per issue, the lane is its own worktree on branch
+## issue-<n>, the signature is worktree-scoped (never the shared config), and
+## every commit the session authored references its ticket; the check provokes
+## each violation for real, so it cannot pass vacuously
+session-isolation:
+	@bash scripts/check-session-isolation.sh
 
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):

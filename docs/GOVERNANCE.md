@@ -15,9 +15,34 @@ and each pillar keeps a stable contract so any agent/product surface can join.
 |--------|-------|
 | `master` | Default branch. Protected **by convention**: no direct pushes, no force-push. Every change lands via a PR (squash merge). Branch protection as code ships with issue #6. |
 | `issue-<n>-<slug>` | Short-lived work branches (e.g. `issue-5-repo-foundation`). Merged and deleted. |
+| `issue-<n>` | The canonical **lane** branch minted with a session identity (see §1b). One issue = one lane = one branch. |
 
 One branch per issue; a pushed branch must be backed by an open PR or be
 deleted (anti-sprawl).
+
+### 1b. Lane isolation — one session identity per issue (institutional)
+
+A lane is not a directory someone was told to use; it is a **minted identity**
+(`governance/isolation/`). `cli.py open --issue <n> --agent <id> --lane <lane>`
+mints a unique `session_id`, provisions the lane as its own git worktree on
+branch `issue-<n>`, and writes the session's git signature into **that
+worktree's own config** (`git config --worktree`) — never the shared repository
+config, because a signature in the shared config would let one lane sign another
+lane's commits. The signature is deliberately non-human:
+`agent-<id> <agent+<id>@agents.invalid>` (RFC 2606 reserved TLD).
+
+Four properties are enforced, each by a check that can fail:
+
+| Property | Broken means |
+|----------|--------------|
+| The branch names the issue | `issue-<n>` (optionally suffixed) — a lane on any other branch is not linked to its ticket. |
+| The signature is the session's and lane-local | Inherited or shared-config signatures make authorship meaningless. |
+| Every commit the session authored carries `Refs kushin77/agent-orchestrator#<n>` | The generated history must point back at the ticket — checked per commit, so a later commit cannot repair an earlier untraceable one. |
+| The worktree is a linked worktree of the repository | A lane inside the shared checkout is not isolated at all. |
+
+`governance/isolation/cli.py audit --all` re-derives these from the filesystem
+and git; `scripts/check-session-isolation.sh` runs the same round trip in
+`make verify` and fails on each violation.
 
 ## 2. Session labels & provenance (AI-originated work)
 

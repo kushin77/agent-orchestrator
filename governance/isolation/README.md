@@ -1,0 +1,101 @@
+# Lane isolation — session identity per issue
+
+> **Status:** institutional · **Issue:** #263 · **Gate:**
+> [`scripts/check-session-isolation.sh`](../../scripts/check-session-isolation.sh)
+> (`make verify`) · **Rule:** `AGENTS.md` golden rule 15
+
+An agent session is not an anonymous process working somewhere in a shared
+checkout. It is a **minted identity bound to one GitHub issue**: a unique
+`session_id`, a canonical branch named for that issue, a dedicated `git worktree`
+that branch is checked out in, and a git signature every commit it authors
+carries. Isolation stops being a convention an agent is asked to honour and
+becomes a state the machine establishes — and re-checks.
+
+## 1. The contract
+
+| Property | Requirement |
+|---|---|
+| **Identity** | `session_id` is deterministic over `(issue, agent, lane, suffix)`, so a re-dispatch reattaches to the lane it already owns instead of forking a second one. |
+| **Branch** | `issue-<n>` (optionally `issue-<n>-<suffix>`), cut from `origin/master`. The branch name *is* the link to the ticket. |
+| **Worktree** | A linked worktree of the repository, outside the shared checkout. A lane inside the shared checkout is not isolated. |
+| **Signature** | `agent-<id> <agent+<id>@agents.invalid>` — written with `git config --worktree` into that worktree's **own** config, never the shared repository config, and also exported as `GIT_AUTHOR_*`/`GIT_COMMITTER_*` so a lost worktree config cannot silently fall back to a human identity. |
+| **History** | Every commit the session authors carries `Refs kushin77/agent-orchestrator#<n>`. |
+
+The `.invalid` TLD is reserved by RFC 2606: it can never resolve and can never be
+mistaken for a person. Refusing an email-shaped `agent_id` is part of the rule
+rather than a technicality — the point of the signature is that generated commits
+are attributable to an agent, not to whoever's laptop ran the loop.
+
+## 2. Why the worktree config is the load-bearing part
+
+Creating a worktree is easy. The failure that actually breaks isolation is
+subtle: `git config user.email` run inside a *linked worktree* writes to the
+**shared** repository config, so two lanes on one machine silently overwrite each
+other's identity and every commit is attributable to whoever ran last.
+
+So the signature is written with `git config --worktree` (after enabling
+`extensions.worktreeConfig`), which git stores per worktree. The audit treats an
+*inherited* signature as **absent**, never as valid, and separately fails a lane
+whose signature reached the shared config — because at that point every other
+lane inherits it too.
+
+## 3. Usage
+
+```bash
+# 1. Open the lane: mint the identity, create the worktree, stamp the signature.
+python3 governance/isolation/cli.py open --issue 263 --agent copilot-brain --lane governance-isolation
+
+# 2. Load the identity into the shell the agent will run in.
+eval "$(python3 governance/isolation/cli.py env --issue 263 --agent copilot-brain)"
+
+# 3. Commit under that identity, referencing the ticket.
+git -C "$AO_WORKTREE" commit -m "implement the thing" -m "Refs kushin77/agent-orchestrator#263"
+
+# 4. Re-derive isolation from the real worktrees; wrong identity or a missing
+#    ticket reference is a named failure, not a warning.
+python3 governance/isolation/cli.py audit --all
+python3 governance/isolation/cli.py close --session <session_id>
+```
+
+`open` prints machine-readable JSON on stdout (`identity`, `created`, `env`,
+`problems`) and human status on stderr. Exit codes follow the repository's
+tri-state convention: `0` OK, `1` NOT-OK, `2` CANNOT-ASSESS.
+
+## 4. What the audit checks, and why each one can fail
+
+| Violation | Raised when |
+|---|---|
+| `worktree-missing` | The lane's worktree is gone. |
+| `worktree-not-linked` | The path is not a linked worktree (e.g. it is the shared checkout). |
+| `branch-does-not-name-issue` | The branch does not encode the session's issue. |
+| `branch-mismatch` | The worktree is checked out on a different branch (or a detached HEAD). |
+| `identity-not-lane-local` | No worktree-scoped signature exists; commits would inherit another identity. |
+| `identity-mismatch` | The worktree signs as a different session. |
+| `identity-leaked-to-shared-config` | The session's signature reached the shared config, so every lane would inherit it. |
+| `commit-missing-ticket-trailer` | A commit authored by this session omits `Refs kushin77/agent-orchestrator#<n>`. |
+
+**The history rule is historical.** The audit checks *every* commit the session
+authored, not just the branch tip, so a later well-formed commit does not repair
+an earlier untraceable one. Commits authored by someone else (a base commit from
+`master`, a human's commit) are exempt — the rule is about *this session's*
+generated history.
+
+## 5. Enforcement
+
+`scripts/check-session-isolation.sh` runs the same round trip in `make verify`:
+it provisions real lanes in a scratch repository, commits under each session's
+signature, and requires each violation above to be **detected**. It also fails if
+any of the declarations in `AGENTS.md`, [`docs/EXECUTION-PLAN.md`](../../docs/EXECUTION-PLAN.md)
+or [`docs/GOVERNANCE.md`](../../docs/GOVERNANCE.md) is removed, and it runs a
+vacuity control on its own declaration check. A check that cannot fail is a
+formality and is rejected (no-false-green doctrine).
+
+The fleet execution loop ([`fleet/terminal.py`](../../fleet/terminal.py))
+provisions every subagent through this module, so a dispatched agent starts in
+its own lane with its own identity instead of in the shared checkout.
+
+## 6. Tests
+
+`governance/isolation/tests` (declared in [`scripts/pytest-suites.txt`](../../scripts/pytest-suites.txt),
+run per suite by `make tests`) pins the mint, the per-worktree signature, the
+two-lane independence, and every violation above.

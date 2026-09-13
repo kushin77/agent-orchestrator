@@ -46,10 +46,27 @@ def test_build_prompt_mandates_merge_and_rehandles_an_existing_pr():
 
 def test_build_prompt_names_the_isolated_worktree(tmp_path):
     tree = tmp_path / "ao-163-dabc1234"
-    prompt = terminal.build_prompt({"id": "d-abc12345", "task": {"issue": 163}, "body": "x"}, "subagent-dabc1234", tree)
+    prompt = terminal.build_prompt(
+        {"id": "d-abc12345", "task": {"issue": 163}, "body": "x"},
+        "subagent-dabc1234",
+        tree,
+    )
     assert str(tree) in prompt
     assert "never in the " in prompt
     assert "shared checkout" in prompt
+
+
+def test_build_prompt_states_the_session_identity_and_the_ticket_trailer():
+    """An agent that is not told its identity cannot keep its commits traceable."""
+    prompt = terminal.build_prompt(
+        {"id": "d-abc12345", "task": {"issue": 163}, "body": "x"},
+        "subagent-dabc1234",
+        None,
+        {"AO_SESSION_ID": "abc123def456", "AO_BRANCH": "issue-163"},
+    )
+    assert "abc123def456" in prompt
+    assert "issue-163" in prompt
+    assert "Refs kushin77/agent-orchestrator#163" in prompt
 
 
 def test_extract_json_parses_watch_output():
@@ -82,31 +99,78 @@ def test_build_prompt_uses_the_unique_agent_id():
     assert "subagent-dabc1234" in prompt
 
 
-def test_provision_worktree_returns_none_when_git_refuses(tmp_path, monkeypatch):
+def test_provision_worktree_returns_none_when_the_provisioner_refuses(monkeypatch):
     """A failed provisioning must be visible, not silently shared-checkout."""
-    monkeypatch.setattr(terminal, "WORKTREE_ROOT", tmp_path / "ao-worktrees")
 
     class Failed:
-        returncode = 128
+        returncode = 1
         stdout = ""
-        stderr = "fatal: boom"
+        stderr = "open: REFUSED — base ref 'origin/master' does not resolve"
 
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: Failed())
-    assert terminal.provision_worktree(163, "d-abc12345") is None
+    assert terminal.provision_worktree(163, "d-abc12345", "subagent-dabc1234", "fleet") is None
 
 
-def test_provision_worktree_names_a_per_directive_branch(tmp_path, monkeypatch):
-    monkeypatch.setattr(terminal, "WORKTREE_ROOT", tmp_path / "ao-worktrees")
+def test_provision_worktree_returns_the_lane_and_its_session_environment(monkeypatch):
+    """The loop gets the lane plus the identity the subagent must run under."""
+    payload = json.dumps(
+        {
+            "identity": {
+                "session_id": "abc123def456",
+                "worktree": "/lanes/ao-163-abc123de",
+                "branch": "issue-163",
+            },
+            "env": {"AO_SESSION_ID": "abc123def456", "AO_BRANCH": "issue-163"},
+            "problems": [],
+        }
+    )
 
     class Ok:
         returncode = 0
-        stdout = ""
+        stdout = payload
         stderr = ""
 
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: Ok())
-    path, branch = terminal.provision_worktree(163, "d-abc12345")
-    assert path == tmp_path / "ao-worktrees" / "ao-163-d-abc123"
-    assert branch == "issue-163-d-abc123"
+    path, branch, env = terminal.provision_worktree(163, "d-abc12345", "subagent-dabc1234", "fleet")
+    assert str(path) == "/lanes/ao-163-abc123de"
+    assert branch == "issue-163"
+    assert env["AO_SESSION_ID"] == "abc123def456"
+
+
+def test_provision_worktree_refuses_unreadable_provisioner_output(monkeypatch):
+    class Garbage:
+        returncode = 0
+        stdout = "not json at all"
+        stderr = ""
+
+    monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: Garbage())
+    assert terminal.provision_worktree(163, "d-abc12345", "subagent-dabc1234", "fleet") is None
+
+
+def test_provision_worktree_names_the_issue_and_the_agent_in_the_order(monkeypatch):
+    """The lane is minted *through the isolation module*, for this issue and agent."""
+    seen = {}
+
+    class Ok:
+        returncode = 0
+        stdout = json.dumps(
+            {
+                "identity": {"worktree": "/lanes/ao-163-abc123de", "branch": "issue-163"},
+                "env": {},
+                "problems": [],
+            }
+        )
+        stderr = ""
+
+    def capture(command, **kwargs):
+        seen["command"] = command
+        return Ok()
+
+    monkeypatch.setattr(terminal.subprocess, "run", capture)
+    terminal.provision_worktree(163, "d-abc12345", "subagent-dabc1234", "fleet")
+    assert "governance/isolation/cli.py" in " ".join(seen["command"])
+    assert seen["command"][seen["command"].index("--agent") + 1] == "subagent-dabc1234"
+    assert seen["command"][seen["command"].index("--issue") + 1] == "163"
 
 
 def test_claim_issue_reports_the_refusal_verbatim(monkeypatch):
