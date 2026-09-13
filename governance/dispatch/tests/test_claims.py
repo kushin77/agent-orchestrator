@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
 import claims
 import pytest
-from model import REASON_CHILD_OF_CLAIM, REASON_NO_CHAIN_EDGE, REASON_NEXT_IN_MILESTONE
+from model import REASON_BLOCKED, REASON_BRAIN_DIRECTED, REASON_CHILD_OF_CLAIM, REASON_NO_CHAIN_EDGE, REASON_NEXT_IN_MILESTONE
 
 
 def test_claim_records_the_reason_and_creates_the_lock(tmp_path, snapshot, base_time):
@@ -149,3 +150,99 @@ def test_audit_flags_an_expired_claim_that_was_never_released(snapshot, base_tim
 def test_audit_text_flags_a_malformed_record(snapshot, base_time):
     problems = claims.audit_text('{"event": "claim"}\n', snapshot, base_time)
     assert any("malformed record" in problem for problem in problems)
+
+
+def _write_directive(sent_dir, directive_id, issue):
+    sent_dir.mkdir(parents=True, exist_ok=True)
+    directive = {
+        "from": "brain",
+        "to": "sister",
+        "type": "directive",
+        "id": directive_id,
+        "task": {"issue": issue},
+    }
+    (sent_dir / f"{directive_id}.json").write_text(json.dumps(directive), encoding="utf-8")
+
+
+def test_a_brain_directive_authorizes_an_off_frontier_claim(tmp_path, monkeypatch, snapshot, base_time):
+    sent = tmp_path / "sent"
+    monkeypatch.setattr(claims, "SENT_DIR", sent)
+    _write_directive(sent, "d-1", 606)
+
+    event = claims.claim(
+        606,
+        "subagent-x",
+        "lessons",
+        snapshot,
+        ledger=tmp_path / "claims.jsonl",
+        lock_dir=tmp_path / "locks",
+        now=base_time,
+        directive_id="d-1",
+    )
+
+    assert event.reason == REASON_BRAIN_DIRECTED
+    assert event.directive_id == "d-1"
+    assert event.directive_from == "brain"
+
+
+def test_a_brain_directive_must_name_this_issue(tmp_path, monkeypatch, snapshot, base_time):
+    sent = tmp_path / "sent"
+    monkeypatch.setattr(claims, "SENT_DIR", sent)
+    _write_directive(sent, "d-1", 601)
+
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            606,
+            "subagent-x",
+            "lessons",
+            snapshot,
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            directive_id="d-1",
+        )
+    assert excinfo.value.reason == "invalid-directive"
+
+
+def test_a_missing_directive_file_is_refused(tmp_path, monkeypatch, snapshot, base_time):
+    monkeypatch.setattr(claims, "SENT_DIR", tmp_path / "sent")
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            606,
+            "subagent-x",
+            "lessons",
+            snapshot,
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            directive_id="never-sent",
+        )
+    assert excinfo.value.reason == "invalid-directive"
+
+
+def test_a_directive_does_not_bypass_a_blocked_issue(tmp_path, monkeypatch, snapshot, base_time):
+    sent = tmp_path / "sent"
+    monkeypatch.setattr(claims, "SENT_DIR", sent)
+    _write_directive(sent, "d-1", 602)
+
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            602,
+            "subagent-x",
+            "lessons",
+            snapshot,
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            directive_id="d-1",
+        )
+    assert excinfo.value.reason == REASON_BLOCKED
+
+
+def test_audit_flags_a_brain_directed_claim_without_a_directive_ref(snapshot, base_time):
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [
+        claims.ClaimEvent(event="claim", issue=601, agent="agent-a", at=moment, reason=REASON_BRAIN_DIRECTED)
+    ]
+    problems = claims.audit(events, snapshot, base_time)
+    assert any("no directive_id" in problem for problem in problems)

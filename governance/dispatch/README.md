@@ -18,6 +18,7 @@ An issue is claimable only when one of these holds:
 | `next-in-milestone` | It is the frontier of the active milestone: the lowest-numbered open, unblocked, unclaimed **non-epic** issue in that milestone. |
 | `child-of-claim` | It declares `Parent: #n` and the agent already holds #n. |
 | `successor-of-claim` | It declares `Blocked-by: #n` and the agent already advanced #n. |
+| `brain-directed` | A brain directive recorded in `.fleet/sent` names exactly this issue (`claim --directive <id>`). The brain is the chain. |
 
 Everything else is refused with a reason: `unknown-issue`, `issue-closed`,
 `blocked`, `already-claimed`, `epic-not-workable`, or `no-chain-edge` — the last

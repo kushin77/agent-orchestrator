@@ -120,6 +120,10 @@ enforced by code:
   `already-claimed`, `epic-not-workable` and `no-chain-edge` (kanban
   scavenging). The last one is the rule in action: a visible board item that is
   not the next step is not work.
+- **Brain directives are chain edges.** A claim may carry `--directive <id>`;
+  the directive must exist in `.fleet/sent`, be a brain-issued directive, and
+  name exactly this issue — the claim is then recorded as `brain-directed`.
+  Off-frontier work without a directive remains refused.
 - **Single claim.** An in-flight issue is locked; a second agent's claim fails
   loudly. A claim whose TTL elapsed may be taken over, so a dead agent cannot
   wedge the chain.
