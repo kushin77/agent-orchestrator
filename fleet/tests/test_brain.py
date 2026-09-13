@@ -199,6 +199,90 @@ def test_non_work_orders_do_not_dispatch(monkeypatch):
     assert "no dispatch" in report
 
 
+# --- the context stream (the brain window must show something) ----------------
+
+
+def _facts(**overrides):
+    facts = {
+        "orders_pending": 0,
+        "dispatched": 11,
+        "waves": {219: [232]},
+        "claims": 0,
+        "head": "8d9c219",
+        "watchdog": "healthy",
+    }
+    facts.update(overrides)
+    return facts
+
+
+def test_the_idle_status_line_carries_every_field_the_operator_needs():
+    """The brain runs detached; this line is the only proof it is alive."""
+    line = brain.status_line(_facts(), idle_seconds=30)
+    assert line.startswith("[brain] idle 30s | ")
+    for field in (
+        "orders pending=0",
+        "dispatched=11",
+        "waves: #219=[232]",
+        "claims=0",
+        "HEAD=8d9c219",
+        "watchdog=healthy",
+    ):
+        assert field in line, f"{field!r} is missing from {line!r}"
+
+
+def test_the_startup_form_of_the_status_line_carries_the_same_fields():
+    line = brain.status_line(_facts(orders_pending=2))
+    assert line.startswith("[brain] up | ")
+    assert "orders pending=2" in line and "HEAD=" in line and "watchdog=" in line
+
+
+def test_format_waves_is_empty_safe():
+    assert brain.format_waves({}) == "waves: none"
+    assert brain.format_waves({219: [232], 240: []}) == "waves: #219=[232], #240=[]"
+
+
+def test_wave_progress_reads_the_plan_files_and_survives_a_broken_one(tmp_path, monkeypatch):
+    monkeypatch.setattr(brain, "WAVES", tmp_path)
+    (tmp_path / "219.json").write_text(
+        json.dumps({"parent": 219, "children": [], "dispatched": [232, 233]}), encoding="utf-8"
+    )
+    (tmp_path / "broken.json").write_text("{not json", encoding="utf-8")
+    assert brain.wave_progress() == {219: [232, 233]}
+
+
+def test_the_status_header_says_where_the_stream_goes():
+    header = brain.status_header(_facts(), pid=4242)
+    assert "pid      4242" in header
+    assert str(brain.LOG_PATH) in header, "the operator must be told which log this stream lands in"
+    assert "[brain] up |" in header
+
+
+def test_the_order_line_shows_the_id_the_task_and_the_body():
+    line = brain.order_line(order())
+    assert "order o-1" in line and "(#5)" in line
+    assert '"issue": 5' in line
+    assert "dispatch one subagent for issue #5" in line
+
+
+def test_the_outcome_line_reports_a_dispatch_with_its_tier():
+    line = brain.outcome_line(order(), True, "channel send: OK")
+    assert line.endswith("→ dispatched #5 at flash/none — channel send: OK")
+
+
+def test_the_outcome_line_quotes_the_refusal_verbatim():
+    line = brain.outcome_line(order(), False, "order names no issue")
+    assert line.endswith("→ refused: order names no issue")
+
+
+def test_the_outcome_line_marks_a_non_work_order_as_an_ack():
+    line = brain.outcome_line(order(task={"kind": "ping"}), True, "fleet health 0 healthy")
+    assert "→ ack (no dispatch)" in line
+
+
+def test_a_wave_advance_is_reported_with_the_issues_it_dispatched():
+    assert brain.wave_line([232, 234]) == "[brain] → advanced waves: dispatched [232, 234]"
+
+
 def test_brain_outbox_reads_newest_last(tmp_path, monkeypatch, capsys):
     """Ids are uuid4, so a filename sort shows the operator a stale reply."""
     monkeypatch.setattr(channel, "BRAIN_OUTBOX", tmp_path / "brain" / "outbox")

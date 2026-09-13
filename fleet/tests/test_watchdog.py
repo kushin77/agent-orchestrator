@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -39,9 +40,11 @@ def test_a_missing_loop_is_respawned(monkeypatch):
     monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
     monkeypatch.setattr(watchdog, "read_beat", lambda path: None)
     calls = []
-    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script: calls.append(script) or True)
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name="": calls.append((script, name)) or True)
     line = watchdog.rung_action("sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "head")
-    assert "missing" in line and calls == ["fleet/terminal.sh"]
+    # The sister's log follows its RUNG name, not its launcher's filename:
+    # `terminal.sh` starts the rung the operator knows as `sister`.
+    assert "missing" in line and calls == [("fleet/terminal.sh", "sister")]
 
 
 def test_a_drifted_sister_with_a_run_in_flight_is_left_alone(monkeypatch):
@@ -61,9 +64,72 @@ def test_a_drifted_idle_sister_is_respawned(monkeypatch):
     monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit="old0000"))
     monkeypatch.setattr(watchdog, "run_in_flight", lambda: False)
     calls = []
-    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script: calls.append(script) or True)
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name="": calls.append(script) or True)
     watchdog.rung_action("sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "head1111")
     assert calls == ["fleet/terminal.sh"]
+
+
+# --- the capture log (A: the rung's stream must survive the spawn) ------------
+
+
+def test_rung_log_is_the_per_rung_capture_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(watchdog, "FLEET_DIR", tmp_path)
+    assert watchdog.rung_log("brain") == tmp_path / "brain.log"
+    assert watchdog.rung_log("sister") == tmp_path / "sister.log"
+    assert watchdog.rung_log("monitor") == tmp_path / "monitor.log"
+
+
+def test_open_log_creates_the_file_and_appends(tmp_path, monkeypatch):
+    """Append, never truncate: a respawn must not erase the run before it."""
+    monkeypatch.setattr(watchdog, "FLEET_DIR", tmp_path)
+    with watchdog.open_log("brain") as fh:
+        fh.write("first run\n")
+    with watchdog.open_log("brain") as fh:
+        fh.write("second run\n")
+    assert (tmp_path / "brain.log").read_text(encoding="utf-8") == "first run\nsecond run\n"
+
+
+def test_open_log_is_line_buffered_so_the_window_is_never_stale(tmp_path, monkeypatch):
+    monkeypatch.setattr(watchdog, "FLEET_DIR", tmp_path)
+    handle = watchdog.open_log("brain")
+    try:
+        assert handle.line_buffering is True
+    finally:
+        handle.close()
+
+
+def test_spawn_appends_both_streams_to_the_rung_log(tmp_path, monkeypatch):
+    """The measured gap: stdout and stderr used to go to DEVNULL, so nothing
+    about the brain was visible from any window or log."""
+    monkeypatch.setattr(watchdog, "FLEET_DIR", tmp_path)
+    calls = []
+
+    def fake_popen(*args, **kwargs):
+        calls.append((args, kwargs))
+        return type("Proc", (), {"pid": 999})()
+
+    monkeypatch.setattr(watchdog.subprocess, "Popen", fake_popen)
+    watchdog.spawn("sister", ["setsid", "bash", "fleet/terminal.sh"])
+    _args, kwargs = calls[0]
+    assert kwargs["stdout"] is not subprocess.DEVNULL
+    assert kwargs["stderr"] is subprocess.STDOUT
+    assert kwargs["stdout"].name == str(tmp_path / "sister.log")
+
+
+def test_respawn_starts_the_rung_into_its_capture_log(monkeypatch):
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    spawned = []
+    monkeypatch.setattr(watchdog, "spawn", lambda name, command: spawned.append((name, command)))
+    assert watchdog.respawn("fleet/terminal.py", "fleet/terminal.sh", "sister") is True
+    assert spawned == [("sister", ["setsid", "bash", str(watchdog.ROOT / "fleet" / "terminal.sh")])]
+
+
+def test_a_default_rung_name_falls_back_to_the_launcher_stem(monkeypatch):
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    spawned = []
+    monkeypatch.setattr(watchdog, "spawn", lambda name, command: spawned.append(name))
+    watchdog.respawn("fleet/brain.py", "fleet/brain.sh")
+    assert spawned == ["brain"]
 
 
 # --- the monitor rung ---------------------------------------------------------
@@ -86,6 +152,7 @@ def test_start_monitor_spawns_a_detached_python_process(monkeypatch):
     monkeypatch.setattr(watchdog.subprocess, "Popen", fake_popen)
     assert watchdog.start_monitor() is True
     assert calls and "fleet/monitor.py" in str(calls[0][0][0])
+    assert calls[0][1]["stdout"].name.endswith("monitor.log")
 
 
 def test_start_monitor_reports_failure_when_spawn_fails(monkeypatch):

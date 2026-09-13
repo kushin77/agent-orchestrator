@@ -57,6 +57,11 @@ governance/board/violations.jsonl
 # Fleet monitor runtime output (tracked module: fleet/monitor.py)
 .fleet/open-eye.log
 .fleet/open-eye.heartbeat
+# Per-rung capture logs: each rung's stdout+stderr, appended by the spawner
+# (tracked modules: fleet/watchdog.py, fleet/control.py, fleet/console.py)
+.fleet/brain.log
+.fleet/sister.log
+.fleet/monitor.log
 
 # Local environment / secrets
 .env

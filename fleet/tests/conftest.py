@@ -42,9 +42,16 @@ RUNTIME_PATHS = {
         "BRAIN_HEARTBEAT",
     ),
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "WORKTREE_ROOT"),
-    "brain": ("HEARTBEAT",),
+    "brain": ("HEARTBEAT", "WAVES"),
     "health": ("SLOG",),
     "telemetry": ("RUNS_LOG",),
+    # `watchdog.spawn` OPENS a file named after FLEET_DIR, and `console` reads
+    # the same tree — without these three lines a test would create real
+    # `.fleet/*.log` files and read the live fleet's state, which is the
+    # measured failure this fixture exists to prevent.
+    "watchdog": ("FLEET_DIR", "RUNS_DIR"),
+    "console": ("FLEET_DIR",),
+    "monitor": ("FLEET_DIR", "LOG", "HEARTBEAT", "WAVES_DIR", "SISTER_HEARTBEAT", "BRAIN_HEARTBEAT"),
 }
 
 
