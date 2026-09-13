@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -187,9 +188,124 @@ def dispatch(order: dict) -> tuple[bool, str]:
     return result.returncode == 0, output
 
 
+WAVES = ROOT / ".fleet" / "waves"
+
+
+def gh_issue_create(title: str, body: str) -> int:
+    """File a micro-task child issue; returns its number, or raises on failure."""
+    result = subprocess.run(
+        ["gh", "issue", "create", "--repo", "kushin77/agent-orchestrator", "--title", title, "--body", body],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"gh issue create failed: {result.stderr.strip()[-400:]}")
+    match = re.search(r"/issues/(\d+)", result.stdout)
+    if not match:
+        raise RuntimeError(f"gh issue create returned no issue number: {result.stdout.strip()}")
+    return int(match.group(1))
+
+
+def handle_decompose(order: dict) -> tuple[bool, str]:
+    """Turn a decomposition spec into child issues and dispatch the ready wave.
+
+    Micro-decomposition: one parent issue becomes N small, collision-free child
+    issues (the pmo-sme discipline), filed with a `Parent: #N` marker so the chain
+    gate recognises them, and the ready wave is dispatched immediately — the brain
+    prepares the next waves in advance instead of waiting for the parent.
+    """
+    spec = (order.get("task") or {}).get("decompose")
+    if not isinstance(spec, dict) or not spec.get("children"):
+        return False, "decompose order carries no children — nothing to file"
+    parent = int(spec["parent_issue"])
+    WAVES.mkdir(parents=True, exist_ok=True)
+    plan = {"parent": parent, "children": [], "dispatched": []}
+    for index, child in enumerate(spec["children"]):
+        title = str(child.get("title", "")).strip()
+        lane = str(child.get("lane", "fleet"))
+        verify = str(child.get("verify", ""))
+        files = ", ".join(child.get("files", []))
+        body = (
+            f"Parent: #{parent}\n\n"
+            f"Lane: {lane}\n\nFiles: {files}\n\nVerify: `{verify}`\n\n"
+            f"Micro-task {index} of #{parent} (decomposed by the brain, pmo-sme discipline)."
+        )
+        number = gh_issue_create(title, body)
+        plan["children"].append(
+            {
+                "index": index,
+                "issue": number,
+                "lane": lane,
+                "verify": verify,
+                "depends_on": [int(d) for d in child.get("depends_on", [])],
+            }
+        )
+    (WAVES / f"{parent}.json").write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+    dispatched = dispatch_ready_children(parent, plan)
+    return True, (
+        f"decomposed #{parent} into {len(plan['children'])} micro-tasks; "
+        f"filed {[c['issue'] for c in plan['children']]}; dispatched {dispatched}"
+    )
+
+
+def issue_is_closed(number: int) -> bool:
+    result = subprocess.run(
+        ["gh", "api", f"repos/kushin77/agent-orchestrator/issues/{number}", "--jq", ".state"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() == "closed"
+
+
+def dispatch_ready_children(parent: int, plan: dict) -> list[int]:
+    """Dispatch any child whose dependencies are all closed and not yet dispatched."""
+    dispatched = []
+    for child in plan["children"]:
+        if child["issue"] in plan["dispatched"]:
+            continue
+        deps = [plan["children"][d]["issue"] for d in child["depends_on"] if d < len(plan["children"])]
+        if deps and not all(issue_is_closed(d) for d in deps):
+            continue
+        order = {
+            "type": "directive",
+            "task": {
+                "issue": child["issue"],
+                "lane": child["lane"],
+                "title": child["title"] if "title" in child else "",
+            },
+            "body": f"Micro-task of #{parent}. Verify: {child['verify']}",
+        }
+        ok, message = dispatch(order)
+        if ok:
+            plan["dispatched"].append(child["issue"])
+            dispatched.append(child["issue"])
+        else:
+            print(f"[brain] dispatch of micro-task #{child['issue']} refused: {message}", file=sys.stderr, flush=True)
+    (WAVES / f"{parent}.json").write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+    return dispatched
+
+
+def advance_waves() -> list[int]:
+    """Called on the idle path: dispatch any newly-ready children of every plan."""
+    if not WAVES.exists():
+        return []
+    advanced = []
+    for path in WAVES.glob("*.json"):
+        try:
+            plan = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        advanced.extend(dispatch_ready_children(int(plan["parent"]), plan))
+    return advanced
+
+
 def handle_order(order: dict) -> tuple[bool, str]:
     """One order in, one directive or one refusal out. Never a silent drop."""
     kind = str((order.get("task") or {}).get("kind") or order.get("kind") or "").lower()
+    if (order.get("task") or {}).get("decompose"):
+        return handle_decompose(order)
     if kind in NON_WORK_KINDS:
         level, reasons = _health()
         return True, f"order kind '{kind}' — no dispatch; fleet health {level}: {'; '.join(reasons)}"
@@ -238,6 +354,9 @@ def loop(args: argparse.Namespace) -> int:
             text=True,
         )
         if watch.returncode != 0:
+            advanced = advance_waves()
+            if advanced:
+                print(f"[brain] advanced waves: dispatched {advanced}", flush=True)
             if not idle_printed:
                 print("[brain] idle — watching .fleet/brain/inbox for operator orders", flush=True)
                 idle_printed = True

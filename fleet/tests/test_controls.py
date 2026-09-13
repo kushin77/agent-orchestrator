@@ -217,3 +217,56 @@ def test_a_missing_profile_is_refused_not_defaulted(tmp_path):
     broken.write_text(json.dumps({"mission": "x"}), encoding="utf-8")
     with pytest.raises(SystemExit):
         brain.load_profile(broken)
+
+
+# --- micro-decomposition: the brain files children and advances waves ----------
+
+
+def test_decompose_files_children_and_dispatches_only_wave_1(tmp_path, monkeypatch):
+    import brain
+
+    monkeypatch.setattr(brain, "WAVES", tmp_path / "waves")
+    filed = []
+    monkeypatch.setattr(brain, "gh_issue_create", lambda title, body: (filed.append(title), 300 + len(filed))[1])
+    dispatched = []
+    monkeypatch.setattr(brain, "dispatch", lambda order: (dispatched.append(order["task"]["issue"]), (True, "ok"))[1])
+
+    spec = {
+        "parent_issue": 219,
+        "children": [
+            {"title": "a", "lane": "fleet", "verify": "pytest a", "files": ["a.py"], "depends_on": []},
+            {"title": "b", "lane": "fleet", "verify": "pytest b", "files": ["b.py"], "depends_on": [0]},
+            {"title": "c", "lane": "fleet", "verify": "pytest c", "files": ["c.py"], "depends_on": [0]},
+        ],
+    }
+    ok, report = brain.handle_decompose({"task": {"decompose": spec}})
+    assert ok is True and len(filed) == 3
+    assert dispatched == [301], "only the dependency-free wave is dispatched now; b and c wait"
+
+
+def test_advance_waves_dispatches_children_whose_deps_are_closed(tmp_path, monkeypatch):
+    import brain
+
+    monkeypatch.setattr(brain, "WAVES", tmp_path / "waves")
+    plan = {
+        "parent": 219,
+        "children": [
+            {"index": 0, "issue": 301, "lane": "fleet", "verify": "x", "depends_on": []},
+            {"index": 1, "issue": 302, "lane": "fleet", "verify": "y", "depends_on": [0]},
+        ],
+        "dispatched": [301],
+    }
+    brain.WAVES.mkdir(parents=True, exist_ok=True)
+    (brain.WAVES / "219.json").write_text(json.dumps(plan), encoding="utf-8")
+    monkeypatch.setattr(brain, "issue_is_closed", lambda n: n == 301)
+    dispatched = []
+    monkeypatch.setattr(brain, "dispatch", lambda order: (dispatched.append(order["task"]["issue"]), (True, "ok"))[1])
+    assert brain.advance_waves() == [302]
+    assert brain.issue_is_closed(301) is True and brain.issue_is_closed(999) is False
+
+
+def test_decompose_refuses_a_spec_without_children(tmp_path):
+    import brain
+
+    ok, report = brain.handle_decompose({"task": {"decompose": {"parent_issue": 219}}})
+    assert ok is False and "no children" in report
