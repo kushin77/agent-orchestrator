@@ -34,12 +34,9 @@ checks=(
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'conformance|bash scripts/check-conformance.sh'
-
+  'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
-
-
   'lessons|bash scripts/check-lessons.sh'
-
   'secrets|bash scripts/check-secrets.sh'
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'

@@ -16,6 +16,32 @@ Start here:
 4. **`docs/GOVERNANCE.md`** — branch, provenance, and session-label
    conventions.
 
+## Issue briefs are brain directives
+
+An issue is not a note — it is the directive a fleet agent executes. Start from
+the [fleet task brief](.github/ISSUE_TEMPLATE/fleet-task.yml) so every issue
+carries what the dispatcher and the FinOps block read:
+
+- **GOAL first, then constraints, then context.** The first sentence states the
+  objective and its success criteria; an agent that reads only that line must
+  still act correctly.
+- **Role, epic, lane** — who executes, which epic it serves, and the single lane
+  that owns its files. One issue = one lane = one branch
+  ([`docs/EXECUTION-PLAN.md`](docs/EXECUTION-PLAN.md)).
+- **Model tier** (`flash` / `pro` / `auditor`) and **thinking effort**
+  (`none` / `low` / `medium` / `high`) — start cheap; escalate on observed
+  difficulty, never pre-emptively.
+- **Verify command** — the exact command whose literal output is the evidence of
+  done (GR-12).
+- **Chain markers** — `Parent: #n`, `Part-of: #n`, `Blocked-by: #n, #m`. These
+  are the dependency edges the chronological dispatcher reads; an issue with no
+  edge declares `Root=none`.
+- **Acceptance criteria + evidence** — mechanically checkable criteria, and the
+  literal output that proves them.
+
+The brief contract is gated: `make issue-template` fails, by name, if a required
+field is dropped from the template.
+
 ## Branching
 
 - `master` is **protected by convention** — no direct pushes, no force-push.

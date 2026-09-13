@@ -297,6 +297,7 @@ its classifier/few-shot/feedback modules are usable without recovery.
 ---
 
 
+
 ## 6. M26 session-fleet harvest (issue #161) — roles, vocabulary, transport
 
 The session fleet operating model (brain → fleet-brain sister → epic-focused
@@ -376,6 +377,43 @@ cannot drift apart on the same asset.
 **Numbering note.** §6 is the M26 session-transport harvest recorded by the
 issue #161 lane; this section is numbered above it rather than reusing 6, so the
 two lanes cannot collide on a heading.
+
+## 8. Issue-brief harvest — the fleet-task template (issue #165)
+
+The canonical issue brief (`.github/ISSUE_TEMPLATE/fleet-task.yml`) is harvested,
+not invented: its field set and FinOps vocabulary are lifted from two
+kushin77-internal sources. **Both sources are kushin77 proprietary / internal use
+only. They were read to learn the FORMAT only — no file, code, or prose was
+copied into this repo, and nothing from them is committed here.** Verdicts follow
+§0.
+
+| Source repo | Key path(s) | Verdict | What the brief takes from it |
+|---|---|---|---|
+| leaderboard | `lib/fleet-roster.sh` (`FLEET_ROLES`, `role_model`, `role_tier`, `role_capability_tier`, `role_effort`) | PATTERN | Role-scoped execution: a task declares a **role**, and the role pins its **model**, **capability tier** (`deep`/`balanced`/`fast`) and **reasoning effort** (`high`/`medium`/`low`), each overridable per run (`ROLE_MODEL_<ROLE>`, `ROLE_TIER_<ROLE>`). The brief reproduces the *shape* — role + tier + effort declared on the issue itself, never inferred later. |
+| leaderboard | `scripts/dispatch/spec-lint.sh` (+ `agent-dispatch-enqueue.sh`) | PATTERN | Pre-dispatch spec lint: a task is refused at enqueue when its brief is incomplete (missing `ISSUE`/`SCOPE`/`TASK_TYPE`/`FILES`, or an issue body with no `## Acceptance (mechanical)` block). This is the precedent for `scripts/check-issue-template.sh` — the brief is linted, not trusted, and it fails loud with a named reason. |
+| leaderboard | `.github/ISSUE_TEMPLATE/enhancement.md` | PATTERN | House brief skeleton (a Scope with affected-component / breaking-change / migration sub-fields; a checkbox `## Acceptance Criteria`; an `## Additional Context` evidence slot) mirrored by the template's acceptance-criteria and evidence fields. |
+| capital-underwriting | `docs/wiki/ELITE_*.md` (`ELITE_PLATOON_LEADER_CHARTER.md`, `ELITE_AUDITOR_CHARTER.md`, `ELITE_GENERAL_CHARTER.md`, `ELITE_COMMANDER_LTC_CHARTER.md`, `ELITE_SCRIBE_CHARTER.md`) | REFERENCE | The ELITE charter structure (role line → companion-document links → blocking thesis → numbered mandate sections → a per-cycle checklist) and its **Model Tiering** table, where each role maps to a model + reasoning effort and the highest-stakes seat is explicitly held *above* the cheap tier. That table is the source of the brief's `model-tier` / `thinking-effort` pairing. |
+
+**Vocabulary adopted verbatim (no local synonym):**
+
+- **Model tier** = `flash` / `pro` / `auditor`. `flash` and `pro` are this
+  repo's FinOps tier names; `auditor` is the measured audit seat the charters
+  require be held at the higher-reasoning tier (`ELITE_AUDITOR_CHARTER.md` §4 —
+  never downgrade the Auditor to the flash tier).
+- **Thinking effort** = `none` / `low` / `medium` / `high`. `low`/`medium`/`high`
+  are the leaderboard `role_effort()` returns; `none` is the fleet's
+  thinking-off state.
+
+The brief is enforced, not merely documented: `scripts/check-issue-template.sh`
+(wired into `make verify` and `make lint`) fails, by name, when a required field
+is missing or the vocabulary drifts, and it runs its own negative control so it
+cannot pass vacuously (GR-12).
+
+**Provenance (GR-10):** `harvested_from:` `kushin77/leaderboard`
+(`lib/fleet-roster.sh`, `scripts/dispatch/spec-lint.sh`,
+`.github/ISSUE_TEMPLATE/enhancement.md`) and `kushin77/capital-underwriting`
+(`docs/wiki/ELITE_*.md`) — pattern/REFERENCE only, kushin77 proprietary /
+internal use only, no code copied.
 
 
 ---

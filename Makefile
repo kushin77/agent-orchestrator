@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims fleet-channel finops-chooser fleet-contract knowledge-index knowledge-index-build \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract knowledge-index knowledge-index-build \
         conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
@@ -52,6 +52,8 @@ help:
 	@echo "                issue selection (GR-20, cannot drift to kanban picking)"
 	@echo "  issue-claims  Claim-time order enforcement (#157): ledger replayed"
 	@echo "                against the board snapshot + self-control mutants"
+	@echo "  issue-template  Issue-brief contract (#165): the required fields +"
+	@echo "                canonical FinOps vocab; a dropped field is refused"
 	@echo "  fleet-channel Steering channel (M26 #162): message contract + the"
 	@echo "                DSv4FNone standing directive, all mutants refused"
 
@@ -81,7 +83,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel finops-chooser fleet-contract knowledge-index lessons
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -131,6 +133,11 @@ chronological-dispatch:
 ## audit always runs its own mutants, so it cannot pass vacuously
 issue-claims:
 	@bash scripts/check-issue-claims.sh
+
+## issue-template — the fleet issue-brief contract (issue #165): every required
+## field present and the FinOps vocabularies canonical; a dropped field fails
+issue-template:
+	@bash scripts/check-issue-template.sh
 
 ## fleet-channel — steering channel (M26, issue #162): the message contract and
 ## the DSv4FNone standing directive; every mutant message must be refused
