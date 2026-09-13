@@ -1,0 +1,58 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "claude-anthropic",
+  "name": "claude-anthropic",
+  "description": "Anthropic Claude provider module: Messages-API model routing, system-message lifting, typed-output validation and cloud-to-local (Ollama) graceful degradation.",
+  "source": {
+    "repo": "kushin77/gmail-agent",
+    "default_branch": "master",
+    "path": "src/agent/claude.ts"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "claude", "anthropic"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.anthropic",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "messages-api",
+      "default": "on",
+      "flags": ["anthropic.messages"],
+      "desc": "Anthropic Messages API chat with model tiers and typed output validation."
+    },
+    {
+      "id": "system-lifting",
+      "default": "on",
+      "flags": ["anthropic.system"],
+      "desc": "System messages lifted into the top-level system field of the Messages request."
+    },
+    {
+      "id": "graceful-degradation",
+      "default": "on",
+      "flags": ["anthropic.fallback"],
+      "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-13",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/gmail-agent src/agent/claude.ts",
+    "note": "Vendored as the claude/anthropic module-catalog entry (issue #255), closing the 4-of-5 gap left by issue #124 which covered DeepSeek, Ollama, Hermes and Paperclip. Pattern only; no source file copied."
+  }
+}

@@ -4,7 +4,8 @@
 build request -> transport round-trip (latency measured) -> parse response ->
 validate typed output against the output schema (fail closed). Subclasses
 supply the provider-specific pieces (endpoint, headers, payload, response
-parsing) - see anthropic.py / deepseek.py / openai.py / gemini.py / ollama.py.
+parsing) - see anthropic.py / deepseek.py / openai.py / gemini.py / ollama.py /
+paperclip.py / hermes.py.
 
 ``Credentials`` carries an optional API key. The key is attached to the
 outbound request headers only; it is never logged, never included in

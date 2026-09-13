@@ -254,6 +254,31 @@ def test_graceful_degradation_to_ollama(sentiment_schema) -> None:
     assert result.content == CONTENT_OBJ
 
 
+def test_hermes_degrades_to_ollama(sentiment_schema) -> None:
+    """Hermes unavailable -> degrade to its local Ollama fallback (frozen map)."""
+
+    def transport_factory(name, cfg):
+        if name == "hermes":
+            return FailingTransport()
+        return RecordingTransport([ok_response("ollama", "llama3.2", VALID_CONTENT)])
+
+    registry = _registry(
+        credentials_factory=lambda tenant, provider: Credentials(api_key=FAKE_KEY),
+        transport_factory=transport_factory,
+    )
+    registry.set_tenant_mapping("acme", {"MED": "hermes"})
+    result = registry.chat(
+        make_messages(),
+        sentiment_schema,
+        tenant_id="acme",
+        agent_id="agent-1",
+        logical_key="MED",
+    )
+    assert result.provider == "ollama"
+    assert result.model == "llama3.2"
+    assert result.content == CONTENT_OBJ
+
+
 def test_retry_then_fail_after_fallback_exhausted() -> None:
     """Every provider in the chain is down -> the call finally fails."""
 
@@ -306,5 +331,6 @@ def test_metering_and_audit_hooks_fire_per_call(sentiment_schema) -> None:
 def test_provider_configs_are_exposed() -> None:
     registry = _registry()
     names = set(registry.provider_configs())
-    assert names == {"anthropic", "deepseek", "openai", "gemini", "ollama"}
+    assert names == {"anthropic", "deepseek", "openai", "gemini", "ollama", "paperclip", "hermes"}
     assert registry.config_for("ollama").requires_key is False
+    assert registry.config_for("hermes").requires_key is False

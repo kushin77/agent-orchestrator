@@ -184,11 +184,23 @@ providerChains:        # primary -> fallback -> local (Ollama)
   LOW:  [deepseek, openai, ollama]
   MED:  [deepseek, anthropic, ollama]
   HIGH: [deepseek, anthropic, ollama]
+routingGroups:         # agent -> pinned provider + fallback/retry (issue #255)
+  purebliss-team:
+    retryMaxAttempts: 2
+    agents:
+      ollama:    { provider: ollama }
+      paperclip: { provider: paperclip, fallbacks: [ollama] }
+      hermes:    { provider: hermes, fallbacks: [ollama] }
+      deepseek:  { provider: deepseek, fallbacks: [ollama] }
+      claude:    { provider: anthropic, fallbacks: [ollama] }
 ```
 
 Routing resolution is therefore: **task-type → capability → model tier
 (FinOps chooser) → provider/model**, with per-task-type capability gating and a
-health-driven fallback chain.
+health-driven fallback chain. An agent that belongs to a `routingGroups`
+entry is routed by its pinned provider chain (primary → fallbacks) instead of
+the tier chain; the FinOps tier choice still sets cost/budget and the model
+tier within the pinned provider.
 
 ## Fallback chain + injected health
 

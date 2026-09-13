@@ -10,7 +10,8 @@
 This tree is the **multi-provider client adapter layer** of the Model
 Gateways pillar (pillar 2, phase 2): a clean, typed, retry-able, measurable
 provider interface for **Claude (Anthropic), DeepSeek, OpenAI (Copilot/GPT),
-Gemini and local Ollama** — swappable without touching orchestration. The
+Gemini, local Ollama, Paperclip and Hermes** — swappable without touching
+orchestration. The
 gateway proxy (issue #16) and later phases consume these adapters.
 
 This module is the **contract-freeze boundary** for phase 2 (per
@@ -68,6 +69,8 @@ gateway/providers/
 ├── openai.py                   # OpenAI/Copilot/GPT adapter
 ├── gemini.py                   # Gemini adapter
 ├── ollama.py                   # local Ollama adapter
+├── paperclip.py                # Paperclip planning/status-report adapter
+├── hermes.py                   # Hermes local agent-service adapter
 ├── example-tenant-overrides.yaml   # documented per-tenant mapping example
 └── tests/                      # offline pytest suite (97 tests)
 ```
@@ -121,6 +124,8 @@ non-transient failures (bad key/request, invalid output) fail immediately.
 | OpenAI / Copilot / GPT | `openai.py` | OpenAI-compatible `chat/completions` | Bearer | LOW/MED→`gpt-4o-mini`, HIGH/MAX→`gpt-4o` |
 | Gemini | `gemini.py` | `models/{model}:generateContent` | `x-goog-api-key` | LOW/MED→`gemini-2.5-flash`, HIGH/MAX→`gemini-2.5-pro` |
 | Ollama (local) | `ollama.py` | `/api/chat` | none (keyless) | LOW/MED→`llama3.2`, HIGH/MAX→`qwen2.5` |
+| Paperclip | `paperclip.py` | OpenAI-compatible `chat/completions` | Bearer | `paperclip-planner` (all tiers) |
+| Hermes (local) | `hermes.py` | `/api/chat` (Ollama-compatible) | none (keyless) | `hermes3` (all tiers) |
 
 Every adapter maps `system` messages per its wire protocol (Anthropic
 top-level `system`, Gemini `systemInstruction`, inline system role for the
@@ -134,7 +139,7 @@ OpenAI-compatible and Ollama protocols), maps assistant roles correctly
 
 `registry.ProviderRegistry` owns:
 
-- **Provider configs** — `config.default_provider_configs()` returns the five
+- **Provider configs** — `config.default_provider_configs()` returns the seven
   platform defaults (`ProviderConfig`: base URL, tier→model map,
   supported-model set, timeout, retry policy, breaker settings, fallback
   chain, `requires_key`). Unknown models are rejected before any request

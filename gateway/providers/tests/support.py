@@ -33,7 +33,7 @@ def chat_body_for(provider: str, model: str, text: str) -> dict:
             "usage": {"input_tokens": 12, "output_tokens": 7},
             "model": model,
         }
-    if provider in ("openai", "deepseek"):
+    if provider in ("openai", "deepseek", "paperclip"):
         return {
             "choices": [{"message": {"content": text}}],
             "usage": {"prompt_tokens": 12, "completion_tokens": 7},
@@ -45,7 +45,7 @@ def chat_body_for(provider: str, model: str, text: str) -> dict:
             "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 7},
             "modelVersion": model,
         }
-    if provider == "ollama":
+    if provider in ("ollama", "hermes"):
         return {
             "message": {"content": text},
             "prompt_eval_count": 12,
@@ -84,5 +84,7 @@ def auth_header_name(provider: str) -> str | None:
         "gemini": "x-goog-api-key",
         "openai": "authorization",
         "deepseek": "authorization",
+        "paperclip": "authorization",
         "ollama": None,
+        "hermes": None,
     }[provider]

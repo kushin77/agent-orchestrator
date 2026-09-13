@@ -69,6 +69,22 @@ class TaskRoute:
     task_class: str
 
 
+@dataclass(frozen=True)
+class AgentRoute:
+    """One agent's pinned provider route within a routing group."""
+
+    provider: str
+    fallbacks: tuple[str, ...] = ()
+
+
+@dataclass
+class RoutingGroup:
+    """A named routing group: agent id -> pinned provider + fallback chain."""
+
+    agents: dict[str, AgentRoute]
+    retry_max_attempts: int = 2
+
+
 @dataclass
 class RoutingConfig:
     """Validated routing policy (loads ``config/routing.yaml``, fail closed)."""
@@ -77,6 +93,7 @@ class RoutingConfig:
     routes: dict[str, TaskRoute] = field(default_factory=dict)
     tier_map: dict[str, str] = field(default_factory=dict)
     provider_chains: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    routing_groups: dict[str, RoutingGroup] = field(default_factory=dict)
 
     def route_for(self, task_type: str) -> TaskRoute:
         route = self.routes.get(task_type)
@@ -102,6 +119,14 @@ class RoutingConfig:
                 f"no provider chain configured for registry tier {registry_tier!r}"
             )
         return chain
+
+    def group_route_for(self, agent_id: str) -> AgentRoute | None:
+        """The agent's pinned provider route from any routing group (or None)."""
+        for group in self.routing_groups.values():
+            route = group.agents.get(agent_id)
+            if route is not None:
+                return route
+        return None
 
 
 def _validate_config(data: Mapping[str, Any]) -> RoutingConfig:
@@ -133,11 +158,43 @@ def _validate_config(data: Mapping[str, Any]) -> RoutingConfig:
         if len(set(chain)) != len(chain):
             raise RoutingConfigError(f"provider chain for {tier!r} contains duplicates")
         chains[str(tier)] = chain
+    routing_groups: dict[str, RoutingGroup] = {}
+    for group_name, group_spec in (data.get("routingGroups") or {}).items():
+        if not isinstance(group_spec, Mapping):
+            raise RoutingConfigError(f"routing group {group_name!r} must be a mapping")
+        agents_raw = group_spec.get("agents")
+        if not isinstance(agents_raw, Mapping) or not agents_raw:
+            raise RoutingConfigError(f"routing group {group_name!r} must declare agents")
+        agents: dict[str, AgentRoute] = {}
+        for agent_id, spec in agents_raw.items():
+            if isinstance(spec, str) and spec:
+                provider, fallbacks = spec, ()
+            elif isinstance(spec, Mapping) and spec.get("provider"):
+                provider = str(spec["provider"])
+                fb = spec.get("fallbacks")
+                fallbacks = tuple(str(f) for f in fb) if isinstance(fb, (list, tuple)) else ()
+            else:
+                raise RoutingConfigError(
+                    f"routing group {group_name!r} agent {agent_id!r} must "
+                    "declare a provider"
+                )
+            if provider in fallbacks:
+                raise RoutingConfigError(
+                    f"routing group {group_name!r} agent {agent_id!r} fallback "
+                    f"chain contains its own primary provider {provider!r}"
+                )
+            agents[str(agent_id)] = AgentRoute(provider=provider, fallbacks=fallbacks)
+        retry_raw = group_spec.get("retryMaxAttempts")
+        retry_max = int(retry_raw) if isinstance(retry_raw, int) and retry_raw > 0 else 2
+        routing_groups[str(group_name)] = RoutingGroup(
+            agents=agents, retry_max_attempts=retry_max
+        )
     return RoutingConfig(
         schema_version=int(data.get("schemaVersion")),
         routes=routes,
         tier_map=tier_map or dict(DEFAULT_TIER_MAP),
         provider_chains=chains,
+        routing_groups=routing_groups,
     )
 
 
@@ -212,7 +269,12 @@ class Router:
                 f"chooser returned {type(choice).__name__}, expected proxy.TierChoice"
             )
         registry_tier = self.config.map_tier(choice.tier)
-        chain = self._ordered_chain(registry_tier, choice)
+        agent_route = self.config.group_route_for(agent_view.agent_id)
+        chain = (
+            self._agent_chain(agent_route)
+            if agent_route is not None
+            else self._ordered_chain(registry_tier, choice)
+        )
         all_candidates = tuple(
             RouteCandidate(
                 provider=provider,
@@ -255,3 +317,16 @@ class Router:
         if choice.provider and choice.provider in chain:
             chain = [choice.provider] + [p for p in chain if p != choice.provider]
         return tuple(chain)
+
+    def _agent_chain(self, agent_route: AgentRoute) -> tuple[str, ...]:
+        """The pinned provider chain for a routing-group agent (primary ->
+        fallbacks).
+
+        Group pinning is authoritative for the agent: the tier chain is not
+        used for a group member, but the FinOps tier choice still sets the
+        cost/budget and the model tier within the pinned provider (the backend
+        resolves each candidate's model per tier).
+        """
+        return (agent_route.provider,) + tuple(
+            f for f in agent_route.fallbacks if f != agent_route.provider
+        )

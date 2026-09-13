@@ -446,5 +446,37 @@ the mailbox, so it cannot itself become a second dispatcher. Wired into
 `fleet/control.py health` for operator use; `fleet/tests/test_health.py`
 covers all three signal levels.
 
+
+## 10. Five-agent team routing + claude/anthropic catalog entry (issue #255)
+
+The gateway routing for the five-agent team (`ollama`, `paperclip`, `hermes`,
+`deepseek`, `claude`) and the claude/anthropic module-catalog entry are
+**consumed prior art**, harvested **2026-09-13** from read-only local checkouts
+of kushin77-owned repos. What is reused is the **pattern and the vocabulary**,
+re-implemented for this repo's Python/YAML substrate; no source file was
+copied, so no `harvested_from` code marker applies.
+
+| Source (repo-relative) | Asset | Verdict | Where it landed |
+|---|---|---|---|
+| `kushin77/gmail-agent` `src/agent/claude.ts` | Claude client: model tiers, p-retry, agentic tool loop, zod output | PATTERN | `gateway/providers/anthropic.py` (existing) + the new gateway-owned `gateway/catalog/modules/claude-anthropic/module.json` entry, closing the 4-of-5 gap left by #124 |
+| `kushin77/ollama` `ollama/services/inference/resilient_ollama_client.py` | Ollama `/api/chat` wire shape, circuit-breaker client | READY | `gateway/providers/hermes.py` — the hermes adapter reuses the Ollama-compatible request/response shape (frozen map `hermes -> hermes/ollama`) |
+| `kushin77/gov-ai-scout` `backend/src/services/ai-provider.ts` | Provider gateway with per-task model registry + fallback/retry | PATTERN | `gateway/providers/paperclip.py` — the paperclip adapter reuses the OpenAI-compatible `chat/completions` shape shared with `deepseek`/`openai` |
+| `kushin77/hermes-agents` `models/model_tiering.py` + `api/capabilities.py` | agent -> model/provider routing tables | READY | `gateway/proxy/config/routing.yaml` `routingGroups.purebliss-team` — agent -> provider + fallback/retry, consumed from the EPIC #253 frozen map |
+
+The `purebliss-team` routing group pins each agent to its provider
+(`ollama -> ollama`, `paperclip -> paperclip`, `hermes -> hermes/ollama`,
+`deepseek -> deepseek`, `claude -> anthropic`) with the local Ollama hop as the
+terminal fallback, and is enforced in `gateway/proxy/router.py` (a group agent
+is routed by its pinned chain, not the tier chain). The claude/anthropic
+catalog entry lives under `gateway/catalog/` (gateway-owned) rather than the
+pinned `vendor/CMR/catalog/modules/` submodule, which this lane must not edit.
+
+**Provenance (GR-10):** `harvested_from:` `kushin77/gmail-agent`
+(`src/agent/claude.ts`), `kushin77/ollama`
+(`ollama/services/inference/resilient_ollama_client.py`),
+`kushin77/gov-ai-scout` (`backend/src/services/ai-provider.ts`),
+`kushin77/hermes-agents` (`models/model_tiering.py`, `api/capabilities.py`) —
+pattern/READY only, kushin77 proprietary / internal use only, no code copied.
+
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*
