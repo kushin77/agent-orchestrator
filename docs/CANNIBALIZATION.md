@@ -295,4 +295,47 @@ its classifier/few-shot/feedback modules are usable without recovery.
   so instead of inventing assets.
 
 ---
+
+## 6. M26 session-fleet harvest (issue #161) — roles, vocabulary, transport
+
+The session fleet operating model (brain → fleet-brain sister → epic-focused
+subagents) is consumable prior art, not new vocabulary. Harvested **2026-09-13**
+from local checkouts, read-only. Both source repos are `kushin77`-owned and both
+carry the license **"Copyright (c) 2026 kushin77. All Rights Reserved.
+PROPRIETARY — INTERNAL USE ONLY"** (`LICENSE` at each repo root) — the same owner
+as this repo. What is reused is therefore the **pattern and the vocabulary**,
+re-implemented for this repo's Python/JSON substrate; no source file was copied,
+so no `harvested_from` code marker applies. The derived artifacts are
+`fleet/CONTRACT.md` and `docs/decision-records/ADR-0011-session-fleet-transport.md`.
+
+| Source (repo-relative) | Asset | Verdict | Where it landed |
+|---|---|---|---|
+| `leaderboard/lib/fleet-roster.sh` | ROLE / TIER / MODEL / TRANSPORT / EFFORT separation, `role_capability_tier` (deep/balanced/fast), per-model capability profiles | PATTERN | `fleet/CONTRACT.md` §1 — a seat is not a model; the four attributes travel in the directive's FinOps block instead of being inferred by the executor |
+| `leaderboard/docs/LEADERBOARD_PROTOCOL.md` | per-session row files, one worktree per session (id = branch), a reporter that *computes* status, "a done claim must match a real gate result" | REFERENCE | `fleet/CONTRACT.md` §0/§6 + ADR-0011 — coordination stays inside the repo's own checkout, no broker |
+| `leaderboard/docs/CTO_OVERLAY.md` | four-layer blocking-governance overlay, per-layer severity and the `.cto/config.yaml` tier system | PATTERN | ADR-0011 — governance layers run in-repo; a layer that cannot block a merge is advisory, which is the same rule this repo's `make verify` follows |
+| `capital-underwriting/docs/wiki/ELITE_GENERAL_CHARTER.md` | commander → general → sniper chain of command; "never substitute 'looks fine' for a gate result" | REFERENCE | `fleet/CONTRACT.md` §4 (trust rules) and §6 (enforcement) |
+| `capital-underwriting/docs/wiki/ELITE_PLATOON_LEADER_CHARTER.md` | wave ownership, mutually-disjoint file sets, role → N-1 hand-off | REFERENCE | `fleet/CONTRACT.md` §2 (`dispatch-issue`, `handoff`) |
+| `capital-underwriting/scripts/agent/sme/*.txt` + `sme-dispatch.sh` | per-file adversarial reviewer prompts (auditor, security, terraform, sniper-generic, prisma-db, test-quality) | READY | epic-subagent reviewer roles — `registry/personas` and the FinOps chooser (#164) |
+| `vendor/CMR` (pinned submodule) | hub M9 (`board/MILESTONES.md`, `board/epics/EPIC-11-github-full-surface.md`) | REFERENCE | ADR-0011 — read to check the A2A option, and **not** usable as an A2A wire contract: the hub's M9 is GitHub full-surface governance |
+
+**Also enumerated, not read in full:** `capital-underwriting/docs/wiki/` carries
+five `ELITE_*.md` charters (`AUDITOR`, `COMMANDER_LTC`, `GENERAL`,
+`PLATOON_LEADER`, `SCRIBE`); two were read in full for this issue (the two in the
+table above) and the remaining three were listed only — no content from them is
+reproduced here.
+
+**Missing / unreadable source — reported, not invented:**
+`capital-underwriting/.claude/agents/*.md`. That path holds **no agent
+markdown**: it contains three runtime session directories
+(`agent-7bfd1589/session.json`, `agent-e418370a/session.json`,
+`relentless-765/session.json`) plus a `.gitkeep`. The SME cards the issue's
+harvest map refers to are the `scripts/agent/sme/*.txt` files listed above. No
+`.claude/agents` content was read or reused.
+
+**Deliberately not harvested here:** `personas.yaml`,
+`capability-registry.json` and `tier-policy.json` / `route-policy.json` belong to
+the #163/#164 lanes. #161 takes the role vocabulary and the transport decision
+only, so two lanes cannot drift apart on the same asset.
+
+---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*

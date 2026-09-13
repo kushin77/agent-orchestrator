@@ -12,10 +12,14 @@ Mailbox layout (runtime state, gitignored):
     .fleet/inbox/    messages for the sister to drain (written by brain send)
     .fleet/sent/     the brain's own copy of everything it sent
     .fleet/outbox/   acks and results written back for the brain
+    .fleet/done/     directives answered and consumed
 
 Messages are validated against `fleet/schema/message.schema.json` semantics
-before they move. Exit codes are the repo tri-state: 0 OK / 1 NOT-OK /
-2 CANNOT-ASSESS.
+before they move. The topology, the directive vocabulary and the trust rules the
+validator enforces are the normative contract in `fleet/CONTRACT.md`, and the
+transport itself is decided by ADR-0011 (docs/decision-records/) — this module is
+the machine that runs that contract. Exit codes are the repo tri-state: 0 OK /
+1 NOT-OK / 2 CANNOT-ASSESS.
 """
 
 from __future__ import annotations
@@ -79,6 +83,8 @@ def validate(message: dict) -> list[str]:
         problems.append("ts must be an ISO-8601 timestamp")
     if "correlation_id" in message and not isinstance(message["correlation_id"], str):
         problems.append("correlation_id must be a string")
+    if "nonce" in message and (not isinstance(message["nonce"], str) or not message["nonce"].strip()):
+        problems.append("nonce must be a non-empty string (the anti-replay token)")
     if message_type == "directive" and message.get("to") != "sister":
         problems.append("directives may only be addressed to the sister")
     if message.get("from") == "sister" and message_type == "directive":
@@ -141,6 +147,31 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def replay_conflict(message: dict) -> str | None:
+    """Reason this message replays an earlier delivery, or None when it is fresh.
+
+    A directive is identified by its ``id`` and carries a ``nonce`` as its
+    anti-replay token (contract §3). Either one recurring in the sent, inbox or
+    done mailbox means the same order is being pushed twice — which the contract
+    refuses rather than silently overwriting the queued copy.
+    """
+    if not message.get("id") and not message.get("nonce"):
+        return None
+    for directory in (SENT, INBOX, DONE):
+        if not directory.exists():
+            continue
+        for path in directory.glob("*.json"):
+            try:
+                prior = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            if message.get("id") and prior.get("id") == message["id"]:
+                return f"id {message['id']} was already sent"
+            if message.get("nonce") and prior.get("nonce") == message["nonce"]:
+                return f"nonce {message['nonce']} was already used"
+    return None
+
+
 def cmd_send(args: argparse.Namespace) -> int:
     message = load_message(args.message)
     problems = validate(message)
@@ -153,6 +184,12 @@ def cmd_send(args: argparse.Namespace) -> int:
         message["id"] = str(uuid.uuid4())
     if not message.get("ts"):
         message["ts"] = now_iso()
+    if not message.get("nonce"):
+        message["nonce"] = str(uuid.uuid4())
+    conflict = replay_conflict(message)
+    if conflict:
+        print(f"channel send: REFUSED — replay detected ({conflict})", file=sys.stderr)
+        return EXIT_NOT_OK
     message_id = message["id"]
     SENT.mkdir(parents=True, exist_ok=True)
     INBOX.mkdir(parents=True, exist_ok=True)

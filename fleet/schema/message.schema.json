@@ -34,6 +34,11 @@
       "type": "string",
       "description": "Binds a result/ack to the directive that caused it."
     },
+    "nonce": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Anti-replay token for a directive (issue #161). Stamped by the channel when absent; send refuses a nonce already seen in the sent, inbox or done mailbox. The rest of the envelope stays v1 — the field is additive."
+    },
     "model": {
       "type": "object",
       "additionalProperties": false,

@@ -69,6 +69,7 @@ writes the real ADR.
 | [ADR-0008](ADR-0008-control-plane-contract.md) | Control plane / portal contract | reserved | issues #38–#42 (phase 7) |
 | [ADR-0009](ADR-0009-autonomous-ops-contract.md) | Autonomous ops / governance contract | reserved | issues #43–#47 (phase 8) |
 | [ADR-0010](ADR-0010-canonical-copy-ownership.md) | Canonical-copy ownership (MODEL/SME/SOLUTION-CLASSES trio + identity standards) | accepted | issue #47 (decision spike) |
+| [ADR-0011](ADR-0011-session-fleet-transport.md) | Session-fleet transport — file mailbox now, A2A as the graduation target | accepted | issue #161 (M26) |
 
 The reserved set covers every pillar contract named in EPIC-00 (issue #4) and
 [`ARCHITECTURE.md`](../ARCHITECTURE.md): agent-registry, model-gateway,

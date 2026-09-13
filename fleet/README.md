@@ -5,6 +5,12 @@ This repo is the complete end-to-end IT department for any organization
 observability, FinOps and governance, run by agents. This directory is the
 session layer that operates it.
 
+**Normative contract:** [`CONTRACT.md`](CONTRACT.md) — the roles, the directive
+vocabulary, the message schema and the trust rules. **This file is the runbook:**
+bootstrap, mailbox layout, listener loop and day-to-day commands. Where the two
+could disagree about *who may say what to whom*, the contract wins; where they
+could disagree about *which command to type*, this file wins.
+
 ## The model
 
 | Role | Runtime | Behaviour |
@@ -14,10 +20,15 @@ session layer that operates it.
 | **Fleet subagents** | DeepSeek agent model, tier/thinking chosen by the brain's FinOps block | Epic-focused executors. One issue = one subagent = one lane. |
 
 The brain ↔ sister and sister ↔ subagent traffic uses this file-mailbox
-channel as the transport of record (localhost mechanics, GR-21). The message
-contract is `schema/message.schema.json`; the channel CLI enforces it. The
-hub's A2A product layer (this repo's M9, #101–#109) is the platform contract
-this model will graduate onto when it ships.
+channel as the transport of record (localhost mechanics, GR-21) — decided and
+recorded in [ADR-0011](../docs/decision-records/ADR-0011-session-fleet-transport.md),
+which the channel cites. The message contract is
+[`schema/message.schema.json`](schema/message.schema.json), which is
+authoritative for the envelope's shape; [`CONTRACT.md`](CONTRACT.md) is
+authoritative for the roles, the vocabulary and the trust rules, and both are
+gated by `make verify`. The hub's A2A product layer (this repo's M9,
+#101–#109) is the platform contract this model will graduate onto when it
+ships — that graduation is a transport swap, not a rewrite of the contract.
 
 ## Bootstrap (the ONLY human step)
 
@@ -53,6 +64,9 @@ Everything after step 2 is code: the brain sends directives with
   unordered scavenging stays refused.
 * Only the brain may address a directive to the sister; the sister can never
   issue directives (dumb-terminal rule, enforced).
+* Every directive is stamped with a `nonce` when it does not carry one, and
+  `send` refuses a nonce it has already seen — a replay never overwrites a
+  queued order (contract §3).
 * `model.tier` ∈ {`pro`, `flash`} and `model.thinking` ∈ {`none`, `low`,
   `high`}; anything else is refused. A subagent cannot raise its own tier —
   only a new brain directive may escalate.

@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims fleet-channel knowledge-index knowledge-index-build \
+        issue-claims fleet-channel fleet-contract knowledge-index knowledge-index-build \
         conformance secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
@@ -54,6 +54,9 @@ help:
 	@echo "                against the board snapshot + self-control mutants"
 	@echo "  fleet-channel Steering channel (M26 #162): message contract + the"
 	@echo "                DSv4FNone standing directive, all mutants refused"
+	@echo "  fleet-contract  Session-fleet steering contract (M26 #161): roles,"
+	@echo "                six directive verbs, envelope fields and trust rules"
+	@echo "                are declared and map onto the shipped channel"
 	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
@@ -70,7 +73,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel knowledge-index
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel fleet-contract knowledge-index
 	@echo ""
 	@echo "lint: OK"
 
@@ -125,6 +128,13 @@ issue-claims:
 ## the DSv4FNone standing directive; every mutant message must be refused
 fleet-channel:
 	@bash scripts/check-fleet-channel.sh
+
+## fleet-contract — session-fleet steering contract (M26, issue #161): the
+## contract must declare the roles, the six directive verbs, the envelope fields
+## and the trust rules, and every verb must map onto a shipped message type;
+## the check mutates its own input, so it cannot pass vacuously
+fleet-contract:
+	@bash scripts/check-fleet-contract.sh
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):
 ## every item's provenance complete, secret policy clean, mandatory kinds covered

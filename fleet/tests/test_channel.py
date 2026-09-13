@@ -81,7 +81,41 @@ def test_send_stamps_id_and_queues_for_the_sister(tmp_path, monkeypatch):
     queued = json.loads(inbox[0].read_text(encoding="utf-8"))
     assert queued["id"]
     assert queued["ts"]
+    assert queued["nonce"]
     assert queued["model"] == {"tier": "flash", "thinking": "none"}
+
+
+def test_send_refuses_a_replayed_directive(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "DONE", tmp_path / "done")
+
+    source = tmp_path / "directive.json"
+    source.write_text(
+        json.dumps(valid_directive(id="directive-0002", nonce="token-alpha")), encoding="utf-8"
+    )
+    assert channel.cmd_send(type("Args", (), {"message": str(source)})) == EXIT_OK
+    assert channel.cmd_send(type("Args", (), {"message": str(source)})) == EXIT_NOT_OK
+
+
+def test_an_empty_nonce_is_refused():
+    problems = validate(valid_directive(nonce="   "))
+    assert any("nonce" in problem for problem in problems)
+
+
+def test_a_replay_conflict_names_what_repeated(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "DONE", tmp_path / "done")
+    channel.SENT.mkdir(parents=True, exist_ok=True)
+    channel.SENT.joinpath("d-9.json").write_text(
+        json.dumps({"from": "brain", "to": "sister", "type": "directive", "id": "d-9", "nonce": "n-9"}),
+        encoding="utf-8",
+    )
+
+    assert channel.replay_conflict({"id": "d-9"}) == "id d-9 was already sent"
+    assert channel.replay_conflict({"nonce": "n-9"}) == "nonce n-9 was already used"
+    assert channel.replay_conflict({"id": "d-10", "nonce": "n-10"}) is None
 
 
 def test_send_refuses_an_invalid_message(tmp_path):
