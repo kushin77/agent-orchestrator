@@ -42,6 +42,7 @@ node_modules/
 .fleet/inbox/
 .fleet/outbox/
 .fleet/sent/
+.fleet/done/
 
 # Local environment / secrets
 .env

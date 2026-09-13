@@ -34,6 +34,7 @@ SCHEMA_PATH = ROOT / "fleet" / "schema" / "message.schema.json"
 INBOX = ROOT / ".fleet" / "inbox"
 SENT = ROOT / ".fleet" / "sent"
 OUTBOX = ROOT / ".fleet" / "outbox"
+DONE = ROOT / ".fleet" / "done"
 
 MESSAGE_TYPES = ("directive", "ack", "result", "halt")
 MODEL_TIERS = ("pro", "flash")
@@ -170,6 +171,20 @@ def cmd_status(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def consume_directive(message_id: str) -> bool:
+    """Mark a directive complete: move it out of the inbox into .fleet/done/.
+
+    Reporting the result IS the completion, so the inbox count is always the
+    number of outstanding orders — a directive that was answered is gone.
+    """
+    source = INBOX / f"{message_id}.json"
+    if not source.exists():
+        return False
+    DONE.mkdir(parents=True, exist_ok=True)
+    source.replace(DONE / source.name)
+    return True
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     """Executor side: write an ack/result answering a directive into the outbox."""
     message = {
@@ -190,7 +205,9 @@ def cmd_report(args: argparse.Namespace) -> int:
     message["ts"] = now_iso()
     OUTBOX.mkdir(parents=True, exist_ok=True)
     (OUTBOX / f"{message['id']}.json").write_text(json.dumps(message, indent=2) + "\n", encoding="utf-8")
-    print(f"channel report: OK — {message['id']} answers {args.correlation}")
+    consumed = consume_directive(args.correlation)
+    suffix = " (directive consumed)" if consumed else ""
+    print(f"channel report: OK — {message['id']} answers {args.correlation}{suffix}")
     return EXIT_OK
 
 
@@ -216,6 +233,37 @@ def cmd_wait(args: argparse.Namespace) -> int:
                 return EXIT_OK
         if deadline is not None and time.monotonic() >= deadline:
             print(f"channel wait: TIMEOUT — no result for {target} after {args.timeout_seconds}s", file=sys.stderr)
+            return EXIT_NOT_OK
+        nap = args.interval
+        if deadline is not None:
+            nap = min(nap, max(0.0, deadline - time.monotonic()))
+        time.sleep(nap)
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    """Sister side listener: return the oldest pending directive, or block for one.
+
+    This is what makes the sister a dumb terminal with a pulse: it runs
+    ``watch`` in a loop, executes the directive it prints, reports the result
+    (which consumes the directive), then runs ``watch`` again. Exit 0 = a
+    directive was returned; 1 = IDLE (nothing arrived before the timeout);
+    2 = CANNOT-ASSESS (the inbox is unusable).
+    """
+    INBOX.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
+    while True:
+        pending = sorted(INBOX.glob("*.json"))
+        if pending:
+            try:
+                message = json.loads(pending[0].read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                print(f"channel watch: CANNOT-ASSESS — {pending[0]} is unreadable ({exc})", file=sys.stderr)
+                return EXIT_CANNOT_ASSESS
+            print(json.dumps(message, indent=2))
+            print(f"channel watch: DIRECTIVE {message.get('id')} — {len(pending)} pending")
+            return EXIT_OK
+        if deadline is not None and time.monotonic() >= deadline:
+            print(f"channel watch: IDLE — no directive within {args.timeout_seconds}s", file=sys.stderr)
             return EXIT_NOT_OK
         nap = args.interval
         if deadline is not None:
@@ -250,6 +298,11 @@ def build_parser() -> argparse.ArgumentParser:
     wait.add_argument("--timeout-seconds", type=float, default=300.0)
     wait.add_argument("--interval", type=float, default=0.5)
     wait.set_defaults(func=cmd_wait)
+
+    watch = sub.add_parser("watch", help="return the next pending directive, or block for one (sister side)")
+    watch.add_argument("--timeout-seconds", type=float, default=600.0)
+    watch.add_argument("--interval", type=float, default=1.0)
+    watch.set_defaults(func=cmd_watch)
     return parser
 
 
