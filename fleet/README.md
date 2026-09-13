@@ -241,11 +241,11 @@ self-heals).
 ## Cron-owned fleet (the watchdog)
 
 The fleet survives a reboot or a crashed loop without a human: one crontab
-line owns the brain/sister rungs. Every N minutes it runs
+line owns the brain/sister/monitor rungs. Every N minutes it runs
 `fleet/watchdog.py run`, which respawns a **missing**, **stale** or **drifted**
-rung and does nothing when the fleet is healthy — so a tick is cheap and
-idempotent. A run in flight is never restarted just to update code (the one
-rule the watchdog never breaks).
+loop rung, restarts the **monitor** when it is missing, and does nothing when
+the fleet is healthy — so a tick is cheap and idempotent. A run in flight is
+never restarted just to update code (the one rule the watchdog never breaks).
 
 ```bash
 python3 fleet/cron.py install [--interval 2]   # add the crontab line (replaces an existing one)
@@ -260,6 +260,25 @@ The line is identifiable by its `# ao-fleet-watchdog` marker, so `uninstall`
 removes exactly this job and `status`/`disable` act on it alone. The same
 subcommands are reachable from the control plane:
 `python3 fleet/control.py cron <sub>`.
+
+## Fleet monitor (the third rung)
+
+`fleet/monitor.py` is the cron-owned, change-only progress watcher. It polls
+every 20s and appends one timestamped line to `.fleet/open-eye.log` only when
+the fleet's observable state changed since the previous tick — sister/brain
+state, held claims, the wave dispatch list and git HEAD — and rewrites
+`.fleet/open-eye.heartbeat` with its own liveness line every tick. It exits
+cleanly on SIGTERM, and the watchdog restarts it whenever it is missing, so
+the monitor is durable and self-healing rather than a one-off runtime script.
+
+```bash
+python3 fleet/monitor.py        # the resident monitor (normally started by the watchdog)
+tail -f .fleet/open-eye.log     # the change-only progress log
+cat .fleet/open-eye.heartbeat   # the monitor's liveness marker
+```
+
+All monitor output lives under the gitignored `.fleet/` directory; the module
+itself is tracked.
 
 ## The gate
 

@@ -3,8 +3,9 @@
 
 Run by cron (installed with ``python3 fleet/cron.py install``) or by hand
 (``python3 fleet/watchdog.py run`` / ``--force``). It respawns a missing, stale or
-drifted rung and does nothing when the fleet is healthy, so a cron tick is cheap
-and idempotent.
+drifted loop rung, ensures the monitor rung (``fleet/monitor.py``) is running,
+and does nothing when the fleet is healthy, so a cron tick is cheap and
+idempotent.
 
 Safety, the one rule a watchdog must never break: **a run in flight is never
 restarted just to update code.** A *missing* loop is respawned regardless — its
@@ -32,6 +33,7 @@ RUNGS = (
     ("brain", "fleet/brain.py", "fleet/brain.sh", channel.BRAIN_HEARTBEAT),
     ("sister", "fleet/terminal.py", "fleet/terminal.sh", channel.HEARTBEAT),
 )
+MONITOR_PATTERN = "fleet/monitor.py"
 RUNS_DIR = ROOT / ".fleet" / "runs"
 
 
@@ -126,8 +128,27 @@ def rung_action(name: str, pattern: str, script: str, beat_path: Path, force: bo
     return f"{name}: {state} ({reason}) — {'respawned' if ok else 'RESPAWN FAILED'}"
 
 
+def monitor_missing() -> bool:
+    """True when no ``fleet/monitor.py`` process is present (simple presence check)."""
+    return loop_pid(MONITOR_PATTERN) is None
+
+
+def start_monitor() -> bool:
+    """Start the monitor detached (its own session, like the loop rungs)."""
+    try:
+        subprocess.Popen(
+            ["setsid", "python3", str(ROOT / "fleet" / "monitor.py")],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return True
+
+
 def watchdog_once(force: bool = False) -> int:
-    """One pass over both rungs; returns 0 (all ok/respawned) or 1 (a failure)."""
+    """One pass over both loops plus the monitor; 0 (ok/respawned) or 1 (failure)."""
     head = channel.head_commit()
     failed = False
     for name, pattern, script, beat_path in RUNGS:
@@ -135,6 +156,16 @@ def watchdog_once(force: bool = False) -> int:
         print(f"[watchdog] {line}", flush=True)
         if "FAILED" in line:
             failed = True
+    # Third rung: the monitor is a resident poller with no run-in-flight concern
+    # and no code-drift concept, so a missing process is always restarted and a
+    # present one is left alone.
+    if monitor_missing():
+        ok = start_monitor()
+        print(f"[watchdog] monitor: missing — {'respawned' if ok else 'RESPAWN FAILED'}", flush=True)
+        if not ok:
+            failed = True
+    else:
+        print("[watchdog] monitor: healthy", flush=True)
     return 1 if failed else 0
 
 
@@ -142,7 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-watchdog", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="one watchdog pass (the cron entry point)")
-    run.add_argument("--force", action="store_true", help="respawn both rungs even when healthy")
+    run.add_argument("--force", action="store_true", help="respawn the loop rungs even when healthy")
     run.set_defaults(func=lambda args: watchdog_once(args.force))
     return parser
 
