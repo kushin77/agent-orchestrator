@@ -44,6 +44,10 @@ node_modules/
 .fleet/sent/
 .fleet/done/
 .fleet/slog.jsonl
+# Brain-rung surfaces (operator orders, replies) and rung liveness: runtime state.
+.fleet/brain/
+.fleet/*.heartbeat.json
+.fleet/*.lock
 
 # Local environment / secrets
 .env
