@@ -535,6 +535,22 @@ def cmd_brain_outbox(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_consume(args: argparse.Namespace) -> int:
+    """Mark a directive handled without reporting a result.
+
+    Process controls (`kill`, `halt`, `refresh`, `restart`) act on the loop
+    itself, so there is no result to report — but the message must still leave the
+    inbox. A control that acted and stayed pending re-fires against the next loop:
+    measured, an unconsumed `kill` would have taken down every loop started after
+    it.
+    """
+    if consume_directive(args.id):
+        print(f"channel consume: OK — {args.id} handled (moved to done)")
+        return EXIT_OK
+    print(f"channel consume: nothing to consume for {args.id}", file=sys.stderr)
+    return EXIT_NOT_OK
+
+
 def cmd_head_commit(args: argparse.Namespace) -> int:
     print(head_commit())
     return EXIT_OK
@@ -774,6 +790,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     head = sub.add_parser("head-commit", help="print the commit a freshly started loop would run")
     head.set_defaults(func=cmd_head_commit)
+
+    consume = sub.add_parser("consume", help="mark a directive handled without a result (process controls)")
+    consume.add_argument("--id", required=True)
+    consume.set_defaults(func=cmd_consume)
     return parser
 
 
