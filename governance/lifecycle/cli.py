@@ -297,8 +297,12 @@ class GhOps:
              "--issue", str(issue), "--agent", agent]
         )
 
+    def record_closing_evidence(self, issue: int, evidence: str) -> str:
+        """Journal the evidence that justifies closing the item."""
+        write_journal(issue, {"closing_evidence": True, "evidence": evidence}, self.root)
+        return "closing evidence journalled"
+
     def close_issue(self, issue: int, evidence: str) -> str:
-        write_journal(issue, {"closing_evidence": True}, self.root)
         return self._run(["gh", "issue", "close", str(issue), "--comment", evidence])
 
     def reclaim_lane(self, session_id: str) -> str:

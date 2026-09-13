@@ -11,8 +11,10 @@ is derived from the incident that motivated the module rather than from taste:
    the still-pending directive was re-executed by the fleet the moment the claim
    freed, so the ordering is load-bearing, not cosmetic;
 5. **release the claim**;
-6. **close the issue with evidence**, which only exists once steps 1-2 have run;
-7. **reclaim the lane last**, so a failure anywhere earlier leaves the worktree
+6. **journal the closing evidence**, then 7. **close the issue** — two invariants,
+   two actions, because fusing them made an already-closed issue read as a failed
+   step while the finding set was empty;
+8. **reclaim the lane last**, so a failure anywhere earlier leaves the worktree
    available for the re-run that finishes the job.
 
 Every step is idempotent: it first asks the operations port for the current state
@@ -28,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
 from governance.lifecycle.audit import Finding, audit_item
+from governance.lifecycle.model import owes_closure
 
 #: How a step ended.
 PERFORMED = "performed"
@@ -54,7 +57,10 @@ class CloseOutOps(Protocol):
         """Release (or reap) the claim held on ``issue``."""
 
     def close_issue(self, issue: int, evidence: str) -> str:
-        """Close the issue with real evidence."""
+        """Close the issue, with the evidence that proves the work."""
+
+    def record_closing_evidence(self, issue: int, evidence: str) -> str:
+        """Journal the evidence that justifies closing the item."""
 
     def reclaim_lane(self, session_id: str) -> str:
         """Remove the lane worktree and its record."""
@@ -115,9 +121,12 @@ def closeout(item: dict, ops: CloseOutOps, evidence: str = "") -> CloseOutResult
     issue = int(item.get("issue") or 0)
     result = CloseOutResult(issue=issue)
 
-    if item.get("state") != "closed":
+    if not owes_closure(item):
+        # Nothing has landed yet: the item is still in flight and close-out has
+        # nothing to drive. Note this is deliberately *not* "the issue is open" —
+        # closing the issue is one of the steps below.
         result.steps.append(
-            Step("inspect", SKIPPED, "the item is still open; close-out applies to terminal items")
+            Step("inspect", SKIPPED, "the change has not landed (no merged pull request); close-out applies once it has")
         )
         result.remaining = audit_item(item)
         return result
@@ -143,21 +152,41 @@ def closeout(item: dict, ops: CloseOutOps, evidence: str = "") -> CloseOutResult
 
     # 4. consume the directive BEFORE freeing the claim, or the pending order is
     #    re-dispatched the moment the claim is released (observed on #263).
-    if directive:
-        _run(result, "consume-directive", lambda: ops.consume_directive(str(directive.get("id") or "")),
-             directive.get("state") != "done")
+    _run(
+        result,
+        "consume-directive",
+        lambda: ops.consume_directive(str(directive.get("id") or "")),
+        bool(directive) and directive.get("state") != "done",
+    )
 
     # 5. release the claim.
     _run(result, "release-claim", lambda: ops.release_claim(issue, str(claim.get("agent") or "")), bool(claim.get("live")))
 
-    # 6. close with evidence.
-    if not item.get("closing_evidence", False):
-        _run(result, "close-issue", lambda: ops.close_issue(issue, evidence or _default_evidence(issue)),
-             True)
+    # 6. journal the evidence, then 7. close the issue - two invariants, two
+    #    actions, each idempotent on its own. Fusing them made an already-closed
+    #    issue look like a failed step while the finding set was empty.
+    _run(
+        result,
+        "record-closing-evidence",
+        lambda: ops.record_closing_evidence(issue, evidence or _default_evidence(issue)),
+        not item.get("closing_evidence", False),
+    )
+    # Always reported, so the step set is uniform: a caller sees the same eight
+    # steps whether or not each one needed to do anything.
+    _run(
+        result,
+        "close-issue",
+        lambda: ops.close_issue(issue, evidence or _default_evidence(issue)),
+        item.get("state") != "closed",
+    )
 
-    # 7. reclaim the lane last: a failure above must leave the worktree for the re-run.
-    if lane.get("present"):
-        _run(result, "reclaim-lane", lambda: ops.reclaim_lane(str(lane.get("session_id") or "")), True)
+    # 8. reclaim the lane last: a failure above must leave the worktree for the re-run.
+    _run(
+        result,
+        "reclaim-lane",
+        lambda: ops.reclaim_lane(str(lane.get("session_id") or "")),
+        bool(lane.get("present")),
+    )
 
     # Never success by assertion: re-derive from the item's own facts.
     result.remaining = audit_item(item)

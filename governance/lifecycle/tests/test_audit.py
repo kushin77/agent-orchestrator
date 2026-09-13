@@ -76,6 +76,16 @@ def test_a_close_without_evidence_is_a_finding():
     assert "CLOSING_EVIDENCE_MISSING" in codes(audit_item(clean_item(closing_evidence=False)))
 
 
+def test_an_issue_left_open_is_a_finding():
+    """The change landed, so the item is not finished until it is off the board."""
+    item = clean_item(state="open", closing_evidence=False)
+    assert "ISSUE_NOT_CLOSED" in codes(audit_item(item))
+
+
+def test_a_closed_item_is_not_charged_with_being_open():
+    assert audit_item(clean_item()) == []
+
+
 def test_an_open_milestoned_item_without_a_declaring_label_is_a_finding():
     item = clean_item(state="open", labels=["enhancement"], pr={}, verify={}, closing_evidence=False)
     findings = audit_item(item)
@@ -176,6 +186,7 @@ def test_every_code_the_auditor_emits_is_in_the_closed_vocabulary():
         clean_item(issue=6, lane={"session_id": "s", "present": True}),
         clean_item(issue=7, closing_evidence=False),
         clean_item(issue=8, state="open", labels=[], milestone="M26"),
+        clean_item(issue=9, state="open", closing_evidence=False),
     ]
     stale = Quarantine(code="FILING_LABELS_MISSING", subject="#8", tracked_by="#174")
     findings = audit(record(*provocations, tracking={"#174": "closed"}), [stale])

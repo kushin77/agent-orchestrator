@@ -17,6 +17,7 @@ from governance.lifecycle.model import (
     TERMINAL_STAGE,
     invariant,
     invariants_for,
+    owes_closure,
     stage_of,
 )
 
@@ -47,20 +48,45 @@ def test_the_vocabulary_is_closed_and_says_so():
     assert "closed" in str(caught.value)
 
 
-def test_a_closed_item_owes_every_closure_invariant():
-    codes = {entry.code for entry in invariants_for("closed")}
+def test_a_landed_change_owes_every_closure_invariant():
+    codes = {entry.code for entry in invariants_for(clean_item())}
     assert "PR_NOT_MERGED" in codes
+    assert "ISSUE_NOT_CLOSED" in codes
     assert "LANE_NOT_RECLAIMED" in codes
-    assert "FILING_LABELS_MISSING" not in codes  # it is closed; filing no longer applies
+    assert "FILING_LABELS_MISSING" not in codes
 
 
-def test_an_open_item_owes_only_the_filing_rule():
-    codes = {entry.code for entry in invariants_for("open")}
+def test_a_merged_pull_request_owes_closure_even_though_the_issue_is_open():
+    """The bug the first end-to-end run found: closing the issue IS a closure step.
+
+    Keying applicability on ``state == 'closed'`` exempted the very items that
+    needed closing, so close-out reported OK on an item it had not closed.
+    """
+    landed = clean_item(state="open", closing_evidence=False)
+    assert owes_closure(landed) is True
+    assert "ISSUE_NOT_CLOSED" in {entry.code for entry in invariants_for(landed)}
+
+
+def test_work_still_in_flight_owes_only_the_filing_rule():
+    codes = {entry.code for entry in invariants_for(clean_item(state="open", pr={}, verify={}))}
     assert codes == {"FILING_LABELS_MISSING"}
+
+
+def test_a_closed_item_that_never_merged_still_owes_the_closure_invariants():
+    assert owes_closure(clean_item(pr={"number": 271, "state": "closed"})) is True
 
 
 def test_stage_of_an_untouched_item_is_filed():
     assert stage_of(clean_item(state="open", claim={}, pr={}, lane={})) == "filed"
+
+
+def test_stage_of_a_verified_but_unmerged_item_is_verified():
+    item = clean_item(pr={"number": 271, "state": "open", "branch": "issue-269", "head_commit": HEAD_COMMIT})
+    assert stage_of(item) == "verified"
+
+
+def test_stage_of_a_landed_but_unclosed_item_is_merged():
+    assert stage_of(clean_item(state="open", closing_evidence=False)) == "merged"
 
 
 def test_stage_of_a_claimed_item_is_claimed():

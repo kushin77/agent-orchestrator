@@ -95,9 +95,14 @@ class FakeOps:
         self.item["claim"] = {"agent": None, "live": False}
         return "released"
 
+    def record_closing_evidence(self, issue: int, evidence: str) -> str:
+        self._record("record-closing-evidence")
+        self.item["closing_evidence"] = True
+        return "evidence journalled"
+
     def close_issue(self, issue: int, evidence: str) -> str:
         self._record("close-issue")
-        self.item["closing_evidence"] = True
+        self.item["state"] = "closed"
         return "closed"
 
     def reclaim_lane(self, session_id: str) -> str:

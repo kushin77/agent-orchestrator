@@ -17,17 +17,31 @@ def test_a_hygienic_item_performs_nothing():
     item = clean_item()
     result = closeout(item, FakeOps(item))
     assert result.ok
-    assert result.steps
+    assert len(result.steps) == 8
     assert all(step.outcome == SKIPPED for step in result.steps)
     assert result.failed_steps == []
 
 
-def test_an_open_item_is_not_closed_out():
-    item = clean_item(state="open", labels=[], milestone="M26", pr={}, verify={})
+def test_work_in_flight_is_not_closed_out():
+    item = clean_item(state="open", pr={}, verify={}, labels=[], milestone="M26")
     result = closeout(item, FakeOps(item))
     assert not result.ok
     assert result.steps[0].action == "inspect"
-    assert "still open" in result.steps[0].detail
+    assert "has not landed" in result.steps[0].detail
+
+
+def test_an_open_issue_whose_change_landed_IS_closed_out():
+    """The dogfood bug: close-out must finish an item, not skip it for being open.
+
+    Both the evidence and the close are owed here, and each is its own idempotent
+    action - fusing them made an already-closed issue look like a failed step.
+    """
+    item = clean_item(state="open", closing_evidence=False)
+    ops = FakeOps(item)
+    result = closeout(item, ops)
+    assert ops.calls == ["record-closing-evidence", "close-issue"]
+    assert result.ok
+    assert item["state"] == "closed"
 
 
 def test_a_surviving_branch_is_deleted():
@@ -71,7 +85,7 @@ def test_a_close_without_evidence_is_repaired():
     item = clean_item(closing_evidence=False)
     ops = FakeOps(item)
     assert closeout(item, ops).ok
-    assert ops.calls == ["close-issue"]
+    assert ops.calls == ["record-closing-evidence"]
 
 
 def test_the_directive_is_consumed_before_the_claim_is_released():
@@ -104,6 +118,12 @@ def test_the_lane_is_reclaimed_last():
 
 
 def test_a_broken_item_is_fully_repaired_in_one_pass():
+    """Every artifact broken at once: one pass drives them all to terminal.
+
+    ``close-issue`` is correctly *skipped* here rather than performed: one item
+    cannot both have an unmerged pull request and a landed change, so an item that
+    provokes PR_NOT_MERGED is necessarily already closed.
+    """
     item = clean_item(
         pr={"number": 271, "state": "open", "branch": "issue-269", "head_commit": HEAD_COMMIT},
         verify={},
@@ -115,8 +135,28 @@ def test_a_broken_item_is_fully_repaired_in_one_pass():
     )
     result = closeout(item, FakeOps(item))
     assert result.ok
-    assert len(result.steps) == 7
-    assert all(step.outcome == PERFORMED for step in result.steps)
+    assert [step.action for step in result.steps] == [
+        "merge-pull-request",
+        "record-verification",
+        "delete-branch",
+        "consume-directive",
+        "release-claim",
+        "record-closing-evidence",
+        "close-issue",
+        "reclaim-lane",
+    ]
+    performed = [step.action for step in result.steps if step.outcome == PERFORMED]
+    assert "close-issue" not in performed
+    assert len(performed) == 7
+
+
+def test_close_out_always_reports_the_same_eight_steps():
+    """A uniform step set, whether or not each step had anything to do."""
+    broken = clean_item(branch_deleted=False)
+    clean = clean_item()
+    actions = [step.action for step in closeout(broken, FakeOps(broken)).steps]
+    assert len(actions) == 8
+    assert actions == [step.action for step in closeout(clean, FakeOps(clean)).steps]
 
 
 def test_a_failing_step_is_reported_and_the_rest_still_run():

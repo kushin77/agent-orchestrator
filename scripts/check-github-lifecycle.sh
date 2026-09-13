@@ -152,6 +152,8 @@ cases = {
     "CLOSING_EVIDENCE_MISSING": record([item(closing_evidence=False)]),
     "FILING_LABELS_MISSING": record([item(state="open", labels=["enhancement"], milestone="M26",
                                           pr={}, verify={})]),
+    # A landed change must not stay on the board: closing the issue is a closure step.
+    "ISSUE_NOT_CLOSED": record([item(state="open")]),
     # Evidence must name the verified head, never the (new) merge commit.
     "VERIFY_WRONG_COMMIT": record([item(verify={"ok": True, "commit": MERGE})]),
 }
@@ -219,6 +221,7 @@ declare -a provoked=(
   DIRECTIVE_NOT_CONSUMED
   LANE_NOT_RECLAIMED
   CLOSING_EVIDENCE_MISSING
+  ISSUE_NOT_CLOSED
   FILING_LABELS_MISSING
 )
 for code in "${provoked[@]}"; do
