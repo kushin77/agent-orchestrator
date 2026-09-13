@@ -25,6 +25,25 @@ def test_build_prompt_contains_issue_and_directive():
     assert "do NOT run claim" in prompt
 
 
+def test_build_prompt_mandates_merge_and_rehandles_an_existing_pr():
+    directive = {
+        "id": "d-merge",
+        "task": {"issue": 164, "lane": "fleet"},
+        "model": {"tier": "flash", "thinking": "low"},
+        "body": "merge-mandate",
+    }
+    prompt = terminal.build_prompt(directive)
+    # A completed PR must be merged, never left open.
+    assert "gh pr merge <number> --squash --delete-branch" in prompt
+    assert "NEVER leave a completed PR unmerged" in prompt
+    # A re-dispatch that finds an existing PR verifies + merges, not bails out.
+    assert "ALREADY exists" in prompt
+    assert "do NOT bail out" in prompt
+    # The report must carry the merge result.
+    assert "merge result" in prompt
+    assert "merged/closed" in prompt
+
+
 def test_build_prompt_names_the_isolated_worktree(tmp_path):
     tree = tmp_path / "ao-163-dabc1234"
     prompt = terminal.build_prompt({"id": "d-abc12345", "task": {"issue": 163}, "body": "x"}, "subagent-dabc1234", tree)

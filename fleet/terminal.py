@@ -92,9 +92,16 @@ def build_prompt(directive: dict, agent_id: str = "subagent", worktree: Path | N
         "Do exactly this, nothing else:\n"
         f"1. Issue #{issue} is ALREADY CLAIMED for you as `{agent_id}` (lane {lane or 'n/a'}) — do NOT "
         "run claim and do NOT run release; the loop manages the claim around your run.\n"
-        f"2. Implement issue #{issue} to completion; open a PR whose body carries 'Closes #{issue}' and the ACTUAL 'make verify' output as evidence.\n"
-        "Return a short report: PR number, verify output summary, files touched. "
-        "If anything fails, report the exact error instead of improvising."
+        f"2. If a PR for issue #{issue} ALREADY exists, do NOT bail out: check out its branch, run "
+        "`make verify`, and if it is green squash-merge the PR and close the issue. Only implement "
+        "from scratch if no PR exists.\n"
+        f"3. Implement issue #{issue} to completion; open a PR whose body carries 'Closes #{issue}' and "
+        "the ACTUAL 'make verify' output as evidence.\n"
+        f"4. After `make verify` is green and the PR is open, squash-merge it with "
+        "`gh pr merge <number> --squash --delete-branch`, then close the issue. "
+        "NEVER leave a completed PR unmerged or the issue open.\n"
+        "Return a short report: PR number, verify output summary, files touched, AND the merge result "
+        "(PR number + merged/closed). If anything fails, report the exact error instead of improvising."
     )
 
 
