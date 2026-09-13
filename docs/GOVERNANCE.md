@@ -57,7 +57,7 @@ these is a **closure invariant** with a name, a requirement and a remediation:
 | The source branch is gone | The branch outlived its issue; the local squash-merge leaves it behind while the main checkout holds `master`. |
 | No live claim is held | A closed issue still claims a lane — the wedge that blocked re-dispatch. |
 | The authorisation directive is consumed | A pending directive re-executes the order the moment the claim frees. |
-| The issue closed with real evidence | A summary is not evidence. |
+| The issue closed with real evidence | A summary is not evidence; and a landed change still on the board is not finished. |
 | The lane worktree is reclaimed | Stale lanes accumulate and collide. |
 | An open, milestoned item declares its labels | The conformance gate cannot hold an item to a rung it never declared. |
 

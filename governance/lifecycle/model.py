@@ -95,6 +95,11 @@ INVARIANTS: Tuple[Invariant, ...] = (
         remediation="close with evidence: the Verify command and its actual output, never a summary",
     ),
     Invariant(
+        code="ISSUE_NOT_CLOSED",
+        requires="the issue itself is closed, so the item is off the board",
+        remediation="close the issue with its evidence comment (`gh issue close <n> --comment ...`)",
+    ),
+    Invariant(
         code="FILING_LABELS_MISSING",
         requires="an open, milestoned item declares the labels the conformance gate holds it to",
         remediation="add the declaring labels (`class:`, and the pillar the class expects) or close the item",
@@ -125,15 +130,31 @@ def invariant(code: str) -> Invariant:
         raise KeyError(f"unknown invariant {code!r}; the vocabulary is closed: {known}") from None
 
 
-def invariants_for(state: str) -> Iterable[Invariant]:
-    """The invariants that apply to an item in ``state``.
+def owes_closure(item: dict) -> bool:
+    """True when the change landed, so the closure invariants apply.
 
-    A closed item owes every closure invariant; an open item owes only the
-    filing rules. Returning the applicable set (rather than all of them) is what
-    keeps the audit honest: it cannot report a merged PR missing on work that has
-    not been merged yet.
+    Deliberately **not** ``state == "closed"``. Closing the issue is itself one of
+    the closure steps, so an item whose pull request has merged but whose issue is
+    still open is exactly the state close-out exists to finish. Keying
+    applicability on the closed state exempts the very items that need closing —
+    which is how the first end-to-end run of this module reported OK on an item it
+    had not closed at all.
     """
-    if state == "closed":
+    if item.get("state") == "closed":
+        return True
+    return (item.get("pr") or {}).get("state") == "merged"
+
+
+def invariants_for(item: dict) -> Iterable[Invariant]:
+    """The invariants an item owes, given the artifacts it actually has.
+
+    Applicability is a function of artifacts, not of a mutable state field: a
+    landed change owes the closure invariants, and work still in flight owes only
+    the filing rule. That distinction is what keeps the audit honest — it cannot
+    charge an unmerged change with a missing merge, and it cannot exempt a merged
+    one from being closed out.
+    """
+    if owes_closure(item):
         return tuple(inv for inv in ITEM_INVARIANTS if inv.code != "FILING_LABELS_MISSING")
     return (INVARIANTS_BY_CODE["FILING_LABELS_MISSING"],)
 
@@ -142,21 +163,27 @@ def stage_of(item: dict) -> str:
     """Which lifecycle stage an item's own facts show it reached.
 
     A *display* helper, deliberately not the enforcement: the invariants in
-    ``audit`` are what decide hygiene, and duplicating them here would give the
-    repo a second rule to keep in sync. This reads only direct artifact facts (a
-    claim, a lane, a pull request, a closed state) so a human can see where an
+    ``audit`` decide hygiene, and duplicating them here would give the repo a
+    second rule to keep in sync. This reads only direct artifact facts (a claim, a
+    lane, a pull request, evidence, a closed state) so a human can see where an
     item sits without reconstructing it by hand.
     """
-    if item.get("state") != "closed":
+    if not owes_closure(item):
         lane = item.get("lane") or {}
         if lane.get("session_id") or lane.get("worktree"):
             return "laned"
-        if item.get("claim"):
+        if item.get("claim") or (item.get("pr") or {}).get("number"):
             return "claimed"
         return "filed"
-    if (item.get("pr") or {}).get("state") != "merged":
-        return "opened"
-    if not item.get("branch_deleted", False):
+
+    pr = item.get("pr") or {}
+    verify = item.get("verify") or {}
+    if pr.get("state") != "merged":
+        evidence_names_head = bool(verify.get("ok")) and str(verify.get("commit") or "") == str(
+            pr.get("head_commit") or ""
+        )
+        return "verified" if evidence_names_head else "opened"
+    if item.get("state") != "closed" or not item.get("branch_deleted", False):
         return "merged"
     if (item.get("claim") or {}).get("live") or (item.get("lane") or {}).get("present"):
         return "closed"

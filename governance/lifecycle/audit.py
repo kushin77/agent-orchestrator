@@ -30,6 +30,7 @@ from governance.lifecycle.model import (
     Invariant,
     invariant,
     invariants_for,
+    owes_closure,
 )
 
 
@@ -152,12 +153,25 @@ def _closure_findings(item: dict) -> list[Finding]:
     if not item.get("closing_evidence", False):
         problems.append(Finding("CLOSING_EVIDENCE_MISSING", subject, "the issue was closed without recorded evidence"))
 
+    if item.get("state") != "closed":
+        problems.append(
+            Finding(
+                "ISSUE_NOT_CLOSED",
+                subject,
+                "the change landed but the issue is still open, so the item is still on the board",
+            )
+        )
+
     return problems
 
 
 def audit_item(item: dict) -> list[Finding]:
-    """Every invariant this item breaks (empty list = hygienic)."""
-    if item.get("state") == "closed":
+    """Every invariant this item breaks (empty list = hygienic).
+
+    A landed change owes the closure invariants even while its issue is still
+    open, because closing the issue is one of those invariants.
+    """
+    if owes_closure(item):
         return _closure_findings(item)
     return _filing_findings(item)
 
@@ -206,8 +220,8 @@ def audit(
 
 
 def applicable_invariants(item: dict) -> list[Invariant]:
-    """The invariants an item in its current state owes — the audit's own rule."""
-    return list(invariants_for(str(item.get("state") or "open")))
+    """The invariants an item owes, given the artifacts it actually has."""
+    return list(invariants_for(item))
 
 
 def hygiene(record: dict, quarantine: Iterable[Quarantine] | None = None) -> dict:
