@@ -238,6 +238,29 @@ self-heals).
   wedged past the staleness window) — `python3 fleet/control.py poke` forces
   it to react without a restart.
 
+## Cron-owned fleet (the watchdog)
+
+The fleet survives a reboot or a crashed loop without a human: one crontab
+line owns the brain/sister rungs. Every N minutes it runs
+`fleet/watchdog.py run`, which respawns a **missing**, **stale** or **drifted**
+rung and does nothing when the fleet is healthy — so a tick is cheap and
+idempotent. A run in flight is never restarted just to update code (the one
+rule the watchdog never breaks).
+
+```bash
+python3 fleet/cron.py install [--interval 2]   # add the crontab line (replaces an existing one)
+python3 fleet/cron.py status                    # installed? recent watchdog log
+python3 fleet/cron.py run                        # one watchdog pass, now (non-destructive)
+python3 fleet/cron.py respawn                    # force-respawn both rungs
+python3 fleet/cron.py disable / enable           # toggle the line without deleting it
+python3 fleet/cron.py uninstall                  # remove the line
+```
+
+The line is identifiable by its `# ao-fleet-watchdog` marker, so `uninstall`
+removes exactly this job and `status`/`disable` act on it alone. The same
+subcommands are reachable from the control plane:
+`python3 fleet/control.py cron <sub>`.
+
 ## The gate
 
 ```bash
