@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "note": "Legacy quarantine for the lifecycle hygiene audit (issue #269). An entry excuses one (code, subject) pair ONLY while the issue tracking it is still open; when that issue closes, the entry itself becomes a QUARANTINE_STALE finding. The quarantine therefore shrinks as legacy closes and cannot grow silently - a new item failing the same invariant fails the audit immediately.",
+  "quarantine": [
+    {
+      "code": "FILING_LABELS_MISSING",
+      "subject": "#253",
+      "tracked_by": "#174",
+      "reason": "Filed by the Shared-Frontend Portal + UI lane without a class label; its solution class is its author's call. Tracked by #174."
+    },
+    {
+      "code": "FILING_LABELS_MISSING",
+      "subject": "#254",
+      "tracked_by": "#174",
+      "reason": "Shared-Frontend Portal + UI lane child issue, filed without a class label. Tracked by #174."
+    },
+    {
+      "code": "FILING_LABELS_MISSING",
+      "subject": "#255",
+      "tracked_by": "#174",
+      "reason": "Shared-Frontend Portal + UI lane child issue, filed without a class label. Tracked by #174."
+    },
+    {
+      "code": "FILING_LABELS_MISSING",
+      "subject": "#259",
+      "tracked_by": "#174",
+      "reason": "Shared-Frontend Portal + UI lane child issue, filed without a class label. Tracked by #174."
+    }
+  ]
+}

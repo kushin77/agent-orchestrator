@@ -35,6 +35,7 @@ checks=(
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'fleet-runbook|bash scripts/check-fleet-runbook.sh'
   'session-isolation|bash scripts/check-session-isolation.sh'
+  'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'brain-profile|bash scripts/check-brain-profile.sh'
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'conformance|bash scripts/check-conformance.sh'

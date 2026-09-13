@@ -89,8 +89,15 @@ field name, never the files.
    `make verify`; paste the **actual output** as evidence on the PR.
 7. **Merge after green** (owner autonomous-merge mandate) — never merge failing
    work.
-8. Close the issue with the evidence comment; re-check the board before
-   standing down (never idle).
+8. **Close the item out — every artifact terminal.** Merging is not the end of
+   the item. Run `python3 governance/lifecycle/cli.py close --issue <n>`: it
+   drives the remaining **close-out** steps in dependency order (consume the
+   authorisation directive *before* releasing the claim, delete the source
+   branch, close the issue with evidence, reclaim the lane) and re-derives the
+   closure invariants afterwards. It reports what is still broken rather than
+   success it cannot evidence; every artifact must reach its **terminal state**.
+   `python3 governance/lifecycle/cli.py audit` reports any item that did not.
+9. Re-check the board before standing down (never idle).
 
 ## 5. Chronological dispatch rule (mandatory)
 

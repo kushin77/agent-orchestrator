@@ -116,6 +116,23 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     session's, or whose commits omit the ticket reference is **not isolated** —
     `scripts/check-session-isolation.sh` (in `make verify`) fails it, and
     `governance/isolation/cli.py audit` names the broken property.
+16. **End-to-end closure (institutional, issue #269).** A work item is not done
+    when its PR merges; it closes **hygienically** only when *every* artifact it
+    created is terminal. `governance/lifecycle/` names the closure invariants
+    (merged at green evidence naming the verified head commit, source branch
+    deleted, claim released, authorisation directive consumed, issue closed with
+    real evidence, lane reclaimed) and `governance/lifecycle/cli.py close` drives
+    them in dependency order — verifying each reached its **terminal state** and
+    reporting what remains rather than a success it cannot evidence. The
+    execution loop runs that **close-out** after every dispatch, so a subagent
+    cannot leave a merged PR unmerged, an issue open, a branch undeleted, a
+    worktree behind, or a claim wedged. `scripts/check-github-lifecycle.sh` (in
+    `make verify`) provokes one violation per invariant and cross-checks the
+    provoked set against the model, so an invariant added without a provoked
+    failure fails the gate. Legacy drift is quarantined **by name** in
+    `governance/lifecycle/baseline.json`, honoured only while the issue tracking
+    it is open: the quarantine shrinks as legacy closes, and a new item failing
+    the same invariant fails immediately.
 
 ## Directory layout (pillar-aligned)
 

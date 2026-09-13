@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation knowledge-index knowledge-index-build \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle knowledge-index knowledge-index-build \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -75,6 +75,10 @@ help:
 	@echo "                issue, its own worktree on issue-<n>, a worktree-scoped"
 	@echo "                commit signature, and a ticket ref on every commit"
 
+	@echo "  github-lifecycle  End-to-end closure (M26 #269): every artifact a work"
+	@echo "                item creates reaches a terminal state, one provoked"
+	@echo "                violation per closure invariant"
+
 	@echo "  brain-profile  Brain profile gate (M26 #160): the elite profile"
 	@echo "                declares mission/KB/floors/controls/escalation and the"
 	@echo "                brain derives its doctrine from it, not from a copy"
@@ -103,7 +107,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -196,6 +200,15 @@ fleet-runbook:
 ## each violation for real, so it cannot pass vacuously
 session-isolation:
 	@bash scripts/check-session-isolation.sh
+
+
+## github-lifecycle — end-to-end closure (issue #269): every artifact a work
+## item creates reaches a terminal state (PR merged at verified evidence, branch
+## deleted, claim released, directive consumed, issue closed with evidence, lane
+## reclaimed); the check provokes one violation per invariant and cross-checks
+## the provoked set against the model, so it cannot fall behind the vocabulary
+github-lifecycle:
+	@bash scripts/check-github-lifecycle.sh
 
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):
