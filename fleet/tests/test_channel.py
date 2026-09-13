@@ -222,8 +222,22 @@ def test_status_reports_no_heartbeat_as_not_running(tmp_path, monkeypatch, capsy
     monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
     monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
     monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "missing.json")
+    monkeypatch.setattr(channel, "running_loop_pids", lambda: [])
     assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
-    assert "NO HEARTBEAT" in capsys.readouterr().out
+    assert "no loop process" in capsys.readouterr().out
+
+
+def test_status_distinguishes_a_loop_running_old_code_from_a_dead_fleet(tmp_path, monkeypatch, capsys):
+    """The 2026-09-13 confusion: the loop was alive on pre-fix code, not dead."""
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "missing.json")
+    monkeypatch.setattr(channel, "running_loop_pids", lambda: [2492689])
+    assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
+    out = capsys.readouterr().out
+    assert "IS running (pid 2492689)" in out
+    assert "older than the heartbeat check" in out
 
 
 def test_status_flags_a_stale_heartbeat(tmp_path, monkeypatch, capsys):
