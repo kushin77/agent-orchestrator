@@ -293,11 +293,15 @@ def test_stop_and_release_frees_the_in_flight_claim(monkeypatch):
 
     monkeypatch.setattr(terminal, "release_issue", fake_release)
     monkeypatch.setattr(terminal.subprocess, "run", fake_run)
-    terminal.IN_FLIGHT.update({"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None})
+    terminal.IN_FLIGHT.update(
+        {"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
+    )
     try:
         terminal.stop_and_release("signal 15")
     finally:
-        terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+        terminal.IN_FLIGHT.update(
+            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
+        )
     assert ("release", 167, "subagent-abc12345") in calls
     assert any(kind == "escalate" for kind, *_ in calls), "the brain must be told the loop stopped mid-run"
 
@@ -311,11 +315,15 @@ def test_stop_and_release_reports_a_failed_release(monkeypatch):
 
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (False, "REFUSED: not the holder"))
     monkeypatch.setattr(terminal.subprocess, "run", fake_run)
-    terminal.IN_FLIGHT.update({"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None})
+    terminal.IN_FLIGHT.update(
+        {"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
+    )
     try:
         terminal.stop_and_release("signal 15")
     finally:
-        terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+        terminal.IN_FLIGHT.update(
+            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
+        )
     assert any("RELEASE FAILED" in body for body in bodies), f"bodies={bodies}"
 
 
@@ -330,11 +338,15 @@ def test_stop_with_nothing_held_says_so_instead_of_claiming_a_release(monkeypatc
 
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "should not be called"))
     monkeypatch.setattr(terminal.subprocess, "run", fake_run)
-    terminal.IN_FLIGHT.update({"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None})
+    terminal.IN_FLIGHT.update(
+        {"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
+    )
     try:
         terminal.stop_and_release("signal 15")
     finally:
-        terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+        terminal.IN_FLIGHT.update(
+            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
+        )
     assert any("no live claim to release" in body for body in bodies), f"bodies={bodies}"
 
 
@@ -346,7 +358,9 @@ def test_an_idle_stop_releases_nothing(monkeypatch):
         return True, "ok"
 
     monkeypatch.setattr(terminal, "release_issue", fake_release)
-    terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+    terminal.IN_FLIGHT.update(
+        {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
+    )
     terminal.stop_and_release("signal 15")
     assert calls == []
 
@@ -370,3 +384,140 @@ def test_looks_refused_detects_a_stopped_subagent():
     assert terminal.looks_refused("no work done — stopping") is True
     assert terminal.looks_refused("no real issue number") is True
     assert terminal.looks_refused("merged PR #163; verify PASS") is False
+
+
+# --- #279: the verdict is evidence the loop runs itself, not the model's prose ---
+
+
+def _board(body: str, state: str):
+    """A stand-in for the board reader: `.body` -> body, `.state` -> state."""
+    return lambda issue, jq: {"body": body, "state": state}[jq.strip(".")]
+
+
+def test_p10a_prose_alone_can_no_longer_produce_a_success(monkeypatch):
+    """Negative control for #279: confident prose with no work is not a success."""
+    monkeypatch.setattr(
+        terminal, "run_gate", lambda command, cwd, timeout: (False, f"`{command}` rc=1: 3 checks failed")
+    )
+    monkeypatch.setattr(terminal, "gh_issue_field", _board("", "open"))
+
+    gate_ok, gate_detail = terminal.gate_evidence(279, None, 30.0)
+    landed, landing_detail = terminal.landed_evidence(279)
+    status, _ = terminal.verdict(
+        0, "All checks are green. Opened PR #279 and merged it. Everything is done.", gate_ok, landed
+    )
+
+    assert gate_ok is False and landed is False
+    assert "rc=1" in gate_detail and "#279 is open" in landing_detail
+    assert status == "failed", "prose alone must never read as a success"
+
+
+def test_p10b_a_run_that_merely_quotes_refused_is_not_a_failure(monkeypatch):
+    """The inverse of #279: the loop's evidence outranks a quoted 'REFUSED'."""
+    monkeypatch.setattr(terminal, "run_gate", lambda command, cwd, timeout: (True, f"`{command}` rc=0: PASS"))
+    monkeypatch.setattr(terminal, "gh_issue_field", _board("", "closed"))
+
+    gate_ok, _ = terminal.gate_evidence(279, None, 30.0)
+    landed, _ = terminal.landed_evidence(279)
+    status, hint = terminal.verdict(
+        0, "channel send: REFUSED (replay detected) — nothing else happened", gate_ok, landed
+    )
+
+    assert status == "done", "a quoted REFUSED must not downgrade verified evidence"
+    assert hint == "refusal language present", "the prose is still carried as a hint"
+
+
+def test_the_issues_own_verify_command_is_what_the_loop_runs(monkeypatch):
+    """The gate is the issue's Verify: line itself, read from the real board."""
+    seen = []
+
+    def fake_gate(command, cwd, timeout):
+        seen.append(command)
+        return True, f"`{command}` rc=0"
+
+    monkeypatch.setattr(terminal, "run_gate", fake_gate)
+    monkeypatch.setattr(terminal, "gh_issue_field", _board("Verify: `bash scripts/check-secrets.sh`", "closed"))
+    ok, _ = terminal.gate_evidence(285, None, 30.0)
+    assert ok is True
+    assert seen == ["bash scripts/check-secrets.sh", "make verify"], f"gates run were {seen}"
+
+
+def test_a_prose_verify_line_falls_back_to_make_verify(monkeypatch):
+    """Prose after `Verify:` is never executed as a command (#279)."""
+    monkeypatch.setattr(terminal, "run_gate", lambda command, cwd, timeout: (True, f"`{command}` rc=0"))
+    monkeypatch.setattr(
+        terminal, "gh_issue_field", _board("`Verify:` the new test fails against today's code", "closed")
+    )
+    assert terminal.issue_verify_command(285) is None
+    ok, detail = terminal.gate_evidence(285, None, 30.0)
+    assert ok is True and "make verify" in detail
+
+
+def test_extract_verify_command_reads_a_real_command_and_ignores_prose():
+    assert terminal.extract_verify_command("`Verify:` `pytest fleet/tests -q`") == "pytest fleet/tests -q"
+    assert terminal.extract_verify_command("Verify: make verify") == "make verify"
+    assert terminal.extract_verify_command("Verify:\n\n`bash scripts/check-secrets.sh`") == (
+        "bash scripts/check-secrets.sh"
+    )
+    assert terminal.extract_verify_command("`Verify:` the new test fails today") is None
+    assert terminal.extract_verify_command("no verify line here") is None
+
+
+def test_landed_evidence_accepts_githubs_canonical_uppercase_state(monkeypatch):
+    """GitHub reports `CLOSED`; uppercase must not read as "not landed" (#290)."""
+    monkeypatch.setattr(terminal, "gh_issue_field", _board("", "CLOSED"))
+    landed, detail = terminal.landed_evidence(279)
+    assert landed is True and "closed" in detail
+
+
+# --- #281: the claim is released exactly once on a graceful stop -----------------
+
+
+def test_a_graceful_stop_releases_the_claim_exactly_once(monkeypatch):
+    """#281: stop_and_release + the run's finally must not both release."""
+    calls = []
+
+    def fake_release(issue, agent):
+        calls.append((issue, agent))
+        return True, "ok"
+
+    monkeypatch.setattr(terminal, "release_issue", fake_release)
+    monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Ok())
+    terminal.IN_FLIGHT.update(
+        {"issue": 281, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
+    )
+    try:
+        terminal.stop_and_release("signal 15")  # the SIGTERM handler
+        terminal.release_in_flight(281, "subagent-abc12345", "d-1")  # what the run's finally does
+    finally:
+        terminal.IN_FLIGHT.update(
+            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
+        )
+    assert calls == [(281, "subagent-abc12345")], f"the claim must be released once, got {calls}"
+
+
+def test_release_issue_treats_not_claimed_as_benign(monkeypatch):
+    """#281: releasing a claim that is already free is a no-op, not a failure."""
+
+    class NotClaimed:
+        returncode = 1
+        stdout = ""
+        stderr = "ClaimRefused(not-claimed): #4242 has no live claim"
+
+    monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: NotClaimed())
+    ok, output = terminal.release_issue(4242, "subagent-x")
+    assert ok is True
+    assert "benign" in output
+
+
+def test_release_issue_still_reports_not_owner(monkeypatch):
+    """A release of someone else's claim stays a real failure."""
+
+    class NotOwner:
+        returncode = 1
+        stdout = ""
+        stderr = "ClaimRefused(not-owner): #4242 is held by subagent-y"
+
+    monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: NotOwner())
+    ok, output = terminal.release_issue(4242, "subagent-x")
+    assert ok is False and "not-owner" in output
