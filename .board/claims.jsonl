@@ -1,0 +1,2 @@
+{"event": "claim", "issue": 139, "agent": "copilot-lane", "at": "2026-09-13T17:54:38Z", "lane": "governance", "base_commit": "", "snapshot_sha256": "93a85749b434e4112dcc40f66d0da1f9fecbd01b498d631c9c992cf615b8726a", "reason": "next-in-milestone", "ttl_hours": 24}
+{"event": "release", "issue": 139, "agent": "copilot-lane", "at": "2026-09-13T18:01:56Z", "lane": "", "base_commit": "", "snapshot_sha256": "", "reason": "", "ttl_hours": 24}
