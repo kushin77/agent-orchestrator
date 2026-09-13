@@ -8,7 +8,11 @@ hierarchy the transport now enforces, and the brain loop that makes it real.
 from __future__ import annotations
 
 import json
+import signal
+import time
 from pathlib import Path
+
+import pytest
 
 import brain
 import channel
@@ -134,6 +138,42 @@ def test_order_refuses_a_message_the_operator_may_not_send(tmp_path, monkeypatch
 class _Args:
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
+
+
+# --- the brain's own runtime isolation (issue #274) --------------------------
+#
+# `conftest.RUNTIME_PATHS["brain"]` was written before the brain owned a marker
+# directory, and conftest.py belongs to another lane — so the redirect for the
+# new path lives here rather than silently writing into the live `.fleet/` tree
+# (the exact failure the conftest fixture exists to prevent).
+
+
+@pytest.fixture(autouse=True)
+def _redirect_dispatch_markers(tmp_path, monkeypatch):
+    monkeypatch.setattr(brain, "DISPATCH_MARKERS", tmp_path / "brain" / "dispatched")
+
+
+@pytest.fixture
+def stub_channel(tmp_path):
+    """A stand-in for `fleet/channel.py`: answers with a fixed payload and exit code."""
+
+    def make(payload: str = "", rc: int = 1):
+        script = tmp_path / "stub-channel.py"
+        script.write_text(
+            "import sys\n"
+            f"sys.stdout.write({payload!r})\n"
+            f"sys.exit({rc})\n",
+            encoding="utf-8",
+        )
+        return script
+
+    return make
+
+
+@pytest.fixture
+def quiet_signals(monkeypatch):
+    """Keep `loop` from installing process-global signal handlers inside pytest."""
+    monkeypatch.setattr(brain.signal, "signal", lambda *args: None)
 
 
 # --- the brain rung ----------------------------------------------------------
@@ -342,3 +382,221 @@ def test_the_directive_carries_the_enterprise_instruction_stack():
         assert str(Path(source).expanduser()) in body
     assert str(Path("~/cmr/AGENTS.md").expanduser()) in body
     assert str(Path("~/deepseek/AGENTS.md").expanduser()) in body
+
+
+# --- #274: a long order must not look dead, and a restart must not re-dispatch --
+
+
+def test_the_brain_beats_while_an_order_is_handled(tmp_path, monkeypatch):
+    """The beat has to move *during* the handler, not only before it.
+
+    `handle_decompose` files N child issues and refreshes the board — longer than
+    the watchdog's 120s stale threshold, and a stale brain is SIGTERMd mid-order.
+    """
+    monkeypatch.setattr(brain, "HEARTBEAT", tmp_path / "brain.heartbeat.json")
+    beater = brain.OrderBeater(
+        "dispatching", started_at="2026-09-13T00:00:00Z", commit="abc1234", interval=0.01
+    ).start()
+    try:
+        time.sleep(0.05)
+        seen = json.loads(brain.HEARTBEAT.read_text(encoding="utf-8"))
+        assert seen["state"] == "dispatching"
+        assert seen["commit"] == "abc1234"
+        first_stamp = brain.HEARTBEAT.stat().st_mtime_ns
+        time.sleep(0.05)
+        assert brain.HEARTBEAT.stat().st_mtime_ns > first_stamp, "the beater stopped beating"
+    finally:
+        beater.stop()
+    stopped_at = brain.HEARTBEAT.stat().st_mtime_ns
+    time.sleep(0.05)
+    assert brain.HEARTBEAT.stat().st_mtime_ns == stopped_at, "the beater outlived its owner"
+
+
+def test_the_loop_keeps_beating_while_a_handler_runs(monkeypatch, stub_channel, quiet_signals):
+    """End-to-end: the loop's own beat stays fresh for the whole of a slow order."""
+    monkeypatch.setattr(brain, "CHANNEL", str(stub_channel(payload=json.dumps(order(id="o-beat")), rc=0)))
+    monkeypatch.setattr(brain, "HEARTBEAT_INTERVAL_SECONDS", 0.01)
+    stamps: set[int] = set()
+
+    def slow_handler(order_):
+        deadline = time.monotonic() + 0.2
+        while time.monotonic() < deadline:
+            if brain.HEARTBEAT.exists():
+                stamps.add(brain.HEARTBEAT.stat().st_mtime_ns)
+            time.sleep(0.005)
+        return True, "handled slowly"
+
+    monkeypatch.setattr(brain, "safe_handle_order", slow_handler)
+    assert brain.loop(_Args(watch_timeout=0.02, once=True)) == 0
+    assert len(stamps) > 1, "the beat never moved while the handler was running"
+    stopped_at = brain.HEARTBEAT.stat().st_mtime_ns
+    time.sleep(0.05)
+    assert brain.HEARTBEAT.stat().st_mtime_ns == stopped_at, "the beater outlived the loop"
+
+
+def test_a_sigterm_stops_the_brain_cleanly():
+    """No handler meant the watchdog's SIGTERM killed the brain outright."""
+    with pytest.raises(SystemExit) as exc:
+        brain.handle_stop(signal.SIGTERM, None)
+    assert exc.value.code == 128 + signal.SIGTERM
+
+
+def test_the_loop_installs_a_clean_stop_for_sigterm_and_sigint(monkeypatch, stub_channel):
+    installed = []
+    monkeypatch.setattr(brain.signal, "signal", lambda signum, handler: installed.append((signum, handler)))
+    monkeypatch.setattr(brain, "CHANNEL", str(stub_channel()))
+    assert brain.loop(_Args(watch_timeout=0.02, once=True)) == 0
+    assert (signal.SIGTERM, brain.handle_stop) in installed
+    assert (signal.SIGINT, brain.handle_stop) in installed
+
+
+def test_the_directive_identity_is_derived_from_the_order_not_random():
+    """Without a stable id the channel's replay guard can never fire (#274)."""
+    first = brain.build_directive(order(id="4242"))["id"]
+    assert first == brain.build_directive(order(id="4242"))["id"]
+    assert brain.build_directive(order(id="4243"))["id"] != first
+    assert validate(brain.build_directive(order(id="4242"))) == []
+
+
+def test_a_restart_does_not_dispatch_the_same_order_twice(tmp_path, monkeypatch):
+    """The P8 proof: re-reading one order dispatched it twice (`['4242', '4242']`).
+
+    Also pins the *ordering* of the fix — the marker must be on disk before the
+    channel is invoked. Moving the write after the send flips the probe to
+    `marker-absent` and this test fails.
+    """
+    log = tmp_path / "sends.txt"
+    marker = brain.DISPATCH_MARKERS / "4242.json"
+    stub = tmp_path / "probe-channel.py"
+    stub.write_text(
+        "import pathlib, sys\n"
+        f"marker = pathlib.Path({str(marker)!r})\n"
+        f"log = pathlib.Path({str(log)!r})\n"
+        "log.open('a', encoding='utf-8').write('marker-present\\n' if marker.exists() else 'marker-absent\\n')\n"
+        "print('channel send: OK — queued for the sister')\n"
+        "sys.exit(0)\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(brain, "CHANNEL", str(stub))
+    same_order = order(id="4242")
+
+    first = brain.handle_order(same_order)
+    second = brain.handle_order(same_order)
+
+    assert log.read_text(encoding="utf-8").split() == ["marker-present"], "the marker was written after the send"
+    assert first[0] is True and "dispatched #5" in first[1]
+    assert second[0] is True and "already dispatched" in second[1]
+    assert json.loads(marker.read_text(encoding="utf-8"))["state"] == "sent"
+
+
+def test_a_refused_send_leaves_no_marker_so_a_corrected_order_can_still_go_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(brain, "CHANNEL", str(_failing_channel(tmp_path)))
+    ok, message = brain.handle_order(order(id="4242"))
+    assert ok is False and "dispatch refused" in message
+    assert brain.order_marker(order(id="4242")) is not None
+    assert not brain.order_marker(order(id="4242")).exists()
+
+
+def _failing_channel(tmp_path) -> Path:
+    """A channel stand-in that refuses like `cmd_send` does: non-zero, nothing queued."""
+    script = tmp_path / "refusing-channel.py"
+    script.write_text(
+        "import sys\n"
+        "sys.stderr.write('channel send: REFUSED (1 violation(s))\\n')\n"
+        "sys.exit(1)\n",
+        encoding="utf-8",
+    )
+    return script
+
+
+# --- #275: a malformed order is a refusal, never a dead brain -----------------
+
+
+def test_a_decompose_order_without_a_parent_issue_is_refused_not_a_crash():
+    """The P2 proof: `KeyError('parent_issue')` propagated out of the loop."""
+    ok, report = brain.handle_order(order(task={"decompose": {"children": [{"title": "t"}]}}))
+    assert ok is False
+    assert "parent_issue" in report
+
+
+def test_a_decompose_order_whose_children_are_not_objects_is_refused():
+    ok, report = brain.handle_order(order(task={"decompose": {"parent_issue": 219, "children": ["nope"]}}))
+    assert ok is False
+    assert "children must each be an object" in report
+
+
+def test_a_decompose_order_with_no_children_is_still_refused():
+    ok, report = brain.handle_order(order(task={"decompose": {"parent_issue": 219, "children": []}}))
+    assert ok is False
+    assert "carries no children" in report
+
+
+def test_the_loop_survives_a_handler_that_raises(monkeypatch, stub_channel, quiet_signals):
+    """Whatever the handler does, the loop reports it and keeps running."""
+    monkeypatch.setattr(brain, "CHANNEL", str(stub_channel(payload=json.dumps(order(id="o-boom")), rc=0)))
+
+    def boom(order_):
+        raise RuntimeError("handler exploded")
+
+    monkeypatch.setattr(brain, "handle_order", boom)
+    assert brain.loop(_Args(watch_timeout=0.02, once=True)) == 1, "a handler error must be a refusal, not a death"
+
+    replies = sorted(channel.BRAIN_OUTBOX.glob("*.json"))
+    assert replies, "the refusal must reach the operator"
+    assert "handler error RuntimeError: handler exploded" in replies[-1].read_text(encoding="utf-8")
+
+
+def test_safe_handle_order_does_not_swallow_a_stop(monkeypatch):
+    """`SystemExit` is the stop handler: a stop must stop, not be reported."""
+
+    def stop(order_):
+        raise SystemExit(143)
+
+    monkeypatch.setattr(brain, "handle_order", stop)
+    with pytest.raises(SystemExit):
+        brain.safe_handle_order(order())
+
+
+def test_safe_handle_order_reports_any_other_failure(monkeypatch):
+    def boom(order_):
+        raise KeyError("parent_issue")
+
+    monkeypatch.setattr(brain, "handle_order", boom)
+    ok, report = brain.safe_handle_order(order())
+    assert ok is False
+    assert "handler error KeyError: 'parent_issue'" in report
+
+
+# --- F10: a decomposed child must keep its title onto the wave directive ------
+
+
+def test_a_decomposed_child_keeps_its_title_into_the_wave_directive(tmp_path, monkeypatch):
+    """`title` was never stored, so every wave directive shipped `task.title == ""`
+    and the title-based FinOps high-floor detection had nothing to read."""
+    monkeypatch.setattr(brain, "WAVES", tmp_path / "waves")
+    monkeypatch.setattr(brain, "gh_issue_create", lambda title, body: 4242)
+    sent: list[dict] = []
+    monkeypatch.setattr(brain, "dispatch", lambda order_: (sent.append(order_), (True, "channel send: OK"))[1])
+
+    class _Refresh:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(brain.subprocess, "run", lambda *a, **k: _Refresh())
+
+    ok, report = brain.handle_decompose(
+        order(
+            task={
+                "decompose": {
+                    "parent_issue": 219,
+                    "children": [{"title": "harden the gate", "verify": "pytest -q", "lane": "fleet"}],
+                }
+            }
+        )
+    )
+
+    assert ok is True and "decomposed #219" in report
+    plan = json.loads((tmp_path / "waves" / "219.json").read_text(encoding="utf-8"))
+    assert plan["children"][0]["title"] == "harden the gate"
+    assert sent and sent[0]["task"]["title"] == "harden the gate"
