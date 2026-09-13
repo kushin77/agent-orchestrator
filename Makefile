@@ -16,8 +16,9 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims fleet-channel secrets feature-flags cloudbuild terraform \
-        tf-fmt tf-validate shellcheck gitleaks pre-commit
+        issue-claims fleet-channel knowledge-index knowledge-index-build \
+        secrets feature-flags cloudbuild terraform tf-fmt \
+        tf-validate shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
 
@@ -53,6 +54,8 @@ help:
 	@echo "                against the board snapshot + self-control mutants"
 	@echo "  fleet-channel Steering channel (M26 #162): message contract + the"
 	@echo "                DSv4FNone standing directive, all mutants refused"
+	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
+	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -65,7 +68,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel knowledge-index
 	@echo ""
 	@echo "lint: OK"
 
@@ -120,6 +123,16 @@ issue-claims:
 ## the DSv4FNone standing directive; every mutant message must be refused
 fleet-channel:
 	@bash scripts/check-fleet-channel.sh
+
+## knowledge-index — the institutional knowledge index must be valid (issue #139):
+## every item's provenance complete, secret policy clean, mandatory kinds covered
+knowledge-index:
+	@bash scripts/check-knowledge-index.sh
+
+## knowledge-index-build — regenerate the catalogue + report on demand (the ops
+## runner invokes the same command on its schedule)
+knowledge-index-build:
+	@python3 governance/knowledge/cli.py build
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
