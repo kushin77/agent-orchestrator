@@ -300,6 +300,18 @@ def held_action(holder: str | None, agent_id: str, state: str) -> str:
     return "orphaned"
 
 
+def handled(directive_id: str) -> None:
+    """Take a control message off the queue before acting on it.
+
+    A process control has no result to report, but it must still leave the inbox:
+    a `kill` that acted and stayed pending kills the *next* loop too, and a
+    `refresh` that stayed pending re-execs forever.
+    """
+    subprocess.run(
+        ["python3", CHANNEL, "consume", "--id", directive_id], cwd=ROOT, capture_output=True, text=True
+    )
+
+
 def agent_id_for(directive_id: str) -> str:
     """The agent id for a directive: one lane, one name, derived from the order."""
     return f"subagent-{directive_id[:8]}"
@@ -639,6 +651,7 @@ def loop(args: argparse.Namespace) -> int:
                     return 1
                 continue
             if verdict == "kill":
+                handled(directive_id)
                 subprocess.run(
                     ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
                      "--severity", "warn", "--body", "control:kill — run terminated, claim released"],
@@ -646,6 +659,7 @@ def loop(args: argparse.Namespace) -> int:
                 )
                 return 128 + signal.SIGTERM
             if verdict == "halt":
+                handled(directive_id)
                 subprocess.run(
                     ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
                      "--type", "ack", "--body", "control:halt — stopping the fleet"],
@@ -653,6 +667,7 @@ def loop(args: argparse.Namespace) -> int:
                 )
                 return 0
             if verdict == "refresh":
+                handled(directive_id)
                 print("[terminal] refresh requested — pull + verify + restart", flush=True)
                 pull = subprocess.run(["git", "pull", "--ff-only"], cwd=ROOT, capture_output=True, text=True)
                 verify = subprocess.run(["make", "verify"], cwd=ROOT, capture_output=True, text=True)
@@ -675,6 +690,7 @@ def loop(args: argparse.Namespace) -> int:
                 continue
             if verdict == "restart":
                 # Re-exec the same code: no pull, no verify — the fast lever.
+                handled(directive_id)
                 subprocess.run(
                     ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
                      "--type", "ack", "--body", "control:restart — re-executing the loop"],
