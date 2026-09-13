@@ -482,8 +482,26 @@ def brain_reply(order: dict, message_type: str, body: str) -> None:
 
 
 def cmd_brain_outbox(args: argparse.Namespace) -> int:
-    """Operator side: read the brain's replies (acks and refusals), oldest first."""
-    replies = sorted(BRAIN_OUTBOX.glob("*.json")) if BRAIN_OUTBOX.exists() else []
+    """Operator side: read the brain's replies (acks and refusals), newest last.
+
+    Ordered by the message timestamp, not by filename: ids are uuid4, so a
+    filename sort returns the replies in arbitrary order and the operator reads
+    a stale answer as if it were the current one (observed live).
+    """
+
+    def by_time(path: Path) -> float:
+        try:
+            message = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return 0.0
+        stamp = str(message.get("ts") or "")
+        try:
+            seen = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return path.stat().st_mtime if path.exists() else 0.0
+        return seen.timestamp()
+
+    replies = sorted(BRAIN_OUTBOX.glob("*.json"), key=by_time) if BRAIN_OUTBOX.exists() else []
     if not replies:
         print("channel brain-outbox: no replies from the brain yet")
         return EXIT_NOT_OK

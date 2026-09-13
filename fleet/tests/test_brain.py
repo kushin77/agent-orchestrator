@@ -182,6 +182,33 @@ def test_non_work_orders_do_not_dispatch(monkeypatch):
     assert "no dispatch" in report
 
 
+def test_brain_outbox_reads_newest_last(tmp_path, monkeypatch, capsys):
+    """Ids are uuid4, so a filename sort shows the operator a stale reply."""
+    monkeypatch.setattr(channel, "BRAIN_OUTBOX", tmp_path / "brain" / "outbox")
+    channel.BRAIN_OUTBOX.mkdir(parents=True, exist_ok=True)
+    for name, stamp, body in (
+        ("zzz-first-id", "2026-09-13T19:00:00Z", "the older reply"),
+        ("aaa-second-id", "2026-09-13T20:00:00Z", "the newer reply"),
+    ):
+        (channel.BRAIN_OUTBOX / f"{name}.json").write_text(
+            json.dumps(
+                {
+                    "from": "brain",
+                    "to": "operator",
+                    "type": "ack",
+                    "id": name,
+                    "ts": stamp,
+                    "correlation_id": "o-1",
+                    "body": body,
+                }
+            ),
+            encoding="utf-8",
+        )
+    assert channel.cmd_brain_outbox(type("Args", (), {"limit": 0})()) == channel.EXIT_OK
+    out = capsys.readouterr().out
+    assert out.index("the older reply") < out.index("the newer reply")
+
+
 def test_brain_reply_lands_in_the_operator_outbox(tmp_path, monkeypatch):
     monkeypatch.setattr(channel, "BRAIN_OUTBOX", tmp_path / "brain" / "outbox")
     monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
