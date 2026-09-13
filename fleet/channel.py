@@ -301,6 +301,17 @@ def heartbeat_age_seconds(beat: dict, moment: float | None = None) -> float | No
     return (reference - seen).total_seconds()
 
 
+def running_loop_pids() -> list[int]:
+    """PIDs of live `fleet/terminal.py` loops, to disambiguate NO-HEARTBEAT."""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "fleet/terminal.py"], capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [int(line) for line in result.stdout.split() if line.strip().isdigit()]
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     def count(directory: Path) -> int:
         return len(list(directory.glob("*.json"))) if directory.exists() else 0
@@ -309,7 +320,15 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     beat = read_heartbeat()
     if beat is None:
-        print("sister: NO HEARTBEAT — the loop is not running (start it: bash fleet/terminal.sh)")
+        pids = running_loop_pids()
+        if pids:
+            print(
+                f"sister: NO HEARTBEAT from a loop that IS running (pid {', '.join(map(str, pids))}) — "
+                "it is executing a build older than the heartbeat check, so merged fixes are not live. "
+                "Restart it: tmux kill-session -t fleet 2>/dev/null; bash fleet/run-fleet.sh"
+            )
+        else:
+            print("sister: NO HEARTBEAT and no loop process — the fleet is down (start: bash fleet/terminal.sh)")
         return EXIT_NOT_OK
 
     age = heartbeat_age_seconds(beat)
