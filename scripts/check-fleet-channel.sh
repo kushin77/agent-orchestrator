@@ -85,8 +85,10 @@ make_mutant "brain-acks" '{"from":"brain","to":"sister","type":"ack","correlatio
 make_mutant "escalate-missing-correlation" '{"from":"sister","to":"brain","type":"escalate","severity":"warn"}'
 make_mutant "escalate-from-brain" '{"from":"brain","to":"brain","type":"escalate","correlation_id":"directive-0001","severity":"warn"}'
 make_mutant "escalate-bad-severity" '{"from":"sister","to":"brain","type":"escalate","correlation_id":"directive-0001","severity":"max"}'
+make_mutant "control-from-sister" '{"from":"sister","to":"brain","type":"directive","control":"poke"}'
+make_mutant "control-bad-action" '{"from":"brain","to":"sister","type":"directive","control":"fly"}'
 
-for mutant in bad-type bad-tier bad-thinking missing-role sister-issues misaddressed ack-no-correlation brain-acks escalate-missing-correlation escalate-from-brain escalate-bad-severity; do
+for mutant in bad-type bad-tier bad-thinking missing-role sister-issues misaddressed ack-no-correlation brain-acks escalate-missing-correlation escalate-from-brain escalate-bad-severity control-from-sister control-bad-action; do
   if $channel verify --message "$work/$mutant.json" >/dev/null 2>&1; then
     echo "  FAIL  mutant '$mutant' was accepted (the channel cannot refuse invalid traffic)" >&2
     fail=$((fail + 1))
@@ -109,6 +111,14 @@ if $channel verify --message "$work/valid-escalate.json" >/dev/null 2>&1; then
   echo "  OK    a valid escalation validates"
 else
   echo "  FAIL  a valid escalation was refused (over-strict contract)" >&2
+  fail=$((fail + 1))
+fi
+
+printf '%s\n' '{"from":"brain","to":"sister","type":"directive","control":"refresh"}' > "$work/valid-control.json"
+if $channel verify --message "$work/valid-control.json" >/dev/null 2>&1; then
+  echo "  OK    a valid control directive validates"
+else
+  echo "  FAIL  a valid control directive was refused (over-strict contract)" >&2
   fail=$((fail + 1))
 fi
 

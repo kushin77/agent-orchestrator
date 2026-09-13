@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -155,6 +156,51 @@ def loop(args: argparse.Namespace) -> int:
             return 0
 
         directive_id = directive.get("id", "")
+        control = directive.get("control")
+        if control:
+            if control == "halt":
+                print("[terminal] HALT received — stopping the loop")
+                return 0
+            if control == "poke":
+                print("[terminal] poke received — loop alive", flush=True)
+                subprocess.run(
+                    ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                     "--type", "ack", "--body", "poke received — loop alive"],
+                    cwd=ROOT,
+                )
+                if args.once:
+                    return 0
+                continue
+            if control == "refresh":
+                print("[terminal] refresh requested — pull + verify + restart", flush=True)
+                pull = subprocess.run(["git", "pull", "--ff-only"], cwd=ROOT, capture_output=True, text=True)
+                verify = subprocess.run(["make", "verify"], cwd=ROOT, capture_output=True, text=True)
+                if pull.returncode == 0 and verify.returncode == 0:
+                    print("[terminal] refresh OK — restarting with new code", flush=True)
+                    subprocess.run(
+                        ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                         "--type", "ack", "--body", "refreshed + verify PASS; restarting"],
+                        cwd=ROOT,
+                    )
+                    os.execv(sys.executable, [sys.executable, *sys.argv])
+                subprocess.run(
+                    ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                     "--severity", "critical",
+                     "--body", f"refresh FAILED: pull rc={pull.returncode}, verify rc={verify.returncode}: {(verify.stdout + verify.stderr)[-400:]}"],
+                    cwd=ROOT,
+                )
+                if args.once:
+                    return 1
+                continue
+            subprocess.run(
+                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                 "--severity", "warn", "--body", f"unknown control action {control}"],
+                cwd=ROOT,
+            )
+            if args.once:
+                return 1
+            continue
+
         issue = directive_issue(directive)
         if issue is None:
             print(f"[terminal] directive {directive_id} names no issue — escalating malformed", file=sys.stderr, flush=True)

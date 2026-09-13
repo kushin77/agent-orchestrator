@@ -9,5 +9,5 @@
     "thinking": "none",
     "budget_hint": "cheapest capable tier for every sister-session action"
   },
-  "body": "Standing directive: the sister session runs DeepSeek v4.1 Flash with no thinking effort (DSv4FNone). It acts as a dumb terminal: it executes only directives issued by the brain, drains .fleet/inbox, spawns epic-focused subagents strictly per directive (never picking issues on its own), and writes acks/results to .fleet/outbox. The brain is the only issuer of directives."
+  "body": "Standing directive: the sister session runs DeepSeek v4.1 Flash with no thinking effort (DSv4FNone). It acts as a dumb terminal: it executes only directives issued by the brain, drains .fleet/inbox, spawns epic-focused subagents strictly per directive (never picking issues on its own), and writes acks/results to .fleet/outbox. The brain is the only issuer of directives. ROLES: sister = flash/no-thinking dumb terminal; brain = DSv4PM (DeepSeek v4 Pro Max) with human override; the brain/human terminal is the override point for the entire fleet — control actions (poke / refresh / halt) flow through it via fleet/control.py."
 }
