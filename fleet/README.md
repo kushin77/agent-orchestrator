@@ -284,6 +284,63 @@ idle:
 A refusal reads the same way, with the reason the contract gave:
 `[brain] o-1: → refused: order names no issue (...)`.
 
+## Status report (paperclip planning / status-report discipline)
+
+`fleet/console.py` answers *what is the fleet doing right now*. `fleet/report.py`
+answers the planning question underneath it — *where does this stand, and what is
+in the way* — and it answers it in the shape the vendored **paperclip** module
+declares: `roadmaps` ("plan-first artifacts and roadmap tracking for workstreams
+and milestones") and `status-reports` ("project status and delivery reporting
+patterns with crisp, human-readable output"). The pattern source is
+`vendor/CMR/catalog/modules/paperclip` and the owning registry persona is
+[`paperclip`](../registry/personas/cards/paperclip.yaml) (tier LOW, lanes
+`paperclip` / `knowledge`) — the reporting half of the ownership boundary
+[ADR-0012](../docs/decision-records/ADR-0012-hermes-paperclip-boundary.md)
+records. The header the report prints names both, so a reader never has to guess
+which pattern a line follows.
+
+```bash
+python3 fleet/report.py            # the human-readable report
+python3 fleet/report.py --json     # the same report, typed and structured
+```
+
+Four sections, in dependency order, each item carrying its issue, its lane and an
+**evidence pointer** — a run id, a claim, the child's own `Verify:` command, or the
+closing record:
+
+| section       | what it holds                                                 |
+|---------------|---------------------------------------------------------------|
+| **now**       | a run marker a loop is tracking, or a live claim               |
+| **next**      | wave children whose dependencies are met, behind the frontier  |
+| **blocked**   | work that cannot proceed, named with what it waits on          |
+| **delivered** | terminal outcomes the fleet already recorded                   |
+
+It reads only state the fleet already writes — the wave plans plus child issue
+states, the live claims the dispatch ledger folds (`governance/dispatch/cli.py
+status` prints the same set), the in-flight run markers under `.fleet/runs/`, the
+recent `.fleet/slog.jsonl` outcomes, and the board milestone/frontier through the
+same `governance/dispatch/order.py` rule the claim gate enforces. **It is
+read-only:** it never writes `.fleet/`, never claims, releases or reaps, and can
+never change a dispatch decision.
+
+Exit codes follow the repo's tri-state convention:
+
+| code | meaning                                                             |
+|------|---------------------------------------------------------------------|
+| `0`  | OK — the report was produced and nothing in it is blocked            |
+| `1`  | NOT-OK — the report was produced and at least one item is blocked    |
+| `2`  | CANNOT-ASSESS — no wave plan and no board snapshot: nothing to report on |
+
+`2` is a refusal, not an empty report: with no plan to derive from, `report.py`
+prints no report at all rather than inventing one. The report also states its own
+**evidence basis** — the commit it was read at, the milestone and frontier, every
+source actually read with its record count, and the last `make verify` verdict
+from `.verify/attestation.json` when the tree carries one (and says so plainly
+when it does not). `--json` is a first-class mode, validated against the report's
+own schema before it is printed, so a consumer gets a shape guarantee rather than
+a hope. The suite is `fleet/tests/test_report.py` — pure functions over a
+synthetic fleet, no network and no tmux.
+
 ## Mailbox
 
 ```
