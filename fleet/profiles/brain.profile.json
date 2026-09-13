@@ -92,7 +92,7 @@
   "templates": {
     "dispatch": "task:{issue,epic,lane,title} + model:{tier,thinking} + body: acceptance + the issue's own Verify: command + the evidence to return",
     "escalation": "what failed / exact error / what was tried / what the operator must decide",
-    "report": "issue + PR + the real command output + what was learned"
+    "report": "issue + PR + the real command output + what was learned + the merge result (PR number + merged/closed)"
   },
   "anti_patterns": [
     "claiming an epic (it closes with its children, it is not work)",
