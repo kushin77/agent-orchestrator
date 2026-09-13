@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 
 import channel
 from channel import EXIT_NOT_OK, EXIT_OK, validate
@@ -98,3 +99,69 @@ def test_standing_directive_on_disk_carries_dsv4fnone():
     assert data["model"] == {"tier": "flash", "thinking": "none", "budget_hint": data["model"]["budget_hint"]}
     assert data["model"]["tier"] == "flash"
     assert data["model"]["thinking"] == "none"
+
+
+def test_ack_requires_a_correlation_id():
+    problems = validate({"from": "sister", "to": "brain", "type": "result"})
+    assert any("correlation_id" in problem for problem in problems)
+
+
+def test_the_brain_cannot_ack_its_own_directives():
+    problems = validate(
+        {"from": "brain", "to": "sister", "type": "ack", "correlation_id": "directive-0001"}
+    )
+    assert any("does not ack" in problem for problem in problems)
+
+
+def test_halt_may_only_come_from_the_brain():
+    assert validate({"from": "brain", "to": "sister", "type": "halt"}) == []
+    problems = validate({"from": "sister", "to": "brain", "type": "halt"})
+    assert any("only the brain" in problem for problem in problems)
+
+
+def test_wait_triggers_when_the_result_lands(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    result = {"from": "sister", "to": "brain", "type": "result", "correlation_id": "d-1", "id": "r-1"}
+
+    def later():
+        import time as clock
+
+        clock.sleep(0.1)
+        channel.OUTBOX.mkdir(parents=True, exist_ok=True)
+        (channel.OUTBOX / "r-1.json").write_text(json.dumps(result), encoding="utf-8")
+
+    thread = threading.Thread(target=later)
+    thread.start()
+    args = type("Args", (), {"id": "d-1", "timeout_seconds": 5.0, "interval": 0.02})()
+    assert channel.cmd_wait(args) == EXIT_OK
+    thread.join()
+
+
+def test_wait_times_out_with_a_failure_not_a_silent_pass(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    args = type("Args", (), {"id": "nope", "timeout_seconds": 0.05, "interval": 0.01})()
+    assert channel.cmd_wait(args) == EXIT_NOT_OK
+
+
+def test_wait_matches_by_correlation_id(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    channel.OUTBOX.mkdir(parents=True, exist_ok=True)
+    result = {"from": "subagent-x", "to": "brain", "type": "result", "correlation_id": "d-1", "id": "r-9"}
+    (channel.OUTBOX / "r-9.json").write_text(json.dumps(result), encoding="utf-8")
+    args = type("Args", (), {"id": "d-1", "timeout_seconds": 1.0, "interval": 0.01})()
+    assert channel.cmd_wait(args) == EXIT_OK
+
+
+def test_report_writes_a_valid_outbox_message(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    args = type(
+        "Args",
+        (),
+        {"from_role": "sister", "type": "result", "correlation": "d-1", "body": "merged #171"},
+    )()
+    assert channel.cmd_report(args) == EXIT_OK
+    files = list((tmp_path / "outbox").glob("*.json"))
+    assert len(files) == 1
+    data = json.loads(files[0].read_text(encoding="utf-8"))
+    assert validate(data) == []
+    assert data["correlation_id"] == "d-1"

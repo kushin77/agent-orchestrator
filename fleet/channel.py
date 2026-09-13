@@ -24,6 +24,7 @@ import argparse
 import json
 import re
 import sys
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -81,6 +82,12 @@ def validate(message: dict) -> list[str]:
         problems.append("directives may only be addressed to the sister")
     if message.get("from") == "sister" and message_type == "directive":
         problems.append("the sister is a dumb terminal: it cannot issue directives")
+    if message_type in ("ack", "result") and not message.get("correlation_id"):
+        problems.append(f"{message_type} must carry correlation_id (the directive it answers)")
+    if message_type in ("ack", "result") and message.get("from") == "brain":
+        problems.append("the brain does not ack or report on its own directives")
+    if message_type == "halt" and message.get("from") != "brain":
+        problems.append("only the brain may issue a halt")
     model = message.get("model")
     if model is not None:
         if not isinstance(model, dict):
@@ -163,6 +170,59 @@ def cmd_status(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    """Executor side: write an ack/result answering a directive into the outbox."""
+    message = {
+        "from": args.from_role,
+        "to": "brain",
+        "type": args.type,
+        "correlation_id": args.correlation,
+    }
+    if args.body:
+        message["body"] = args.body
+    problems = validate(message)
+    if problems:
+        print(f"channel report: REFUSED ({len(problems)} violation(s))", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return EXIT_NOT_OK
+    message["id"] = str(uuid.uuid4())
+    message["ts"] = now_iso()
+    OUTBOX.mkdir(parents=True, exist_ok=True)
+    (OUTBOX / f"{message['id']}.json").write_text(json.dumps(message, indent=2) + "\n", encoding="utf-8")
+    print(f"channel report: OK — {message['id']} answers {args.correlation}")
+    return EXIT_OK
+
+
+def cmd_wait(args: argparse.Namespace) -> int:
+    """Brain side: block until a result for this id (or correlation) lands in the outbox.
+
+    This is the completion trigger of the operating model: push a directive with
+    ``send``, then ``wait`` until the executor answers. A timeout is NOT-OK (1),
+    never a silent pass.
+    """
+    target = args.id
+    deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
+    OUTBOX.mkdir(parents=True, exist_ok=True)
+    while True:
+        for path in sorted(OUTBOX.glob("*.json")):
+            try:
+                message = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            if message.get("id") == target or message.get("correlation_id") == target:
+                print(json.dumps(message, indent=2))
+                print(f"channel wait: TRIGGERED — {target} answered by {message.get('from')}")
+                return EXIT_OK
+        if deadline is not None and time.monotonic() >= deadline:
+            print(f"channel wait: TIMEOUT — no result for {target} after {args.timeout_seconds}s", file=sys.stderr)
+            return EXIT_NOT_OK
+        nap = args.interval
+        if deadline is not None:
+            nap = min(nap, max(0.0, deadline - time.monotonic()))
+        time.sleep(nap)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-channel", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -177,6 +237,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="mailbox counts")
     status.set_defaults(func=cmd_status)
+
+    report = sub.add_parser("report", help="write an ack/result answering a directive (executor side)")
+    report.add_argument("--from", dest="from_role", required=True)
+    report.add_argument("--type", choices=("ack", "result"), required=True)
+    report.add_argument("--correlation", required=True)
+    report.add_argument("--body", default=None)
+    report.set_defaults(func=cmd_report)
+
+    wait = sub.add_parser("wait", help="block until the outbox answers this id/correlation (brain side)")
+    wait.add_argument("--id", required=True)
+    wait.add_argument("--timeout-seconds", type=float, default=300.0)
+    wait.add_argument("--interval", type=float, default=0.5)
+    wait.set_defaults(func=cmd_wait)
     return parser
 
 
