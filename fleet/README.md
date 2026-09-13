@@ -87,6 +87,26 @@ Everything after step 2 is code: the brain sends directives with
   `high`}; anything else is refused. A subagent cannot raise its own tier —
   only a new brain directive may escalate.
 
+## Enterprise instruction stack
+
+Every brain directive hands the subagent the **same enterprise instruction
+stack the operator's top-level agent runs under**, not just the repo's own
+docs. `fleet/brain.py` combines three KB groups into the directive's
+"Read first" block:
+
+* `kb.own_repo` — repo-relative doctrine (`AGENTS.md`, `docs/GOLDEN-RULES.md`,
+  `docs/EXECUTION-PLAN.md`, `docs/ARCHITECTURE.md`, `fleet/CONTRACT.md`,
+  `.board/snapshot.json`);
+* `kb.enterprise_instructions` — the operator's home-relative instruction stack
+  (`~/.claude/*`, the VS Code user prompts, `~/deepseek/{AGENTS,CLAUDE}.md`,
+  `~/cmr/{AGENTS,GOLDEN-RULES}.md`, the key `~/cmr/docs/*.md`, and all 11
+  `~/.copilot/agents/*.agent.md` SME profiles). Each `~` is expanded to a real
+  path by `fleet/brain.py` so a subagent can open it without a shell;
+* `kb.fleet_modules` — the fleet-module pointers, kept last as provenance.
+
+The paths live in `fleet/profiles/brain.profile.json`
+(`kb.enterprise_instructions`) and are expanded in `fleet/brain.py`.
+
 ## Push → wait → completion trigger
 
 The brain never spins a session on a task. It pushes, blocks, and wakes:
