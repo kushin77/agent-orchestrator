@@ -50,6 +50,10 @@ flags:
     stage: "off"
     rollout_pct: 0
     targeted: []
+  services.web:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
   rollout.pipeline:
     stage: "off"
     rollout_pct: 0

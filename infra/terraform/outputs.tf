@@ -14,3 +14,13 @@ output "deployer_service_account" {
   description = "Email of the flag-gated deployer service account; null until deployer_enabled."
   value       = module.deployer.service_account_email
 }
+
+output "web_surface_uri" {
+  description = "URI of the public web surface; null until enable_web."
+  value       = module.web_surface.service_uri
+}
+
+output "web_surface_domain" {
+  description = "Public hostname served by the web surface; null until enable_web."
+  value       = module.web_surface.domain
+}

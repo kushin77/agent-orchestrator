@@ -9,11 +9,12 @@ Every resource is gated by an `enable_*` variable that defaults to `false`
 | File | Purpose |
 |------|---------|
 | `versions.tf` / `providers.tf` | Terraform + Google provider pins (offline-validatable). |
-| `variables.tf` | Root inputs, including the seven `enable_*` service flags + `deployer_enabled`, all default `false`. |
+| `variables.tf` | Root inputs, including the eight `enable_*` service flags + `deployer_enabled`, all default `false`. |
 | `main.tf` | Composes `modules/control-plane-service` once per service and `modules/deployer-sa`. |
 | `outputs.tf` | Gated outputs (`service_uris`, `deployer_service_account`) — null while flags are OFF. |
 | `backend.tf.example` | GCS remote-state template; copy to `backend.tf` at go-live. |
 | `modules/control-plane-service/` | One Cloud Run v2 service, count-gated on `enabled`, internal ingress by default. |
+| `modules/web-surface/` | The public web surface (ai.purebliss.app): Cloud Run v2 with public ingress, DNS + Google-managed TLS — count-gated on `enabled`. |
 | `modules/deployer-sa/` | The flag-gated deployer service account — the only apply identity. |
 
 The promotion state of every service is recorded in
