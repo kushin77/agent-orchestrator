@@ -54,11 +54,13 @@ def test_routed_model_call_is_governed_audited_metered(control):
 
 
 def test_multi_provider_conformance(control):
-    """Same path under DeepSeek / OpenAI / local Ollama / Claude (anthropic)."""
+    """Same path under every provider of the five-agent purebliss team."""
     payload = run_golden_path(control)
     conformance = payload["stages"]["conformance"]
     served = conformance["served"]
-    assert {"deepseek", "openai", "ollama", "anthropic"} <= set(served)
+    # The purebliss team (epic #253): ollama/paperclip/hermes/deepseek/claude,
+    # with claude served by anthropic (plus openai kept for degradation cover).
+    assert {"ollama", "paperclip", "hermes", "deepseek", "anthropic"} <= set(served)
     for entry in conformance["providers"]:
         assert entry["served"] is True
         assert entry["policy_decision"] == "log"
