@@ -15,6 +15,10 @@ rung a real process:
 * it turns each order into a brain-signed directive for the sister, deriving the
   FinOps block from the order (and refusing a tier/thinking outside the
   contract's allowlist);
+* it routes the order by the capability the work needs, through the routing
+  policy that consumes the vendored orchestration contract (ADR-0012; #300,
+  #301) — the brain keeps no second copy of that vocabulary, so dispatch and the
+  declared contract cannot drift apart;
 * it answers the operator in `.fleet/brain/outbox` — an `ack` naming the
   directive it issued, or a `result` reporting a refusal with the exact reason;
 * it publishes `.fleet/brain.heartbeat.json` so `status`/`health` can tell a
@@ -58,6 +62,7 @@ sys.path.insert(0, str(ROOT / "fleet"))
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
 import channel  # noqa: E402
+import routing  # noqa: E402
 import singleton  # noqa: E402
 
 FLEET_DIR = ROOT / ".fleet"
@@ -110,17 +115,50 @@ def load_profile(path: Path | None = None) -> dict:
 
 PROFILE = load_profile()
 
+# Capability routing is a CONSUMPTION of the vendored orchestration contract
+# (ADR-0012; #300, #301), not a dialect grown here: the vocabulary lives in
+# `fleet/profiles/routing.policy.json` and `fleet/routing.py` is its only reader.
+# The brain consults that module and keeps NO second copy of the mapping — the
+# floors and defaults below are DERIVED from it, and the profile's own
+# declaration is checked against the policy, so the doctrine and the machine
+# cannot drift apart (the parity idiom the registry uses for its catalog and
+# schema). A disagreement refuses the start rather than routing on a half-loaded
+# contract, the same posture as `load_profile`.
+try:
+    ROUTING = routing.load()
+except routing.RoutingRefusal as exc:
+    raise SystemExit(f"[brain] REFUSED — cannot load the routing policy: {exc}")
+
 # The FinOps floor the brain enforces when it dispatches. Security, secrets,
-# auth and production-IaC work never drops below the high floor (fleet doctrine),
-# so a lane whose name says so is escalated rather than accepted at flash/none.
-# Vocabulary comes from the profile, not from this file, so the doctrine and the
-# machine cannot drift apart.
-HIGH_FLOOR_LANES = tuple(PROFILE["finops"]["high_floor_lanes"])
+# auth, identity and production-IaC work never drops below the high floor (fleet
+# doctrine), so a lane whose name says so is escalated rather than accepted at
+# flash/none. The vocabulary is the routing policy's, not this file's.
+HIGH_FLOOR_LANES = ROUTING.high_floor_tokens
 DEFAULT_TIER = PROFILE["finops"]["default_tier"]
 DEFAULT_THINKING = PROFILE["finops"]["default_thinking"]
 HIGH_TIER = PROFILE["finops"]["high_floor_tier"]
 HIGH_THINKING = PROFILE["finops"]["high_floor_thinking"]
 CONTROLS = tuple(PROFILE["controls"])
+
+# One contract, two declarations: the profile states the doctrine, the routing
+# policy carries it into the machine. Drift between them is a refusal.
+_PROFILE_FLOORS = tuple(PROFILE["finops"]["high_floor_lanes"])
+_PROFILE_FLOOR_BLOCK = (HIGH_TIER, HIGH_THINKING)
+if HIGH_FLOOR_LANES != _PROFILE_FLOORS:
+    raise SystemExit(
+        f"[brain] REFUSED — the routing policy floors on {HIGH_FLOOR_LANES} but "
+        f"{PROFILE_PATH} declares {_PROFILE_FLOORS}: one of the two is stale"
+    )
+if (DEFAULT_TIER, DEFAULT_THINKING) != ROUTING.default_block:
+    raise SystemExit(
+        f"[brain] REFUSED — the routing policy's default block {ROUTING.default_block} disagrees "
+        f"with {PROFILE_PATH}'s ({DEFAULT_TIER}/{DEFAULT_THINKING})"
+    )
+if _PROFILE_FLOOR_BLOCK != ROUTING.high_floor_block:
+    raise SystemExit(
+        f"[brain] REFUSED — the routing policy's high floor {ROUTING.high_floor_block} disagrees "
+        f"with {PROFILE_PATH}'s {_PROFILE_FLOOR_BLOCK}"
+    )
 
 
 def kb_sources(profile: dict) -> tuple[str, ...]:
@@ -239,20 +277,53 @@ def needs_high_floor(order: dict) -> bool:
     task = order.get("task") or {}
     lane = str(task.get("lane") or "").lower()
     title = str(task.get("title") or "").lower()
-    return any(word in lane or word in title for word in HIGH_FLOOR_LANES)
+    return ROUTING.needs_high_floor(lane, title)
+
+
+def order_risk(order: dict) -> str:
+    """The risk level of an order, decided by the policy's floor rule."""
+    return routing.HIGH if needs_high_floor(order) else routing.NORMAL
 
 
 def choose_model(order: dict) -> tuple[str, str]:
-    """Derive the FinOps block: an operator may raise the tier, never lower the floor."""
+    """The FinOps block for an order: capability-routed, then floored by risk.
+
+    The base block is the policy's answer for the capability the work needs —
+    resolved through the registry persona that owns that capability — and the
+    operator's own `model` block may raise either value. The risk floor is applied
+    last, so it can never be lowered (escalation is a floor, never a ceiling,
+    ADR-0012 decision (b)). A capability claim the registry cannot back raises
+    `RoutingRefusal`, which `handle_order` reports by name instead of dispatching
+    on a default.
+    """
+    task = order.get("task") or {}
     model = order.get("model") or {}
-    tier = model.get("tier") or DEFAULT_TIER
-    thinking = model.get("thinking") or DEFAULT_THINKING
-    if needs_high_floor(order):
-        if channel.MODEL_TIERS.index(tier) < channel.MODEL_TIERS.index(HIGH_TIER):
-            tier = HIGH_TIER
-        if channel.THINKING_LEVELS.index(thinking) < channel.THINKING_LEVELS.index(HIGH_THINKING):
-            thinking = HIGH_THINKING
+    risk = order_risk(order)
+    tier, thinking = ROUTING.tier_for(ROUTING.capability_for(task), risk)
+    tier = str(model.get("tier") or tier)
+    thinking = str(model.get("thinking") or thinking)
+    if risk == routing.HIGH:
+        tier, thinking = ROUTING.floor(tier, thinking)
     return tier, thinking
+
+
+def routing_summary(order: dict) -> str:
+    """The routing decision, as one directive-body line.
+
+    ADR-0012 decision (b): dispatch is capability-routed from the registry
+    personas that are actually dispatched. The directive therefore names the
+    persona the work resolves to and the registry card that backed it, so the
+    subagent sees the decision rather than inferring it. A task whose lane and
+    title claim no capability says exactly that instead of inventing one.
+    """
+    decision = ROUTING.route(order.get("task") or {})
+    if decision["capability"] is None:
+        return "Routing: the lane/title claims no capability — the declared default FinOps block applies"
+    return (
+        f"Routing: capability={decision['capability']} → persona={decision['persona']} "
+        f"(registry card {decision['card']}) → {decision['tier']}/{decision['thinking']} "
+        f"(risk {decision['risk']})"
+    )
 
 
 def order_reference(order: dict) -> str:
@@ -325,6 +396,7 @@ def build_directive(order: dict) -> dict:
         "body": (
             f"Operator order {order_reference(order)}:\n{body}\n\n"
             f"Brain doctrine: {PROFILE['mission']}\n"
+            f"{routing_summary(order)}\n"
             f"Read first (fleet KB):\n{kb}\n"
             f"Return: {PROFILE['templates']['report']}"
         ),
@@ -557,7 +629,12 @@ def handle_order(order: dict) -> tuple[bool, str]:
             "dispatches work only for a real issue; nothing was sent to the sister"
         )
 
-    ok, message = dispatch(order)
+    try:
+        ok, message = dispatch(order)
+    except routing.RoutingRefusal as exc:
+        # A routing refusal is a refusal, not a crash: the policy could not back
+        # the capability the order claims, so nothing is dispatched (ADR-0012).
+        return False, f"dispatch refused for #{issue}: {exc}"
     if not ok:
         if message.startswith(DUPLICATE_SUPPRESSED):
             # Not a failure: the directive is already out. Consuming the order (the
