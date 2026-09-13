@@ -35,6 +35,12 @@ CHANNEL = str(ROOT / "fleet" / "channel.py")
 ISOLATION_CLI = str(ROOT / "governance" / "isolation" / "cli.py")
 #: The institutional close-out: drives every artifact of a finished item to terminal.
 LIFECYCLE_CLI = str(ROOT / "governance" / "lifecycle" / "cli.py")
+#: Session reconciliation (#304): a per-lane heartbeat, so a lane whose agent died
+#: is visible as a dead lane rather than as work in progress.
+sys.path.insert(0, str(ROOT))
+from governance.reconcile.heartbeat import DEFAULT_BEAT_SECONDS, Beater as SessionBeater  # noqa: E402
+
+SESSION_BEAT_SECONDS = DEFAULT_BEAT_SECONDS
 
 
 def extract_json(text: str) -> dict:
@@ -145,6 +151,42 @@ def build_command(
     return shlex.split(runner) + [build_prompt(directive, agent_id, worktree, env)]
 
 
+def start_session_beat(env: dict | None, pid: int) -> object | None:
+    """Beat a per-session heartbeat for the lane this dispatch owns (#304).
+
+    The pid recorded is the **subagent's**, not this loop's: a lane has to go
+    stale when *its* process dies, and the loop outlives every lane it dispatches,
+    so a loop pid would keep every orphan looking alive forever.
+    """
+    session_id = (env or {}).get("AO_SESSION_ID", "")
+    if not session_id:
+        return None
+    try:
+        return SessionBeater(
+            session_id=session_id,
+            issue=int((env or {}).get("AO_ISSUE") or 0),
+            agent=(env or {}).get("AO_AGENT_ID", ""),
+            root=ROOT,
+            lane=(env or {}).get("AO_LANE", ""),
+            worktree=(env or {}).get("AO_WORKTREE", ""),
+            branch=(env or {}).get("AO_BRANCH", ""),
+            pid=pid,
+            interval=SESSION_BEAT_SECONDS,
+        ).start()
+    except (OSError, ValueError) as exc:
+        print(f"[terminal] session heartbeat not started for {session_id}: {exc}", file=sys.stderr, flush=True)
+        return None
+
+
+def stop_session_beat(beater: object | None) -> None:
+    """Stop beating and remove the heartbeat: a clean exit is not an orphan."""
+    if beater is not None:
+        try:
+            beater.stop()  # type: ignore[attr-defined]
+        except (OSError, ValueError):
+            pass
+
+
 def run_once(
     directive: dict,
     runner: str,
@@ -178,6 +220,7 @@ def run_once(
     except OSError as exc:
         return 127, f"runner could not start in {cwd}: {exc}"
     IN_FLIGHT["child"] = child
+    beater = start_session_beat(env, child.pid)
     try:
         output, _ = child.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -185,6 +228,7 @@ def run_once(
         output, _ = child.communicate()
         return 124, f"runner timed out after {timeout}s: {(output or '')[-400:]}"
     finally:
+        stop_session_beat(beater)
         IN_FLIGHT["child"] = None
     return child.returncode, output or ""
 

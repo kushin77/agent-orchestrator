@@ -310,6 +310,22 @@ def test_install_replaces_an_existing_line_and_keeps_others(monkeypatch):
     assert [entry for entry in written if entry.endswith("# ao-fleet-prune")] == [cron.prune_line()]
 
 
+def test_the_install_owns_the_reconcile_worker_line_too():
+    """The orphan sweep is automated by cron (issue #304), on the watchdog's cadence.
+
+    It is a marked line of its own rather than a step inside the watchdog's pass:
+    a sweep acts on real lanes, and the watchdog's own tests must never be able to
+    reclaim a live worktree as a side effect of a pass.
+    """
+    entries = cron.install_lines([], 2)
+    reconcile = [entry for entry in entries if entry.endswith(f"# {cron.RECONCILE_MARKER}")]
+    assert len(reconcile) == 1
+    assert "governance/reconcile/cli.py" in reconcile[0]
+    assert "watch --once --apply" in reconcile[0]
+    assert reconcile[0].startswith("*/2 * * * *")
+    assert cron.RECONCILE_MARKER in cron.MARKERS
+
+
 def test_uninstall_removes_only_the_fleet_line(monkeypatch):
     state = {"written": None}
     monkeypatch.setattr(cron, "read_crontab", lambda: [

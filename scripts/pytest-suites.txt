@@ -69,4 +69,5 @@ governance/remediation
 governance/board
 governance/isolation
 governance/lifecycle
+governance/reconcile
 scripts

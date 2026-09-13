@@ -56,6 +56,8 @@ governance/board/violations.jsonl
 .fleet/lanes/
 # Lifecycle journals: durable per-item evidence of what was verified and merged
 .fleet/lifecycle/
+# Session heartbeats: one per running lane, swept by governance/reconcile (#304)
+.fleet/sessions/
 # Fleet monitor runtime output (tracked module: fleet/monitor.py)
 .fleet/open-eye.log
 .fleet/open-eye.heartbeat

@@ -133,6 +133,21 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     `governance/lifecycle/baseline.json`, honoured only while the issue tracking
     it is open: the quarantine shrinks as legacy closes, and a new item failing
     the same invariant fails immediately.
+17. **Orphan reconciliation (institutional, issue #304).** A session records a
+    **heartbeat** in `.fleet/sessions/<session_id>.json` while it runs, refreshed
+    on an interval. A session whose beat passes the TTL (15 minutes) is orphaned;
+    one whose process is gone while the beat is fresh is reported as *suspect*,
+    never reclaimed on absence alone. `governance/reconcile/` sweeps orphans and
+    reconciles each in one of three ways, decided by **where its work lives**:
+    *reclaimed* (landed on `master` — worktree removed, branch deleted, claim
+    released), *parked* (preserved only on a remote branch, which is kept), or
+    **shelved** — an orphan whose work exists nowhere else keeps its worktree, its
+    branch and its claim. The worker never trades **unmerged** work for an
+    unlocked issue: that lane is reported on every pass until someone resolves
+    it, and reclaimed automatically once its work lands. `sweep` is the pass and
+    `watch` is the worker; cron owns the schedule (code-native automation — no
+    workflow files). `scripts/check-reconcile.sh` (in `make verify`) proves every
+    outcome against a real repository, the refusal included.
 
 ## Directory layout (pillar-aligned)
 
