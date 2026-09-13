@@ -697,6 +697,24 @@ def cmd_wait(args: argparse.Namespace) -> int:
         time.sleep(nap)
 
 
+def ordered_by_time(directory: Path) -> list[Path]:
+    """Messages in the order they were sent, not in uuid order.
+
+    Ids are uuid4, so a filename sort is arbitrary: measured, the sister took a
+    `resume` before the `pause` it was meant to lift and the fetched order changed
+    run to run. The envelope's `ts` is the only ordering the transport has.
+    """
+
+    def sent_at(path: Path) -> tuple[str, str]:
+        try:
+            message = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return ("", path.name)
+        return (str(message.get("ts") or ""), path.name)
+
+    return sorted(directory.glob("*.json"), key=sent_at)
+
+
 def cmd_watch(args: argparse.Namespace) -> int:
     """Sister side listener: return the oldest pending directive, or block for one.
 
@@ -709,7 +727,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
     INBOX.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
     while True:
-        pending = sorted(INBOX.glob("*.json"))
+        pending = ordered_by_time(INBOX)
         if pending:
             try:
                 message = json.loads(pending[0].read_text(encoding="utf-8"))

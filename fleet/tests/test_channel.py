@@ -333,6 +333,32 @@ def test_report_writes_a_valid_outbox_message(tmp_path, monkeypatch):
     assert data["correlation_id"] == "d-1"
 
 
+def test_the_queue_is_ordered_by_time_not_by_uuid(tmp_path, monkeypatch):
+    """Ids are uuid4: a filename sort takes a `resume` before the `pause` it lifts."""
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    channel.INBOX.mkdir(parents=True, exist_ok=True)
+    # Deliberately adversarial names: the later message sorts first alphabetically.
+    for name, stamp, control in (
+        ("zzz-early", "2026-09-13T10:00:00Z", "pause"),
+        ("aaa-late", "2026-09-13T11:00:00Z", "resume"),
+    ):
+        (channel.INBOX / f"{name}.json").write_text(
+            json.dumps(
+                {
+                    "from": "brain",
+                    "to": "sister",
+                    "type": "directive",
+                    "id": name,
+                    "ts": stamp,
+                    "control": control,
+                }
+            ),
+            encoding="utf-8",
+        )
+    order = [json.loads(p.read_text(encoding="utf-8"))["control"] for p in channel.ordered_by_time(channel.INBOX)]
+    assert order == ["pause", "resume"], "the transport must honour ts, not filename"
+
+
 def test_watch_returns_the_oldest_pending_directive(tmp_path, monkeypatch):
     monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
     channel.INBOX.mkdir(parents=True, exist_ok=True)
