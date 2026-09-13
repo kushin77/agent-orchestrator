@@ -1,0 +1,71 @@
+# CMR class / pattern / template conformance policy (issue #140)
+#
+# The quality ladder every piece of repository work is classified against, and the
+# metadata each class must declare for that claim to be credible.
+#
+# Calibration note: the `required` sets below were fixed against measured board
+# state on 2026-09-13 (113 issues; 20 open + milestoned). All 20 milestoned issues
+# already declare class/type/priority/area, so enforcing those is green today and
+# binds new work. The `expectations` sets are partial in the existing board
+# (pillar 10/20, gdc 15/20), so they are reported as deviations with remediation
+# rather than failing the gate — enforcing a standard the current board violates
+# would make the gate red for reasons no lane can fix by working its own issue.
+
+schema: cmr.conformance/policy-v1
+
+# The ladder, lowest rung first. A declared class must be one of these.
+ladder:
+  - template
+  - class
+  - pattern
+  - enterprise
+  - faang
+  - elite
+
+# Applies across every rung: infrastructure is declared, never clicked, and new
+# infrastructure ships flag-gated OFF.
+mandates:
+  iac:
+    id: iac
+    description: >-
+      Infrastructure is declared in Terraform or Cloud Build; new infrastructure
+      ships disabled. A change that adds infrastructure without a flag or a
+      declared-off posture does not conform at any class.
+    infra_paths:
+      - infra/
+      - .github/workflows/
+    required_marker: flag
+
+# Classification metadata every in-scope issue must declare, at every rung.
+required:
+  - class
+  - type
+  - priority
+  - area
+
+# Per-rung additional expectations. Reported as deviations (warning) so they are
+# visible and assignable without wedging the gate; escalated to errors by
+# `--strict`, which is how a milestone that has caught up is meant to be checked.
+expectations:
+  enterprise:
+    - gdc
+  elite:
+    - gdc
+    - pillar
+
+# Labels that carry a value in `name:value` form.
+prefixed:
+  - class
+  - type
+  - priority
+  - area
+  - pillar
+  - gdc
+  - phase
+  - source
+
+# The rungs at which an issue must also cite the CMR standards it maps to. Kept
+# informational: the offline board snapshot carries labels, not bodies.
+standards_citation:
+  - faang
+  - elite
