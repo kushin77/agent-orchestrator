@@ -43,10 +43,15 @@ OUTBOX = ROOT / ".fleet" / "outbox"
 DONE = ROOT / ".fleet" / "done"
 SLOG = ROOT / ".fleet" / "slog.jsonl"
 
+# The FinOps vocabulary is harvested, not invented (issue #164) and is declared
+# once in governance/finops/policy.json: tiers from capital-underwriting
+# config/leaderboard/tier-policy.json, thinking effort from leaderboard
+# lib/fleet-roster.sh role_effort(). scripts/check-finops-chooser.sh fails if
+# these constants, the message schema and the policy stop agreeing.
 MESSAGE_TYPES = ("directive", "ack", "result", "halt", "escalate")
 SEVERITIES = ("info", "warn", "critical")
-MODEL_TIERS = ("pro", "flash")
-THINKING_LEVELS = ("none", "low", "high")
+MODEL_TIERS = ("flash", "pro", "auditor")
+THINKING_LEVELS = ("none", "low", "medium", "high")
 _ROLE_RE = re.compile(r"^(brain|sister|subagent(-[a-z0-9]+)?)$")
 
 EXIT_OK = 0

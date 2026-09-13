@@ -1,0 +1,78 @@
+{
+  "policy_version": "1.0.0",
+  "harvested_at": "2026-09-13",
+  "description": "FinOps vocabulary and dispatch allowlist for the session fleet (M26, issue #164). The tier and thinking-effort names are harvested verbatim from the mature prior art in kushin77/leaderboard and kushin77/capital-underwriting — no new taxonomy is coined here, and no source file was copied (pattern + vocabulary reuse only, GR-10).",
+  "sources": [
+    {
+      "repo": "kushin77/capital-underwriting",
+      "path": "config/leaderboard/tier-policy.json",
+      "asset": "tier names (tiers{}), tier -> model map, complexity -> tier thresholds",
+      "verdict": "PATTERN",
+      "license": "Proprietary — Copyright (c) 2026 kushin77. All Rights Reserved. PROPRIETARY — INTERNAL USE ONLY"
+    },
+    {
+      "repo": "kushin77/capital-underwriting",
+      "path": "config/leaderboard/route-policy.json",
+      "asset": "route -> model_tier mapping (fast=flash, deep=pro, strict=auditor) and dispatch defaults",
+      "verdict": "PATTERN",
+      "license": "Proprietary — Copyright (c) 2026 kushin77. All Rights Reserved. PROPRIETARY — INTERNAL USE ONLY"
+    },
+    {
+      "repo": "kushin77/leaderboard",
+      "path": "lib/fleet-roster.sh",
+      "asset": "ROLE/TIER/MODEL/TRANSPORT/EFFORT separation; role_effort() giving low|medium|high",
+      "verdict": "PATTERN",
+      "license": "Proprietary — Copyright (c) 2026 kushin77. All Rights Reserved. PROPRIETARY — INTERNAL USE ONLY"
+    },
+    {
+      "repo": "kushin77/leaderboard",
+      "path": "scripts/elite/finops-router.sh",
+      "asset": "cheapest-capable-tier routing, T2=flash / T3=pro+thinking, security escalation",
+      "verdict": "PATTERN",
+      "license": "Proprietary — Copyright (c) 2026 kushin77. All Rights Reserved. PROPRIETARY — INTERNAL USE ONLY"
+    },
+    {
+      "repo": "kushin77/capital-underwriting",
+      "path": "config/leaderboard.config.example",
+      "asset": "the thinking-off state name used by the fleet (DEEPSEEK_THINKING / LB_THINKING_DEEPSEEK = disabled|enabled)",
+      "verdict": "REFERENCE",
+      "license": "Proprietary — Copyright (c) 2026 kushin77. All Rights Reserved. PROPRIETARY — INTERNAL USE ONLY"
+    }
+  ],
+  "vocabulary": {
+    "tiers": ["flash", "pro", "auditor"],
+    "thinking_levels": ["none", "low", "medium", "high"]
+  },
+  "tier_models": {
+    "flash": "deepseek-v4-flash",
+    "pro": "deepseek-v4-pro",
+    "auditor": "deepseek-v4-pro"
+  },
+  "tier_rank": {
+    "flash": 1,
+    "pro": 2,
+    "auditor": 3
+  },
+  "thinking_rank": {
+    "none": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3
+  },
+  "role_allowlist": {
+    "sister": {
+      "tiers": ["flash"],
+      "thinking_levels": ["none"],
+      "note": "The sister is a dumb terminal: DeepSeek v4.1 Flash with thinking off (the DSv4FNone seat). It may not be dispatched higher by anything but a new brain directive."
+    },
+    "subagent": {
+      "tiers": ["flash", "pro", "auditor"],
+      "thinking_levels": ["none", "low", "medium", "high"],
+      "note": "A subagent runs at whatever the brain's directive says, within the harvested tier set. It has no vote."
+    }
+  },
+  "escalation": {
+    "self_choice": "refused",
+    "rule": "A subagent may not choose its own tier or thinking effort, in either direction. The brain's directive is the only source; escalation requires a new brain directive."
+  }
+}

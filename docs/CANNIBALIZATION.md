@@ -296,6 +296,7 @@ its classifier/few-shot/feedback modules are usable without recovery.
 
 ---
 
+
 ## 6. M26 session-fleet harvest (issue #161) — roles, vocabulary, transport
 
 The session fleet operating model (brain → fleet-brain sister → epic-focused
@@ -336,6 +337,46 @@ harvest map refers to are the `scripts/agent/sme/*.txt` files listed above. No
 `capability-registry.json` and `tier-policy.json` / `route-policy.json` belong to
 the #163/#164 lanes. #161 takes the role vocabulary and the transport decision
 only, so two lanes cannot drift apart on the same asset.
+
+
+## 7. M26 FinOps chooser harvest (issue #164) — tier and thinking-effort vocabulary
+
+The FinOps vocabulary the brain directs subagents with is **prior art, not new
+coinage**. Harvested **2026-09-13** from read-only local checkouts of the two
+mature `kushin77` repos. Both are owner-authored and carry the license
+**"Copyright (c) 2026 kushin77. All Rights Reserved. PROPRIETARY — INTERNAL USE
+ONLY"** (`LICENSE` at each repo root) — the same owner as this repo. What is
+reused is therefore the **pattern and the vocabulary**, re-implemented for this
+repo's Python/JSON substrate; no source file was copied, so no `harvested_from`
+code marker applies. The derived artifacts are `governance/finops/policy.json`,
+`governance/finops/chooser.py` (the chooser and its enforcement) and
+`scripts/check-finops-chooser.sh` (the gate).
+
+| Source (repo-relative) | Asset | Verdict | Where it landed |
+|---|---|---|---|
+| `capital-underwriting/config/leaderboard/tier-policy.json` | `tiers{}` → `flash` / `pro` / `auditor`, their model ids (`deepseek-v4-flash` / `deepseek-v4-pro`), timeout and context limits, `complexity_to_tier` thresholds | PATTERN | `governance/finops/policy.json` — the tier names and `tier_models` are adopted verbatim |
+| `capital-underwriting/config/leaderboard/route-policy.json` | route → `model_tier` mapping (`fast`→flash, `deep`→pro, `strict`→auditor) plus `dispatch_defaults` | PATTERN | `governance/finops/policy.json` `tier_rank` (auditor is the escalation tier) and the subagent allowlist |
+| `leaderboard/lib/fleet-roster.sh` | ROLE / TIER / MODEL / TRANSPORT / EFFORT separation, `role_effort()` = `low` / `medium` / `high`, `role_capability_tier()` = deep / balanced / fast, and the rule that nothing else may hardcode a model per role | PATTERN | the thinking-effort names; the chooser derives all four attributes from one directive block instead of letting an executor infer them |
+| `leaderboard/scripts/elite/finops-router.sh` | cheapest-capable-tier routing (T2 = flash, T3 = pro + thinking), with a forced tier treated as a privileged override | PATTERN | refusal of a self-chosen tier: here the only issuer is the brain's directive, so an agent's own request can never be honoured |
+| `capital-underwriting/config/leaderboard.config.example` | the fleet's thinking-off state (`DEEPSEEK_THINKING` / `LB_THINKING_DEEPSEEK` = `enabled` / `disabled`) | REFERENCE | `none` in the vocabulary is that disabled state, which is already this repo's standing-directive value |
+
+**Adopted verbatim (no new coinage).** Tiers `flash | pro | auditor` — exactly
+the `tiers{}` keys above. Thinking effort `low | medium | high` — exactly
+`role_effort()`'s values; plus `none`, the fleet's thinking-off state, which is
+not a coinage either: it is the DSv4FNone seat this repo already states in
+`fleet/directive.json`. The gate pins all four names, so a rename in the policy,
+the message schema, the channel or the docs fails `make verify`.
+
+**Deliberately not harvested here.** `capability-registry.json` and
+`personas.yaml` belong to the #163 dispatcher lane; `LEADERBOARD_PROTOCOL.md`,
+the CTO overlay and the `ELITE_*` charters belong to the #161 / #165 / #166
+lanes. #164 takes the FinOps vocabulary and its enforcement only, so two lanes
+cannot drift apart on the same asset.
+
+**Numbering note.** §6 is the M26 session-transport harvest recorded by the
+issue #161 lane; this section is numbered above it rather than reusing 6, so the
+two lanes cannot collide on a heading.
+
 
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*
