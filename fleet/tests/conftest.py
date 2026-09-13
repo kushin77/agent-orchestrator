@@ -9,22 +9,24 @@ On 2026-09-13 running this suite appended fabricated entries to the repo's real
 `done`, i.e. work that never happened, in the audit log the brain tails and the
 health signal reads. The autouse fixture below redirects every runtime path the
 fleet writes to a per-test tmp directory, so a new test cannot forget to patch
-one; the guard test proves the cover is real.
+one; the guard itself lives in ``test_isolation_guard.py`` — a collected
+module, not this plugin, because a guard test inside ``conftest.py`` is never
+collected (issue #284).
 """
 
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PKG_DIR not in sys.path:
     sys.path.insert(0, PKG_DIR)
-
-import channel  # noqa: E402
 
 # module -> the runtime paths it writes (all redirected for every test)
 RUNTIME_PATHS = {
@@ -55,13 +57,26 @@ RUNTIME_PATHS = {
 }
 
 
+def _import_runtime_modules() -> dict[str, ModuleType]:
+    """Import every module in the cover, instead of hoping a test already did.
+
+    The fixture used to look each module up in ``sys.modules`` and skip it when
+    absent, so a module no test had imported at fixture time stayed
+    un-redirected — ``monitor`` was dead cover for exactly that reason. Importing
+    here makes the module set complete by construction, and
+    ``test_isolation_guard.py`` fails if a key cannot be covered.
+    """
+    return {name: importlib.import_module(name) for name in RUNTIME_PATHS}
+
+
+RUNTIME_MODULES: dict[str, ModuleType] = _import_runtime_modules()
+
+
 @pytest.fixture(autouse=True)
 def isolate_fleet_runtime(tmp_path, monkeypatch):
     """Point every fleet runtime path at a tmp dir for the duration of a test."""
     for module_name, names in RUNTIME_PATHS.items():
-        module = sys.modules.get(module_name)
-        if module is None:
-            continue
+        module = RUNTIME_MODULES[module_name]
         for name in names:
             if hasattr(module, name):
                 monkeypatch.setattr(module, name, tmp_path / module_name / name.lower())
@@ -72,31 +87,11 @@ def isolate_fleet_runtime(tmp_path, monkeypatch):
 
 
 def live_fleet_dir() -> Path:
-    """The real `.fleet/` beside the fleet package — what must stay untouched."""
-    return Path(__file__).resolve().parents[1] / ".fleet"
+    """The real ``.fleet/`` at the repository root — what must stay untouched.
 
-
-def test_a_test_write_lands_in_tmp_and_never_in_the_live_log(tmp_path):
-    """The guard: if the cover regresses, this fails instead of the log lying."""
-    probe = "isolation probe — this must never reach the live slog"
-    channel._slog({"type": "result", "from": "sister", "to": "brain", "body": probe})
-
-    written = Path(channel.SLOG).read_text(encoding="utf-8")
-    assert probe in written, "the probe did not go where the fixture points"
-    assert str(channel.SLOG).startswith(str(tmp_path)), "SLOG is not redirected"
-
-    live = live_fleet_dir() / "slog.jsonl"
-    if live.exists():
-        assert probe not in live.read_text(encoding="utf-8"), (
-            "a test wrote into the live fleet log — the autouse isolation fixture "
-            "is not covering this path"
-        )
-
-
-def test_every_channel_runtime_path_is_redirected(tmp_path):
-    """The cover is only real if each path actually moved out of the repo."""
-    for name in RUNTIME_PATHS["channel"]:
-        value = getattr(channel, name, None)
-        if value is None:
-            continue
-        assert tmp_path in Path(value).parents, f"channel.{name} was not redirected"
+    ``fleet/tests/conftest.py`` sits two directories below the repository root,
+    so ``parents[2]`` is ``<repo>``. The previous ``parents[1]`` resolved to
+    ``<repo>/fleet/.fleet``, a path no runtime path uses, so the leak assertion
+    could never fire (issue #284).
+    """
+    return Path(__file__).resolve().parents[2] / ".fleet"

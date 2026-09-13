@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle knowledge-index knowledge-index-build \
+        issue-claims issue-template pr-contract fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle knowledge-index knowledge-index-build \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -57,6 +57,10 @@ help:
 	@echo "                against the board snapshot + self-control mutants"
 	@echo "  issue-template  Issue-brief contract (#165): the required fields +"
 	@echo "                canonical FinOps vocab; a dropped field is refused"
+
+	@echo "  pr-contract   PR-body + commit-trailer contract (#288): the template,"
+	@echo "                the Refs trailer predicate (proved both directions), and"
+	@echo "                a range mode that requires the trailer on every commit"
 	@echo "  fleet-channel Steering channel (M26 #162): message contract + the"
 	@echo "                DSv4FNone standing directive, all mutants refused"
 
@@ -107,7 +111,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template pr-contract fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -162,6 +166,14 @@ issue-claims:
 ## field present and the FinOps vocabularies canonical; a dropped field fails
 issue-template:
 	@bash scripts/check-issue-template.sh
+
+## pr-contract — PR-body + commit-trailer contract (issue #288): the template
+## declares the body obligations, the trailer predicate is proved in both
+## directions, and every commit ahead of origin/master must carry the
+## `Refs <owner>/<repo>#<n>` trailer. Opt-in (not run by `make verify`) because
+## in-flight lanes predate the rule; run it before merge.
+pr-contract:
+	@bash scripts/check-pr-contract.sh origin/master..HEAD
 
 ## fleet-channel — steering channel (M26, issue #162): the message contract and
 ## the DSv4FNone standing directive; every mutant message must be refused

@@ -37,6 +37,18 @@ def test_a_commit_without_the_ticket_trailer_is_a_violation(lane, repo: Path):
     assert "commit-missing-ticket-trailer" in codes(audit_lane(lane, repo))
 
 
+def test_a_ref_in_the_subject_only_is_not_a_trailer(lane, repo: Path):
+    """A ref woven into the subject is a mention, not a trailer (issue #287)."""
+    commit(lane.worktree, "work.txt", f"{lane.trailer}: fix the thing")
+    assert "commit-missing-ticket-trailer" in codes(audit_lane(lane, repo))
+
+
+def test_a_ref_inside_a_body_sentence_is_not_a_trailer(lane, repo: Path):
+    """A ref quoted mid-paragraph is a mention, not a trailer (issue #287)."""
+    commit(lane.worktree, "work.txt", f"do the work\n\nSee {lane.trailer} for context.")
+    assert "commit-missing-ticket-trailer" in codes(audit_lane(lane, repo))
+
+
 def test_a_commit_with_the_ticket_trailer_is_accepted(lane, repo: Path):
     commit(lane.worktree, "work.txt", "implement something", trailer=lane.trailer)
     assert audit_lane(lane, repo) == []

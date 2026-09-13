@@ -20,6 +20,7 @@ Three properties are checked, and each one is a real failure when broken:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,6 +35,38 @@ from .worktree import (
 
 FIELD = "\x1f"
 RECORD = "\x1e"
+
+#: A git trailer line (``Token: value``, e.g. ``Co-authored-by: …``).
+_TRAILER_LINE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9-]*:\s")
+
+#: The ticket trailer this repo uses — ``Refs <owner>/<repo>#<issue>``. It has
+#: no ``Token: value`` colon, so ``git interpret-trailers`` never classifies it.
+_TRAILER_RE = re.compile(r"^Refs\s+([^\s#]+)#(\d+)$")
+
+
+def trailing_ref(message: str) -> tuple[str, int] | None:
+    """The ``Refs <slug>#<issue>`` line in the message's trailer region, if any.
+
+    Walk up from the end, skipping blank lines and ``Token: value`` trailers
+    (``Co-authored-by: …``); the first content line must BE the ref. A ref woven
+    into a subject line or a body sentence is a mention, not a trailer, and is
+    not in the trailer region (issue #287).
+    """
+    for line in reversed(message.splitlines()):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _TRAILER_LINE_RE.match(stripped):
+            continue
+        match = _TRAILER_RE.match(stripped)
+        return (match.group(1), int(match.group(2))) if match else None
+    return None
+
+
+def commit_carries_trailer(message: str, trailer: str) -> bool:
+    """True when ``trailer`` stands alone in the message's trailer region."""
+    ref = trailing_ref(message)
+    return ref is not None and f"Refs {ref[0]}#{ref[1]}" == trailer
 
 
 @dataclass(frozen=True)
@@ -130,7 +163,11 @@ def audit_lane(identity: SessionIdentity, main: Path | str) -> list[Violation]:
             )
         )
 
-    missing = [sha for sha, message in authored_commits(worktree, identity.author_email) if identity.trailer not in message]
+    missing = [
+        sha
+        for sha, message in authored_commits(worktree, identity.author_email)
+        if not commit_carries_trailer(message, identity.trailer)
+    ]
     if missing:
         shown = ", ".join(sha[:8] for sha in missing[:5])
         problems.append(

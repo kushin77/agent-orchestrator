@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import types
+
 import terminal
 import telemetry
 
@@ -47,10 +50,67 @@ def test_record_run_swallows_a_bad_status_instead_of_crashing_the_loop(tmp_path,
     assert "rejected" in capsys.readouterr().err
 
 
-def test_loop_wires_record_run_into_the_run_path():
-    """The run path must call record_run for both the start and the outcome."""
-    import inspect
+class _NullBeater:
+    """A beater stand-in: the loop only ever calls ``stop()`` on it."""
 
-    source = inspect.getsource(terminal.loop)
-    assert 'record_run(directive_id, issue, agent_id, "started"' in source
-    assert "record_run(directive_id, issue, agent_id, run_status" in source
+    def stop(self) -> None:
+        return None
+
+
+class _FakeSubprocess:
+    """A subprocess stand-in: this test spawns no process at all."""
+
+    def __init__(self, respond):
+        self._respond = respond
+
+    def run(self, argv, **kwargs):
+        return self._respond(argv)
+
+
+def _completed(rc: int, stdout: str = ""):
+    return types.SimpleNamespace(returncode=rc, stdout=stdout, stderr="")
+
+
+def test_loop_records_started_and_a_terminal_record_for_the_run_path(monkeypatch):
+    """Asserted by EFFECT — the records the loop writes, not its source text.
+
+    The old test grepped ``inspect.getsource(terminal.loop)``, so commenting the
+    emission out while keeping its text left it green (issue #286). This drives
+    ``loop`` once against stubs and reads the telemetry back.
+    """
+    directive = {
+        "id": "d286aaaa",
+        "from": "brain",
+        "to": "sister",
+        "type": "directive",
+        "task": {"issue": 286, "lane": "harness"},
+    }
+
+    def respond(argv):
+        if argv[:1] == ["git"]:
+            return _completed(0, "deadbee\n")
+        if "watch" in argv:
+            return _completed(0, json.dumps(directive) + "\n")
+        if "held" in argv:
+            # rc != 0 means "not held" — the loop then executes the directive.
+            return _completed(1, "")
+        return _completed(0, "")
+
+    monkeypatch.setattr(terminal, "subprocess", _FakeSubprocess(respond))
+    monkeypatch.setattr(terminal.singleton, "guard", lambda *args, **kwargs: True)
+    monkeypatch.setattr(terminal, "provision_worktree", lambda *args, **kwargs: None)
+    monkeypatch.setattr(terminal, "run_once", lambda *args, **kwargs: (0, "the work landed"))
+    monkeypatch.setattr(terminal, "closeout_issue", lambda issue: "OK")
+    monkeypatch.setattr(terminal, "start_beating", lambda *args, **kwargs: _NullBeater())
+
+    args = terminal.build_parser().parse_args(["run", "--once"])
+
+    assert terminal.loop(args) == 0
+
+    records = [r for r in telemetry.read_records(telemetry.RUNS_LOG) if r["run_id"] == directive["id"]]
+    assert {record["status"] for record in records} == {"started", "done"}, (
+        "the run path did not emit both a started and a terminal telemetry record"
+    )
+    started = next(record for record in records if record["status"] == "started")
+    assert started["issue"] == "286"
+    assert started["finished_at"] is None

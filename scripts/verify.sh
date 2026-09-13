@@ -42,6 +42,7 @@ checks=(
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'
   'issue-template|bash scripts/check-issue-template.sh'
+  'pr-contract|bash scripts/check-pr-contract.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
   'secrets|bash scripts/check-secrets.sh'
