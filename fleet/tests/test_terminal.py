@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 
 import terminal
 
@@ -101,6 +102,63 @@ def test_claim_issue_reports_the_refusal_verbatim(monkeypatch):
 
 class _Ok:
     returncode = 0
+
+
+def test_held_action_distinguishes_in_flight_from_orphaned():
+    """The regression: an untracked holder read as 'in flight' and the directive
+    was consumed, so the run was recorded nowhere and the claim stayed wedged."""
+    assert terminal.held_action("subagent-abc", "subagent-abc", "live") == "in-flight"
+    assert terminal.held_action("other-agent", "subagent-abc", "live") == "in-flight"
+    assert terminal.held_action("subagent-abc", "subagent-abc", "orphaned") == "self-heal"
+    assert terminal.held_action("other-agent", "subagent-abc", "orphaned") == "orphaned"
+    assert terminal.held_action("other-agent", "subagent-abc", "none") == "orphaned"
+    assert terminal.held_action(None, "subagent-abc", "none") == "orphaned"
+
+
+def test_a_run_marker_is_live_then_orphaned_when_its_loop_dies(tmp_path, monkeypatch):
+    monkeypatch.setattr(terminal, "RUNS", tmp_path / "runs")
+    assert terminal.run_state("d-1") == "none"
+
+    terminal.mark_run("d-1", 142, "subagent-d1")
+    assert terminal.run_state("d-1") == "live", "our own live loop must read as tracked"
+
+    dead = subprocess.Popen(["true"])
+    dead.wait()
+    (terminal.RUNS / "d-2.json").write_text(
+        json.dumps({"issue": 142, "agent": "subagent-d2", "pid": dead.pid}), encoding="utf-8"
+    )
+    assert terminal.run_state("d-2") == "orphaned", "a run whose loop is gone is not in flight"
+
+    terminal.clear_run("d-1")
+    assert terminal.run_state("d-1") == "none"
+
+
+def test_report_once_says_it_once_per_state(tmp_path, monkeypatch):
+    """A pending directive is re-read every cycle; the report must not repeat."""
+    sent = []
+
+    def fake_run(command, **kwargs):
+        sent.append(command)
+        return _Ok()
+
+    monkeypatch.setattr(terminal, "REPORTED", tmp_path / "reported")
+    monkeypatch.setattr(terminal.subprocess, "run", fake_run)
+
+    assert terminal.report_once("d-1", "orphaned:agent-x", "escalate", "body") is True
+    assert terminal.report_once("d-1", "orphaned:agent-x", "escalate", "body") is False
+    assert len(sent) == 1, "the same state must not be reported twice"
+    assert terminal.report_once("d-1", "orphaned:agent-y", "escalate", "body") is True
+    assert len(sent) == 2, "a changed state is news again"
+
+
+def test_clear_reported_lets_a_new_cycle_speak(tmp_path, monkeypatch):
+    sent = []
+    monkeypatch.setattr(terminal, "REPORTED", tmp_path / "reported")
+    monkeypatch.setattr(terminal.subprocess, "run", lambda command, **kwargs: (sent.append(command), _Ok())[1])
+    terminal.report_once("d-1", "in-flight:agent-x", "result", "body")
+    terminal.clear_reported("d-1")
+    terminal.report_once("d-1", "in-flight:agent-x", "result", "body")
+    assert len(sent) == 2
 
 
 def test_stop_and_release_frees_the_in_flight_claim(monkeypatch):
