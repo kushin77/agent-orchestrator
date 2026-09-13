@@ -19,6 +19,7 @@ stopping it:
     python3 fleet/control.py debug      # full non-destructive state dump
     python3 fleet/control.py watch      # idle-watch the slog (same as listen)
     python3 fleet/control.py health     # tri-state signal: 0 healthy/1 degraded/2 failing
+    python3 fleet/control.py cron <sub> # fleet cron job → python3 fleet/cron.py install|status|run|respawn|disable|enable|uninstall
 
 Roles (see fleet/profiles/brain.md and fleet/directive.json): the sister is a
 DUMB terminal (DeepSeek v4.1 Flash, no thinking); the brain is DSv4PM with human
@@ -272,6 +273,14 @@ def cmd_health(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_cron(args: argparse.Namespace) -> int:
+    """Passthrough to the fleet cron manager (install/status/run/respawn/disable/enable/uninstall)."""
+    return subprocess.call(
+        ["python3", str(ROOT / "fleet" / "cron.py"), *args.cron_args],
+        cwd=ROOT,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-control", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -291,6 +300,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("debug", cmd_debug),
         ("watch", cmd_watch),
         ("health", cmd_health),
+        ("cron", cmd_cron),
     ):
         sub.add_parser(name, help=f"control.{name}").set_defaults(func=func)
     debug = sub.choices["debug"]
@@ -301,6 +311,8 @@ def build_parser() -> argparse.ArgumentParser:
     override.add_argument("--body", default=None)
     health = sub.choices["health"]
     health.add_argument("--stale-minutes", type=float, default=30.0)
+    cron = sub.choices["cron"]
+    cron.add_argument("cron_args", nargs=argparse.REMAINDER, help="passed through to fleet/cron.py")
     return parser
 
 
