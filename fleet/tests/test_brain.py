@@ -242,3 +242,19 @@ def test_the_brain_writes_a_heartbeat(tmp_path, monkeypatch):
     brain.write_heartbeat("idle", started_at="2026-09-13T00:00:00Z", commit="abc1234")
     entry = json.loads(Path(brain.HEARTBEAT).read_text(encoding="utf-8"))
     assert entry["state"] == "idle" and entry["commit"] == "abc1234" and entry["pid"] > 0
+
+
+def test_the_directive_carries_the_enterprise_instruction_stack():
+    """A subagent gets the SAME enterprise instruction stack as the operator's
+    top-level agent — the DeepSeek module, the CMR module, and the module files."""
+    enterprise = brain.PROFILE["kb"]["enterprise_instructions"]
+    assert "~/cmr/AGENTS.md" in enterprise
+    assert "~/deepseek/AGENTS.md" in enterprise
+
+    directive = brain.build_directive(order())
+    body = directive["body"]
+    # every `~`-prefixed path is expanded to a real, loadable path in the directive
+    for source in enterprise:
+        assert str(Path(source).expanduser()) in body
+    assert str(Path("~/cmr/AGENTS.md").expanduser()) in body
+    assert str(Path("~/deepseek/AGENTS.md").expanduser()) in body

@@ -85,7 +85,26 @@ DEFAULT_THINKING = PROFILE["finops"]["default_thinking"]
 HIGH_TIER = PROFILE["finops"]["high_floor_tier"]
 HIGH_THINKING = PROFILE["finops"]["high_floor_thinking"]
 CONTROLS = tuple(PROFILE["controls"])
-KB_SOURCES = tuple(PROFILE["kb"]["fleet_modules"])
+
+
+def kb_sources(profile: dict) -> tuple[str, ...]:
+    """The KB list a directive hands to the subagent.
+
+    ``own_repo`` paths are repo-relative (loadable from the worktree root);
+    ``enterprise_instructions`` carry the operator's own instruction stack
+    (home-relative, ``~``-prefixed) and are expanded here to real, openable
+    paths; ``fleet_modules`` pointers are kept last as provenance (descriptive,
+    not file paths).
+    """
+    kb = profile["kb"]
+    sources = list(kb.get("own_repo") or [])
+    for source in kb.get("enterprise_instructions") or []:
+        sources.append(str(Path(source).expanduser()))
+    sources.extend(kb.get("fleet_modules") or [])
+    return tuple(sources)
+
+
+KB_SOURCES = kb_sources(PROFILE)
 
 # Order kinds that are not work: the operator may ask the brain to report or to
 # ping instead of dispatching an issue (the vocabulary lives in the channel).
