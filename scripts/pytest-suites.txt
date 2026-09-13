@@ -65,3 +65,4 @@ e2e
 governance/sync
 infra/rollout
 governance/lessons
+scripts
