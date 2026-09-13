@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 
 import terminal
 
@@ -159,6 +160,36 @@ def test_clear_reported_lets_a_new_cycle_speak(tmp_path, monkeypatch):
     terminal.clear_reported("d-1")
     terminal.report_once("d-1", "in-flight:agent-x", "result", "body")
     assert len(sent) == 2
+
+
+def test_a_run_keeps_its_beat_fresh_while_the_child_works(tmp_path, monkeypatch):
+    """A long run must not look like a dead loop — the misread cost two restarts."""
+    monkeypatch.setattr(terminal, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {"child": None, "issue": 142, "agent_id": "subagent-x", "directive": "d"})
+
+    stop = terminal.start_beating("2026-09-13T00:00:00Z", "abc1234", 142, "subagent-x", interval=0.05)
+    time.sleep(0.2)
+    beat = json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))
+    first_ts = beat["ts"]
+    assert beat["state"] == "working:#142" and beat["issue"] == 142 and beat["agent"] == "subagent-x"
+
+    time.sleep(0.2)
+    assert json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))["ts"] >= first_ts
+    stop.set()
+    time.sleep(0.15)
+    after_stop = json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))["ts"]
+    time.sleep(0.2)
+    assert json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))["ts"] == after_stop, "the beat must stop"
+
+
+def test_the_heartbeat_can_name_the_child_process(tmp_path, monkeypatch):
+    monkeypatch.setattr(terminal, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    terminal.write_heartbeat(
+        "working:#142", started_at="2026-09-13T00:00:00Z", commit="abc1234",
+        issue=142, agent="subagent-x", child_pid=4242,
+    )
+    beat = json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))
+    assert beat["child_pid"] == 4242 and beat["issue"] == 142
 
 
 def test_stop_and_release_frees_the_in_flight_claim(monkeypatch):

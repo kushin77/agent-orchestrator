@@ -20,6 +20,7 @@ import shlex
 import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -373,6 +374,9 @@ def clear_reported(directive_id: str) -> None:
 # cursor and the process. `control.py` sends them; this decides what they mean.
 PAUSED = ROOT / ".fleet" / "paused"
 STOPPING = ROOT / ".fleet" / "stopping"
+# How often a run refreshes its beat. Short enough that a stuck run still looks
+# alive, long enough that the file is not rewritten constantly.
+HEARTBEAT_INTERVAL_SECONDS = 15.0
 
 
 def paused() -> bool:
@@ -426,11 +430,23 @@ def apply_control(action: str, directive: dict, agent_id: str) -> str:
     return "continue"
 
 
-def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
+def write_heartbeat(
+    state: str,
+    *,
+    started_at: str,
+    commit: str,
+    issue: int | None = None,
+    agent: str | None = None,
+    child_pid: int | None = None,
+) -> None:
     """Publish liveness *and* the commit this process is running.
 
     A loop left running stale code made a healthy fleet look broken: the status
-    surface could not tell "not running" from "running the pre-fix build".
+    surface could not tell "not running" from "running the pre-fix build". A long
+    run made it look broken too — the beat was written only *before* the child
+    started, so `state: working` with a stale timestamp read as a dead loop. The
+    run's identity and child pid are part of the beat now, and the run beats
+    itself (see `start_beating`).
     """
     entry = {
         "pid": os.getpid(),
@@ -439,10 +455,47 @@ def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
         "commit": commit,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    if issue is not None:
+        entry["issue"] = issue
+    if agent is not None:
+        entry["agent"] = agent
+    if child_pid is not None:
+        entry["child_pid"] = child_pid
     HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
     tmp = HEARTBEAT.with_suffix(".tmp")
     tmp.write_text(json.dumps(entry) + "\n", encoding="utf-8")
     tmp.replace(HEARTBEAT)
+
+
+def start_beating(
+    started_at: str,
+    commit: str,
+    issue: int,
+    agent_id: str,
+    interval: float = HEARTBEAT_INTERVAL_SECONDS,
+) -> threading.Event:
+    """Keep the beat fresh while a child runs; returns the stop event.
+
+    Without this a run of any length is indistinguishable from a dead loop, which
+    is the misread that made two operators (and one brain) restart a healthy
+    fleet. Daemon thread: it can never hold the process open.
+    """
+    stop = threading.Event()
+
+    def beat() -> None:
+        while not stop.wait(interval):
+            child = IN_FLIGHT.get("child")
+            write_heartbeat(
+                f"working:#{issue}",
+                started_at=started_at,
+                commit=commit,
+                issue=issue,
+                agent=agent_id,
+                child_pid=getattr(child, "pid", None),
+            )
+
+    threading.Thread(target=beat, name="fleet-heartbeat", daemon=True).start()
+    return stop
 
 
 def loop(args: argparse.Namespace) -> int:
@@ -687,8 +740,9 @@ def loop(args: argparse.Namespace) -> int:
                 continue
 
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
-        write_heartbeat("working", started_at=started_at, commit=commit)
+        write_heartbeat("working", started_at=started_at, commit=commit, issue=issue, agent=agent_id)
         mark_run(directive_id, issue, agent_id)
+        beat_stop = start_beating(started_at, commit, issue, agent_id)
         lane = (directive.get("task") or {}).get("lane") or ""
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
@@ -714,6 +768,7 @@ def loop(args: argparse.Namespace) -> int:
         try:
             rc, output = run_once(directive, args.runner, args.timeout, args.dry_run, agent_id, worktree)
         finally:
+            beat_stop.set()
             IN_FLIGHT["issue"] = None
             IN_FLIGHT["agent_id"] = None
             IN_FLIGHT["directive"] = None
