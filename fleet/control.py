@@ -31,6 +31,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -81,6 +83,34 @@ def cmd_update(args: argparse.Namespace) -> int:
     return 0
 
 
+def _loop_pid() -> int | None:
+    """The sister loop's pid, from its heartbeat — the handle for out-of-band signals.
+
+    Process levers cannot travel by mailbox alone: the loop is blocked in the
+    child run while a task is in flight, so a control message would sit unread
+    until the task ends. Signals are how a caller takes effect immediately.
+    """
+    beat = ROOT / ".fleet" / "sister.heartbeat.json"
+    try:
+        return int(json.loads(beat.read_text(encoding="utf-8")).get("pid"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def _signal_loop(signum: int, label: str) -> None:
+    """Signal the loop after logging the order in the channel (audit trail)."""
+    pid = _loop_pid()
+    if pid is None:
+        print(f"  no loop heartbeat — nothing to {label}; the fleet is not running")
+        return
+    try:
+        os.kill(pid, signum)
+    except OSError as exc:
+        print(f"  cannot {label} pid {pid}: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"  {label}: signalled pid {pid} — the loop releases its claim and escalates")
+
+
 def cmd_poke(args: argparse.Namespace) -> int:
     _send_control("poke")
     print("poke sent — the sister will ack on its next poll")
@@ -111,10 +141,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     print("== status: rungs, flags, runs ==")
     _run(["python3", CHANNEL, "status"], check=False)
     fleet = ROOT / ".fleet"
-    for flag, label in (("paused", "PAUSED"), ("stopping", "STOPPING")):
-        print(f"  {label if (fleet / flag).exists() else label.lower() + ' off'}")
+    for flag in ("paused", "stopping"):
+        print(f"  {flag}: {'yes' if (fleet / flag).exists() else 'no'}")
     runs = sorted(p.name for p in (fleet / "runs").glob("*.json")) if (fleet / "runs").exists() else []
     print(f"  tracked runs: {', '.join(runs) if runs else 'none'}")
+    pid = _loop_pid()
+    print(f"  loop pid (from heartbeat): {pid if pid else 'none'}")
     return 0
 
 
@@ -131,21 +163,36 @@ def cmd_resume(args: argparse.Namespace) -> int:
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
+    """Graceful: the loop exits *between* runs, so the task in flight survives."""
     _send_control("stop")
-    print("stop sent — the loop exits after the current run (never mid-run)")
+    print("stop sent — the loop exits after the current run finishes (never mid-run)")
     return 0
 
 
 def cmd_kill(args: argparse.Namespace) -> int:
+    """Immediate: signal the loop; its handler releases the run's claim and escalates."""
     _send_control("kill")
-    print("kill sent — the loop terminates the run, releases its claim and escalates")
+    print("kill sent — taking the loop down now")
+    _signal_loop(signal.SIGTERM, "kill")
     return 0
 
 
 def cmd_restart(args: argparse.Namespace) -> int:
-    _send_control("restart")
-    print("restart sent — the loop re-execs the same code (no pull; use `refresh` for that)")
-    return 0
+    """Re-exec the same code: signal, wait for the release, relaunch."""
+    pid = _loop_pid()
+    if pid is None:
+        print("no loop heartbeat — starting instead")
+        return cmd_start(args)
+    print(f"restart requested — signalling pid {pid}")
+    _signal_loop(signal.SIGTERM, "restart")
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            break
+        time.sleep(0.5)
+    return cmd_start(args)
 
 
 def cmd_override(args: argparse.Namespace) -> int:
