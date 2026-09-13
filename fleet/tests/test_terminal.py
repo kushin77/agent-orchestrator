@@ -40,3 +40,17 @@ def test_run_once_dry_run_prints_and_returns_zero():
     rc, output = terminal.run_once(directive, "claude -p", 10.0, dry_run=True)
     assert rc == 0
     assert "DRY-RUN" in output
+
+
+def test_directive_issue_rejects_missing_or_invalid_issue():
+    assert terminal.directive_issue({"id": "d-1", "task": {}}) is None
+    assert terminal.directive_issue({"id": "d-1"}) is None
+    assert terminal.directive_issue({"id": "d-1", "task": {"issue": 0}}) is None
+    assert terminal.directive_issue({"id": "d-1", "task": {"issue": 163}}) == 163
+
+
+def test_looks_refused_detects_a_stopped_subagent():
+    assert terminal.looks_refused("Claim REFUSED: already-claimed") is True
+    assert terminal.looks_refused("no work done — stopping") is True
+    assert terminal.looks_refused("no real issue number") is True
+    assert terminal.looks_refused("merged PR #163; verify PASS") is False
