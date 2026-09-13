@@ -44,6 +44,7 @@ RUNTIME_PATHS = {
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "WORKTREE_ROOT"),
     "brain": ("HEARTBEAT",),
     "health": ("SLOG",),
+    "telemetry": ("RUNS_LOG",),
 }
 
 
