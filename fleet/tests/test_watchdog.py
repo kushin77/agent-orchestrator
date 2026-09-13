@@ -118,6 +118,8 @@ def test_spawn_appends_both_streams_to_the_rung_log(tmp_path, monkeypatch):
 
 def test_respawn_starts_the_rung_into_its_capture_log(monkeypatch):
     monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [999])
+    monkeypatch.setattr(watchdog, "RESPAWN_SETTLE_SECONDS", 0.0)
     spawned = []
     monkeypatch.setattr(watchdog, "spawn", lambda name, command: spawned.append((name, command)))
     assert watchdog.respawn("fleet/terminal.py", "fleet/terminal.sh", "sister") is True
@@ -126,10 +128,86 @@ def test_respawn_starts_the_rung_into_its_capture_log(monkeypatch):
 
 def test_a_default_rung_name_falls_back_to_the_launcher_stem(monkeypatch):
     monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [999])
+    monkeypatch.setattr(watchdog, "RESPAWN_SETTLE_SECONDS", 0.0)
     spawned = []
     monkeypatch.setattr(watchdog, "spawn", lambda name, command: spawned.append(name))
     watchdog.respawn("fleet/brain.py", "fleet/brain.sh")
     assert spawned == ["brain"]
+
+
+# --- respawn verification (issue #276: a claim of success must be measured) ---
+
+
+def test_respawn_reports_failure_when_the_rung_never_comes_up(monkeypatch):
+    """P1a: a no-op spawn must NOT read as `respawned`."""
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [])
+    monkeypatch.setattr(watchdog, "RESPAWN_VERIFY_SECONDS", 0.0)
+    spawned = []
+    monkeypatch.setattr(watchdog, "spawn", lambda name, command: spawned.append(name))
+    assert watchdog.respawn("fleet/terminal.py", "fleet/terminal.sh", "sister") is False
+    assert spawned == ["sister"], "the spawn was attempted"
+
+
+def test_respawn_reports_failure_when_spawn_raises(monkeypatch):
+    """P1b: an OSError from spawn is reported, not allowed to crash the pass."""
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+
+    def boom(*args, **kwargs):
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(watchdog, "spawn", boom)
+    assert watchdog.respawn("fleet/terminal.py", "fleet/terminal.sh", "sister") is False
+
+
+def test_rung_came_up_requires_the_rung_to_survive_the_settle_window(monkeypatch):
+    """A rung that starts and immediately dies (singleton refusal) is a failure."""
+    seq = [[111], []]
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: seq.pop(0) if seq else [])
+    now = {"t": 0.0}
+    ok = watchdog.rung_came_up(
+        "fleet/terminal.py",
+        None,
+        window=10.0,
+        settle=1.0,
+        clock=lambda: now["t"],
+        sleep=lambda s: now.__setitem__("t", now["t"] + s),
+    )
+    assert ok is False
+
+
+def test_rung_came_up_is_true_when_the_process_survives(monkeypatch):
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [111])
+    now = {"t": 0.0}
+    ok = watchdog.rung_came_up(
+        "fleet/terminal.py",
+        None,
+        window=10.0,
+        settle=1.0,
+        clock=lambda: now["t"],
+        sleep=lambda s: now.__setitem__("t", now["t"] + s),
+    )
+    assert ok is True
+
+
+def test_rung_action_surfaces_respawn_failed(monkeypatch):
+    """The `RESPAWN FAILED` branch is reachable for the loop rungs now."""
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: None)
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [])
+    monkeypatch.setattr(watchdog, "RESPAWN_VERIFY_SECONDS", 0.0)
+    monkeypatch.setattr(watchdog, "spawn", lambda name, command: None)
+    line = watchdog.rung_action("sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "head")
+    assert "RESPAWN FAILED" in line
+
+
+def test_watchdog_once_exits_nonzero_when_a_rung_respawn_fails(monkeypatch, capsys):
+    monkeypatch.setattr(watchdog.channel, "head_commit", lambda: "head1111")
+    monkeypatch.setattr(watchdog, "rung_action", lambda *a, **k: "sister: missing (no loop process) — RESPAWN FAILED")
+    monkeypatch.setattr(watchdog, "monitor_missing", lambda: False)
+    assert watchdog.watchdog_once() == 1
+    assert "RESPAWN FAILED" in capsys.readouterr().out
 
 
 # --- the monitor rung ---------------------------------------------------------
@@ -143,6 +221,8 @@ def test_monitor_missing_reflects_process_presence(monkeypatch):
 
 
 def test_start_monitor_spawns_a_detached_python_process(monkeypatch):
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [999])
+    monkeypatch.setattr(watchdog, "RESPAWN_SETTLE_SECONDS", 0.0)
     calls = []
 
     def fake_popen(*args, **kwargs):
@@ -160,6 +240,13 @@ def test_start_monitor_reports_failure_when_spawn_fails(monkeypatch):
         raise OSError("spawn denied")
 
     monkeypatch.setattr(watchdog.subprocess, "Popen", boom)
+    assert watchdog.start_monitor() is False
+
+
+def test_start_monitor_reports_failure_when_the_monitor_never_comes_up(monkeypatch):
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [])
+    monkeypatch.setattr(watchdog, "RESPAWN_VERIFY_SECONDS", 0.0)
+    monkeypatch.setattr(watchdog.subprocess, "Popen", lambda *a, **k: type("Proc", (), {"pid": 1})())
     assert watchdog.start_monitor() is False
 
 
