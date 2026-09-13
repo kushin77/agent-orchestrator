@@ -53,6 +53,28 @@ Everything after step 2 is code: the brain sends directives with
   `high`}; anything else is refused. A subagent cannot raise its own tier —
   only a new brain directive may escalate.
 
+## Push → wait → completion trigger
+
+The brain never spins a session on a task. It pushes, blocks, and wakes:
+
+```bash
+# brain
+python3 fleet/channel.py send --message /tmp/directive.json      # prints the message id
+python3 fleet/channel.py wait --id <id> --timeout-seconds 600    # blocks
+
+# executor (sister / subagent), the moment the task is done:
+python3 fleet/channel.py report --from sister --correlation <id> --type result --body "merged #171"
+
+# the waiting brain prints the result and continues — that is the A2A trigger
+```
+
+`wait` matches the outbox by message id **or** `correlation_id`, so an executor
+answers the exact directive that is being waited on. A timeout exits 1 (NOT-OK)
+— a silent pass would be a false green. The sister dispatcher (#163) calls
+`report` on completion; ack/result messages must carry their `correlation_id`
+and may never come from the brain itself (enforced by the contract and the
+gate).
+
 ## Mailbox
 
 ```

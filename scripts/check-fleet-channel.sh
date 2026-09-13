@@ -80,8 +80,10 @@ make_mutant "bad-thinking"  '{"from":"brain","to":"sister","type":"directive","m
 make_mutant "missing-role"  '{"from":"brain","type":"directive"}'
 make_mutant "sister-issues" '{"from":"sister","to":"brain","type":"directive"}'
 make_mutant "misaddressed"  '{"from":"brain","to":"subagent-x","type":"directive"}'
+make_mutant "ack-no-correlation" '{"from":"sister","to":"brain","type":"result"}'
+make_mutant "brain-acks" '{"from":"brain","to":"sister","type":"ack","correlation_id":"directive-0001"}'
 
-for mutant in bad-type bad-tier bad-thinking missing-role sister-issues misaddressed; do
+for mutant in bad-type bad-tier bad-thinking missing-role sister-issues misaddressed ack-no-correlation brain-acks; do
   if $channel verify --message "$work/$mutant.json" >/dev/null 2>&1; then
     echo "  FAIL  mutant '$mutant' was accepted (the channel cannot refuse invalid traffic)" >&2
     fail=$((fail + 1))
@@ -89,6 +91,15 @@ for mutant in bad-type bad-tier bad-thinking missing-role sister-issues misaddre
     echo "  OK    mutant '$mutant' refused"
   fi
 done
+
+# A valid correlated result must be accepted (the contract is not over-strict).
+printf '%s\n' '{"from":"sister","to":"brain","type":"result","correlation_id":"directive-0001"}' > "$work/valid-result.json"
+if $channel verify --message "$work/valid-result.json" >/dev/null 2>&1; then
+  echo "  OK    a valid correlated result validates"
+else
+  echo "  FAIL  a valid correlated result was refused (over-strict contract)" >&2
+  fail=$((fail + 1))
+fi
 
 rm -rf "$work"
 
