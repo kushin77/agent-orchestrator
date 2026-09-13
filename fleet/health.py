@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SLOG = ROOT / ".fleet" / "slog.jsonl"
 
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
+sys.path.insert(0, str(ROOT / "fleet"))
+import channel  # noqa: E402
 import claims  # noqa: E402
 from snapshot import parse_iso  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
@@ -62,12 +64,37 @@ def stalest_claim_minutes(ledger_path: Path) -> float | None:
     return max(ages) if ages else None
 
 
+def code_drift() -> str | None:
+    """A reason string when the live loop is executing a stale build.
+
+    "A process exists" is not health. On 2026-09-13 a loop on pre-fix code made
+    a working fleet look broken, so the heartbeat's declared commit is compared
+    against HEAD — the same truth `channel.py status` reports.
+    """
+    beat = channel.read_heartbeat()
+    if beat is None:
+        return (
+            "no heartbeat file — the live loop predates the heartbeat build (it is running "
+            "old code); restart it: bash fleet/terminal.sh"
+        )
+    running = str(beat.get("commit", "unknown"))
+    head = channel.head_commit()
+    if head != "unknown" and running != head:
+        return f"loop is running {running} but HEAD is {head} — merged fixes are not live; restart it"
+    return None
+
+
 def evaluate(stale_minutes: float, ledger_path: Path) -> tuple[int, list[str]]:
     reasons: list[str] = []
     if not loop_running():
         return FAILING, ["fleet/terminal.py is not running — the never-idle loop is dead"]
 
     level = HEALTHY
+    drift = code_drift()
+    if drift:
+        level = DEGRADED
+        reasons.append(drift)
+
     age = slog_age_minutes()
     if age is None:
         level = DEGRADED
