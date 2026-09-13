@@ -66,4 +66,5 @@ governance/sync
 infra/rollout
 governance/lessons
 governance/remediation
+governance/board
 scripts

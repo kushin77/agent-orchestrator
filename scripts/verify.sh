@@ -38,6 +38,7 @@ checks=(
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'conformance|bash scripts/check-conformance.sh'
   'remediation|bash scripts/check-remediation.sh'
+  'board-gate|bash scripts/check-board-gate.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'

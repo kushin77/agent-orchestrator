@@ -1,0 +1,28 @@
+# Board-approved exceptions for the enforcement gate (issue #143).
+#
+# Each entry grants exactly one named check a timeboxed exemption from
+# failing the gate. It does not hide the failure (make verify still shows it
+# as EXCEPTED, and it is written into .verify/board-report.json) — it only
+# stops that one failure from turning the gate red until `expires`.
+#
+# An exception past its `expires` date stops applying automatically: the
+# underlying failure counts in full again and is reported under
+# `expired_exceptions`. Renewing an exception is a new board decision, not an
+# edit to the date.
+#
+# Fields (all required):
+#   check       - the gate name, one of: knowledge-index, conformance,
+#                 lessons, remediation
+#   reason      - why the board approved it
+#   approved_by - who approved it (board role or name)
+#   expires     - ISO date (YYYY-MM-DD), exclusive
+#
+# Example (commented out — no exceptions are active today):
+#
+# exceptions:
+#   - check: conformance
+#     reason: "M24 backlog migration in flight, tracked by #150"
+#     approved_by: "board-chair"
+#     expires: "2026-10-01"
+
+exceptions: []

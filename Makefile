@@ -238,6 +238,13 @@ remediation-dispatch:
 lessons:
 	@bash scripts/check-lessons.sh
 
+## board-gate — governance board enforcement gate (issue #143): re-runs
+## knowledge-index, conformance, lessons and remediation for real and refuses
+## to report ok unless every one of them does; applies timeboxed board
+## exceptions and escalates repeated violations (see governance/board/CHARTER.md)
+board-gate:
+	@python3 governance/board/cli.py check
+
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
 	@bash scripts/check-secrets.sh
