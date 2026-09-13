@@ -31,6 +31,7 @@ checks=(
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'fleet-channel|bash scripts/check-fleet-channel.sh'
+  'fleet-contract|bash scripts/check-fleet-contract.sh'
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'conformance|bash scripts/check-conformance.sh'
   'lessons|bash scripts/check-lessons.sh'
