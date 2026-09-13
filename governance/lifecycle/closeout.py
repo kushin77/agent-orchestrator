@@ -65,6 +65,16 @@ class CloseOutOps(Protocol):
     def reclaim_lane(self, session_id: str) -> str:
         """Remove the lane worktree and its record."""
 
+    def refresh(self, item: dict) -> dict:
+        """The item's current state, after the effects just performed.
+
+        The item passed in is the *pre-close* state; once the operations above
+        have run it is stale. The final audit must read the world the ops
+        changed, not the snapshot it started from - otherwise a fully successful
+        close reads as NOT-OK, the inverse of the false green this module exists
+        to prevent.
+        """
+
 
 @dataclass
 class Step:
@@ -188,8 +198,11 @@ def closeout(item: dict, ops: CloseOutOps, evidence: str = "") -> CloseOutResult
         bool(lane.get("present")),
     )
 
-    # Never success by assertion: re-derive from the item's own facts.
-    result.remaining = audit_item(item)
+    # Never success by assertion: re-collect the item through the operations
+    # port and re-derive from its *fresh* facts. The pre-close item is stale once
+    # the effects above have run; auditing it would report a successful close as
+    # NOT-OK.
+    result.remaining = audit_item(ops.refresh(item))
     return result
 
 

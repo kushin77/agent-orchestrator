@@ -67,10 +67,12 @@ dependency order. The order is derived from the incident above, not from taste:
    for the re-run that finishes the job.
 
 Every step is idempotent (it asks the operations port for current state and skips
-when the invariant already holds), and the executor **re-derives the findings
-afterwards**: `ok` is the absence of findings, never the absence of exceptions. An
-operations port that reports success without acting still fails, and a step that
-cannot complete is reported while the remaining steps continue.
+when the invariant already holds), and the executor **re-collects the item through
+the operations port and re-derives the findings afterwards**: `ok` is the absence
+of findings in the *fresh* state, never the absence of exceptions. Auditing the
+pre-close item would report a fully successful close as NOT-OK — the inverse of
+the false green this module exists to prevent, and a bug the third end-to-end run
+caught.
 
 ## 4. Auditing, and why it is offline
 

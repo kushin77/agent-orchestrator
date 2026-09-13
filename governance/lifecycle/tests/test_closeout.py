@@ -159,6 +159,31 @@ def test_close_out_always_reports_the_same_eight_steps():
     assert actions == [step.action for step in closeout(clean, FakeOps(clean)).steps]
 
 
+def test_the_final_audit_reads_the_refreshed_item_not_the_stale_one():
+    """The real bug: a fully successful close read as NOT-OK because the audit
+    re-read the pre-close item while the effects happened on GitHub."""
+
+    class ExternalOps(FakeOps):
+        """Effects happen outside the item (as real GhOps does); refresh supplies truth."""
+
+        def __init__(self, item):
+            super().__init__(item)
+            self.done = dict(item)
+
+        def delete_branch(self, branch: str) -> str:
+            self._record("delete-branch")
+            self.done["branch_deleted"] = True
+            return "deleted"
+
+        def refresh(self, item: dict) -> dict:
+            return self.done
+
+    stale = clean_item(branch_deleted=False)
+    result = closeout(stale, ExternalOps(stale))
+    assert result.ok
+    assert result.remaining == []
+
+
 def test_a_failing_step_is_reported_and_the_rest_still_run():
     item = clean_item(branch_deleted=False, lane={"session_id": "s-269", "present": True})
     ops = FakeOps(item, fail=("delete-branch",))

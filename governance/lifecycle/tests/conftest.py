@@ -109,3 +109,7 @@ class FakeOps:
         self._record("reclaim-lane")
         self.item["lane"] = {}
         return f"reclaimed {session_id}"
+
+    def refresh(self, item: dict) -> dict:
+        """The mutated item is the post-close state, so it is what gets re-audited."""
+        return self.item
