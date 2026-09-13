@@ -15,7 +15,7 @@
 SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
-        shell-syntax yaml-lint json-lint docs-lint \
+        shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
         secrets feature-flags cloudbuild terraform tf-fmt tf-validate \
         shellcheck gitleaks pre-commit
 
@@ -47,6 +47,8 @@ help:
 	@echo "  yaml-lint     Parse every .yml/.yaml outside vendor/ (PyYAML)"
 	@echo "  json-lint     Validate every *.json outside vendor/"
 	@echo "  docs-lint     Foundation files + md links + whitespace + markers"
+	@echo "  chronological-dispatch  Governance docs declare dependency-ordered"
+	@echo "                issue selection (GR-20, cannot drift to kanban picking)"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -59,7 +61,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch
 	@echo ""
 	@echo "lint: OK"
 
@@ -98,6 +100,11 @@ json-lint:
 ## docs-lint — foundation files, markdown links, whitespace, unfinished markers
 docs-lint:
 	@bash scripts/check-docs.sh
+
+## chronological-dispatch — governance docs must declare dependency-ordered
+## issue selection (GR-20); a doc-only rule is advisory, so this gate fails it
+chronological-dispatch:
+	@bash scripts/check-chronological-dispatch.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
