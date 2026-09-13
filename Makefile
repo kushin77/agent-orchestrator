@@ -18,7 +18,7 @@ SHELL := /bin/bash
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
         issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index knowledge-index-build \
         conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
-        tf-validate shellcheck gitleaks pre-commit
+        tf-validate shellcheck gitleaks pre-commit worktrees
 
 .DEFAULT_GOAL := help
 
@@ -75,6 +75,9 @@ help:
 	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
 	@echo "                RCA, every action recorded, every lesson evidenced"
 	@echo "  secrets       Mechanical secret scan (always on)"
+	@echo "  worktrees     Reclaim stale lane worktrees (dry run; --apply via"
+	@echo "                scripts/prune-worktrees.sh). Keeps dirty, in-use and"
+	@echo "                unpreserved worktrees; /tmp ones are the RAM hazard."
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
 	@echo "  terraform     infra/terraform fmt + offline validate (SKIP if absent)"
@@ -84,6 +87,10 @@ help:
 ## verify — gate of record (orchestrated by scripts/verify.sh, with attestation)
 verify:
 	@bash scripts/verify.sh verify
+
+## worktrees — reclaim stale lane worktrees (dry run by default)
+worktrees:
+	@bash scripts/prune-worktrees.sh
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
 lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index lessons
