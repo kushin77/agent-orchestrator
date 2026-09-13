@@ -35,8 +35,10 @@ from e2e.wiring import (  # noqa: E402
     ENDPOINTS,
     PROVIDER_ANTHROPIC,
     PROVIDER_DEEPSEEK,
+    PROVIDER_HERMES,
     PROVIDER_OLLAMA,
     PROVIDER_OPENAI,
+    PROVIDER_PAPERCLIP,
     TENANT,
     ControlPlane,
     build_control_plane,
@@ -283,11 +285,11 @@ def _stage_routed_call(control: ControlPlane) -> Dict[str, Any]:
 
 
 def _stage_conformance(control: ControlPlane) -> Dict[str, Any]:
-    """Same task under DeepSeek / OpenAI / local Ollama, plus Claude (anthropic)
-    on the MED tier: every provider yields governed, audited, metered behavior."""
-    from proxy.wiring import build_real_gateway
-
-    from e2e.wiring import TruthyListCallRecordSink
+    """Same task under every provider of the five-agent purebliss team —
+    DeepSeek / local Ollama / paperclip / hermes (LOW) and Claude (anthropic,
+    MED), plus OpenAI for degradation coverage: every provider yields governed,
+    audited, metered behavior."""
+    from e2e.wiring import TruthyListCallRecordSink, build_team_gateway
 
     results: List[Dict[str, Any]] = []
     scenarios = [
@@ -302,11 +304,19 @@ def _stage_conformance(control: ControlPlane) -> Dict[str, Any]:
         ({"deepseek": False}, PROVIDER_ANTHROPIC, "reviewer",
          "code-review-verdict", {"diff": "+raise_on_invalid()", "context": "small PR"},
          CODE_REVIEW_OK),
+        # paperclip + hermes are keyless local team hops (issue #257); the
+        # offline stub adapters are driven through the same scriptable rig.
+        ({"deepseek": False, "openai": False, "ollama": False},
+         PROVIDER_PAPERCLIP, "orchestrator", "classify-route",
+         {"input": "billing outage"}, CLASSIFY_OK),
+        ({"deepseek": False, "openai": False, "ollama": False, "paperclip": False},
+         PROVIDER_HERMES, "orchestrator", "classify-route",
+         {"input": "billing outage"}, CLASSIFY_OK),
     ]
     for health, provider, agent, task_type, task_input, content in scenarios:
         audit = TruthyListCallRecordSink()
         metering = TruthyListCallRecordSink()
-        wired = build_real_gateway(health=health, audit_sink=audit, metering_sink=metering)
+        wired = build_team_gateway(health=health, audit_sink=audit, metering_sink=metering)
         wired.rig.script_success(provider, content)
         evidence = guarded_model_call(
             control,

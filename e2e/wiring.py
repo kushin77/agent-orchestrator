@@ -48,6 +48,8 @@ ENDPOINTS = {
     "anthropic": "https://api.anthropic.com/v1/messages",
     "ollama": "http://localhost:11434/api/chat",
     "openai": "https://api.openai.com/v1/chat/completions",
+    "paperclip": "http://localhost:11435/api/chat",
+    "hermes": "http://localhost:11436/api/chat",
 }
 
 # Provider names as the providers-registry / routing policy know them.
@@ -55,8 +57,27 @@ PROVIDER_DEEPSEEK = "deepseek"
 PROVIDER_ANTHROPIC = "anthropic"
 PROVIDER_OPENAI = "openai"
 PROVIDER_OLLAMA = "ollama"  # the keyless local terminal hop of every chain
+PROVIDER_PAPERCLIP = "paperclip"  # purebliss team member (local, no live endpoint)
+PROVIDER_HERMES = "hermes"  # purebliss team member (local; falls back to ollama)
 
 TENANT = "acme"
+
+# The five-agent purebliss team (epic #253 frozen contract): agent id -> provider.
+TEAM_AGENT_PROVIDERS = {
+    "ollama": PROVIDER_OLLAMA,
+    "paperclip": PROVIDER_PAPERCLIP,
+    "hermes": PROVIDER_HERMES,
+    "deepseek": PROVIDER_DEEPSEEK,
+    "claude": PROVIDER_ANTHROPIC,
+}
+# Provider ids exercised by the five-agent team (claude routes to anthropic).
+TEAM_PROVIDERS = (
+    PROVIDER_OLLAMA,
+    PROVIDER_PAPERCLIP,
+    PROVIDER_HERMES,
+    PROVIDER_DEEPSEEK,
+    PROVIDER_ANTHROPIC,
+)
 
 # --------------------------------------------------------------------------- #
 # Truthy sink (integration fact 1 above).
@@ -389,3 +410,79 @@ def write_evidence(work_dir: str, name: str, payload: Dict[str, Any]) -> str:
         json.dump(payload, fh, indent=2, sort_keys=True, default=_json_default)
         fh.write("\n")
     return path
+
+
+# --------------------------------------------------------------------------- #
+# purebliss five-agent team: offline local provider stubs (issue #257)
+# --------------------------------------------------------------------------- #
+def install_team_provider_stubs() -> None:
+    """Register offline stub adapters for the two team providers with no live
+    endpoint (paperclip, hermes). Runtime-only, idempotent; no gateway file is
+    edited."""
+    from providers.registry import PROVIDER_CLASSES
+
+    from e2e._team_providers import HermesProvider, PaperclipProvider
+
+    if "paperclip" not in PROVIDER_CLASSES:
+        PROVIDER_CLASSES["paperclip"] = PaperclipProvider
+    if "hermes" not in PROVIDER_CLASSES:
+        PROVIDER_CLASSES["hermes"] = HermesProvider
+
+
+def _team_provider_configs() -> List[Any]:
+    from providers.config import ProviderConfig
+
+    def _local(name: str, port: int, model: str) -> ProviderConfig:
+        return ProviderConfig(
+            name=name,
+            base_url=f"http://localhost:{port}",
+            api_path="/api/chat",
+            tier_models={tier: model for tier in ("LOW", "MED", "HIGH", "MAX")},
+            default_model=model,
+            supported_models=frozenset({model}),
+            requires_key=False,
+            fallback=("ollama",),
+        )
+
+    return [_local("paperclip", 11435, "paperclip-1"), _local("hermes", 11436, "hermes-1")]
+
+
+def register_team_provider_configs(registry: Any) -> None:
+    """Add the local team provider configs to a built provider registry."""
+    for config in _team_provider_configs():
+        registry.register_provider_config(config)
+
+
+def extend_team_routing(wired: Any) -> None:
+    """Append the local team providers as terminal fallback hops on every
+    routing chain so the five-agent team is routable offline (issue #257).
+
+    Runtime-only: the merged routing policy (``gateway/proxy/config/routing.yaml``)
+    predates the purebliss team and this lane never edits a gateway file.
+    """
+    config = wired.gateway.router.config
+    for tier, chain in list(config.provider_chains.items()):
+        if "paperclip" not in chain:
+            config.provider_chains[tier] = tuple(chain) + ("paperclip", "hermes")
+
+
+def build_team_gateway(
+    *,
+    health: Any = None,
+    audit_sink: Any = None,
+    metering_sink: Any = None,
+) -> Any:
+    """``build_real_gateway`` plus the purebliss team's offline local providers.
+
+    Registers the paperclip + hermes stub adapters, adds their configs, and
+    extends the routing chains so every team provider is routable (issue #257).
+    """
+    from proxy.wiring import build_real_gateway
+
+    install_team_provider_stubs()
+    wired = build_real_gateway(
+        health=health, audit_sink=audit_sink, metering_sink=metering_sink
+    )
+    register_team_provider_configs(wired.provider_registry)
+    extend_team_routing(wired)
+    return wired

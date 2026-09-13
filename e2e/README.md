@@ -32,7 +32,7 @@ modules and writes `golden-path.json` evidence. Stage by stage:
 | `rbac` | `identity/rbac` (issue #12) | owner allowed `agent:read`; a stranger denied at the scope gate |
 | `agents` | `registry/service` + `events` (issue #10) | `worker-1` (coder@1.0.0) and `reviewer-1` active; scoped-claims session binds tenant `acme` |
 | `routed-call` | `gateway/proxy` wiring over personas/profiles/prompts (issues #9/#11/#13/#15/#16/#17/#18/#19) | a governed `classify-route` dispatch served by `deepseek`; policy `log` + DLP `sent` + preflight `allow` + ledger `model.call` + metered billable usage |
-| `conformance` | same gateway stack, all providers | the **same path** under DeepSeek, OpenAI, local Ollama (LOW) and Claude/anthropic (MED) yields governed, audited, metered behavior on every provider |
+| `conformance` | same gateway stack, all providers | the **same path** under every provider of the five-agent purebliss team — DeepSeek, local Ollama, paperclip, hermes (LOW) and Claude/anthropic (MED), plus OpenAI for degradation cover — yields governed, audited, metered behavior on every provider |
 | `durable` | `engine/core` (issue #21) | one durable `TASK_EXECUTION` workflow (file-backed event store) runs the real gateway through the `core.task` handler and succeeds |
 | `audit` | `telemetry/ledger` (issue #31) | every action is on the per-tenant hash-chained ledger; `verify` → `OK` (exit 0) |
 | `billing` | `telemetry/metering` (issue #33) | every call is ingested and rolled up; billable usage + cost per model |
@@ -54,7 +54,13 @@ conformance stage disables providers one at a time via the real health signal
 * DeepSeek healthy → served by `deepseek/deepseek-chat`;
 * DeepSeek down, OpenAI healthy → served by `openai/gpt-4o-mini`;
 * both cloud providers down → local **Ollama** (`ollama/llama3.2`) degradation;
-* DeepSeek down on the MED task → **Claude** (`anthropic/claude-sonnet-4-5`).
+* DeepSeek down on the MED task → **Claude** (`anthropic/claude-sonnet-4-5`);
+* cloud + Ollama down → local **paperclip** (`paperclip/paperclip-1`);
+* cloud + Ollama + paperclip down → local **hermes** (`hermes/hermes-1`).
+
+The two team-local hops (paperclip, hermes) have no live endpoint, so the e2e
+lane registers offline stub adapters (`e2e/_team_providers.py`) and appends
+them as terminal fallback hops at runtime — no gateway file is edited.
 
 Every hop is a canned offline response through the real providers registry
 transport rig — no keys, no network.
