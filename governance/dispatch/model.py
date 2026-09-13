@@ -53,6 +53,7 @@ class Issue:
     labels: tuple[str, ...] = ()
     parent: int | None = None
     blocked_by: tuple[int, ...] = ()
+    closed_at: str = ""
 
     @property
     def closed(self) -> bool:
@@ -72,6 +73,7 @@ class Issue:
             "labels": list(self.labels),
             "parent": self.parent,
             "blocked_by": list(self.blocked_by),
+            "closed_at": self.closed_at,
         }
 
 

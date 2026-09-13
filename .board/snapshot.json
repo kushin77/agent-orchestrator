@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T18:06:16Z",
+  "generated_at": "2026-09-13T20:01:00Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1170,7 +1170,7 @@
     {
       "number": 140,
       "title": "Enforce CMR class, pattern, and template conformance across repos",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -1187,7 +1187,7 @@
     {
       "number": 141,
       "title": "Enforce RCA and lessons capture for all failures, incidents, and corrective actions",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:incident-response",
@@ -1427,7 +1427,7 @@
     {
       "number": 161,
       "title": "Define the session topology and steering contract (brain \u2192 fleet brain \u2192 subagents)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:session-fleet",
@@ -1443,7 +1443,7 @@
     {
       "number": 162,
       "title": "Implement the steering channel: message schema, mailbox, and channel CLI",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:session-fleet",
@@ -1459,7 +1459,7 @@
     {
       "number": 163,
       "title": "Implement the fleet-brain dispatcher (dumb-terminal executor for brain directives)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:session-fleet",
@@ -1474,7 +1474,7 @@
     {
       "number": 164,
       "title": "FinOps model chooser for fleet subagents: tier + thinking-effort directives",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:fleet",
@@ -1490,7 +1490,7 @@
     {
       "number": 165,
       "title": "Enhance the GitHub issue template for brain-directed fleet work",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:board",
@@ -1506,7 +1506,7 @@
     {
       "number": 166,
       "title": "Session bootstrap + runbook: zero-touch beyond the single model switch",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:session-fleet",
@@ -1521,7 +1521,7 @@
     {
       "number": 167,
       "title": "E2E pilot: one brain command \u2192 sister \u2192 subagent \u2192 PR \u2192 merge, with negative controls",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:session-fleet",
@@ -1533,6 +1533,180 @@
       ],
       "parent": 160,
       "blocked_by": []
+    },
+    {
+      "number": 170,
+      "title": "Harden the claim gate: snapshot staleness check + conflict-free claim storage",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 171,
+      "title": "Steering channel: push-task wait + completion trigger (the brain blocks until the task reports done)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        162
+      ]
+    },
+    {
+      "number": 174,
+      "title": "Assign class labels to the six issues with declared-vs-actual conformance mismatches",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 175,
+      "title": "Close the steering loop: sister-side listener (watch) + consume-on-report",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        171
+      ]
+    },
+    {
+      "number": 178,
+      "title": "Brain directives are chain edges: claim --directive integration (channel x dispatch)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:board",
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        171
+      ]
+    },
+    {
+      "number": 180,
+      "title": "Lessons from first live steering + enterprise-scale hardening register",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": []
+    },
+    {
+      "number": 181,
+      "title": "Sync waves with the deepseek and code-indexing modules: bidirectional capability feedback loop",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:knowledge-index",
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        180
+      ]
+    },
+    {
+      "number": 184,
+      "title": "Escalation + live log: sister-side problems ping the brain terminal (never sleep, idle-watch)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        175
+      ]
+    },
+    {
+      "number": 186,
+      "title": "Session launchers: one command opens the brain + dumb-terminal sessions (never-idle loop)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        175
+      ]
+    },
+    {
+      "number": 190,
+      "title": "Fleet control plane + self-refresh: poke/halt/refresh/update/debug/watch + roles directive",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        186
+      ]
     }
   ]
 }
