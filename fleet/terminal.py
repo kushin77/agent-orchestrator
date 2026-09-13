@@ -467,23 +467,26 @@ def write_heartbeat(
     tmp.replace(HEARTBEAT)
 
 
-def start_beating(
-    started_at: str,
-    commit: str,
-    issue: int,
-    agent_id: str,
-    interval: float = HEARTBEAT_INTERVAL_SECONDS,
-) -> threading.Event:
-    """Keep the beat fresh while a child runs; returns the stop event.
+class RunBeater:
+    """Keeps the beat fresh while a child runs; `stop()` is synchronous.
 
-    Without this a run of any length is indistinguishable from a dead loop, which
-    is the misread that made two operators (and one brain) restart a healthy
-    fleet. Daemon thread: it can never hold the process open.
+    `stop()` joins the thread rather than merely setting a flag: a beater that
+    outlives its owner writes the *owner's* idea of the world — measured, a test
+    beater left running wrote `commit: abc1234` and a pytest pid into the live
+    heartbeat when monkeypatch restored the real path.
     """
-    stop = threading.Event()
 
-    def beat() -> None:
-        while not stop.wait(interval):
+    def __init__(self, started_at: str, commit: str, issue: int, agent_id: str, interval: float) -> None:
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._beat,
+            args=(started_at, commit, issue, agent_id, interval),
+            name="fleet-heartbeat",
+            daemon=True,
+        )
+
+    def _beat(self, started_at: str, commit: str, issue: int, agent_id: str, interval: float) -> None:
+        while not self._stop.wait(interval):
             child = IN_FLIGHT.get("child")
             write_heartbeat(
                 f"working:#{issue}",
@@ -494,8 +497,25 @@ def start_beating(
                 child_pid=getattr(child, "pid", None),
             )
 
-    threading.Thread(target=beat, name="fleet-heartbeat", daemon=True).start()
-    return stop
+    def start(self) -> RunBeater:
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+
+def start_beating(
+    started_at: str,
+    commit: str,
+    issue: int,
+    agent_id: str,
+    interval: float = HEARTBEAT_INTERVAL_SECONDS,
+) -> RunBeater:
+    """Start a run's beater; the caller MUST `stop()` it in a finally block."""
+    return RunBeater(started_at, commit, issue, agent_id, interval).start()
 
 
 def loop(args: argparse.Namespace) -> int:
@@ -742,9 +762,8 @@ def loop(args: argparse.Namespace) -> int:
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
         write_heartbeat("working", started_at=started_at, commit=commit, issue=issue, agent=agent_id)
         mark_run(directive_id, issue, agent_id)
-        beat_stop = start_beating(started_at, commit, issue, agent_id)
-        lane = (directive.get("task") or {}).get("lane") or ""
-        claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
+        beater = start_beating(started_at, commit, issue, agent_id)
+        lane = (directive.get("task") or {}).get("lane") or ""        claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
             print(f"[terminal] claim refused for #{issue}: {claim_output}", file=sys.stderr, flush=True)
             subprocess.run(
@@ -768,7 +787,7 @@ def loop(args: argparse.Namespace) -> int:
         try:
             rc, output = run_once(directive, args.runner, args.timeout, args.dry_run, agent_id, worktree)
         finally:
-            beat_stop.set()
+            beater.stop()
             IN_FLIGHT["issue"] = None
             IN_FLIGHT["agent_id"] = None
             IN_FLIGHT["directive"] = None
