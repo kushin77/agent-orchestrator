@@ -99,6 +99,21 @@ def run_once(directive: dict, runner: str, timeout: float, dry_run: bool) -> tup
     return result.returncode, (result.stdout or "") + (result.stderr or "")
 
 
+def directive_issue(directive: dict) -> int | None:
+    """The issue a directive names; None when it is not executable work."""
+    task = directive.get("task") or {}
+    issue = task.get("issue")
+    if isinstance(issue, bool) or not isinstance(issue, int) or issue < 1:
+        return None
+    return issue
+
+
+def looks_refused(output: str) -> bool:
+    """A subagent that stopped on a refusal must not read as success."""
+    upper = output.upper()
+    return "REFUSED" in upper or "NO WORK DONE" in upper or "NO REAL ISSUE" in upper
+
+
 def loop(args: argparse.Namespace) -> int:
     idle_printed = False
     while True:
@@ -140,13 +155,32 @@ def loop(args: argparse.Namespace) -> int:
             return 0
 
         directive_id = directive.get("id", "")
-        print(f"[terminal] executing directive {directive_id} (issue {(directive.get('task') or {}).get('issue')})", flush=True)
+        issue = directive_issue(directive)
+        if issue is None:
+            print(f"[terminal] directive {directive_id} names no issue — escalating malformed", file=sys.stderr, flush=True)
+            subprocess.run(
+                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                 "--severity", "warn", "--body", "directive names no issue (relay messages are not executable work)"],
+                cwd=ROOT,
+            )
+            if args.once:
+                return 1
+            continue
+
+        print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
         rc, output = run_once(directive, args.runner, args.timeout, args.dry_run)
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
-        if rc == 0:
+        refused = looks_refused(output)
+        if rc == 0 and not refused:
             subprocess.run(
                 ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
                  "--type", "result", "--body", tail],
+                cwd=ROOT,
+            )
+        elif refused:
+            subprocess.run(
+                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                 "--severity", "warn", "--body", tail],
                 cwd=ROOT,
             )
         else:
