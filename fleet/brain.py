@@ -242,6 +242,16 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
             }
         )
     (WAVES / f"{parent}.json").write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+    # The freshly filed children are absent from the committed snapshot, so a claim
+    # would be refused `unknown-issue` the moment the wave arrives. Refresh first.
+    refresh = subprocess.run(
+        ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "snapshot", "--from-github"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if refresh.returncode != 0:
+        return False, f"children filed, but the board snapshot failed to refresh: {refresh.stderr.strip()[-300:]}"
     dispatched = dispatch_ready_children(parent, plan)
     return True, (
         f"decomposed #{parent} into {len(plan['children'])} micro-tasks; "

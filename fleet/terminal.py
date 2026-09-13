@@ -839,11 +839,16 @@ def loop(args: argparse.Namespace) -> int:
         lane = (directive.get("task") or {}).get("lane") or ""
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
+            # Escalate ONCE and leave the directive pending: the refusal is usually
+            # a stale snapshot (a freshly filed child), and after a board refresh the
+            # next cycle claims it. Re-escalating every cycle was measured — four
+            # lines a second for one refusal.
             print(f"[terminal] claim refused for #{issue}: {claim_output}", file=sys.stderr, flush=True)
-            subprocess.run(
-                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
-                 "--severity", "warn", "--body", f"claim refused: {claim_output[-400:]}"],
-                cwd=ROOT,
+            report_once(
+                directive_id,
+                key=f"claim-refused:{claim_output[-80:]}",
+                message_type="escalate",
+                body=f"claim refused: {claim_output[-400:]}",
             )
             if args.once:
                 return 1
