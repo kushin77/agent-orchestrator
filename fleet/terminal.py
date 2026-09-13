@@ -312,6 +312,16 @@ def handled(directive_id: str) -> None:
     )
 
 
+def work_held(directive: dict, is_paused: bool) -> bool:
+    """Pause holds WORK, never controls.
+
+    A paused loop that also stopped reading its inbox could not be resumed: the
+    operator's `resume` was delivered and sat unread until the flag was cleared by
+    hand. Controls are therefore always processed; only dispatch waits.
+    """
+    return bool(is_paused and not directive.get("control"))
+
+
 def agent_id_for(directive_id: str) -> str:
     """The agent id for a directive: one lane, one name, derived from the order."""
     return f"subagent-{directive_id[:8]}"
@@ -553,19 +563,13 @@ def loop(args: argparse.Namespace) -> int:
     idle_printed = False
     paused_printed = False
     while True:
-        if paused():
-            # `pause` stops new work, not the run in flight: the operator asked to
-            # hold the queue, not to abandon the task being executed.
-            write_heartbeat("paused", started_at=started_at, commit=commit)
-            if not paused_printed:
-                print("[terminal] PAUSED — holding the queue (resume to continue)", flush=True)
-                paused_printed = True
-            if args.once:
-                return 0
-            time.sleep(max(args.idle_sleep, 1.0))
-            continue
-        paused_printed = False
-        write_heartbeat("idle", started_at=started_at, commit=commit)
+        if stopping():
+            # `stop` takes effect between runs — and an idle loop is between runs.
+            # Checking only after a run meant `stop` on an idle fleet did nothing.
+            set_flag(STOPPING, False)
+            write_heartbeat("stopped", started_at=started_at, commit=commit)
+            print("[terminal] control:stop — stopping the loop cleanly", flush=True)
+            return 0
         watch = subprocess.run(
             ["python3", CHANNEL, "watch", "--timeout-seconds", str(args.watch_timeout), "--interval", "1"],
             cwd=ROOT,
@@ -723,6 +727,25 @@ def loop(args: argparse.Namespace) -> int:
                 continue
 
         issue = directive_issue(directive)
+        if work_held(directive, paused()):
+            # Pause holds *work*, never controls: a paused loop that stopped reading
+            # the inbox could not be resumed — measured, `resume` was delivered and
+            # sat unread until an operator cleared the flag by hand.
+            write_heartbeat("paused", started_at=started_at, commit=commit)
+            if not paused_printed:
+                print("[terminal] PAUSED — holding the queue (resume to continue)", flush=True)
+                paused_printed = True
+            if issue is not None:
+                report_once(
+                    directive_id,
+                    key=f"paused:#{issue}",
+                    message_type="result",
+                    body=f"#{issue} held while paused — the order stays pending until `resume`",
+                )
+            if args.once:
+                return 0
+            continue
+        paused_printed = False
         if issue is None:
             print(f"[terminal] directive {directive_id} names no issue — escalating malformed", file=sys.stderr, flush=True)
             subprocess.run(
