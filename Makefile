@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims fleet-channel knowledge-index knowledge-index-build \
+        issue-claims fleet-channel finops-chooser knowledge-index knowledge-index-build \
         conformance secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
@@ -54,6 +54,8 @@ help:
 	@echo "                against the board snapshot + self-control mutants"
 	@echo "  fleet-channel Steering channel (M26 #162): message contract + the"
 	@echo "                DSv4FNone standing directive, all mutants refused"
+	@echo "  finops-chooser  FinOps chooser (M26 #164): the harvested tier/thinking"
+	@echo "                vocabulary, enforced — a subagent cannot pick its own tier"
 	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
@@ -125,6 +127,13 @@ issue-claims:
 ## the DSv4FNone standing directive; every mutant message must be refused
 fleet-channel:
 	@bash scripts/check-fleet-channel.sh
+
+## finops-chooser — FinOps tier/thinking enforcement (M26 #164): the harvested
+## vocabulary pinned across the policy, schema, channel and docs; a subagent
+## cannot choose its own tier, and a spawn that does not reproduce the brain's
+## choice is refused (all mutants must be refused)
+finops-chooser:
+	@bash scripts/check-finops-chooser.sh
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):
 ## every item's provenance complete, secret policy clean, mandatory kinds covered
