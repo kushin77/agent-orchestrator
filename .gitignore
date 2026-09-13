@@ -43,6 +43,7 @@ node_modules/
 .fleet/outbox/
 .fleet/sent/
 .fleet/done/
+.fleet/slog.jsonl
 
 # Local environment / secrets
 .env

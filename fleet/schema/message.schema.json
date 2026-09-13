@@ -22,7 +22,7 @@
       "description": "Recipient role."
     },
     "type": {
-      "enum": ["directive", "ack", "result", "halt"],
+      "enum": ["directive", "ack", "result", "halt", "escalate"],
       "description": "directive = brain order; ack/result = sister/subagent reports; halt = stop signal."
     },
     "ts": {
@@ -38,6 +38,10 @@
       "type": "string",
       "minLength": 1,
       "description": "Anti-replay token for a directive (issue #161). Stamped by the channel when absent; send refuses a nonce already seen in the sent, inbox or done mailbox. The rest of the envelope stays v1 — the field is additive."
+    },
+    "severity": {
+      "enum": ["info", "warn", "critical"],
+      "description": "Escalation severity: info | warn | critical."
     },
     "model": {
       "type": "object",
