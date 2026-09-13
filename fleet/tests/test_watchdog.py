@@ -298,9 +298,16 @@ def test_install_replaces_an_existing_line_and_keeps_others(monkeypatch):
     monkeypatch.setattr(cron, "write_crontab", lambda lines: state.__setitem__("written", lines))
     assert cron.cmd_install(type("Args", (), {"interval": 2})()) == 0
     written = state["written"]
-    assert len(written) == 2
+    # The install owns TWO marked lines now — the watchdog and the `.fleet`
+    # retention job (issue #280) — but the properties are unchanged: the foreign
+    # line survives, the stale watchdog line is replaced, and exactly one
+    # watchdog line remains.
     assert written[0] == "0 2 * * * other-job # other"
-    assert written[1].startswith("*/2 * * * *") and written[1].endswith("# ao-fleet-watchdog")
+    watchdog_lines = [entry for entry in written if entry.endswith("# ao-fleet-watchdog")]
+    assert len(watchdog_lines) == 1
+    assert watchdog_lines[0].startswith("*/2 * * * *")
+    assert "old fleet line" not in "\n".join(written)
+    assert [entry for entry in written if entry.endswith("# ao-fleet-prune")] == [cron.prune_line()]
 
 
 def test_uninstall_removes_only_the_fleet_line(monkeypatch):

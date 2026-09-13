@@ -64,6 +64,13 @@ governance/board/violations.jsonl
 .fleet/brain.log
 .fleet/sister.log
 .fleet/monitor.log
+# Fleet retention (tracked module: fleet/prune.py, issue #280): the telemetry
+# ledger, every rotated generation of an append-only ledger, and the pruner's
+# own cron log are all runtime state, never committed.
+.fleet/runs.jsonl
+.fleet/*.jsonl.*
+.fleet/prune.log
+.fleet/watchdog.log
 
 # Local environment / secrets
 .env
