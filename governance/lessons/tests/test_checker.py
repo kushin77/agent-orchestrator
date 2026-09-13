@@ -15,14 +15,18 @@ import pytest
 from checker import (
     GitProbe,
     LedgerUnavailable,
+    Policy,
+    PolicyUnavailable,
     check_ledger,
     load_ledger,
+    load_policy,
     load_snapshot,
     parse_ledger_text,
     relpath,
 )
 from conftest import (
     ARTIFACT,
+    INCIDENT_LABEL,
     REPO_ROOT,
     StubProbe,
     action,
@@ -34,6 +38,7 @@ from conftest import (
     suggestion,
 )
 from model import (
+    CODE_BOARD_INCIDENT_EXEMPT,
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
     CODE_CORRECTIVE_ACTION_OPEN,
@@ -72,6 +77,11 @@ def codes(report):
 
 def only(report, code):
     return [f for f in report.findings if f.code == code]
+
+
+def clean_ledger():
+    """A complete one-incident ledger, as records."""
+    return [incident(1), rca(1), action(1), lesson(1)]
 
 
 def test_a_complete_ledger_passes(report_factory, clean_records):
@@ -426,6 +436,101 @@ def test_a_board_issue_without_the_label_is_out_of_scope(report_factory):
     assert report.counts["board_incidents_scanned"] == 0
     assert CODE_BOARD_INCIDENT_WITHOUT_RCA not in codes(report)
     assert CODE_BOARD_INCIDENT_PENDING not in codes(report)
+
+
+# --- policy and exemptions --------------------------------------------------
+
+
+def test_a_closed_enforcement_issue_is_an_error_without_an_exemption(report_factory):
+    """The post-merge regression: #141 closes, and the rule must not misfire."""
+    snapshot = board(
+        board_issue(100, state="OPEN", labels=["area:board"]),
+        board_issue(141, state="CLOSED"),
+    )
+    report = report_factory(clean_ledger(), snapshot=snapshot)
+    assert CODE_BOARD_INCIDENT_WITHOUT_RCA in codes(report)
+
+
+def test_an_exempt_issue_is_reported_rather_than_failed(
+    report_factory, exempt_policy
+):
+    snapshot = board(
+        board_issue(100, state="OPEN", labels=["area:board"]),
+        board_issue(141, state="CLOSED"),
+    )
+    report = report_factory(
+        clean_ledger(), snapshot=snapshot, policy=exempt_policy
+    )
+    assert errors(report.findings) == []
+    finding = only(report, CODE_BOARD_INCIDENT_EXEMPT)[0]
+    assert finding.subject == "#141"
+    assert "circular" in finding.message
+    assert report.counts["board_incidents_exempt"] == 1
+
+
+def test_the_shipped_policy_exempts_only_the_enforcement_issue():
+    policy = load_policy(REPO_ROOT / "governance/lessons/policy.yaml")
+    assert policy.exemptions == {
+        "#141": policy.exemptions["#141"],
+    }
+    assert "circular" in policy.exemptions["#141"]
+    assert policy.review_cadence_days == 180
+    assert policy.incident_label == INCIDENT_LABEL
+
+
+def test_the_snapshot_today_is_green_with_the_shipped_policy():
+    """The real board plus the real policy must not fail the gate."""
+    probe = GitProbe(REPO_ROOT)
+    if not probe.available:
+        pytest.skip("not a git work tree")
+    ledger = load_ledger(REPO_ROOT / "governance/lessons/ledger.jsonl")
+    snapshot = load_snapshot(REPO_ROOT / ".board/snapshot.json")
+    policy = load_policy(REPO_ROOT / "governance/lessons/policy.yaml")
+    report = check_ledger(
+        ledger,
+        root=REPO_ROOT,
+        snapshot=snapshot,
+        policy=policy,
+        today=date(2026, 9, 15),
+        git=probe,
+    )
+    assert errors(report.findings) == []
+    assert report.counts["board_incidents_scanned"] >= 1
+    assert report.counts["board_incidents_exempt"] == 1
+
+
+def test_a_malformed_policy_cannot_be_loaded(tmp_path):
+    broken = tmp_path / "policy.yaml"
+    broken.write_text("schema: [unclosed\n", encoding="utf-8")
+    with pytest.raises(PolicyUnavailable):
+        load_policy(broken)
+
+
+def test_a_policy_exemption_without_a_reason_is_rejected(tmp_path):
+    path = tmp_path / "policy.yaml"
+    path.write_text(
+        "board:\n  exemptions:\n    - ref: '#1'\n", encoding="utf-8"
+    )
+    with pytest.raises(PolicyUnavailable):
+        load_policy(path)
+
+
+def test_a_policy_with_a_bad_cadence_is_rejected(tmp_path):
+    path = tmp_path / "policy.yaml"
+    path.write_text("review_cadence_days: soon\n", encoding="utf-8")
+    with pytest.raises(PolicyUnavailable):
+        load_policy(path)
+
+
+def test_a_missing_policy_raises_unavailable(tmp_path):
+    with pytest.raises(PolicyUnavailable):
+        load_policy(tmp_path / "absent.yaml")
+
+
+def test_the_policy_cadence_drives_the_review_check(report_factory, clean_records):
+    tight = Policy(review_cadence_days=1)
+    report = report_factory(clean_records, policy=tight, today=date(2026, 9, 20))
+    assert CODE_RCA_REVIEW_OVERDUE in codes(report)
 
 
 # --- strict escalation and the self-control ---------------------------------

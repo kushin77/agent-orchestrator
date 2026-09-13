@@ -36,14 +36,17 @@ if _PKG_DIR not in sys.path:
 
 from checker import (  # noqa: E402
     LEDGER_RELPATH,
+    POLICY_RELPATH,
     REPORT_RELPATH,
     SNAPSHOT_RELPATH,
     TEMPLATE_RELPATH,
     GitProbe,
     Ledger,
     LedgerUnavailable,
+    PolicyUnavailable,
     check_ledger,
     load_ledger,
+    load_policy,
     load_snapshot,
     parse_ledger_text,
     write_report,
@@ -72,7 +75,8 @@ def _summary(report) -> str:
     counts = report.counts
     return (
         "incidents: %d (%d closed) | rcas: %d | corrective actions: %d (%d open) | "
-        "lessons: %d | suggestions: %d | board incident-labelled issues scanned: %d"
+        "lessons: %d | suggestions: %d | board incident-labelled issues scanned: %d "
+        "(%d exempt)"
         % (
             counts.get("incidents", 0),
             counts.get("incidents_closed", 0),
@@ -82,6 +86,7 @@ def _summary(report) -> str:
             counts.get("lessons", 0),
             counts.get("suggestions", 0),
             counts.get("board_incidents_scanned", 0),
+            counts.get("board_incidents_exempt", 0),
         )
     )
 
@@ -123,10 +128,20 @@ def cmd_check(args: argparse.Namespace) -> int:
         )
         return EXIT_CANNOT_ASSESS
 
+    policy_path = root / POLICY_RELPATH
+    policy = None
+    if policy_path.is_file():
+        try:
+            policy = load_policy(policy_path)
+        except PolicyUnavailable as exc:
+            print("lessons: NOT-OK — %s" % exc, file=sys.stderr)
+            return EXIT_NOT_OK
+
     report = check_ledger(
         ledger,
         root=root,
         snapshot=snapshot,
+        policy=policy,
         strict=args.strict,
         git=probe,
     )

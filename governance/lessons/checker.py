@@ -22,11 +22,13 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from model import (
+    CODE_BOARD_INCIDENT_EXEMPT,
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
     CODE_CORRECTIVE_ACTION_OPEN,
@@ -77,6 +79,7 @@ from model import (
 
 LEDGER_RELPATH = "governance/lessons/ledger.jsonl"
 TEMPLATE_RELPATH = "governance/lessons/rca-template.md"
+POLICY_RELPATH = "governance/lessons/policy.yaml"
 REPORT_RELPATH = ".verify/lessons-report.json"
 SNAPSHOT_RELPATH = ".board/snapshot.json"
 
@@ -89,6 +92,77 @@ RE_SHA = re.compile(r"^[0-9a-f]{7,40}$")
 
 class LedgerUnavailable(Exception):
     """The canonical ledger is absent — the gate cannot assess anything."""
+
+
+class PolicyUnavailable(Exception):
+    """The enforcement policy is present but unusable."""
+
+
+@dataclass(frozen=True)
+class Policy:
+    """What counts as an incident-labelled issue, and what is exempt from it.
+
+    ``exemptions`` maps an issue ref to the reason it is exempt. An exemption
+    is not a silent bypass: the gate still reports it, with the reason, every
+    time it runs.
+    """
+
+    incident_label: str = INCIDENT_LABEL
+    review_cadence_days: int = REVIEW_CADENCE_DAYS
+    exemptions: Mapping[str, str] = field(default_factory=dict)
+
+
+def default_policy() -> Policy:
+    return Policy()
+
+
+def load_policy(path: Path) -> Policy:
+    """Load ``policy.yaml``; a malformed policy is a hard finding, not a pass."""
+    path = Path(path)
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise PolicyUnavailable("cannot read %s (%s)" % (path, exc)) from exc
+    try:
+        import yaml  # noqa: PLC0415 - optional dependency, resolved on demand
+    except ImportError as exc:  # pragma: no cover - depends on the environment
+        raise PolicyUnavailable("PyYAML is not installed: %s" % exc) from exc
+    try:
+        payload = yaml.safe_load(raw)
+    except Exception as exc:  # yaml.YAMLError and friends
+        raise PolicyUnavailable("%s is not valid YAML (%s)" % (path, exc)) from exc
+    if not isinstance(payload, dict):
+        raise PolicyUnavailable("%s does not hold a policy object" % path)
+
+    board = payload.get("board") or {}
+    if not isinstance(board, dict):
+        raise PolicyUnavailable("%s: board must be an object" % path)
+    exemptions: Dict[str, str] = {}
+    for entry in board.get("exemptions") or []:
+        if not isinstance(entry, dict) or not str(entry.get("ref", "")).strip():
+            raise PolicyUnavailable(
+                "%s: every exemption needs a ref and a reason" % path
+            )
+        reason = str(entry.get("reason", "")).strip()
+        if not reason:
+            raise PolicyUnavailable(
+                "%s: exemption %s carries no reason" % (path, entry.get("ref"))
+            )
+        exemptions[str(entry["ref"]).strip()] = reason
+
+    cadence = payload.get("review_cadence_days", REVIEW_CADENCE_DAYS)
+    if not isinstance(cadence, int) or isinstance(cadence, bool) or cadence <= 0:
+        raise PolicyUnavailable("%s: review_cadence_days must be a positive integer" % path)
+
+    label = str(board.get("incident_label", INCIDENT_LABEL)).strip()
+    if not label:
+        raise PolicyUnavailable("%s: board.incident_label is empty" % path)
+
+    return Policy(
+        incident_label=label,
+        review_cadence_days=cadence,
+        exemptions=exemptions,
+    )
 
 
 def relpath(value: Any) -> str:
@@ -265,6 +339,7 @@ def check_ledger(
     *,
     root: Path,
     snapshot: Optional[Dict[int, Dict[str, Any]]] = None,
+    policy: Optional[Policy] = None,
     today: Optional[date] = None,
     strict: bool = False,
     git: Optional[GitProbe] = None,
@@ -273,6 +348,7 @@ def check_ledger(
     """Run every enforcement rule and return the report."""
     root = Path(root)
     today = today or date.today()
+    active_policy = policy if policy is not None else default_policy()
     probe = git if git is not None else GitProbe(root)
     findings: List[Finding] = list(ledger.findings)
 
@@ -298,9 +374,9 @@ def check_ledger(
     findings.extend(_check_incident_coverage(incidents, rcas, lessons))
     findings.extend(_check_lessons(lessons, root=root, probe=probe))
     findings.extend(_check_actions(actions, rcas, root=root, probe=probe))
-    findings.extend(_check_review_cadence(rcas, today=today))
+    findings.extend(_check_review_cadence(rcas, today=today, policy=active_policy))
     if snapshot is not None:
-        findings.extend(_check_board(incidents, snapshot))
+        findings.extend(_check_board(incidents, snapshot, policy=active_policy))
 
     counts = {
         "incidents": len(incidents),
@@ -319,7 +395,17 @@ def check_ledger(
             else sum(
                 1
                 for issue in snapshot.values()
-                if INCIDENT_LABEL in (issue.get("labels") or [])
+                if active_policy.incident_label in (issue.get("labels") or [])
+            )
+        ),
+        "board_incidents_exempt": (
+            0
+            if snapshot is None
+            else sum(
+                1
+                for issue in snapshot.values()
+                if active_policy.incident_label in (issue.get("labels") or [])
+                and "#%d" % issue.get("number", 0) in active_policy.exemptions
             )
         ),
         "artifacts_checked": len(rcas),
@@ -772,19 +858,19 @@ def _unresolvable_evidence(record_id: str, sha: str, probe: GitProbe) -> List[Fi
     ]
 
 
-def _check_review_cadence(rcas, *, today: date) -> List[Finding]:
+def _check_review_cadence(rcas, *, today: date, policy: Policy) -> List[Finding]:
     """An RCA that is never re-read is a document, not a practice."""
     findings: List[Finding] = []
     for rca in rcas:
         rca_id = str(rca.get("id"))
         age = days_since(rca.get("reviewed_at"), today)
-        if age is None or age <= REVIEW_CADENCE_DAYS:
+        if age is None or age <= policy.review_cadence_days:
             continue
         findings.append(
             Finding(
                 code=CODE_RCA_REVIEW_OVERDUE,
                 message="%s was last reviewed %d days ago (> %d)"
-                % (rca_id, age, REVIEW_CADENCE_DAYS),
+                % (rca_id, age, policy.review_cadence_days),
                 subject=rca_id,
                 severity=SEVERITY_WARNING,
                 remediation="re-review the RCA and re-stamp reviewed_at",
@@ -793,8 +879,12 @@ def _check_review_cadence(rcas, *, today: date) -> List[Finding]:
     return findings
 
 
-def _check_board(incidents, snapshot) -> List[Finding]:
-    """AC2/DoD: an incident-labelled issue must have an RCA (closed) or a plan."""
+def _check_board(incidents, snapshot, *, policy: Policy) -> List[Finding]:
+    """AC2/DoD: an incident-labelled issue needs an RCA (closed) or a plan.
+
+    Scope is declared in ``policy.yaml``. An issue listed as exempt is reported
+    with the reason it is exempt, so nothing is silently skipped.
+    """
     findings: List[Finding] = []
     traced = {
         _origin_ref(record)
@@ -803,10 +893,22 @@ def _check_board(incidents, snapshot) -> List[Finding]:
     }
     for number in sorted(snapshot):
         issue = snapshot[number]
-        if INCIDENT_LABEL not in (issue.get("labels") or []):
+        if policy.incident_label not in (issue.get("labels") or []):
             continue
         ref = "#%d" % number
         if ref in traced:
+            continue
+        reason = policy.exemptions.get(ref)
+        if reason:
+            findings.append(
+                Finding(
+                    code=CODE_BOARD_INCIDENT_EXEMPT,
+                    message="incident-labelled issue %s is exempt: %s" % (ref, reason),
+                    subject=ref,
+                    severity=SEVERITY_WARNING,
+                    remediation="re-review the exemption when the issue closes",
+                )
+            )
             continue
         if str(issue.get("state", "")).upper() == "CLOSED":
             findings.append(

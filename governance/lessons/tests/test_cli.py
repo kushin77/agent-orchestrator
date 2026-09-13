@@ -189,6 +189,15 @@ def test_strict_fails_on_deviations(tmp_path, capsys):
     assert "SUGGEST-0001 is open" in capsys.readouterr().out
 
 
+def test_a_malformed_policy_fails_the_gate(tmp_path, capsys):
+    repo = make_repo(tmp_path / "repo")
+    (repo / "governance" / "lessons" / "policy.yaml").write_text(
+        "schema: [unclosed\n", encoding="utf-8"
+    )
+    assert cli.main(["--root", str(repo), "check"]) == 1
+    assert "NOT-OK" in capsys.readouterr().err
+
+
 def test_status_summarizes_the_ledger(tmp_path, capsys):
     repo = make_repo(tmp_path / "repo")
     assert cli.main(["--root", str(repo), "status"]) == 0

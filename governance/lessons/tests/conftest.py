@@ -21,7 +21,7 @@ if str(PKG_DIR) not in sys.path:
 
 REPO_ROOT = PKG_DIR.parent.parent
 
-from checker import check_ledger, parse_ledger_text  # noqa: E402
+from checker import Policy, check_ledger, parse_ledger_text  # noqa: E402
 from model import RCA_REQUIRED_SECTIONS  # noqa: E402
 
 TODAY = date(2026, 9, 15)
@@ -164,13 +164,16 @@ def root(tmp_path: Path) -> Path:
 def report_factory(root: Path):
     """Build a ledger from records and check it, with stubs by default."""
 
-    def build(records, *, snapshot=None, probe=None, strict=False, today=TODAY):
+    def build(
+        records, *, snapshot=None, probe=None, policy=None, strict=False, today=TODAY
+    ):
         text = "\n".join(json.dumps(r, sort_keys=True) for r in records) + "\n"
         ledger = parse_ledger_text(text, root / "ledger.jsonl")
         return check_ledger(
             ledger,
             root=root,
             snapshot=snapshot,
+            policy=policy,
             strict=strict,
             today=today,
             git=probe if probe is not None else StubProbe(commits={"abc1234"}),
@@ -178,6 +181,18 @@ def report_factory(root: Path):
         )
 
     return build
+
+
+@pytest.fixture
+def exempt_policy():
+    """A policy that exempts the enforcement issue from board coverage."""
+    return Policy(
+        incident_label=INCIDENT_LABEL,
+        review_cadence_days=180,
+        exemptions={
+            "#141": "installs this enforcement; an RCA for the rule is circular"
+        },
+    )
 
 
 @pytest.fixture
