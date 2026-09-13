@@ -105,6 +105,51 @@ def test_kill_releases_the_run_before_it_takes_the_loop_down(monkeypatch):
     assert calls == ["control:kill"], "kill must go through the release path, not just exit"
 
 
+# --- the control plane: process levers must work while a run blocks ------------
+
+
+def test_the_loop_pid_comes_from_the_heartbeat(tmp_path, monkeypatch):
+    import control
+
+    fleet = tmp_path / ".fleet"
+    fleet.mkdir(parents=True, exist_ok=True)
+    (fleet / "sister.heartbeat.json").write_text(json.dumps({"pid": 4242}), encoding="utf-8")
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    assert control._loop_pid() == 4242
+
+
+def test_kill_signals_the_loop_because_a_message_would_wait_for_the_run(tmp_path, monkeypatch):
+    """The loop blocks in the child run, so a mailbox-only kill would sit unread."""
+    import control
+
+    sent, signalled = [], []
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    (tmp_path / ".fleet").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".fleet" / "sister.heartbeat.json").write_text(json.dumps({"pid": 4242}), encoding="utf-8")
+    monkeypatch.setattr(control, "_send_control", lambda action: sent.append(action))
+    monkeypatch.setattr(control.os, "kill", lambda pid, sig: signalled.append((pid, sig)))
+
+    assert control.cmd_kill(type("Args", (), {})()) == 0
+    assert sent == ["kill"], "the order must still be recorded in the channel"
+    assert signalled == [(4242, control.signal.SIGTERM)], "and it must take effect immediately"
+
+
+def test_status_reports_the_flags_and_the_loop_pid(tmp_path, monkeypatch, capsys):
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    fleet = tmp_path / ".fleet"
+    (fleet / "runs").mkdir(parents=True, exist_ok=True)
+    (fleet / "paused").write_text("x", encoding="utf-8")
+    (fleet / "sister.heartbeat.json").write_text(json.dumps({"pid": 99}), encoding="utf-8")
+    monkeypatch.setattr(control, "_run", lambda cmd, check=True: type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})())
+
+    control.cmd_status(type("Args", (), {})())
+    out = capsys.readouterr().out
+    assert "paused: yes" in out and "stopping: no" in out
+    assert "loop pid (from heartbeat): 99" in out
+
+
 def test_the_brain_profile_drives_the_floors_and_the_kb(tmp_path):
     """A profile that nothing reads is decoration."""
     import brain
