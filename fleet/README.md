@@ -98,6 +98,27 @@ to run it again, not an error. Reporting **consumes** the directive: it leaves
 number of outstanding orders. Without a running listener, queued directives sit
 unread — which is exactly what a timed-out `wait` on the brain side means.
 
+## Escalation + the live log (both sides idle, never asleep)
+
+The brain and sister never sleep — they idle and wait to be pinged:
+
+```bash
+# sister/subagent: when a directive hits trouble, raise it instead of going dark
+python3 fleet/channel.py escalate --from sister --correlation <id> \
+  --severity critical --body "verify failed twice: <exact error>"
+
+# brain: idle-watch the whole channel as a live log
+python3 fleet/channel.py listen --timeout-seconds 0
+```
+
+`listen` tails `.fleet/slog.jsonl` (the append-only structured log every
+`send`/`report`/`escalate` writes) and prints each message the moment it lands,
+so an escalation from the sister pings the brain terminal in real time. The
+brain stays blocked on `listen` — idle, not asleep — and answers on demand.
+Escalations must carry `correlation_id` and a `severity` (`info`/`warn`/
+`critical`) and may only come from the sister or a subagent, never the brain
+(enforced by the gate).
+
 ## Mailbox
 
 ```

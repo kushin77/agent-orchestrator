@@ -205,3 +205,44 @@ def test_consuming_an_absent_directive_is_a_no_op(tmp_path, monkeypatch):
     monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
     monkeypatch.setattr(channel, "DONE", tmp_path / "done")
     assert channel.consume_directive("never-queued") is False
+
+
+def test_escalate_requires_a_correlation_id():
+    problems = validate({"from": "sister", "to": "brain", "type": "escalate", "severity": "warn"})
+    assert any("correlation_id" in problem for problem in problems)
+
+
+def test_the_brain_cannot_escalate_to_itself():
+    problems = validate(
+        {"from": "brain", "to": "brain", "type": "escalate", "correlation_id": "d-1", "severity": "warn"}
+    )
+    assert any("does not escalate" in problem for problem in problems)
+
+
+def test_escalate_with_a_bad_severity_is_refused():
+    problems = validate(
+        {"from": "sister", "to": "brain", "type": "escalate", "correlation_id": "d-1", "severity": "max"}
+    )
+    assert any("severity" in problem for problem in problems)
+
+
+def test_escalate_writes_to_the_outbox_and_the_slog(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
+    args = type(
+        "Args",
+        (),
+        {"from_role": "sister", "correlation": "d-1", "severity": "critical", "body": "boom"},
+    )()
+    assert channel.cmd_escalate(args) == EXIT_OK
+    assert len(list((tmp_path / "outbox").glob("*.json"))) == 1
+    assert (tmp_path / "slog.jsonl").exists()
+
+
+def test_listen_prints_a_new_message(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
+    channel._slog(
+        {"type": "escalate", "from": "sister", "correlation_id": "d-1", "severity": "critical", "body": "x"}
+    )
+    args = type("Args", (), {"timeout_seconds": 0.5, "interval": 0.01, "max_messages": 1})()
+    assert channel.cmd_listen(args) == EXIT_OK
