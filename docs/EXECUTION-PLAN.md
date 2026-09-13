@@ -76,7 +76,29 @@ field name, never the files.
 7. Close the issue with the evidence comment; re-check the board before
    standing down (never idle).
 
-## 5. FinOps / model discipline
+## 5. Chronological dispatch rule (mandatory)
+
+Agents must not schedule work by board visibility or board scavenging. The issue
+queue is executed in chronological, dependency-aware order.
+
+1. **Claim only the next required issue.** The active issue is the next item in
+   the current milestone / phase chain or the child needed to close the active
+   parent.
+2. **No unrelated board picking.** A GitHub issue that is not required to close
+   the current issue or advance the active dependency chain is not eligible.
+3. **Parent/child chain wins over board rank.** A parent issue and its
+   dependent child work together as one sequence; the board only exposes the
+   next valid item in that chain.
+4. **Kanban drift is forbidden.** If a task is not directly tied to the current
+   open issue, it is deferred until the chain reaches it.
+5. **Close the chain before launching new work.** New issue selection is only
+   allowed after the current chain reaches verification/closeout or when the new
+   issue is the direct required continuation of the same chain.
+
+This is a governance rule, not an optimization preference. Any agent that
+starts choosing issues ad hoc is violating the repo's execution contract.
+
+## 6. FinOps / model discipline
 
 - Default dispatch at the **cheapest capable tier** (flash/LOW).
 - Escalate (pro/HIGH) only on observed difficulty or for security/authN lanes —
@@ -84,7 +106,7 @@ field name, never the files.
 - No two agents touch the same file in the same wave; conflicts are a cost,
   not just a correctness problem.
 
-## 6. Gate of record
+## 7. Gate of record
 
 `make verify` is the repo's gate of record until CI lands (issue #6). It is an
 **honest composite gate** (shell syntax, YAML, JSON, docs, secrets) — every
