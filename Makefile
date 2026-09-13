@@ -16,8 +16,8 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims secrets feature-flags cloudbuild terraform tf-fmt \
-        tf-validate shellcheck gitleaks pre-commit
+        issue-claims fleet-channel secrets feature-flags cloudbuild terraform \
+        tf-fmt tf-validate shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
 
@@ -51,6 +51,8 @@ help:
 	@echo "                issue selection (GR-20, cannot drift to kanban picking)"
 	@echo "  issue-claims  Claim-time order enforcement (#157): ledger replayed"
 	@echo "                against the board snapshot + self-control mutants"
+	@echo "  fleet-channel Steering channel (M26 #162): message contract + the"
+	@echo "                DSv4FNone standing directive, all mutants refused"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -63,7 +65,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel
 	@echo ""
 	@echo "lint: OK"
 
@@ -113,6 +115,11 @@ chronological-dispatch:
 ## audit always runs its own mutants, so it cannot pass vacuously
 issue-claims:
 	@bash scripts/check-issue-claims.sh
+
+## fleet-channel — steering channel (M26, issue #162): the message contract and
+## the DSv4FNone standing directive; every mutant message must be refused
+fleet-channel:
+	@bash scripts/check-fleet-channel.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
