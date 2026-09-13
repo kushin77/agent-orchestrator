@@ -188,7 +188,10 @@ def validate(message: dict) -> list[str]:
             if kind is not None and kind not in TASK_KINDS:
                 problems.append(f"task.kind must be one of {', '.join(TASK_KINDS)}")
             issue = task.get("issue")
-            if kind not in NON_WORK_KINDS and (
+            # A decompose order carries task.decompose (a micro-task plan) instead of
+            # an issue; like a non-work kind, it needs no issue of its own.
+            carries_decompose = isinstance(task.get("decompose"), dict) and bool(task["decompose"].get("children"))
+            if kind not in NON_WORK_KINDS and not carries_decompose and (
                 not isinstance(issue, int) or isinstance(issue, bool) or issue < 1
             ):
                 problems.append("task.issue must be a positive integer")
