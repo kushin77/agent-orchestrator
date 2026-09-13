@@ -181,13 +181,13 @@ def collect_from_github(root: Path | None = None) -> dict:
             {
                 "issue": number,
                 "title": issue.get("title", ""),
-                "state": issue.get("state", "open"),
+                "state": str(issue.get("state", "open")).lower(),
                 "milestone": (issue.get("milestone") or {}).get("title"),
                 "labels": [label["name"] for label in issue.get("labels") or []],
                 "pr": (
                     {
                         "number": int(pull["number"]),
-                        "state": pull.get("state"),
+                        "state": str(pull.get("state", "")).lower(),
                         "branch": pull.get("headRefName", ""),
                         "head_commit": pull.get("headRefOid", ""),
                         "merge_commit": (pull.get("mergeCommit") or {}).get("oid", ""),
