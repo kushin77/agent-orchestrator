@@ -48,6 +48,9 @@ node_modules/
 .fleet/brain/
 .fleet/*.heartbeat.json
 .fleet/*.lock
+# Run registry (which loop is tracking which directive) + report dedupe: runtime state.
+.fleet/runs/
+.fleet/reported/
 
 # Local environment / secrets
 .env
