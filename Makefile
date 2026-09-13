@@ -16,7 +16,8 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims secrets feature-flags cloudbuild terraform tf-fmt \
+        issue-claims knowledge-index knowledge-index-build secrets \
+        feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
@@ -51,6 +52,8 @@ help:
 	@echo "                issue selection (GR-20, cannot drift to kanban picking)"
 	@echo "  issue-claims  Claim-time order enforcement (#157): ledger replayed"
 	@echo "                against the board snapshot + self-control mutants"
+	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
+	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -113,6 +116,16 @@ chronological-dispatch:
 ## audit always runs its own mutants, so it cannot pass vacuously
 issue-claims:
 	@bash scripts/check-issue-claims.sh
+
+## knowledge-index — the institutional knowledge index must be valid (issue #139):
+## every item's provenance complete, secret policy clean, mandatory kinds covered
+knowledge-index:
+	@bash scripts/check-knowledge-index.sh
+
+## knowledge-index-build — regenerate the catalogue + report on demand (the ops
+## runner invokes the same command on its schedule)
+knowledge-index-build:
+	@python3 governance/knowledge/cli.py build
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
