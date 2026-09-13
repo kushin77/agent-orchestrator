@@ -108,6 +108,7 @@ def cmd_claim(args: argparse.Namespace) -> int:
             base_commit=args.base_commit,
             snapshot_sha256=digest,
             ttl_hours=args.ttl_hours,
+            directive_id=args.directive,
         )
     except claims.ClaimRefused as exc:
         print(f"claim REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
@@ -190,6 +191,7 @@ def build_parser() -> argparse.ArgumentParser:
     claim.add_argument("--lane", default="")
     claim.add_argument("--ttl-hours", type=int, default=claims.DEFAULT_TTL_HOURS)
     claim.add_argument("--base-commit", default="")
+    claim.add_argument("--directive", default="", help="brain directive id authorizing this claim")
     claim.set_defaults(func=cmd_claim)
 
     release = sub.add_parser("release", help="release a claim")

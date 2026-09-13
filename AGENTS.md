@@ -98,7 +98,9 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     `python3 governance/dispatch/cli.py claim --issue <n> --agent <id> --lane
     <lane>` refuses an out-of-order or duplicate claim; `make issue-claims`
     audits the ledger against the committed board snapshot
-    (`governance/dispatch/README.md`).
+    (`governance/dispatch/README.md`). A brain directive recorded in
+    `.fleet/sent` is a chain edge: `claim --directive <id>` authorizes exactly
+    the issue the directive names.
 
 ## Directory layout (pillar-aligned)
 

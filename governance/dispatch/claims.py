@@ -23,10 +23,15 @@ from pathlib import Path
 import order
 from model import (
     ALLOWED_CLAIM_REASONS,
+    REASON_BLOCKED,
+    REASON_BRAIN_DIRECTED,
     REASON_CHILD_OF_CLAIM,
+    REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
     REASON_SUCCESSOR_OF_CLAIM,
+    REASON_UNKNOWN_ISSUE,
     ClaimEvent,
+    Eligibility,
     Issue,
     Snapshot,
     parse_claim_event,
@@ -36,6 +41,7 @@ from snapshot import now_iso, parse_iso
 DEFAULT_LEDGER = Path(".board/claims.jsonl")
 DEFAULT_LOCK_DIR = Path(".board/locks")
 DEFAULT_TTL_HOURS = 24
+SENT_DIR = Path(__file__).resolve().parent.parent.parent / ".fleet" / "sent"
 
 
 class ClaimRefused(Exception):
@@ -137,6 +143,30 @@ def _release_lock(issue: int, lock_dir: Path | str) -> None:
     lock_path(issue, lock_dir).unlink(missing_ok=True)
 
 
+def _load_brain_directive(directive_id: str, issue_number: int) -> dict:
+    """Verify the brain authorized this issue through a sent directive.
+
+    The brain is the chain: a directive recorded in .fleet/sent is a chain edge
+    that authorizes off-frontier work. It must be a real, brain-issued directive
+    naming exactly this issue — anything else raises ClaimRefused.
+    """
+    target = SENT_DIR / f"{directive_id}.json"
+    if not target.exists():
+        raise ClaimRefused("invalid-directive", f"no sent directive {directive_id} in .fleet/sent")
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise ClaimRefused("invalid-directive", f"directive {directive_id} is unreadable ({exc})")
+    if data.get("from") != "brain" or data.get("type") != "directive":
+        raise ClaimRefused("invalid-directive", f"{directive_id} is not a brain directive")
+    task = data.get("task") or {}
+    if task.get("issue") != issue_number:
+        raise ClaimRefused(
+            "invalid-directive", f"directive {directive_id} authorizes #{task.get('issue')}, not #{issue_number}"
+        )
+    return data
+
+
 def claim(
     issue_number: int,
     agent: str,
@@ -148,6 +178,7 @@ def claim(
     snapshot_sha256: str = "",
     ttl_hours: int = DEFAULT_TTL_HOURS,
     now: datetime | None = None,
+    directive_id: str = "",
 ) -> ClaimEvent:
     """Claim an issue after checking order. Raises ClaimRefused when it is not the next step."""
     moment = now or datetime.now(timezone.utc)
@@ -167,16 +198,34 @@ def claim(
     if latest is not None and is_expired(latest, moment) and latest.agent != agent:
         takeover = True
 
-    others = frozenset(number for number, holder in live.items() if holder.agent != agent)
-    verdict = order.eligible(
-        snapshot,
-        issue_number,
-        active_claims=frozenset(number for number, holder in live.items() if holder.agent == agent),
-        agent_history=frozenset(history),
-        claimed_by_others=others,
-    )
-    if not verdict.eligible:
-        raise ClaimRefused(verdict.reason, verdict.detail)
+    # Structural checks hold for every path, directive or not.
+    issue = snapshot.get(issue_number)
+    if issue is None:
+        raise ClaimRefused(REASON_UNKNOWN_ISSUE, f"#{issue_number} is absent from the snapshot")
+    if issue.closed:
+        raise ClaimRefused(REASON_ISSUE_CLOSED, f"#{issue_number} is closed")
+    open_blockers = snapshot.blockers_open(issue)
+    if open_blockers:
+        listed = ", ".join(f"#{number}" for number in open_blockers)
+        raise ClaimRefused(REASON_BLOCKED, f"#{issue_number} is blocked by {listed}")
+
+    directive: dict | None = None
+    if directive_id:
+        directive = _load_brain_directive(directive_id, issue_number)
+
+    if directive is not None:
+        verdict = Eligibility(issue_number, True, REASON_BRAIN_DIRECTED, f"brain-directed via {directive_id}")
+    else:
+        others = frozenset(number for number, holder in live.items() if holder.agent != agent)
+        verdict = order.eligible(
+            snapshot,
+            issue_number,
+            active_claims=frozenset(number for number, holder in live.items() if holder.agent == agent),
+            agent_history=frozenset(history),
+            claimed_by_others=others,
+        )
+        if not verdict.eligible:
+            raise ClaimRefused(verdict.reason, verdict.detail)
 
     if not _acquire_lock(issue_number, lock_dir, takeover=takeover):
         raise ClaimRefused("already-claimed", f"#{issue_number} lock is held by another agent")
@@ -192,6 +241,8 @@ def claim(
         snapshot_sha256=snapshot_sha256,
         reason=verdict.reason,
         ttl_hours=ttl_hours,
+        directive_id=directive_id,
+        directive_from="brain" if directive is not None else "",
     )
     append_event(event, ledger)
     return event
@@ -315,6 +366,10 @@ def _claim_problems(event: ClaimEvent, events: list[ClaimEvent], snapshot: Snaps
     if event.reason not in ALLOWED_CLAIM_REASONS:
         problems.append(f"#{event.issue}: reason '{event.reason or '<empty>'}' is not a chain reason")
         return problems
+    if event.reason == REASON_BRAIN_DIRECTED:
+        if not event.directive_id:
+            problems.append(f"#{event.issue}: reason 'brain-directed' but no directive_id is recorded")
+        return problems
 
     earlier = {
         prior.issue
@@ -435,7 +490,37 @@ def self_control(now: datetime | None = None) -> list[str]:
         "child-of-claim",
         [record(601, REASON_NEXT_IN_MILESTONE), record(605, REASON_CHILD_OF_CLAIM)],
     )
+    expect_clean(
+        "brain-directed",
+        [
+            ClaimEvent(
+                event="claim",
+                issue=603,
+                agent="control-agent",
+                at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                lane="control",
+                reason=REASON_BRAIN_DIRECTED,
+                ttl_hours=DEFAULT_TTL_HOURS,
+                directive_id="d-1",
+                directive_from="brain",
+            )
+        ],
+    )
     expect_rejected("scavenging", [record(603, REASON_NEXT_IN_MILESTONE)])
+    expect_rejected(
+        "brain-directed-without-ref",
+        [
+            ClaimEvent(
+                event="claim",
+                issue=603,
+                agent="control-agent",
+                at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                lane="control",
+                reason=REASON_BRAIN_DIRECTED,
+                ttl_hours=DEFAULT_TTL_HOURS,
+            )
+        ],
+    )
     expect_rejected("epic", [record(607, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("blocked", [record(602, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("closed", [record(604, REASON_NEXT_IN_MILESTONE)])

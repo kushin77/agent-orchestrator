@@ -21,10 +21,12 @@ from typing import Any
 REASON_CHILD_OF_CLAIM = "child-of-claim"
 REASON_SUCCESSOR_OF_CLAIM = "successor-of-claim"
 REASON_NEXT_IN_MILESTONE = "next-in-milestone"
+REASON_BRAIN_DIRECTED = "brain-directed"
 ALLOWED_CLAIM_REASONS = (
     REASON_CHILD_OF_CLAIM,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_NEXT_IN_MILESTONE,
+    REASON_BRAIN_DIRECTED,
 )
 
 # Reasons a claim is refused.
@@ -141,6 +143,8 @@ class ClaimEvent:
     snapshot_sha256: str = ""
     reason: str = ""
     ttl_hours: int = 24
+    directive_id: str = ""
+    directive_from: str = ""
 
     @property
     def is_claim(self) -> bool:
@@ -157,6 +161,8 @@ class ClaimEvent:
             "snapshot_sha256": self.snapshot_sha256,
             "reason": self.reason,
             "ttl_hours": self.ttl_hours,
+            "directive_id": self.directive_id,
+            "directive_from": self.directive_from,
         }
 
 
@@ -197,4 +203,6 @@ def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
         snapshot_sha256=str(obj.get("snapshot_sha256", "") or ""),
         reason=str(obj.get("reason", "") or ""),
         ttl_hours=ttl,
+        directive_id=str(obj.get("directive_id", "") or ""),
+        directive_from=str(obj.get("directive_from", "") or ""),
     )

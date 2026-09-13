@@ -47,6 +47,10 @@ Everything after step 2 is code: the brain sends directives with
 ```
 
 * Only `directive`, `ack`, `result` and `halt` message types exist.
+* A directive is also a **chain edge**: the subagent authorizes its claim with
+  it — `python3 governance/dispatch/cli.py claim --issue N --agent X --lane L
+  --directive <id>` — so the brain can legally direct off-frontier work while
+  unordered scavenging stays refused.
 * Only the brain may address a directive to the sister; the sister can never
   issue directives (dumb-terminal rule, enforced).
 * `model.tier` ∈ {`pro`, `flash`} and `model.thinking` ∈ {`none`, `low`,

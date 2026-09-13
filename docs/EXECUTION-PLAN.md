@@ -64,7 +64,9 @@ field name, never the files.
    --agent <id> --lane <lane>` — refused unless the issue is the next step in the
    active chain (frontier of the active milestone, a child of an issue you hold,
    or the successor of one you advanced). A second claim on an in-flight issue is
-   refused too. Release the claim when the chain advances.
+   refused too. Release the claim when the chain advances. A brain directive
+   recorded in `.fleet/sent` authorizes off-frontier work:
+   `claim --directive <id>`; without one, off-frontier claims stay refused.
 2. Work in your **own git worktree** under `$TMPDIR` (never the shared main
    checkout).
 3. Read the issue spec (`gh api` is authoritative — `gh issue view` trips the
