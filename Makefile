@@ -18,7 +18,8 @@ SHELL := /bin/bash
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
         issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index knowledge-index-build \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
-        tf-validate shellcheck gitleaks pre-commit worktrees
+        tf-validate shellcheck gitleaks pre-commit worktrees \
+        remediation remediation-scan remediation-dispatch
 
 .DEFAULT_GOAL := help
 
@@ -201,6 +202,32 @@ conformance:
 ## (GR-15 code-native automation; new infrastructure ships flag-gated OFF)
 conformance-change-set:
 	@python3 governance/conformance/cli.py change-set
+
+## remediation — auto-generate violator remediation issues from policy drift
+## (issue #142): board conformance findings must produce a well-formed
+## remediation payload (title/labels/owner-lane/corrective-steps/policy-ref/
+## evidence) or the scan itself must resolve; only CANNOT-ASSESS fails the
+## gate, the same reasoning check-conformance.sh already applies (a calibrated
+## backlog of deviations is reported, not a red gate no lane can fix alone)
+remediation:
+	@bash scripts/check-remediation.sh
+
+## remediation-scan — auto-generate violator remediation issues from policy
+## drift (issue #142): runs the conformance board + change-set checks and
+## turns each finding into a remediation-issue payload (title, labels, owner
+## lane, corrective steps, policy reference, evidence), deduped/merged across
+## repeats, writes .verify/remediation-report.json. Offline (no GitHub I/O) —
+## the "on changes" hook; run it after any change that could drift the board.
+remediation-scan:
+	@python3 governance/remediation/cli.py scan
+
+## remediation-dispatch — scan, then create/update the actual GitHub issues
+## for anything not already tracked, escalating SLA/severity breaches to the
+## governance board (the ops runner invokes this on its schedule, the same
+## precedent as knowledge-index-build — network-touching, so it stays a make
+## target rather than a new GitHub Actions workflow, GR-15).
+remediation-dispatch:
+	@python3 governance/remediation/cli.py route --apply
 
 ## lessons — RCA + lessons enforcement (issue #141): an incident with no RCA,
 ## an RCA with no traceable origin or corrective action, an action that is not

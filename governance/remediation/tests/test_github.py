@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import List
 
 from github import create_issue, existing_remediation_issues, find_existing, route
-from model import RemediationIssue
+from remediation_model import RemediationIssue
 
 
 def _issue(key="class-missing:issue-1", severity="high", occurrences=1):

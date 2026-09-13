@@ -41,19 +41,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-_CONFORMANCE_DIR = os.path.join(os.path.dirname(_PKG_DIR), "conformance")
+if _PKG_DIR not in sys.path:
+    sys.path.insert(0, _PKG_DIR)
 
-# Both governance/conformance and governance/remediation are standalone
-# modules (no package __init__.py) that each own a bare `model.py`, so they
-# cannot both sit on sys.path at once: `from model import X` binds whichever
-# `model` module the interpreter cached first under sys.modules["model"], and
-# the two are not compatible (one has `Finding`, the other `RemediationIssue`).
-#
-# Import conformance's checker + model *in isolation* first — the names it
-# needs (`Finding`, `Policy`, ...) get bound into `checker`'s own namespace at
-# import time, so evicting `model` from sys.modules afterwards is safe: it
-# only forces the *next* `from model import ...` (ours) to resolve fresh.
-sys.path.insert(0, _CONFORMANCE_DIR)
+_CONFORMANCE_DIR = os.path.join(os.path.dirname(_PKG_DIR), "conformance")
+if _CONFORMANCE_DIR not in sys.path:
+    sys.path.insert(0, _CONFORMANCE_DIR)
+
+# governance/conformance and governance/remediation are both standalone
+# modules (no package __init__.py); conformance's own domain module is
+# `model.py` while this package's is `remediation_model.py` specifically so
+# the two can be imported together in one process without a sys.modules
+# collision on the bare name "model".
 from checker import (  # noqa: E402
     POLICY_RELPATH,
     SNAPSHOT_RELPATH,
@@ -62,14 +61,9 @@ from checker import (  # noqa: E402
     load_policy,
     load_snapshot,
 )
-
-sys.path.remove(_CONFORMANCE_DIR)
-sys.modules.pop("model", None)
-
-sys.path.insert(0, _PKG_DIR)
 from generator import generate  # noqa: E402
 from github import route  # noqa: E402
-from model import RemediationReport  # noqa: E402
+from remediation_model import RemediationReport  # noqa: E402
 
 DEFAULT_ROOT = Path(_PKG_DIR).parent.parent
 REPORT_RELPATH = Path(".verify") / "remediation-report.json"

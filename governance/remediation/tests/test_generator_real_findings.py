@@ -72,6 +72,11 @@ def _load_real_findings():
     module from ``sys.modules`` so the remediation package's own ``model``
     resolves fresh for the rest of this process (the two packages each own a
     bare, incompatible ``model.py`` — see cli.py's import section)."""
+    # Evict any remediation-side `model`/`checker` already cached in this test
+    # session (other test modules in this same process import them) before
+    # conformance's checker does its own `from model import ...`.
+    sys.modules.pop("model", None)
+    sys.modules.pop("checker", None)
     sys.path.insert(0, _CONFORMANCE_DIR)
     try:
         import checker as conformance_checker

@@ -22,7 +22,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Sequence
 
-from model import ESCALATION_LABEL, REMEDIATION_LABEL, RemediationIssue
+from remediation_model import ESCALATION_LABEL, REMEDIATION_LABEL, RemediationIssue
 
 Runner = Callable[..., "subprocess.CompletedProcess"]
 

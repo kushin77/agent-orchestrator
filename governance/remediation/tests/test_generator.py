@@ -5,7 +5,7 @@ from __future__ import annotations
 from conftest import FakeFinding
 
 from generator import build_issue, generate, merge
-from model import SEVERITY_CRITICAL, SEVERITY_HIGH, SEVERITY_MEDIUM
+from remediation_model import SEVERITY_CRITICAL, SEVERITY_HIGH, SEVERITY_MEDIUM
 
 
 def test_build_issue_carries_title_labels_summary_lane_steps_policy_evidence():

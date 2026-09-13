@@ -20,9 +20,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 CLI = REPO_ROOT / "governance" / "remediation" / "cli.py"
 
 
-def _run(*args):
+def _run(root, *args):
     return subprocess.run(
-        [sys.executable, str(CLI), *args],
+        [sys.executable, str(CLI), "--root", str(root), *args],
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
@@ -31,7 +31,7 @@ def _run(*args):
 
 
 def test_scan_runs_against_the_real_board_and_writes_a_report(tmp_path):
-    result = _run("scan", "--root", str(REPO_ROOT), "--repo", "kushin77/agent-orchestrator")
+    result = _run(REPO_ROOT, "scan", "--repo", "kushin77/agent-orchestrator")
     assert result.returncode in (0, 1), result.stderr
 
     report_path = REPO_ROOT / ".verify" / "remediation-report.json"
@@ -49,7 +49,7 @@ def test_scan_runs_against_the_real_board_and_writes_a_report(tmp_path):
 
 
 def test_scan_dedups_repeated_findings_into_one_issue_with_growing_occurrences():
-    result = _run("scan", "--root", str(REPO_ROOT))
+    result = _run(REPO_ROOT, "scan")
     assert result.returncode in (0, 1), result.stderr
 
     report_path = REPO_ROOT / ".verify" / "remediation-report.json"
@@ -59,7 +59,7 @@ def test_scan_dedups_repeated_findings_into_one_issue_with_growing_occurrences()
 
 
 def test_route_without_apply_performs_no_network_calls_and_exits_ok():
-    result = _run("route", "--root", str(REPO_ROOT), "--repo", "kushin77/agent-orchestrator")
+    result = _run(REPO_ROOT, "route", "--repo", "kushin77/agent-orchestrator")
     assert result.returncode == 0, result.stderr
     assert "dry-run" in result.stdout
 
@@ -69,6 +69,6 @@ def test_scan_cannot_assess_when_policy_is_absent(tmp_path):
     # (exit 2), not a false green and not a crash.
     (tmp_path / "governance" / "conformance").mkdir(parents=True)
     (tmp_path / ".board").mkdir()
-    result = _run("scan", "--root", str(tmp_path))
+    result = _run(tmp_path, "scan")
     assert result.returncode == 2
     assert "CANNOT-ASSESS" in result.stderr

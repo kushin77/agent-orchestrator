@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from model import (
+from remediation_model import (
     ESCALATE_OCCURRENCE_THRESHOLD,
     LANE_GOVERNANCE,
     LANE_PLATFORM,

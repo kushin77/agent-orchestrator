@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Iterable, List, Sequence
 
-from model import (
+from remediation_model import (
     RemediationIssue,
     dedup_key,
     lane_for,
@@ -101,7 +101,7 @@ def merge(issues: Iterable[RemediationIssue]) -> List[RemediationIssue]:
         for item in issue.evidence:
             if item not in existing.evidence:
                 existing.evidence.append(item)
-        from model import SEVERITY_RANK  # local import: avoid a cycle at module load
+        from remediation_model import SEVERITY_RANK  # local import: avoid a cycle at module load
 
         if SEVERITY_RANK.get(issue.severity, 0) > SEVERITY_RANK.get(existing.severity, 0):
             existing.severity = issue.severity
