@@ -20,6 +20,7 @@ import shlex
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -115,9 +116,36 @@ def looks_refused(output: str) -> bool:
     return "REFUSED" in upper or "NO WORK DONE" in upper or "NO REAL ISSUE" in upper
 
 
+HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
+
+
+def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
+    """Publish liveness *and* the commit this process is running.
+
+    A loop left running stale code made a healthy fleet look broken: the status
+    surface could not tell "not running" from "running the pre-fix build".
+    """
+    entry = {
+        "pid": os.getpid(),
+        "state": state,
+        "started_at": started_at,
+        "commit": commit,
+        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
+    tmp = HEARTBEAT.with_suffix(".tmp")
+    tmp.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+    tmp.replace(HEARTBEAT)
+
+
 def loop(args: argparse.Namespace) -> int:
+    started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    commit = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
+    ).stdout.strip() or "unknown"
     idle_printed = False
     while True:
+        write_heartbeat("idle", started_at=started_at, commit=commit)
         watch = subprocess.run(
             ["python3", CHANNEL, "watch", "--timeout-seconds", str(args.watch_timeout), "--interval", "1"],
             cwd=ROOT,
@@ -236,6 +264,7 @@ def loop(args: argparse.Namespace) -> int:
             continue
 
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
+        write_heartbeat("working", started_at=started_at, commit=commit)
         rc, output = run_once(directive, args.runner, args.timeout, args.dry_run, agent_id)
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
         refused = looks_refused(output)
