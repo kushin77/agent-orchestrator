@@ -52,6 +52,8 @@ governance/board/violations.jsonl
 # Run registry (which loop is tracking which directive) + report dedupe: runtime state.
 .fleet/runs/
 .fleet/reported/
+# Lane isolation records: runtime state, one file per minted session (issue #263)
+.fleet/lanes/
 # Fleet monitor runtime output (tracked module: fleet/monitor.py)
 .fleet/open-eye.log
 .fleet/open-eye.heartbeat

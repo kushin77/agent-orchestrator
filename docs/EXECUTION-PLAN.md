@@ -67,14 +67,23 @@ field name, never the files.
    refused too. Release the claim when the chain advances. A brain directive
    recorded in `.fleet/sent` authorizes off-frontier work:
    `claim --directive <id>`; without one, off-frontier claims stay refused.
-2. Work in your **own git worktree** under `$TMPDIR` (never the shared main
-   checkout).
+2. **Open your lane — do not work in the shared checkout.**
+   `python3 governance/isolation/cli.py open --issue <n> --agent <id> --lane
+   <lane>` mints your session identity, creates the lane's **own git worktree**
+   on branch `issue-<n>` cut from `origin/master`, and stamps your session's
+   signature into that worktree's own config with `git config --worktree`, so two
+   lanes on one machine never sign as each other. Load the identity into your
+   shell with `eval "$(python3 governance/isolation/cli.py env --issue <n>
+   --agent <id>)"` — it exports `AO_SESSION_ID`, `AO_ISSUE`, `AO_BRANCH`,
+   `AO_WORKTREE` and `GIT_AUTHOR_*`/`GIT_COMMITTER_*`. Isolation is a state the
+   machine establishes, not a convention an agent is asked to honour.
 3. Read the issue spec (`gh api` is authoritative — `gh issue view` trips the
    classic-Projects GraphQL bug on this org); implement the acceptance criteria
    to completion.
 4. Stay in your lane; smallest focused diff; no unfinished markers or debug
    leftovers.
-5. Commit with `Refs kushin77/agent-orchestrator#<n>`; push; open a PR whose
+5. Commit with `Refs kushin77/agent-orchestrator#<n>` (every commit you author —
+   the lane audit checks each one, not just the branch tip); push; open a PR whose
    body includes `Closes #<n>` and an AI-assistance declaration.
 6. **Verify before done (GR-12):** run the issue's `Verify:` command and
    `make verify`; paste the **actual output** as evidence on the PR.

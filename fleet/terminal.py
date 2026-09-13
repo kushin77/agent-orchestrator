@@ -29,6 +29,8 @@ import singleton
 
 ROOT = Path(__file__).resolve().parent.parent
 CHANNEL = str(ROOT / "fleet" / "channel.py")
+#: The institutional lane provisioner: mints the session identity before each spawn.
+ISOLATION_CLI = str(ROOT / "governance" / "isolation" / "cli.py")
 
 
 def extract_json(text: str) -> dict:
@@ -64,13 +66,22 @@ def extract_json(text: str) -> dict:
     return {}
 
 
-def build_prompt(directive: dict, agent_id: str = "subagent", worktree: Path | None = None) -> str:
-    """The subagent prompt: one issue, one worktree, evidence over assertion.
+def build_prompt(
+    directive: dict,
+    agent_id: str = "subagent",
+    worktree: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> str:
+    """The subagent prompt: one issue, one worktree, one session identity.
 
     The claim is *owned by the loop*, not by the subagent: a subagent that died
     mid-task used to leave its claim wedged until the 24h TTL, because nobody
     was left to release it. The loop claims before the spawn and releases in a
     `finally`, so a dead subagent can no longer strand an issue.
+
+    The session identity travels with the order too. An agent that does not know
+    which branch it is on cannot keep its commits traceable to the ticket, so the
+    id, the branch and the required trailer are stated rather than assumed.
     """
     task = directive.get("task") or {}
     issue = task.get("issue")
@@ -78,16 +89,26 @@ def build_prompt(directive: dict, agent_id: str = "subagent", worktree: Path | N
     directive_id = directive.get("id", "")
     model = directive.get("model") or {}
     body = directive.get("body", "")
+    identity = env or {}
+    session = identity.get("AO_SESSION_ID", "")
+    branch = identity.get("AO_BRANCH", "")
     where = (
-        f"Your worktree is {worktree} (branch {worktree.name}). Work ONLY there — never in the "
+        f"Your worktree is {worktree} (branch {branch or worktree.name}). Work ONLY there — never in the "
         "shared checkout, which other lanes are using.\n"
         if worktree is not None
         else "Work in the repo checkout; disk worktrees under ~/ao-worktrees, never /tmp.\n"
     )
+    who = (
+        f"Your session identity is {session} (agent {agent_id}) on branch {branch}. Every commit you "
+        f"author MUST carry 'Refs kushin77/agent-orchestrator#{issue}' — the lane audit checks each "
+        "commit, and one that omits it stays a violation even after a later good commit.\n"
+        if session
+        else ""
+    )
     return (
         "You are an epic-focused subagent in the kushin77/agent-orchestrator fleet, "
         "steered by the brain through the sister session. "
-        f"{where}\n"
+        f"{where}{who}\n"
         f"BRAIN DIRECTIVE {directive_id} — model {model.get('tier', 'flash')}/{model.get('thinking', 'none')}:\n{body}\n\n"
         "Do exactly this, nothing else:\n"
         f"1. Issue #{issue} is ALREADY CLAIMED for you as `{agent_id}` (lane {lane or 'n/a'}) — do NOT "
@@ -105,9 +126,15 @@ def build_prompt(directive: dict, agent_id: str = "subagent", worktree: Path | N
     )
 
 
-def build_command(directive: dict, runner: str, agent_id: str, worktree: Path | None = None) -> list[str]:
+def build_command(
+    directive: dict,
+    runner: str,
+    agent_id: str,
+    worktree: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> list[str]:
     """Runner must accept the prompt as its final argument (e.g. `claude -p`)."""
-    return shlex.split(runner) + [build_prompt(directive, agent_id, worktree)]
+    return shlex.split(runner) + [build_prompt(directive, agent_id, worktree, env)]
 
 
 def run_once(
@@ -117,20 +144,29 @@ def run_once(
     dry_run: bool,
     agent_id: str,
     worktree: Path | None = None,
+    env: dict[str, str] | None = None,
 ) -> tuple[int, str]:
     """Run one subagent for one directive; return (exit code, captured output).
 
     Uses Popen rather than `subprocess.run` so the child is reachable from the
     stop handler: a stopped loop must take its subagent down with it instead of
-    orphaning it.
+    orphaning it. The session environment is injected here, so the subagent and
+    everything it spawns commit under its own identity.
     """
-    command = build_command(directive, runner, agent_id, worktree)
+    command = build_command(directive, runner, agent_id, worktree, env)
     cwd = str(worktree) if worktree is not None else str(ROOT)
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
         return 0, f"DRY-RUN (not executed) in {cwd}"
     try:
-        child = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        child = subprocess.Popen(
+            command,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env={**os.environ, **(env or {})},
+        )
     except OSError as exc:
         return 127, f"runner could not start in {cwd}: {exc}"
     IN_FLIGHT["child"] = child
@@ -145,34 +181,55 @@ def run_once(
     return child.returncode, output or ""
 
 
-def provision_worktree(issue: int, directive_id: str) -> tuple[Path, str] | None:
-    """One lane = one branch = one working tree, provisioned before the spawn.
+def provision_worktree(
+    issue: int,
+    directive_id: str,
+    agent_id: str,
+    lane: str,
+) -> tuple[Path, str, dict[str, str]] | None:
+    """One lane = one session identity = one branch = one working tree.
 
-    Subagents used to run in the shared checkout, so a single dispatch checked
-    that checkout out onto a feature branch and two lanes shared one working
-    tree. Returns (path, branch), or None when provisioning failed (the caller
-    then runs in the shared checkout and must say so).
+    Provisioning goes through ``governance/isolation`` rather than creating a
+    worktree here, because the point is not the directory: the module mints the
+    session id and stamps the session's signature into that worktree's *own*
+    config, so the subagent's commits are attributable to the agent that made
+    them instead of to whoever's checkout they happen to share. Returns
+    (path, branch, env), or None when provisioning failed — the caller then runs
+    in the shared checkout and must say so.
     """
-    slug = f"ao-{issue}-{directive_id[:8]}"
-    path = WORKTREE_ROOT / slug
-    branch = f"issue-{issue}-{directive_id[:8]}"
-    if path.exists():
-        return path, branch
-    try:
-        WORKTREE_ROOT.mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        print(f"[terminal] cannot create {WORKTREE_ROOT}: {exc}", file=sys.stderr, flush=True)
-        return None
-    subprocess.run(["git", "-C", str(ROOT), "fetch", "origin", "master"], capture_output=True, text=True)
-    add = subprocess.run(
-        ["git", "-C", str(ROOT), "worktree", "add", "-b", branch, str(path), "origin/master"],
+    result = subprocess.run(
+        [
+            "python3", ISOLATION_CLI, "open",
+            "--issue", str(issue),
+            "--agent", agent_id,
+            "--lane", lane or "fleet",
+            "--suffix", directive_id[:8],
+            "--main", str(ROOT),
+            "--base", "origin/master",
+            "--fetch",
+        ],
+        cwd=ROOT,
         capture_output=True,
         text=True,
     )
-    if add.returncode != 0:
-        print(f"[terminal] worktree add failed: {add.stderr.strip()[-300:]}", file=sys.stderr, flush=True)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()[-300:]
+        print(f"[terminal] lane not provisioned for #{issue}: {detail}", file=sys.stderr, flush=True)
         return None
-    return path, branch
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        print(f"[terminal] lane provisioning returned unreadable JSON for #{issue}", file=sys.stderr, flush=True)
+        return None
+    identity = payload.get("identity") or {}
+    worktree = identity.get("worktree")
+    branch = identity.get("branch")
+    if not worktree or not branch:
+        print(f"[terminal] lane provisioning named no worktree for #{issue}", file=sys.stderr, flush=True)
+        return None
+    for problem in payload.get("problems") or []:
+        print(f"[terminal] lane {identity.get('session_id')} isolation problem: {problem}", file=sys.stderr, flush=True)
+    return Path(worktree), str(branch), dict(payload.get("env") or {})
 
 
 def claim_issue(issue: int, agent_id: str, lane: str, directive_id: str) -> tuple[bool, str]:
@@ -861,17 +918,19 @@ def loop(args: argparse.Namespace) -> int:
                 return 1
             continue
 
-        tree = provision_worktree(issue, directive_id)
+        tree = provision_worktree(issue, directive_id, agent_id, lane)
         if tree is None:
             subprocess.run(
                 ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
                  "--severity", "warn",
-                 "--body", f"no isolated worktree for #{issue} — running in the shared checkout"[:200]],
+                 "--body", f"no isolated lane for #{issue} — running in the shared checkout"[:200]],
                 cwd=ROOT,
             )
-        worktree, branch = tree if tree else (None, None)
+        worktree, _branch, lane_env = tree if tree else (None, None, {})
         try:
-            rc, output = run_once(directive, args.runner, args.timeout, args.dry_run, agent_id, worktree)
+            rc, output = run_once(
+                directive, args.runner, args.timeout, args.dry_run, agent_id, worktree, lane_env
+            )
         finally:
             beater.stop()
             IN_FLIGHT["issue"] = None

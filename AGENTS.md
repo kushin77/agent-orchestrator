@@ -101,6 +101,21 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     (`governance/dispatch/README.md`). A brain directive recorded in
     `.fleet/sent` is a chain edge: `claim --directive <id>` authorizes exactly
     the issue the directive names.
+15. **Session identity & lane isolation (institutional, issue #263).** Every
+    agent session is a minted identity bound to exactly one issue.
+    `governance/isolation/` generates a unique `session_id`, provisions the lane
+    as its **own git worktree** on branch `issue-<n>` cut from `origin/master`,
+    writes the session's signature into that worktree's *own* config with
+    `git config --worktree` (never the shared repository config, which every
+    other lane reads), and exports the identity — `AO_SESSION_ID`, `AO_ISSUE`,
+    `AO_BRANCH`, `AO_WORKTREE`, `GIT_AUTHOR_*`/`GIT_COMMITTER_*` — into the
+    agent's environment before it runs. Every commit a session authors carries
+    `Refs kushin77/agent-orchestrator#<n>`, so the generated history points back
+    at the ticket that ordered it. A lane whose signature leaked into the shared
+    config, whose branch does not name its issue, whose signature is another
+    session's, or whose commits omit the ticket reference is **not isolated** —
+    `scripts/check-session-isolation.sh` (in `make verify`) fails it, and
+    `governance/isolation/cli.py audit` names the broken property.
 
 ## Directory layout (pillar-aligned)
 
@@ -131,7 +146,8 @@ describing what will land there; later issues fill the directories in.
    lane/pillar it owns.
 3. **Stay in your lane.** Edit only files your issue owns (GR-3,
    `docs/EXECUTION-PLAN.md`). Smallest focused diff; no unrelated edits; no
-   unfinished markers or debug leftovers.
+   unfinished markers or debug leftovers. Work in the lane worktree your
+   session identity minted (rule 15), never in the shared checkout.
 4. **Implement** the acceptance criteria to completion — no partial work.
 5. **Verify:** run the issue's `Verify:` command **and** `make verify`; run
    `bash -n` on any shell file you add; validate any YAML/JSON you add.
