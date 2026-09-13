@@ -54,6 +54,8 @@ governance/board/violations.jsonl
 .fleet/reported/
 # Lane isolation records: runtime state, one file per minted session (issue #263)
 .fleet/lanes/
+# Lifecycle journals: durable per-item evidence of what was verified and merged
+.fleet/lifecycle/
 # Fleet monitor runtime output (tracked module: fleet/monitor.py)
 .fleet/open-eye.log
 .fleet/open-eye.heartbeat

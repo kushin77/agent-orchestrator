@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 #: The institutional lane provisioner: mints the session identity before each spawn.
 ISOLATION_CLI = str(ROOT / "governance" / "isolation" / "cli.py")
+#: The institutional close-out: drives every artifact of a finished item to terminal.
+LIFECYCLE_CLI = str(ROOT / "governance" / "lifecycle" / "cli.py")
 
 
 def extract_json(text: str) -> dict:
@@ -122,6 +124,10 @@ def build_prompt(
         f"4. After `make verify` is green and the PR is open, squash-merge it with "
         "`gh pr merge <number> --squash --delete-branch`, then close the issue. "
         "NEVER leave a completed PR unmerged or the issue open.\n"
+        "5. Leave every artifact terminal: the loop then runs the lifecycle close-out "
+        "(`governance/lifecycle`) and its verdict travels with your report, so a "
+        "surviving branch, a wedged claim, an unconsumed directive or a lane left "
+        "behind is reported as NOT-OK rather than passing as done.\n"
         "Return a short report: PR number, verify output summary, files touched, AND the merge result "
         "(PR number + merged/closed). If anything fails, report the exact error instead of improvising."
     )
@@ -264,6 +270,28 @@ def release_issue(issue: int, agent_id: str) -> tuple[bool, str]:
         text=True,
     )
     return result.returncode == 0, (result.stdout + result.stderr).strip()
+
+
+def closeout_issue(issue: int) -> str:
+    """Drive the item's remaining artifacts to their terminal state.
+
+    A run that stopped at "the PR is merged" used to be reported as a success
+    while the source branch, the claim, the authorisation directive and the lane
+    worktree were all still live — five separate drifts, none of them noticed by
+    a gate. Close-out runs here and its verdict travels with the report, so a
+    partial close reaches the brain instead of being found later by hand.
+    """
+    result = subprocess.run(
+        ["python3", LIFECYCLE_CLI, "close", "--issue", str(issue)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        detail = (result.stdout + result.stderr).strip()[-600:]
+        print(f"[terminal] close-out of #{issue} left invariants broken:\n{detail}", file=sys.stderr, flush=True)
+        return "NOT-OK"
+    return "OK"
 
 
 def stop_and_release(reason: str) -> None:
@@ -988,6 +1016,10 @@ def loop(args: argparse.Namespace) -> int:
         record_run(directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200])
         clear_reported(directive_id)
         if rc == 0 and not refused:
+            # "The PR is merged" is not "the item is closed": at this point the
+            # branch, the claim, the directive and the lane are still live. Close
+            # them out and carry the verdict, so a partial close is visible.
+            tail = f"{tail} | close-out: {closeout_issue(issue)}"
             subprocess.run(
                 ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
                  "--type", "result", "--body", tail],

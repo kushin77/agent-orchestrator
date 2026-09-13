@@ -68,4 +68,5 @@ governance/lessons
 governance/remediation
 governance/board
 governance/isolation
+governance/lifecycle
 scripts

@@ -44,6 +44,31 @@ Four properties are enforced, each by a check that can fail:
 and git; `scripts/check-session-isolation.sh` runs the same round trip in
 `make verify` and fails on each violation.
 
+### 1c. End-to-end closure — every artifact terminal (institutional)
+
+Isolation (§1b) covers the *open*; closure covers the *close*. A work item closes
+**hygienically** only when every artifact it created is terminal, and each of
+these is a **closure invariant** with a name, a requirement and a remediation:
+
+| Closure invariant | Broken means |
+|---|---|
+| The pull request is merged | A verified change that never landed. |
+| Green evidence names the verified head commit | "Green" is a claim. A squash merge creates a new commit, so evidence names the tree that was verified, never the merge itself. |
+| The source branch is gone | The branch outlived its issue; the local squash-merge leaves it behind while the main checkout holds `master`. |
+| No live claim is held | A closed issue still claims a lane — the wedge that blocked re-dispatch. |
+| The authorisation directive is consumed | A pending directive re-executes the order the moment the claim frees. |
+| The issue closed with real evidence | A summary is not evidence. |
+| The lane worktree is reclaimed | Stale lanes accumulate and collide. |
+| An open, milestoned item declares its labels | The conformance gate cannot hold an item to a rung it never declared. |
+
+`governance/lifecycle/cli.py close` drives them in dependency order, is
+idempotent, and reports the remainder rather than a success it cannot evidence;
+`governance/lifecycle/cli.py audit` re-derives the whole set offline.
+`scripts/check-github-lifecycle.sh` provokes one violation per invariant in
+`make verify`. Legacy drift is quarantined by name in
+`governance/lifecycle/baseline.json`, honoured only while its tracking issue is
+open.
+
 ## 2. Session labels & provenance (AI-originated work)
 
 AI-originated issues, PRs, commits, and doc sections declare their source:
