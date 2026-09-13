@@ -310,6 +310,15 @@ class GhOps:
             ["python3", str(self.root / "governance" / "isolation" / "cli.py"), "close", "--session", session_id]
         )
 
+    def refresh(self, item: dict) -> dict:
+        """Re-collect this item from the live board, so the final audit reads the
+        world the close-out just changed rather than the stale pre-close state."""
+        issue = int(item.get("issue") or 0)
+        for fresh in collect_from_github(self.root)["items"]:
+            if fresh["issue"] == issue:
+                return fresh
+        return item
+
 
 def cmd_audit(args: argparse.Namespace) -> int:
     record = json.loads(Path(args.record).read_text(encoding="utf-8")) if args.record else collect_from_github()
