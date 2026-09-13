@@ -186,6 +186,49 @@ def test_wait_matches_by_correlation_id(tmp_path, monkeypatch):
     assert channel.cmd_wait(args) == EXIT_OK
 
 
+def test_send_accepts_inline_json(tmp_path, monkeypatch):
+    """The brain must not have to write a temp file to steer the fleet."""
+    for name in ("INBOX", "OUTBOX", "SENT", "DONE"):
+        monkeypatch.setattr(channel, name, tmp_path / name.lower())
+    monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
+    for directory in (channel.INBOX, channel.OUTBOX, channel.SENT, channel.DONE):
+        directory.mkdir(parents=True, exist_ok=True)
+    body = json.dumps(
+        {
+            "from": "brain",
+            "to": "sister",
+            "type": "directive",
+            "correlation_id": "inline-1",
+            "task": {"issue": 5},
+        }
+    )
+    args = type("Args", (), {"message": body})()
+    assert channel.cmd_send(args) == EXIT_OK
+    assert len(list(channel.INBOX.glob("*.json"))) == 1
+
+
+def test_send_refuses_a_missing_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    args = type("Args", (), {"message": "not-json-at-all"})()
+    try:
+        channel.cmd_send(args)
+    except SystemExit as exc:
+        assert exc.code == channel.EXIT_CANNOT_ASSESS
+    else:
+        raise AssertionError("a missing message file must be refused, not ignored")
+
+
+def test_send_refuses_invalid_inline_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    args = type("Args", (), {"message": "{not json}"})()
+    try:
+        channel.cmd_send(args)
+    except SystemExit as exc:
+        assert exc.code == channel.EXIT_CANNOT_ASSESS
+    else:
+        raise AssertionError("malformed inline JSON must be refused, not ignored")
+
+
 def test_report_writes_a_valid_outbox_message(tmp_path, monkeypatch):
     monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
     args = type(
