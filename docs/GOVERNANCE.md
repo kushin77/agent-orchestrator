@@ -84,3 +84,25 @@ A lesson is written down the moment a change reveals it — never "at the end".
    deliberately enabled.
 5. **FinOps** — dispatch at the cheapest capable tier; declared services carry
    resource limits.
+
+## 8. Chronological issue dispatch (mandatory)
+
+All agents must consume GitHub work in a strict end-to-end sequence, not as a
+free-form board queue.
+
+- **Rule 1: no ad hoc board picking.** An agent cannot claim a GitHub issue
+  simply because it is visible on the board.
+- **Rule 2: dependency order wins.** The next accepted issue is the next step in
+  the current milestone / phase / parent-child chain, or a child required to
+  close an already-open issue.
+- **Rule 3: no kanban drift.** A board item unrelated to the active issue
+  chain is not valid work. It must remain unclaimed until the current dependency
+  path reaches that point.
+- **Rule 4: close the active chain before branching.** A new issue may only be
+  picked if it is directly required for closure of the already-open issue or a
+  planned continuation of the same execution path.
+- **Rule 5: monotonic progress.** Agents must advance from prerequisite → child
+  → validation → closeout, not skip ahead to unrelated tasks.
+
+This prevents "issue scavenging" and ensures the board behaves like a governed
+execution plan instead of a generic kanban.
