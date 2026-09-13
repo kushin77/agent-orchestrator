@@ -70,6 +70,7 @@ writes the real ADR.
 | [ADR-0009](ADR-0009-autonomous-ops-contract.md) | Autonomous ops / governance contract | reserved | issues #43–#47 (phase 8) |
 | [ADR-0010](ADR-0010-canonical-copy-ownership.md) | Canonical-copy ownership (MODEL/SME/SOLUTION-CLASSES trio + identity standards) | accepted | issue #47 (decision spike) |
 | [ADR-0011](ADR-0011-session-fleet-transport.md) | Session-fleet transport — file mailbox now, A2A as the graduation target | accepted | issue #161 (M26) |
+| [ADR-0012](ADR-0012-hermes-paperclip-boundary.md) | Hermes/Paperclip ownership boundary for the fleet | accepted | issue #303, amended by #317 (M26) |
 
 The reserved set covers every pillar contract named in EPIC-00 (issue #4) and
 [`ARCHITECTURE.md`](../ARCHITECTURE.md): agent-registry, model-gateway,

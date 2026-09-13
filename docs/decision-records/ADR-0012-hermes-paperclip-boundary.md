@@ -17,6 +17,11 @@ supersedes no earlier decision and is superseded by none. The decision is
 reproduced as the EPIC's governing section so the roadmap and the record cannot
 drift apart.
 
+Amended 2026-09-13 (issue #317) to make the **runtime fork** explicit: the
+accepted path is *map the policy, do not couple the runtime*. The amendment adds
+Context §7, decision (e), the counterfactual in Alternatives and the failure-mode
+paragraph in Consequences. It changes no other decision.
+
 ## Context
 
 This repo vendors two CMR modules whose declared purpose is, verbatim, what this
@@ -91,6 +96,24 @@ boundary by naming *which artifact is authoritative for what*, so that a later
 migration swaps an implementation rather than rewriting a contract — the same
 shape is applied here.
 
+**7. The runtime question, measured — the fact this record has to state.**
+`hermes-agents` is a real service, but it is **deployable-not-running**, and it
+is **not wired into this repo at all**. Measured 2026-09-13:
+
+| Question | Measured answer |
+|---|---|
+| Deployable as a service? | **Yes.** `kushin77/hermes-agents` ships a multi-stage `Dockerfile`, a `docker-compose.yml` (service `hermes-agent`, healthcheck `GET /health`), a Flask app whose `PORT` default is **9501**, and `terraform/cluster/` plus `scripts/deploy-to-production.sh`. |
+| Running as a service? | **Not evidenced.** Zero releases, zero tags; the only environment is `staging` (there is no `production` environment); every recorded deployment is dated 2026-05-01 and every `deploy.yml` run concluded `failure` (10 of 10, newest 2026-07-19). |
+| Does this repo deploy it? | **No.** `vendor/CMR/catalog/modules/hermes-agents/module.json` declares `"distribution": { "terraform": null }`; the string `hermes` appears nowhere under `infra/**`; there is no compose file or Dockerfile here for it. |
+| Is the gateway wired to it? | **No.** `gateway/providers/config.py` maps `hermes` to `http://localhost:8080/api/chat` with model `hermes3`, inheriting `OllamaProvider` (`gateway/providers/hermes.py`). The service speaks Flask on **9501** at `/health`, `/api/capabilities`, `/api/router` and `/api/tiering`; the string `9501` occurs nowhere in this repo. The gateway's `hermes` provider is an Ollama-protocol endpoint serving the Hermes-3 *LLM* — a namesake, not the routing service. |
+
+Residual uncertainty, named rather than hidden: a direct `/health` probe of the
+private cluster (VIP `192.168.168.50`, nodes `.31`/`.42`) is not reachable from
+this sandbox, so "not running" rests on deployment history — zero releases, a
+staging-only environment, an all-failed deploy workflow — and not on a probe.
+That is enough to decide the boundary below, and not enough to justify depending
+on the service at run time.
+
 ## Decision
 
 **The orchestration layer has a declared owner: the vendored `hermes-agents`
@@ -101,6 +124,11 @@ cannibalizes its patterns under **GR-10** provenance into `fleet/` and
 pinned read-only source (GR-5). `paperclip` owns the **reporting** half of the
 same boundary — planning, roadmap tracking and status-report discipline — not
 the routing half.
+
+**This record maps the policy; it does not couple the runtime.** The fleet
+consumes `hermes-agents` as a *contract* and a *pattern source*. It does not run
+the service, call it at dispatch time, or depend on it for availability — see
+(e).
 
 **(a) Ownership is declared, not implied.** `hermes-agents` is the declared
 owner of the orchestration layer. The fleet's `choose_model` / tier-floor /
@@ -126,6 +154,23 @@ fleet has one declared owner too.
 stop-and-swap, no big-bang rewrite, no freeze: the alignment lands as an adapter
 over behaviour that is already live. A change that cannot land without stopping
 the fleet is out of scope for this decision.
+
+**(e) The runtime boundary is explicit, and it is the load-bearing part of this
+decision.** The accepted path is **"map the policy, do not couple the runtime"**,
+and it is decided by three facts rather than assumed:
+
+| Fact | Question | Answer here |
+|---|---|---|
+| 1. Availability | Is `hermes-agents` deployable and/or running as a service? | Deployable; not evidenced running; **not wired into this repo** (Context §7). |
+| 2. Dependency | Do we accept the fleet's control loop depending on it at run time — its latency, its failure modes, its tenancy? | **No.** Dispatch is the control plane's most latency- and availability-sensitive path, and a private service with an all-failed deploy history and no production environment is not a runtime authority this repo can depend on. |
+| 3. Ownership | Is Hermes a product to dogfood, or an internal pattern library? | **A pattern library.** The fleet adopts its vocabulary and cannibalizes its patterns under GR-10; it does not operate the product. |
+
+**The seam that keeps the swap cheap is the `RoutingPolicy` port** being
+implemented under #300 and #301: dispatch asks a `RoutingPolicy` for a routing
+decision rather than reading a vendor's internals. If facts 1–3 ever flip, the
+fleet replaces one implementation of that port instead of rewriting the
+contract — the same shape [`ADR-0011`](ADR-0011-session-fleet-transport.md) used
+for transport.
 
 **Out of scope, stated so it is not conflated:** the gateway adapter modules
 named in Context §5 are inference-only and unchanged by this decision. This
@@ -155,6 +200,18 @@ code, and it does not move provider routing.
   personas and their tiers already exist; this decision says they are the routing
   contract, rather than introducing them.
 
+**The honest failure mode.** The outcome this decision exists to avoid is
+**half-coupling**: the fleet treats `hermes-agents` as the owner of the routing
+contract *and* separately runs or calls the service as the routing authority —
+two authoritative routing engines, neither of which can be trusted to decide.
+Every failure mode of that split is invisible to a passing test: a dispatch can
+originate from either engine, provenance is ambiguous, a divergence between them
+is silent, and no caller can tell which owner bound it. Half-coupling is
+therefore not a smaller version of the migration this record declines — it is the
+state that makes that migration unrunnable. Either the fleet owns dispatch (this
+record) or Hermes does (Alternatives 6); the outcome that must not happen is
+both.
+
 **Follow-ups.**
 
 - #300 — dispatch by capability: the brain consults the registry personas.
@@ -162,9 +219,8 @@ code, and it does not move provider routing.
   dispatch, with the GR-10 provenance record.
 - #302 — cannibalize paperclip planning / status-report patterns into the fleet
   reporting surface.
-- The index in [`README.md`](README.md) should list this record. It is recorded
-  here as a follow-up because this change is deliberately scoped to this file
-  alone; the index row is the one thing deliberately left un-R'd.
+- The index in [`README.md`](README.md) lists this record (row added 2026-09-13
+  with this amendment, issue #317).
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) may want a pointer to this record
   where it describes the dispatch and reporting layers.
 
@@ -193,6 +249,15 @@ code, and it does not move provider routing.
    The module is a pattern source in this repo, not a deployed dependency, and a
    stop-and-swap buys no capability the adapter path does not — while violating
    decision (d) outright.
+6. **Dogfood Hermes as the runtime: make it the routing authority and let the
+   fleet be a client.** Not rejected — **deferred as a different decision.** If
+   fact 3 of Context §7 were answered "a product to dogfood", this record would
+   not exist in its present form: the decision would be *"Hermes is the runtime
+   routing authority; the fleet is a client"*, which is a **migration** — a
+   deployment dependency, a tenancy answer, an availability contract and a
+   service lifecycle — and not a mapping. That is a **new ADR**. It is recorded
+   here rather than left implicit so the fork is a choice on the record, not an
+   implication a later reader has to guess at.
 
 ## Migration
 
@@ -214,4 +279,6 @@ phases 1–3 leave the transport, the mailbox and the claim chain untouched
 **What would require a new record.** If the fleet ever needs routing behaviour
 this contract does not express — per-tenant routing policy, for instance, which a
 multi-tenant control plane will eventually want — that is a **new** ADR, not an
-edit to this one.
+edit to this one. The counterfactual in Alternatives 6 is the same shape of
+change: making Hermes the *runtime* routing authority is a **new** ADR (a
+migration), not an edit to this one.
