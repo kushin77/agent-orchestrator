@@ -200,16 +200,17 @@ debug it without stopping it.
 
 ## Launch the two sessions
 
-One command opens both — the brain terminal and the never-idle sister loop:
+One command starts whichever rungs are missing and puts you in front of the whole
+fleet:
 
 ```bash
-bash fleet/run-fleet.sh        # tmux: one window, two panes (or konsole/fallback)
+bash fleet/run-fleet.sh        # == python3 fleet/control.py live
 ```
 
 Or separately:
 
 ```bash
-bash fleet/brain.sh            # brain: advisor context + idle-watch the slog
+bash fleet/brain.sh            # brain: the context stream + the order loop
 bash fleet/terminal.sh         # sister: never-idle loop (watch -> run -> report/escalate)
 ```
 
@@ -218,6 +219,70 @@ forever, runs one subagent per directive with the agent CLI (`--runner "claude
 -p"` by default; `--dry-run` prints the command), reports the result, and
 escalates any failure. An empty inbox is just another poll cycle — it never
 idles out. `FLEET_RUNNER` overrides the runner.
+
+## Log into the live session
+
+`live` (alias `attach`) is the operator's way in: it starts only the rungs that
+are missing — the same rule `start` follows — and then attaches to a tmux session
+named `fleet`.
+
+```bash
+python3 fleet/control.py live              # or: bash fleet/run-fleet.sh
+python3 fleet/control.py attach            # the same verb by its other name
+python3 fleet/control.py live --dry-run    # print the tmux commands, build nothing
+```
+
+The session has one window per thing you need to watch, and **the session is a
+view, not the host**: the rungs run detached (the watchdog and cron own their
+lifecycle), so attaching, detaching or even killing the session never touches a
+run in flight.
+
+| window      | runs                                        |
+|-------------|---------------------------------------------|
+| `dashboard` | `python3 fleet/console.py`                   |
+| `brain`     | `tail -f .fleet/brain.log`                   |
+| `sister`    | `tail -f .fleet/sister.log`                  |
+| `monitor`   | `tail -f .fleet/monitor.log`                 |
+
+Detach with `Ctrl-b d`; the fleet keeps running. Attaching again reuses the
+existing session — it never rebuilds it over a live fleet (the singleton guard
+would refuse the new panes and you would see `[exited]`).
+
+### Where each rung's stream goes
+
+Every rung is respawned detached with its stdout+stderr **appended** to
+`.fleet/<rung>.log` — `brain.log`, `sister.log`, `monitor.log` — by the watchdog
+when it respawns a rung and by `control.py start` when it starts one. The windows
+above tail exactly those files. No tmux? The same view is one command:
+
+```bash
+python3 fleet/console.py           # self-refreshing dashboard (Ctrl-C exits)
+python3 fleet/console.py --once    # a single frame, for a script or a log
+```
+
+The frame carries: the header (repo, HEAD, time); each rung (pid, state, running
+commit, heartbeat age); the orders waiting for the brain and the latest one; the
+brain's latest acks; the live claims; wave progress with `✓` closed, `▶`
+dispatched and `·` pending; the last events from `.fleet/slog.jsonl`; and the last
+verdicts from `.fleet/watchdog.log`.
+
+### What the brain prints
+
+The brain's stream (`brain.log`, and the `brain` window) is the only place the
+middle rung explains itself. It is deliberately low-noise — a banner, the order
+it received, what it did with it, the waves it advanced, and a heartbeat while
+idle:
+
+```
+[brain] up | orders pending=0 | dispatched=11 | waves: #219=[232] | claims=0 | HEAD=8d9c219 | watchdog=healthy
+[brain] order o-1 (#232) | task={"issue": 232, "lane": "fleet"} | body=micro-task of #219
+[brain] o-1: → dispatched #232 at flash/none — channel send: OK — <id> queued for the sister
+[brain] → advanced waves: dispatched [233, 234]
+[brain] idle 30s | orders pending=0 | dispatched=11 | waves: #219=[232] | claims=0 | HEAD=8d9c219 | watchdog=healthy
+```
+
+A refusal reads the same way, with the reason the contract gave:
+`[brain] o-1: → refused: order names no issue (...)`.
 
 ## Mailbox
 
@@ -266,6 +331,11 @@ line owns the brain/sister/monitor rungs. Every N minutes it runs
 loop rung, restarts the **monitor** when it is missing, and does nothing when
 the fleet is healthy — so a tick is cheap and idempotent. A run in flight is
 never restarted just to update code (the one rule the watchdog never breaks).
+
+Every rung it respawns is started detached with stdout+stderr appended to
+`.fleet/<rung>.log` — the capture the `brain`, `sister` and `monitor` windows of
+the live session tail, and the only reason the brain is observable at all (it
+used to be spawned into `/dev/null`).
 
 ```bash
 python3 fleet/cron.py install [--interval 2]   # add the crontab line (replaces an existing one)

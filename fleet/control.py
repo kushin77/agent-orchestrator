@@ -20,6 +20,16 @@ stopping it:
     python3 fleet/control.py watch      # idle-watch the slog (same as listen)
     python3 fleet/control.py health     # tri-state signal: 0 healthy/1 degraded/2 failing
     python3 fleet/control.py cron <sub> # fleet cron job → python3 fleet/cron.py install|status|run|respawn|disable|enable|uninstall
+    python3 fleet/control.py live       # ensure the rungs, then attach to the live `fleet` session
+    python3 fleet/control.py attach     # alias for live
+
+`live` is the operator's way in. It starts only the rungs that are missing (the
+same rule `start` follows) and then attaches to a tmux session named `fleet` with
+a `dashboard` window (`fleet/console.py`), a `brain` window, a `sister` window and
+a `monitor` window — the last three tailing `.fleet/<rung>.log`. The session is a
+VIEW, never the host: the rungs run detached and the watchdog/cron owns their
+lifecycle, so attaching, detaching or killing the session never touches a run in
+flight. `--dry-run` prints the exact tmux commands instead of running them.
 
 Roles (see fleet/profiles/brain.md and fleet/directive.json): the sister is a
 DUMB terminal (DeepSeek v4.1 Flash, no thinking); the brain is DSv4PM with human
@@ -33,6 +43,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -42,6 +53,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CHANNEL = str(ROOT / "fleet" / "channel.py")
+# The operator's live session. One name, used by the verb, by run-fleet.sh and by
+# the header of the dashboard, so "attach to the fleet" means exactly one thing.
+SESSION = "fleet"
+# The rungs the operator wants to see, in the order the windows are created.
+LIVE_RUNGS = ("brain", "sister", "monitor")
 
 
 def _run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -125,11 +141,16 @@ def cmd_start(args: argparse.Namespace) -> int:
     a loop that died would kill every newly started loop at its first cycle; a
     combined pgrep reported "already running" because it matched the *other* rung;
     and refusing to start anything while one rung lived left the fleet half up.
+
+    Each rung is started detached with stdout+stderr appended to `.fleet/<rung>.log`
+    — the same capture path the watchdog uses. Starting a rung into `DEVNULL` made
+    the window the operator then attaches to show nothing at all.
     """
     rungs = (
         ("brain", "fleet/brain.py", "fleet/brain.sh"),
         ("sister", "fleet/terminal.py", "fleet/terminal.sh"),
     )
+    ensure_logs()
     live = {}
     for rung, pattern, _script in rungs:
         probe = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True)
@@ -150,10 +171,14 @@ def cmd_start(args: argparse.Namespace) -> int:
                 print(f"  cleared stale {flag} flag (queue state from the previous loop)")
 
     for rung, script in missing:
-        subprocess.Popen(
-            ["setsid", "bash", script], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        print(f"  started {script}")
+        handle = rung_log(rung).open("a", encoding="utf-8", buffering=1)
+        try:
+            subprocess.Popen(
+                ["setsid", "bash", script], cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT
+            )
+        finally:
+            handle.close()
+        print(f"  started {script} (stream: {rung_log(rung)})")
     time.sleep(3)
     _run(["python3", CHANNEL, "status"], check=False)
     return 0
@@ -281,6 +306,85 @@ def cmd_cron(args: argparse.Namespace) -> int:
     )
 
 
+def rung_log(name: str) -> Path:
+    """`.fleet/<rung>.log` — the capture log `fleet/watchdog.py` writes when it spawns a rung.
+
+    Declared here as well as in the watchdog on purpose: the path IS the contract
+    between the spawner, the starter (`cmd_start` below), the reader
+    (`fleet/console.py`) and the tail windows, and `fleet/monitor.py` sets the
+    precedent of each module naming the runtime paths it touches.
+    """
+    return ROOT / ".fleet" / f"{name}.log"
+
+
+def ensure_logs() -> list[Path]:
+    """Create each rung's capture log so `tail -f` has a file to follow immediately."""
+    paths = []
+    for name in LIVE_RUNGS:
+        path = rung_log(name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch(exist_ok=True)
+        paths.append(path)
+    return paths
+
+
+def live_layout() -> list[list[str]]:
+    """The tmux argv list that builds the operator's live session.
+
+    Pure construction, so `--dry-run` can print exactly what would run and the
+    tests can assert the layout without a tmux server or an attached terminal.
+    """
+    return [
+        ["tmux", "new-session", "-d", "-s", SESSION, "-n", "dashboard", "python3", "fleet/console.py"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "brain", "tail", "-f", ".fleet/brain.log"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "sister", "tail", "-f", ".fleet/sister.log"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "monitor", "tail", "-f", ".fleet/monitor.log"],
+        ["tmux", "select-window", "-t", f"{SESSION}:dashboard"],
+    ]
+
+
+def tmux_session_exists() -> bool:
+    probe = subprocess.run(["tmux", "has-session", "-t", SESSION], capture_output=True, text=True)
+    return probe.returncode == 0
+
+
+def _tmux(argv: list[str]) -> int:
+    return subprocess.call(argv, cwd=ROOT)
+
+
+def _attach() -> int:
+    """Attach the operator's terminal to the session. Kept separate so tests can
+    prove the layout without ever running `tmux attach`."""
+    return subprocess.call(["tmux", "attach", "-t", SESSION], cwd=ROOT)
+
+
+def cmd_live(args: argparse.Namespace) -> int:
+    """Ensure the rungs are up, then put the operator in front of the live fleet."""
+    logs = ensure_logs()
+    layout = live_layout()
+    if args.dry_run:
+        print(f"fleet live --dry-run — the tmux session this would build (rung logs: {logs[0].parent}):")
+        for argv in layout:
+            print("  " + " ".join(argv))
+        print(f"  tmux attach -t {SESSION}")
+        return 0
+
+    started = cmd_start(args)
+    if started != 0:
+        return started
+    if shutil.which("tmux") is None:
+        print("tmux is not installed — the fleet is running and every rung's stream is captured:")
+        for path in logs:
+            print(f"  {path}")
+        print("Watch it live with: python3 fleet/console.py")
+        return 1
+    if not tmux_session_exists():
+        for argv in layout:
+            _tmux(argv)
+    print("attaching to the live fleet session — detach with Ctrl-b d")
+    return _attach()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-control", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -301,6 +405,8 @@ def build_parser() -> argparse.ArgumentParser:
         ("watch", cmd_watch),
         ("health", cmd_health),
         ("cron", cmd_cron),
+        ("live", cmd_live),
+        ("attach", cmd_live),
     ):
         sub.add_parser(name, help=f"control.{name}").set_defaults(func=func)
     debug = sub.choices["debug"]
@@ -313,6 +419,10 @@ def build_parser() -> argparse.ArgumentParser:
     health.add_argument("--stale-minutes", type=float, default=30.0)
     cron = sub.choices["cron"]
     cron.add_argument("cron_args", nargs=argparse.REMAINDER, help="passed through to fleet/cron.py")
+    for name in ("live", "attach"):
+        sub.choices[name].add_argument(
+            "--dry-run", action="store_true", help="print the tmux commands instead of building the session"
+        )
     return parser
 
 

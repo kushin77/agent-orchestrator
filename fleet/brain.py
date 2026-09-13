@@ -19,6 +19,10 @@ rung a real process:
   directive it issued, or a `result` reporting a refusal with the exact reason;
 * it publishes `.fleet/brain.heartbeat.json` so `status`/`health` can tell a
   live brain from a dead one and catch code drift;
+* it prints a low-noise CONTEXT STREAM to stdout — a startup banner, the order it
+  received, what it did with it, the waves it advanced, and an idle heartbeat
+  every ~30s. That stream is captured to `.fleet/brain.log` (the watchdog owns
+  the spawn), which is what the `brain` window of the `fleet` tmux session shows;
 * it refuses — never improvises — when the order is malformed, names no issue,
   or asks for a tier below the floor that work requires.
 
@@ -37,6 +41,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -47,9 +52,18 @@ sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 import channel  # noqa: E402
 import singleton  # noqa: E402
 
-HEARTBEAT = ROOT / ".fleet" / "brain.heartbeat.json"
+FLEET_DIR = ROOT / ".fleet"
+HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
+# Where this process's stdout is captured. The watchdog owns the spawn and opens
+# exactly this path (`fleet/watchdog.py`); it is named here only so the startup
+# header can tell the operator where the stream they are reading came from.
+LOG_PATH = FLEET_DIR / "brain.log"
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 PROFILE_PATH = ROOT / "fleet" / "profiles" / "brain.profile.json"
+# How often the idle path repeats its heartbeat line. The loop blocks up to
+# `--watch-timeout` (30s) on each poll, so one line per idle tick is one line per
+# ~30s: enough to prove the brain is alive, not enough to bury an order in noise.
+IDLE_HEARTBEAT_SECONDS = 30.0
 
 
 def load_profile(path: Path | None = None) -> dict:
@@ -368,12 +382,169 @@ def _health() -> tuple[int, list[str]]:
     return result.returncode, [payload.get("status", "unknown")] + list(payload.get("reasons") or [])
 
 
+# --- the context stream (what the operator's brain window shows) -------------
+#
+# The brain runs detached and this process's stdout is captured to
+# `.fleet/brain.log`, which is what the `brain` window in the `fleet` tmux
+# session tails. Without this block that file is empty: the loop printed nothing
+# at startup, nothing that identified the order it was handling, and nothing
+# while idle — so a working brain and a wedged one looked identical from the
+# operator's side. Every line below is built by a pure function over plain data,
+# so the tests assert the text instead of the operator having to eyeball it.
+
+
+def read_json(path: Path) -> dict | None:
+    """A JSON object from `path`, or None — a missing/corrupt file is not a crash."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _count(directory: Path) -> int:
+    return len(list(directory.glob("*.json"))) if directory.exists() else 0
+
+
+def wave_progress() -> dict[int, list[int]]:
+    """Parent issue -> the children already dispatched from that wave plan."""
+    progress: dict[int, list[int]] = {}
+    if not WAVES.exists():
+        return progress
+    for path in sorted(WAVES.glob("*.json")):
+        plan = read_json(path)
+        if plan is None or "parent" not in plan:
+            continue
+        try:
+            progress[int(plan["parent"])] = [int(issue) for issue in plan.get("dispatched") or []]
+        except (TypeError, ValueError):
+            continue
+    return progress
+
+
+def format_waves(progress: dict[int, list[int]]) -> str:
+    """`waves: #219=[232]` — compact, greppable, and empty-safe."""
+    if not progress:
+        return "waves: none"
+    rendered = ", ".join(f"#{parent}={children}" for parent, children in sorted(progress.items()))
+    return f"waves: {rendered}"
+
+
+def held_claims() -> int:
+    """Live claims, read from the dispatch ledger's own status output."""
+    try:
+        result = subprocess.run(
+            ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "status"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    for line in result.stdout.splitlines():
+        if "live claims:" in line:
+            fields = line.split("live claims:")[1].strip().split()
+            return int(fields[0]) if fields and fields[0].isdigit() else 0
+    return 0
+
+
+def watchdog_state() -> str:
+    """The watchdog's own last verdict — who is keeping this rung alive."""
+    try:
+        lines = (FLEET_DIR / "watchdog.log").read_text(encoding="utf-8").splitlines()[-20:]
+    except OSError:
+        return "unknown"
+    if any("RESPAWN FAILED" in line for line in lines):
+        return "failing"
+    if any("respawned" in line for line in lines):
+        return "recovering"
+    if any("healthy" in line for line in lines):
+        return "healthy"
+    return "unknown"
+
+
+def fleet_facts() -> dict:
+    """The facts every context line reports, gathered once per print."""
+    return {
+        "orders_pending": _count(channel.BRAIN_INBOX),
+        "dispatched": _count(channel.BRAIN_DONE),
+        "waves": wave_progress(),
+        "claims": held_claims(),
+        "head": channel.head_commit(),
+        "watchdog": watchdog_state(),
+    }
+
+
+def status_line(facts: dict, *, idle_seconds: int | None = None) -> str:
+    """One compact context line: the startup form, or the idle heartbeat.
+
+    `idle_seconds=None` renders the startup form (`up`); a number renders the
+    idle form the brain repeats every IDLE_HEARTBEAT_SECONDS.
+    """
+    position = "up" if idle_seconds is None else f"idle {idle_seconds}s"
+    return (
+        f"[brain] {position} | orders pending={facts.get('orders_pending', 0)} | "
+        f"dispatched={facts.get('dispatched', 0)} | {format_waves(facts.get('waves') or {})} | "
+        f"claims={facts.get('claims', 0)} | HEAD={facts.get('head', 'unknown')} | "
+        f"watchdog={facts.get('watchdog', 'unknown')}"
+    )
+
+
+def status_header(facts: dict, *, pid: int) -> str:
+    """The startup banner: what this process is and where its stream goes."""
+    return "\n".join(
+        (
+            "=" * 72,
+            "  BRAIN — session fleet operating model (M26)",
+            "  Hierarchy: operator -> BRAIN -> sister -> subagents",
+            f"  repo     {ROOT}",
+            f"  pid      {pid}",
+            f"  orders   {channel.BRAIN_INBOX}",
+            "           order it: python3 fleet/channel.py order --message '<json>'",
+            f"  replies  {channel.BRAIN_OUTBOX}",
+            "           read them: python3 fleet/channel.py brain-outbox",
+            f"  log      {LOG_PATH}",
+            f"  {status_line(facts)}",
+            "=" * 72,
+        )
+    )
+
+
+def order_line(order: dict) -> str:
+    """The order's id, the issue it names, and the task and body it carried."""
+    task = json.dumps(order.get("task") or {}, sort_keys=True)
+    body = " ".join(str(order.get("body") or "").split())
+    return (
+        f"[brain] order {order_reference(order) or '-'} ({channel_issue(order)}) "
+        f"| task={task} | body={body}"
+    )
+
+
+def outcome_line(order: dict, ok: bool, report: str) -> str:
+    """What the brain did with the order: dispatched, ack, or the refusal itself."""
+    reference = order_reference(order) or "-"
+    if not ok:
+        return f"[brain] {reference}: → refused: {report}"
+    issue = order_issue(order)
+    if issue is None:
+        return f"[brain] {reference}: → ack (no dispatch): {report}"
+    tier, thinking = choose_model(order)
+    return f"[brain] {reference}: → dispatched #{issue} at {tier}/{thinking} — {report}"
+
+
+def wave_line(advanced: list[int]) -> str:
+    return f"[brain] → advanced waves: dispatched {advanced}"
+
+
 def loop(args: argparse.Namespace) -> int:
     if not singleton.guard("brain", "bash fleet/run-fleet.sh (or: bash fleet/brain.sh)"):
         return 1
     started_at = now_iso()
     commit = channel.head_commit()
-    idle_printed = False
+    print(status_header(fleet_facts(), pid=os.getpid()), flush=True)
+    idle_since: float | None = None
+    last_idle_line = 0.0
     while True:
         write_heartbeat("idle", started_at=started_at, commit=commit)
         watch = subprocess.run(
@@ -385,14 +556,21 @@ def loop(args: argparse.Namespace) -> int:
         if watch.returncode != 0:
             advanced = advance_waves()
             if advanced:
-                print(f"[brain] advanced waves: dispatched {advanced}", flush=True)
-            if not idle_printed:
-                print("[brain] idle — watching .fleet/brain/inbox for operator orders", flush=True)
-                idle_printed = True
+                print(wave_line(advanced), flush=True)
+            moment = time.monotonic()
+            if idle_since is None:
+                idle_since = moment
+            # One heartbeat as soon as the brain goes idle, then one every
+            # IDLE_HEARTBEAT_SECONDS: the operator can tell "waiting for an
+            # order" from "stuck" without the log becoming a wall of timestamps.
+            if last_idle_line == 0.0 or moment - last_idle_line >= IDLE_HEARTBEAT_SECONDS:
+                print(status_line(fleet_facts(), idle_seconds=int(moment - idle_since)), flush=True)
+                last_idle_line = moment
             if args.once:
                 return 0
             continue
-        idle_printed = False
+        idle_since = None
+        last_idle_line = 0.0
         try:
             order = json.loads(watch.stdout)
         except json.JSONDecodeError:
@@ -400,12 +578,12 @@ def loop(args: argparse.Namespace) -> int:
             continue
 
         order_id = order.get("id", "")
-        print(f"[brain] order {order_id}: {channel_issue(order)}", flush=True)
+        print(order_line(order), flush=True)
         write_heartbeat("dispatching", started_at=started_at, commit=commit)
         ok, report = handle_order(order)
         channel.brain_reply(order, "ack" if ok else "result", report)
         channel.consume_order(order_id)
-        print(f"[brain] {order_id}: {report[:200]}", flush=True)
+        print(outcome_line(order, ok, report), flush=True)
         if args.once:
             return 0 if ok else 1
 

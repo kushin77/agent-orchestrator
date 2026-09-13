@@ -11,6 +11,13 @@ Safety, the one rule a watchdog must never break: **a run in flight is never
 restarted just to update code.** A *missing* loop is respawned regardless — its
 run is already orphaned and the fresh loop self-heals the claim. A *drifted*
 (healthy but old-code) sister is respawned only when idle.
+
+Every rung this module spawns is started detached with its stdout+stderr
+appended to a per-rung capture log, `.fleet/<rung>.log`. Spawning used to send
+both streams to `DEVNULL`, so the brain — the middle rung of the hierarchy — was
+unobservable from anywhere: no window, no log, no way in. The watchdog is the
+spawn authority, so the capture path is defined here and read by
+`fleet/console.py` (the dashboard) and `fleet/run-fleet.sh` (the tail windows).
 """
 
 from __future__ import annotations
@@ -23,6 +30,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TextIO
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fleet"))
@@ -34,7 +42,50 @@ RUNGS = (
     ("sister", "fleet/terminal.py", "fleet/terminal.sh", channel.HEARTBEAT),
 )
 MONITOR_PATTERN = "fleet/monitor.py"
-RUNS_DIR = ROOT / ".fleet" / "runs"
+MONITOR_NAME = "monitor"
+FLEET_DIR = ROOT / ".fleet"
+RUNS_DIR = FLEET_DIR / "runs"
+
+
+def rung_log(name: str) -> Path:
+    """The capture log for a rung: `.fleet/<rung>.log`.
+
+    The path is the contract between the writer (this module, and
+    `control.py` when it starts a rung), the reader (`fleet/console.py`) and the
+    operator's windows (`fleet/run-fleet.sh` tails exactly this file).
+    """
+    return FLEET_DIR / f"{name}.log"
+
+
+def open_log(name: str) -> TextIO:
+    """Open a rung's capture log for appending, created if missing, line-buffered.
+
+    Line buffering matters for the operator, not the machine: a rung writes a few
+    lines and then blocks on its next poll, so a block-buffered handle would
+    leave the window empty for minutes at a time and look like a dead rung.
+    """
+    path = rung_log(name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path.open("a", encoding="utf-8", buffering=1)
+
+
+def spawn(name: str, command: list[str]) -> subprocess.Popen:
+    """Start a rung detached, appending stdout+stderr to `.fleet/<name>.log`.
+
+    The parent closes its copy of the handle as soon as the child holds its own:
+    the log stays open for the child's lifetime without leaking a descriptor into
+    a watchdog that exits a moment later.
+    """
+    handle = open_log(name)
+    try:
+        return subprocess.Popen(
+            command,
+            cwd=ROOT,
+            stdout=handle,
+            stderr=subprocess.STDOUT,
+        )
+    finally:
+        handle.close()
 
 
 def loop_pid(pattern: str) -> int | None:
@@ -89,8 +140,14 @@ def decide(pid: int | None, beat: dict | None, head: str) -> tuple[str, str]:
     return "healthy", ""
 
 
-def respawn(pattern: str, script: str) -> bool:
-    """Stop the rung (SIGTERM, then SIGKILL) and start it detached."""
+def respawn(pattern: str, script: str, name: str = "") -> bool:
+    """Stop the rung (SIGTERM, then SIGKILL) and start it detached.
+
+    `name` selects the capture log (`.fleet/<name>.log`) and defaults to the
+    launcher's own stem, which is right for every rung whose log is named after
+    its script; the sister passes its rung name explicitly because its launcher
+    is `terminal.sh` while the operator's window is `sister`.
+    """
     pid = loop_pid(pattern)
     if pid is not None:
         try:
@@ -105,12 +162,7 @@ def respawn(pattern: str, script: str) -> bool:
                 os.kill(pid, signal.SIGKILL)
             except OSError:
                 pass
-    subprocess.Popen(
-        ["setsid", "bash", str(ROOT / script)],
-        cwd=ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    spawn(name or Path(script).stem, ["setsid", "bash", str(ROOT / script)])
     return True
 
 
@@ -124,7 +176,7 @@ def rung_action(name: str, pattern: str, script: str, beat_path: Path, force: bo
         return f"{name}: healthy"
     if state == "drifted" and name == "sister" and run_in_flight():
         return f"{name}: drifted ({reason}) but a run is in flight — left alone"
-    ok = respawn(pattern, script)
+    ok = respawn(pattern, script, name)
     return f"{name}: {state} ({reason}) — {'respawned' if ok else 'RESPAWN FAILED'}"
 
 
@@ -136,12 +188,7 @@ def monitor_missing() -> bool:
 def start_monitor() -> bool:
     """Start the monitor detached (its own session, like the loop rungs)."""
     try:
-        subprocess.Popen(
-            ["setsid", "python3", str(ROOT / "fleet" / "monitor.py")],
-            cwd=ROOT,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        spawn(MONITOR_NAME, ["setsid", "python3", str(ROOT / "fleet" / "monitor.py")])
     except (OSError, subprocess.SubprocessError):
         return False
     return True

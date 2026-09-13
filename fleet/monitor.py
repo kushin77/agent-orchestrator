@@ -121,6 +121,11 @@ def _request_stop(signum: int, frame: object) -> None:
 
 def run() -> int:
     FLEET_DIR.mkdir(parents=True, exist_ok=True)
+    # The monitor's stdout is captured to `.fleet/monitor.log` by whoever spawns
+    # it (the watchdog, or `control.py`), and that is what the `monitor` window in
+    # the `fleet` tmux session tails. Without these two prints the capture would be
+    # an empty file that looks like a dead rung.
+    print(f"[monitor] up {now_iso()} pid={os.getpid()} poll={POLL_SECONDS}s log={LOG}", flush=True)
     last: str | None = None
     while not _stop:
         current = snapshot()
@@ -128,6 +133,7 @@ def run() -> int:
         if current != last:
             with LOG.open("a", encoding="utf-8") as fh:
                 fh.write(f"{stamp} {current}\n")
+            print(f"[monitor] {stamp} {current}", flush=True)
             last = current
         HEARTBEAT.write_text(f"{stamp} alive pid={os.getpid()}\n", encoding="utf-8")
         # Sleep in small slices so a SIGTERM is honoured within a second.

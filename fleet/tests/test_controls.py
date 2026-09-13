@@ -270,3 +270,117 @@ def test_decompose_refuses_a_spec_without_children(tmp_path):
 
     ok, report = brain.handle_decompose({"task": {"decompose": {"parent_issue": 219}}})
     assert ok is False and "no children" in report
+
+
+# --- the way in: `live` (the operator's session) ------------------------------
+
+CONTROL_SOURCE = (Path(__file__).resolve().parents[1] / "control.py").read_text(encoding="utf-8")
+
+
+def test_the_live_verb_and_its_attach_alias_are_registered():
+    assert '("live", cmd_live)' in CONTROL_SOURCE
+    assert '("attach", cmd_live)' in CONTROL_SOURCE
+
+
+def test_the_dry_run_prints_the_layout_and_touches_nothing(tmp_path, monkeypatch, capsys):
+    """The construction is unit-testable only if dry-run runs none of it."""
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    monkeypatch.setattr(control, "cmd_start", lambda args: (_ for _ in ()).throw(AssertionError("dry-run starts nothing")))
+    monkeypatch.setattr(control, "_tmux", lambda argv: (_ for _ in ()).throw(AssertionError("dry-run runs no tmux")))
+    monkeypatch.setattr(control, "_attach", lambda: (_ for _ in ()).throw(AssertionError("dry-run never attaches")))
+
+    assert control.cmd_live(type("Args", (), {"dry_run": True})()) == 0
+    printed = capsys.readouterr().out
+    assert "new-session -d -s fleet -n dashboard python3 fleet/console.py" in printed
+    assert "brain tail -f .fleet/brain.log" in printed
+    assert "sister tail -f .fleet/sister.log" in printed
+    assert "tmux attach -t fleet" in printed
+
+
+def test_ensure_logs_creates_every_rung_log(tmp_path, monkeypatch):
+    """`tail -f` needs the file to exist; the dashboard reads the same path."""
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    assert [path.name for path in control.ensure_logs()] == ["brain.log", "sister.log", "monitor.log"]
+    assert all(path.exists() for path in control.ensure_logs())
+
+
+def test_live_builds_the_layout_window_by_window_when_the_session_is_absent(tmp_path, monkeypatch, capsys):
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    monkeypatch.setattr(control, "cmd_start", lambda args: 0)
+    monkeypatch.setattr(control.shutil, "which", lambda name: "/usr/bin/tmux")
+    monkeypatch.setattr(control, "tmux_session_exists", lambda: False)
+    ran, attached = [], []
+    monkeypatch.setattr(control, "_tmux", lambda argv: ran.append(argv) or 0)
+    monkeypatch.setattr(control, "_attach", lambda: attached.append(True) or 0)
+
+    assert control.cmd_live(type("Args", (), {"dry_run": False})()) == 0
+    assert ran == control.live_layout(), "the session is built from exactly the declared layout"
+    assert attached == [True]
+    assert "attaching to the live fleet session — detach with Ctrl-b d" in capsys.readouterr().out
+
+
+def test_live_reuses_an_existing_session_and_never_rebuilds_it(tmp_path, monkeypatch, capsys):
+    """The measured trap: recreating the session over a running fleet makes the
+    singleton guard refuse the new panes and the operator sees `[exited]`."""
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    monkeypatch.setattr(control, "cmd_start", lambda args: 0)
+    monkeypatch.setattr(control.shutil, "which", lambda name: "/usr/bin/tmux")
+    monkeypatch.setattr(control, "tmux_session_exists", lambda: True)
+    monkeypatch.setattr(control, "_tmux", lambda argv: (_ for _ in ()).throw(AssertionError("no rebuild")))
+    monkeypatch.setattr(control, "_attach", lambda: 0)
+
+    assert control.cmd_live(type("Args", (), {"dry_run": False})()) == 0
+    assert "attaching to the live fleet session" in capsys.readouterr().out
+
+
+def test_live_says_what_to_do_when_tmux_is_absent(tmp_path, monkeypatch, capsys):
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    monkeypatch.setattr(control, "cmd_start", lambda args: 0)
+    monkeypatch.setattr(control.shutil, "which", lambda name: None)
+    monkeypatch.setattr(control, "_attach", lambda: (_ for _ in ()).throw(AssertionError("nothing to attach")))
+
+    assert control.cmd_live(type("Args", (), {"dry_run": False})()) == 1
+    printed = capsys.readouterr().out
+    assert "tmux is not installed" in printed and "python3 fleet/console.py" in printed
+
+
+def test_live_does_not_attach_when_a_rung_fails_to_start(tmp_path, monkeypatch):
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    monkeypatch.setattr(control, "cmd_start", lambda args: 1)
+    monkeypatch.setattr(control, "_attach", lambda: (_ for _ in ()).throw(AssertionError("no attach")))
+    assert control.cmd_live(type("Args", (), {"dry_run": False})()) == 1
+
+
+def test_start_appends_the_rung_stream_to_its_capture_log(tmp_path, monkeypatch, capsys):
+    """Starting a rung into DEVNULL is why the brain window showed nothing."""
+    import control
+
+    monkeypatch.setattr(control, "ROOT", tmp_path)
+    probe = type("R", (), {"returncode": 1, "stdout": "", "stderr": ""})()
+    monkeypatch.setattr(control.subprocess, "run", lambda *a, **k: probe)
+    monkeypatch.setattr(control, "_run", lambda cmd, check=True: probe)
+    monkeypatch.setattr(control.time, "sleep", lambda seconds: None)
+    spawns = []
+    monkeypatch.setattr(
+        control.subprocess, "Popen", lambda *a, **k: spawns.append(k) or type("P", (), {"pid": 1})()
+    )
+
+    assert control.cmd_start(type("Args", (), {})()) == 0
+    assert len(spawns) == 2, "both rungs were missing, so both are started"
+    names = sorted(kwargs["stdout"].name for kwargs in spawns)
+    assert names == [str(tmp_path / ".fleet" / "brain.log"), str(tmp_path / ".fleet" / "sister.log")]
+    for kwargs in spawns:
+        assert kwargs["stdout"] is not control.subprocess.DEVNULL
+        assert kwargs["stderr"] is control.subprocess.STDOUT
