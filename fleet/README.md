@@ -15,10 +15,25 @@ could disagree about *which command to type*, this file wins.
 
 | Role | Runtime | Behaviour |
 |---|---|---|
-| **Brain** | DSv4PM (DeepSeek v4 Pro Max) with **human override** | Issues directives. The only directive issuer. Steers and verifies. |
-| **Human / override terminal** | You, in the brain terminal | Full override of the entire fleet via `fleet/control.py`. |
+| **Operator** | You, at the override terminal | Orders the **brain** (`channel.py order`). Never addresses the sister directly — the channel refuses it, because skipping a rung makes the brain advisory. |
+| **Brain** | DSv4PM (DeepSeek v4 Pro Max) with **human override** | The middle rung and the only directive issuer: `fleet/brain.py` drains the operator's orders, signs each one into a directive for the sister, and reports back. |
 | **Fleet brain (sister)** | DeepSeek v4.1 Flash, **no thinking** (DSv4FNone) | A dumb terminal: drains `.fleet/inbox`, executes only brain directives, spawns epic-focused subagents per directive, writes acks/results to `.fleet/outbox`. Never picks issues on its own. |
-| **Fleet subagents** | DeepSeek agent model, tier/thinking chosen by the brain's FinOps block | Epic-focused executors. One issue = one subagent = one lane. |
+| **Fleet subagents** | DeepSeek agent model, tier/thinking chosen by the brain's FinOps block | Epic-focused executors. One issue = one subagent = one lane, each in its own worktree. |
+
+The chain is enforced by the transport, not by convention:
+
+```
+operator ──order──▶ brain ──directive──▶ sister ──spawn──▶ subagent
+   ▲                   ▲                     │                 │
+   └──── ack/report ────┴───── ack/report ────┴──── result ────┘
+```
+
+```bash
+# order the brain (the top of the chain, and the ONLY way in)
+python3 fleet/channel.py order --message '{"type":"directive","task":{"issue":166,"lane":"session-fleet"},"body":"dispatch one subagent"}'
+python3 fleet/channel.py brain-outbox           # the brain's acks and refusals
+python3 fleet/channel.py brain-inbox --timeout-seconds 5   # what the brain is working on
+```
 
 The brain ↔ sister and sister ↔ subagent traffic uses this file-mailbox
 channel as the transport of record (localhost mechanics, GR-21) — decided and

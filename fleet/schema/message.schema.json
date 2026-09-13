@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/kushin77/agent-orchestrator/fleet/schema/message.schema.json",
-  "title": "Fleet steering message (brain <-> sister <-> subagents)",
-  "description": "The message contract for the session fleet operating model (M26, issue #160). The brain is the only sender of directives to the sister; the sister only spawns epic-focused subagents per a directive; subagents report results back through the sister. Everything else is refused.",
+  "title": "Fleet steering message (operator <-> brain <-> sister <-> subagents)",
+  "description": "The message contract for the session fleet operating model (M26, issue #160). The operator orders the brain, the brain is the only sender of directives to the sister, the sister only spawns epic-focused subagents per a directive, and subagents report results back through the sister. Everything else is refused.",
   "type": "object",
   "required": ["from", "to", "type"],
   "additionalProperties": false,
@@ -13,13 +13,13 @@
     },
     "from": {
       "type": "string",
-      "pattern": "^(brain|sister|subagent(-[a-z0-9]+)?)$",
-      "description": "Sender role. brain is the only directive issuer."
+      "pattern": "^(operator|brain|sister|subagent(-[a-z0-9]+)?)$",
+      "description": "Sender role. The operator orders the brain; brain is the only directive issuer to the sister."
     },
     "to": {
       "type": "string",
-      "pattern": "^(brain|sister|subagent(-[a-z0-9]+)?)$",
-      "description": "Recipient role."
+      "pattern": "^(operator|brain|sister|subagent(-[a-z0-9]+)?)$",
+      "description": "Recipient role. operator -> brain (orders), brain -> sister (directives), up-only for reports and escalations."
     },
     "type": {
       "enum": ["directive", "ack", "result", "halt", "escalate"],
@@ -64,13 +64,20 @@
     "task": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Work to execute: an issue (and optionally the epic it serves).",
-      "required": ["issue"],
+      "description": "Work to execute: an issue (and optionally the epic it serves). An order may instead carry a non-work kind, which the brain answers without dispatching anything.",
       "properties": {
+        "kind": {
+          "enum": ["work", "status", "report", "ping"],
+          "description": "work (default) needs an issue; status/report/ping are answered by the brain without dispatching to the sister."
+        },
         "issue": { "type": "integer", "minimum": 1 },
         "epic": { "type": "integer", "minimum": 1 },
-        "lane": { "type": "string" }
-      }
+        "lane": { "type": "string" },
+        "title": { "type": "string", "description": "Optional title, used by the brain's FinOps floor check (a security/auth/IaC order never dispatches at flash/none)." }
+      },
+      "if": { "properties": { "kind": { "enum": ["status", "report", "ping"] } }, "required": ["kind"] },
+      "then": {},
+      "else": { "required": ["issue"] }
     },
     "body": {
       "type": "string",
