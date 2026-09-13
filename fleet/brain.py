@@ -44,6 +44,7 @@ sys.path.insert(0, str(ROOT / "fleet"))
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
 import channel  # noqa: E402
+import singleton  # noqa: E402
 
 HEARTBEAT = ROOT / ".fleet" / "brain.heartbeat.json"
 CHANNEL = str(ROOT / "fleet" / "channel.py")
@@ -182,6 +183,8 @@ def _health() -> tuple[int, list[str]]:
 
 
 def loop(args: argparse.Namespace) -> int:
+    if not singleton.guard("brain", "bash fleet/run-fleet.sh (or: bash fleet/brain.sh)"):
+        return 1
     started_at = now_iso()
     commit = channel.head_commit()
     idle_printed = False

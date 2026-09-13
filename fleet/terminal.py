@@ -24,6 +24,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import singleton
+
 ROOT = Path(__file__).resolve().parent.parent
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 
@@ -215,6 +217,22 @@ def stop_and_release(reason: str) -> None:
     issue, agent_id, directive_id = IN_FLIGHT.get("issue"), IN_FLIGHT.get("agent_id"), IN_FLIGHT.get("directive")
     if issue is None or not agent_id:
         return
+    held = subprocess.run(
+        ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if held.returncode != 0:
+        # Nothing was held (the claim was refused, or already released): say so
+        # rather than reporting a release that never happened.
+        subprocess.run(
+            ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id or "unknown",
+             "--severity", "warn", "--body", f"operator stopped the loop mid-run on #{issue} ({reason}); "
+             "no live claim to release"[:2000]],
+            cwd=ROOT,
+        )
+        return
     ok, output = release_issue(issue, agent_id)
     body = (
         f"operator stopped the loop mid-run on #{issue} ({reason}); claim released"
@@ -274,6 +292,8 @@ def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
 
 
 def loop(args: argparse.Namespace) -> int:
+    if not singleton.guard("sister", "bash fleet/run-fleet.sh (or: bash fleet/terminal.sh)"):
+        return 1
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, handle_stop)
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

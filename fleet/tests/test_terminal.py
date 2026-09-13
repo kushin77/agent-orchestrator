@@ -140,7 +140,26 @@ def test_stop_and_release_reports_a_failed_release(monkeypatch):
         terminal.stop_and_release("signal 15")
     finally:
         terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
-    assert bodies and "RELEASE FAILED" in bodies[0]
+    assert any("RELEASE FAILED" in body for body in bodies), f"bodies={bodies}"
+
+
+def test_stop_with_nothing_held_says_so_instead_of_claiming_a_release(monkeypatch):
+    """The handler must not report a release that never happened."""
+    bodies = []
+
+    def fake_run(command, **kwargs):
+        bodies.append(command[-1])
+        # `held` exits 1 when the issue is free — nothing to release.
+        return type("R", (), {"returncode": 1, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "should not be called"))
+    monkeypatch.setattr(terminal.subprocess, "run", fake_run)
+    terminal.IN_FLIGHT.update({"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None})
+    try:
+        terminal.stop_and_release("signal 15")
+    finally:
+        terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+    assert any("no live claim to release" in body for body in bodies), f"bodies={bodies}"
 
 
 def test_an_idle_stop_releases_nothing(monkeypatch):
