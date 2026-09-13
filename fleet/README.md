@@ -119,6 +119,27 @@ Escalations must carry `correlation_id` and a `severity` (`info`/`warn`/
 `critical`) and may only come from the sister or a subagent, never the brain
 (enforced by the gate).
 
+## Launch the two sessions
+
+One command opens both — the brain terminal and the never-idle sister loop:
+
+```bash
+bash fleet/run-fleet.sh        # tmux: one window, two panes (or konsole/fallback)
+```
+
+Or separately:
+
+```bash
+bash fleet/brain.sh            # brain: advisor context + idle-watch the slog
+bash fleet/terminal.sh         # sister: never-idle loop (watch -> run -> report/escalate)
+```
+
+The sister loop (`fleet/terminal.py`) is code-native: it watches `.fleet/inbox`
+forever, runs one subagent per directive with the agent CLI (`--runner "claude
+-p"` by default; `--dry-run` prints the command), reports the result, and
+escalates any failure. An empty inbox is just another poll cycle — it never
+idles out. `FLEET_RUNNER` overrides the runner.
+
 ## Mailbox
 
 ```
