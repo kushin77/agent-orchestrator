@@ -389,14 +389,32 @@ def _claim_problems(event: ClaimEvent, events: list[ClaimEvent], snapshot: Snaps
         return [f"#{event.issue}: claimed but absent from the snapshot"]
 
     if issue.closed:
-        # Settled unless the claim is still open (never released) — a live claim on
-        # a closed issue is a real problem; a released one is finished history.
+        # Settled unless the claim is still live — a live claim on a closed issue
+        # is a real problem; one ended by a release OR a reap is finished history.
+        # When the snapshot carries closed_at the judgement is chronological: a
+        # claim that predates closure was legitimate at the time.
         still_live = not any(
-            later.event == "release" and later.issue == event.issue
+            later.event in ("release", "reap") and later.issue == event.issue
             for later in events
         )
         if still_live:
-            problems.append(f"#{event.issue}: claimed after it was closed")
+            if issue.closed_at:
+                try:
+                    claimed = parse_iso(event.at)
+                except ValueError:
+                    claimed = None
+                if claimed is None:
+                    # Cannot judge the chronology of an unparseable timestamp, but
+                    # a live claim on a closed issue is still a real problem.
+                    problems.append(f"#{event.issue}: claim on a closed issue was never released")
+                elif claimed > parse_iso(issue.closed_at):
+                    problems.append(
+                        f"#{event.issue}: claimed after it was closed "
+                        f"(claim {event.at}, closed_at {issue.closed_at})"
+                    )
+                # else: the claim predates closure — legitimate at the time, no problem.
+            else:
+                problems.append(f"#{event.issue}: claim on a closed issue was never released")
         return problems
 
     if issue.is_epic:
@@ -481,6 +499,8 @@ def control_snapshot(now: datetime | None = None) -> Snapshot:
     #603 open and out of order, #604 closed, #605 a child of #601.
     """
     moment = now or datetime.now(timezone.utc)
+    later = moment + timedelta(hours=1)
+    earlier = moment - timedelta(hours=1)
     issues = {
         601: Issue(601, "frontier", milestone="CONTROL", labels=("type:task",)),
         602: Issue(602, "blocked", milestone="CONTROL", blocked_by=(603,)),
@@ -488,6 +508,10 @@ def control_snapshot(now: datetime | None = None) -> Snapshot:
         604: Issue(604, "closed", state="closed", milestone="CONTROL"),
         605: Issue(605, "child", milestone="CONTROL", parent=601),
         607: Issue(607, "epic", milestone="CONTROL", labels=("type:epic",)),
+        608: Issue(608, "closed later", state="closed", milestone="CONTROL",
+                   closed_at=later.strftime("%Y-%m-%dT%H:%M:%SZ")),
+        609: Issue(609, "closed earlier", state="closed", milestone="CONTROL",
+                   closed_at=earlier.strftime("%Y-%m-%dT%H:%M:%SZ")),
     }
     return Snapshot(
         generated_at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -566,6 +590,8 @@ def self_control(now: datetime | None = None) -> list[str]:
     expect_rejected("epic", [record(607, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("blocked", [record(602, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("closed", [record(604, REASON_NEXT_IN_MILESTONE)])
+    expect_clean("claim-before-closure", [record(608, REASON_NEXT_IN_MILESTONE)])
+    expect_rejected("claim-after-closure", [record(609, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("unsupported-reason", [record(601, "because-i-felt-like-it")])
     expect_rejected(
         "duplicate-claim",

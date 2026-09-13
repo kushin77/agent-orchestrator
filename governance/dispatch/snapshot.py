@@ -89,6 +89,7 @@ def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at:
             labels=label_names,
             parent=parent,
             blocked_by=blocked,
+            closed_at=str(record.get("closedAt") or ""),
         )
     return Snapshot(generated_at=generated_at or now_iso(), source=source, issues=issues)
 

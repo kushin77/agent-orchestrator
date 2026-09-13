@@ -7,7 +7,15 @@ from datetime import timedelta
 
 import claims
 import pytest
-from model import REASON_BLOCKED, REASON_BRAIN_DIRECTED, REASON_CHILD_OF_CLAIM, REASON_NO_CHAIN_EDGE, REASON_NEXT_IN_MILESTONE
+from model import (
+    REASON_BLOCKED,
+    REASON_BRAIN_DIRECTED,
+    REASON_CHILD_OF_CLAIM,
+    REASON_NO_CHAIN_EDGE,
+    REASON_NEXT_IN_MILESTONE,
+    Issue,
+    Snapshot,
+)
 
 
 def test_claim_records_the_reason_and_creates_the_lock(tmp_path, snapshot, base_time):
@@ -122,12 +130,45 @@ def test_audit_flags_a_release_without_a_claim(snapshot, base_time):
     assert any("no prior claim" in problem for problem in problems)
 
 
-def test_audit_flags_a_claim_after_the_issue_closed(snapshot, base_time):
+def test_audit_flags_a_live_claim_on_a_closed_issue(snapshot, base_time):
     moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
     events = [
         claims.ClaimEvent(event="claim", issue=604, agent="agent-a", at=moment, reason=REASON_NEXT_IN_MILESTONE)
     ]
     problems = claims.audit(events, snapshot, base_time)
+    assert any("never released" in problem for problem in problems)
+
+
+def test_audit_clears_a_closed_issue_claim_ended_by_a_reap(snapshot, base_time):
+    """A reap settles a claim the same as a release — the audit must not accuse it."""
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [
+        claims.ClaimEvent(event="claim", issue=604, agent="agent-a", at=moment, reason=REASON_NEXT_IN_MILESTONE),
+        claims.ClaimEvent(event="reap", issue=604, agent="brain", at=moment, reaped_agent="agent-a"),
+    ]
+    assert claims.audit(events, snapshot, base_time) == []
+
+
+def test_audit_is_chronological_when_closed_at_is_known(base_time):
+    """A claim made before the issue closed was legitimate at the time (the #140 case)."""
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    later = base_time + timedelta(hours=1)
+    earlier = base_time - timedelta(hours=1)
+    snapshot = Snapshot(
+        generated_at=moment,
+        source="test",
+        issues={
+            701: Issue(701, "closed after the claim", state="closed",
+                       closed_at=later.strftime("%Y-%m-%dT%H:%M:%SZ")),
+            702: Issue(702, "closed before the claim", state="closed",
+                       closed_at=earlier.strftime("%Y-%m-%dT%H:%M:%SZ")),
+        },
+    )
+    before_closure = [claims.ClaimEvent(event="claim", issue=701, agent="a", at=moment, reason=REASON_NEXT_IN_MILESTONE)]
+    assert claims.audit(before_closure, snapshot, base_time) == []
+
+    after_closure = [claims.ClaimEvent(event="claim", issue=702, agent="a", at=moment, reason=REASON_NEXT_IN_MILESTONE)]
+    problems = claims.audit(after_closure, snapshot, base_time)
     assert any("claimed after it was closed" in problem for problem in problems)
 
 
