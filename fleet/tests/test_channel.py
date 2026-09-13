@@ -278,8 +278,17 @@ def test_listen_prints_a_new_message(tmp_path, monkeypatch):
     channel._slog(
         {"type": "escalate", "from": "sister", "correlation_id": "d-1", "severity": "critical", "body": "x"}
     )
-    args = type("Args", (), {"timeout_seconds": 0.5, "interval": 0.01, "max_messages": 1})()
+    args = type("Args", (), {"timeout_seconds": 0.5, "interval": 0.01, "max_messages": 1, "from_start": True})()
     assert channel.cmd_listen(args) == EXIT_OK
+
+
+def test_listen_tails_from_now_by_default(tmp_path, monkeypatch, capsys):
+    """The brain terminal must show new events, not replay history."""
+    monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
+    channel._slog({"type": "result", "from": "sister", "correlation_id": "old", "body": "ancient history"})
+    args = type("Args", (), {"timeout_seconds": 0.2, "interval": 0.01, "max_messages": 1, "from_start": False})()
+    assert channel.cmd_listen(args) == EXIT_OK
+    assert "ancient history" not in capsys.readouterr().out
 
 
 def test_control_may_only_come_from_the_brain():

@@ -37,7 +37,7 @@ REASON_ALREADY_CLAIMED = "already-claimed"
 REASON_NO_CHAIN_EDGE = "no-chain-edge"
 REASON_EPIC_NOT_WORKABLE = "epic-not-workable"
 
-CLAIM_EVENTS = ("claim", "release", "take-over")
+CLAIM_EVENTS = ("claim", "release", "take-over", "reap")
 
 MISSING = object()
 
@@ -145,6 +145,7 @@ class ClaimEvent:
     ttl_hours: int = 24
     directive_id: str = ""
     directive_from: str = ""
+    reaped_agent: str = ""
 
     @property
     def is_claim(self) -> bool:
@@ -163,6 +164,7 @@ class ClaimEvent:
             "ttl_hours": self.ttl_hours,
             "directive_id": self.directive_id,
             "directive_from": self.directive_from,
+            "reaped_agent": self.reaped_agent,
         }
 
 
@@ -205,4 +207,5 @@ def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
         ttl_hours=ttl,
         directive_id=str(obj.get("directive_id", "") or ""),
         directive_from=str(obj.get("directive_from", "") or ""),
+        reaped_agent=str(obj.get("reaped_agent", "") or ""),
     )
