@@ -22,7 +22,7 @@
       "description": "Recipient role."
     },
     "type": {
-      "enum": ["directive", "ack", "result", "halt"],
+      "enum": ["directive", "ack", "result", "halt", "escalate"],
       "description": "directive = brain order; ack/result = sister/subagent reports; halt = stop signal."
     },
     "ts": {
@@ -33,6 +33,10 @@
     "correlation_id": {
       "type": "string",
       "description": "Binds a result/ack to the directive that caused it."
+    },
+    "severity": {
+      "enum": ["info", "warn", "critical"],
+      "description": "Escalation severity: info | warn | critical."
     },
     "model": {
       "type": "object",
