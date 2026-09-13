@@ -69,6 +69,32 @@ idempotent, and reports the remainder rather than a success it cannot evidence;
 `governance/lifecycle/baseline.json`, honoured only while its tracking issue is
 open.
 
+### 1d. Orphan reconciliation — a dead session leaves a clean workspace
+
+Isolation (§1b) opens a lane and closure (§1c) finishes one that completed. This
+covers the third case: a lane whose agent **died**. Each session writes a
+**heartbeat** under `.fleet/sessions/` while it runs; a beat older than the TTL
+(15 minutes) is an orphan, and a fresh beat behind a missing process is reported
+as *suspect* — absence alone is not enough to reclaim a lane.
+
+Teardown is three-way and decided by **where the orphan's work lives**:
+
+| Work's location | Action |
+|---|---|
+| landed on `master` | worktree removed, branch deleted, lane forgotten, claim released |
+| only on a remote branch | worktree removed, **remote branch kept** (parked), claim released |
+| nowhere else | nothing removed: **shelved**, claim kept, reported every pass |
+
+The third row is deliberate and load-bearing: the worker **never trades
+unmerged work for an unlocked issue.** Unlocking there would invite a second lane
+to start the same work while the first lane's only copy sits in a worktree nobody
+is watching. A shelved lane is re-evaluated on every pass and reclaimed
+automatically once its work lands.
+
+`governance/reconcile/cli.py sweep` performs one pass and `watch` runs it as a
+daemon; `scripts/check-reconcile.sh` proves every outcome (and the refusal) in
+`make verify`.
+
 ## 2. Session labels & provenance (AI-originated work)
 
 AI-originated issues, PRs, commits, and doc sections declare their source:

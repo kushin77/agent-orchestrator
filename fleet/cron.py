@@ -44,7 +44,12 @@ LOG = ROOT / ".fleet" / "watchdog.log"
 PRUNE_MARKER = "ao-fleet-prune"
 PRUNE_LOG = ROOT / ".fleet" / "prune.log"
 PRUNE_SCHEDULE = "23 4 * * *"
-MARKERS = (MARKER, PRUNE_MARKER)
+# The reconciliation worker (issue #304) is the third marked line. It rides the
+# watchdog's cadence rather than a daily one: an orphaned lane blocks work, and a
+# pass with no sessions to reconcile is a no-op, so the tick is cheap.
+RECONCILE_MARKER = "ao-fleet-reconcile"
+RECONCILE_LOG = ROOT / ".fleet" / "reconcile.log"
+MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER)
 
 
 def line(interval: int) -> str:
@@ -61,6 +66,20 @@ def prune_line() -> str:
     )
 
 
+def reconcile_line(interval: int) -> str:
+    """The orphan sweep, on the watchdog's cadence.
+
+    It is its own line rather than a step inside `watchdog.py run` on purpose: a
+    sweep acts on real lanes, and anything the watchdog's pass does is exercised
+    by the watchdog's own tests, which must never be able to reclaim a live
+    worktree as a side effect.
+    """
+    return (
+        f"*/{interval} * * * * cd {ROOT} && /usr/bin/python3 governance/reconcile/cli.py "
+        f"watch --once --apply >> {RECONCILE_LOG} 2>&1 # {RECONCILE_MARKER}"
+    )
+
+
 def _is_ours(entry: str) -> bool:
     """Does this crontab line carry one of our markers (enabled or commented out)?"""
     return any(entry.rstrip().endswith(f"# {marker}") for marker in MARKERS)
@@ -71,7 +90,11 @@ def install_lines(lines: list[str], interval: int) -> list[str]:
 
     Pure, so the merge is testable without touching the real crontab.
     """
-    return [entry for entry in lines if not _is_ours(entry)] + [line(interval), prune_line()]
+    return [entry for entry in lines if not _is_ours(entry)] + [
+        line(interval),
+        prune_line(),
+        reconcile_line(interval),
+    ]
 
 
 def remove_lines(lines: list[str]) -> tuple[list[str], list[str]]:
@@ -102,6 +125,7 @@ def cmd_install(args: argparse.Namespace) -> int:
     write_crontab(merged)
     print(f"cron: installed — watchdog every {args.interval} minute(s): {line(args.interval)}")
     print(f"cron: installed — prune daily ({PRUNE_SCHEDULE}): {prune_line()}")
+    print(f"cron: installed — reconcile every {args.interval} minute(s): {reconcile_line(args.interval)}")
     return 0
 
 

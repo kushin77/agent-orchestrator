@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle knowledge-index knowledge-index-build \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile knowledge-index knowledge-index-build \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -107,7 +107,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -209,6 +209,14 @@ session-isolation:
 ## the provoked set against the model, so it cannot fall behind the vocabulary
 github-lifecycle:
 	@bash scripts/check-github-lifecycle.sh
+
+
+## reconcile — orphan reconciliation (issue #304): per-session heartbeats, a TTL
+## sweep, and a three-way teardown decided by where the orphan's work lives -
+## landed lanes are reclaimed, server-preserved ones parked, and lanes whose work
+## exists nowhere else are shelved with their worktree, branch and claim intact
+reconcile:
+	@bash scripts/check-reconcile.sh
 
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):

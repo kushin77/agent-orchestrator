@@ -371,13 +371,14 @@ def test_the_watchdog_line_is_unchanged_by_the_second_line():
     assert cron.PRUNE_MARKER not in text
 
 
-def test_install_adds_both_lines_and_keeps_foreign_ones():
+def test_install_adds_every_managed_line_and_keeps_foreign_ones():
     foreign = "0 * * * * /usr/bin/true # someone-else"
     merged = cron.install_lines([foreign, cron.line(2)], 2)
     assert foreign in merged, "a foreign crontab line was dropped"
-    assert merged[-1] == cron.prune_line()
-    assert merged[-2] == cron.line(2)
-    assert len([entry for entry in merged if cron._is_ours(entry)]) == 2
+    assert merged[-1] == cron.reconcile_line(2)
+    assert merged[-2] == cron.prune_line()
+    assert merged[-3] == cron.line(2)
+    assert len([entry for entry in merged if cron._is_ours(entry)]) == 3
 
 
 def test_install_is_idempotent():
@@ -388,12 +389,13 @@ def test_install_is_idempotent():
 
 def test_uninstall_removes_only_our_lines():
     foreign = "0 * * * * /usr/bin/true # someone-else"
-    kept, ours = cron.remove_lines([foreign, cron.line(2), cron.prune_line()])
+    kept, ours = cron.remove_lines([foreign, cron.line(2), cron.prune_line(), cron.reconcile_line(2)])
     assert kept == [foreign]
-    assert len(ours) == 2
+    assert len(ours) == 3
 
 
 def test_a_disabled_line_is_still_recognised_as_ours():
     assert cron._is_ours("# " + cron.prune_line())
     assert cron._is_ours("# " + cron.line(2))
+    assert cron._is_ours("# " + cron.reconcile_line(2))
     assert not cron._is_ours("0 * * * * /usr/bin/true # someone-else")
