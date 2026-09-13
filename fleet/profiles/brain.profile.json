@@ -95,6 +95,8 @@
     ],
     "high_floor_tier": "pro",
     "high_floor_thinking": "low",
+    "routing_policy": "fleet/profiles/routing.policy.json",
+    "routing_rule": "dispatch is capability-routed through the routing policy (read by fleet/routing.py, ADR-0012): the capability the work needs resolves to the registered persona that owns it and that persona's tier; the block declared here is the doctrine and the policy carries it into the machine — the two are checked against each other at brain startup, and a disagreement refuses the start.",
     "rule": "start cheap, escalate once on observed difficulty; never let a subagent choose its own tier"
   },
   "controls": [

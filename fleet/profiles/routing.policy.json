@@ -1,0 +1,143 @@
+{
+  "policy_version": "1.0.0",
+  "adopted": "2026-09-13",
+  "decision_record": "docs/decision-records/ADR-0012-hermes-paperclip-boundary.md",
+  "issues": [300, 301],
+  "description": "The single declarative source of capability routing for the fleet: which capability a unit of work needs, which registered persona owns it, which FinOps tier that persona runs at, and the risk floor that outranks both. `fleet/routing.py` is its only reader and `fleet/brain.py` consults that module — the brain keeps no second copy of this dialect (ADR-0012).",
+  "provenance": {
+    "doctrine": "GR-10 — a harvested asset records its source, path, verdict and landing. The vendored module is pinned read-only and never edited (GR-5); no source file was copied, so no `harvested_from` marker is required — this policy re-implements the pattern and reuses the vocabulary.",
+    "harvested_from": [
+      {
+        "repo": "kushin77/CMR",
+        "path": "vendor/CMR/catalog/modules/hermes-agents/module.json",
+        "asset": "the declared routing contract this policy consumes: features capability-registry, task-routing, model-tiering, escalation",
+        "verdict": "PATTERN",
+        "landing": "this file (capabilities / personas / finops / risk / escalation)"
+      },
+      {
+        "repo": "kushin77/CMR",
+        "path": "vendor/CMR/catalog/modules/hermes-agents (capability-registry: src/hermes_agent/services/capability_registry.py)",
+        "asset": "capability -> agent resolution from capability metadata",
+        "verdict": "PATTERN",
+        "landing": "fleet/routing.py (capability_for / agent_for / route)"
+      },
+      {
+        "repo": "kushin77/CMR",
+        "path": "vendor/CMR/catalog/modules/hermes-agents (model-tiering: src/hermes_agent/models/model_tiering.py)",
+        "asset": "tier assignment, escalation-as-a-floor, escalate once on observed difficulty",
+        "verdict": "PATTERN",
+        "landing": "fleet/routing.py (tier_for / floor / escalate)"
+      },
+      {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "registry/personas/cards/hermes.yaml",
+        "asset": "the dispatched hermes persona: capabilitySet [code-author, test-author, test-run, memory-ops] at defaultModelTier MED",
+        "verdict": "REGISTRY",
+        "landing": "personas.hermes — the loader verifies this card's tier and capability set against the policy"
+      },
+      {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "registry/personas/cards/paperclip.yaml",
+        "asset": "the dispatched paperclip persona: capabilitySet [research, docs-authoring, memory-ops] at defaultModelTier LOW",
+        "verdict": "REGISTRY",
+        "landing": "personas.paperclip — the loader verifies this card's tier and capability set against the policy"
+      },
+      {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "registry/profiles/catalog.yaml",
+        "asset": "the closed capability vocabulary (capabilities{} keys) this policy's ids are drawn from",
+        "verdict": "REGISTRY",
+        "landing": "capabilities{} / unrouted_capabilities{}"
+      }
+    ]
+  },
+  "personas": {
+    "hermes": {
+      "role": "coding worker",
+      "card": "registry/personas/cards/hermes.yaml",
+      "profile": "registry/profiles/seeds/hermes.1.0.0.yaml",
+      "tier": "MED",
+      "lanes": ["hermes", "code-authoring"]
+    },
+    "paperclip": {
+      "role": "knowledge assistant",
+      "card": "registry/personas/cards/paperclip.yaml",
+      "profile": "registry/profiles/seeds/paperclip.1.0.0.yaml",
+      "tier": "LOW",
+      "lanes": ["paperclip", "knowledge"]
+    }
+  },
+  "capabilities": {
+    "code-author": {"persona": "hermes", "summary": "Author code changes and pull requests."},
+    "test-author": {"persona": "hermes", "summary": "Author tests (unit, integration, mutation)."},
+    "test-run": {"persona": "hermes", "summary": "Execute gates and verification and return real evidence."},
+    "code-review": {"persona": "hermes", "summary": "Review code correctness and quality."},
+    "research": {"persona": "paperclip", "summary": "Investigate, root-cause analysis, evidence gathering."},
+    "docs-authoring": {"persona": "paperclip", "summary": "Documentation and knowledge-base writing."},
+    "memory-ops": {"persona": "paperclip", "summary": "Read/write scoped memory (repository, session, user). Declared by both cards; routed once, to the knowledge assistant (see shared_capabilities)."}
+  },
+  "shared_capabilities": {
+    "memory-ops": ["hermes", "paperclip"]
+  },
+  "unrouted_capabilities": {
+    "orchestrate": "the brain itself plans, decomposes and dispatches; no registered persona declares this capability",
+    "task-claim": "claiming is dispatch bookkeeping (governance/dispatch), not a persona capability",
+    "security-review": "security work runs under the risk floor below; no registered persona declares this capability",
+    "architecture-decision": "decisions-only advisor work; no registered persona declares this capability",
+    "infra-authoring": "production-IaC work runs under the risk floor below; no registered persona declares this capability",
+    "audit": "independent verification is a posture, not a dispatch target, at this phase",
+    "finops-meter": "metering is the observability pillar's job, not a dispatched persona's",
+    "data-analysis": "no registered persona declares this capability at this phase"
+  },
+  "hints": [
+    {"capability": "code-author", "words": ["code-author", "code-authoring", "implement", "refactor", "feature"]},
+    {"capability": "test-author", "words": ["test-author", "test author", "tests", "test", "mutation"]},
+    {"capability": "test-run", "words": ["test-run", "verify", "gate", "pytest", "lint"]},
+    {"capability": "code-review", "words": ["code-review", "code review", "review"]},
+    {"capability": "research", "words": ["research", "investigate", "investigation", "spike", "rca", "root-cause"]},
+    {"capability": "docs-authoring", "words": ["docs-authoring", "docs", "documentation", "readme", "reporting"]},
+    {"capability": "memory-ops", "words": ["memory-ops", "memory"]}
+  ],
+  "finops": {
+    "tier_map": {
+      "LOW": "flash",
+      "MED": "flash",
+      "HIGH": "pro",
+      "MAX": "auditor"
+    },
+    "thinking": {
+      "flash": "none",
+      "pro": "low",
+      "auditor": "high"
+    },
+    "default": {"tier": "flash", "thinking": "none"},
+    "note": "Hermes' LOW/MED/HIGH (and MAX) persona tiers map onto this repo's harvested FinOps vocabulary (governance/finops/policy.json: tiers flash|pro|auditor). The thinking effort is the tier's floor of care: flash runs thinking-off, pro runs low, auditor runs high. tier_map and thinking must agree with the tiers the wire enforces (fleet/channel.py) — fleet/tests/test_routing.py is the parity gate.",
+    "rule": "start cheap, escalate once on observed difficulty; the operator may raise a tier, never lower a floor"
+  },
+  "risk": {
+    "high_floor": {
+      "tokens": ["security", "secrets", "auth", "identity", "iac", "infra", "terraform"],
+      "tier": "pro",
+      "thinking": "low",
+      "rule": "security, secrets, auth, identity and production-IaC work never starts below this floor. The floor outranks the persona tier, applies whatever capability the work claims, and is a floor — never a ceiling."
+    },
+    "capability_risk": {
+      "security-review": "high",
+      "infra-authoring": "high",
+      "architecture-decision": "high"
+    }
+  },
+  "escalation": {
+    "rule": "escalate once, on observed difficulty — never speculatively and never pre-emptively",
+    "requires": "a reason naming the observed difficulty",
+    "order": {
+      "tier": ["flash", "pro", "auditor"],
+      "thinking": ["none", "low", "medium", "high"]
+    },
+    "never": [
+      "downgrade a tier or a thinking level",
+      "escalate without an observed reason",
+      "escalate more than one rung at a time"
+    ]
+  }
+}

@@ -197,6 +197,64 @@ def test_the_brain_does_not_lower_a_tier_the_operator_raised():
     assert directive["model"] == {"tier": "pro", "thinking": "high"}
 
 
+# --- #300 / ADR-0012: dispatch is capability-routed through the policy --------
+#
+# The brain used to derive the FinOps block from a private dialect. It now consults
+# `fleet/routing.py` (which reads `fleet/profiles/routing.policy.json` and the
+# registry persona cards), so these tests are the brain's half of the contract: the
+# persona it names in the directive is the one the registry declared, and the
+# floors stay derived rather than re-declared.
+
+
+def test_the_brain_routes_a_lane_through_the_policy_to_its_registry_persona():
+    directive = brain.build_directive(order(task={"issue": 7, "lane": "hermes"}))
+    body = directive["body"]
+    assert "capability=code-author" in body
+    assert "persona=hermes" in body
+    assert "registry/personas/cards/hermes.yaml" in body, "the directive must name the card it read"
+    # Hermes is a MED persona; MED maps onto flash, and thinking stays off there.
+    assert directive["model"] == {"tier": "flash", "thinking": "none"}
+    assert validate(directive) == []
+
+
+def test_the_brain_routes_research_to_the_knowledge_persona():
+    directive = brain.build_directive(order(task={"issue": 8, "lane": "research"}))
+    assert "persona=paperclip" in directive["body"]
+    assert "registry/personas/cards/paperclip.yaml" in directive["body"]
+    assert directive["model"] == {"tier": "flash", "thinking": "none"}
+
+
+def test_a_lane_that_claims_no_capability_says_so_instead_of_inventing_one():
+    directive = brain.build_directive(order(task={"issue": 5, "lane": "fleet"}))
+    assert "claims no capability" in directive["body"]
+    assert directive["model"] == {"tier": "flash", "thinking": "none"}
+
+
+def test_an_unroutable_capability_claim_is_refused_by_name():
+    """A capability the registry cannot back is a named refusal, never a default."""
+    ok, report = brain.handle_order(order(task={"issue": 11, "lane": "fleet", "capability": "make-coffee"}))
+    assert ok is False
+    assert "dispatch refused for #11" in report
+    assert "capability-unknown" in report and "make-coffee" in report
+
+
+def test_the_high_floor_still_wins_over_a_persona_route():
+    """ADR-0012 decision (b): the floor outranks the persona tier, unchanged."""
+    directive = brain.build_directive(
+        order(task={"issue": 12, "lane": "hermes", "title": "harden the secrets path"})
+    )
+    assert directive["model"] == {"tier": "pro", "thinking": "low"}
+    assert "capability=code-author" in directive["body"]
+
+
+def test_the_brain_derives_its_floor_vocabulary_from_the_policy():
+    """The brain has no dialect of its own: floors and defaults come from the policy."""
+    assert brain.HIGH_FLOOR_LANES == brain.ROUTING.high_floor_tokens
+    assert (brain.DEFAULT_TIER, brain.DEFAULT_THINKING) == brain.ROUTING.default_block
+    assert (brain.HIGH_TIER, brain.HIGH_THINKING) == brain.ROUTING.high_floor_block
+    assert set(brain.HIGH_FLOOR_LANES) == set(brain.PROFILE["finops"]["high_floor_lanes"])
+
+
 def test_handle_order_refuses_one_that_names_no_issue():
     ok, report = brain.handle_order(order(task={"lane": "fleet"}))
     assert ok is False
