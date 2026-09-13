@@ -246,3 +246,36 @@ def test_audit_flags_a_brain_directed_claim_without_a_directive_ref(snapshot, ba
     ]
     problems = claims.audit(events, snapshot, base_time)
     assert any("no directive_id" in problem for problem in problems)
+
+
+def test_reap_releases_a_claim_wedged_by_a_dead_agent(tmp_path, snapshot, base_time):
+    ledger = tmp_path / "claims.jsonl"
+    locks = tmp_path / "locks"
+    claims.claim(601, "dead-agent", "fleet", snapshot, ledger=ledger, lock_dir=locks, now=base_time)
+    assert claims.lock_path(601, locks).exists()
+
+    later = base_time + timedelta(minutes=90)
+    reaped = claims.reap(45, ledger=ledger, lock_dir=locks, now=later)
+
+    assert [event.issue for event in reaped] == [601]
+    assert reaped[0].reaped_agent == "dead-agent"
+    assert claims.active_claims(claims.read_ledger(ledger), later) == {}
+    assert not claims.lock_path(601, locks).exists()
+
+
+def test_reap_leaves_fresh_claims_alone(tmp_path, snapshot, base_time):
+    ledger = tmp_path / "claims.jsonl"
+    locks = tmp_path / "locks"
+    claims.claim(601, "busy-agent", "fleet", snapshot, ledger=ledger, lock_dir=locks, now=base_time)
+
+    reaped = claims.reap(45, ledger=ledger, lock_dir=locks, now=base_time + timedelta(minutes=5))
+
+    assert reaped == []
+    assert claims.active_claims(claims.read_ledger(ledger), base_time + timedelta(minutes=5))[601].agent == "busy-agent"
+
+
+def test_audit_flags_a_reap_that_names_no_agent(snapshot, base_time):
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [claims.ClaimEvent(event="reap", issue=601, agent="brain", at=moment)]
+    problems = claims.audit(events, snapshot, base_time)
+    assert any("does not name the reaped agent" in problem for problem in problems)

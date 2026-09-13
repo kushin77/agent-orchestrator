@@ -147,6 +147,24 @@ def cmd_status(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_reap(args: argparse.Namespace) -> int:
+    """Recover claims wedged by dead agents so their issues can be dispatched again."""
+    reaped = claims.reap(
+        args.older_than_minutes,
+        ledger=args.ledger,
+        lock_dir=args.locks,
+        issue=args.issue,
+        reaper=args.reaper,
+    )
+    if not reaped:
+        print("reap: nothing to reap (no live claim older than the threshold)")
+        return EXIT_OK
+    for event in reaped:
+        print(f"reap: #{event.issue} released from {event.reaped_agent} (held since {event.lane or 'n/a'})")
+    print(f"reap: {len(reaped)} claim(s) recovered")
+    return EXIT_OK
+
+
 def cmd_held(args: argparse.Namespace) -> int:
     """Exit 0 and print the holder when the issue has a live claim; exit 1 when it does not."""
     live = claims.active_claims(claims.read_ledger(args.ledger))
@@ -219,6 +237,13 @@ def build_parser() -> argparse.ArgumentParser:
     add_paths(held)
     held.add_argument("--issue", type=int, required=True)
     held.set_defaults(func=cmd_held)
+
+    reap = sub.add_parser("reap", help="release claims wedged by dead agents past a threshold")
+    add_paths(reap)
+    reap.add_argument("--older-than-minutes", type=int, default=45)
+    reap.add_argument("--issue", type=int, default=None)
+    reap.add_argument("--reaper", default="brain")
+    reap.set_defaults(func=cmd_reap)
 
     snap = sub.add_parser("snapshot", help="refresh .board/snapshot.json from GitHub")
     snap.add_argument("--from-github", action="store_true")

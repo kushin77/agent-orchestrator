@@ -109,9 +109,47 @@ def replay(events: list[ClaimEvent]) -> dict[int, ClaimEvent]:
     for event in events:
         if event.is_claim:
             raw[event.issue] = event
-        elif event.event == "release":
+        elif event.event in ("release", "reap"):
             raw.pop(event.issue, None)
     return raw
+
+
+def reap(
+    older_than_minutes: int,
+    ledger: Path | str = DEFAULT_LEDGER,
+    lock_dir: Path | str = DEFAULT_LOCK_DIR,
+    now: datetime | None = None,
+    issue: int | None = None,
+    reaper: str = "brain",
+) -> list[ClaimEvent]:
+    """Release claims older than the threshold whose holder is gone.
+
+    A subagent that dies holding a claim wedges its issue until the 24h TTL.
+    The brain reaps it: a `reap` event names the reaped agent, clears the claim
+    and releases the lock, so the issue can be dispatched again.
+    """
+    moment = now or datetime.now(timezone.utc)
+    events = read_ledger(ledger)
+    live = active_claims(events, moment)
+    reaped: list[ClaimEvent] = []
+    for number, holder in sorted(live.items()):
+        if issue is not None and number != issue:
+            continue
+        if moment - parse_iso(holder.at) < timedelta(minutes=older_than_minutes):
+            continue
+        event = ClaimEvent(
+            event="reap",
+            issue=number,
+            agent=reaper,
+            at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            lane=holder.lane,
+            reason="reaped: holder gone past threshold",
+            reaped_agent=holder.agent,
+        )
+        append_event(event, ledger)
+        _release_lock(number, lock_dir)
+        reaped.append(event)
+    return reaped
 
 
 def expired_claims(events: list[ClaimEvent], now: datetime | None = None) -> dict[int, ClaimEvent]:
@@ -313,6 +351,10 @@ def audit(events: list[ClaimEvent], snapshot: Snapshot, now: datetime | None = N
                 )
             else:
                 holder.pop(event.issue, None)
+        elif event.event == "reap":
+            if not event.reaped_agent:
+                problems.append(f"{where}: reap of #{event.issue} does not name the reaped agent")
+            holder.pop(event.issue, None)
 
     for issue, stale in sorted(expired_claims(events, moment).items()):
         issue_obj = snapshot.get(issue)

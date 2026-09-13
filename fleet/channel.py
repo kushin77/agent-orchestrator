@@ -334,7 +334,7 @@ def cmd_listen(args: argparse.Namespace) -> int:
     """
     deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
     seen = 0
-    offset = 0
+    offset = 0 if getattr(args, "from_start", False) else (SLOG.stat().st_size if SLOG.exists() else 0)
     while True:
         if SLOG.exists():
             with open(SLOG, encoding="utf-8") as handle:
@@ -471,6 +471,7 @@ def build_parser() -> argparse.ArgumentParser:
     listen.add_argument("--timeout-seconds", type=float, default=0.0)
     listen.add_argument("--interval", type=float, default=1.0)
     listen.add_argument("--max-messages", type=int, default=0)
+    listen.add_argument("--from-start", action="store_true", help="replay the whole slog instead of tailing from now")
     listen.set_defaults(func=cmd_listen)
     return parser
 
