@@ -1,15 +1,20 @@
-"""SSO + RBAC tests (issue #39 AC #3).
+"""SSO + RBAC tests (issue #39 AC #3, issue #272).
 
-SSO is the real merged identity/sso console flow (issue #35): relay-state,
-RS256 os-session-token, ROOT_ADMIN allowlist. RBAC is super-admin
-(root_admin) vs tenant-admin, with the rbac (issue #12) platform role pack
-permission vocabulary enforced at the console boundary.
+SSO is the shared-frontend auth-gate session (issue #272): the console minted
+no session of its own and verifies the RS256 ``os-session-token`` against the
+gate's published JWKS (``purpose: os-session-token``, ROOT_ADMIN allowlist).
+RBAC is super-admin (root_admin) vs tenant-admin, with the rbac (issue #12)
+platform role pack permission vocabulary enforced at the console boundary.
+
+Scope is never taken from the token: a token claiming a tenant the identity is
+not bound to in the org directory still grants nothing (no cross-tenant
+fallback).
 """
 
 from __future__ import annotations
 
 import pytest
-from conftest import ApiClient, login_as
+from conftest import login_as
 
 
 def _data(payload):
@@ -47,16 +52,16 @@ def test_revoked_session_is_refused_even_when_unexpired(app):
     assert payload["error"]["code"] == "unauthorized"
 
 
-def test_login_denied_for_unbound_tenant(app):
-    api = ApiClient(app)
-    status, payload = api.post(
-        "/api/console/login",
-        {"email": "carol@globex.example.com", "tenantId": "acme", "state": "x"},
-    )
-    # carol is bound to globex, not acme -> scope denied before the relay
-    # state is even consumed (fail closed on the tenant gate).
+def test_token_tenant_claim_grants_no_scope(app):
+    # carol is bound to globex in the org directory; a token whose tenantId
+    # claim says acme is therefore still out of scope for acme (the claim is
+    # not an authorization input - fail closed on the tenant gate).
+    api = login_as(app, "carol@globex.example.com", "acme")
+    status, payload = api.get("/api/tenants/acme/agents")
     assert status == 403
     assert payload["error"]["code"] == "scope_denied"
+    status, payload = api.get("/api/tenants")
+    assert [row["tenantId"] for row in _data(payload)["tenants"]] == ["globex"]
 
 
 # -- RBAC: super-admin vs tenant-admin --------------------------------------

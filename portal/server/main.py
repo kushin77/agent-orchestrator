@@ -2,21 +2,26 @@
 """portal.server.main — run the offline console server.
 
 The console is a self-contained static app (design-token CSS/JSON twins +
-vanilla JS views) served by this stdlib-only Python HTTP layer with the
-console routes + SSO session check. No build step and no node_modules.
+vanilla JS views) served by this stdlib-only Python HTTP layer with the console
+routes + the auth-gate session check. No build step and no node_modules.
 
 Usage:
 
     python3 -m portal.server.main --port 8787
 
-Then open http://127.0.0.1:8787/ in a browser. Demo logins (offline demo
-directory, see portal/README.md):
+The console has no login of its own: it redirects unauthenticated visitors to
+the shared-frontend OS auth gate (``/auth/login``) and establishes a console
+session only from a verified auth-gate RS256 ``os-session-token``. Point it at
+a mirror of the gate's published JWKS (``GET /auth/.well-known/jwks.json``) and
+set the console allowlist before starting it:
 
-    root@platform.example.com   super-admin (multi-tenant console)
-    alice@acme.example.com      tenant owner of acme
-    bob@acme.example.com        tenant admin of acme (read-only on controls)
-    carol@globex.example.com    tenant owner of globex
-    dan@initech.example.com     tenant owner of initech
+    PORTAL_AUTH_GATE_JWKS_FILE=/etc/ao/auth-gate-jwks.json \\
+    ROOT_ADMIN_EMAILS=root@platform.example.com \\
+    python3 -m portal.server.main --port 8787
+
+With no JWKS mirror configured the console trusts no key and refuses every
+session (fail closed). The offline seed directory (portal/README.md) still
+supplies the org bindings those identities are authorized with.
 """
 
 from __future__ import annotations
