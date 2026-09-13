@@ -86,6 +86,17 @@ def test_the_sister_still_escalates_to_the_brain():
 # --- the operator trigger ----------------------------------------------------
 
 
+def test_a_non_work_order_needs_no_issue_and_a_work_order_still_does():
+    """The live bug: `task.kind: status` was refused for lacking an issue."""
+    assert validate({"from": "operator", "to": "brain", "type": "directive", "task": {"kind": "status"}}) == []
+    problems = validate({"from": "operator", "to": "brain", "type": "directive", "task": {}})
+    assert any("task.issue must be a positive integer" in problem for problem in problems)
+    problems = validate(
+        {"from": "operator", "to": "brain", "type": "directive", "task": {"kind": "whenever"}}
+    )
+    assert any("task.kind must be one of" in problem for problem in problems)
+
+
 def test_order_queues_for_the_brain(tmp_path, monkeypatch):
     monkeypatch.setattr(channel, "BRAIN_INBOX", tmp_path / "brain" / "inbox")
     monkeypatch.setattr(channel, "BRAIN_SENT", tmp_path / "brain" / "sent")

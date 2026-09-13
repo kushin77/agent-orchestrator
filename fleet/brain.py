@@ -58,8 +58,8 @@ HIGH_TIER = "pro"
 HIGH_THINKING = "low"
 
 # Order kinds that are not work: the operator may ask the brain to report or to
-# refresh the fleet instead of dispatching an issue.
-NON_WORK_KINDS = ("status", "report", "ping")
+# ping instead of dispatching an issue (the vocabulary lives in the channel).
+NON_WORK_KINDS = channel.NON_WORK_KINDS
 
 
 def now_iso() -> str:

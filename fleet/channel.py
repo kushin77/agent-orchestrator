@@ -60,6 +60,10 @@ SEVERITIES = ("info", "warn", "critical")
 CONTROL_ACTIONS = ("poke", "refresh", "halt")
 MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
+# Order kinds (schema v1, additive): `work` needs an issue; the others are
+# answered by the brain without dispatching anything to the sister.
+TASK_KINDS = ("work", "status", "report", "ping")
+NON_WORK_KINDS = ("status", "report", "ping")
 _ROLE_RE = re.compile(r"^(operator|brain|sister|subagent(-[a-z0-9]+)?)$")
 
 EXIT_OK = 0
@@ -163,8 +167,13 @@ def validate(message: dict) -> list[str]:
         if not isinstance(task, dict):
             problems.append("task must be an object")
         else:
+            kind = task.get("kind")
+            if kind is not None and kind not in TASK_KINDS:
+                problems.append(f"task.kind must be one of {', '.join(TASK_KINDS)}")
             issue = task.get("issue")
-            if not isinstance(issue, int) or isinstance(issue, bool) or issue < 1:
+            if kind not in NON_WORK_KINDS and (
+                not isinstance(issue, int) or isinstance(issue, bool) or issue < 1
+            ):
                 problems.append("task.issue must be a positive integer")
             for field in ("epic",):
                 if field in task and (not isinstance(task[field], int) or isinstance(task[field], bool) or task[field] < 1):
