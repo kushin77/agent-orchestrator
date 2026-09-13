@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T20:43:08Z",
+  "generated_at": "2026-09-13T21:24:51Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1313,7 +1313,7 @@
     {
       "number": 143,
       "title": "Establish the governance board and enforcement gate for CMR/GDC knowledge compliance",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:board",
@@ -1326,7 +1326,7 @@
       "blocked_by": [
         142
       ],
-      "closed_at": ""
+      "closed_at": "2026-09-13T20:53:02Z"
     },
     {
       "number": 144,
@@ -1863,6 +1863,106 @@
       "labels": [
         "type:feature"
       ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 232,
+      "title": "fleet/telemetry.py: per-run record schema + JSONL append helper",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 219,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 233,
+      "title": "Wire per-run telemetry into fleet/terminal.py run path",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 219,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 234,
+      "title": "Telemetry summary verb + gitignore for .fleet/telemetry.jsonl",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 219,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 237,
+      "title": "cron-owned fleet watchdog (respawn brain/sister)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:05:26Z"
+    },
+    {
+      "number": 239,
+      "title": "Mechanical execution layer \u2014 concept/intent (no containers yet)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 240,
+      "title": "Cannibalize leaderboard worker-fleet hardening patterns (cannibalization index #8)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 241,
+      "title": "Generated-cron reconciler (leaderboard pattern, later)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 242,
+      "title": "Wire cron verb + install and demonstrate the fleet watchdog",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:09:41Z"
+    },
+    {
+      "number": 244,
+      "title": "fleet: subagent prompt must merge its own green PR and close the issue",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 245,
+      "title": "Track the fleet progress monitor as a third watchdog rung (durable, auto-start)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
       "parent": null,
       "blocked_by": [],
       "closed_at": ""
