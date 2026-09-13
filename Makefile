@@ -17,7 +17,7 @@ SHELL := /bin/bash
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
         issue-claims fleet-channel knowledge-index knowledge-index-build \
-        conformance secrets feature-flags cloudbuild terraform tf-fmt \
+        conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
@@ -58,6 +58,8 @@ help:
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
 	@echo "                milestoned issue classified; mandates checked on the diff"
+	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
+	@echo "                RCA, every action recorded, every lesson evidenced"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -70,7 +72,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel knowledge-index
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -145,6 +147,13 @@ conformance:
 ## (GR-15 code-native automation; new infrastructure ships flag-gated OFF)
 conformance-change-set:
 	@python3 governance/conformance/cli.py change-set
+
+## lessons — RCA + lessons enforcement (issue #141): an incident with no RCA,
+## an RCA with no traceable origin or corrective action, an action that is not
+## recorded or names no owner, and a closed lesson with no commit evidence all
+## fail the gate; the historical backlog is reported with its remediation
+lessons:
+	@bash scripts/check-lessons.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
