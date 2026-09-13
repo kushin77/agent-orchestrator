@@ -211,6 +211,33 @@ idles out. `FLEET_RUNNER` overrides the runner.
 `fleet/directive.json` and the schema are tracked artifacts — the sister can
 always discover its standing orders from a clean clone.
 
+## Recovery (no operator step — code handles each failure)
+
+Every failure mode below is handled by an existing command; none of them needs
+a human to do anything but run the command (or nothing at all, if the loop
+self-heals).
+
+* **The sister dies mid-claim.** A claim carries a `ttl_hours` (24h default,
+  set at claim time by `governance/dispatch/cli.py claim`). Once the TTL
+  elapses the claim is stale and `governance/dispatch/cli.py claim` for the
+  same issue on a new agent **reaps** it automatically (`reaped_agent` in the
+  claim event names who was taken over from) — no manual unlock step. A new
+  sister session just claims again; there is nothing to clean up by hand.
+* **The mailbox fills up (`.fleet/inbox` backs up).** `report` **consumes**
+  the directive it answers — it moves the message from `.fleet/inbox` to
+  `.fleet/done`, so a backlog only means the listener stopped running, not
+  that state is corrupted. Restarting the loop (`bash fleet/terminal.sh`, or
+  `python3 fleet/control.py refresh`) drains the backlog from where it left
+  off; nothing needs to be deleted or re-sent.
+* **The dispatcher loop fails (rc=2).** `fleet/health.py check` returns `2
+  failing` exactly when `fleet/terminal.py` is not running at all (see
+  below) — that exit code is itself the alert: the brain's `listen`/`watch`
+  loop or any script polling `health` sees `2` and knows to restart the
+  terminal (`bash fleet/terminal.sh`) rather than guess. `1 degraded` means
+  the loop is up but stale (`.fleet/slog.jsonl` hasn't moved, or a claim is
+  wedged past the staleness window) — `python3 fleet/control.py poke` forces
+  it to react without a restart.
+
 ## The gate
 
 ```bash

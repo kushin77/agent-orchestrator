@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract knowledge-index knowledge-index-build \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index knowledge-index-build \
         conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
@@ -65,6 +65,9 @@ help:
 	@echo "                six directive verbs, envelope fields and trust rules"
 	@echo "                are declared and map onto the shipped channel"
 
+	@echo "  fleet-runbook  Bootstrap runbook gate (M26 #166): the only human step"
+	@echo "                is the model switch, and the recovery paths stay documented"
+
 	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
@@ -83,7 +86,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract knowledge-index lessons
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -159,6 +162,14 @@ finops-chooser:
 ## the check mutates its own input, so it cannot pass vacuously
 fleet-contract:
 	@bash scripts/check-fleet-contract.sh
+
+
+## fleet-runbook — session-fleet bootstrap runbook gate (M26, issue #166): the
+## only human step is the model switch, and the recovery paths (claim TTL
+## take-over, mailbox backlog, dispatcher rc=2) stay documented; the check
+## mutates its own input, so it cannot pass vacuously
+fleet-runbook:
+	@bash scripts/check-fleet-runbook.sh
 
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):

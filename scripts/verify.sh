@@ -32,6 +32,7 @@ checks=(
   'issue-claims|bash scripts/check-issue-claims.sh'
   'fleet-channel|bash scripts/check-fleet-channel.sh'
   'fleet-contract|bash scripts/check-fleet-contract.sh'
+  'fleet-runbook|bash scripts/check-fleet-runbook.sh'
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'conformance|bash scripts/check-conformance.sh'
   'issue-template|bash scripts/check-issue-template.sh'
