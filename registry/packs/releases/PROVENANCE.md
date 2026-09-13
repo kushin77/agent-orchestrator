@@ -16,6 +16,7 @@ redefines their vocabularies.
 | `worker-platform` 1.0.0 | prompt `classify-route@v1` (`registry/prompts/modules/classify-route.v1.yaml`) | prompt-module convention from `gmail-agent` `prompts/<task>/v1.ts` (issue #13) |
 | `data-ops` 1.0.0 | profile `data-agent@1.0.0` + persona `data-agent` + prompt `summarize@v1` | `kushin77/capital-underwriting` `infra/docker/worker-fleet/personas.yaml` (ds-worker pool) + `registry/profiles` + `registry/personas` + `registry/prompts` |
 | `orchestrator-ops` 1.0.0 | profile `orchestrator@1.0.0` + persona `orchestrator` + prompt `classify-route@v1` | `kushin77/leaderboard` orchestrator persona + `registry/profiles` + `registry/personas` + `registry/prompts` |
+| `purebliss-team` 1.0.0 | profile `ollama/paperclip/hermes/deepseek/claude@1.0.0` + persona `ollama/paperclip/hermes/deepseek/claude` | `kushin77/ollama` (resilient local client), `kushin77/llm-triage` (provider-neutral classifier), `kushin77/hermes-agents` (capability registry), `kushin77/leaderboard` (model chooser), `kushin77/gmail-agent` (Claude client) + `registry/profiles` + `registry/personas` |
 | all | policy + tool manifests (pack-authored content derived from each bundled profile's `guardrailPolicyRef` / `toolAllowlist`) | `kushin77/CMR` `guardrails/policy/controls.yaml` (policy registry) + `registry/profiles/catalog.yaml` tool catalog (issue #9) |
 
 ## Signed-attestation vocabulary (consumed, not redefined)
@@ -41,3 +42,9 @@ redefines their vocabularies.
 - The private key is **never committed**; it is injected at publish time
   (GR-6: env/secret manager only). Release signatures are produced during the
   publish pipeline, not from repository state.
+- **Key rotation (issue #254):** the original private key was never committed
+  and was not recoverable, so a fresh RSA-2048 keypair was generated and the
+  new public key committed in its place; the three pre-existing snapshots
+  (`data-ops`, `orchestrator-ops`, `worker-platform`) were re-signed under the
+  new key (contents unchanged) and `purebliss-team` was signed with it. All
+  four signatures verify against the committed public key.

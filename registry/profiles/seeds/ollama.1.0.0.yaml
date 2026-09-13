@@ -1,0 +1,32 @@
+# AgentProfile seed: ollama (local inference worker) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/ollama ollama/services/inference/resilient_ollama_client.py
+#     (resilient local-LLM client; circuit breaker + typed inference contracts)
+#   - kushin77/ollama ollama/services/resilience/circuit_breaker.py (call resilience)
+#   - kushin77/CMR onboarding/agent-profiles/role.schema.json (model-tier ladder)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: ollama
+version: 1.0.0
+owner: platform/purebliss
+systemPromptRef: ollama/primary@v1
+toolAllowlist:
+  - file_read
+  - file_write
+  - shell_exec
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - stay-in-lane
+  - verify-before-done
+  - no-debug-leftovers
+capabilitySet:
+  - code-author
+  - test-run
+  - memory-ops
+defaultModelTier: LOW
+memoryScope:
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

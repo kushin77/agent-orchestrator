@@ -1,0 +1,31 @@
+# AgentProfile seed: paperclip (provider-neutral knowledge assistant) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/llm-triage src/llm_triage/classifier.py (provider-neutral
+#     classifier behind one ABC; cache + retry)
+#   - kushin77/gov-ai-scout backend/src/services/ai-provider.ts (provider gateway
+#     + typed structured outputs)
+#   - kushin77/CMR onboarding/agent-profiles/role.schema.json (model-tier ladder)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: paperclip
+version: 1.0.0
+owner: platform/purebliss
+systemPromptRef: paperclip/primary@v1
+toolAllowlist:
+  - file_read
+  - web_fetch
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - verify-before-done
+  - no-debug-leftovers
+capabilitySet:
+  - research
+  - docs-authoring
+  - memory-ops
+defaultModelTier: LOW
+memoryScope:
+  - user
+  - repository
+guardrailPolicyRef: worker-bundle

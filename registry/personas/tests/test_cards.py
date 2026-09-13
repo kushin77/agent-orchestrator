@@ -1,6 +1,6 @@
 """Seed persona cards validate, discover and carry the expected mix.
 
-Covers acceptance: ~15 seed personas assembled from the harvested library
+Covers acceptance: ~20 seed personas assembled from the harvested library
 (file-per-persona, filename-adds-no-code-change), including the auditor
 persona, each carrying provenance per the repo provenance rule (GR-10).
 """
@@ -30,18 +30,23 @@ EXPECTED_IDS = {
     "frontend-sme",
     "docs-sme",
     "auditor",
+    "ollama",
+    "paperclip",
+    "hermes",
+    "deepseek",
+    "claude",
 }
 
 
 def test_seed_card_count_and_auditor_present():
     files = sorted(CARDS_DIR.glob("*.yaml"))
-    assert len(files) == len(EXPECTED_IDS) == 15
+    assert len(files) == len(EXPECTED_IDS) == 20
     assert {f.stem for f in files} == EXPECTED_IDS
 
 
 def test_seed_cards_validate_and_match_filename_stem():
     cards = REAL.discover()
-    assert len(cards) == 15
+    assert len(cards) == 20
     for (tenant, persona_id), card in cards.items():
         assert tenant == "platform"  # every seed is a platform-default persona
         assert persona_id == card["id"]
@@ -59,7 +64,7 @@ def test_seed_posture_mix():
     postures = {}
     for (_tenant, _persona_id), card in cards.items():
         postures[card["posture"]] = postures.get(card["posture"], 0) + 1
-    assert postures == {"executor": 7, "reviewer": 7, "auditor": 1}
+    assert postures == {"executor": 12, "reviewer": 7, "auditor": 1}
     assert any(c["posture"] == "auditor" for c in cards.values())
 
 

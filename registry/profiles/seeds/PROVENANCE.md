@@ -21,6 +21,11 @@ and memory-scope semantics are normalized to `registry/profiles/catalog.yaml`.
 | `researcher` | `kushin77/gmail-agent` `src/agent/tools.ts` (search_memory, store_memory) | memory tooling for evidence capture |
 | `data-agent` | `kushin77/capital-underwriting` `infra/docker/worker-fleet/personas.yaml` (ds-worker-* pool) | capability data-analysis; tools sql_query/file_write; MED flash tier |
 | `data-agent` | `kushin77/hermes-agents` `src/hermes_agent/models/capability_registry.py` | capability-tagged task routing into data-analysis |
+| `ollama` | `kushin77/ollama` `ollama/services/inference/resilient_ollama_client.py` + `ollama/services/resilience/circuit_breaker.py` | local-LLM client + circuit breaker; LOW flash tier; local-inference posture |
+| `paperclip` | `kushin77/llm-triage` `src/llm_triage/classifier.py` + `kushin77/gov-ai-scout` `backend/src/services/ai-provider.ts` | provider-neutral classifier + typed structured outputs; research/docs-authoring |
+| `hermes` | `kushin77/hermes-agents` `src/hermes_agent/services/capability_registry.py` + `models/model_tiering.py` | code-gen/refactor/test-gen routing; tier/ceiling/cost model; MED tier |
+| `deepseek` | `kushin77/leaderboard` `lib/fleet-roster.sh` + `config/deepseek-capabilities.txt` + `kushin77/capital-underwriting` `personas.yaml` (ds-worker-*) | role→tier→model chooser; DeepSeek capability catalog; data-analysis/research; MED tier |
+| `claude` | `kushin77/gmail-agent` `src/agent/claude.ts` + `kushin77/CMR` `onboarding/agent-profiles/profiles/architecture-sme.json` | governed Claude client (tiers/p-retry/tool loop); orchestration posture; MED tier |
 
 Cross-cutting field semantics (all seeds):
 

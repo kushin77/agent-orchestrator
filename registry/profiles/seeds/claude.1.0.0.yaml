@@ -1,0 +1,42 @@
+# AgentProfile seed: claude (senior multi-domain worker + orchestration) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/gmail-agent src/agent/claude.ts (governed Claude client: model
+#     tiers AI_PRIMARY/COMPLEX/FALLBACK, p-retry, agentic tool loop)
+#   - kushin77/CMR onboarding/agent-profiles/profiles/architecture-sme.json
+#     (planner/decisions, orchestration posture)
+#   - kushin77/CMR docs/MODEL-PROFILES.md (FinOps model ladder)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: claude
+version: 1.0.0
+owner: platform/purebliss
+systemPromptRef: claude/primary@v1
+toolAllowlist:
+  - gh_issue
+  - gh_pr
+  - file_read
+  - file_write
+  - shell_exec
+  - web_fetch
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - stay-in-lane
+  - verify-before-done
+  - evidence-on-pr
+  - no-direct-push
+  - no-secrets
+  - no-unverified-merge
+  - no-debug-leftovers
+capabilitySet:
+  - orchestrate
+  - code-author
+  - code-review
+  - research
+defaultModelTier: MED
+memoryScope:
+  - user
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

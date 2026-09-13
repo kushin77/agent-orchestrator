@@ -151,7 +151,8 @@
         "review",
         "research",
         "security",
-        "integration"
+        "integration",
+        "team"
       ],
       "description": "Closed pack category vocabulary. Keep in sync with pack-catalog.yaml categories (validate.py parity gate enforces it)."
     },
