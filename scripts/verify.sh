@@ -30,6 +30,7 @@ checks=(
   'docs-lint|bash scripts/check-docs.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
+  'fleet-channel|bash scripts/check-fleet-channel.sh'
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'secrets|bash scripts/check-secrets.sh'
   'feature-flags|python3 scripts/check-feature-flags.py'

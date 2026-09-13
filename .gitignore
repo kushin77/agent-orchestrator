@@ -38,6 +38,11 @@ node_modules/
 # Claim locks are runtime state (the claim ledger itself is tracked evidence)
 .board/locks/
 
+# Fleet steering mailboxes are runtime state (schema + standing directive are tracked)
+.fleet/inbox/
+.fleet/outbox/
+.fleet/sent/
+
 # Local environment / secrets
 .env
 .env.*

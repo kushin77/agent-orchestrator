@@ -1,0 +1,13 @@
+{
+  "id": "directive-0001-sister-bootstrap",
+  "from": "brain",
+  "to": "sister",
+  "type": "directive",
+  "ts": "2026-09-13T00:00:00Z",
+  "model": {
+    "tier": "flash",
+    "thinking": "none",
+    "budget_hint": "cheapest capable tier for every sister-session action"
+  },
+  "body": "Standing directive: the sister session runs DeepSeek v4.1 Flash with no thinking effort (DSv4FNone). It acts as a dumb terminal: it executes only directives issued by the brain, drains .fleet/inbox, spawns epic-focused subagents strictly per directive (never picking issues on its own), and writes acks/results to .fleet/outbox. The brain is the only issuer of directives."
+}
