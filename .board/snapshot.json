@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T20:24:11Z",
+  "generated_at": "2026-09-13T20:43:08Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1295,7 +1295,7 @@
     {
       "number": 142,
       "title": "Automatically generate violator remediation issues from policy drift and non-compliance",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:remediation",
@@ -1308,7 +1308,7 @@
       "blocked_by": [
         140
       ],
-      "closed_at": ""
+      "closed_at": "2026-09-13T20:33:55Z"
     },
     {
       "number": 143,
