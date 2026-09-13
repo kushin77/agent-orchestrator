@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import singleton
+import telemetry
 
 ROOT = Path(__file__).resolve().parent.parent
 CHANNEL = str(ROOT / "fleet" / "channel.py")
@@ -406,6 +407,38 @@ def mark_run(directive_id: str, issue: int, agent_id: str) -> None:
         encoding="utf-8",
     )
     tmp.replace(target)
+
+
+def record_run(
+    directive_id: str,
+    issue: int,
+    agent_id: str,
+    status: str,
+    started_at: str,
+    finished_at: str | None = None,
+    detail: str = "",
+) -> None:
+    """Append one per-run telemetry record; a bad append must not kill the loop.
+
+    Telemetry is an observability signal, not the run itself — if the log write
+    fails (disk full, bad permissions), the run outcome still gets reported over
+    the channel; only the extra record is lost.
+    """
+    try:
+        telemetry.append_record(
+            telemetry.RUNS_LOG,
+            telemetry.build_record(
+                run_id=directive_id,
+                issue=str(issue),
+                agent=agent_id,
+                status=status,
+                started_at=started_at,
+                finished_at=finished_at,
+                detail=detail,
+            ),
+        )
+    except telemetry.TelemetryError as exc:
+        print(f"[terminal] telemetry record for {directive_id} rejected: {exc}", file=sys.stderr, flush=True)
 
 
 def clear_run(directive_id: str) -> None:
@@ -899,6 +932,8 @@ def loop(args: argparse.Namespace) -> int:
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
         write_heartbeat("working", started_at=started_at, commit=commit, issue=issue, agent=agent_id)
         mark_run(directive_id, issue, agent_id)
+        run_started_at = _now()
+        record_run(directive_id, issue, agent_id, "started", run_started_at)
         beater = start_beating(started_at, commit, issue, agent_id)
         lane = (directive.get("task") or {}).get("lane") or ""
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
@@ -949,6 +984,8 @@ def loop(args: argparse.Namespace) -> int:
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
         tail = f"[{where}] {tail}"
         refused = looks_refused(output)
+        run_status = "done" if (rc == 0 and not refused) else "failed"
+        record_run(directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200])
         clear_reported(directive_id)
         if rc == 0 and not refused:
             subprocess.run(
