@@ -55,6 +55,7 @@ control-plane/instructions
 control-plane/sdk/python
 governance/merge
 governance/dispatch
+fleet
 governance/knowledge
 governance/conformance
 # Final registration (issue #46, E2E lane): the top-level negative-control +

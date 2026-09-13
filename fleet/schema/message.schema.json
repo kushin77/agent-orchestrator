@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/fleet/schema/message.schema.json",
+  "title": "Fleet steering message (brain <-> sister <-> subagents)",
+  "description": "The message contract for the session fleet operating model (M26, issue #160). The brain is the only sender of directives to the sister; the sister only spawns epic-focused subagents per a directive; subagents report results back through the sister. Everything else is refused.",
+  "type": "object",
+  "required": ["from", "to", "type"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique message id (uuid4). Stamped by the channel when absent."
+    },
+    "from": {
+      "type": "string",
+      "pattern": "^(brain|sister|subagent(-[a-z0-9]+)?)$",
+      "description": "Sender role. brain is the only directive issuer."
+    },
+    "to": {
+      "type": "string",
+      "pattern": "^(brain|sister|subagent(-[a-z0-9]+)?)$",
+      "description": "Recipient role."
+    },
+    "type": {
+      "enum": ["directive", "ack", "result", "halt"],
+      "description": "directive = brain order; ack/result = sister/subagent reports; halt = stop signal."
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp; stamped by the channel when absent."
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Binds a result/ack to the directive that caused it."
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "FinOps block: the model tier and thinking effort the target must run at. Overrides outside the allowlist are refused.",
+      "required": ["tier", "thinking"],
+      "properties": {
+        "tier": { "enum": ["pro", "flash"] },
+        "thinking": { "enum": ["none", "low", "high"] },
+        "budget_hint": {
+          "type": "string",
+          "description": "Optional cost hint for the subagent's run."
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Work to execute: an issue (and optionally the epic it serves).",
+      "required": ["issue"],
+      "properties": {
+        "issue": { "type": "integer", "minimum": 1 },
+        "epic": { "type": "integer", "minimum": 1 },
+        "lane": { "type": "string" }
+      }
+    },
+    "body": {
+      "type": "string",
+      "description": "Human- and agent-readable order text."
+    }
+  }
+}
