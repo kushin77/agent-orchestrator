@@ -18,6 +18,12 @@ both streams to `DEVNULL`, so the brain — the middle rung of the hierarchy —
 unobservable from anywhere: no window, no log, no way in. The watchdog is the
 spawn authority, so the capture path is defined here and read by
 `fleet/console.py` (the dashboard) and `fleet/run-fleet.sh` (the tail windows).
+
+Respawn is a *measurement*, not a claim (issue #276). "`spawn()` returned" is not
+"the rung came up": the watchdog now waits, bounded, for the rung's process to
+appear and survive a short settle window, so a no-op spawn or a rung that dies at
+startup (a singleton refusal, a crash) reports `RESPAWN FAILED` and the pass exits
+non-zero instead of fabricating a success.
 """
 
 from __future__ import annotations
@@ -45,6 +51,14 @@ MONITOR_PATTERN = "fleet/monitor.py"
 MONITOR_NAME = "monitor"
 FLEET_DIR = ROOT / ".fleet"
 RUNS_DIR = FLEET_DIR / "runs"
+
+# Respawn verification window (issue #276). After spawning, wait up to
+# VERIFY seconds for a new loop process to appear, and only report success once
+# it has stayed up past SETTLE — a rung that starts and immediately exits is a
+# failure, not a spawn the operator can trust.
+RESPAWN_VERIFY_SECONDS = 10.0
+RESPAWN_SETTLE_SECONDS = 1.0
+RESPAWN_POLL_SECONDS = 0.25
 
 
 def rung_log(name: str) -> Path:
@@ -97,6 +111,17 @@ def loop_pid(pattern: str) -> int | None:
     return None
 
 
+def loop_pids(pattern: str) -> list[int]:
+    """Every pid matching `pattern` — `loop_pid` returns only the first.
+
+    Respawn verification needs the whole set: the pid we just tried to stop can
+    linger (a SIGKILLed child stays visible until it is reaped), so "a pid exists"
+    only proves a rung came up when it can be compared against the old one.
+    """
+    result = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True)
+    return [int(line.strip()) for line in result.stdout.splitlines() if line.strip().isdigit()]
+
+
 def process_alive(pid: int | None) -> bool:
     try:
         os.kill(int(pid), 0)
@@ -140,13 +165,54 @@ def decide(pid: int | None, beat: dict | None, head: str) -> tuple[str, str]:
     return "healthy", ""
 
 
-def respawn(pattern: str, script: str, name: str = "") -> bool:
-    """Stop the rung (SIGTERM, then SIGKILL) and start it detached.
+def rung_came_up(
+    pattern: str,
+    pid_before: int | None,
+    *,
+    window: float | None = None,
+    settle: float | None = None,
+    clock=time.monotonic,
+    sleep=time.sleep,
+) -> bool:
+    """True when a *new* live loop for `pattern` appears and survives `settle`.
+
+    A spawn that started nothing leaves no pid to find, and a rung that exits at
+    startup (singleton refusal, a crash) is gone before the settle window ends;
+    both must read as a failed respawn rather than a fabricated success.
+    """
+    if window is None:
+        window = RESPAWN_VERIFY_SECONDS
+    if settle is None:
+        settle = RESPAWN_SETTLE_SECONDS
+    started = clock()
+    deadline = started + window
+    while True:
+        up = any(pid != pid_before for pid in loop_pids(pattern))
+        if up and (clock() - started) >= settle:
+            return True
+        if clock() >= deadline:
+            return False
+        sleep(RESPAWN_POLL_SECONDS)
+
+
+def respawn(
+    pattern: str,
+    script: str,
+    name: str = "",
+    *,
+    window: float | None = None,
+    settle: float | None = None,
+) -> bool:
+    """Stop the rung (SIGTERM, then SIGKILL), start it detached, and VERIFY it came up.
 
     `name` selects the capture log (`.fleet/<name>.log`) and defaults to the
     launcher's own stem, which is right for every rung whose log is named after
     its script; the sister passes its rung name explicitly because its launcher
     is `terminal.sh` while the operator's window is `sister`.
+
+    Returns False — so the caller prints `RESPAWN FAILED` and the pass exits
+    non-zero — when the spawn itself raises, or when no new rung process appears
+    and survives the settle window.
     """
     pid = loop_pid(pattern)
     if pid is not None:
@@ -162,8 +228,11 @@ def respawn(pattern: str, script: str, name: str = "") -> bool:
                 os.kill(pid, signal.SIGKILL)
             except OSError:
                 pass
-    spawn(name or Path(script).stem, ["setsid", "bash", str(ROOT / script)])
-    return True
+    try:
+        spawn(name or Path(script).stem, ["setsid", "bash", str(ROOT / script)])
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return rung_came_up(pattern, pid, window=window, settle=settle)
 
 
 def rung_action(name: str, pattern: str, script: str, beat_path: Path, force: bool, head: str) -> str:
@@ -185,13 +254,17 @@ def monitor_missing() -> bool:
     return loop_pid(MONITOR_PATTERN) is None
 
 
-def start_monitor() -> bool:
-    """Start the monitor detached (its own session, like the loop rungs)."""
+def start_monitor(*, window: float | None = None, settle: float | None = None) -> bool:
+    """Start the monitor detached (its own session) and verify it came up.
+
+    Like `respawn`, a successful `Popen` is not a running monitor: a monitor that
+    dies at startup must surface as `RESPAWN FAILED` so the pass exits non-zero.
+    """
     try:
         spawn(MONITOR_NAME, ["setsid", "python3", str(ROOT / "fleet" / "monitor.py")])
     except (OSError, subprocess.SubprocessError):
         return False
-    return True
+    return rung_came_up(MONITOR_PATTERN, None, window=window, settle=settle)
 
 
 def watchdog_once(force: bool = False) -> int:

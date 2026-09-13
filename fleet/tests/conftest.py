@@ -43,7 +43,7 @@ RUNTIME_PATHS = {
     ),
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "WORKTREE_ROOT"),
     "brain": ("HEARTBEAT", "WAVES"),
-    "health": ("SLOG",),
+    "health": ("SISTER_HEARTBEAT", "BRAIN_HEARTBEAT"),
     "telemetry": ("RUNS_LOG",),
     # `watchdog.spawn` OPENS a file named after FLEET_DIR, and `console` reads
     # the same tree — without these three lines a test would create real
