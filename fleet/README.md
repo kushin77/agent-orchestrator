@@ -15,7 +15,8 @@ could disagree about *which command to type*, this file wins.
 
 | Role | Runtime | Behaviour |
 |---|---|---|
-| **Brain** | Copilot session (advisor, max DeepSeek vPro) | Issues directives. The only directive issuer. Steers and verifies. |
+| **Brain** | DSv4PM (DeepSeek v4 Pro Max) with **human override** | Issues directives. The only directive issuer. Steers and verifies. |
+| **Human / override terminal** | You, in the brain terminal | Full override of the entire fleet via `fleet/control.py`. |
 | **Fleet brain (sister)** | DeepSeek v4.1 Flash, **no thinking** (DSv4FNone) | A dumb terminal: drains `.fleet/inbox`, executes only brain directives, spawns epic-focused subagents per directive, writes acks/results to `.fleet/outbox`. Never picks issues on its own. |
 | **Fleet subagents** | DeepSeek agent model, tier/thinking chosen by the brain's FinOps block | Epic-focused executors. One issue = one subagent = one lane. |
 
@@ -132,6 +133,24 @@ brain stays blocked on `listen` — idle, not asleep — and answers on demand.
 Escalations must carry `correlation_id` and a `severity` (`info`/`warn`/
 `critical`) and may only come from the sister or a subagent, never the brain
 (enforced by the gate).
+
+## Control plane (refresh / update / poke / halt / debug / watch)
+
+From the brain/human terminal — without stopping the sister loop:
+
+```bash
+python3 fleet/control.py refresh    # git pull --ff-only + snapshot + make verify
+python3 fleet/control.py update     # refresh + rebuild the knowledge index
+python3 fleet/control.py poke       # ping the sister: it acks (liveness)
+python3 fleet/control.py halt       # stop the sister loop cleanly
+python3 fleet/control.py debug      # channel + board + slog tail + loop process
+python3 fleet/control.py watch      # idle-watch the slog (same as listen)
+```
+
+`refresh` on the sister side is a **self-update**: the loop pulls, runs
+`make verify`, then re-executes itself with the new code — so the terminal can
+be upgraded live without a human restart. `poke` forces it to react so you can
+debug it without stopping it.
 
 ## Launch the two sessions
 

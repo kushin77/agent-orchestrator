@@ -50,6 +50,7 @@ SLOG = ROOT / ".fleet" / "slog.jsonl"
 # these constants, the message schema and the policy stop agreeing.
 MESSAGE_TYPES = ("directive", "ack", "result", "halt", "escalate")
 SEVERITIES = ("info", "warn", "critical")
+CONTROL_ACTIONS = ("poke", "refresh", "halt")
 MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
 _ROLE_RE = re.compile(r"^(brain|sister|subagent(-[a-z0-9]+)?)$")
@@ -114,6 +115,12 @@ def validate(message: dict) -> list[str]:
         severity = message.get("severity")
         if severity is not None and severity not in SEVERITIES:
             problems.append(f"severity must be one of {', '.join(SEVERITIES)}")
+    control = message.get("control")
+    if control is not None:
+        if message.get("from") != "brain":
+            problems.append("only the brain may issue control")
+        if control not in CONTROL_ACTIONS:
+            problems.append(f"control must be one of {', '.join(CONTROL_ACTIONS)}")
     model = message.get("model")
     if model is not None:
         if not isinstance(model, dict):

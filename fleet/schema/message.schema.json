@@ -43,6 +43,10 @@
       "enum": ["info", "warn", "critical"],
       "description": "Escalation severity: info | warn | critical."
     },
+    "control": {
+      "enum": ["poke", "refresh", "halt"],
+      "description": "Brain-only control action for the sister loop: poke | refresh | halt."
+    },
     "model": {
       "type": "object",
       "additionalProperties": false,

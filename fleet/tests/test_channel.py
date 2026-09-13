@@ -280,3 +280,17 @@ def test_listen_prints_a_new_message(tmp_path, monkeypatch):
     )
     args = type("Args", (), {"timeout_seconds": 0.5, "interval": 0.01, "max_messages": 1})()
     assert channel.cmd_listen(args) == EXIT_OK
+
+
+def test_control_may_only_come_from_the_brain():
+    problems = validate({"from": "sister", "to": "brain", "type": "directive", "control": "poke"})
+    assert any("only the brain may issue control" in problem for problem in problems)
+
+
+def test_control_with_a_bad_action_is_refused():
+    problems = validate({"from": "brain", "to": "sister", "type": "directive", "control": "fly"})
+    assert any("control must be one of" in problem for problem in problems)
+
+
+def test_a_valid_control_directive_passes():
+    assert validate({"from": "brain", "to": "sister", "type": "directive", "control": "refresh"}) == []
