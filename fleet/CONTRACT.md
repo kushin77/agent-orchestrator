@@ -47,9 +47,21 @@ without it: the field is additive, and the schema stays v1.
 
 | Role | Runtime | Authority |
 |---|---|---|
+| **operator** | The human, and the override terminal | Orders the brain. The top of the chain: it does not address the sister directly, because a chain the operator can skip is not a chain. |
 | **brain** | Copilot advisor session, maximum DeepSeek vPro | The only directive issuer. Steers, verifies, merges. |
 | **fleet brain** (the **sister** session) | DeepSeek v4.1 Flash, thinking effort **off** (DSv4FNone) | A dumb terminal. Drains the inbox, executes brain directives only, spawns epic-focused subagents per directive, reports results back. Never picks work on its own. |
 | **subagent** (`subagent-<name>`) | Model + tier + thinking chosen by the brain's FinOps block | Epic-focused executor. One issue = one subagent = one lane. Cannot escalate its own tier. |
+
+**Rung 1b — the operator orders the brain (added by this revision).** Issue #160
+named the operator and the brain as separate rungs, but shipped no path between
+them: the operator's only working trigger was to write into the sister's inbox,
+which *is* the brain's job. The channel now carries the missing edge —
+`channel.py order` (operator → brain) and `fleet/brain.py` (the brain loop that
+signs and dispatches each order to the sister) — and refuses `operator → sister`
+outright, because a hierarchy the transport cannot enforce is a suggestion.
+Escalations flow the same way in reverse: sister/subagent → brain (a problem)
+and brain → operator (a problem the brain has decided it must not resolve
+alone).
 
 The roster separates **ROLE** (what an agent is for) from **TIER** (which
 transport carries it), **MODEL** (what answers) and **EFFORT** (how much
@@ -103,6 +115,17 @@ Four rules, and one consequence that is itself the rule:
 1. **Only the brain may issue directives to the sister.** A directive from the
    sister is refused outright: the sister is a dumb terminal, and a dumb
    terminal that can rewrite its own orders is not a dumb terminal.
+1b. **The operator orders the brain, and never the sister.** The channel
+   validates the sender of every message before it moves, so this is enforced
+   rather than requested:
+
+   | Sender | May address | Refused with |
+   |---|---|---|
+   | `operator` | `brain` only, as a `directive` (an order) | *"the operator does not address the sister: it orders the brain, and the brain orders the sister"* |
+   | `brain` | `sister` (directives, control) and `operator` (acks, results, escalations) | *"the brain takes orders only from the operator"* — a directive addressed to the brain from anywhere else |
+   | `sister` | `brain` (acks, results, escalations) | *"only the brain may issue directives to the sister"* |
+   | `subagent-*` | `brain` (results, escalations) | *"only the brain may issue directives to the sister"* |
+
 2. **The sister may only spawn subagents per a directive.** Spawning is an
    execution of a brain order, never a decision of the sister's own.
 3. **Subagents report back through the sister.** A subagent's result travels the

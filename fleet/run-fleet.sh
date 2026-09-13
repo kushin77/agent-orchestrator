@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# run-fleet.sh — open BOTH sessions from a single command: the brain terminal
-# and the dumb-terminal (sister) loop, side by side.
+# run-fleet.sh — open BOTH loops from a single command: the brain (operator ->
+# brain -> sister) and the dumb-terminal (sister) loop, side by side.
 #
 # Preference order: tmux (one window, two panes) -> konsole (two windows) ->
 # background + foreground (no terminal emulator).
@@ -27,9 +27,9 @@ if command -v gnome-terminal >/dev/null 2>&1; then
   exec gnome-terminal -- bash fleet/brain.sh
 fi
 
-echo "No tmux/konsole/gnome-terminal found — running both in this terminal:"
+echo "No tmux/konsole/gnome-terminal found — running both loops in this terminal:"
 echo "  sister loop -> background (log: /tmp/fleet-terminal.log)"
-echo "  brain       -> foreground (idle-watch; Ctrl-C stops)"
+echo "  brain loop  -> foreground (Ctrl-C stops it)"
 bash fleet/terminal.sh run >/tmp/fleet-terminal.log 2>&1 &
 echo "sister pid $!"
 exec bash fleet/brain.sh
