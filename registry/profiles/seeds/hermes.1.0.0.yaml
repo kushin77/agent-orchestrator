@@ -1,0 +1,41 @@
+# AgentProfile seed: hermes (coding / capability-routing worker) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/hermes-agents src/hermes_agent/services/capability_registry.py
+#     (code-gen/refactor/test-gen capability-tagged routing)
+#   - kushin77/hermes-agents models/model_tiering.py (tier/ceiling/cost model)
+#   - kushin77/CMR onboarding/agent-profiles/role.schema.json (model-tier ladder)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: hermes
+version: 1.0.0
+owner: platform/purebliss
+systemPromptRef: hermes/primary@v1
+toolAllowlist:
+  - gh_issue
+  - gh_pr
+  - git_worktree
+  - file_read
+  - file_write
+  - shell_exec
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - stay-in-lane
+  - no-unrelated-edits
+  - verify-before-done
+  - evidence-on-pr
+  - no-direct-push
+  - no-secrets
+  - no-unverified-merge
+  - no-debug-leftovers
+capabilitySet:
+  - code-author
+  - test-author
+  - test-run
+  - memory-ops
+defaultModelTier: MED
+memoryScope:
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

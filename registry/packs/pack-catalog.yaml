@@ -39,6 +39,8 @@ categories:
     summary: "Security-guardrail-centric bundles."
   integration:
     summary: "Integration / connector agent bundles."
+  team:
+    summary: "Cross-provider agent teams (heterogeneous profile/persona bundles)."
 
 artifactTypes:
   profile:

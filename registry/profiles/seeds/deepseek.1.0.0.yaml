@@ -1,0 +1,37 @@
+# AgentProfile seed: deepseek (reasoning + data-analysis worker) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/leaderboard lib/fleet-roster.sh + scripts/elite/finops-router.sh
+#     (role -> tier -> model chooser; DeepSeek flash/pro ladder)
+#   - kushin77/leaderboard config/deepseek-capabilities.txt (DeepSeek capability catalog)
+#   - kushin77/capital-underwriting infra/docker/worker-fleet/personas.yaml
+#     (ds-worker-* pool: analytics + debugging)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: deepseek
+version: 1.0.0
+owner: platform/purebliss
+systemPromptRef: deepseek/primary@v1
+toolAllowlist:
+  - file_read
+  - file_write
+  - shell_exec
+  - web_fetch
+  - sql_query
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - verify-before-done
+  - no-secrets
+  - no-debug-leftovers
+capabilitySet:
+  - code-author
+  - research
+  - data-analysis
+  - memory-ops
+defaultModelTier: MED
+memoryScope:
+  - user
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

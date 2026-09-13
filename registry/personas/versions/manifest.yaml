@@ -90,3 +90,33 @@ entries:
   file: cards/sniper.yaml
   sha256: 9c9e1ec4c368ee45e2644216a4a96938d634f3ca3bc4a3ea5faf05947d47a5b3
   status: published
+- tenant: platform
+  persona: ollama
+  version: 1.0.0
+  file: cards/ollama.yaml
+  sha256: ccb4326374b36b08fc900031ea4ab888970dddeda0ef945b4124459b71cfbc3b
+  status: published
+- tenant: platform
+  persona: paperclip
+  version: 1.0.0
+  file: cards/paperclip.yaml
+  sha256: fc6edf75dd7afe3d63d11a41fcef8c7144d79caeccdc451c5d918db35ef768c1
+  status: published
+- tenant: platform
+  persona: hermes
+  version: 1.0.0
+  file: cards/hermes.yaml
+  sha256: b4c5d8750491853d61f146a8b61eac53d1e89dcecdf405f2d6ff97a492c0c993
+  status: published
+- tenant: platform
+  persona: deepseek
+  version: 1.0.0
+  file: cards/deepseek.yaml
+  sha256: 43dbf33d04bf805e081d4440a550b57594f428f084edd371e22673eb84a7c9e8
+  status: published
+- tenant: platform
+  persona: claude
+  version: 1.0.0
+  file: cards/claude.yaml
+  sha256: ec3258e215ecf9ac6a624a1e85eaf65163d8ee224c2045d68d02d384fce580cf
+  status: published

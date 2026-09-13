@@ -72,7 +72,7 @@ def test_materialize_rejects_unknown_vocabulary():
 def test_all_seed_personas_materialize():
     """Every shipped persona produces a schema-valid AgentProfile."""
     cards = REAL.discover()
-    assert len(cards) == 15
+    assert len(cards) == 20
     for (_tenant, _persona_id), card in cards.items():
         profile = mapping.materialize_profile(card)
         mapping.validate_profile(profile)

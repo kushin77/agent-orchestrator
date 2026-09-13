@@ -37,3 +37,23 @@ published:
     version: 1.0.0
     file: seeds/data-agent.1.0.0.yaml
     sha256: 7bc4196f07a38f3133725d3dcf785cbcbde7c150b5cc10be367f2b7f137468f5
+  - profile: ollama
+    version: 1.0.0
+    file: seeds/ollama.1.0.0.yaml
+    sha256: 59613093d0cb002031739d2b29ec0c656b832a18a4a96f08c00db5113293e160
+  - profile: paperclip
+    version: 1.0.0
+    file: seeds/paperclip.1.0.0.yaml
+    sha256: 4cd10b338e7dba0035c136d2c6d0599ac842e479c5ed45418fe7c974f73e93c4
+  - profile: hermes
+    version: 1.0.0
+    file: seeds/hermes.1.0.0.yaml
+    sha256: e0e63877a1890afc8c44ffb40f688883ac6c1250553741d19065a0ee2dc1deab
+  - profile: deepseek
+    version: 1.0.0
+    file: seeds/deepseek.1.0.0.yaml
+    sha256: 906ec029bd3b781393df825df67c16d45b28941513c414ee7fcc2fab56084956
+  - profile: claude
+    version: 1.0.0
+    file: seeds/claude.1.0.0.yaml
+    sha256: c0e98f063f63903ad185188e53fcfa2ba51772ceb5b36469a82302afead834ae

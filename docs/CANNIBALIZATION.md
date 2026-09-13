@@ -446,7 +446,6 @@ the mailbox, so it cannot itself become a second dispatcher. Wired into
 `fleet/control.py health` for operator use; `fleet/tests/test_health.py`
 covers all three signal levels.
 
-
 ## 10. Five-agent team routing + claude/anthropic catalog entry (issue #255)
 
 The gateway routing for the five-agent team (`ollama`, `paperclip`, `hermes`,
@@ -477,6 +476,39 @@ pinned `vendor/CMR/catalog/modules/` submodule, which this lane must not edit.
 `kushin77/gov-ai-scout` (`backend/src/services/ai-provider.ts`),
 `kushin77/hermes-agents` (`models/model_tiering.py`, `api/capabilities.py`) —
 pattern/READY only, kushin77 proprietary / internal use only, no code copied.
+## 11. Five-agent team harvest (issue #254) — profiles, personas, purebliss-team pack
+
+Issue #254 registers the five-agent team (`ollama`, `paperclip`, `hermes`,
+`deepseek`, `claude`) as first-class registry artifacts: five AgentProfile
+seeds under `registry/profiles/seeds/`, five PersonaCards under
+`registry/personas/cards/`, and one AgentPack
+(`registry/packs/releases/purebliss-team.1.0.0.yaml`, publisher
+`platform/purebliss`, category `team`) that bundles the ten artifacts behind a
+signed PS256 attestation. Every profile/persona consumes **only** the closed
+vocabulary already in `registry/profiles/catalog.yaml` (no new vocabulary ids),
+and the new `team` pack category is added to both
+`registry/packs/agent-pack.schema.json` and `registry/packs/pack-catalog.yaml`
+(schema↔catalog parity).
+
+| Source (repo-relative) | Asset | Verdict | Feeds |
+|---|---|---|---|
+| `ollama/services/inference/resilient_ollama_client.py` + `services/resilience/circuit_breaker.py` | resilient local-LLM client + circuit breaker | PATTERN | `ollama` profile/persona (LOW tier, local inference, executor posture) |
+| `llm-triage/src/llm_triage/classifier.py` | provider-neutral classifier behind one ABC (cache + retry) | PATTERN | `paperclip` profile/persona (research/docs-authoring, provider-neutral) |
+| `hermes-agents/src/hermes_agent/services/capability_registry.py` + `models/model_tiering.py` | capability-tagged routing + tier/ceiling/cost model | READY | `hermes` profile/persona (code-author/test-author, MED tier) |
+| `leaderboard/lib/fleet-roster.sh` + `scripts/elite/finops-router.sh` + `config/deepseek-capabilities.txt` | role→tier→model chooser + DeepSeek capability catalog | READY | `deepseek` profile/persona (research/data-analysis, MED tier) |
+| `gmail-agent/src/agent/claude.ts` | governed Claude client (model tiers, p-retry, agentic tool loop) | READY | `claude` profile/persona (orchestrate/code-author/review, MED tier) |
+| `CMR/catalog/schemas/module.schema.json` + `registry/packs/*` | signed per-version bundle attestation (PS256, `kid`/`alg`/`signedAt`) | READY | `purebliss-team` pack attestation (reuses `registry/packs/attestation.py`) |
+
+**Publisher-key rotation note (GR-6).** The private half of the pack publisher
+key (`kid ao-pack-publisher-v1`) was never committed and is not recoverable, so
+this issue's implementing agent generated a fresh RSA-2048 keypair, committed
+the new public key to `registry/packs/publisher-key.pem`, re-signed the three
+pre-existing release snapshots (`data-ops`, `orchestrator-ops`,
+`worker-platform` — contents untouched, only the attestation signature
+changes), and signed the new `purebliss-team` snapshot with the same new key.
+The private key is discarded after signing (GR-6: env/secret-manager-only at
+publish time); all four release signatures verify against the committed public
+key via `registry/packs/validate.py`.
 
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*

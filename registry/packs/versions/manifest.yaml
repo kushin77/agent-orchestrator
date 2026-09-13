@@ -11,12 +11,16 @@ published:
   - pack: data-ops
     version: 1.0.0
     file: releases/data-ops.1.0.0.yaml
-    sha256: a19295faa16eb6ebc8251148c10b82b0502f6769c681b3e93f8dd252c24ce96b
+    sha256: 8a915421b4f605566ebb1b5a7529545a43199c789171378e2da8d4d7c324fadd
   - pack: orchestrator-ops
     version: 1.0.0
     file: releases/orchestrator-ops.1.0.0.yaml
-    sha256: 8907efb66be0dde9fbc90e8794e4470a6f04e261195cd5ae3be2082a6ff3df31
+    sha256: 90af61f7445e78e5c8219e80d3b481ead62a21c3c5c921108b542f78c42e15e7
   - pack: worker-platform
     version: 1.0.0
     file: releases/worker-platform.1.0.0.yaml
-    sha256: 7c2695025ec8ffeab7e68b01f31044904efec569c024bd8fc783b8dcc04409e3
+    sha256: 0b129e8d9e6bdb3294a94a25a7cd55b33287e6e79fa178b1414a4ae09926d7c4
+  - pack: purebliss-team
+    version: 1.0.0
+    file: releases/purebliss-team.1.0.0.yaml
+    sha256: f5a5e11ed77147469469a0fd34b38f5a285dd3353ae1cea7a5e8f9b395de82a2
