@@ -14,7 +14,7 @@
       var payload = await CP.get("/api/console/me");
       me = payload.data;
     } catch (err) {
-      window.location.href = "/views/login.html";
+      window.location.href = "/auth/login";
       return;
     }
     state.me = me;

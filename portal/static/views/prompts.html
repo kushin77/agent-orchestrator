@@ -24,7 +24,7 @@
         var payload = await CP.get("/api/tenants/" + encodeURIComponent(tenantId) + "/prompts");
         render(payload.data.prompts);
       } catch (err) {
-        if (err.status === 401) { window.location.href = "/views/login.html"; return; }
+        if (err.status === 401) { window.location.href = "/auth/login"; return; }
         CP.clear(app).appendChild(CP.el("div", { class: "empty error-text", text: err.message }));
       }
       function render(modules) {

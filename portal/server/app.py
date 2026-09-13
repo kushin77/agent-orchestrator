@@ -6,9 +6,12 @@ body/cookie-map and returns a :class:`Response`. ``httpd.py`` binds it to
 uses the control-plane envelope ``{ok, status, requestId, data, error}``
 (identity/cpapi shape) and every mutation appends to the tenant audit chain.
 
-Session pipeline mirrors the control plane (issue #38): authN first (the
-console os-session-token, issue #35), then the scope gate, then the
-permission gate (issue #12 role vocabulary via ``authz``).
+Front door: the console has **no login of its own** — the shared-frontend OS
+auth gate is the only sign-in surface, and an unauthenticated document request
+is redirected there (``/auth/login``). The session pipeline mirrors the control
+plane (issue #38): authN first (a verified auth-gate RS256 ``os-session-token``
+via ``sso``), then the scope gate, then the permission gate (issue #12 role
+vocabulary via ``authz``).
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ from portal.server.controls import (
     PolicyStateStore,
     build_control_policy_map,
 )
-from portal.server.sso import ConsoleSso, SESSION_COOKIE
+from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
 
 _CONTENT_TYPES = {
@@ -80,7 +83,7 @@ class ConsoleApplication:
         static_dir: Optional[Path] = None,
         state: Optional[ConsoleState] = None,
         sso: Optional[ConsoleSso] = None,
-        root_admin_emails: tuple[str, ...] = ("root@platform.example.com",),
+        root_admin_emails: Optional[tuple[str, ...]] = None,
         allowlist_only: bool = False,
     ) -> None:
         self.repo_root = Path(repo_root)
@@ -150,6 +153,12 @@ class ConsoleApplication:
 
     # -- index / static -----------------------------------------------------
     def _index(self, cookies: dict[str, str]) -> Response:
+        """The front door: no local login — unauthenticated goes to the gate.
+
+        A verified auth-gate ``os-session-token`` opens the shell; anything
+        else (absent, forged, wrong-purpose or expired) is redirected to the
+        OS auth gate, the platform's only sign-in surface.
+        """
         token = cookies.get(SESSION_COOKIE)
         if token:
             try:
@@ -160,11 +169,11 @@ class ConsoleApplication:
                     payload="",
                     headers=[("Location", "/views/shell.html")],
                 )
-            except Exception:  # noqa: BLE001 - fall through to login
+            except Exception:  # noqa: BLE001 - a refused session reaches the gate
                 pass
         return Response(
             status=302, is_json=False, payload="",
-            headers=[("Location", "/views/login.html")],
+            headers=[("Location", AUTH_GATE_LOGIN_PATH)],
         )
 
     def _is_static(self, path: str) -> bool:
@@ -202,15 +211,10 @@ class ConsoleApplication:
         if not parts:
             raise ApiError(404, "not_found", "empty api route")
 
-        # public console endpoints
-        if parts[:2] == ["console", "relay-state"] and method == "GET":
-            return self._ok(self.sso.relay_state())
-        if parts[:2] == ["console", "login"] and method == "POST":
-            return self._login(body, now_iso)
+        # public console endpoints: health only — the console issues no
+        # credential of its own, so it has no login/relay/JWKS surface
         if parts == ["healthz"] and method == "GET":
             return self._ok({"status": "ok", "service": "portal-console"})
-        if parts == ["console", "jwks"] and method == "GET":
-            return self._ok(self.sso.jwks())
 
         # authenticated surface
         principal, claims = self._require_session(cookies)
@@ -233,78 +237,33 @@ class ConsoleApplication:
 
     # -- session ------------------------------------------------------------
     def _require_session(self, cookies: dict[str, str]) -> tuple[Principal, dict[str, Any]]:
+        """Establish the console principal from a verified auth-gate session.
+
+        The session exists **only** if the ``os-session-token`` the OS shell
+        handed this module verifies (RS256, published JWKS, purpose-checked);
+        anything else fails closed with a 401. Identity is the token subject and
+        the role comes from the local ROOT_ADMIN allowlist plus the org
+        directory — never from the token's own ``role`` claim.
+        """
         token = cookies.get(SESSION_COOKIE)
         if not token:
             raise ApiError(401, "unauthorized", "missing console session token")
         try:
             claims = self.sso.verify(token)
+            identity = self.sso.identity_from_claims(claims)
         except Exception as exc:  # noqa: BLE001 - invalid token is a denial
             raise ApiError(401, "unauthorized", f"invalid console session: {exc}") from exc
-        email = str(claims.get("email") or claims.get("sub") or "")
-        role = str(claims.get("role") or "user")
-        super_admin = role == "root_admin" or self.sso.is_root_admin(email)
         bindings = [
             (binding.tenant_id, binding.role)
-            for binding in self.state.roles_for(email)
+            for binding in self.state.roles_for(identity.email)
         ]
         principal = Principal(
-            email=email, role=role, super_admin=super_admin, bindings=bindings
+            email=identity.email,
+            role=identity.role,
+            super_admin=identity.super_admin,
+            bindings=bindings,
         )
         return principal, claims
-
-    def _login(self, body: dict[str, Any], now_iso: str) -> Response:
-        email = str(body.get("email") or "").strip()
-        tenant_id = str(body.get("tenantId") or "").strip()
-        state_token = str(body.get("state") or "").strip()
-        if not email or not tenant_id or not state_token:
-            raise ApiError(400, "invalid_request", "email/tenantId/state are required")
-        try:
-            self.sso.allowlist_role(email)
-        except PermissionError as exc:
-            raise ApiError(403, "login_denied", str(exc)) from exc
-        is_root = self.sso.is_root_admin(email)
-        if not is_root:
-            if not self.authorizer.in_scope(
-                Principal(email=email, role="user", bindings=[
-                    (b.tenant_id, b.role) for b in self.state.roles_for(email)
-                ]),
-                tenant_id,
-            ):
-                raise ApiError(
-                    403, "scope_denied",
-                    f"email {email!r} has no role in tenant {tenant_id!r}",
-                )
-        try:
-            session = self.sso.login(state_token, email, tenant_id)
-        except Exception as exc:  # noqa: BLE001 - relay/login failure is a denial
-            raise ApiError(403, "login_denied", f"console login failed: {exc}") from exc
-        self._audit(
-            tenant_id,
-            f"user:{email}",
-            "console.login",
-            resource=f"tenant:{tenant_id}",
-            detail=f"console login (role={session['role']})",
-            now_iso=now_iso,
-        )
-        cookie = (
-            f"{SESSION_COOKIE}={session['token']}; HttpOnly; Path=/; SameSite=Strict"
-        )
-        return Response(
-            status=200,
-            is_json=True,
-            headers=[("Set-Cookie", cookie)],
-            payload={
-                "ok": True,
-                "status": 200,
-                "requestId": _request_id(),
-                "data": {
-                    "email": session["email"],
-                    "role": session["role"],
-                    "tenantId": session["tenantId"],
-                },
-                "error": None,
-            },
-        )
 
     def _logout(self, cookies: dict[str, str], now_iso: str) -> Response:
         token = cookies.get(SESSION_COOKIE, "")

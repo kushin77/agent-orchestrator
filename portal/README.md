@@ -28,7 +28,20 @@ python3 -m portal.server.main --port 8787
 # open http://127.0.0.1:8787/
 ```
 
-Demo identities (offline seed directory in `server/state.py`):
+The console has **no login of its own**: an unauthenticated visitor is
+redirected to the shared-frontend OS auth gate (`/auth/login`), and a console
+session exists only once the portal has verified the auth-gate RS256
+`os-session-token` offline against the gate's published JWKS. Configure the
+mirror + allowlist before starting the server (with neither set, the console
+refuses every session — fail closed):
+
+```bash
+PORTAL_AUTH_GATE_JWKS_FILE=/etc/ao/auth-gate-jwks.json   # or PORTAL_AUTH_GATE_JWKS=<inline JSON>
+ROOT_ADMIN_EMAILS=root@platform.example.com             # comma-separated super-admin allowlist
+```
+
+Offline seed directory (`server/state.py`) — the **org bindings** those
+identities are authorized with; sign-in itself always happens at the gate:
 
 | Email | Console role | Org role | Scope |
 |---|---|---|---|
@@ -52,7 +65,7 @@ make -C <repo-root> verify     # repo gate stays green
 |---|---|
 | Console shell with design tokens (CSS+JSON twins + provenance), dark mode, per-frame CSS no-cascade | `static/design-tokens/tokens.css` + `tokens.json` + `PROVENANCE.md`, `static/css/console.css`, `static/views/shell.html`; each view frame links the twins itself |
 | Views: Tenant overview · Agents (org tree, profiles) · Personas · Prompts (versions + FP/FN) · Policies/Controls (toggle, default OFF) · Budgets/Usage · Audit (verify chain) · Approvals feed (real-time) | `static/views/{overview,agents,personas,prompts,policies,budgets,usage,audit,approvals,tenants}.html` over the endpoints in `server/app.py` |
-| SSO via console session token (inject #35) + RBAC super-admin vs tenant-admin | `server/sso.py` (real `identity/sso` SsoService, RS256 `os-session-token` + relay + allowlist), `server/authz.py` (issue #12 role pack) |
+| SSO via the shared-frontend auth gate (one front door) + RBAC super-admin vs tenant-admin | `server/sso.py` (verifies the RS256 `os-session-token` offline against the auth-gate JWKS mirror, `purpose: os-session-token`, fail closed — issues nothing), `server/authz.py` (issue #12 role pack); no portal login form/route |
 | Every control toggle maps to a policy control (no UI-only state) | `server/controls.py` (mapping table + `PolicyStateStore` + `PolicyEnforcer`), `catalog/policy-controls.yaml`; proof in `tests/test_controls_mapping.py` |
 
 ## Layout
@@ -71,13 +84,13 @@ portal/
 │   ├── controls.py              # control→policy mapping + policy state/enforcer
 │   ├── httpd.py                 # http.server binding (no sockets in tests)
 │   ├── main.py                  # `python3 -m portal.server.main`
-│   ├── sso.py                   # console SSO (injects identity/sso, issue #35)
+│   ├── sso.py                   # auth-gate session verifier (JWKS mirror, fail closed)
 │   └── state.py                 # seeded offline demo state
 ├── static/
 │   ├── css/console.css          # component/chrome styles (token-driven)
 │   ├── design-tokens/           # harvested token system (CSS + JSON twins)
 │   ├── js/api.js + console.js   # frame API + shell chrome
-│   └── views/*.html             # shell + login + the 9 tenant/console views
+│   └── views/*.html             # shell + auth-gate redirect + the 9 views
 └── tests/                       # offline pytest suite (90 tests incl. assets)
 ```
 
