@@ -48,15 +48,43 @@ import singleton  # noqa: E402
 
 HEARTBEAT = ROOT / ".fleet" / "brain.heartbeat.json"
 CHANNEL = str(ROOT / "fleet" / "channel.py")
+PROFILE_PATH = ROOT / "fleet" / "profiles" / "brain.profile.json"
+
+
+def load_profile(path: Path | None = None) -> dict:
+    """The brain's elite profile: mission, KB, controls, FinOps floors, anti-patterns.
+
+    A profile that is missing or malformed is a REFUSAL, not a default: the brain
+    steering a fleet on a half-loaded doctrine is worse than a brain that will
+    not start. The floor vocabulary below is derived from it, so the profile is
+    the single source for what the brain enforces.
+    """
+    target = path or PROFILE_PATH
+    try:
+        profile = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"[brain] REFUSED — cannot load the brain profile {target}: {exc}")
+    required = ("mission", "authority", "kb", "finops", "controls", "escalation", "templates")
+    missing = [key for key in required if key not in profile]
+    if missing:
+        raise SystemExit(f"[brain] REFUSED — brain profile {target} is missing {', '.join(missing)}")
+    return profile
+
+
+PROFILE = load_profile()
 
 # The FinOps floor the brain enforces when it dispatches. Security, secrets,
 # auth and production-IaC work never drops below the high floor (fleet doctrine),
 # so a lane whose name says so is escalated rather than accepted at flash/none.
-HIGH_FLOOR_LANES = ("security", "secrets", "auth", "identity", "iac", "infra", "terraform")
-DEFAULT_TIER = "flash"
-DEFAULT_THINKING = "none"
-HIGH_TIER = "pro"
-HIGH_THINKING = "low"
+# Vocabulary comes from the profile, not from this file, so the doctrine and the
+# machine cannot drift apart.
+HIGH_FLOOR_LANES = tuple(PROFILE["finops"]["high_floor_lanes"])
+DEFAULT_TIER = PROFILE["finops"]["default_tier"]
+DEFAULT_THINKING = PROFILE["finops"]["default_thinking"]
+HIGH_TIER = PROFILE["finops"]["high_floor_tier"]
+HIGH_THINKING = PROFILE["finops"]["high_floor_thinking"]
+CONTROLS = tuple(PROFILE["controls"])
+KB_SOURCES = tuple(PROFILE["kb"]["fleet_modules"])
 
 # Order kinds that are not work: the operator may ask the brain to report or to
 # ping instead of dispatching an issue (the vocabulary lives in the channel).
@@ -121,6 +149,10 @@ def build_directive(order: dict) -> dict:
     task = dict(order.get("task") or {})
     tier, thinking = choose_model(order)
     body = order.get("body") or ""
+    # The profile travels with the order: the subagent gets the KB it must read
+    # and the evidence it must return, so dispatch quality does not depend on the
+    # operator remembering to say it.
+    kb = "\n".join(f"  - {source}" for source in KB_SOURCES)
     directive = {
         "from": "brain",
         "to": "sister",
@@ -128,8 +160,17 @@ def build_directive(order: dict) -> dict:
         "correlation_id": order_reference(order),
         "task": task,
         "model": {"tier": tier, "thinking": thinking},
-        "body": f"Operator order {order_reference(order)}:\n{body}",
+        "body": (
+            f"Operator order {order_reference(order)}:\n{body}\n\n"
+            f"Brain doctrine: {PROFILE['mission']}\n"
+            f"Read first (fleet KB):\n{kb}\n"
+            f"Return: {PROFILE['templates']['report']}"
+        ),
     }
+    if order.get("control") == "override" or task.get("override"):
+        # The operator's override still travels the hierarchy: the operator orders
+        # the brain, and the brain issues the control to the sister.
+        directive["control"] = "override"
     return directive
 
 

@@ -299,6 +299,11 @@ def held_action(holder: str | None, agent_id: str, state: str) -> str:
     return "orphaned"
 
 
+def agent_id_for(directive_id: str) -> str:
+    """The agent id for a directive: one lane, one name, derived from the order."""
+    return f"subagent-{directive_id[:8]}"
+
+
 def mark_run(directive_id: str, issue: int, agent_id: str) -> None:
     """Record that this loop is tracking a run for a directive."""
     RUNS.mkdir(parents=True, exist_ok=True)
@@ -362,6 +367,65 @@ def clear_reported(directive_id: str) -> None:
         pass
 
 
+# --- controls (the operator's levers, relayed by the brain) -------------------
+#
+# The loop is the only place these can be honoured: it owns the run, the queue
+# cursor and the process. `control.py` sends them; this decides what they mean.
+PAUSED = ROOT / ".fleet" / "paused"
+STOPPING = ROOT / ".fleet" / "stopping"
+
+
+def paused() -> bool:
+    return PAUSED.exists()
+
+
+def stopping() -> bool:
+    return STOPPING.exists()
+
+
+def set_flag(path: Path, on: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if on:
+        path.write_text(_now() + "\n", encoding="utf-8")
+    else:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def apply_control(action: str, directive: dict, agent_id: str) -> str:
+    """Translate a control action into a verdict the loop acts on.
+
+    * ``continue`` — handled here; keep going.
+    * ``dispatch-override`` — an operator override: skip the held-check (the
+      caller already reaped the holder) and dispatch this directive.
+    * ``stop`` / ``kill`` / ``halt`` / ``restart`` / ``refresh`` — act on the
+      process.
+    """
+    if action == "pause":
+        set_flag(PAUSED, True)
+        return "continue"
+    if action == "resume":
+        set_flag(PAUSED, False)
+        return "continue"
+    if action == "stop":
+        # Graceful: finish the run in flight, then exit. Never mid-run.
+        set_flag(STOPPING, True)
+        return "continue"
+    if action == "kill":
+        # Hard: take the run down with us, release its claim, escalate.
+        stop_and_release("control:kill")
+        return "kill"
+    if action == "status":
+        return "continue"
+    if action == "override":
+        return "dispatch-override"
+    if action in ("refresh", "restart", "halt"):
+        return action
+    return "continue"
+
+
 def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
     """Publish liveness *and* the commit this process is running.
 
@@ -391,7 +455,20 @@ def loop(args: argparse.Namespace) -> int:
         ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
     ).stdout.strip() or "unknown"
     idle_printed = False
+    paused_printed = False
     while True:
+        if paused():
+            # `pause` stops new work, not the run in flight: the operator asked to
+            # hold the queue, not to abandon the task being executed.
+            write_heartbeat("paused", started_at=started_at, commit=commit)
+            if not paused_printed:
+                print("[terminal] PAUSED — holding the queue (resume to continue)", flush=True)
+                paused_printed = True
+            if args.once:
+                return 0
+            time.sleep(max(args.idle_sleep, 1.0))
+            continue
+        paused_printed = False
         write_heartbeat("idle", started_at=started_at, commit=commit)
         watch = subprocess.run(
             ["python3", CHANNEL, "watch", "--timeout-seconds", str(args.watch_timeout), "--interval", "1"],
@@ -432,21 +509,47 @@ def loop(args: argparse.Namespace) -> int:
 
         directive_id = directive.get("id", "")
         control = directive.get("control")
+        override = False
         if control:
-            if control == "halt":
-                print("[terminal] HALT received — stopping the loop")
-                return 0
-            if control == "poke":
-                print("[terminal] poke received — loop alive", flush=True)
+            # `poke` and `status` answer with the loop's own state; the rest are
+            # process levers. Every one of them is acked or reported — a control
+            # that silently does nothing is indistinguishable from a dead loop.
+            if control in ("poke", "status"):
+                body = (
+                    "poke received — loop alive"
+                    if control == "poke"
+                    else (
+                        f"loop state: paused={paused()} stopping={stopping()} "
+                        f"in-flight={IN_FLIGHT.get('issue') or 'none'} runs={len(list(RUNS.glob('*.json'))) if RUNS.exists() else 0}"
+                    )
+                )
+                print(f"[terminal] control:{control} — answering", flush=True)
                 subprocess.run(
                     ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
-                     "--type", "ack", "--body", "poke received — loop alive"],
+                     "--type", "ack", "--body", body],
                     cwd=ROOT,
                 )
                 if args.once:
                     return 0
                 continue
-            if control == "refresh":
+
+            verdict = apply_control(control, directive, agent_id_for(directive_id))
+            print(f"[terminal] control:{control} — {verdict}", flush=True)
+            if verdict == "kill":
+                subprocess.run(
+                    ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                     "--severity", "warn", "--body", "control:kill — run terminated, claim released"],
+                    cwd=ROOT,
+                )
+                return 128 + signal.SIGTERM
+            if verdict == "halt":
+                subprocess.run(
+                    ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                     "--type", "ack", "--body", "control:halt — stopping the fleet"],
+                    cwd=ROOT,
+                )
+                return 0
+            if verdict == "refresh":
                 print("[terminal] refresh requested — pull + verify + restart", flush=True)
                 pull = subprocess.run(["git", "pull", "--ff-only"], cwd=ROOT, capture_output=True, text=True)
                 verify = subprocess.run(["make", "verify"], cwd=ROOT, capture_output=True, text=True)
@@ -467,14 +570,38 @@ def loop(args: argparse.Namespace) -> int:
                 if args.once:
                     return 1
                 continue
-            subprocess.run(
-                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
-                 "--severity", "warn", "--body", f"unknown control action {control}"],
-                cwd=ROOT,
-            )
-            if args.once:
-                return 1
-            continue
+            if verdict == "restart":
+                # Re-exec the same code: no pull, no verify — the fast lever.
+                subprocess.run(
+                    ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                     "--type", "ack", "--body", "control:restart — re-executing the loop"],
+                    cwd=ROOT,
+                )
+                print("[terminal] restart requested — re-exec", flush=True)
+                os.execv(sys.executable, [sys.executable, *sys.argv])
+            if verdict == "dispatch-override":
+                print("[terminal] control:override — reaping any holder, then dispatching", flush=True)
+                issue_for_override = directive_issue(directive)
+                if issue_for_override is not None:
+                    reap = subprocess.run(
+                        ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "reap",
+                         "--older-than-minutes", "0", "--issue", str(issue_for_override), "--reaper", "operator-override"],
+                        cwd=ROOT,
+                        capture_output=True,
+                        text=True,
+                    )
+                    print(f"[terminal] override reap rc={reap.returncode}: {reap.stdout.strip()[:120]}", flush=True)
+                override = True
+            else:
+                # pause / resume / stop: the flag is set; ack and carry on.
+                subprocess.run(
+                    ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                     "--type", "ack", "--body", f"control:{control} — {verdict}"],
+                    cwd=ROOT,
+                )
+                if args.once:
+                    return 0
+                continue
 
         issue = directive_issue(directive)
         if issue is None:
@@ -488,7 +615,7 @@ def loop(args: argparse.Namespace) -> int:
                 return 1
             continue
 
-        agent_id = f"subagent-{directive_id[:8]}"
+        agent_id = agent_id_for(directive_id)
         IN_FLIGHT["issue"] = issue
         IN_FLIGHT["agent_id"] = agent_id
         IN_FLIGHT["directive"] = directive_id
@@ -498,7 +625,7 @@ def loop(args: argparse.Namespace) -> int:
             capture_output=True,
             text=True,
         )
-        if held.returncode == 0:
+        if held.returncode == 0 and not override:
             try:
                 holder = json.loads(held.stdout).get("agent")
             except json.JSONDecodeError:
@@ -623,6 +750,12 @@ def loop(args: argparse.Namespace) -> int:
                 cwd=ROOT,
             )
         if args.once:
+            return 0
+        if stopping():
+            # `stop` is graceful: it takes effect between runs, never mid-run.
+            set_flag(STOPPING, False)
+            write_heartbeat("stopped", started_at=started_at, commit=commit)
+            print("[terminal] control:stop — run finished; stopping the loop cleanly", flush=True)
             return 0
 
 
