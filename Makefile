@@ -16,8 +16,8 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims fleet-channel finops-chooser knowledge-index knowledge-index-build \
-        conformance secrets feature-flags cloudbuild terraform tf-fmt \
+        issue-claims fleet-channel finops-chooser fleet-contract knowledge-index knowledge-index-build \
+        conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
@@ -54,12 +54,21 @@ help:
 	@echo "                against the board snapshot + self-control mutants"
 	@echo "  fleet-channel Steering channel (M26 #162): message contract + the"
 	@echo "                DSv4FNone standing directive, all mutants refused"
+
 	@echo "  finops-chooser  FinOps chooser (M26 #164): the harvested tier/thinking"
 	@echo "                vocabulary, enforced — a subagent cannot pick its own tier"
+
+
+	@echo "  fleet-contract  Session-fleet steering contract (M26 #161): roles,"
+	@echo "                six directive verbs, envelope fields and trust rules"
+	@echo "                are declared and map onto the shipped channel"
+
 	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
 	@echo "                milestoned issue classified; mandates checked on the diff"
+	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
+	@echo "                RCA, every action recorded, every lesson evidenced"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -72,7 +81,7 @@ verify:
 	@bash scripts/verify.sh verify
 
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel knowledge-index
+lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims fleet-channel finops-chooser fleet-contract knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -128,12 +137,22 @@ issue-claims:
 fleet-channel:
 	@bash scripts/check-fleet-channel.sh
 
+
 ## finops-chooser — FinOps tier/thinking enforcement (M26 #164): the harvested
 ## vocabulary pinned across the policy, schema, channel and docs; a subagent
 ## cannot choose its own tier, and a spawn that does not reproduce the brain's
 ## choice is refused (all mutants must be refused)
 finops-chooser:
 	@bash scripts/check-finops-chooser.sh
+
+
+## fleet-contract — session-fleet steering contract (M26, issue #161): the
+## contract must declare the roles, the six directive verbs, the envelope fields
+## and the trust rules, and every verb must map onto a shipped message type;
+## the check mutates its own input, so it cannot pass vacuously
+fleet-contract:
+	@bash scripts/check-fleet-contract.sh
+
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):
 ## every item's provenance complete, secret policy clean, mandatory kinds covered
@@ -154,6 +173,13 @@ conformance:
 ## (GR-15 code-native automation; new infrastructure ships flag-gated OFF)
 conformance-change-set:
 	@python3 governance/conformance/cli.py change-set
+
+## lessons — RCA + lessons enforcement (issue #141): an incident with no RCA,
+## an RCA with no traceable origin or corrective action, an action that is not
+## recorded or names no owner, and a closed lesson with no commit evidence all
+## fail the gate; the historical backlog is reported with its remediation
+lessons:
+	@bash scripts/check-lessons.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:

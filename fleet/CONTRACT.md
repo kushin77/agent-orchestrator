@@ -1,0 +1,152 @@
+# Session fleet steering contract (v1)
+
+> **Status:** normative · **Ratified by:** issue #161 (milestone M26, epic #160)
+> · **Transport decision:** [ADR-0011](../docs/decision-records/ADR-0011-session-fleet-transport.md)
+
+This is the **normative** contract for the session fleet operating model: the
+roles, the directive vocabulary, the message schema, and the trust rules. It is
+enforced, not advisory. `fleet/channel.py` refuses traffic that violates it, and
+[`../scripts/check-fleet-contract.sh`](../scripts/check-fleet-contract.sh) —
+wired into `make verify` — fails the gate when any element declared here is
+removed from this file (GR-12: a rule a gate cannot fail on is a formality).
+
+## 0. What is authoritative where
+
+This issue (M26) reconciles a contract with a channel that already shipped
+(issue #162, PR #169) and a completion trigger that already shipped (issue #171,
+PR #173). This document is **additive**: it does not restate the envelope, and
+where the contract and the code could disagree, the code wins and this section
+says so.
+
+| Artifact | Authority |
+|---|---|
+| `fleet/CONTRACT.md` (this file) | **Authoritative** for roles, directive vocabulary, trust rules and the transport decision. |
+| `fleet/schema/message.schema.json` | **Authoritative** for the message envelope — field names, required fields and the FinOps allowlists. The envelope is v1. |
+| [`channel.py`](channel.py) | **Authoritative** for what is actually enforced (it refuses invalid traffic; the JSON Schema documents the same rules but is not the machine that runs). |
+| [`README.md`](README.md) | The **operational runbook** (bootstrap, mailbox layout, listener loop, day-to-day commands). It defers to this contract for meaning and to the schema for shape. |
+| [ADR-0011](../docs/decision-records/ADR-0011-session-fleet-transport.md) | **Authoritative** for *why the transport is what it is*. |
+
+**Decision — contract vs. runbook.** `fleet/README.md` is deliberately **not**
+the contract. It is written as an operator runbook (bootstrap steps, mailbox
+paths, CLI recipes) and changes whenever the mechanics change; the contract is
+the slower-moving statement of *who may say what to whom*. Splitting them means
+the gate can pin the contract's vocabulary without freezing the runbook's
+commands. The runbook links here for meaning; this file links there for
+procedure.
+
+**Reconciliation — `nonce`.** The issue's schema v1 requires a `nonce` field.
+The envelope shipped by issue #162 carried `id` (a channel-stamped uuid4) but no
+`nonce`. Issue #161 **extends** the envelope rather than rewriting it: `nonce`
+is now an optional field accepted by `channel.validate`, stamped by `send` when
+absent, and used as an **anti-replay token** — `send` refuses a directive whose
+`nonce` is already present in the sent, inbox or done mailboxes. Existing
+messages (including the standing directive `fleet/directive.json`) remain valid
+without it: the field is additive, and the schema stays v1.
+
+## 1. Roles
+
+| Role | Runtime | Authority |
+|---|---|---|
+| **brain** | Copilot advisor session, maximum DeepSeek vPro | The only directive issuer. Steers, verifies, merges. |
+| **fleet brain** (the **sister** session) | DeepSeek v4.1 Flash, thinking effort **off** (DSv4FNone) | A dumb terminal. Drains the inbox, executes brain directives only, spawns epic-focused subagents per directive, reports results back. Never picks work on its own. |
+| **subagent** (`subagent-<name>`) | Model + tier + thinking chosen by the brain's FinOps block | Epic-focused executor. One issue = one subagent = one lane. Cannot escalate its own tier. |
+
+The roster separates **ROLE** (what an agent is for) from **TIER** (which
+transport carries it), **MODEL** (what answers) and **EFFORT** (how much
+thinking it spends) — harvested from `leaderboard/lib/fleet-roster.sh`, whose
+own header records why the separation exists: coupling a seat to a model made a
+role's cost and capability drift silently. A subagent receives all four in its
+directive; none of them is inferred by the subagent.
+
+**FinOps block.** Every directive carries `model.tier` ∈ {`pro`, `flash`} and
+`model.thinking` ∈ {`none`, `low`, `high`}, plus an optional `budget_hint`.
+Anything outside those allowlists is refused, and only a new brain directive may
+raise a tier — an executor that wants more model must ask, not take.
+
+## 2. Directive vocabulary
+
+Exactly six verbs exist. There is no seventh, and there is no free-form verb
+field: each verb maps onto an envelope type that `channel.py` already enforces,
+so the vocabulary is expressible in the shipped schema rather than parallel to
+it.
+
+| Verb | Envelope | Meaning |
+|---|---|---|
+| `spawn-epic-agent` | `directive` | Brain orders the sister to spawn one epic-focused subagent. |
+| `dispatch-issue` | `directive` | Brain names the issue (and lane) that subagent works; the directive is the claim's chain edge. |
+| `model-directive` | `directive` | Brain sets the FinOps block for a subagent's run. |
+| `handoff` | `directive` | Brain moves an in-flight epic from one subagent to another; the receiving subagent inherits the evidence, not the authority. |
+| `halt` | `halt` | Brain stops the fleet. Only the brain may issue it. |
+| `report` | `result` | The sister or a subagent answers the directive it was given. A synchronous progress acknowledgement is the same envelope as `ack`. |
+
+## 3. Message schema v1 (JSON)
+
+The normative schema is [`schema/message.schema.json`](schema/message.schema.json).
+The fields the contract depends on:
+
+| Field | Required | Purpose |
+|---|---|---|
+| `from` / `to` | yes | Roles: `brain`, `sister`, `subagent` or `subagent-<name>`. |
+| `type` | yes | `directive` · `ack` · `result` · `halt`. |
+| `id` | stamped | Unique message id (uuid4) stamped by the channel. |
+| `ts` | stamped | ISO-8601 UTC timestamp stamped by the channel. |
+| `correlation_id` | for `ack`/`result` | Binds a report to the directive that caused it — the completion trigger the brain waits on. |
+| `nonce` | stamped | Anti-replay token; `send` refuses a nonce it has already seen. |
+| `model` | for `directive` | The FinOps block: `tier`, `thinking`, optional `budget_hint`. |
+| `task` | for work directives | `issue` (required), optional `epic`, optional `lane`. |
+| `body` | no | Human- and agent-readable order text. |
+
+## 4. Trust model
+
+Four rules, and one consequence that is itself the rule:
+
+1. **Only the brain may issue directives to the sister.** A directive from the
+   sister is refused outright: the sister is a dumb terminal, and a dumb
+   terminal that can rewrite its own orders is not a dumb terminal.
+2. **The sister may only spawn subagents per a directive.** Spawning is an
+   execution of a brain order, never a decision of the sister's own.
+3. **Subagents report back through the sister.** A subagent's result travels the
+   same channel as the directive that caused it, correlated by `correlation_id`;
+   it never addresses the brain as a peer authority.
+4. **Everything else is refused.** Not "discouraged", not "logged" — refused by
+   `channel.validate` before the message moves, so an out-of-contract message
+   never reaches a mailbox.
+
+Consequences of the model, stated so they are not discovered later:
+
+- The brain cannot `ack` or `result` its own directives — a report must come
+  from the party that executed.
+- Only the brain may `halt`.
+- A subagent cannot escalate its own tier or thinking effort; only a
+  `model-directive` from the brain changes them.
+
+## 5. Transport decision
+
+The transport is the **file mailbox** (`fleet/channel.py` over
+`.fleet/{inbox,sent,outbox,done}`), with the **push → wait → completion trigger**
+loop: the brain sends a directive, blocks on `wait`, and wakes when the executor
+`report`s. The alternatives considered — the hub's A2A product layer, and the
+engine's state machine — and the reasons the mailbox is the transport of record
+*now* (with A2A as the graduation target once this repo's M9 ships) are recorded
+in [ADR-0011](../docs/decision-records/ADR-0011-session-fleet-transport.md).
+The channel references that record in its own module docstring, so the transport
+and its rationale cannot drift apart.
+
+## 6. Enforcement
+
+| Control | Where | What it proves |
+|---|---|---|
+| `channel.validate` | `fleet/channel.py` | Refuses out-of-contract traffic at the boundary (unknown type, bad tier/thinking, missing role, sister-issued directive, misaddressed directive, uncorrelated report, brain ack). |
+| `nonce` replay refusal | `fleet/channel.py` `send` | A directive cannot be replayed into the mailbox under a previously seen nonce. |
+| `scripts/check-fleet-contract.sh` | `make verify` (`fleet-contract`) | This contract still declares the six verbs, the four trust rules and the schema/ADR references; every declared verb maps to a message type the channel actually implements; and the check proves itself non-vacuous by mutating its own input. |
+| `fleet/tests/test_contract.py` | `make tests` (`fleet` suite) | The same declarations, asserted in the per-suite test corpus. |
+
+## 7. Provenance
+
+The vocabulary and role separation in this contract are harvested, not invented
+(GR-10); every source is recorded in
+[`../docs/CANNIBALIZATION.md`](../docs/CANNIBALIZATION.md) §6 with repo, path
+and license. The prior art is the mature fleet model in `kushin77/leaderboard`
+and `kushin77/capital-underwriting`, both proprietary and owner-authored, so
+what is reused is the *pattern and the vocabulary* — reimplemented here for this
+repo's Python/JSON substrate — never copied code.

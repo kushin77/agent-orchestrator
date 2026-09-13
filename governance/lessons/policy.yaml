@@ -1,0 +1,27 @@
+# RCA + lessons enforcement policy (issue #141)
+#
+# What counts as an incident-labelled issue on the board, how long an RCA may go
+# without review, and which issues carry the incident-response label as *process*
+# work rather than as an incident.
+#
+# Every exemption carries the reason it exists, and the gate reports it on every
+# run (`board-incident-exempt`), so an exemption is visible rather than silent.
+# The alternative — a hard rule with a false positive baked in — turns the gate
+# red for a reason no lane can fix, which is the false-green failure mode this
+# module exists to prevent (see governance/lessons/rca/RCA-0001-*).
+
+schema: cmr.lessons/policy-v1
+
+board:
+  # The label that marks an issue as an incident or policy failure.
+  incident_label: area:incident-response
+
+  exemptions:
+    - ref: "#141"
+      reason: >-
+        Enforce RCA and lessons capture — the issue that installs this process.
+        Requiring an RCA for the rule that requires RCAs is circular, and the
+        label describes the work the issue does, not an incident it records.
+
+# An RCA that is never re-read is a document, not a practice.
+review_cadence_days: 180
