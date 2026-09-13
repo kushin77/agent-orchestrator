@@ -18,7 +18,12 @@ rung a real process:
 * it answers the operator in `.fleet/brain/outbox` — an `ack` naming the
   directive it issued, or a `result` reporting a refusal with the exact reason;
 * it publishes `.fleet/brain.heartbeat.json` so `status`/`health` can tell a
-  live brain from a dead one and catch code drift;
+  live brain from a dead one and catch code drift, and it keeps that beat fresh
+  *while an order is being handled* — a decomposition files N child issues and
+  refreshes the board, which outlives the watchdog's stale threshold (#274);
+* it stops cleanly on SIGTERM/SIGINT (the watchdog's kill) instead of dying
+  mid-order, and records a sent-marker *before* it sends, so a restart can never
+  re-dispatch an order whose directive already went out (#274);
 * it prints a low-noise CONTEXT STREAM to stdout — a startup banner, the order it
   received, what it did with it, the waves it advanced, and an idle heartbeat
   every ~30s. That stream is captured to `.fleet/brain.log` (the watchdog owns
@@ -36,11 +41,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -60,6 +68,20 @@ HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
 LOG_PATH = FLEET_DIR / "brain.log"
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 PROFILE_PATH = ROOT / "fleet" / "profiles" / "brain.profile.json"
+# Where the brain records that a directive has been *sent* for an order. The
+# marker is written BEFORE the channel is invoked (#274): a brain killed between
+# the dispatch and `channel.consume_order` used to re-read the order on restart
+# and send it a second time (measured: `['4242', '4242']`). On restart the marker
+# suppresses the duplicate instead of repeating it.
+DISPATCH_MARKERS = FLEET_DIR / "brain" / "dispatched"
+# The prefix `dispatch()` returns when the marker says the order is already out.
+# Callers report "already dispatched" and never send a second directive.
+DUPLICATE_SUPPRESSED = "duplicate suppressed"
+# How often the beat is refreshed while an order is being handled. The watchdog
+# SIGTERMs a rung whose beat is older than `channel.STALE_HEARTBEAT_SECONDS`
+# (120s), and a decompose order outlives that easily; the sister beats every 15s
+# for the same reason (`fleet/terminal.py`).
+HEARTBEAT_INTERVAL_SECONDS = 15.0
 # How often the idle path repeats its heartbeat line. The loop blocks up to
 # `--watch-timeout` (30s) on each poll, so one line per idle tick is one line per
 # ~30s: enough to prove the brain is alive, not enough to bury an order in noise.
@@ -143,6 +165,66 @@ def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
     tmp.replace(HEARTBEAT)
 
 
+class OrderBeater:
+    """Keeps the beat fresh while one order is handled; `stop()` joins.
+
+    The brain used to beat only once per poll and once *before* `handle_order`,
+    so a long order looked dead: the watchdog treats a beat older than
+    `channel.STALE_HEARTBEAT_SECONDS` as stale and SIGTERMs the rung — killing
+    the brain mid-order. `stop()` sets the flag *and* joins, because a beater
+    that outlives its owner would write its owner's last idea of the world over
+    the next iteration's beat (the sister learned this the hard way, #281).
+    """
+
+    def __init__(
+        self,
+        state: str,
+        *,
+        started_at: str,
+        commit: str,
+        interval: float = HEARTBEAT_INTERVAL_SECONDS,
+    ) -> None:
+        self._state = state
+        self._started_at = started_at
+        self._commit = commit
+        self._interval = interval
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._beat, name="brain-heartbeat", daemon=True)
+
+    def _beat(self) -> None:
+        while not self._stop.wait(self._interval):
+            write_heartbeat(self._state, started_at=self._started_at, commit=self._commit)
+
+    def start(self) -> OrderBeater:
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+
+def handle_stop(signum: int, frame: object) -> None:
+    """A stopped brain exits; it does not die mid-order.
+
+    Without a handler the watchdog's SIGTERM killed the process outright, leaving
+    whatever was half-written exactly as it fell. Raising `SystemExit` unwinds
+    through the loop's `finally` (stopping the beater), and the sent-marker
+    written *before* the send is what makes the restart safe: the order is
+    suppressed on restart rather than dispatched a second time (#274).
+    """
+    print(f"[brain] signal {signum} — stopping cleanly (a restart suppresses any duplicate)", flush=True)
+    raise SystemExit(128 + signum)
+
+
+def install_stop_handlers() -> tuple[int, ...]:
+    """Install the loop's stop handlers; returns the signals the loop owns."""
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(signum, handle_stop)
+    return (int(signal.SIGTERM), int(signal.SIGINT))
+
+
 def order_issue(order: dict) -> int | None:
     """The issue an order names, or None when the order is not dispatchable work."""
     task = order.get("task") or {}
@@ -178,6 +260,52 @@ def order_reference(order: dict) -> str:
     return str(order.get("id") or order.get("correlation_id") or "")
 
 
+# Characters that may not appear in a marker filename. The reference arrives in
+# operator-supplied JSON and becomes a path component, so `../` must not be able
+# to walk out of the marker directory.
+_MARKER_UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def order_marker(order: dict) -> Path | None:
+    """The sent-marker path for an order, or None when it carries no reference."""
+    reference = order_reference(order)
+    if not reference:
+        return None
+    return DISPATCH_MARKERS / f"{_MARKER_UNSAFE.sub('_', reference)[:120]}.json"
+
+
+def write_marker(marker: Path, order: dict, state: str) -> None:
+    """Persist (atomically) what the brain has done with this order so far."""
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "reference": order_reference(order),
+        "issue": order_issue(order),
+        "state": state,
+        "ts": now_iso(),
+    }
+    tmp = marker.with_suffix(".tmp")
+    tmp.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+    tmp.replace(marker)
+
+
+def directive_identity(order: dict) -> tuple[str | None, str | None]:
+    """A deterministic (id, nonce) for the directive an order produces.
+
+    `dispatch()` composed a directive with no id and no nonce, so `channel.send`
+    stamped a fresh uuid4 on every call and its replay guard could never fire —
+    a restart that re-read the order dispatched it twice (measured
+    `['4242', '4242']`, #274). Deriving the identity from the order's own
+    reference makes the SAME order produce the SAME directive, so the channel's
+    existing replay check (sent/inbox/done) refuses the second send. Hashed
+    because the id becomes a filename inside the channel.
+    """
+    reference = order_reference(order)
+    if not reference:
+        return None, None
+    digest = hashlib.sha256(f"brain-directive:{reference}".encode("utf-8")).hexdigest()[:32]
+    return f"brain-directive-{digest}", f"brain-nonce-{digest}"
+
+
 def build_directive(order: dict) -> dict:
     """Compose the brain-signed directive the sister will execute."""
     task = dict(order.get("task") or {})
@@ -205,12 +333,30 @@ def build_directive(order: dict) -> dict:
         # The operator's override still travels the hierarchy: the operator orders
         # the brain, and the brain issues the control to the sister.
         directive["control"] = "override"
+    message_id, nonce = directive_identity(order)
+    if message_id and nonce:
+        # Deterministic identity (see `directive_identity`): the same order must
+        # never become a second directive after a restart.
+        directive["id"] = message_id
+        directive["nonce"] = nonce
     return directive
 
 
 def dispatch(order: dict) -> tuple[bool, str]:
-    """Send the composed directive through the channel; return (ok, message)."""
+    """Send the composed directive through the channel; return (ok, message).
+
+    Restart-safe by construction: the sent-marker is persisted *before* the
+    channel is invoked, so a brain killed mid-send finds it on restart and
+    refuses to send the same order twice. Marker first, send second — the reverse
+    order loses the at-most-once property this exists for. `(False, ...)` with a
+    `DUPLICATE_SUPPRESSED` prefix means "already sent", not "send failed".
+    """
+    marker = order_marker(order)
+    if marker is not None and marker.exists():
+        return False, f"{DUPLICATE_SUPPRESSED} — {marker.name} records that this order was already sent"
     directive = build_directive(order)
+    if marker is not None:
+        write_marker(marker, order, "sending")
     result = subprocess.run(
         ["python3", CHANNEL, "send", "--message", json.dumps(directive)],
         cwd=ROOT,
@@ -218,7 +364,21 @@ def dispatch(order: dict) -> tuple[bool, str]:
         text=True,
     )
     output = (result.stdout + result.stderr).strip()
-    return result.returncode == 0, output
+    ok = result.returncode == 0
+    if marker is not None:
+        if ok:
+            write_marker(marker, order, "sent")
+        else:
+            # The channel answered non-zero, and `cmd_send` refuses *before* it
+            # queues anything: nothing left the brain, so the marker is dropped
+            # (a corrected order must still be able to go out). The pathological
+            # "queued, then exited non-zero" case stays covered by the
+            # directive's deterministic id, which the channel refuses on replay.
+            try:
+                marker.unlink()
+            except OSError:
+                pass
+    return ok, output
 
 
 WAVES = ROOT / ".fleet" / "waves"
@@ -240,6 +400,30 @@ def gh_issue_create(title: str, body: str) -> int:
     return int(match.group(1))
 
 
+def decompose_problem(spec: object) -> str | None:
+    """Why this decomposition spec cannot be filed, or None when it is well formed.
+
+    Validating up front is the point: `handle_decompose` used a bare subscript for
+    `parent_issue`, so a spec that omitted it raised `KeyError` out of `loop` and
+    killed the brain process (#275) — and `gh_issue_create` raises `RuntimeError`
+    on any `gh` failure, the same escape. A malformed order is a refusal.
+    """
+    if not isinstance(spec, dict):
+        return "decompose order carries no decompose object — nothing to file"
+    children = spec.get("children")
+    if not isinstance(children, list) or not children:
+        return "decompose order carries no children — nothing to file"
+    if not all(isinstance(child, dict) for child in children):
+        return "decompose children must each be an object (title/lane/verify) — nothing to file"
+    parent = spec.get("parent_issue")
+    if isinstance(parent, bool) or not isinstance(parent, int) or parent < 1:
+        return (
+            "decompose order names no parent_issue (it must be a positive integer) — "
+            "no child was filed and nothing was dispatched"
+        )
+    return None
+
+
 def handle_decompose(order: dict) -> tuple[bool, str]:
     """Turn a decomposition spec into child issues and dispatch the ready wave.
 
@@ -249,8 +433,9 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
     prepares the next waves in advance instead of waiting for the parent.
     """
     spec = (order.get("task") or {}).get("decompose")
-    if not isinstance(spec, dict) or not spec.get("children"):
-        return False, "decompose order carries no children — nothing to file"
+    problem = decompose_problem(spec)
+    if problem:
+        return False, problem
     parent = int(spec["parent_issue"])
     WAVES.mkdir(parents=True, exist_ok=True)
     plan = {"parent": parent, "children": [], "dispatched": []}
@@ -270,6 +455,10 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
                 "index": index,
                 "issue": number,
                 "lane": lane,
+                # Stored, not dropped: `dispatch_ready_children` reads it back onto
+                # the wave directive, and a directive with `title == ""` defeats
+                # the title-based FinOps high-floor detection (#274 review, F10).
+                "title": title,
                 "verify": verify,
                 "depends_on": [int(d) for d in child.get("depends_on", [])],
             }
@@ -313,15 +502,23 @@ def dispatch_ready_children(parent: int, plan: dict) -> list[int]:
             continue
         order = {
             "type": "directive",
+            # A stable reference per child: it becomes the directive's identity (and
+            # its correlation id), so a brain restarted mid-wave suppresses the
+            # duplicate instead of dispatching the child a second time.
+            "id": f"child-{parent}-{child['issue']}",
             "task": {
                 "issue": child["issue"],
                 "lane": child["lane"],
-                "title": child["title"] if "title" in child else "",
+                "title": child.get("title") or "",
             },
             "body": f"Micro-task of #{parent}. Verify: {child['verify']}",
         }
         ok, message = dispatch(order)
-        if ok:
+        if message.startswith(DUPLICATE_SUPPRESSED):
+            # Already out (a restart re-read the plan): stop retrying it, but do not
+            # report it as a wave this idle tick advanced.
+            plan["dispatched"].append(child["issue"])
+        elif ok:
             plan["dispatched"].append(child["issue"])
             dispatched.append(child["issue"])
         else:
@@ -362,9 +559,33 @@ def handle_order(order: dict) -> tuple[bool, str]:
 
     ok, message = dispatch(order)
     if not ok:
+        if message.startswith(DUPLICATE_SUPPRESSED):
+            # Not a failure: the directive is already out. Consuming the order (the
+            # loop does that next) is what breaks the duplicate-dispatch cycle.
+            return True, f"#{issue} was already dispatched — {message}"
         return False, f"dispatch refused for #{issue}: {message}"
     tier, thinking = choose_model(order)
     return True, f"dispatched #{issue} to the sister at {tier}/{thinking} — {message}"
+
+
+def safe_handle_order(order: dict) -> tuple[bool, str]:
+    """Run `handle_order`, turning ANY handler error into a refusal.
+
+    The brain is the fleet's middle rung: a malformed order must cost one
+    refusal, not the process. Measured (#275): a decompose order without
+    `parent_issue` raised `KeyError` straight out of `loop` and killed the brain,
+    and nothing restarted it until the next watchdog tick. `SystemExit` — the stop
+    handler — is deliberately NOT caught: a stop is a stop.
+    """
+    try:
+        return handle_order(order)
+    except Exception as exc:  # noqa: BLE001 — surviving the order IS the point
+        print(
+            f"[brain] handler error on order {order_reference(order) or '-'}: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return False, f"handler error {type(exc).__name__}: {exc} — the order was refused; the loop continues"
 
 
 def _health() -> tuple[int, list[str]]:
@@ -540,6 +761,7 @@ def wave_line(advanced: list[int]) -> str:
 def loop(args: argparse.Namespace) -> int:
     if not singleton.guard("brain", "bash fleet/run-fleet.sh (or: bash fleet/brain.sh)"):
         return 1
+    install_stop_handlers()
     started_at = now_iso()
     commit = channel.head_commit()
     print(status_header(fleet_facts(), pid=os.getpid()), flush=True)
@@ -580,9 +802,22 @@ def loop(args: argparse.Namespace) -> int:
         order_id = order.get("id", "")
         print(order_line(order), flush=True)
         write_heartbeat("dispatching", started_at=started_at, commit=commit)
-        ok, report = handle_order(order)
-        channel.brain_reply(order, "ack" if ok else "result", report)
-        channel.consume_order(order_id)
+        # Beat while the handler runs: a decompose order files N child issues and
+        # refreshes the board, which outlives the watchdog's stale threshold — and a
+        # stale brain is SIGTERMd (#274). `finally` stops the beater before the next
+        # iteration's own beat, so the thread cannot outlive its owner.
+        beater = OrderBeater(
+            "dispatching",
+            started_at=started_at,
+            commit=commit,
+            interval=HEARTBEAT_INTERVAL_SECONDS,
+        ).start()
+        try:
+            ok, report = safe_handle_order(order)
+            channel.brain_reply(order, "ack" if ok else "result", report)
+            channel.consume_order(order_id)
+        finally:
+            beater.stop()
         print(outcome_line(order, ok, report), flush=True)
         if args.once:
             return 0 if ok else 1

@@ -241,17 +241,24 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def replay_conflict(message: dict) -> str | None:
+def replay_conflict(message: dict, directories: tuple[Path, ...] | None = None) -> str | None:
     """Reason this message replays an earlier delivery, or None when it is fresh.
 
     A directive is identified by its ``id`` and carries a ``nonce`` as its
-    anti-replay token (contract §3). Either one recurring in the sent, inbox or
-    done mailbox means the same order is being pushed twice — which the contract
+    anti-replay token (contract §3). Either one recurring in the mailboxes this
+    call path owns means the same order is being pushed twice — which the contract
     refuses rather than silently overwriting the queued copy.
+
+    The mailbox set is a parameter, not a constant, because the two paths write to
+    *different* mailboxes: ``send`` (brain → sister) writes ``SENT``/``INBOX`` and
+    ``order`` (operator → brain) writes ``BRAIN_SENT``/``BRAIN_INBOX``. Scanning
+    the sister's mailboxes from ``order`` made that guard unreachable — measured,
+    an identical operator order was accepted twice (#278). ``None`` keeps the
+    default a run-time lookup of the sister's mailboxes.
     """
     if not message.get("id") and not message.get("nonce"):
         return None
-    for directory in (SENT, INBOX, DONE):
+    for directory in (SENT, INBOX, DONE) if directories is None else directories:
         if not directory.exists():
             continue
         for path in directory.glob("*.json"):
@@ -304,7 +311,7 @@ def cmd_send(args: argparse.Namespace) -> int:
         message["ts"] = now_iso()
     if not message.get("nonce"):
         message["nonce"] = str(uuid.uuid4())
-    conflict = replay_conflict(message)
+    conflict = replay_conflict(message, (SENT, INBOX, DONE))
     if conflict:
         print(f"channel send: REFUSED — replay detected ({conflict})", file=sys.stderr)
         return EXIT_NOT_OK
@@ -429,6 +436,11 @@ def cmd_order(args: argparse.Namespace) -> int:
     The operator trigger exists so the chain is real code — operator → brain →
     sister — rather than a convention the transport cannot enforce. `send` is
     brain→sister and refuses an operator sender, so this is the only way in.
+
+    The anti-replay scan covers the mailboxes *this* path writes
+    (``BRAIN_SENT``/``BRAIN_INBOX``/``BRAIN_DONE``): the shared default scans the
+    sister's mailboxes, so the guard could never fire here and an identical order
+    was accepted twice (#278).
     """
     message = load_message(args.message)
     message.setdefault("from", "operator")
@@ -446,7 +458,7 @@ def cmd_order(args: argparse.Namespace) -> int:
         message["ts"] = now_iso()
     if not message.get("nonce"):
         message["nonce"] = str(uuid.uuid4())
-    conflict = replay_conflict(message)
+    conflict = replay_conflict(message, (BRAIN_SENT, BRAIN_INBOX, BRAIN_DONE))
     if conflict:
         print(f"channel order: REFUSED — replay detected ({conflict})", file=sys.stderr)
         return EXIT_NOT_OK

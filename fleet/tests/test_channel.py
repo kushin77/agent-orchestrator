@@ -399,6 +399,72 @@ def test_consuming_an_absent_directive_is_a_no_op(tmp_path, monkeypatch):
     assert channel.consume_directive("never-queued") is False
 
 
+# --- #278: the operator-order anti-replay guard must actually be reachable ----
+
+
+def _order_paths(monkeypatch, tmp_path):
+    monkeypatch.setattr(channel, "BRAIN_INBOX", tmp_path / "brain" / "inbox")
+    monkeypatch.setattr(channel, "BRAIN_SENT", tmp_path / "brain" / "sent")
+    monkeypatch.setattr(channel, "BRAIN_DONE", tmp_path / "brain" / "done")
+    monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
+
+
+def test_order_refuses_a_replayed_operator_order(tmp_path, monkeypatch):
+    """The P4a proof: `order` scanned the sister's mailboxes, so an identical
+    order (same id *and* nonce) was accepted twice (rc1=0 rc2=0)."""
+    _order_paths(monkeypatch, tmp_path)
+    replay = json.dumps(
+        {
+            "from": "operator",
+            "to": "brain",
+            "type": "directive",
+            "id": "order-dup-1",
+            "nonce": "nonce-dup-1",
+            "correlation_id": "o-1",
+            "task": {"issue": 42},
+        }
+    )
+    args = type("Args", (), {"message": replay})()
+
+    assert channel.cmd_order(args) == EXIT_OK
+    assert channel.cmd_order(args) == EXIT_NOT_OK, "the same order was queued twice"
+    assert len(list(channel.BRAIN_INBOX.glob("*.json"))) == 1
+
+
+def test_order_refuses_a_replay_after_the_brain_consumed_it(tmp_path, monkeypatch):
+    """A replayed order whose first copy already reached `done/` is still a replay."""
+    _order_paths(monkeypatch, tmp_path)
+    channel.BRAIN_DONE.mkdir(parents=True, exist_ok=True)
+    channel.BRAIN_DONE.joinpath("order-dup-2.json").write_text(
+        json.dumps({"id": "order-dup-2", "nonce": "nonce-dup-2"}), encoding="utf-8"
+    )
+    message = json.dumps(
+        {
+            "from": "operator",
+            "to": "brain",
+            "type": "directive",
+            "id": "order-dup-2",
+            "nonce": "nonce-dup-2",
+            "task": {"issue": 42},
+        }
+    )
+    assert channel.cmd_order(type("Args", (), {"message": message})()) == EXIT_NOT_OK
+
+
+def test_replay_conflict_scans_only_the_mailboxes_it_is_given(tmp_path, monkeypatch):
+    """The mailbox set is per call path, and a path that has none is not a replay."""
+    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "DONE", tmp_path / "done")
+    brain_sent = tmp_path / "brain-sent"
+    brain_sent.mkdir()
+    (brain_sent / "o-9.json").write_text(json.dumps({"id": "o-9", "nonce": "n-9"}), encoding="utf-8")
+
+    assert channel.replay_conflict({"id": "o-9"}, (brain_sent,)) == "id o-9 was already sent"
+    assert channel.replay_conflict({"id": "o-9"}, (channel.SENT,)) is None
+    assert channel.replay_conflict({"nonce": "n-9"}, (brain_sent,)) == "nonce n-9 was already used"
+
+
 def test_escalate_requires_a_correlation_id():
     problems = validate({"from": "sister", "to": "brain", "type": "escalate", "severity": "warn"})
     assert any("correlation_id" in problem for problem in problems)
