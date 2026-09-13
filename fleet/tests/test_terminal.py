@@ -99,6 +99,63 @@ def test_claim_issue_reports_the_refusal_verbatim(monkeypatch):
     assert ok is False and "no-chain-edge" in output
 
 
+class _Ok:
+    returncode = 0
+
+
+def test_stop_and_release_frees_the_in_flight_claim(monkeypatch):
+    """A restart must not strand the claim — the wedge, recreated by the operator."""
+    calls = []
+
+    def fake_release(issue, agent):
+        calls.append(("release", issue, agent))
+        return True, "ok"
+
+    def fake_run(command, **kwargs):
+        calls.append(("escalate", command))
+        return _Ok()
+
+    monkeypatch.setattr(terminal, "release_issue", fake_release)
+    monkeypatch.setattr(terminal.subprocess, "run", fake_run)
+    terminal.IN_FLIGHT.update({"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None})
+    try:
+        terminal.stop_and_release("signal 15")
+    finally:
+        terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+    assert ("release", 167, "subagent-abc12345") in calls
+    assert any(kind == "escalate" for kind, *_ in calls), "the brain must be told the loop stopped mid-run"
+
+
+def test_stop_and_release_reports_a_failed_release(monkeypatch):
+    bodies = []
+
+    def fake_run(command, **kwargs):
+        bodies.append(command[-1])
+        return _Ok()
+
+    monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (False, "REFUSED: not the holder"))
+    monkeypatch.setattr(terminal.subprocess, "run", fake_run)
+    terminal.IN_FLIGHT.update({"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None})
+    try:
+        terminal.stop_and_release("signal 15")
+    finally:
+        terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+    assert bodies and "RELEASE FAILED" in bodies[0]
+
+
+def test_an_idle_stop_releases_nothing(monkeypatch):
+    calls = []
+
+    def fake_release(issue, agent):
+        calls.append(issue)
+        return True, "ok"
+
+    monkeypatch.setattr(terminal, "release_issue", fake_release)
+    terminal.IN_FLIGHT.update({"issue": None, "agent_id": None, "directive": None, "child": None})
+    terminal.stop_and_release("signal 15")
+    assert calls == []
+
+
 def test_run_once_reports_an_unstartable_runner(tmp_path, monkeypatch):
     monkeypatch.setattr(terminal, "ROOT", tmp_path)
     rc, output = terminal.run_once({"id": "d-1", "task": {"issue": 1}}, "definitely-not-a-command-xyz", 5.0, False, "subagent-d1")
