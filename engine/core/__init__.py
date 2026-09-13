@@ -30,6 +30,7 @@ from .errors import (
 from .events import EventRecord, EventStore, FileJsonlEventStore, InMemoryEventStore
 from .gateway_port import GatewayRequest, GatewayResult, ModelGateway, NullGateway
 from .handlers import BUILTIN_HANDLERS, DEFAULT_HANDLERS, Handler, StepContext
+from .leaderboard import LeaderboardSessionRegistry, SessionRecord
 from .machine import legal_moves, next_status
 from .model import (
     Compensation,
@@ -101,6 +102,9 @@ __all__ = [
     # workflow projection
     "WorkflowExecution",
     "StepExecutionState",
+    # leaderboard session registry
+    "SessionRecord",
+    "LeaderboardSessionRegistry",
     # runtime
     "Engine",
     "ExecutionReport",
