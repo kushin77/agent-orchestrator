@@ -66,10 +66,10 @@ def test_super_admin_sees_all_tenants(super_client):
     assert status == 200
     me = _data(payload)
     assert me["superAdmin"] is True
-    assert set(me["scopedTenants"]) == {"acme", "globex", "initech"}
+    assert set(me["scopedTenants"]) == {"acme", "globex", "initech", "purebliss"}
     status, payload = super_client.get("/api/tenants")
     assert status == 200
-    assert len(_data(payload)["tenants"]) == 3
+    assert len(_data(payload)["tenants"]) == 4
 
 
 def test_tenant_owner_is_scoped_to_own_tenant(app):

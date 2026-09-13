@@ -170,6 +170,17 @@ def seed_state() -> ConsoleState:
             usage_month_usd=148.10,
             usage_today_tokens=254_000,
         ),
+        Tenant(
+            id="purebliss",
+            name="Purebliss",
+            plan="enterprise",
+            subscription_status="active",
+            primary_domain="ai.purebliss.app",
+            monthly_budget_usd=1200.0,
+            daily_token_limit=5_000_000,
+            usage_month_usd=318.40,
+            usage_today_tokens=1_106_000,
+        ),
     ]
     for tenant in tenants:
         state.tenants[tenant.id] = tenant
@@ -202,6 +213,25 @@ def seed_state() -> ConsoleState:
         OrgAgent("tps-1", "platform", "coder", "paused", "flash", ["code"]),
         OrgAgent("cover-1", "platform", "researcher", "active", "pro",
                  ["research", "summarize"]),
+    ]
+
+    # -- purebliss team (issue #256) ----------------------------------------
+    # The platform's own five-agent ecosystem, frozen by EPIC #253: agent ids
+    # ollama/paperclip/hermes/deepseek/claude under team id `purebliss`, all
+    # active. Model tier + capabilities stay consistent with the registry
+    # profiles (registry lane #254): claude runs at `pro` (anthropic);
+    # ollama/paperclip/hermes/deepseek run at `flash`.
+    state.agents["purebliss"] = [
+        OrgAgent("ollama", "purebliss", "ollama", "active", "flash",
+                 ["research", "summarize"]),
+        OrgAgent("paperclip", "purebliss", "paperclip", "active", "flash",
+                 ["docs", "summarize"]),
+        OrgAgent("hermes", "purebliss", "hermes", "active", "flash",
+                 ["code", "test"]),
+        OrgAgent("deepseek", "purebliss", "deepseek", "active", "flash",
+                 ["code", "research"]),
+        OrgAgent("claude", "purebliss", "claude", "active", "pro",
+                 ["review", "audit"]),
     ]
 
     # -- personas (registry/personas cards) ---------------------------------
@@ -288,6 +318,7 @@ def seed_state() -> ConsoleState:
         OrgBinding("erin@acme.example.com", "acme", "agent-operator"),
         OrgBinding("carol@globex.example.com", "globex", "owner"),
         OrgBinding("dan@initech.example.com", "initech", "owner"),
+        OrgBinding("root@platform.example.com", "purebliss", "owner"),
     ]
 
     # -- seed audit chains (telemetry/ledger actor kind:id vocabulary) ------
@@ -312,6 +343,12 @@ def seed_state() -> ConsoleState:
         ("system:provision", "registry.register", "agent:cover-1", None),
         ("user:dan@initech.example.com", "registry.activate", "agent:cover-1",
          "activated"),
+    ])
+    _seed_audit(state, "purebliss", [
+        ("system:provision", "registry.register", "agent:claude", None),
+        ("user:root@platform.example.com", "registry.activate", "agent:claude",
+         "activated on onboarding"),
+        ("system:policy", "policy.decision", "model.call", "allow (no control on)"),
     ])
     return state
 

@@ -82,10 +82,13 @@
             "Your role (" + (role || "none") + ") is read-only for agents here — mutations are refused server-side." }));
         }
         teams.forEach(function (team) {
+          var active = team.agents.filter(function (a) { return a.status === "active"; }).length;
           var card = CP.el("div", { class: "card" },
             CP.el("div", { class: "spread" },
-              CP.el("h3", { text: team.team }),
-              CP.el("span", { class: "badge", text: team.agents.length + " agents" })));
+              CP.el("div", {},
+                CP.el("span", { class: "mono dim", text: "team" }),
+                CP.el("h3", { text: team.team })),
+              CP.el("span", { class: "badge", text: team.agents.length + " agents · " + active + " active" })));
           var table = CP.el("table", { class: "tbl" });
           table.appendChild(CP.el("thead", {},
             CP.el("tr", {},
