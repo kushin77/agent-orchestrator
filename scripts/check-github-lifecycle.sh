@@ -156,6 +156,9 @@ cases = {
     "ISSUE_NOT_CLOSED": record([item(state="open")]),
     # Evidence must name the verified head, never the (new) merge commit.
     "VERIFY_WRONG_COMMIT": record([item(verify={"ok": True, "commit": MERGE})]),
+    # GitHub's canonical casing (OPEN/CLOSED/MERGED) must read as its lowercase
+    # equivalent; the second end-to-end run found close-out misreading exactly this.
+    "GITHUB_CASING": record([item(state="CLOSED", pr=dict(item()["pr"], state="MERGED"))]),
 }
 
 for name, payload in cases.items():
@@ -211,6 +214,7 @@ expect_code() { # expect_code <code> <record> [baseline]
 }
 
 expect_pass "a hygienically closed item is accepted" "$work/clean.json"
+expect_pass "GitHub's canonical casing is read as hygienic" "$work/GITHUB_CASING.json"
 
 # One provoked violation per invariant in the closed vocabulary.
 declare -a provoked=(

@@ -130,6 +130,17 @@ def invariant(code: str) -> Invariant:
         raise KeyError(f"unknown invariant {code!r}; the vocabulary is closed: {known}") from None
 
 
+def _state(item: dict, key: str, default: str = "") -> str:
+    """A state/status value, canonicalised to lowercase.
+
+    GitHub reports its canonical casing (``OPEN``/``CLOSED``/``MERGED``); every
+    comparison in this package is against lowercase. Normalising at the point of
+    comparison rather than trusting the collector means a record can come from
+    anywhere - the collector, a fixture, a journal - and still be read the same.
+    """
+    return str((item or {}).get(key) or default).lower()
+
+
 def owes_closure(item: dict) -> bool:
     """True when the change landed, so the closure invariants apply.
 
@@ -140,9 +151,9 @@ def owes_closure(item: dict) -> bool:
     which is how the first end-to-end run of this module reported OK on an item it
     had not closed at all.
     """
-    if item.get("state") == "closed":
+    if _state(item, "state") == "closed":
         return True
-    return (item.get("pr") or {}).get("state") == "merged"
+    return _state(item.get("pr") or {}, "state") == "merged"
 
 
 def invariants_for(item: dict) -> Iterable[Invariant]:

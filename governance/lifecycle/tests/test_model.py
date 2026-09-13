@@ -76,6 +76,19 @@ def test_a_closed_item_that_never_merged_still_owes_the_closure_invariants():
     assert owes_closure(clean_item(pr={"number": 271, "state": "closed"})) is True
 
 
+def test_github_casing_is_normalised_to_lowercase():
+    """The collector returns OPEN/CLOSED/MERGED; the model must read lowercase.
+
+    This is the bug the second end-to-end run found: GitHub's canonical casing
+    made ``owes_closure`` false for a closed item whose PR was merged, so close-out
+    reported "the change has not landed" on an item it had itself just merged.
+    """
+    landed = clean_item(state="CLOSED", pr={**clean_item()["pr"], "state": "MERGED"})
+    assert owes_closure(landed) is True
+    assert owes_closure(clean_item(state="OPEN", pr={**clean_item()["pr"], "state": "MERGED"})) is True
+    assert owes_closure(clean_item(state="OPEN", pr={})) is False
+
+
 def test_stage_of_an_untouched_item_is_filed():
     assert stage_of(clean_item(state="open", claim={}, pr={}, lane={})) == "filed"
 

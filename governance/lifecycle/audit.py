@@ -104,7 +104,7 @@ def _closure_findings(item: dict) -> list[Finding]:
     # was verified is the tree that landed.
     verified_commit = str(pr.get("head_commit") or "")
 
-    if pr.get("state") != "merged":
+    if str(pr.get("state") or "").lower() != "merged":
         problems.append(
             Finding("PR_NOT_MERGED", subject, f"pull request state is {pr.get('state') or 'unknown'}, not merged")
         )
@@ -153,7 +153,7 @@ def _closure_findings(item: dict) -> list[Finding]:
     if not item.get("closing_evidence", False):
         problems.append(Finding("CLOSING_EVIDENCE_MISSING", subject, "the issue was closed without recorded evidence"))
 
-    if item.get("state") != "closed":
+    if str(item.get("state") or "").lower() != "closed":
         problems.append(
             Finding(
                 "ISSUE_NOT_CLOSED",

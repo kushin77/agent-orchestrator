@@ -177,7 +177,7 @@ def closeout(item: dict, ops: CloseOutOps, evidence: str = "") -> CloseOutResult
         result,
         "close-issue",
         lambda: ops.close_issue(issue, evidence or _default_evidence(issue)),
-        item.get("state") != "closed",
+        str(item.get("state") or "").lower() != "closed",
     )
 
     # 8. reclaim the lane last: a failure above must leave the worktree for the re-run.

@@ -86,6 +86,12 @@ def test_a_closed_item_is_not_charged_with_being_open():
     assert audit_item(clean_item()) == []
 
 
+def test_github_casing_of_state_and_pr_is_read_correctly():
+    """A hygienic item whose state came back from GitHub in canonical casing."""
+    item = clean_item(state="CLOSED", pr={**clean_item()["pr"], "state": "MERGED"})
+    assert audit_item(item) == []
+
+
 def test_an_open_milestoned_item_without_a_declaring_label_is_a_finding():
     item = clean_item(state="open", labels=["enhancement"], pr={}, verify={}, closing_evidence=False)
     findings = audit_item(item)
