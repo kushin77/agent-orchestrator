@@ -325,6 +325,35 @@ def test_listen_prints_a_new_message(tmp_path, monkeypatch):
     assert channel.cmd_listen(args) == EXIT_OK
 
 
+def test_listen_header_shows_when_and_which_issue(tmp_path, monkeypatch, capsys):
+    """A live tail is useless if the brain cannot see the time or the issue."""
+    monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
+    channel._slog(
+        {
+            "type": "directive",
+            "from": "brain",
+            "to": "sister",
+            "correlation_id": "d-9",
+            "task": {"issue": 163},
+            "body": "work it",
+        }
+    )
+    args = type("Args", (), {"timeout_seconds": 0.5, "interval": 0.01, "max_messages": 1, "from_start": True})()
+    assert channel.cmd_listen(args) == EXIT_OK
+    out = capsys.readouterr().out
+    header = [line for line in out.splitlines() if "channel listen:" in line][0]
+    assert "T" in header and header.count(":") >= 3
+    assert "issue 163" in header
+
+
+def test_slog_records_the_task_issue(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
+    channel._slog({"type": "directive", "from": "brain", "task": {"issue": 166}})
+    entry = json.loads(channel.SLOG.read_text(encoding="utf-8").strip())
+    assert entry["issue"] == 166
+    assert entry["ts"]
+
+
 def test_listen_tails_from_now_by_default(tmp_path, monkeypatch, capsys):
     """The brain terminal must show new events, not replay history."""
     monkeypatch.setattr(channel, "SLOG", tmp_path / "slog.jsonl")
