@@ -10,8 +10,9 @@ cd "$root" || exit 1
 cat <<'BANNER'
 ==================================================================
   SISTER — dumb terminal (DeepSeek v4.1 Flash, no thinking)
-  Watches .fleet/inbox forever, executes only brain directives,
-  reports results, escalates problems. Never idles out.
+  Watches .fleet/inbox forever, executes only BRAIN directives,
+  reports results, escalates up to the brain. Never idles out.
+  Orders come from the brain: python3 fleet/channel.py order ...
 ==================================================================
 BANNER
 

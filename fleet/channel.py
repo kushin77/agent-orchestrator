@@ -39,11 +39,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "fleet" / "schema" / "message.schema.json"
 INBOX = ROOT / ".fleet" / "inbox"
+BRAIN_INBOX = ROOT / ".fleet" / "brain" / "inbox"
+BRAIN_OUTBOX = ROOT / ".fleet" / "brain" / "outbox"
+BRAIN_DONE = ROOT / ".fleet" / "brain" / "done"
+BRAIN_SENT = ROOT / ".fleet" / "brain" / "sent"
 SENT = ROOT / ".fleet" / "sent"
 OUTBOX = ROOT / ".fleet" / "outbox"
 DONE = ROOT / ".fleet" / "done"
 SLOG = ROOT / ".fleet" / "slog.jsonl"
 HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
+BRAIN_HEARTBEAT = ROOT / ".fleet" / "brain.heartbeat.json"
 
 # The FinOps vocabulary is harvested, not invented (issue #164) and is declared
 # once in governance/finops/policy.json: tiers from capital-underwriting
@@ -55,7 +60,7 @@ SEVERITIES = ("info", "warn", "critical")
 CONTROL_ACTIONS = ("poke", "refresh", "halt")
 MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
-_ROLE_RE = re.compile(r"^(brain|sister|subagent(-[a-z0-9]+)?)$")
+_ROLE_RE = re.compile(r"^(operator|brain|sister|subagent(-[a-z0-9]+)?)$")
 
 EXIT_OK = 0
 EXIT_NOT_OK = 1
@@ -92,7 +97,7 @@ def validate(message: dict) -> list[str]:
     for field in ("from", "to"):
         value = message.get(field)
         if not isinstance(value, str) or not _ROLE_RE.match(value):
-            problems.append(f"{field} must match brain|sister|subagent(-name)?")
+            problems.append(f"{field} must match operator|brain|sister|subagent(-name)?")
     if "id" in message and (not isinstance(message["id"], str) or not message["id"].strip()):
         problems.append("id must be a non-empty string")
     if "ts" in message and (not isinstance(message["ts"], str) or not _parse_ts(message["ts"])):
@@ -101,23 +106,40 @@ def validate(message: dict) -> list[str]:
         problems.append("correlation_id must be a string")
     if "nonce" in message and (not isinstance(message["nonce"], str) or not message["nonce"].strip()):
         problems.append("nonce must be a non-empty string (the anti-replay token)")
-    if message_type == "directive" and message.get("to") != "sister":
-        problems.append("directives may only be addressed to the sister")
+    if message_type == "directive" and message.get("to") not in ("sister", "brain"):
+        problems.append("directives are addressed to the sister (from the brain) or to the brain (from the operator)")
+    # Hierarchy (contract §4, rule 1b): the operator commands the brain, and the
+    # brain commands the sister. Neither step may be skipped — an operator that
+    # could address the sister directly would make the brain advisory. Reports
+    # and escalations still travel *up* to the brain, so the rule is scoped to
+    # the operator's own traffic and to directives addressed to the brain.
+    if message.get("from") == "operator":
+        if message.get("to") != "brain":
+            problems.append(
+                "the operator does not address the sister: it orders the brain, and the brain orders the sister"
+            )
+        elif message_type != "directive":
+            problems.append("an operator order to the brain must be a directive")
+    if message.get("to") == "brain" and message_type == "directive" and message.get("from") != "operator":
+        problems.append("the brain takes orders only from the operator")
+    if message_type == "directive" and message.get("to") == "sister" and message.get("from") != "brain":
+        problems.append("only the brain may issue directives to the sister")
     if message.get("from") == "sister" and message_type == "directive":
         problems.append("the sister is a dumb terminal: it cannot issue directives")
     if message_type in ("ack", "result") and not message.get("correlation_id"):
         problems.append(f"{message_type} must carry correlation_id (the directive it answers)")
-    if message_type in ("ack", "result") and message.get("from") == "brain":
-        problems.append("the brain does not ack or report on its own directives")
+    if message_type in ("ack", "result") and message.get("from") == "brain" and message.get("to") != "operator":
+        problems.append("the brain does not ack or report on its own directives (only back to the operator)")
     if message_type == "halt" and message.get("from") != "brain":
         problems.append("only the brain may issue a halt")
     if message_type == "escalate":
         if not message.get("correlation_id"):
             problems.append("escalate must carry correlation_id (the directive that hit trouble)")
         if message.get("from") == "brain":
-            problems.append("the brain does not escalate to itself")
-        if message.get("to") != "brain":
-            problems.append("escalations are addressed to the brain")
+            if message.get("to") != "operator":
+                problems.append("a brain escalation is addressed to the operator (the next level up)")
+        elif message.get("to") != "brain":
+            problems.append("escalations go up: subagents and the sister escalate to the brain")
         severity = message.get("severity")
         if severity is not None and severity not in SEVERITIES:
             problems.append(f"severity must be one of {', '.join(SEVERITIES)}")
@@ -301,34 +323,176 @@ def heartbeat_age_seconds(beat: dict, moment: float | None = None) -> float | No
     return (reference - seen).total_seconds()
 
 
-def cmd_status(args: argparse.Namespace) -> int:
-    def count(directory: Path) -> int:
-        return len(list(directory.glob("*.json"))) if directory.exists() else 0
+def running_loop_pids() -> list[int]:
+    """PIDs of live `fleet/terminal.py` loops, to disambiguate NO-HEARTBEAT."""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "fleet/terminal.py"], capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [int(line) for line in result.stdout.split() if line.strip().isdigit()]
 
-    print(f"inbox: {count(INBOX)} pending | sent: {count(SENT)} | outbox: {count(OUTBOX)}")
 
-    beat = read_heartbeat()
+def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -> bool:
+    """Report one rung's liveness and code drift; True when it is live and current.
+
+    Shared by the brain and the sister so neither can be silently absent from
+    `status`, and so a rung running merged-but-unrestarted code is reported as
+    such instead of looking dead.
+    """
+    try:
+        beat = json.loads(heartbeat_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        beat = None
     if beat is None:
-        print("sister: NO HEARTBEAT — the loop is not running (start it: bash fleet/terminal.sh)")
-        return EXIT_NOT_OK
+        try:
+            alive = subprocess.run(
+                ["pgrep", "-f", process], capture_output=True, text=True, timeout=10
+            ).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            alive = False
+        if alive:
+            print(
+                f"{name}: NO HEARTBEAT from a loop that IS running — it is executing a build older "
+                f"than the heartbeat check, so merged fixes are not live. Restart: {start_cmd}"
+            )
+        else:
+            print(f"{name}: NO HEARTBEAT and no process — this rung is down (start: {start_cmd})")
+        return False
 
     age = heartbeat_age_seconds(beat)
     state = beat.get("state", "?")
     if age is None:
-        print(f"sister: heartbeat present (pid {beat.get('pid', '?')}, state {state}) but undated")
-        return EXIT_CANNOT_ASSESS
-
-    running = beat.get("commit", "unknown")
-    current = head_commit()
+        print(f"{name}: heartbeat present (pid {beat.get('pid', '?')}, state {state}) but undated")
+        return False
     verdict = "live" if age <= STALE_HEARTBEAT_SECONDS else f"STALE ({int(age)}s since last beat)"
-    print(f"sister: {verdict} — pid {beat.get('pid', '?')}, state {state}, last beat {int(age)}s ago")
-    print(f"sister: running commit {running} | HEAD {current}")
-    if running != current and current != "unknown":
+    running = str(beat.get("commit", "unknown"))
+    current = head_commit()
+    print(f"{name}: {verdict} — pid {beat.get('pid', '?')}, state {state}, last beat {int(age)}s ago")
+    print(f"{name}: running commit {running} | HEAD {current}")
+    if current != "unknown" and running != current:
         print(
-            f"sister: CODE DRIFT — the loop is running {running}, not HEAD {current}; "
-            "send `control: refresh` (or restart: bash fleet/terminal.sh) to pick up merged fixes"
+            f"{name}: CODE DRIFT — it is running {running}, not HEAD {current}; merged fixes are not "
+            f"live. Restart: {start_cmd}"
         )
+        return False
+    return age <= STALE_HEARTBEAT_SECONDS
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    def count(directory: Path) -> int:
+        return len(list(directory.glob("*.json"))) if directory.exists() else 0
+
+    print(
+        f"inbox: {count(INBOX)} pending | sent: {count(SENT)} | outbox: {count(OUTBOX)}\n"
+        f"brain: {count(BRAIN_INBOX)} order(s) pending | {count(BRAIN_DONE)} dispatched | "
+        f"{count(BRAIN_OUTBOX)} reply(ies)"
+    )
+    brain_ok = report_rung("brain", BRAIN_HEARTBEAT, "fleet/brain.py", "bash fleet/brain.sh")
+    sister_ok = report_rung("sister", HEARTBEAT, "fleet/terminal.py", "bash fleet/terminal.sh")
+    return EXIT_OK if (brain_ok and sister_ok) else EXIT_NOT_OK
+
+
+def cmd_order(args: argparse.Namespace) -> int:
+    """Top of the hierarchy: the operator orders the *brain*, never the sister.
+
+    The operator trigger exists so the chain is real code — operator → brain →
+    sister — rather than a convention the transport cannot enforce. `send` is
+    brain→sister and refuses an operator sender, so this is the only way in.
+    """
+    message = load_message(args.message)
+    message.setdefault("from", "operator")
+    message.setdefault("to", "brain")
+    message.setdefault("type", "directive")
+    problems = validate(message)
+    if problems:
+        print(f"channel order: REFUSED ({len(problems)} violation(s))", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
         return EXIT_NOT_OK
+    if not message.get("id"):
+        message["id"] = str(uuid.uuid4())
+    if not message.get("ts"):
+        message["ts"] = now_iso()
+    if not message.get("nonce"):
+        message["nonce"] = str(uuid.uuid4())
+    conflict = replay_conflict(message)
+    if conflict:
+        print(f"channel order: REFUSED — replay detected ({conflict})", file=sys.stderr)
+        return EXIT_NOT_OK
+    message_id = message["id"]
+    payload = json.dumps(message, indent=2) + "\n"
+    for directory in (BRAIN_SENT, BRAIN_INBOX):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / f"{message_id}.json").write_text(payload, encoding="utf-8")
+    _slog(message)
+    print(f"channel order: OK — {message_id} queued for the brain")
+    return EXIT_OK
+
+
+def cmd_brain_inbox(args: argparse.Namespace) -> int:
+    """The brain's own watch: the oldest order from the operator, if any."""
+    deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
+    while True:
+        pending = sorted(BRAIN_INBOX.glob("*.json")) if BRAIN_INBOX.exists() else []
+        if pending:
+            print(pending[0].read_text(encoding="utf-8"), flush=True)
+            return EXIT_OK
+        if deadline is not None and time.monotonic() >= deadline:
+            print("channel brain-inbox: IDLE — no order", file=sys.stderr)
+            return EXIT_NOT_OK
+        time.sleep(args.interval)
+
+
+def consume_order(message_id: str) -> bool:
+    """The brain has dispatched (or refused) the order: move it to done/."""
+    source = BRAIN_INBOX / f"{message_id}.json"
+    if not source.exists():
+        return False
+    BRAIN_DONE.mkdir(parents=True, exist_ok=True)
+    source.replace(BRAIN_DONE / source.name)
+    return True
+
+
+def brain_reply(order: dict, message_type: str, body: str) -> None:
+    """Answer the operator in the brain outbox — the report the operator reads."""
+    message = {
+        "from": "brain",
+        "to": "operator",
+        "type": message_type,
+        "correlation_id": str(order.get("id") or order.get("correlation_id") or ""),
+        "id": str(uuid.uuid4()),
+        "ts": now_iso(),
+        "nonce": str(uuid.uuid4()),
+        "body": body[:2000],
+    }
+    BRAIN_OUTBOX.mkdir(parents=True, exist_ok=True)
+    (BRAIN_OUTBOX / f"{message['id']}.json").write_text(json.dumps(message, indent=2) + "\n", encoding="utf-8")
+    _slog(message)
+
+
+def cmd_brain_outbox(args: argparse.Namespace) -> int:
+    """Operator side: read the brain's replies (acks and refusals), oldest first."""
+    replies = sorted(BRAIN_OUTBOX.glob("*.json")) if BRAIN_OUTBOX.exists() else []
+    if not replies:
+        print("channel brain-outbox: no replies from the brain yet")
+        return EXIT_NOT_OK
+    for path in replies[-args.limit :] if args.limit else replies:
+        try:
+            message = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"channel brain-outbox: unreadable {path.name}: {exc}", file=sys.stderr)
+            continue
+        print(
+            f"{message.get('ts', '-')} {message.get('type', '-')} "
+            f"(order {message.get('correlation_id', '-')}): {message.get('body', '')}"
+        )
+    return EXIT_OK
+
+
+def cmd_head_commit(args: argparse.Namespace) -> int:
+    print(head_commit())
     return EXIT_OK
 
 
@@ -550,6 +714,22 @@ def build_parser() -> argparse.ArgumentParser:
     listen.add_argument("--max-messages", type=int, default=0)
     listen.add_argument("--from-start", action="store_true", help="replay the whole slog instead of tailing from now")
     listen.set_defaults(func=cmd_listen)
+
+    order = sub.add_parser("order", help="operator side: order the BRAIN (never the sister)")
+    order.add_argument("--message", required=True)
+    order.set_defaults(func=cmd_order)
+
+    brain_inbox = sub.add_parser("brain-inbox", help="brain side: the oldest operator order, or block for one")
+    brain_inbox.add_argument("--timeout-seconds", type=float, default=0.0)
+    brain_inbox.add_argument("--interval", type=float, default=1.0)
+    brain_inbox.set_defaults(func=cmd_brain_inbox)
+
+    brain_outbox = sub.add_parser("brain-outbox", help="operator side: the brain's replies")
+    brain_outbox.add_argument("--limit", type=int, default=10)
+    brain_outbox.set_defaults(func=cmd_brain_outbox)
+
+    head = sub.add_parser("head-commit", help="print the commit a freshly started loop would run")
+    head.set_defaults(func=cmd_head_commit)
     return parser
 
 

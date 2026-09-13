@@ -54,9 +54,10 @@ def test_a_sister_issued_directive_is_refused():
     assert any("cannot issue directives" in problem for problem in problems)
 
 
-def test_a_directive_not_addressed_to_the_sister_is_refused():
+def test_a_directive_the_hierarchy_cannot_carry_is_refused():
+    """A directive reaches the sister (from the brain) or the brain (from the operator)."""
     problems = validate(valid_directive(to="subagent-x"))
-    assert any("only be addressed to the sister" in problem for problem in problems)
+    assert any("addressed to the sister" in problem for problem in problems)
 
 
 def test_a_halting_message_needs_no_task():
@@ -187,51 +188,77 @@ def test_wait_matches_by_correlation_id(tmp_path, monkeypatch):
     assert channel.cmd_wait(args) == EXIT_OK
 
 
-def test_status_reports_liveness_and_a_running_commit(tmp_path, monkeypatch, capsys):
+def _status_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
     monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
     monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "BRAIN_INBOX", tmp_path / "brain" / "inbox")
+    monkeypatch.setattr(channel, "BRAIN_DONE", tmp_path / "brain" / "done")
+    monkeypatch.setattr(channel, "BRAIN_OUTBOX", tmp_path / "brain" / "outbox")
     monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
-    monkeypatch.setattr(channel, "head_commit", lambda: "abc1234")
-    channel.HEARTBEAT.write_text(
-        json.dumps({"pid": 111, "state": "idle", "commit": "abc1234", "ts": channel.now_iso()}),
+    monkeypatch.setattr(channel, "BRAIN_HEARTBEAT", tmp_path / "brain.heartbeat.json")
+
+
+def _beat(path, commit, state="idle"):
+    path.write_text(
+        json.dumps({"pid": 111, "state": state, "commit": commit, "ts": channel.now_iso()}),
         encoding="utf-8",
     )
+
+
+def _pgrep(monkeypatch, running: bool, pid: int = 2492689):
+    class Result:
+        returncode = 0 if running else 1
+        stdout = f"{pid}\n" if running else ""
+        stderr = ""
+
+    monkeypatch.setattr(channel.subprocess, "run", lambda *a, **k: Result())
+
+
+def test_status_reports_liveness_and_a_running_commit(tmp_path, monkeypatch, capsys):
+    _status_paths(monkeypatch, tmp_path)
+    _beat(channel.HEARTBEAT, "abc1234")
+    _beat(channel.BRAIN_HEARTBEAT, "abc1234")
+    monkeypatch.setattr(channel, "head_commit", lambda: "abc1234")
     assert channel.cmd_status(type("Args", (), {})()) == EXIT_OK
     out = capsys.readouterr().out
-    assert "sister: live" in out and "running commit abc1234 | HEAD abc1234" in out
+    assert "sister: live" in out and "brain: live" in out
+    assert "running commit abc1234 | HEAD abc1234" in out
 
 
 def test_status_flags_a_loop_running_stale_code(tmp_path, monkeypatch, capsys):
     """The failure of 2026-09-13: a healthy loop on pre-fix code looked dead."""
-    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
-    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
-    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
-    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    _status_paths(monkeypatch, tmp_path)
+    _beat(channel.HEARTBEAT, "old0000", state="working")
+    _beat(channel.BRAIN_HEARTBEAT, "old0000")
     monkeypatch.setattr(channel, "head_commit", lambda: "beef999")
-    channel.HEARTBEAT.write_text(
-        json.dumps({"pid": 111, "state": "working", "commit": "old0000", "ts": channel.now_iso()}),
-        encoding="utf-8",
-    )
     assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
     assert "CODE DRIFT" in capsys.readouterr().out
 
 
-def test_status_reports_no_heartbeat_as_not_running(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
-    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
-    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
-    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "missing.json")
+def test_status_reports_a_dead_fleet_when_no_rung_is_alive(tmp_path, monkeypatch, capsys):
+    _status_paths(monkeypatch, tmp_path)
+    _pgrep(monkeypatch, running=False)
     assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
-    assert "NO HEARTBEAT" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert out.count("no process") == 2  # both rungs, named
+    assert "brain: NO HEARTBEAT and no process" in out
+
+
+def test_status_distinguishes_a_loop_running_old_code_from_a_dead_fleet(tmp_path, monkeypatch, capsys):
+    """The 2026-09-13 confusion: the loops were alive on pre-fix code, not dead."""
+    _status_paths(monkeypatch, tmp_path)
+    _pgrep(monkeypatch, running=True, pid=2492689)
+    assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
+    out = capsys.readouterr().out
+    assert "IS running" in out
+    assert "older than the heartbeat check" in out
 
 
 def test_status_flags_a_stale_heartbeat(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
-    monkeypatch.setattr(channel, "SENT", tmp_path / "sent")
-    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
-    monkeypatch.setattr(channel, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    _status_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(channel, "head_commit", lambda: "abc1234")
+    _beat(channel.BRAIN_HEARTBEAT, "abc1234")
     stale = datetime.now(timezone.utc) - timedelta(seconds=channel.STALE_HEARTBEAT_SECONDS + 30)
     channel.HEARTBEAT.write_text(
         json.dumps(
@@ -351,11 +378,18 @@ def test_escalate_requires_a_correlation_id():
     assert any("correlation_id" in problem for problem in problems)
 
 
-def test_the_brain_cannot_escalate_to_itself():
+def test_the_brain_escalates_up_to_the_operator_never_sideways():
+    """The brain is not the top of the chain — the operator is."""
     problems = validate(
-        {"from": "brain", "to": "brain", "type": "escalate", "correlation_id": "d-1", "severity": "warn"}
+        {"from": "brain", "to": "sister", "type": "escalate", "correlation_id": "d-1", "severity": "warn"}
     )
-    assert any("does not escalate" in problem for problem in problems)
+    assert any("addressed to the operator" in problem for problem in problems)
+    assert (
+        validate(
+            {"from": "brain", "to": "operator", "type": "escalate", "correlation_id": "d-1", "severity": "warn"}
+        )
+        == []
+    )
 
 
 def test_escalate_with_a_bad_severity_is_refused():
