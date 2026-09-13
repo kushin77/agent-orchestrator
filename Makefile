@@ -15,7 +15,7 @@
 SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
-        shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
+        shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
         issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook knowledge-index knowledge-index-build \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees
@@ -45,6 +45,8 @@ help:
 	@echo ""
 	@echo "Fine-grained checks (used by verify):"
 	@echo "  shell-syntax  bash -n on every *.sh outside vendor/"
+	@echo "  python-syntax py_compile on every tracked *.py outside vendor/ —"
+	@echo "                a syntax-broken fleet module must not pass the gate"
 	@echo "  yaml-lint     Parse every .yml/.yaml outside vendor/ (PyYAML)"
 	@echo "  json-lint     Validate every *.json outside vendor/"
 	@echo "  docs-lint     Foundation files + md links + whitespace + markers"
@@ -96,7 +98,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
