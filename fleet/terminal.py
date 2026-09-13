@@ -270,6 +270,96 @@ HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
 WORKTREE_ROOT = Path(os.environ.get("AO_WORKTREE_ROOT", str(Path.home() / "ao-worktrees")))
 # What the loop is currently executing, so a stop signal can free the claim.
 IN_FLIGHT: dict[str, object] = {"issue": None, "agent_id": None, "directive": None, "child": None}
+# Run registry: who is tracking which directive. Without it a claim's holder is
+# just a string — indistinguishable from an agent that died mid-run, which is how
+# a directive got consumed as "already in-flight" while nothing was running.
+RUNS = ROOT / ".fleet" / "runs"
+REPORTED = ROOT / ".fleet" / "reported"
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def held_action(holder: str | None, agent_id: str, state: str) -> str:
+    """What to do when an issue is already claimed by someone.
+
+    * ``in-flight`` — a tracked run owns it: report it and leave the directive
+      PENDING. Consuming it would erase the only record that the work was
+      ordered, and nobody would ever report the result.
+    * ``self-heal`` — our own run died mid-task (a restart): reap the dead claim
+      and dispatch in the same cycle, because the work was never reported.
+    * ``orphaned`` — someone else's untracked claim: escalate so the brain
+      decides; never consume, never steal.
+    """
+    if state == "live":
+        return "in-flight"
+    if holder is not None and holder == agent_id:
+        return "self-heal"
+    return "orphaned"
+
+
+def mark_run(directive_id: str, issue: int, agent_id: str) -> None:
+    """Record that this loop is tracking a run for a directive."""
+    RUNS.mkdir(parents=True, exist_ok=True)
+    (RUNS / f"{directive_id}.json").write_text(
+        json.dumps({"issue": issue, "agent": agent_id, "pid": os.getpid(), "started_at": _now()}) + "\n",
+        encoding="utf-8",
+    )
+
+
+def clear_run(directive_id: str) -> None:
+    try:
+        (RUNS / f"{directive_id}.json").unlink()
+    except OSError:
+        pass
+
+
+def run_state(directive_id: str) -> str:
+    """'live' (a loop is tracking it), 'orphaned' (nobody is), or 'none'."""
+    marker = RUNS / f"{directive_id}.json"
+    try:
+        record = json.loads(marker.read_text(encoding="utf-8"))
+        pid = int(record.get("pid", 0))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return "none"
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return "orphaned"
+    return "live"
+
+
+def report_once(directive_id: str, key: str, message_type: str, body: str) -> bool:
+    """Say something about a directive once, not once per watch cycle.
+
+    A directive that is left pending is re-read every cycle; without this the
+    loop would repeat the same report forever.
+    """
+    REPORTED.mkdir(parents=True, exist_ok=True)
+    path = REPORTED / f"{directive_id}.json"
+    try:
+        last = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        last = {}
+    if last.get("key") == key:
+        return False
+    path.write_text(json.dumps({"key": key, "at": _now()}) + "\n", encoding="utf-8")
+    if message_type == "result":
+        command = ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                   "--type", "result", "--body", body]
+    else:
+        command = ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                   "--severity", "warn", "--body", body]
+    subprocess.run(command, cwd=ROOT)
+    return True
+
+
+def clear_reported(directive_id: str) -> None:
+    try:
+        (REPORTED / f"{directive_id}.json").unlink()
+    except OSError:
+        pass
 
 
 def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
@@ -413,18 +503,65 @@ def loop(args: argparse.Namespace) -> int:
                 holder = json.loads(held.stdout).get("agent")
             except json.JSONDecodeError:
                 holder = "unknown"
-            print(f"[terminal] #{issue} already held by {holder} — not re-dispatching", flush=True)
-            subprocess.run(
-                ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
-                 "--type", "result", "--body", f"#{issue} already in-flight (held by {holder}) — not re-dispatched"],
-                cwd=ROOT,
-            )
-            if args.once:
-                return 0
-            continue
+            state = run_state(directive_id)
+            action = held_action(holder, agent_id, state)
+            if action == "in-flight":
+                # Someone (another loop) is tracking this run: report it, and leave
+                # the directive PENDING — consuming it would erase the only record
+                # that the work was ordered, and nobody would report its result.
+                print(f"[terminal] #{issue} in flight (held by {holder}, run tracked) — left pending", flush=True)
+                report_once(
+                    directive_id,
+                    key=f"in-flight:{holder}",
+                    message_type="result",
+                    body=f"#{issue} in flight (held by {holder}, run tracked) — directive left pending; "
+                    "the tracking loop reports the result",
+                )
+                if args.once:
+                    return 0
+                continue
+            if action == "self-heal":
+                # Our own orphan: a previous loop of ours was stopped mid-run. The
+                # work was never reported, so self-heal — reap the dead claim, then
+                # dispatch below in this same cycle.
+                print(f"[terminal] #{issue} orphaned by our own dead run — reaping and re-dispatching", flush=True)
+                reap = subprocess.run(
+                    ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "reap",
+                     "--older-than-minutes", "0", "--issue", str(issue), "--reaper", "sister-self-heal"],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                )
+                report_once(
+                    directive_id,
+                    key=f"self-heal:{holder}:{reap.returncode}",
+                    message_type="escalate",
+                    body=f"#{issue} claimed by our own run that no longer exists; reaped "
+                    f"(rc={reap.returncode}) and re-dispatching — the previous run was never reported",
+                )
+                if reap.returncode != 0:
+                    print(f"[terminal] self-heal reap failed: {reap.stdout}{reap.stderr}", file=sys.stderr, flush=True)
+                    if args.once:
+                        return 1
+                    continue
+                clear_reported(directive_id)
+            else:
+                # A claim nobody is tracking, held by someone else: the brain decides.
+                print(f"[terminal] #{issue} held by {holder} with no live run — escalating, left pending", flush=True)
+                report_once(
+                    directive_id,
+                    key=f"orphaned:{holder}",
+                    message_type="escalate",
+                    body=f"#{issue} is held by {holder} but no loop is tracking that run — the claim is "
+                    "orphaned; reap it (dispatch reap) so the directive can be dispatched. Directive left pending.",
+                )
+                if args.once:
+                    return 0
+                continue
 
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
         write_heartbeat("working", started_at=started_at, commit=commit)
+        mark_run(directive_id, issue, agent_id)
         lane = (directive.get("task") or {}).get("lane") or ""
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
@@ -453,6 +590,7 @@ def loop(args: argparse.Namespace) -> int:
             IN_FLIGHT["issue"] = None
             IN_FLIGHT["agent_id"] = None
             IN_FLIGHT["directive"] = None
+            clear_run(directive_id)
             released, release_output = release_issue(issue, agent_id)
             if not released:
                 print(f"[terminal] release of #{issue} FAILED: {release_output}", file=sys.stderr, flush=True)
@@ -465,6 +603,7 @@ def loop(args: argparse.Namespace) -> int:
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
         tail = f"[{where}] {tail}"
         refused = looks_refused(output)
+        clear_reported(directive_id)
         if rc == 0 and not refused:
             subprocess.run(
                 ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
