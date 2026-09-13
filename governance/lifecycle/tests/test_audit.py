@@ -157,6 +157,16 @@ def test_a_closed_item_out_of_scope_never_reaches_the_audit():
     assert in_scope(closed=True) is False
 
 
+def test_a_quarantine_is_honoured_in_whatever_casing_the_tracker_arrives():
+    """The collector returns OPEN/CLOSED; the audit must read lowercase."""
+    item = clean_item(issue=253, state="open", labels=[], milestone="Portal", pr={}, verify={})
+    entry = Quarantine(code="FILING_LABELS_MISSING", subject="#253", tracked_by="#174")
+    report = hygiene(record(item, tracking={"#174": "OPEN"}), [entry])
+    assert report["hygienic"] is True
+    stale = hygiene(record(item, tracking={"#174": "CLOSED"}), [entry])
+    assert [f["code"] for f in stale["findings"]] == ["QUARANTINE_STALE"]
+
+
 def test_a_quarantined_item_is_excused_while_its_tracking_issue_is_open():
     item = clean_item(issue=253, state="open", labels=["enhancement"], milestone="Portal", pr={}, verify={})
     entry = Quarantine(code="FILING_LABELS_MISSING", subject="#253", tracked_by="#174")

@@ -170,6 +170,8 @@ quarantine = {"version": 1, "quarantine": [
 (out / "quarantine.json").write_text(json.dumps(quarantine, indent=2) + "\n", encoding="utf-8")
 (out / "quarantine-live.json").write_text(
     json.dumps(record([legacy], {"#174": "open"}), indent=2) + "\n", encoding="utf-8")
+(out / "quarantine-live-uppercase.json").write_text(
+    json.dumps(record([legacy], {"#174": "OPEN"}), indent=2) + "\n", encoding="utf-8")
 (out / "quarantine-stale.json").write_text(
     json.dumps(record([legacy], {"#174": "closed"}), indent=2) + "\n", encoding="utf-8")
 # A different item breaking the same invariant must NOT be excused.
@@ -238,6 +240,8 @@ expect_code "VERIFY_EVIDENCE_MISSING" "$work/VERIFY_WRONG_COMMIT.json"
 # --- 4. the quarantine excuses legacy, and only while it is tracked ----------
 expect_pass "a quarantined legacy item is excused while its tracker is open" \
   "$work/quarantine-live.json" "$work/quarantine.json"
+expect_pass "a quarantine is honoured in whatever casing the tracker arrives" \
+  "$work/quarantine-live-uppercase.json" "$work/quarantine.json"
 expect_code "QUARANTINE_STALE" "$work/quarantine-stale.json" "$work/quarantine.json"
 expect_code "FILING_LABELS_MISSING" "$work/quarantine-leak.json" "$work/quarantine.json"
 

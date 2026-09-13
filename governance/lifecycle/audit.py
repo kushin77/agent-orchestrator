@@ -204,7 +204,13 @@ def in_scope(
 
 
 def _tracking_state(record: dict, tracked_by: str) -> str:
-    return str((record.get("tracking") or {}).get(tracked_by, "unknown"))
+    """The state of the issue tracking a quarantine entry, lowercased.
+
+    GitHub reports its canonical casing (``OPEN``/``CLOSED``); the quarantine rule
+    compares against lowercase. Normalising here means a record is read the same
+    wherever its tracking map came from.
+    """
+    return str((record.get("tracking") or {}).get(tracked_by, "unknown")).lower()
 
 
 def audit(

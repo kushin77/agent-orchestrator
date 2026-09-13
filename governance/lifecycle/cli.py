@@ -219,7 +219,7 @@ def collect_from_github(root: Path | None = None) -> dict:
     wanted = {entry["tracked_by"] for entry in baseline.get("quarantine", [])}
     for reference in wanted:
         state = next((i["state"] for i in issues if f"#{i['number']}" == reference), "unknown")
-        tracking[reference] = state
+        tracking[reference] = str(state).lower()
 
     return {
         "scope": "fleet-touched items, plus open milestoned items (filing rule)",
