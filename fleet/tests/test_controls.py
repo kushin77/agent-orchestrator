@@ -108,6 +108,39 @@ def test_kill_releases_the_run_before_it_takes_the_loop_down(monkeypatch):
 # --- the control plane: process levers must work while a run blocks ------------
 
 
+def test_pause_holds_work_but_never_controls():
+    """The deadlock found live: a paused loop that stopped reading controls could
+    not be resumed — `resume` sat unread until an operator cleared the flag."""
+    assert terminal.work_held({"id": "d-1", "task": {"issue": 142}}, True) is True
+    assert terminal.work_held({"id": "d-1", "control": "resume"}, True) is False
+    assert terminal.work_held({"id": "d-1", "control": "poke"}, True) is False
+    assert terminal.work_held({"id": "d-1", "task": {"issue": 142}}, False) is False
+
+
+def test_stop_takes_effect_on_an_idle_loop(tmp_path, monkeypatch):
+    """`stop` used to be checked only after a run, so an idle fleet never stopped."""
+    monkeypatch.setattr(terminal, "STOPPING", tmp_path / "stopping")
+    monkeypatch.setattr(terminal, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
+    import singleton
+
+    monkeypatch.setattr(singleton, "FLEET", tmp_path / "singleton")
+    (tmp_path / "stopping").write_text("2026-09-13T00:00:00Z\n", encoding="utf-8")
+    args = type(
+        "Args",
+        (),
+        {
+            "once": True,
+            "watch_timeout": 1.0,
+            "idle_sleep": 0.01,
+            "timeout": 1.0,
+            "runner": "true",
+            "dry_run": True,
+        },
+    )()
+    assert terminal.loop(args) == 0, "an idle loop must honour stop immediately"
+    assert not (tmp_path / "stopping").exists(), "the stop flag is cleared as it is honoured"
+
+
 def test_the_loop_pid_comes_from_the_heartbeat(tmp_path, monkeypatch):
     import control
 
