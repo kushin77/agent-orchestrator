@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -107,19 +108,31 @@ def run_once(
     agent_id: str,
     worktree: Path | None = None,
 ) -> tuple[int, str]:
-    """Run one subagent for one directive; return (exit code, captured output)."""
+    """Run one subagent for one directive; return (exit code, captured output).
+
+    Uses Popen rather than `subprocess.run` so the child is reachable from the
+    stop handler: a stopped loop must take its subagent down with it instead of
+    orphaning it.
+    """
     command = build_command(directive, runner, agent_id, worktree)
     cwd = str(worktree) if worktree is not None else str(ROOT)
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
         return 0, f"DRY-RUN (not executed) in {cwd}"
     try:
-        result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return 124, f"runner timed out after {timeout}s"
+        child = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     except OSError as exc:
         return 127, f"runner could not start in {cwd}: {exc}"
-    return result.returncode, (result.stdout or "") + (result.stderr or "")
+    IN_FLIGHT["child"] = child
+    try:
+        output, _ = child.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        output, _ = child.communicate()
+        return 124, f"runner timed out after {timeout}s: {(output or '')[-400:]}"
+    finally:
+        IN_FLIGHT["child"] = None
+    return child.returncode, output or ""
 
 
 def provision_worktree(issue: int, directive_id: str) -> tuple[Path, str] | None:
@@ -167,8 +180,13 @@ def claim_issue(issue: int, agent_id: str, lane: str, directive_id: str) -> tupl
     return result.returncode == 0, (result.stdout + result.stderr).strip()
 
 
-def release_issue(issue: int, agent_id: str) -> None:
-    subprocess.run(
+def release_issue(issue: int, agent_id: str) -> tuple[bool, str]:
+    """Release a claim; report the outcome rather than swallowing it.
+
+    A silent release failure is how a finished run left #167 held for the next
+    operator to find, so the caller now gets the channel's own words.
+    """
+    result = subprocess.run(
         [
             "python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "release",
             "--issue", str(issue), "--agent", agent_id,
@@ -177,6 +195,42 @@ def release_issue(issue: int, agent_id: str) -> None:
         capture_output=True,
         text=True,
     )
+    return result.returncode == 0, (result.stdout + result.stderr).strip()
+
+
+def stop_and_release(reason: str) -> None:
+    """A stopped loop must not strand its claim: take the subagent down, free it.
+
+    Observed live: restarting the sister loop mid-run killed it before the
+    `finally`, so #167 stayed claimed by an agent that no longer existed — the
+    exact wedge the reap tool exists to clean, recreated by an operator restart.
+    """
+    child = IN_FLIGHT.get("child")
+    if child is not None and child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            child.kill()
+    issue, agent_id, directive_id = IN_FLIGHT.get("issue"), IN_FLIGHT.get("agent_id"), IN_FLIGHT.get("directive")
+    if issue is None or not agent_id:
+        return
+    ok, output = release_issue(issue, agent_id)
+    body = (
+        f"operator stopped the loop mid-run on #{issue} ({reason}); claim released"
+        + (" — re-dispatch is safe" if ok else f" — RELEASE FAILED: {output[-200:]}")
+    )
+    subprocess.run(
+        ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id or "unknown",
+         "--severity", "warn", "--body", body[:2000]],
+        cwd=ROOT,
+    )
+
+
+def handle_stop(signum: int, frame: object) -> None:
+    print(f"[terminal] signal {signum} — releasing the in-flight claim and stopping", flush=True)
+    stop_and_release(f"signal {signum}")
+    raise SystemExit(128 + signum)
 
 
 def directive_issue(directive: dict) -> int | None:
@@ -196,6 +250,8 @@ def looks_refused(output: str) -> bool:
 
 HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
 WORKTREE_ROOT = Path(os.environ.get("AO_WORKTREE_ROOT", str(Path.home() / "ao-worktrees")))
+# What the loop is currently executing, so a stop signal can free the claim.
+IN_FLIGHT: dict[str, object] = {"issue": None, "agent_id": None, "directive": None, "child": None}
 
 
 def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
@@ -218,6 +274,8 @@ def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
 
 
 def loop(args: argparse.Namespace) -> int:
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(signum, handle_stop)
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     commit = subprocess.run(
         ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
@@ -321,6 +379,9 @@ def loop(args: argparse.Namespace) -> int:
             continue
 
         agent_id = f"subagent-{directive_id[:8]}"
+        IN_FLIGHT["issue"] = issue
+        IN_FLIGHT["agent_id"] = agent_id
+        IN_FLIGHT["directive"] = directive_id
         held = subprocess.run(
             ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
             cwd=ROOT,
@@ -369,7 +430,17 @@ def loop(args: argparse.Namespace) -> int:
         try:
             rc, output = run_once(directive, args.runner, args.timeout, args.dry_run, agent_id, worktree)
         finally:
-            release_issue(issue, agent_id)
+            IN_FLIGHT["issue"] = None
+            IN_FLIGHT["agent_id"] = None
+            IN_FLIGHT["directive"] = None
+            released, release_output = release_issue(issue, agent_id)
+            if not released:
+                print(f"[terminal] release of #{issue} FAILED: {release_output}", file=sys.stderr, flush=True)
+                subprocess.run(
+                    ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                     "--severity", "warn", "--body", f"release of #{issue} failed: {release_output[-400:]}"],
+                    cwd=ROOT,
+                )
         where = f"worktree {worktree}" if worktree else "shared checkout"
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
         tail = f"[{where}] {tail}"
