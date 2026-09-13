@@ -1,0 +1,88 @@
+{
+    "escalated_count": 0,
+    "generated_at": "2026-09-13T20:18:49Z",
+    "issue_count": 3,
+    "issues": [
+        {
+            "code": "class-expectation-unmet",
+            "corrective_steps": [
+                "add the label, or lower the declared class to match what the work actually meets"
+            ],
+            "escalate": false,
+            "evidence": [
+                "issue #143 is class 'elite', which expects a `pillar:` label (declared-vs-actual mismatch)"
+            ],
+            "key": "class-expectation-unmet:issue-143",
+            "labels": [
+                "remediation:auto",
+                "severity:medium",
+                "lane:governance",
+                "scope:repo"
+            ],
+            "occurrences": 1,
+            "owner_lane": "governance",
+            "policy_ref": "governance/conformance/policy.yaml",
+            "repo": "kushin77/agent-orchestrator",
+            "scope": "repo",
+            "severity": "medium",
+            "sla_hours": 168,
+            "subject": "issue-143",
+            "title": "[remediation] class-expectation-unmet: issue-143"
+        },
+        {
+            "code": "class-expectation-unmet",
+            "corrective_steps": [
+                "add the label, or lower the declared class to match what the work actually meets"
+            ],
+            "escalate": false,
+            "evidence": [
+                "issue #150 is class 'elite', which expects a `pillar:` label (declared-vs-actual mismatch)"
+            ],
+            "key": "class-expectation-unmet:issue-150",
+            "labels": [
+                "remediation:auto",
+                "severity:medium",
+                "lane:governance",
+                "scope:repo"
+            ],
+            "occurrences": 1,
+            "owner_lane": "governance",
+            "policy_ref": "governance/conformance/policy.yaml",
+            "repo": "kushin77/agent-orchestrator",
+            "scope": "repo",
+            "severity": "medium",
+            "sla_hours": 168,
+            "subject": "issue-150",
+            "title": "[remediation] class-expectation-unmet: issue-150"
+        },
+        {
+            "code": "scope-mismatch",
+            "corrective_steps": [
+                "run with --include-unmilestoned to bring them into scope"
+            ],
+            "escalate": false,
+            "evidence": [
+                "15 open issue(s) carry no milestone and were not classified in this run"
+            ],
+            "key": "scope-mismatch:scope",
+            "labels": [
+                "remediation:auto",
+                "severity:medium",
+                "lane:governance",
+                "scope:repo"
+            ],
+            "occurrences": 1,
+            "owner_lane": "governance",
+            "policy_ref": "governance/conformance/policy.yaml",
+            "repo": "kushin77/agent-orchestrator",
+            "scope": "repo",
+            "severity": "medium",
+            "sla_hours": 168,
+            "subject": "scope",
+            "title": "[remediation] scope-mismatch: scope"
+        }
+    ],
+    "scanned": 13,
+    "schema": "cmr.remediation/report-v1",
+    "scope": "open+milestoned"
+}

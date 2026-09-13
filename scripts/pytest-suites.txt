@@ -65,4 +65,5 @@ e2e
 governance/sync
 infra/rollout
 governance/lessons
+governance/remediation
 scripts
