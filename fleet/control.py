@@ -10,6 +10,7 @@ stopping it:
     python3 fleet/control.py halt       # stop the sister loop cleanly
     python3 fleet/control.py debug      # full non-destructive state dump
     python3 fleet/control.py watch      # idle-watch the slog (same as listen)
+    python3 fleet/control.py health     # tri-state signal: 0 healthy/1 degraded/2 failing
 
 Roles (see fleet/directive.json): the sister is a dumb terminal (DeepSeek v4.1
 Flash, no thinking); the brain is DSv4PM with human override; THIS terminal is
@@ -105,6 +106,13 @@ def cmd_watch(args: argparse.Namespace) -> int:
     return subprocess.call(["python3", CHANNEL, "listen", "--timeout-seconds", "0"], cwd=ROOT)
 
 
+def cmd_health(args: argparse.Namespace) -> int:
+    return subprocess.call(
+        ["python3", str(ROOT / "fleet" / "health.py"), "check", "--stale-minutes", str(args.stale_minutes)],
+        cwd=ROOT,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-control", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -115,10 +123,13 @@ def build_parser() -> argparse.ArgumentParser:
         ("halt", cmd_halt),
         ("debug", cmd_debug),
         ("watch", cmd_watch),
+        ("health", cmd_health),
     ):
         sub.add_parser(name, help=f"control.{name}").set_defaults(func=func)
     debug = sub.choices["debug"]
     debug.add_argument("--tail", type=int, default=20)
+    health = sub.choices["health"]
+    health.add_argument("--stale-minutes", type=float, default=30.0)
     return parser
 
 
