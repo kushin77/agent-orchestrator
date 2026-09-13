@@ -66,6 +66,65 @@ def test_a_drifted_idle_sister_is_respawned(monkeypatch):
     assert calls == ["fleet/terminal.sh"]
 
 
+# --- the monitor rung ---------------------------------------------------------
+
+
+def test_monitor_missing_reflects_process_presence(monkeypatch):
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    assert watchdog.monitor_missing() is True
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 123)
+    assert watchdog.monitor_missing() is False
+
+
+def test_start_monitor_spawns_a_detached_python_process(monkeypatch):
+    calls = []
+
+    def fake_popen(*args, **kwargs):
+        calls.append((args, kwargs))
+        return type("Proc", (), {"pid": 999})()
+
+    monkeypatch.setattr(watchdog.subprocess, "Popen", fake_popen)
+    assert watchdog.start_monitor() is True
+    assert calls and "fleet/monitor.py" in str(calls[0][0][0])
+
+
+def test_start_monitor_reports_failure_when_spawn_fails(monkeypatch):
+    def boom(*args, **kwargs):
+        raise OSError("spawn denied")
+
+    monkeypatch.setattr(watchdog.subprocess, "Popen", boom)
+    assert watchdog.start_monitor() is False
+
+
+def test_watchdog_once_ensures_a_missing_monitor_is_respawned(monkeypatch, capsys):
+    monkeypatch.setattr(watchdog.channel, "head_commit", lambda: "head1111")
+    monkeypatch.setattr(watchdog, "rung_action", lambda *a, **k: "healthy")
+    monkeypatch.setattr(watchdog, "monitor_missing", lambda: True)
+    monkeypatch.setattr(watchdog, "start_monitor", lambda: True)
+    assert watchdog.watchdog_once() == 0
+    assert "monitor: missing — respawned" in capsys.readouterr().out
+
+
+def test_watchdog_once_reports_a_failed_monitor_respawn(monkeypatch, capsys):
+    monkeypatch.setattr(watchdog.channel, "head_commit", lambda: "head1111")
+    monkeypatch.setattr(watchdog, "rung_action", lambda *a, **k: "healthy")
+    monkeypatch.setattr(watchdog, "monitor_missing", lambda: True)
+    monkeypatch.setattr(watchdog, "start_monitor", lambda: False)
+    assert watchdog.watchdog_once() == 1
+    assert "RESPAWN FAILED" in capsys.readouterr().out
+
+
+def test_watchdog_once_leaves_a_present_monitor_alone(monkeypatch, capsys):
+    monkeypatch.setattr(watchdog.channel, "head_commit", lambda: "head1111")
+    monkeypatch.setattr(watchdog, "rung_action", lambda *a, **k: "healthy")
+    monkeypatch.setattr(watchdog, "monitor_missing", lambda: False)
+    monkeypatch.setattr(
+        watchdog, "start_monitor", lambda: (_ for _ in ()).throw(AssertionError("must not start"))
+    )
+    assert watchdog.watchdog_once() == 0
+    assert "monitor: healthy" in capsys.readouterr().out
+
+
 # --- the crontab manager ------------------------------------------------------
 
 
