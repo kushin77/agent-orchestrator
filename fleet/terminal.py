@@ -570,6 +570,10 @@ def loop(args: argparse.Namespace) -> int:
             write_heartbeat("stopped", started_at=started_at, commit=commit)
             print("[terminal] control:stop — stopping the loop cleanly", flush=True)
             return 0
+        if paused():
+            write_heartbeat("paused", started_at=started_at, commit=commit)
+        else:
+            write_heartbeat("idle", started_at=started_at, commit=commit)
         watch = subprocess.run(
             ["python3", CHANNEL, "watch", "--timeout-seconds", str(args.watch_timeout), "--interval", "1"],
             cwd=ROOT,
