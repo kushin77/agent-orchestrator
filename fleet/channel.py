@@ -29,6 +29,7 @@ import fcntl
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import uuid
@@ -42,6 +43,7 @@ SENT = ROOT / ".fleet" / "sent"
 OUTBOX = ROOT / ".fleet" / "outbox"
 DONE = ROOT / ".fleet" / "done"
 SLOG = ROOT / ".fleet" / "slog.jsonl"
+HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
 
 # The FinOps vocabulary is harvested, not invented (issue #164) and is declared
 # once in governance/finops/policy.json: tiers from capital-underwriting
@@ -58,6 +60,10 @@ _ROLE_RE = re.compile(r"^(brain|sister|subagent(-[a-z0-9]+)?)$")
 EXIT_OK = 0
 EXIT_NOT_OK = 1
 EXIT_CANNOT_ASSESS = 2
+
+# A beat older than this means the loop died rather than that it is busy: the
+# loop beats every poll cycle (default 30s) and before each directive.
+STALE_HEARTBEAT_SECONDS = 120
 
 
 def now_iso() -> str:
@@ -262,11 +268,67 @@ def cmd_send(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def head_commit() -> str:
+    """The current HEAD sha — what a freshly started loop would be running."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return result.stdout.strip() or "unknown"
+
+
+def read_heartbeat() -> dict | None:
+    try:
+        return json.loads(HEARTBEAT.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def heartbeat_age_seconds(beat: dict, moment: float | None = None) -> float | None:
+    stamp = beat.get("ts")
+    if not stamp:
+        return None
+    try:
+        seen = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    reference = datetime.fromtimestamp(moment, tz=timezone.utc) if moment is not None else datetime.now(timezone.utc)
+    return (reference - seen).total_seconds()
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     def count(directory: Path) -> int:
         return len(list(directory.glob("*.json"))) if directory.exists() else 0
 
     print(f"inbox: {count(INBOX)} pending | sent: {count(SENT)} | outbox: {count(OUTBOX)}")
+
+    beat = read_heartbeat()
+    if beat is None:
+        print("sister: NO HEARTBEAT — the loop is not running (start it: bash fleet/terminal.sh)")
+        return EXIT_NOT_OK
+
+    age = heartbeat_age_seconds(beat)
+    state = beat.get("state", "?")
+    if age is None:
+        print(f"sister: heartbeat present (pid {beat.get('pid', '?')}, state {state}) but undated")
+        return EXIT_CANNOT_ASSESS
+
+    running = beat.get("commit", "unknown")
+    current = head_commit()
+    verdict = "live" if age <= STALE_HEARTBEAT_SECONDS else f"STALE ({int(age)}s since last beat)"
+    print(f"sister: {verdict} — pid {beat.get('pid', '?')}, state {state}, last beat {int(age)}s ago")
+    print(f"sister: running commit {running} | HEAD {current}")
+    if running != current and current != "unknown":
+        print(
+            f"sister: CODE DRIFT — the loop is running {running}, not HEAD {current}; "
+            "send `control: refresh` (or restart: bash fleet/terminal.sh) to pick up merged fixes"
+        )
+        return EXIT_NOT_OK
     return EXIT_OK
 
 
