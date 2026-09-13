@@ -146,17 +146,28 @@ def validate(message: dict) -> list[str]:
     return problems
 
 
-def load_message(path: Path | str) -> dict:
-    target = Path(path)
-    try:
-        raw = target.read_text(encoding="utf-8")
-    except OSError as exc:
-        print(f"channel: CANNOT-ASSESS — cannot read {target}: {exc}", file=sys.stderr)
-        raise SystemExit(EXIT_CANNOT_ASSESS)
+def load_message(source: Path | str) -> dict:
+    """Accept a path to a JSON file *or* inline JSON.
+
+    The brain is a live terminal, so forcing it to write a temp file for every
+    directive is pure friction — and a bare JSON argument was previously read as
+    a filename (``File name too long``). Inline JSON is the natural form.
+    """
+    text = str(source)
+    if text.lstrip().startswith("{"):
+        raw, label = text, "<inline message>"
+    else:
+        target = Path(text)
+        label = str(target)
+        try:
+            raw = target.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"channel: CANNOT-ASSESS — cannot read {target}: {exc}", file=sys.stderr)
+            raise SystemExit(EXIT_CANNOT_ASSESS)
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
-        print(f"channel: CANNOT-ASSESS — {target} is not valid JSON: {exc.msg}", file=sys.stderr)
+        print(f"channel: CANNOT-ASSESS — {label} is not valid JSON: {exc.msg}", file=sys.stderr)
         raise SystemExit(EXIT_CANNOT_ASSESS)
     return data
 

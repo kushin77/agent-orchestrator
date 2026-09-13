@@ -41,7 +41,7 @@ ships — that graduation is a transport swap, not a rewrite of the contract.
    `fleet/channel.py` plus the executor from issue #163.
 
 Everything after step 2 is code: the brain sends directives with
-`python3 fleet/channel.py send --message <file>`, the sister acknowledges into
+`python3 fleet/channel.py send --message <file-or-inline-json>`, the sister acknowledges into
 `.fleet/outbox`, subagents work the issue (subject to the claim rules in
 `governance/dispatch/`), and evidence returns the same way.
 
@@ -80,6 +80,9 @@ The brain never spins a session on a task. It pushes, blocks, and wakes:
 # brain
 python3 fleet/channel.py send --message /tmp/directive.json      # prints the message id
 python3 fleet/channel.py wait --id <id> --timeout-seconds 600    # blocks
+
+# `--message` also takes inline JSON, so a live terminal needs no temp file:
+python3 fleet/channel.py send --message '{"from":"brain","to":"sister","type":"directive","correlation_id":"x","task":{"issue":5}}'
 
 # executor (sister / subagent), the moment the task is done:
 python3 fleet/channel.py report --from sister --correlation <id> --type result --body "merged #171"
