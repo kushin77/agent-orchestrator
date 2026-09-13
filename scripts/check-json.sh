@@ -17,11 +17,7 @@ while IFS= read -r f; do
     printf '  FAIL  %s\n' "$f" >&2
     failed=$((failed + 1))
   fi
-done < <(find . -type f -name '*.json' \
-  -not -path './.git/*' \
-  -not -path './vendor/*' \
-  -not -path './.research/*' \
-  | LC_ALL=C sort)
+done < <(git ls-files '*.json' | grep -v '^vendor/' || true)
 
 if [ "$failed" -ne 0 ]; then
   printf 'json: %s of %s file(s) FAILED\n' "$failed" "$count" >&2

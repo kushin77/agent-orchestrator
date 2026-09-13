@@ -306,12 +306,20 @@ def agent_id_for(directive_id: str) -> str:
 
 
 def mark_run(directive_id: str, issue: int, agent_id: str) -> None:
-    """Record that this loop is tracking a run for a directive."""
+    """Record that this loop is tracking a run for a directive.
+
+    Written atomically (tmp + rename): readers outside the loop (the JSON gate,
+    the brain, an operator) can otherwise catch a torn file mid-write — which is
+    exactly how it was caught, by `json-lint` reading a half-written registry.
+    """
     RUNS.mkdir(parents=True, exist_ok=True)
-    (RUNS / f"{directive_id}.json").write_text(
+    target = RUNS / f"{directive_id}.json"
+    tmp = target.with_suffix(".tmp")
+    tmp.write_text(
         json.dumps({"issue": issue, "agent": agent_id, "pid": os.getpid(), "started_at": _now()}) + "\n",
         encoding="utf-8",
     )
+    tmp.replace(target)
 
 
 def clear_run(directive_id: str) -> None:
@@ -427,7 +435,10 @@ def apply_control(action: str, directive: dict, agent_id: str) -> str:
         return "dispatch-override"
     if action in ("refresh", "restart", "halt"):
         return action
-    return "continue"
+    # Anything else cannot be handled by this build; the caller escalates ONCE and
+    # consumes it. Measured: a control the loop did not understand stayed in the
+    # inbox and was re-read every cycle, escalating hundreds of times a second.
+    return "unknown"
 
 
 def write_heartbeat(
@@ -608,6 +619,25 @@ def loop(args: argparse.Namespace) -> int:
 
             verdict = apply_control(control, directive, agent_id_for(directive_id))
             print(f"[terminal] control:{control} — {verdict}", flush=True)
+            if verdict == "unknown":
+                # Poison message: this build cannot execute it, and re-reading it
+                # cannot change that. Say so once, then consume it.
+                report_once(
+                    directive_id,
+                    key=f"unknown-control:{control}",
+                    message_type="escalate",
+                    body=f"unknown control action '{control}' — not in this build's vocabulary; consumed "
+                    "so it cannot loop",
+                )
+                subprocess.run(
+                    ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                     "--type", "result", "--body", f"control '{control}' is not in this build's vocabulary; "
+                     "escalated once and consumed (a message that can never be handled must not be re-read)"],
+                    cwd=ROOT,
+                )
+                if args.once:
+                    return 1
+                continue
             if verdict == "kill":
                 subprocess.run(
                     ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
@@ -763,7 +793,8 @@ def loop(args: argparse.Namespace) -> int:
         write_heartbeat("working", started_at=started_at, commit=commit, issue=issue, agent=agent_id)
         mark_run(directive_id, issue, agent_id)
         beater = start_beating(started_at, commit, issue, agent_id)
-        lane = (directive.get("task") or {}).get("lane") or ""        claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
+        lane = (directive.get("task") or {}).get("lane") or ""
+        claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
             print(f"[terminal] claim refused for #{issue}: {claim_output}", file=sys.stderr, flush=True)
             subprocess.run(

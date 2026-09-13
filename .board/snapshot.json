@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T20:01:00Z",
+  "generated_at": "2026-09-13T20:24:11Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -9,7 +9,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-01-28T21:54:20Z"
     },
     {
       "number": 2,
@@ -18,7 +19,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-01-28T21:54:19Z"
     },
     {
       "number": 3,
@@ -27,7 +29,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T23:48:46Z"
     },
     {
       "number": 4,
@@ -42,7 +45,8 @@
         "type:epic"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T23:48:45Z"
     },
     {
       "number": 5,
@@ -57,7 +61,8 @@
         "type:task"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T17:42:07Z"
     },
     {
       "number": 6,
@@ -72,7 +77,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T17:54:47Z"
     },
     {
       "number": 7,
@@ -87,7 +93,8 @@
         "type:task"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T17:48:39Z"
     },
     {
       "number": 8,
@@ -102,7 +109,8 @@
         "type:task"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T17:37:50Z"
     },
     {
       "number": 9,
@@ -117,7 +125,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:10:58Z"
     },
     {
       "number": 10,
@@ -132,7 +141,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:27:56Z"
     },
     {
       "number": 11,
@@ -147,7 +157,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:28:40Z"
     },
     {
       "number": 12,
@@ -162,7 +173,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:10:20Z"
     },
     {
       "number": 13,
@@ -177,7 +189,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:10:28Z"
     },
     {
       "number": 14,
@@ -192,7 +205,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:33:42Z"
     },
     {
       "number": 15,
@@ -207,7 +221,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:50:50Z"
     },
     {
       "number": 16,
@@ -222,7 +237,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T19:16:32Z"
     },
     {
       "number": 17,
@@ -237,7 +253,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:49:12Z"
     },
     {
       "number": 18,
@@ -252,7 +269,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T19:06:23Z"
     },
     {
       "number": 19,
@@ -267,7 +285,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:51:18Z"
     },
     {
       "number": 20,
@@ -282,7 +301,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T19:09:07Z"
     },
     {
       "number": 21,
@@ -297,7 +317,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T19:35:18Z"
     },
     {
       "number": 22,
@@ -312,7 +333,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T19:29:09Z"
     },
     {
       "number": 23,
@@ -327,7 +349,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T19:55:53Z"
     },
     {
       "number": 24,
@@ -342,7 +365,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T20:05:14Z"
     },
     {
       "number": 25,
@@ -357,7 +381,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T19:33:22Z"
     },
     {
       "number": 26,
@@ -372,7 +397,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T20:22:06Z"
     },
     {
       "number": 27,
@@ -387,7 +413,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T20:22:25Z"
     },
     {
       "number": 28,
@@ -402,7 +429,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T20:23:58Z"
     },
     {
       "number": 29,
@@ -417,7 +445,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T21:01:35Z"
     },
     {
       "number": 30,
@@ -432,7 +461,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T20:48:37Z"
     },
     {
       "number": 31,
@@ -447,7 +477,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T21:20:01Z"
     },
     {
       "number": 32,
@@ -462,7 +493,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T21:25:03Z"
     },
     {
       "number": 33,
@@ -477,7 +509,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T21:40:45Z"
     },
     {
       "number": 34,
@@ -492,7 +525,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T21:59:49Z"
     },
     {
       "number": 35,
@@ -507,7 +541,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T22:03:17Z"
     },
     {
       "number": 36,
@@ -522,7 +557,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T21:54:25Z"
     },
     {
       "number": 37,
@@ -537,7 +573,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T22:18:18Z"
     },
     {
       "number": 38,
@@ -552,7 +589,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T22:26:36Z"
     },
     {
       "number": 39,
@@ -567,7 +605,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T22:47:46Z"
     },
     {
       "number": 40,
@@ -582,7 +621,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T22:43:37Z"
     },
     {
       "number": 41,
@@ -597,7 +637,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T22:49:27Z"
     },
     {
       "number": 42,
@@ -612,7 +653,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T23:02:03Z"
     },
     {
       "number": 43,
@@ -627,7 +669,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T23:03:29Z"
     },
     {
       "number": 44,
@@ -642,7 +685,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T23:24:50Z"
     },
     {
       "number": 45,
@@ -657,7 +701,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T23:22:20Z"
     },
     {
       "number": 46,
@@ -672,7 +717,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T23:46:12Z"
     },
     {
       "number": 47,
@@ -687,7 +733,8 @@
         "type:spike"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T22:59:56Z"
     },
     {
       "number": 48,
@@ -702,7 +749,8 @@
         "type:spike"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:26:58Z"
     },
     {
       "number": 49,
@@ -717,7 +765,8 @@
         "type:spike"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T18:07:19Z"
     },
     {
       "number": 58,
@@ -732,7 +781,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-08T20:42:58Z"
     },
     {
       "number": 98,
@@ -744,7 +794,8 @@
         "vendor:onboarding"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-09T00:12:24Z"
     },
     {
       "number": 101,
@@ -756,7 +807,8 @@
         "type:epic"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:05Z"
     },
     {
       "number": 102,
@@ -768,7 +820,8 @@
         "type:epic"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:07Z"
     },
     {
       "number": 103,
@@ -780,7 +833,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:09Z"
     },
     {
       "number": 104,
@@ -792,7 +846,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:11Z"
     },
     {
       "number": 105,
@@ -804,7 +859,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:13Z"
     },
     {
       "number": 106,
@@ -816,7 +872,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:15Z"
     },
     {
       "number": 107,
@@ -828,7 +885,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:17Z"
     },
     {
       "number": 108,
@@ -840,7 +898,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:20Z"
     },
     {
       "number": 109,
@@ -852,7 +911,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:37:22Z"
     },
     {
       "number": 110,
@@ -864,7 +924,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:13Z"
     },
     {
       "number": 111,
@@ -876,7 +937,8 @@
         "type:epic"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:15Z"
     },
     {
       "number": 112,
@@ -888,7 +950,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:17Z"
     },
     {
       "number": 113,
@@ -900,7 +963,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:19Z"
     },
     {
       "number": 114,
@@ -912,7 +976,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:21Z"
     },
     {
       "number": 115,
@@ -924,7 +989,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:23Z"
     },
     {
       "number": 116,
@@ -936,7 +1002,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:25Z"
     },
     {
       "number": 117,
@@ -948,7 +1015,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:27Z"
     },
     {
       "number": 118,
@@ -960,7 +1028,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:29Z"
     },
     {
       "number": 119,
@@ -972,7 +1041,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T13:50:31Z"
     },
     {
       "number": 120,
@@ -981,7 +1051,8 @@
       "milestone": "KB + Module Health",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T15:44:30Z"
     },
     {
       "number": 121,
@@ -990,7 +1061,8 @@
       "milestone": "Shared-Frontend Portal + UI",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T15:44:32Z"
     },
     {
       "number": 122,
@@ -999,7 +1071,8 @@
       "milestone": "KB + Module Health",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T15:49:23Z"
     },
     {
       "number": 123,
@@ -1008,7 +1081,8 @@
       "milestone": "Shared-Frontend Portal + UI",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T15:49:26Z"
     },
     {
       "number": 124,
@@ -1017,7 +1091,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T15:49:28Z"
     },
     {
       "number": 125,
@@ -1026,7 +1101,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 126,
@@ -1035,7 +1111,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 127,
@@ -1044,7 +1121,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 128,
@@ -1053,7 +1131,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 129,
@@ -1062,7 +1141,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 130,
@@ -1071,7 +1151,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 131,
@@ -1080,7 +1161,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 132,
@@ -1089,7 +1171,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 133,
@@ -1098,7 +1181,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 134,
@@ -1107,7 +1191,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 135,
@@ -1116,7 +1201,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 136,
@@ -1125,7 +1211,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 137,
@@ -1134,7 +1221,8 @@
       "milestone": "",
       "labels": [],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 138,
@@ -1150,7 +1238,8 @@
         "type:epic"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 139,
@@ -1165,7 +1254,8 @@
         "type:feature"
       ],
       "parent": 138,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T18:02:43Z"
     },
     {
       "number": 140,
@@ -1182,7 +1272,8 @@
       "parent": 138,
       "blocked_by": [
         139
-      ]
+      ],
+      "closed_at": "2026-09-13T18:14:23Z"
     },
     {
       "number": 141,
@@ -1198,7 +1289,8 @@
         "type:feature"
       ],
       "parent": 138,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T19:18:48Z"
     },
     {
       "number": 142,
@@ -1215,7 +1307,8 @@
       "parent": 138,
       "blocked_by": [
         140
-      ]
+      ],
+      "closed_at": ""
     },
     {
       "number": 143,
@@ -1232,7 +1325,8 @@
       "parent": 138,
       "blocked_by": [
         142
-      ]
+      ],
+      "closed_at": ""
     },
     {
       "number": 144,
@@ -1248,7 +1342,8 @@
         "type:epic"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 145,
@@ -1264,7 +1359,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 146,
@@ -1279,7 +1375,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 147,
@@ -1295,7 +1392,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 148,
@@ -1311,7 +1409,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T17:41:21Z"
     },
     {
       "number": 149,
@@ -1327,7 +1426,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 150,
@@ -1342,7 +1442,8 @@
         "type:governance"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 151,
@@ -1357,7 +1458,8 @@
         "type:feature"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 152,
@@ -1373,7 +1475,8 @@
         "type:governance"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T17:36:29Z"
     },
     {
       "number": 154,
@@ -1389,7 +1492,8 @@
         "type:governance"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T17:38:50Z"
     },
     {
       "number": 157,
@@ -1405,7 +1509,8 @@
         "type:governance"
       ],
       "parent": 144,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T17:50:06Z"
     },
     {
       "number": 160,
@@ -1422,7 +1527,8 @@
         "type:epic"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 161,
@@ -1438,7 +1544,8 @@
         "type:governance"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T19:19:52Z"
     },
     {
       "number": 162,
@@ -1454,7 +1561,8 @@
         "type:feature"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T18:08:14Z"
     },
     {
       "number": 163,
@@ -1469,7 +1577,8 @@
         "type:feature"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T19:39:55Z"
     },
     {
       "number": 164,
@@ -1485,7 +1594,8 @@
         "type:feature"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T19:21:29Z"
     },
     {
       "number": 165,
@@ -1501,7 +1611,8 @@
         "type:feature"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T19:22:30Z"
     },
     {
       "number": 166,
@@ -1516,7 +1627,8 @@
         "type:governance"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T19:46:39Z"
     },
     {
       "number": 167,
@@ -1532,7 +1644,8 @@
         "type:feature"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": "2026-09-13T19:53:29Z"
     },
     {
       "number": 170,
@@ -1547,7 +1660,8 @@
         "type:governance"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 171,
@@ -1565,7 +1679,8 @@
       "parent": 160,
       "blocked_by": [
         162
-      ]
+      ],
+      "closed_at": "2026-09-13T18:14:12Z"
     },
     {
       "number": 174,
@@ -1580,7 +1695,8 @@
         "type:governance"
       ],
       "parent": null,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 175,
@@ -1598,7 +1714,8 @@
       "parent": 160,
       "blocked_by": [
         171
-      ]
+      ],
+      "closed_at": "2026-09-13T18:24:57Z"
     },
     {
       "number": 178,
@@ -1617,7 +1734,8 @@
       "parent": 160,
       "blocked_by": [
         171
-      ]
+      ],
+      "closed_at": "2026-09-13T18:41:19Z"
     },
     {
       "number": 180,
@@ -1633,7 +1751,8 @@
         "type:governance"
       ],
       "parent": 160,
-      "blocked_by": []
+      "blocked_by": [],
+      "closed_at": ""
     },
     {
       "number": 181,
@@ -1652,7 +1771,8 @@
       "parent": 160,
       "blocked_by": [
         180
-      ]
+      ],
+      "closed_at": ""
     },
     {
       "number": 184,
@@ -1670,7 +1790,8 @@
       "parent": 160,
       "blocked_by": [
         175
-      ]
+      ],
+      "closed_at": "2026-09-13T19:08:57Z"
     },
     {
       "number": 186,
@@ -1688,7 +1809,8 @@
       "parent": 160,
       "blocked_by": [
         175
-      ]
+      ],
+      "closed_at": "2026-09-13T19:15:07Z"
     },
     {
       "number": 190,
@@ -1706,7 +1828,44 @@
       "parent": 160,
       "blocked_by": [
         186
-      ]
+      ],
+      "closed_at": "2026-09-13T19:26:47Z"
+    },
+    {
+      "number": 218,
+      "title": "fleet terminal: honour the FinOps block \u2014 tier/thinking must select the real runner",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 219,
+      "title": "fleet terminal: per-run telemetry (duration, tier, model, rc, PR) aligned with fleet metering",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 220,
+      "title": "fleet terminal: dispatch a context pack (issue, lane, acceptance, prior lessons) not just an order string",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
     }
   ]
 }

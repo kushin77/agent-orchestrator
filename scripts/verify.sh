@@ -25,6 +25,7 @@ results_tsv="$verify_dir/.results.tsv"
 # name|command — every command is an honest gate (real exit code, can fail).
 checks=(
   'shell-syntax|bash scripts/check-shell-syntax.sh'
+  'python-syntax|bash scripts/check-python-syntax.sh'
   'yaml-lint|python3 scripts/check-yaml.py'
   'json-lint|bash scripts/check-json.sh'
   'docs-lint|bash scripts/check-docs.sh'
