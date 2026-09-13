@@ -16,8 +16,8 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims knowledge-index knowledge-index-build secrets \
-        feature-flags cloudbuild terraform tf-fmt \
+        issue-claims knowledge-index knowledge-index-build conformance \
+        secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit
 
 .DEFAULT_GOAL := help
@@ -54,6 +54,8 @@ help:
 	@echo "                against the board snapshot + self-control mutants"
 	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
 	@echo "                coverage and secret policy over the indexed assets"
+	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
+	@echo "                milestoned issue classified; mandates checked on the diff"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
@@ -126,6 +128,16 @@ knowledge-index:
 ## runner invokes the same command on its schedule)
 knowledge-index-build:
 	@python3 governance/knowledge/cli.py build
+
+## conformance — CMR class/pattern/template enforcement (issue #140): every
+## milestoned issue must be classified, and the class it declares must hold
+conformance:
+	@bash scripts/check-conformance.sh
+
+## conformance-change-set — check the current diff against the mandates
+## (GR-15 code-native automation; new infrastructure ships flag-gated OFF)
+conformance-change-set:
+	@python3 governance/conformance/cli.py change-set
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:

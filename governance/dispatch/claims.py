@@ -249,7 +249,7 @@ def audit(events: list[ClaimEvent], snapshot: Snapshot, now: datetime | None = N
                     "(single-claim lock violated)"
                 )
             problems.extend(
-                f"{where}: {problem}" for problem in _claim_problems(event, events[: index + 1], snapshot)
+                f"{where}: {problem}" for problem in _claim_problems(event, events, snapshot)
             )
             holder[event.issue] = event
         elif event.event == "release":
@@ -281,14 +281,31 @@ def _claimed_at(event: ClaimEvent, fallback: datetime) -> datetime:
         return fallback
 
 
-def _claim_problems(event: ClaimEvent, events_so_far: list[ClaimEvent], snapshot: Snapshot) -> list[str]:
-    """Structural problems with one claim record (schema-valid but unjustified)."""
+def _claim_problems(event: ClaimEvent, events: list[ClaimEvent], snapshot: Snapshot) -> list[str]:
+    """Structural problems with one claim record (schema-valid but unjustified).
+
+    Time-aware by necessity: this replays *history* against *present* truth, so a
+    claim that predates the issue's closure is legitimate record, not a violation.
+    Only a claim still live at audit time is judged against the current snapshot —
+    otherwise an agent that completes an issue is retroactively blamed for having
+    claimed it.
+    """
     problems: list[str] = []
     issue = snapshot.get(event.issue)
     if issue is None:
         return [f"#{event.issue}: claimed but absent from the snapshot"]
+
     if issue.closed:
-        problems.append(f"#{event.issue}: claimed after it was closed")
+        # Settled unless the claim is still open (never released) — a live claim on
+        # a closed issue is a real problem; a released one is finished history.
+        still_live = not any(
+            later.event == "release" and later.issue == event.issue
+            for later in events
+        )
+        if still_live:
+            problems.append(f"#{event.issue}: claimed after it was closed")
+        return problems
+
     if issue.is_epic:
         problems.append(f"#{event.issue}: claimed an epic (an epic closes with its children, it is not work)")
     open_blockers = snapshot.blockers_open(issue)
@@ -301,7 +318,7 @@ def _claim_problems(event: ClaimEvent, events_so_far: list[ClaimEvent], snapshot
 
     earlier = {
         prior.issue
-        for prior in events_so_far[:-1]
+        for prior in events
         if prior.is_claim and prior.agent == event.agent
     }
     if event.reason == REASON_CHILD_OF_CLAIM:
@@ -319,6 +336,11 @@ def _claim_problems(event: ClaimEvent, events_so_far: list[ClaimEvent], snapshot
     elif event.reason == REASON_NEXT_IN_MILESTONE:
         if not issue.milestone:
             problems.append(f"#{event.issue}: reason 'next-in-milestone' but the issue has no milestone")
+        elif _released(events, event):
+            # The frontier is a point-in-time property: once this agent released the
+            # issue, later work legitimately advances the frontier past it, so
+            # comparing against today's frontier would blame completed work.
+            pass
         else:
             candidate = order.frontier(snapshot, issue.milestone)
             if candidate is None or candidate.number != event.issue:
@@ -328,6 +350,16 @@ def _claim_problems(event: ClaimEvent, events_so_far: list[ClaimEvent], snapshot
                     f"is {frontier_text}"
                 )
     return problems
+
+
+def _released(events: list[ClaimEvent], event: ClaimEvent) -> bool:
+    """Whether this claim was later released (finished, not abandoned)."""
+    return any(
+        later.event == "release"
+        and later.issue == event.issue
+        and later.agent == event.agent
+        for later in events
+    )
 
 
 def audit_text(text: str, snapshot: Snapshot, now: datetime | None = None) -> list[str]:

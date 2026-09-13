@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T17:46:59Z",
+  "generated_at": "2026-09-13T18:06:16Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1155,7 +1155,7 @@
     {
       "number": 139,
       "title": "Implement the CMR/GDC institutional knowledge indexer",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:knowledge-index",
@@ -1394,7 +1394,7 @@
     {
       "number": 157,
       "title": "Enforce issue order at claim time (behavioral, not just declared): eligibility check + single-claim lock",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:board",
@@ -1405,6 +1405,133 @@
         "type:governance"
       ],
       "parent": 144,
+      "blocked_by": []
+    },
+    {
+      "number": 160,
+      "title": "EPIC: Session Fleet Operating Model \u2014 Brain / Fleet Brain / Epic Subagent Fleet (e2e IT department)",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": []
+    },
+    {
+      "number": 161,
+      "title": "Define the session topology and steering contract (brain \u2192 fleet brain \u2192 subagents)",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": []
+    },
+    {
+      "number": 162,
+      "title": "Implement the steering channel: message schema, mailbox, and channel CLI",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": []
+    },
+    {
+      "number": 163,
+      "title": "Implement the fleet-brain dispatcher (dumb-terminal executor for brain directives)",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": []
+    },
+    {
+      "number": 164,
+      "title": "FinOps model chooser for fleet subagents: tier + thinking-effort directives",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "area:session-fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": []
+    },
+    {
+      "number": 165,
+      "title": "Enhance the GitHub issue template for brain-directed fleet work",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:board",
+        "area:session-fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 160,
+      "blocked_by": []
+    },
+    {
+      "number": 166,
+      "title": "Session bootstrap + runbook: zero-touch beyond the single model switch",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": []
+    },
+    {
+      "number": 167,
+      "title": "E2E pilot: one brain command \u2192 sister \u2192 subagent \u2192 PR \u2192 merge, with negative controls",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 160,
       "blocked_by": []
     }
   ]
