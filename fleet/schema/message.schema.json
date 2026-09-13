@@ -34,6 +34,11 @@
       "type": "string",
       "description": "Binds a result/ack to the directive that caused it."
     },
+    "nonce": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Anti-replay token for a directive (issue #161). Stamped by the channel when absent; send refuses a nonce already seen in the sent, inbox or done mailbox. The rest of the envelope stays v1 — the field is additive."
+    },
     "severity": {
       "enum": ["info", "warn", "critical"],
       "description": "Escalation severity: info | warn | critical."
@@ -41,11 +46,11 @@
     "model": {
       "type": "object",
       "additionalProperties": false,
-      "description": "FinOps block: the model tier and thinking effort the target must run at. Overrides outside the allowlist are refused.",
+      "description": "FinOps block: the model tier and thinking effort the target must run at. The vocabulary is the harvested one (governance/finops/policy.json, issue #164): tiers from capital-underwriting config/leaderboard/tier-policy.json, thinking effort from leaderboard lib/fleet-roster.sh role_effort(). A subagent may not choose its own tier, and an override is refused by governance/finops/chooser.py.",
       "required": ["tier", "thinking"],
       "properties": {
-        "tier": { "enum": ["pro", "flash"] },
-        "thinking": { "enum": ["none", "low", "high"] },
+        "tier": { "enum": ["flash", "pro", "auditor"] },
+        "thinking": { "enum": ["none", "low", "medium", "high"] },
         "budget_hint": {
           "type": "string",
           "description": "Optional cost hint for the subagent's run."

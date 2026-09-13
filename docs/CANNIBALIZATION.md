@@ -296,7 +296,89 @@ its classifier/few-shot/feedback modules are usable without recovery.
 
 ---
 
-## 6. Issue-brief harvest — the fleet-task template (issue #165)
+
+
+## 6. M26 session-fleet harvest (issue #161) — roles, vocabulary, transport
+
+The session fleet operating model (brain → fleet-brain sister → epic-focused
+subagents) is consumable prior art, not new vocabulary. Harvested **2026-09-13**
+from local checkouts, read-only. Both source repos are `kushin77`-owned and both
+carry the license **"Copyright (c) 2026 kushin77. All Rights Reserved.
+PROPRIETARY — INTERNAL USE ONLY"** (`LICENSE` at each repo root) — the same owner
+as this repo. What is reused is therefore the **pattern and the vocabulary**,
+re-implemented for this repo's Python/JSON substrate; no source file was copied,
+so no `harvested_from` code marker applies. The derived artifacts are
+`fleet/CONTRACT.md` and `docs/decision-records/ADR-0011-session-fleet-transport.md`.
+
+| Source (repo-relative) | Asset | Verdict | Where it landed |
+|---|---|---|---|
+| `leaderboard/lib/fleet-roster.sh` | ROLE / TIER / MODEL / TRANSPORT / EFFORT separation, `role_capability_tier` (deep/balanced/fast), per-model capability profiles | PATTERN | `fleet/CONTRACT.md` §1 — a seat is not a model; the four attributes travel in the directive's FinOps block instead of being inferred by the executor |
+| `leaderboard/docs/LEADERBOARD_PROTOCOL.md` | per-session row files, one worktree per session (id = branch), a reporter that *computes* status, "a done claim must match a real gate result" | REFERENCE | `fleet/CONTRACT.md` §0/§6 + ADR-0011 — coordination stays inside the repo's own checkout, no broker |
+| `leaderboard/docs/CTO_OVERLAY.md` | four-layer blocking-governance overlay, per-layer severity and the `.cto/config.yaml` tier system | PATTERN | ADR-0011 — governance layers run in-repo; a layer that cannot block a merge is advisory, which is the same rule this repo's `make verify` follows |
+| `capital-underwriting/docs/wiki/ELITE_GENERAL_CHARTER.md` | commander → general → sniper chain of command; "never substitute 'looks fine' for a gate result" | REFERENCE | `fleet/CONTRACT.md` §4 (trust rules) and §6 (enforcement) |
+| `capital-underwriting/docs/wiki/ELITE_PLATOON_LEADER_CHARTER.md` | wave ownership, mutually-disjoint file sets, role → N-1 hand-off | REFERENCE | `fleet/CONTRACT.md` §2 (`dispatch-issue`, `handoff`) |
+| `capital-underwriting/scripts/agent/sme/*.txt` + `sme-dispatch.sh` | per-file adversarial reviewer prompts (auditor, security, terraform, sniper-generic, prisma-db, test-quality) | READY | epic-subagent reviewer roles — `registry/personas` and the FinOps chooser (#164) |
+| `vendor/CMR` (pinned submodule) | hub M9 (`board/MILESTONES.md`, `board/epics/EPIC-11-github-full-surface.md`) | REFERENCE | ADR-0011 — read to check the A2A option, and **not** usable as an A2A wire contract: the hub's M9 is GitHub full-surface governance |
+
+**Also enumerated, not read in full:** `capital-underwriting/docs/wiki/` carries
+five `ELITE_*.md` charters (`AUDITOR`, `COMMANDER_LTC`, `GENERAL`,
+`PLATOON_LEADER`, `SCRIBE`); two were read in full for this issue (the two in the
+table above) and the remaining three were listed only — no content from them is
+reproduced here.
+
+**Missing / unreadable source — reported, not invented:**
+`capital-underwriting/.claude/agents/*.md`. That path holds **no agent
+markdown**: it contains three runtime session directories
+(`agent-7bfd1589/session.json`, `agent-e418370a/session.json`,
+`relentless-765/session.json`) plus a `.gitkeep`. The SME cards the issue's
+harvest map refers to are the `scripts/agent/sme/*.txt` files listed above. No
+`.claude/agents` content was read or reused.
+
+**Deliberately not harvested here:** `personas.yaml`,
+`capability-registry.json` and `tier-policy.json` / `route-policy.json` belong to
+the #163/#164 lanes. #161 takes the role vocabulary and the transport decision
+only, so two lanes cannot drift apart on the same asset.
+
+
+## 7. M26 FinOps chooser harvest (issue #164) — tier and thinking-effort vocabulary
+
+The FinOps vocabulary the brain directs subagents with is **prior art, not new
+coinage**. Harvested **2026-09-13** from read-only local checkouts of the two
+mature `kushin77` repos. Both are owner-authored and carry the license
+**"Copyright (c) 2026 kushin77. All Rights Reserved. PROPRIETARY — INTERNAL USE
+ONLY"** (`LICENSE` at each repo root) — the same owner as this repo. What is
+reused is therefore the **pattern and the vocabulary**, re-implemented for this
+repo's Python/JSON substrate; no source file was copied, so no `harvested_from`
+code marker applies. The derived artifacts are `governance/finops/policy.json`,
+`governance/finops/chooser.py` (the chooser and its enforcement) and
+`scripts/check-finops-chooser.sh` (the gate).
+
+| Source (repo-relative) | Asset | Verdict | Where it landed |
+|---|---|---|---|
+| `capital-underwriting/config/leaderboard/tier-policy.json` | `tiers{}` → `flash` / `pro` / `auditor`, their model ids (`deepseek-v4-flash` / `deepseek-v4-pro`), timeout and context limits, `complexity_to_tier` thresholds | PATTERN | `governance/finops/policy.json` — the tier names and `tier_models` are adopted verbatim |
+| `capital-underwriting/config/leaderboard/route-policy.json` | route → `model_tier` mapping (`fast`→flash, `deep`→pro, `strict`→auditor) plus `dispatch_defaults` | PATTERN | `governance/finops/policy.json` `tier_rank` (auditor is the escalation tier) and the subagent allowlist |
+| `leaderboard/lib/fleet-roster.sh` | ROLE / TIER / MODEL / TRANSPORT / EFFORT separation, `role_effort()` = `low` / `medium` / `high`, `role_capability_tier()` = deep / balanced / fast, and the rule that nothing else may hardcode a model per role | PATTERN | the thinking-effort names; the chooser derives all four attributes from one directive block instead of letting an executor infer them |
+| `leaderboard/scripts/elite/finops-router.sh` | cheapest-capable-tier routing (T2 = flash, T3 = pro + thinking), with a forced tier treated as a privileged override | PATTERN | refusal of a self-chosen tier: here the only issuer is the brain's directive, so an agent's own request can never be honoured |
+| `capital-underwriting/config/leaderboard.config.example` | the fleet's thinking-off state (`DEEPSEEK_THINKING` / `LB_THINKING_DEEPSEEK` = `enabled` / `disabled`) | REFERENCE | `none` in the vocabulary is that disabled state, which is already this repo's standing-directive value |
+
+**Adopted verbatim (no new coinage).** Tiers `flash | pro | auditor` — exactly
+the `tiers{}` keys above. Thinking effort `low | medium | high` — exactly
+`role_effort()`'s values; plus `none`, the fleet's thinking-off state, which is
+not a coinage either: it is the DSv4FNone seat this repo already states in
+`fleet/directive.json`. The gate pins all four names, so a rename in the policy,
+the message schema, the channel or the docs fails `make verify`.
+
+**Deliberately not harvested here.** `capability-registry.json` and
+`personas.yaml` belong to the #163 dispatcher lane; `LEADERBOARD_PROTOCOL.md`,
+the CTO overlay and the `ELITE_*` charters belong to the #161 / #165 / #166
+lanes. #164 takes the FinOps vocabulary and its enforcement only, so two lanes
+cannot drift apart on the same asset.
+
+**Numbering note.** §6 is the M26 session-transport harvest recorded by the
+issue #161 lane; this section is numbered above it rather than reusing 6, so the
+two lanes cannot collide on a heading.
+
+## 8. Issue-brief harvest — the fleet-task template (issue #165)
 
 The canonical issue brief (`.github/ISSUE_TEMPLATE/fleet-task.yml`) is harvested,
 not invented: its field set and FinOps vocabulary are lifted from two
@@ -332,6 +414,7 @@ cannot pass vacuously (GR-12).
 `.github/ISSUE_TEMPLATE/enhancement.md`) and `kushin77/capital-underwriting`
 (`docs/wiki/ELITE_*.md`) — pattern/REFERENCE only, kushin77 proprietary /
 internal use only, no code copied.
+
 
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*
