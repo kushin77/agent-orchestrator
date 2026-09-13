@@ -118,16 +118,37 @@ def cmd_poke(args: argparse.Namespace) -> int:
 
 
 def cmd_start(args: argparse.Namespace) -> int:
-    """Start both rungs. The rung locks make a second start harmless (refused)."""
-    running = subprocess.run(["pgrep", "-f", "fleet/(brain|terminal)\\.py"], capture_output=True, text=True)
-    if running.returncode == 0:
-        print("fleet already running:")
-        print(running.stdout.strip())
-        print("use `fleet/control.py status` for state, or stop/kill/restart")
+    """Start whichever rungs are missing; clear stale queue flags when the sister starts.
+
+    Three traps found by sweeping the controls live: a `stopping` flag left behind by
+    a loop that died would kill every newly started loop at its first cycle; a
+    combined pgrep reported "already running" because it matched the *other* rung;
+    and refusing to start anything while one rung lived left the fleet half up.
+    """
+    rungs = (
+        ("brain", "fleet/brain.py", "fleet/brain.sh"),
+        ("sister", "fleet/terminal.py", "fleet/terminal.sh"),
+    )
+    live = {}
+    for rung, pattern, _script in rungs:
+        probe = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True)
+        live[rung] = probe.stdout.split()[0] if probe.returncode == 0 and probe.stdout.split() else None
+
+    missing = [(rung, script) for rung, _pattern, script in rungs if live[rung] is None]
+    print("fleet state: " + ", ".join(f"{rung}={pid or 'down'}" for rung, pid in live.items()))
+    if not missing:
+        print("both rungs are already up — use status, or stop/kill/restart")
         return 0
-    print("== start: brain + sister ==")
-    # Detached so the loops outlive this terminal; the rung locks enforce one each.
-    for script in ("fleet/brain.sh", "fleet/terminal.sh"):
+
+    fleet = ROOT / ".fleet"
+    starting_sister = any(rung == "sister" for rung, _ in missing)
+    if starting_sister:
+        for flag in ("paused", "stopping"):
+            if (fleet / flag).exists():
+                (fleet / flag).unlink()
+                print(f"  cleared stale {flag} flag (queue state from the previous loop)")
+
+    for rung, script in missing:
         subprocess.Popen(
             ["setsid", "bash", script], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
