@@ -1,0 +1,133 @@
+name: Fleet task
+description: Issue brief for a brain-directed fleet task — role, epic, lane, FinOps model tier + thinking effort, Verify command, and chain markers.
+title: "[fleet-task]"
+labels: ["area:session-fleet"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **GOAL first.** State the concrete objective and its success criteria
+        before any constraints or context, so a subagent (or a session resuming
+        after compaction) can act correctly from the first line alone. Order the
+        brief **GOAL -> constraints -> context**, then fill every required field.
+
+        `governance/dispatch/` reads the chain markers, model tier and thinking
+        effort straight out of this brief: an unfilled field is a broken
+        directive. The issue-template gate fails if a required field is dropped
+        from this form, so edit the form only together with its gate.
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Role (executor)
+      description: Who executes this brief. The brain issues directives; a sister coordinates an epic; a subagent does the work.
+      options:
+        - brain
+        - sister
+        - subagent
+    validations:
+      required: true
+
+  - type: input
+    id: epic
+    attributes:
+      label: Epic
+      description: The epic index this task serves, as a bare issue reference.
+      placeholder: "#160"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: pillar
+    attributes:
+      label: Pillar
+      description: The five-pillar surface (or cross-cutting area) this task touches.
+      options:
+        - agent-registry
+        - model-gateway
+        - state-machine
+        - guardrails-security
+        - observability-finops
+        - identity-rbac
+        - control-plane
+        - infra-iac
+        - autonomous-ops
+    validations:
+      required: true
+
+  - type: input
+    id: lane
+    attributes:
+      label: Lane
+      description: The single lane that owns this issue. One issue = one lane = one branch; no two lanes share a file in a wave.
+      placeholder: autonomous-ops
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model-tier
+    attributes:
+      label: Model tier (FinOps)
+      description: Start cheap. flash is the default; escalate to pro on observed difficulty, never pre-emptively; auditor is the measured audit seat (never below pro for security, secrets, auth or IaC work).
+      options:
+        - flash
+        - pro
+        - auditor
+    validations:
+      required: true
+
+  - type: dropdown
+    id: thinking-effort
+    attributes:
+      label: Thinking effort
+      description: Reasoning effort for this task. none is the fleet's thinking-off state; low|medium|high come from the harvested role-effort ladder.
+      options:
+        - none
+        - low
+        - medium
+        - high
+    validations:
+      required: true
+
+  - type: input
+    id: verify-command
+    attributes:
+      label: Verify command
+      description: The exact command whose real output is the evidence of done. Never claim done without it.
+      placeholder: make verify
+    validations:
+      required: true
+
+  - type: textarea
+    id: chain-markers
+    attributes:
+      label: Chain markers
+      description: The dependency edges the dispatcher reads. Declare the parent, any blocker, and the chain position. Write `Root=none` if this issue is the head of a chain.
+      value: |
+        Parent: #<n>
+        Part-of: #<n>
+        Blocked-by: #<n>
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Each criterion must be mechanically checkable, with the command or assertion that decides it.
+      value: |
+        - [ ] criterion (how it is checked)
+        - [ ] criterion (how it is checked)
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Paste the literal command output proving the Verify command passed. A summary or a claimed count is not evidence.
+      render: console
+    validations:
+      required: false
