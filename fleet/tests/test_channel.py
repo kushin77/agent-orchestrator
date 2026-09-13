@@ -165,3 +165,43 @@ def test_report_writes_a_valid_outbox_message(tmp_path, monkeypatch):
     data = json.loads(files[0].read_text(encoding="utf-8"))
     assert validate(data) == []
     assert data["correlation_id"] == "d-1"
+
+
+def test_watch_returns_the_oldest_pending_directive(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    channel.INBOX.mkdir(parents=True, exist_ok=True)
+    directive = {"from": "brain", "to": "sister", "type": "directive", "id": "d-1"}
+    (channel.INBOX / "d-1.json").write_text(json.dumps(directive), encoding="utf-8")
+    args = type("Args", (), {"timeout_seconds": 1.0, "interval": 0.01})()
+    assert channel.cmd_watch(args) == EXIT_OK
+
+
+def test_watch_reports_idle_rather_than_blocking_forever(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    args = type("Args", (), {"timeout_seconds": 0.05, "interval": 0.01})()
+    assert channel.cmd_watch(args) == EXIT_NOT_OK
+
+
+def test_report_consumes_the_directive_it_answers(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(channel, "DONE", tmp_path / "done")
+    channel.INBOX.mkdir(parents=True, exist_ok=True)
+    directive = {"from": "brain", "to": "sister", "type": "directive", "id": "d-1"}
+    (channel.INBOX / "d-1.json").write_text(json.dumps(directive), encoding="utf-8")
+
+    args = type(
+        "Args",
+        (),
+        {"from_role": "sister", "type": "result", "correlation": "d-1", "body": "done"},
+    )()
+    assert channel.cmd_report(args) == EXIT_OK
+
+    assert not (channel.INBOX / "d-1.json").exists()
+    assert (tmp_path / "done" / "d-1.json").exists()
+
+
+def test_consuming_an_absent_directive_is_a_no_op(tmp_path, monkeypatch):
+    monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
+    monkeypatch.setattr(channel, "DONE", tmp_path / "done")
+    assert channel.consume_directive("never-queued") is False

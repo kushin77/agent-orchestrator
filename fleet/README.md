@@ -75,12 +75,32 @@ answers the exact directive that is being waited on. A timeout exits 1 (NOT-OK)
 and may never come from the brain itself (enforced by the contract and the
 gate).
 
+## Sister listener loop (the pulse)
+
+The sister has no agency of its own — it runs the listener and acts on whatever
+it prints:
+
+```bash
+while true; do
+  python3 fleet/channel.py watch --timeout-seconds 600   # blocks until an order arrives
+  # ...execute exactly what it printed...
+  python3 fleet/channel.py report --from sister --correlation <id> --type result --body "<evidence>"
+done
+```
+
+`watch` exits 1 (IDLE) when nothing arrives inside the window — that is a signal
+to run it again, not an error. Reporting **consumes** the directive: it leaves
+`.fleet/inbox` and lands in `.fleet/done`, so the pending count is always the
+number of outstanding orders. Without a running listener, queued directives sit
+unread — which is exactly what a timed-out `wait` on the brain side means.
+
 ## Mailbox
 
 ```
 .fleet/inbox/    pending directives for the sister   (runtime, gitignored)
 .fleet/sent/     the brain's copy of what it sent    (runtime, gitignored)
 .fleet/outbox/   acks and results back to the brain  (runtime, gitignored)
+.fleet/done/     directives answered and consumed   (runtime, gitignored)
 ```
 
 `fleet/directive.json` and the schema are tracked artifacts — the sister can
