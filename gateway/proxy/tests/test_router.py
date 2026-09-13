@@ -11,7 +11,7 @@ from proxy.contract import (
     UnknownTaskRouteError,
 )
 from proxy.model import TaskRequest, TierChoice
-from proxy.router import Router, load_routing_config
+from proxy.router import Router, _validate_config, load_routing_config
 
 from support import FakeChooser, make_agent, make_task
 
@@ -147,3 +147,70 @@ class TestHealthFilter:
             health=lambda provider: provider == "ollama",
         )
         assert decision.candidate_providers() == ("ollama",)
+
+
+class TestRoutingGroups:
+    """The purebliss-team agent routing group (issue #255, EPIC #253 map)."""
+
+    TEAM = {
+        "ollama": "ollama",
+        "paperclip": "paperclip",
+        "hermes": "hermes",
+        "deepseek": "deepseek",
+        "claude": "anthropic",
+    }
+
+    def test_purebliss_team_group_declared(self, router):
+        group = router.config.routing_groups["purebliss-team"]
+        assert set(group.agents) == set(self.TEAM)
+        assert group.retry_max_attempts == 2
+
+    @pytest.mark.parametrize("agent_id,provider", sorted(TEAM.items()))
+    def test_team_agent_pinned_to_provider(self, router, agent_id, provider):
+        choice = TierChoice(task_class="classify-route", tier="L0")
+        decision = router.route(
+            make_task("classify-route"),
+            make_agent(agent_id),
+            TaskRequest(tenant_id="acme", task_type="classify-route"),
+            chooser=FakeChooser(choice=choice),
+        )
+        assert decision.candidate_providers()[0] == provider
+        if provider != "ollama":
+            assert decision.candidate_providers()[-1] == "ollama"
+
+    def test_non_team_agent_uses_tier_chain(self, router):
+        choice = TierChoice(task_class="classify-route", tier="L0")
+        decision = router.route(
+            make_task("classify-route"),
+            make_agent("orchestrator"),
+            TaskRequest(tenant_id="acme", task_type="classify-route"),
+            chooser=FakeChooser(choice=choice),
+        )
+        assert decision.candidate_providers() == ("deepseek", "openai", "ollama")
+
+    def test_group_agent_falls_back_when_primary_unhealthy(self, router):
+        choice = TierChoice(task_class="classify-route", tier="L0")
+        decision = router.route(
+            make_task("classify-route"),
+            make_agent("claude"),
+            TaskRequest(tenant_id="acme", task_type="classify-route"),
+            chooser=FakeChooser(choice=choice),
+            health={"anthropic": False},
+        )
+        assert decision.candidate_providers() == ("ollama",)
+
+    def test_malformed_group_fails_closed(self):
+        data = {
+            "schemaVersion": 1,
+            "routes": {
+                "classify-route": {
+                    "capability": "orchestrate",
+                    "taskClass": "classify-route",
+                }
+            },
+            "tierMap": {"L0": "LOW"},
+            "providerChains": {"LOW": ["deepseek", "ollama"]},
+            "routingGroups": {"bad": {"agents": {"a": {}}}},
+        }
+        with pytest.raises(RoutingConfigError):
+            _validate_config(data)

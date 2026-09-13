@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from proxy import contract
 from proxy.model import (
     STAGE_COMPLETED,
@@ -152,3 +154,29 @@ class TestDispatchStream:
         assert items[-1].served()
         assert all(isinstance(item, DispatchEvent) for item in items[:-1])
         assert items[-1].events == tuple(items[:-1])
+
+
+class TestPureblissTeamDispatch:
+    """classify-route dispatches to each of the five team agents' providers."""
+
+    TEAM = {
+        "ollama": "ollama",
+        "paperclip": "paperclip",
+        "hermes": "hermes",
+        "deepseek": "deepseek",
+        "claude": "anthropic",
+    }
+
+    @pytest.mark.parametrize("agent_id,provider", sorted(TEAM.items()))
+    def test_classify_route_dispatches_to_team_provider(self, agent_id, provider):
+        backend = ScriptedBackend().on(
+            provider,
+            lambda c, i: backend.result(provider, VALID_CLASSIFY_JSON),
+        )
+        gateway, *_ = build_gateway(
+            agent=make_agent(agent_id), task=make_task(), backend=backend
+        )
+        result = gateway.dispatch(agent_id, _request())
+        assert result.served()
+        assert result.outcome == contract.OUTCOME_SUCCESS
+        assert result.provider == provider

@@ -58,3 +58,27 @@ providerChains:
     - deepseek
     - anthropic
     - ollama
+
+# Agent routing groups: a named team's agent -> provider mapping with an
+# ordered fallback chain and a retry budget. An agent that belongs to a group
+# is routed by its pinned chain (primary -> fallbacks) instead of the tier
+# chain, so a whole team can be pinned to its providers without re-declaring
+# the tier vocabulary. The FinOps tier choice still sets cost/budget and the
+# model tier within the pinned provider. Consumed from the EPIC #253 frozen
+# mapping: ollama -> ollama, paperclip -> paperclip, hermes -> hermes/ollama,
+# deepseek -> deepseek, claude -> anthropic. The claude/anthropic module
+# entry is the gateway-owned catalog entry at
+# gateway/catalog/modules/claude-anthropic/module.json (issue #255).
+routingGroups:
+  purebliss-team:
+    description: >-
+      The five-agent team (EPIC #253): local ollama, paperclip, hermes,
+      deepseek and claude/anthropic, each pinned to its provider with the local
+      Ollama hop as the terminal fallback (cloud -> local graceful degradation).
+    retryMaxAttempts: 2
+    agents:
+      ollama:    { provider: ollama }
+      paperclip: { provider: paperclip, fallbacks: [ollama] }
+      hermes:    { provider: hermes, fallbacks: [ollama] }
+      deepseek:  { provider: deepseek, fallbacks: [ollama] }
+      claude:    { provider: anthropic, fallbacks: [ollama] }

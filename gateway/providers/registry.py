@@ -42,6 +42,7 @@ from providers.contract import (
     ChatResult,
 )
 from providers.deepseek import DeepSeekProvider
+from providers.hermes import HermesProvider
 from providers.errors import (
     CircuitOpenError,
     OutputValidationError,
@@ -61,6 +62,7 @@ from providers.events import (
 from providers.gemini import GeminiProvider
 from providers.ollama import OllamaProvider
 from providers.openai import OpenAIProvider
+from providers.paperclip import PaperclipProvider
 from providers.resilience import (
     CircuitBreakerManager,
     call_with_retries,
@@ -74,9 +76,11 @@ PROVIDER_CLASSES: dict[str, type] = {
     for cls in (
         AnthropicProvider,
         DeepSeekProvider,
+        HermesProvider,
         OpenAIProvider,
         GeminiProvider,
         OllamaProvider,
+        PaperclipProvider,
     )
 }
 

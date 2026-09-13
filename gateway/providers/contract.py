@@ -11,8 +11,8 @@ The interface follows the issue acceptance criteria exactly:
         plus the call stamp {provider, tenant_id, agent_id, logical_key}
 
 A concrete provider adapter (``anthropic`` / ``deepseek`` / ``openai`` /
-``gemini`` / ``ollama``) speaks one provider wire protocol over an injected
-transport, extracts content text + token usage + the model actually used,
+``gemini`` / ``ollama`` / ``paperclip`` / ``hermes``) speaks one provider wire
+protocol over an injected transport, extracts content text + token usage + the model actually used,
 then VALIDATES the typed output against the caller's output schema and fails
 closed (``OutputValidationError``) when the content does not satisfy the
 schema. There is no silent pass-through of invalid output.

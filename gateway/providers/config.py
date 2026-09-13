@@ -73,13 +73,17 @@ def _base(name: str, base_url: str, api_path: str, tier_models: Mapping[str, str
 
 
 def default_provider_configs() -> dict[str, ProviderConfig]:
-    """Platform-default configurations for the five shipped providers.
+    """Platform-default configurations for the seven shipped providers.
 
     Model ids are real provider model identifiers (provenance:
     gmail-agent sonnet/opus/haiku tiers, capital-underwriting gemini model
-    constants, deepseek chat/reasoner, local Ollama). The default fallback
-    chain for every cloud provider is local Ollama (cloud -> local, the
-    defragsuite + gov-ai-scout graceful-degradation pattern).
+    constants, deepseek chat/reasoner, local Ollama). The paperclip and
+    hermes model ids are default illustrative identifiers for the vendored
+    modules (issue #255); operators override them via per-tenant mapping. The
+    default fallback chain for every cloud provider is local Ollama
+    (cloud -> local, the defragsuite + gov-ai-scout graceful-degradation
+    pattern); hermes is the local hop whose own fallback is also Ollama
+    (frozen map ``hermes -> hermes/ollama``, EPIC #253).
     """
     configs: dict[str, ProviderConfig] = {
         "anthropic": _base(
@@ -110,6 +114,20 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
             {"LOW": "gemini-2.5-flash", "MED": "gemini-2.5-flash",
              "HIGH": "gemini-2.5-pro", "MAX": "gemini-2.5-pro"},
         ),
+        "paperclip": _base(
+            "paperclip",
+            "https://api.paperclip.dev/v1",
+            "/chat/completions",
+            {"LOW": "paperclip-planner", "MED": "paperclip-planner",
+             "HIGH": "paperclip-planner", "MAX": "paperclip-planner"},
+        ),
+        "hermes": _base(
+            "hermes",
+            "http://localhost:8080",
+            "/api/chat",
+            {"LOW": "hermes3", "MED": "hermes3",
+             "HIGH": "hermes3", "MAX": "hermes3"},
+        ),
     }
     for name in configs:
         configs[name] = _with_fallback(configs[name], ("ollama",))
@@ -120,6 +138,7 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
         {"LOW": "llama3.2", "MED": "llama3.2", "HIGH": "qwen2.5", "MAX": "qwen2.5"},
     )
     configs["ollama"] = _replace(configs["ollama"], requires_key=False)
+    configs["hermes"] = _replace(configs["hermes"], requires_key=False)
     return configs
 
 

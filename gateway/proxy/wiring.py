@@ -276,7 +276,7 @@ def provider_response(
     """Build a provider-appropriate HTTP body for a canned typed output."""
     import json
 
-    if provider in ("deepseek", "openai"):
+    if provider in ("deepseek", "openai", "paperclip"):
         body = {
             "choices": [{"message": {"role": "assistant", "content": content}}],
             "usage": {"prompt_tokens": input_tokens, "completion_tokens": output_tokens},
@@ -288,7 +288,7 @@ def provider_response(
             "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
             "model": model,
         }
-    elif provider == "ollama":
+    elif provider in ("ollama", "hermes"):
         body = {
             "message": {"role": "assistant", "content": content},
             "prompt_eval_count": input_tokens,
