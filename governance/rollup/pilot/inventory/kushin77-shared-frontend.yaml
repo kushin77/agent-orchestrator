@@ -1,0 +1,40 @@
+# Fleet inventory — kushin77/shared-frontend (pilot, issue #151).
+#
+# Kept in its own file and its own tenant scope: the whole point of the
+# isolation property is that its spend, closure and drift are computed from
+# these declarations only, and never blended with a sibling repo's.
+schema: ao.rollup/fleet-inventory-v1
+repo: kushin77/shared-frontend
+tenant: kushin77-platform
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: frontend-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 360
+    spend_usd: 312.50
+    capacity_hours: 40
+    engaged_hours: 36
+    dispatched: 11
+    closed: 9
+  - id: qa-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 260
+    spend_usd: 198.00
+    capacity_hours: 24
+    engaged_hours: 20
+    dispatched: 6
+    closed: 6
+  - id: architecture-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 280
+    spend_usd: 96.00
+    capacity_hours: 16
+    engaged_hours: 6
+    dispatched: 2
+    closed: 2
+drift:
+  checks: 22
+  findings: 2
