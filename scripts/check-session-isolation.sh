@@ -50,6 +50,11 @@ if ! command -v git >/dev/null 2>&1; then
   exit 2
 fi
 for required in "$cli" "$terminal" "$suites"; do
+  if [ ! -f "$required" ]; then
+    echo "check-session-isolation: FAIL — $required is missing" >&2
+    exit 1
+  fi
+done
 
 fail=0
 
