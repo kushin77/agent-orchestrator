@@ -99,6 +99,37 @@ wrong until someone notices. The filing path is therefore part of the standard:
   refusal to the operator instead of filing an issue the gate rejects later.
 * `cli.py file` is the supported hand-run path, for the same reason.
 
+### A declaration is honoured or refused — never dropped (issue #517)
+
+`--declare name=value` states a companion label explicitly. A name the policy
+recognises as a declaring label (`Policy.declaring_fields`: `class`, the `required`
+companions, every rung's `expectations`, and the `prefixed` vocabulary — `pillar`,
+`phase`, `gdc`, `source`) is **passed through** into the labels the filing carries,
+even when the declared class does not require it. Before #517 anything outside the
+class's own label set was accepted on the command line and then discarded — `file
+--declare pillar=autonomous-ops --declare phase=8-autonomous-ops` planned five
+labels and no `pillar:`/`phase:` at all, with no warning and exit 0.
+
+A declared name the policy does **not** recognise is **refused**, naming the field,
+with a non-zero exit and nothing filed. Refusal rather than pass-through, for three
+reasons:
+
+1. the doctrine on this path is already *refuse rather than drop* — the module
+   refuses a filing that cannot derive a required label rather than filing one the
+   gate rejects later, and an ignored declaration is the same loss in reverse;
+2. `--declare` is documented as the *declaring* vocabulary, and `--label` is the
+   explicit path for a label the policy does not declare — so refusing loses no
+   expressiveness while catching the typo (`--declare priorty=P1`) that would
+   otherwise land an issue missing the `priority:` its filer believes it declared;
+3. passing an unknown name through would write unvalidated metadata onto the board,
+   where nothing detects it afterwards (`expectations` are non-fatal deviations).
+
+Two further declarations are refused for the same reason: a `class:` label that
+contradicts the class the filing states (one would have to be dropped to honour the
+other), and a declaration with an empty value (falling back to the policy default
+would report a declaration that was never honoured). `--dry-run` plans through the
+same `plan_filing`, so it prints exactly the label set a real filing would pass.
+
 `filing-check` is the self-control the gate runs (GR-12: a control whose refusal
 path cannot be reached is a formality). It provokes, for real:
 
@@ -112,6 +143,16 @@ path cannot be reached is a formality). It provokes, for real:
 | refusal files nothing | the runner is never reached |
 | refusal is explicit | the message names `#320` (prevention) and `#174` (repair) |
 | the fleet's filing path delegates | `fleet/brain.py` builds no `gh issue create` of its own |
+| passes through a recognised companion | `pillar`/`phase` declared at `enterprise`, which does not require them (#517) |
+| refuses an unrecognised declaration | a declared `priorty` (#517) |
+| the unrecognised-declaration refusal files nothing | the runner is never reached (#517) |
+| refuses two different classes | `--class elite` plus a declared `class:enterprise` (#517) |
+| a dry run shows the filing's labels | the same plan the real filing would run (#517) |
+
+`scripts/check-conformance.sh` adds the same two controls at the CLI boundary — the
+layer the #517 defect was observed at: the labels a filing prints must include a
+declared `pillar:`/`phase:`, and an unrecognised `--declare` must exit non-zero
+naming the field.
 
 ## Calibration (measured 2026-09-13)
 
@@ -152,6 +193,8 @@ To change the standard, edit [`policy.yaml`](policy.yaml) — it is the single
 declaration of what conformance means. No code change is needed to add a rung, an
 expectation, or a filing default, and a policy naming a rung that does not exist —
 including a `filing.default_class` that is not a rung — is rejected as malformed.
+A name added to `required`, `expectations` or `prefixed` is also a name
+`--declare` will accept; a name in none of them is refused (#517).
 
 ## Related
 

@@ -93,6 +93,35 @@ class Policy:
     def allowed_classes(self) -> FrozenSet[str]:
         return frozenset(self.ladder)
 
+    @property
+    def declaring_fields(self) -> Tuple[str, ...]:
+        """Every name this policy recognises as a ``name:value`` declaring label.
+
+        The union of ``class``, the ``required`` companions, every name any rung's
+        ``expectations`` adds, and the ``prefixed`` vocabulary — in policy order, so
+        a caller can depend on the order. It is the criterion the filing path uses
+        to decide whether a declared label is recognised: a name the policy does not
+        list here is not a declaring label, and `--declare` REFUSES it by name
+        rather than dropping it (issue #517 — an ignored declaration is silent
+        board-metadata loss).
+        """
+        names = ["class"]
+        for name in self.required:
+            if name not in names:
+                names.append(name)
+        for rung in self.ladder:
+            for name in self.expectations_for(rung):
+                if name not in names:
+                    names.append(name)
+        for name in self.prefixed:
+            if name not in names:
+                names.append(name)
+        return tuple(names)
+
+    def declares(self, name: str) -> bool:
+        """Whether ``name`` is a declaring label this policy recognises."""
+        return name in self.declaring_fields
+
     def filing_label_names(self, declared_class: str) -> Tuple[str, ...]:
         """Every label a filing must carry, in declaration order.
 
@@ -130,6 +159,7 @@ class Policy:
             "required": list(self.required),
             "expectations": {k: list(v) for k, v in self.expectations.items()},
             "prefixed": list(self.prefixed),
+            "declaring_fields": list(self.declaring_fields),
             "infra_paths": list(self.infra_paths),
             "filing": {
                 "default_class": self.filing_default_class,

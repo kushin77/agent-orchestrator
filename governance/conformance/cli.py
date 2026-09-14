@@ -415,6 +415,118 @@ def cmd_filing_check(args: argparse.Namespace) -> int:
         "; ".join(problem.message for problem in problems) or "no bypass found",
     )
 
+    # 9. PASS-THROUGH (issue #517): a companion the policy recognises but the
+    #    declared class does not require reaches the command instead of being
+    #    dropped on the floor. `pillar` is in the policy's `prefixed` vocabulary and
+    #    is NOT an `enterprise` expectation, which is exactly the shape that was
+    #    silently discarded before this issue.
+    with_pillar = FilingRequest(
+        title="t", body="b", declaring={"pillar": "autonomous-ops", "phase": "8"}
+    )
+    if "pillar" in policy.expectations_for("enterprise"):
+        expect(
+            "passes through a recognised companion the class does not require",
+            False,
+            "the policy's own `enterprise` expectations now require `pillar`; this "
+            "expectation needs a companion the rung does not require",
+        )
+    else:
+        try:
+            passed = plan_filing(with_pillar, policy)
+            carried = [passed.label("pillar"), passed.label("phase")]
+            expect(
+                "passes through a recognised companion the class does not require",
+                carried == ["pillar:autonomous-ops", "phase:8"],
+                "labels=%s" % ", ".join(passed.labels),
+            )
+        except FilingRefused as exc:
+            expect(
+                "passes through a recognised companion the class does not require",
+                False,
+                exc.loud_message,
+            )
+
+    # 10. REFUSAL, not a drop: a declared label the policy does not recognise is
+    #     refused BY NAME, so a typo (`priorty=`) cannot land an issue missing
+    #     `priority:` while its filer believes it declared one.
+    unknown = FilingRequest(title="t", body="b", declaring={"priorty": "P1"})
+    unknown_refusal = None
+    try:
+        plan_filing(unknown, policy)
+        expect(
+            "refuses a declared label the policy does not recognise",
+            False,
+            "it planned a filing anyway, silently dropping `priorty:`",
+        )
+    except FilingRefused as exc:
+        unknown_refusal = exc
+        expect(
+            "refuses a declared label the policy does not recognise",
+            exc.missing == ("priorty",) and "priorty" in exc.reason,
+            exc.reason,
+        )
+
+    # 11. The unrecognised-declaration refusal also files NOTHING. The recorder
+    #     returns a success rather than raising, so a mutant that removes the
+    #     refusal is REPORTED as a failure instead of crashing the gate.
+    unknown_calls: list = []
+
+    def unknown_recorder(argv, **_kwargs):  # pragma: no cover - must not run
+        unknown_calls.append(list(argv))
+        return subprocess.CompletedProcess(argv, 0, "https://github.com/o/r/issues/1", "")
+
+    try:
+        file_issue(unknown, policy, runner=unknown_recorder)
+        expect("the unrecognised-declaration refusal files nothing", False, "it filed")
+    except FilingRefused:
+        expect(
+            "the unrecognised-declaration refusal files nothing",
+            not unknown_calls,
+            "runner invocations=%d" % len(unknown_calls),
+        )
+
+    # 12. A class stated twice with two different values is refused: honouring one
+    #     would drop the other silently, which is the defect class #517 removes.
+    try:
+        plan_filing(
+            FilingRequest(
+                title="t", body="b", declared_class="elite", declaring={"class": "enterprise"}
+            ),
+            policy,
+        )
+        expect("refuses two different classes on one filing", False, "it planned a filing")
+    except FilingRefused as exc:
+        expect(
+            "refuses two different classes on one filing",
+            CLASS_FIELD in exc.missing and "elite" in exc.reason and "enterprise" in exc.reason,
+            exc.reason,
+        )
+
+    # 13. `--dry-run` shows the label set the real filing would carry: both plan
+    #     through the same path, so a dry run cannot advertise labels the filing
+    #     would not pass.
+    dry_calls: list = []
+
+    def dry_recorder(*call_args, **call_kwargs):  # pragma: no cover - must not run
+        dry_calls.append((call_args, call_kwargs))
+        raise AssertionError("a dry run must not invoke `gh`")
+
+    dry = FilingRequest(
+        title="t", body="b", declaring={"pillar": "autonomous-ops"}, dry_run=True
+    )
+    try:
+        dry_result = file_issue(dry, policy, runner=dry_recorder)
+        expect(
+            "a dry run shows the same labels the filing would pass",
+            dry_result.dry_run
+            and not dry_calls
+            and list(dry_result.labels) == list(plan_filing(dry, policy).labels)
+            and "pillar:autonomous-ops" in dry_result.labels,
+            "labels=%s" % ", ".join(dry_result.labels),
+        )
+    except FilingRefused as exc:
+        expect("a dry run shows the same labels the filing would pass", False, exc.loud_message)
+
     unmet = [index for index, ok in enumerate(results, start=1) if not ok]
     if unmet:
         print(
@@ -475,7 +587,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="NAME=VALUE",
-        help="declare a companion label explicitly (type/priority/area/gdc/...)",
+        help=(
+            "declare a companion label explicitly (type/priority/area/gdc/pillar/"
+            "phase/...); a name the policy does not recognise as a declaring label "
+            "is REFUSED by name, never dropped — use --label for a label the policy "
+            "does not declare"
+        ),
     )
     p_file.add_argument(
         "--label", action="append", default=[], help="an extra non-declaring label"
