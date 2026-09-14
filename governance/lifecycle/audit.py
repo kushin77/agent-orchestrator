@@ -20,6 +20,7 @@ Two properties make the result trustworthy:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -89,6 +90,44 @@ def _filing_findings(item: dict) -> list[Finding]:
             detail=f"open and milestoned ({item.get('milestone')}) but declares no declaring label",
         )
     ]
+
+
+#: The parent declaration marker, byte-identical to the one
+#: ``governance/dispatch/snapshot.py`` parses into ``Issue.parent``: a ``Parent:
+#: #<n>`` (or ``part-of`` / ``part of``) marker at the start of a line. Keeping it
+#: the same means a child's parent is decided identically at claim time and at
+#: close time.
+_PARENT_RE = re.compile(r"^\s*(?:parent|part[-_ ]of)\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
+
+
+def declared_parent(body: str) -> int | None:
+    """The parent an issue body declares, or ``None``; the first number of the marker."""
+    match = _PARENT_RE.search(body or "")
+    if not match:
+        return None
+    numbers = [int(part) for part in re.findall(r"[0-9]+", match.group(1))]
+    return numbers[0] if numbers else None
+
+
+def _declared_children(item: dict) -> list[dict]:
+    """The children whose body declares this item as parent, from the supplied set.
+
+    The child-set fact arrives as *input* — a supplied child set on the item,
+    never a live board read — and a child belongs to this epic only when its own
+    body carries the ``Parent: #<n>`` marker naming it: the same marker
+    ``dispatch/snapshot.py`` parses into ``Issue.parent`` (mirrored here
+    byte-for-byte as ``_PARENT_RE`` rather than imported, because that module's
+    implicit-relative ``from model import ...`` only resolves when the dispatch
+    directory is on ``sys.path``). Reading the marker rather than guessing by
+    adjacency is what keeps a child that names a *different* parent from either
+    provoking or excusing this epic.
+    """
+    parent = int(item.get("issue") or 0)
+    declared: list[dict] = []
+    for child in item.get("children") or []:
+        if declared_parent(str(child.get("body") or "")) == parent:
+            declared.append(child)
+    return declared
 
 
 def _closure_findings(item: dict) -> list[Finding]:
@@ -161,6 +200,16 @@ def _closure_findings(item: dict) -> list[Finding]:
                 "the change landed but the issue is still open, so the item is still on the board",
             )
         )
+
+    for child in _declared_children(item):
+        if str(child.get("state") or "").lower() != "closed":
+            problems.append(
+                Finding(
+                    "CHILD_NOT_CLOSED",
+                    subject,
+                    f"declared child #{child.get('number')} is {child.get('state') or 'open'}, not closed",
+                )
+            )
 
     return problems
 

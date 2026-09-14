@@ -48,6 +48,7 @@ and the gate can require that each one has been provoked.
 | `LANE_NOT_RECLAIMED` | Stale lanes accumulate and collide. |
 | `CLOSING_EVIDENCE_MISSING` | A summary is not evidence. |
 | `ISSUE_NOT_CLOSED` | The change landed but the item is still on the board. Closing the issue *is* a closure step, which is why applicability is keyed on whether the change landed, never on the issue already being closed. |
+| `CHILD_NOT_CLOSED` | An epic was closed while a declared child is still open. "Declared" is mechanical — a child whose body's first line is `Parent: #<n>` naming the epic, the same marker `dispatch/snapshot.py` parses into `Issue.parent` — never a hand list. (Subject: an epic's child set, not an item.) |
 | `FILING_LABELS_MISSING` | An open, milestoned item declares no `class:` label, so the conformance gate cannot hold it to a rung. |
 | `QUARANTINE_STALE` | A legacy excuse outlived the issue tracking it. (Subject: the baseline, not an item.) |
 
