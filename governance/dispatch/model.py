@@ -61,6 +61,11 @@ class Issue:
     labels: tuple[str, ...] = ()
     parent: int | None = None
     blocked_by: tuple[int, ...] = ()
+    # Cross-repo chain edges, e.g. ``kushin77/code-indexing#128`` (issue #181).
+    # A foreign board is not in this snapshot, so these are captured but never
+    # gated by the same-repo eligibility rules — they are surfaced for the
+    # wave-bootstrap report and the triage lane to act on.
+    cross_refs: tuple[str, ...] = ()
     closed_at: str = ""
 
     @property
@@ -81,6 +86,7 @@ class Issue:
             "labels": list(self.labels),
             "parent": self.parent,
             "blocked_by": list(self.blocked_by),
+            "cross_refs": list(self.cross_refs),
             "closed_at": self.closed_at,
         }
 

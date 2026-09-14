@@ -11,6 +11,9 @@ body, so a chain is declared rather than guessed:
     Parent: #152          -> this issue is a child of #152
     Part-of: #152         -> same edge, alternate spelling
     Blocked-by: #9, #10   -> this issue cannot start until those are closed
+    Blocked-by: kushin77/code-indexing#128
+                          -> cross-repo edge, captured as ``cross_refs`` (a
+                             foreign board is not gated by this snapshot)
 
 An issue with no declared edges is still eligible as the milestone frontier
 (rule "next-in-milestone"); it is never eligible merely because it is visible.
@@ -44,26 +47,47 @@ DEFAULT_STALENESS_MINUTES = lease.SNAPSHOT_STALENESS_MINUTES
 
 _PARENT_RE = re.compile(r"^\s*(?:parent|part[-_ ]of)\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
 _BLOCKED_RE = re.compile(r"^\s*blocked[-_ ]by\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
+_CROSS_REPO_RE = re.compile(r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([0-9]+)")
+_EDGE_LINE_RE = re.compile(
+    r"^[ \t]*(?:parent|part[-_ ]of|blocked[-_ ]by)[ \t]*:[ \t]*(.+?)[ \t]*$", re.I | re.M
+)
 
 
 def _numbers(blob: str) -> list[int]:
     return [int(part) for part in re.findall(r"[0-9]+", blob)]
 
 
-def parse_edges(body: str) -> tuple[int | None, tuple[int, ...]]:
-    """Extract (parent, blocked_by) from an issue body using the marker convention."""
+def parse_edges(body: str) -> tuple[int | None, tuple[int, ...], tuple[str, ...]]:
+    """Extract (parent, blocked_by, cross_refs) from an issue body.
+
+    Same-repo edges are unchanged: ``Parent: #152`` and ``Blocked-by: #9, #10``
+    yield integer references. A cross-repo reference written ``owner/repo#N``
+    (e.g. ``Blocked-by: kushin77/code-indexing#128``) is captured separately in
+    ``cross_refs`` and is never coerced into a same-repo number — the foreign
+    board is not in this snapshot and cannot be gated here. Cross-repo refs are
+    read from ``Parent:``/``Blocked-by:`` lines only, so an issue body that
+    merely *mentions* another repo does not acquire chain edges.
+    """
+    text = body or ""
     parent: int | None = None
-    match = _PARENT_RE.search(body or "")
+    match = _PARENT_RE.search(text)
     if match:
         numbers = _numbers(match.group(1))
         if numbers:
             parent = numbers[0]
     blocked: list[int] = []
-    for match in _BLOCKED_RE.finditer(body or ""):
+    for match in _BLOCKED_RE.finditer(text):
         for number in _numbers(match.group(1)):
             if number not in blocked and number != parent:
                 blocked.append(number)
-    return parent, tuple(sorted(blocked))
+
+    cross: list[str] = []
+    for match in _EDGE_LINE_RE.finditer(text):
+        for owner, repo, number in _CROSS_REPO_RE.findall(match.group(1)):
+            canonical = f"{owner}/{repo}#{number}"
+            if canonical not in cross:
+                cross.append(canonical)
+    return parent, tuple(sorted(blocked)), tuple(sorted(cross))
 
 
 def now_iso() -> str:
@@ -109,7 +133,7 @@ def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at:
     issues: dict[int, Issue] = {}
     for record in records:
         number = int(record["number"])
-        parent, blocked = parse_edges(str(record.get("body", "") or ""))
+        parent, blocked, cross_refs = parse_edges(str(record.get("body", "") or ""))
         milestone = record.get("milestone") or {}
         milestone_title = milestone.get("title", "") if isinstance(milestone, dict) else str(milestone or "")
         labels = record.get("labels") or []
@@ -124,6 +148,7 @@ def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at:
             labels=label_names,
             parent=parent,
             blocked_by=blocked,
+            cross_refs=cross_refs,
             closed_at=str(record.get("closedAt") or ""),
         )
     return Snapshot(generated_at=generated_at or now_iso(), source=source, issues=issues)
@@ -177,6 +202,7 @@ def load(path: Path | str = DEFAULT_PATH) -> Snapshot:
             raise ValueError(f"{target}: every snapshot issue needs a 'number'")
         number = int(entry["number"])
         blocked = entry.get("blocked_by") or []
+        cross_refs = entry.get("cross_refs") or []
         issues[number] = Issue(
             number=number,
             title=str(entry.get("title", "") or ""),
@@ -185,6 +211,7 @@ def load(path: Path | str = DEFAULT_PATH) -> Snapshot:
             labels=tuple(str(label) for label in (entry.get("labels") or [])),
             parent=int(entry["parent"]) if entry.get("parent") is not None else None,
             blocked_by=tuple(sorted(int(number) for number in blocked)),
+            cross_refs=tuple(sorted(str(ref) for ref in cross_refs)),
         )
     return Snapshot(
         generated_at=str(data.get("generated_at", "") or ""),
