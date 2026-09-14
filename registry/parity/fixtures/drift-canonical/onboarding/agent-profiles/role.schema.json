@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:parity-fixture:cmr-role.schema.drift:v1",
+  "title": "Canonical CMR agent-role schema (DELIBERATE DRIFT fixture)",
+  "description": "Same as registry/parity/fixtures/canonical/... but the role enum carries an extra id (cmr-new-role) the registry has not backfilled. The parity gate must report this as canonical-only drift (exit 1), proving the canonical->registry direction is checked.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "role": {
+      "enum": [
+        "owner",
+        "architecture-sme",
+        "iac-sme",
+        "security-sme",
+        "sync-sme",
+        "platform-sme",
+        "qa-sme",
+        "frontend-sme",
+        "pmo-sme",
+        "general",
+        "vendor",
+        "spoke-consumer",
+        "cmr-new-role"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "properties": {
+        "tier": { "enum": ["LOW", "MED", "HIGH", "MAX"] },
+        "model": { "enum": ["flash", "pro"] }
+      }
+    },
+    "ownedLanes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "arch",
+          "gov-iac",
+          "security",
+          "sync-engine",
+          "harvest",
+          "module-contract",
+          "catalog",
+          "registry",
+          "gates",
+          "observability",
+          "pilot-frontend",
+          "guardrails",
+          "standards",
+          "dx",
+          "meta",
+          "hygiene",
+          "pmo"
+        ]
+      }
+    }
+  }
+}

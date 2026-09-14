@@ -97,6 +97,7 @@ FIXTURE_EXPECTATIONS = {
     "invalid-duplicate-tools.yaml": "duplicate",
     "invalid-bad-prompt-ref.yaml": "systemPromptRef",
     "invalid-extra-field.yaml": "bogusField",
+    "invalid-negative-spend-ceiling.yaml": "weekly_spend_ceiling",
 }
 
 

@@ -202,6 +202,18 @@ def validate_card(
             "(not in platform catalog guardrail policies)"
         )
 
+    # weekly_spend_ceiling (issue #145): first-class FinOps field. Optional
+    # (absence is the documented default: the platform budget guardrail governs),
+    # but when present it must be a non-negative number. bool is excluded
+    # explicitly because Python's bool is an int subclass.
+    ceiling = card.get("weekly_spend_ceiling")
+    if ceiling is not None and (
+        isinstance(ceiling, bool) or not isinstance(ceiling, (int, float)) or ceiling < 0
+    ):
+        raise InvalidCardError(
+            f"weekly_spend_ceiling must be a non-negative number (got {ceiling!r})"
+        )
+
 
 def _check_members(card: Dict[str, Any], field: str, allowed: set) -> None:
     for value in card.get(field, []):
