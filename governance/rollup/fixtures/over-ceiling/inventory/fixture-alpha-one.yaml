@@ -1,0 +1,24 @@
+# Over-ceiling provocation: one SME past its ceiling (issue #151).
+#
+# `qa-sme` spends $140 against a $100 ceiling. The gate requires this to surface
+# as an explicit SPEND_OVER_CEILING finding naming this ref, with the $40 excess
+# reported — never a total clamped back to $100.
+schema: ao.rollup/fleet-inventory-v1
+repo: fixture/alpha-one
+tenant: alpha
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: qa-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 100
+    spend_usd: 140
+    capacity_hours: 20
+    engaged_hours: 12
+    dispatched: 4
+    closed: 3
+drift:
+  checks: 4
+  findings: 0

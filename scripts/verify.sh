@@ -49,6 +49,7 @@ checks=(
   'paperclip-gap-analysis|bash scripts/check-paperclip-gap-analysis.sh'
   'brain-profile|bash scripts/check-brain-profile.sh'
   'knowledge-index|bash scripts/check-knowledge-index.sh'
+  'cross-reference|bash scripts/check-cross-reference.sh'
   'conformance|bash scripts/check-conformance.sh'
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'

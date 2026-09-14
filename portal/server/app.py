@@ -33,6 +33,7 @@ from portal.server.controls import (
 )
 from portal.server.finops import FinOpsReports
 from portal.server.fleet import FleetProjection
+from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
 from portal.server.surfaces import PortalSurfacesFeed
@@ -137,6 +138,8 @@ class ConsoleApplication:
             if portal_surfaces is not None
             else PortalSurfacesFeed(repo_root=self.repo_root)
         )
+        # Tenant scoping + RBAC for that surface (issue #333).
+        self.fleet_authz = FleetAuthorizer(state=self.state, repo_root=self.repo_root)
         # The FinOps single-pane surface (issue #341) — feature-flag-gated OFF.
         self.finops = (
             finops_reports
@@ -294,7 +297,7 @@ class ConsoleApplication:
         principal, claims = self._require_session(cookies)
         try:
             if parts[0] == "fleet":
-                return self._route_fleet(parts, method, query)
+                return self._route_fleet(parts, method, query, principal)
             if parts[0] == "portal":
                 return self._route_portal(parts, method)
             if parts[0] == "finops":
@@ -323,23 +326,41 @@ class ConsoleApplication:
     FLEET_EVENTS_MAX_LIMIT = 500
 
     def _route_fleet(
-        self, parts: list[str], method: str, query: dict[str, str]
+        self,
+        parts: list[str],
+        method: str,
+        query: dict[str, str],
+        principal: Principal,
     ) -> Response | StreamResponse:
-        """The read-only web single-pane-of-glass (issue #331).
+        """The read-only web single-pane-of-glass (issue #331), access-controlled.
 
         Every read is delegated to ``fleet/console.py`` through the projection,
         so the browser receives exactly the dashboard's projection. The surface
-        is GET-only and, when the feature flag is off, never reaches here.
+        is GET-only and, when the feature flag is off, never reaches here. Each
+        read is scoped to the caller by ``fleet_authz`` (issue #333): a tenant
+        principal receives only its own org's rows, and the cross-org roll-up is
+        refused unless the caller passes the platform gates.
         """
         if method != "GET":
             raise ApiError(405, "method_not_allowed", "the fleet surface is GET only")
         surface = parts[1:]
-        if surface == ["snapshot"]:
-            return self._ok(self.fleet.snapshot())
-        if surface == ["events"]:
-            return self._ok(self.fleet.events(self._fleet_events_limit(query)))
-        if surface == ["stream"]:
-            return StreamResponse(frames=self.fleet.stream())
+        try:
+            if surface == ["rollup"]:
+                return self._ok(self.fleet_authz.rollup(principal, self.fleet))
+            if surface == ["snapshot"]:
+                return self._ok(self.fleet_authz.scoped_snapshot(principal, self.fleet))
+            if surface == ["events"]:
+                return self._ok(
+                    self.fleet_authz.scoped_events(
+                        principal, self.fleet, self._fleet_events_limit(query)
+                    )
+                )
+            if surface == ["stream"]:
+                return StreamResponse(
+                    frames=self.fleet_authz.scoped_stream(principal, self.fleet)
+                )
+        except FleetDenied as exc:
+            raise ApiError(exc.status, exc.code, exc.message) from None
         raise ApiError(404, "not_found", f"no such fleet surface: {'/'.join(surface)}")
 
     def _fleet_events_limit(self, query: dict[str, str]) -> int:

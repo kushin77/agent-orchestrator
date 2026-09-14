@@ -1,0 +1,18 @@
+# Fail-closed schema provocation (issue #151).
+#
+# Not a valid contract: `oneOf` is outside the keyword subset
+# governance/rollup/schema.py implements. A validator that ignored it would
+# report every document as valid — the false green this repo rejects — so the
+# loader must refuse the schema outright and the CLI must exit CANNOT-ASSESS
+# (2). The gate requires exactly that, and would fail if this file started
+# validating cleanly.
+schema: http://json-schema.org/draft-07/schema#
+$id: urn:agent-orchestrator:rollup/fixtures/unsupported:v1
+title: Unsupported-keyword schema fixture
+definitions:
+  org:
+    oneOf:
+      - type: object
+      - type: array
+  inventory:
+    type: object
