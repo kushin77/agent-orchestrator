@@ -279,6 +279,19 @@ def membership_errors(data, vocab, label):
     if isinstance(gpref, str) and gpref not in vocab["guardrailPolicies"]:
         errors.append("%s: guardrailPolicyRef references unknown policy "
                       "'%s' (fail closed)" % (label, gpref))
+
+    # weekly_spend_ceiling (issue #145): first-class FinOps field. Optional
+    # (absence is the documented default: the platform budget guardrail governs),
+    # but when present it must be a non-negative number. bool is excluded
+    # explicitly because Python's bool is an int subclass.
+    ceiling = data.get("weekly_spend_ceiling")
+    if ceiling is not None:
+        if isinstance(ceiling, bool) or not isinstance(ceiling, (int, float)):
+            errors.append("%s: weekly_spend_ceiling must be a number "
+                          "(got %r)" % (label, ceiling))
+        elif ceiling < 0:
+            errors.append("%s: weekly_spend_ceiling must be non-negative "
+                          "(got %r)" % (label, ceiling))
     return errors
 
 

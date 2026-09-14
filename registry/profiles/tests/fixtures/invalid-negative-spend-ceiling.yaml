@@ -1,0 +1,18 @@
+# DELIBERATELY BROKEN fixture: weekly_spend_ceiling is NEGATIVE. The first-class
+# FinOps ceiling (issue #145) must be a non-negative number, so a negative value
+# is refused by both the JSON Schema (minimum: 0) and validate.py. Must be rejected.
+id: coder
+version: 1.0.0
+owner: platform/execution
+systemPromptRef: coder/primary@v1
+toolAllowlist:
+  - gh_issue
+constraintSet:
+  - issue-first
+capabilitySet:
+  - code-author
+defaultModelTier: LOW
+memoryScope:
+  - session
+guardrailPolicyRef: worker-bundle
+weekly_spend_ceiling: -5

@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:parity-fixture:cmr-role.schema:v1",
+  "title": "Canonical CMR agent-role schema (parity fixture)",
+  "description": "Hermetic stand-in for vendor/CMR/onboarding/agent-profiles/role.schema.json, used by registry/parity/tests so the parity gate can be exercised without the vendor/CMR submodule (which is unpopulated in a fresh git worktree). The role/tier/model/lane enums below MIRROR the canonical CMR role schema; they are deliberately not read from vendor/ at test time.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "role": {
+      "enum": [
+        "owner",
+        "architecture-sme",
+        "iac-sme",
+        "security-sme",
+        "sync-sme",
+        "platform-sme",
+        "qa-sme",
+        "frontend-sme",
+        "pmo-sme",
+        "general",
+        "vendor",
+        "spoke-consumer"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "properties": {
+        "tier": { "enum": ["LOW", "MED", "HIGH", "MAX"] },
+        "model": { "enum": ["flash", "pro"] }
+      }
+    },
+    "ownedLanes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "arch",
+          "gov-iac",
+          "security",
+          "sync-engine",
+          "harvest",
+          "module-contract",
+          "catalog",
+          "registry",
+          "gates",
+          "observability",
+          "pilot-frontend",
+          "guardrails",
+          "standards",
+          "dx",
+          "meta",
+          "hygiene",
+          "pmo"
+        ]
+      }
+    }
+  }
+}
