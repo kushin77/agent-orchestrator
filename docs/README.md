@@ -17,6 +17,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`CTO-OVERLAY.md`](CTO-OVERLAY.md) | The per-repo drop-in governance overlay — four real layer gates, BLOCKING/WARNING, preserved no-false-green tally (EPIC #144, issue #147). |
 | [`AUTHORITY-MODEL.md`](AUTHORITY-MODEL.md) | Scoped admin rights, repo separation, schema-enforced separation of duties, end-to-end closure (EPIC #144, issue #150). |
 | [`ENTERPRISE-ROLLUP.md`](ENTERPRISE-ROLLUP.md) | Tenant hierarchy + org aggregate view — a projection over per-repo fleets, never a second source of truth (EPIC #144, issue #151). |
+| [`SESSION-FLEET-LESSONS.md`](SESSION-FLEET-LESSONS.md) | Session-fleet lessons register: six lessons from first live steering + seven-item enterprise hardening register, each item mapped to its owning issue (issue #180). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
 
