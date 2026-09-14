@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "note": "Legacy quarantine for the cross-repo execution boundary (issue #388). An entry excuses one (code, subject) pair ONLY while the issue tracking it is still open; when that issue closes, the entry itself becomes a stale finding. The quarantine therefore shrinks as legacy closes and cannot grow silently - a new cross-repo child fails immediately. tracked_by #358 (Board attack plan, milestone-epic-class) is the open PMO artifact that enumerates and tracks the 11 vendor-compliance children (#126-#137) to closure; the brief's fallback #125 (the vendor-compliance epic) is CLOSED, so using it would make every entry stale on day one.",
+  "quarantine": [
+    {
+      "code": "self-parent",
+      "subject": "#126",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#126",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo saas-rbac it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#127",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#127",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo github-workflow it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#128",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#128",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo shared-temporal it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#129",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#129",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo Shared_Integrations it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#131",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#131",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo shared-governance it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#132",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#132",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo shared-services it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#133",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#133",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo googleworkspace it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#134",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#134",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo SharedFeatures it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#135",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#135",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo ERP-CRM it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#136",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#136",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo code-indexing it remediates."
+    },
+    {
+      "code": "self-parent",
+      "subject": "#137",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; its body carries the `Parent: #125` out-of-scope marker."
+    },
+    {
+      "code": "foreign-repo-declaration",
+      "subject": "#137",
+      "tracked_by": "#358",
+      "reason": "Legacy CMR vendor-compliance child of #125; declares the foreign repo diagrams it remediates."
+    }
+  ]
+}
