@@ -62,10 +62,14 @@ def test_record_run_survives_an_unwritable_log(tmp_path, monkeypatch, capsys):
     assert "rejected" in capsys.readouterr().err
 
 
-def test_loop_wires_record_run_into_the_run_path():
-    """The run path must call record_run for both the start and the outcome."""
-    import inspect
-
-    source = inspect.getsource(terminal.loop)
-    assert 'record_run(directive_id, issue, agent_id, "started"' in source
-    assert "record_run(directive_id, issue, agent_id, run_status" in source
+# The claim "the loop wires record_run into the run path — for both the start and
+# the outcome" is asserted by EFFECT in
+# ``test_isolation_guard.py::test_loop_wires_record_run_into_the_run_path``: it
+# drives ``terminal.loop`` through one real dispatch with every out-of-process
+# seam stubbed and reads the records the run path wrote back from the JSONL, so
+# deleting either emission fails it. It is deliberately NOT asserted here by
+# grepping the source: the previous version of that test did exactly that and
+# stayed green with the call commented out (#286, GR-12). A source-text
+# assertion cannot be the load-bearing check for a call — it is green while the
+# characters are present and the call is dead, and red when the call is merely
+# reformatted.
