@@ -43,6 +43,7 @@ def test_default_catalog_has_three_plans(catalog):
         "audit_log",
         "api_access",
         "sso",
+        "fleet_dashboard",
     }
 
 
@@ -64,7 +65,7 @@ def test_plan_toggles_and_limits(catalog):
 def test_feature_kinds_are_declared(catalog):
     assert catalog.feature("managed_agents").kind == FEATURE_KIND_LIMIT
     for key in ("multi_team", "budgets", "model_routing", "tool_governance",
-                "audit_log", "api_access", "sso"):
+                "audit_log", "api_access", "sso", "fleet_dashboard"):
         assert catalog.feature(key).kind == FEATURE_KIND_FEATURE
 
 
@@ -73,6 +74,11 @@ def test_grants_map_features_to_permissions(catalog):
     assert set(catalog.feature("budgets").grants) == {"budget:read", "budget:manage"}
     assert set(catalog.feature("audit_log").grants) == {"audit:read"}
     assert set(catalog.feature("model_routing").grants) == {"model:read", "model:manage"}
+    # The fleet single-pane-of-glass gates the portal's own row actions (#333).
+    assert set(catalog.feature("fleet_dashboard").grants) == {
+        "fleet:read",
+        "fleet:rollup",
+    }
     assert set(catalog.feature("multi_team").grants) == {
         "team:manage", "member:invite", "member:remove",
     }

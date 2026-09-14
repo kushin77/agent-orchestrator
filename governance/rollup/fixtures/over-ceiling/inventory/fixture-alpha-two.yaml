@@ -1,0 +1,33 @@
+# Over-ceiling provocation, sibling repo (issue #151).
+#
+# This repo runs a `qa-sme` too — the same SME id as its sibling — and its
+# `iac-sme` sits exactly on its ceiling. Two things are proved here at once:
+# the siblings' spends stay in separate totals (isolation), and at-ceiling is
+# telemetry rather than a finding.
+schema: ao.rollup/fleet-inventory-v1
+repo: fixture/alpha-two
+tenant: alpha
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: qa-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 80
+    spend_usd: 30
+    capacity_hours: 16
+    engaged_hours: 9
+    dispatched: 3
+    closed: 3
+  - id: iac-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 60
+    spend_usd: 60
+    capacity_hours: 12
+    engaged_hours: 6
+    dispatched: 2
+    closed: 1
+drift:
+  checks: 4
+  findings: 1
