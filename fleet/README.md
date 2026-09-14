@@ -172,6 +172,47 @@ Escalations must carry `correlation_id` and a `severity` (`info`/`warn`/
 `critical`) and may only come from the sister or a subagent, never the brain
 (enforced by the gate).
 
+## Live logs, KB access and mid-run steering (the A2A extension, issue #367)
+
+The mailbox above carries *discrete* messages. Issue #367 adds three live
+capabilities over the same transport — still localhost, file-based, no
+daemons:
+
+```bash
+# follow one run's stdout/events live (per-directive log stream)
+python3 fleet/channel.py follow --directive <directive-id> --timeout-seconds 0
+
+# append one event to a run's stream (the loop does this for you)
+python3 fleet/channel.py log --directive <directive-id> --line "checkpoint: ..."
+
+# pull the KB mid-run — a running agent answers from the recorded catalogue
+python3 fleet/channel.py kb --text "fail-closed" --kind policy --limit 5
+python3 fleet/channel.py kb --json --text "lessons" --limit 3
+
+# steer a stuck run without killing or re-dispatching it
+python3 fleet/channel.py steer --directive <directive-id> \
+  --body "the gate is green in the worktree; the failure is a stale snapshot — refresh and re-run"
+
+# the operator steers through the hierarchy, never directly:
+python3 fleet/channel.py order --message '{
+  "type": "directive", "task": {"kind": "steer", "directive": "<directive-id>"},
+  "body": "retry against the refreshed board snapshot"}'
+```
+
+- **`follow`** tails `.fleet/runs/<directive>.log` — every stdout line the
+  subagent writes (streamed by the loop as it happens) plus the loop's own
+  events (dispatch, claim, lane, steer, verdict). `--timeout-seconds 0`
+  follows forever; `--max-lines` bounds it.
+- **`kb`** answers from `governance/knowledge/catalog.json` (the recorded
+  knowledge index), each hit with source-backed evidence; a missing catalogue
+  is CANNOT-ASSESS (exit 2), a query with no matches is NOT-OK (exit 1).
+- **`steer`** queues a brain-signed hint for an in-flight directive. The
+  sister loop delivers it every cycle: the hint goes to the running child's
+  stdin, is echoed into the run's log stream and stamped into the run marker
+  (`.fleet/runs/<id>.json` → `steered`), then the steer is consumed. A steer
+  whose run has not started stays queued; one whose run already finished is
+  dropped, never re-targeted. Nothing is killed or re-dispatched.
+
 ## Control plane (refresh / update / poke / halt / debug / watch / health)
 
 From the brain/human terminal — without stopping the sister loop:
@@ -348,6 +389,8 @@ synthetic fleet, no network and no tmux.
 .fleet/sent/     the brain's copy of what it sent    (runtime, gitignored)
 .fleet/outbox/   acks and results back to the brain  (runtime, gitignored)
 .fleet/done/     directives answered and consumed   (runtime, gitignored)
+.fleet/runs/     run markers + each run's live log stream (`<id>.log`)  (runtime, gitignored)
+.fleet/brain/steer/  the brain's pending steering hints, one per directive  (runtime, gitignored)
 ```
 
 `fleet/directive.json` and the schema are tracked artifacts — the sister can

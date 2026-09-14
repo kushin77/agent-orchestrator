@@ -52,6 +52,20 @@ class _Beater:
         pass
 
 
+class _FakeStdin:
+    """Stands in for the child's stdin: the loop may write a mid-run steer."""
+
+    def __init__(self) -> None:
+        self.written: list[str] = []
+
+    def write(self, text: str) -> int:
+        self.written.append(str(text))
+        return len(text)
+
+    def flush(self) -> None:
+        pass
+
+
 class _FakeChild:
     """A ``subprocess.Popen`` stand-in: a real child would run a real model."""
 
@@ -60,9 +74,15 @@ class _FakeChild:
         self.env = dict(env)
         self.pid = 4242
         self.returncode = 0
+        self.stdin = _FakeStdin()
+        # The streaming run path pumps child stdout into the live log stream.
+        self.stdout = iter(())  # a finished run printed nothing yet
 
     def communicate(self, timeout: float | None = None) -> tuple[str, None]:
         return "runner finished", None
+
+    def wait(self, timeout: float | None = None) -> int:
+        return 0
 
     def poll(self) -> int:
         return 0

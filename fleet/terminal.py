@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+import channel
 import routing
 import runtime
 import singleton
@@ -378,6 +379,32 @@ def stop_session_beat(beater: object | None) -> None:
             pass
 
 
+def _pump_child_stdout(child, directive_id: str, captured: list[str]) -> None:
+    """Tee the child's stdout into the run's live log stream, line by line.
+
+    The pipe makes the child line-buffer its output (a plain file redirect would
+    block-buffer it and the `follow` view would lag); this thread drains it so
+    the loop can ``wait`` without a pipe-buffer deadlock, and every line lands
+    in `.fleet/runs/<directive>.log` the moment the subagent writes it — the
+    per-directive live log stream `channel follow --directive <id>` tails
+    (issue #367).
+    """
+    stream = getattr(child, "stdout", None)
+    if stream is None:
+        return
+    try:
+        for line in stream:
+            captured.append(line)
+            try:
+                channel.append_directive_log(
+                    directive_id, str(line).rstrip("\n"), source="subagent"
+                )
+            except (OSError, ValueError):
+                pass
+    except (OSError, ValueError):
+        pass
+
+
 def run_once(
     directive: dict,
     runner: str,
@@ -418,6 +445,7 @@ def run_once(
             return RC_REFUSED, f"dispatch refused: {refusal}"
     command = build_command(directive, str(dispatch["runner"]), agent_id, worktree, env, pack)
     cwd = str(worktree) if worktree is not None else str(ROOT)
+    directive_id = str(directive.get("id") or "unknown")
     print(f"[terminal] {finops_line(dispatch)}", flush=True)
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
@@ -426,6 +454,9 @@ def run_once(
         child = subprocess.Popen(
             command,
             cwd=cwd,
+            # stdin stays a pipe: the loop writes a mid-run steer into it
+            # (`deliver_pending_steers`), and stdout is drained live by the pump.
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -437,18 +468,26 @@ def run_once(
         return 127, f"runner could not start in {cwd}: {exc}"
     if slot is not None:
         slot["child"] = child
+    captured: list[str] = []
+    pumper = threading.Thread(
+        target=_pump_child_stdout, args=(child, directive_id, captured), daemon=True
+    )
+    pumper.start()
     beater = start_session_beat(env, child.pid)
     try:
-        output, _ = child.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        child.kill()
-        output, _ = child.communicate()
-        return 124, f"runner timed out after {timeout}s: {(output or '')[-400:]}"
+        try:
+            rc = child.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            rc = child.wait()
+            pumper.join(timeout=5.0)
+            return 124, f"runner timed out after {timeout}s: {(''.join(captured) or '')[-400:]}"
+        pumper.join(timeout=5.0)
     finally:
         stop_session_beat(beater)
         if slot is not None:
             slot["child"] = None
-    return child.returncode, output or ""
+    return rc, "".join(captured) or ""
 
 
 def provision_worktree(
@@ -1141,6 +1180,102 @@ def unregister_run(directive_id: str) -> None:
         IN_FLIGHT.pop(directive_id, None)
 
 
+def stream_run_event(directive_id: str, text: str) -> None:
+    """Append one loop-owned event to a run's live log stream (issue #367).
+
+    The subagent's stdout rides the pump (`_pump_child_stdout`); this carries
+    the loop's own events — dispatch resolved, claim taken, lane provisioned,
+    steer delivered, verdict — so `channel follow` shows the whole run, not
+    only the child's half of it.
+    """
+    try:
+        channel.append_directive_log(directive_id, text, source="sister")
+    except (OSError, ValueError):
+        pass
+
+
+def record_steer(directive_id: str, steer: dict) -> None:
+    """Stamp the delivered steer into the run marker — proof the run honoured it.
+
+    The marker `.fleet/runs/<directive>.json` already travels with the run
+    (issue #304's beat, #220's context pack); the `steered` list makes the
+    mid-run delivery auditable from outside the loop instead of only visible
+    in the log stream.
+    """
+    target = RUNS / f"{directive_id}.json"
+    try:
+        record = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    steered = record.get("steered")
+    if not isinstance(steered, list):
+        steered = []
+    steered.append(
+        {
+            "id": str(steer.get("id") or ""),
+            "ts": str(steer.get("ts") or _now()),
+            "body": str(steer.get("body") or "")[:400],
+        }
+    )
+    record["steered"] = steered
+    tmp = target.with_suffix(".tmp")
+    tmp.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    tmp.replace(target)
+
+
+def deliver_pending_steers() -> list[str]:
+    """Deliver every queued steer to its live run; returns the delivered ids.
+
+    Called by the loop every cycle (issue #367): the steer is injected into the
+    running child's stdin (the mid-run hint), echoed into the run's live log
+    stream, stamped into the run marker, and consumed from the queue — so the
+    brain steers a stuck run without killing or re-dispatching it. A steer
+    whose run is not live yet stays pending (an early steer is not lost); one
+    whose run already finished is consumed, because a hint for a finished run
+    must never steer the NEXT run of the same directive.
+    """
+    delivered: list[str] = []
+    for path in channel.pending_steers():
+        try:
+            steer = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            channel.consume_steer(path)
+            continue
+        if not isinstance(steer, dict):
+            channel.consume_steer(path)
+            continue
+        directive_id = str(steer.get("correlation_id") or "")
+        with RUNS_LOCK:
+            slot = IN_FLIGHT.get(directive_id)
+            child = slot.get("child") if slot is not None else None
+        if child is None:
+            continue
+        try:
+            running = child.poll() is None
+        except (OSError, AttributeError):
+            running = getattr(child, "returncode", None) is None
+        if not running:
+            channel.consume_steer(path)
+            continue
+        hint = " ".join(str(steer.get("body") or "").split())
+        if hint:
+            try:
+                stdin = getattr(child, "stdin", None)
+                if stdin is not None:
+                    stdin.write(f"\n[STEER from the brain] {hint}\n")
+                    stdin.flush()
+            except (OSError, ValueError):
+                pass
+        try:
+            channel.append_directive_log(directive_id, f"STEER delivered: {hint}", source="steer")
+        except (OSError, ValueError):
+            pass
+        record_steer(directive_id, steer)
+        channel.consume_steer(path)
+        delivered.append(directive_id)
+    return delivered
+
+
 def active_run_slots() -> list[dict]:
     """A snapshot of every in-flight run slot, so N runs are visible at once."""
     with RUNS_LOCK:
@@ -1586,6 +1721,7 @@ def loop(args: argparse.Namespace) -> int:
             directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200],
             dispatch=dispatch,
         )
+        stream_run_event(directive_id, f"run finished: rc={rc} status={run_status} | {gate_detail}")
         clear_reported(directive_id)
         if run_status == "done":
             subprocess.run(
@@ -1607,6 +1743,11 @@ def loop(args: argparse.Namespace) -> int:
     paused_printed = False
     pool = pool_size()
     while True:
+        # Mid-run steering (issue #367): deliver any steer the brain queued for a
+        # live run before this cycle does anything else.
+        delivered_steers = deliver_pending_steers()
+        if delivered_steers:
+            print(f"[terminal] delivered steer(s) to {delivered_steers}", flush=True)
         active = len(active_run_slots())
         if stopping():
             # `stop` is graceful: it takes effect once every in-flight run has
@@ -1634,6 +1775,11 @@ def loop(args: argparse.Namespace) -> int:
             capture_output=True,
             text=True,
         )
+        # A steer can land while the watch blocks; deliver it before the cycle
+        # moves on, so a hint reaches its run on the next tick at worst.
+        delivered_steers = deliver_pending_steers()
+        if delivered_steers:
+            print(f"[terminal] delivered steer(s) to {delivered_steers}", flush=True)
         if watch.returncode == 1:  # IDLE — just poll again (never stop)
             if not idle_printed:
                 print("[terminal] idle — watching .fleet/inbox (never sleeps)", flush=True)
@@ -1916,6 +2062,7 @@ def loop(args: argparse.Namespace) -> int:
             f"[terminal] executing directive {directive_id} (issue {issue}) — {finops_line(dispatch)}",
             flush=True,
         )
+        stream_run_event(directive_id, f"executing directive (issue {issue}) — {finops_line(dispatch)}")
         lane = (directive.get("task") or {}).get("lane") or ""
         # What the subagent is TOLD, not just ordered (#220): the issue's identity,
         # acceptance text and Verify: clause from the board snapshot (offline), the
@@ -1929,6 +2076,8 @@ def loop(args: argparse.Namespace) -> int:
             detail=context_summary(context), dispatch=dispatch,
         )
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
+        if claimed:
+            stream_run_event(directive_id, f"claim taken for #{issue} by {agent_id}")
         if not claimed:
             # Escalate ONCE and leave the directive pending: the refusal is usually
             # a stale snapshot (a freshly filed child), and after a board refresh the
@@ -1953,6 +2102,9 @@ def loop(args: argparse.Namespace) -> int:
                  "--body", f"no isolated lane for #{issue} — running in the shared checkout"[:200]],
                 cwd=ROOT,
             )
+            stream_run_event(directive_id, f"no isolated lane for #{issue} — shared checkout")
+        else:
+            stream_run_event(directive_id, f"isolated lane provisioned for #{issue}: {tree[0]}")
         worktree, _branch, lane_env = tree if tree else (None, None, {})
         # One worker = one lane = one claim = one run marker = one report. The
         # claim is taken here (by the loop) and released in the worker's `finally`,
