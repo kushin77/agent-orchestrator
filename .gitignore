@@ -70,6 +70,9 @@ governance/board/violations.jsonl
 # ledger, every rotated generation of an append-only ledger, and the pruner's
 # own cron log are all runtime state, never committed.
 .fleet/runs.jsonl
+# Per-run telemetry ledger (tracked module: fleet/telemetry.py, issue #219):
+# runtime state, one JSONL record per run, never committed.
+.fleet/telemetry.jsonl
 .fleet/*.jsonl.*
 .fleet/prune.log
 .fleet/watchdog.log
