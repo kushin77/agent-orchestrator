@@ -1,0 +1,32 @@
+{
+  "carrier": "brain-directive",
+  "declared_by": "docs/CROSS-REPO-LESSONS-SYNC.md",
+  "note": "The dispatch-hint table: the local equivalent of kushin77/deepseek#79's 'feed lessons back as dispatch hints'. The hint transport is the brain directive / claim chain. Every hint carries the lesson id, an issue reference, and a commit sha; a bare string is refused by the gate.",
+  "hints": [
+    {
+      "id": "hint-0001",
+      "lesson_id": "INC-0001",
+      "issue": "#153",
+      "commit": "e78f80b",
+      "text": "Ship the contract text the gate asserts before wiring the gate."
+    },
+    {
+      "id": "hint-0002",
+      "lesson_id": "LESSON-0001",
+      "issue": "#402",
+      "commit": "b87cdf9",
+      "peer_ref": {
+        "repo": "kushin77/deepseek",
+        "issue": 84
+      },
+      "text": "Lessons enter the ticket graph as typed edges; the peer learns of them through a reviewed direction item, never a silent copy."
+    },
+    {
+      "id": "hint-0003",
+      "lesson_id": "LESSON-0004",
+      "issue": "#446",
+      "commit": "8b2383f",
+      "text": "Prefer a rebuildable projection over a hand-maintained second store."
+    }
+  ]
+}
