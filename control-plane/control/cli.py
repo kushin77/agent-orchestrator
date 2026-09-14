@@ -66,7 +66,7 @@ SOURCES: dict[str, set[str]] = {
     },
     "governance/dispatch/cli.py": {
         "audit", "eligible", "claim", "release", "status", "held", "reap",
-        "snapshot",
+        "snapshot", "focus",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
     "governance/lifecycle/cli.py": {"audit", "status", "close", "collect"},

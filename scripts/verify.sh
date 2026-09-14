@@ -59,6 +59,7 @@ checks=(
   'gate-coverage|bash scripts/check-gate-coverage.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
+  'epic-focus|bash scripts/check-epic-focus.sh'
   'fleet-channel|bash scripts/check-fleet-channel.sh'
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'fleet-runbook|bash scripts/check-fleet-runbook.sh'

@@ -6,6 +6,7 @@
     "ORDERS": {"outcome": "ok", "rows": ["operator -> brain: 1 queued", "brain -> operator: 0 replies"]},
     "DISPATCHES": {"outcome": "ok", "rows": ["issue #565 dispatched to ao-rc10 · ack received"]},
     "CLAIMS": {"outcome": "ok", "rows": ["#565 held by ao-rc10 (lane control-plane)"]},
+    "FOCUS": {"outcome": "ok", "rows": ["active epic #707 EPIC: single-epic-focused BAU", "children 7 open · 0 closed", "pooled 67 waiting", "agents the pool (max_agents 0)"]},
     "WAVES": {"outcome": "ok", "rows": ["wave #551 12/19 done", "#565 eligible"]},
     "EVENTS": {"outcome": "ok", "rows": ["13:57 dispatch claim #565", "13:58 verify started"]},
     "WATCHDOG": {"outcome": "ok", "rows": ["2 sessions, 0 orphaned, 0 suspect"]},
