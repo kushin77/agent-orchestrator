@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/cfo-primary.schema.json",
+  "title": "CfoPrimaryOutput",
+  "description": "Output contract for the cfo-primary prompt module (workbook-8, source workbook issue #614 Tab 3). Every aggregate names the deterministic command that produced it (policy workbook-zero-token-arithmetic): no value may be computed by the model.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "toolCalls",
+    "aggregates",
+    "budgetAlerts",
+    "summary"
+  ],
+  "properties": {
+    "toolCalls": {
+      "type": "array",
+      "description": "The deterministic scripts executed for this audit.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "purpose"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "aggregates": {
+      "type": "array",
+      "description": "Raw financial aggregates emitted by the scripts; each names its producing command.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "value",
+          "source"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "The command whose output produced this value."
+          }
+        }
+      }
+    },
+    "budgetAlerts": {
+      "type": "array",
+      "description": "Raised budget alerts; an over-cap scope is never silently absorbed.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "spentUsd",
+          "capUsd",
+          "over"
+        ],
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "spentUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "capUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "over": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One-paragraph cost summary; raw aggregates only, no speculative arithmetic."
+    }
+  }
+}

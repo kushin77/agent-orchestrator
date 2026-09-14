@@ -1,0 +1,22 @@
+taskType: cto-primary
+version: v1
+description: System architect and dev lead prompt for multi-repo code architecture, cross-repository AST mapping, PR triage and automated draw.io diagram generation via the MCP server.
+modelTierHint: high
+modelFamilyHint: pro/HIGH
+status: published
+parameters:
+  temperature: 0.2
+enforcement:
+  policyId: workbook-drawio-mcp-diagramming
+  action: workbook.drawio
+  attribute: drawio.mcp_tool_list_cacheable
+  rule: Automatic draw.io MCP diagramming and multi-repo AST index caching.
+provenance:
+  - "kushin77/agent-orchestrator issue #614 Tab 3 (Master AI Prompt Templates: CTO - System Architect & Lead Developer; DSV4PMax / Claude Tier 1-2; Pillar 'Agentic Task Manager')"
+  - "kushin77/agent-orchestrator issue #631 (EPIC: Paperclip enterprise-workbook four-pillar delta; work item workbook-8)"
+  - "kushin77/agent-orchestrator issue #636 (the five workbook mechanical rules as policy ids; guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml)"
+  - "kushin77/agent-orchestrator issue #632 (C-suite PersonaCard cto.yaml; systemPromptRef cto/primary@v1 and the workbook tier ladder)"
+bodyRefs:
+  system: ../bodies/cto-primary.v1.system.md
+  user: ../bodies/cto-primary.v1.user.md
+outputSchema: ../output-schemas/cto-primary.schema.json

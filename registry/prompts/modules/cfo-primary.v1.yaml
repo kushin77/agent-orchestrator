@@ -1,0 +1,22 @@
+taskType: cfo-primary
+version: v1
+description: Financial and compute controller prompt for deterministic Python cost analysis, API token burn auditing and budget alerts with zero-token arithmetic.
+modelTierHint: low
+modelFamilyHint: flash/LOW
+status: published
+parameters:
+  temperature: 0.0
+enforcement:
+  policyId: workbook-zero-token-arithmetic
+  action: workbook.arithmetic
+  attribute: arithmetic.cacheable
+  rule: Deterministic Python script execution for cost analysis, with zero-token arithmetic.
+provenance:
+  - "kushin77/agent-orchestrator issue #614 Tab 3 (Master AI Prompt Templates: CFO - Financial Controller; DSV4FNone Tier 5; Pillar 'Agentic OS & Governance')"
+  - "kushin77/agent-orchestrator issue #631 (EPIC: Paperclip enterprise-workbook four-pillar delta; work item workbook-8)"
+  - "kushin77/agent-orchestrator issue #636 (the five workbook mechanical rules as policy ids; guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml)"
+  - "kushin77/agent-orchestrator issue #632 (C-suite PersonaCard cfo.yaml; systemPromptRef cfo/primary@v1 and the workbook tier ladder)"
+bodyRefs:
+  system: ../bodies/cfo-primary.v1.system.md
+  user: ../bodies/cfo-primary.v1.user.md
+outputSchema: ../output-schemas/cfo-primary.schema.json
