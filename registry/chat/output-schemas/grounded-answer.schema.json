@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/chat/output-schemas/grounded-answer.schema.json",
+  "title": "GroundedAnswer",
+  "description": "Output contract for the chat-answer prompt module: an answer drawn only from the retrieved fragments, with every claim naming its source. The citations envelope is REQUIRED and must hold at least one entry - an answer that does not name its sources does not validate (ADR-0023).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["answer", "citations"],
+  "properties": {
+    "answer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The grounded answer, drawn from the supplied fragments."
+    },
+    "citations": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The citations envelope: one entry per grounded claim, naming the fragment it came from and that fragment's source_id.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fragment_id", "source_id"],
+        "properties": {
+          "fragment_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The retrieved fragment this claim came from."
+          },
+          "source_id": {
+            "type": "string",
+            "pattern": "^(bridge|tool_call|ticket):[A-Za-z0-9._:/-]+$",
+            "description": "The fragment's source identifier: a bridge family plus revision, a tool call id, or a ticket id."
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source revision the fragment was read at, when the source is versioned."
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The span of the answer this citation grounds."
+          }
+        }
+      }
+    }
+  }
+}

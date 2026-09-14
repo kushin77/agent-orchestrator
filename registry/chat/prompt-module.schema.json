@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/chat/prompt-module.schema.json",
+  "title": "ChatPromptModule",
+  "description": "A versioned chat prompt module. Every conversational turn resolves one of these (a taskType pinned to a frozen version) plus its declared output schema, so a chat answer is a contract rather than an ad-hoc prompt. A chat module's output schema must require the citations envelope (ADR-0023) - registry.chat.prompt_modules.check_module_contract refuses a module whose schema does not. See registry/chat/README.md for the full contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "taskType",
+    "version",
+    "bodyRefs",
+    "outputSchema",
+    "modelTierHint",
+    "groundingPolicy"
+  ],
+  "properties": {
+    "taskType": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Kebab-case task identifier; the registry key a runtime resolves on."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$",
+      "description": "Version label (v1, v2, ...). A published (taskType, version) is immutable."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What this module is for and when a caller should use it."
+    },
+    "modelTierHint": {
+      "type": "string",
+      "enum": ["low", "med", "high"],
+      "description": "Cheapest model tier that can do the task: low = flash/LOW, med = balanced, high = pro/HIGH. Consumed by the model gateway for routing."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "published", "deprecated"],
+      "description": "Lifecycle state. Only 'published' versions resolve at runtime."
+    },
+    "groundingPolicy": {
+      "type": "string",
+      "enum": [
+        "require-citations",
+        "refuse-without-citations",
+        "answer-without-citations"
+      ],
+      "description": "What the module does with grounding. 'require-citations' answers and cites (and refuses when it cannot ground); 'refuse-without-citations' states the refusal and its reason code and answers nothing; 'answer-without-citations' is expressible in the policy space but no published module may use it - a candidate version carrying it regresses the grounded fixture case, and registry.chat.regression refuses the promotion by name."
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Optional sampling parameters the gateway should use for this module.",
+      "additionalProperties": false,
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "topP": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "bodyRefs": {
+      "type": "object",
+      "description": "Named pointers (relative to the modules/ directory) to the frozen prompt bodies. At least one part is required; system and user are the conventional parts.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assistant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "examples": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference (relative path from the module file's directory) to the JSON Schema the model output must satisfy. It must require the citations envelope."
+    }
+  }
+}

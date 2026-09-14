@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/chat/output-schemas/refusal.schema.json",
+  "title": "ChatRefusal",
+  "description": "Output contract for the chat-refuse prompt module: the turn could not be grounded, so it resolves to an honest refusal with a reason code and answers nothing. The citations envelope is still REQUIRED - a refusal carries it empty, which is how 'nothing was grounded' is stated rather than omitted (an omitted envelope is indistinguishable from a lost one).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome", "reason", "reason_code", "citations"],
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["no-data", "refusal", "block", "flag"],
+      "description": "The refusal family: no-data (nothing to ground on), refusal (the request may not be answered), block (the request never reached the model), flag (a supplied source was quarantined)."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Why the turn was refused, in prose, with no request content echoed back."
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "description": "The machine-readable reason code the eval fixtures also declare as expected."
+    },
+    "citations": {
+      "type": "array",
+      "minItems": 0,
+      "description": "The citations envelope, empty for a refusal: a refusal grounds no claim.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fragment_id", "source_id"],
+        "properties": {
+          "fragment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "pattern": "^(bridge|tool_call|ticket):[A-Za-z0-9._:/-]+$"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

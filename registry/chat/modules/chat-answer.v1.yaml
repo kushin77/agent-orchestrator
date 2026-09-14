@@ -1,0 +1,14 @@
+taskType: chat-answer
+version: v1
+description: >
+  Answer a user's question from the fragments a turn retrieved, with every claim
+  naming its source in the citations envelope (ADR-0023). Used by the
+  conversational surface when the grounding lane could ground the question; a
+  turn it cannot ground is refused by the chat-refuse module instead.
+modelTierHint: med
+status: published
+groundingPolicy: require-citations
+bodyRefs:
+  system: ../bodies/chat-answer.v1.system.md
+  user: ../bodies/chat-answer.v1.user.md
+outputSchema: ../output-schemas/grounded-answer.schema.json
