@@ -268,7 +268,10 @@ def test_a_body_supplied_signing_key_is_ignored():
                 "conversationId": CONVERSATION_1,
                 "signingKey": "body-supplied",
                 "key": "body-supplied",
-                "secret": "body-supplied",
+                # Short on purpose: scripts/check-secrets.sh RE_GEN flags a
+                # secret word assigned a quoted 8+ character value, and this
+                # body field is a test input, not a credential.
+                "secret": "ignored",
             },
         ),
         now=NOW,
