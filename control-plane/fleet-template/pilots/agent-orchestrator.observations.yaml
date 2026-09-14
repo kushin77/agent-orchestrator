@@ -1,0 +1,19 @@
+# Pilot A run-state observation -- what the fleet was OBSERVED to be running.
+#
+# This is the other half of the definition-vs-run-state split: the params and
+# template declare the composition, this file records reality. A declared
+# `required` member that is absent here renders as `unverified`, and
+# `unverified` is never reported as present. Nothing here is derived from the
+# declared fleet -- it is an input, exactly like an orchestrator's own
+# session/lane snapshot would be.
+apiVersion: ao.fleet-template/v1
+kind: FleetRunStateObservation
+repo: agent-orchestrator
+source: "fleet live session/lane snapshot, recorded by the orchestrator"
+observed_present:
+  - agent-orchestrator:commander
+  - agent-orchestrator:general
+  - agent-orchestrator:soldier
+  - agent-orchestrator:sme:testing
+  - agent-orchestrator:sme:security-scanning
+  - agent-orchestrator:sme:infra

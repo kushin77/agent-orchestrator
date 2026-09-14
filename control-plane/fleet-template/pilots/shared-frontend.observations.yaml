@@ -1,0 +1,19 @@
+# Pilot B run-state observation -- recorded reality for a second repo.
+#
+# Deliberately a DIFFERENT observed set from pilot A: the auditor is observed
+# here, the infra SME is not. Between the two pilots the committed data
+# exercises every branch of the tri-state -- present (required + observed),
+# parked (declared parked), and unverified (declared required, never observed).
+apiVersion: ao.fleet-template/v1
+kind: FleetRunStateObservation
+repo: shared-frontend
+source: "fleet live session/lane snapshot, recorded by the orchestrator"
+observed_present:
+  - shared-frontend:commander
+  - shared-frontend:general
+  - shared-frontend:soldier
+  - shared-frontend:auditor
+  - shared-frontend:sme:testing
+  - shared-frontend:sme:security-scanning
+  - shared-frontend:sme:frontend-vibe
+  - shared-frontend:sme:docs

@@ -1,0 +1,850 @@
+# Ao fleet-template schema bundle (issue kushin77/agent-orchestrator#146).
+#
+# A JSON-Schema BUNDLE: `$defs` holds the shared definitions, and the
+# top-level `template`, `params`, `observations` and `instance` keys are each
+# a real JSON Schema that references them by `#/$defs/...`.
+#
+# Why a bundle instead of four files: the four documents are one contract
+# (template -> params -> rendered instance, plus the recorded run-state
+# observation), and they share the same identifier / role / tier / domain
+# vocabulary. Keeping the vocabulary in ONE place is what stops the schema
+# from drifting away from the renderer it constrains.
+#
+# `render.py` validates against this bundle with its own stdlib-only
+# validator. `tests/test_schema_is_real_json_schema.py` cross-checks the same
+# documents with the `jsonschema` library (skipped if it is absent), so the
+# claim "this is a real JSON Schema" is measured, not asserted.
+#
+# Vocabulary provenance (GR-10): role ids, the ROLE->TIER->MODEL split, the
+# platoon/lens routing keys and the SME domain names are harvested from the
+# fleet sources listed in docs/FLEET-TEMPLATE.md (PROVENANCE). None of the
+# taxonomy is invented here.
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ao.fleet-template.schema/v1"
+title: "Per-repo agent fleet template / params / instance contract"
+description: >-
+  Declared-data contract for a per-repo agent fleet. A parameterized
+  template renders a complete fleet instance (roles, SMEs, routing, FinOps
+  ceilings, run-state) that is namespaced to exactly one repository, so two
+  repositories' fleets can never share identity or state.
+$defs:
+
+  # -- primitive vocabulary -------------------------------------------------
+  identifier:
+    type: string
+    minLength: 1
+    maxLength: 64
+    pattern: "^[a-z0-9][a-z0-9._-]*$"
+
+  semver:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+
+  nonempty:
+    type: string
+    minLength: 1
+
+  # A `${param.path}` placeholder. Template-side fields cannot be held to the
+  # concrete enums/patterns the rendered instance is held to (the enum value
+  # does not exist until render time), so every template-side enumerable field
+  # is `oneOf [concrete, placeholder]`. The two branches cannot overlap: the
+  # placeholder branch requires the literal `${...}` shape.
+  placeholder:
+    type: string
+    pattern: "^\\$\\{[A-Za-z0-9_.]+\\}$"
+
+  # `$for_each` names a parameter PATH (it selects data), it does not
+  # interpolate: `domains`, `budget.per_role`. Distinct from `$key`/`$value`,
+  # which ARE interpolations.
+  param_path:
+    type: string
+    pattern: "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$"
+
+  tpl_identifier:
+    oneOf:
+      - $ref: "#/$defs/identifier"
+      - $ref: "#/$defs/placeholder"
+
+  tpl_role:
+    oneOf:
+      - $ref: "#/$defs/role_id"
+      - $ref: "#/$defs/placeholder"
+
+  tpl_tier:
+    oneOf:
+      - $ref: "#/$defs/tier_id"
+      - $ref: "#/$defs/placeholder"
+
+  tpl_domain:
+    oneOf:
+      - $ref: "#/$defs/domain_id"
+      - $ref: "#/$defs/placeholder"
+
+  tpl_transport:
+    oneOf:
+      - $ref: "#/$defs/transport"
+      - $ref: "#/$defs/placeholder"
+
+  tpl_effort:
+    oneOf:
+      - $ref: "#/$defs/effort"
+      - $ref: "#/$defs/placeholder"
+
+  tpl_state:
+    oneOf:
+      - $ref: "#/$defs/declared_state"
+      - $ref: "#/$defs/placeholder"
+
+  tpl_prompt:
+    oneOf:
+      - type: string
+        pattern: "^[a-z0-9-]+\\.txt$"
+      - $ref: "#/$defs/placeholder"
+
+  # A lens id may be PARTIALLY interpolated ("lens:${domain.name}"), so the
+  # placeholder branch only requires a placeholder to appear somewhere.
+  tpl_lens:
+    oneOf:
+      - type: string
+        pattern: "^lens:[a-z0-9-]+$"
+      - type: string
+        pattern: "\\$\\{[A-Za-z0-9_.]+\\}"
+
+  # A literal constant and a placeholder are both legitimate here; the two
+  # branches cannot overlap because a placeholder must have the `${...}` shape.
+  tpl_scalar_or_placeholder:
+    oneOf:
+      - $ref: "#/$defs/identifier"
+      - $ref: "#/$defs/placeholder"
+
+  model_id:
+    type: string
+    minLength: 1
+    maxLength: 64
+    pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+
+  # Harvested from leaderboard/lib/fleet-roster.sh FLEET_ROLES.
+  role_id:
+    enum: [commander, general, soldier, auditor, advisor]
+
+  # Harvested from the ROLE_TIER_<ROLE> split in fleet-roster.sh: role, tier
+  # and model are three separate axes. `volume` (soldier) and `verify`
+  # (auditor) are distinct seats that happen to share a default model string
+  # -- that is the roster's own honest position, kept here rather than
+  # flattened into a fake one-model-per-tier ladder.
+  tier_id:
+    enum: [brain, volume, verify, escalate]
+
+  # Harvested from capital-underwriting SME_SQUAD_DESIGN.md (7 routed domains).
+  domain_id:
+    enum:
+      - testing
+      - security-scanning
+      - debugging
+      - infra
+      - frontend-vibe
+      - backend-server
+      - docs
+
+  transport:
+    enum: [api, cli, local]
+
+  effort:
+    enum: [low, medium, high]
+
+  # What the fleet DECLARES. `unverified` is deliberately not declarable: it
+  # is a runtime fact about observation, not a composition choice, and it is
+  # never reported as present.
+  declared_state:
+    enum: [required, parked]
+
+  # What the fleet is OBSERVED to be. `unverified` means no observation was
+  # available -- it is not a synonym for present.
+  effective_state:
+    enum: [required, parked, unverified]
+
+  # -- template-side (placeholder-permitting) shapes -----------------------
+  parameter:
+    type: object
+    required: [name, type, required, description]
+    additionalProperties: false
+    properties:
+      name:
+        $ref: "#/$defs/identifier"
+      type:
+        enum: [string, number, boolean, object, array]
+      required:
+        type: boolean
+      default: {}
+      description:
+        $ref: "#/$defs/nonempty"
+
+  template_isolation:
+    type: object
+    required: [fleet_id, state_prefix, worktree_prefix, lane_namespace, exclusive]
+    additionalProperties: false
+    properties:
+      fleet_id:
+        $ref: "#/$defs/nonempty"
+      state_prefix:
+        $ref: "#/$defs/nonempty"
+      worktree_prefix:
+        $ref: "#/$defs/nonempty"
+      lane_namespace:
+        $ref: "#/$defs/nonempty"
+      exclusive:
+        const: true
+
+  template_role:
+    type: object
+    required: [role, tier, transport, effort, description, memory_file, state, parallelism]
+    additionalProperties: false
+    properties:
+      role:
+        $ref: "#/$defs/tpl_role"
+      tier:
+        $ref: "#/$defs/tpl_tier"
+      transport:
+        $ref: "#/$defs/tpl_transport"
+      effort:
+        $ref: "#/$defs/tpl_effort"
+      description:
+        $ref: "#/$defs/nonempty"
+      memory_file:
+        $ref: "#/$defs/nonempty"
+      state:
+        $ref: "#/$defs/tpl_state"
+      parallelism:
+        oneOf:
+          - type: integer
+            minimum: 1
+          - $ref: "#/$defs/placeholder"
+
+  template_sme_member:
+    type: object
+    required: [domain, sme, role, tier, labels, prompt, state]
+    additionalProperties: false
+    properties:
+      domain:
+        $ref: "#/$defs/tpl_domain"
+      sme:
+        $ref: "#/$defs/tpl_identifier"
+      role:
+        $ref: "#/$defs/tpl_role"
+      tier:
+        $ref: "#/$defs/tpl_tier"
+      labels:
+        oneOf:
+          - type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/nonempty"
+          - $ref: "#/$defs/placeholder"
+      prompt:
+        $ref: "#/$defs/tpl_prompt"
+      state:
+        $ref: "#/$defs/tpl_state"
+
+  for_each_block:
+    type: object
+    required: ["$for_each", "$as", "$template"]
+    additionalProperties: false
+    properties:
+      "$for_each":
+        $ref: "#/$defs/param_path"
+      "$as":
+        $ref: "#/$defs/identifier"
+      "$key":
+        $ref: "#/$defs/tpl_scalar_or_placeholder"
+      "$value":
+        $ref: "#/$defs/tpl_scalar_or_placeholder"
+      "$template":
+        $ref: "#/$defs/template_sme_member"
+
+  template_smes:
+    oneOf:
+      - $ref: "#/$defs/for_each_block"
+      - type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/template_sme_member"
+
+  template_lens_member:
+    type: object
+    required: [lens, platoon, parallelism, domains]
+    additionalProperties: false
+    properties:
+      lens:
+        $ref: "#/$defs/tpl_lens"
+      platoon:
+        $ref: "#/$defs/tpl_identifier"
+      parallelism:
+        oneOf:
+          - type: integer
+            minimum: 1
+          - $ref: "#/$defs/placeholder"
+      domains:
+        oneOf:
+          - type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/tpl_domain"
+          - $ref: "#/$defs/placeholder"
+
+  template_lenses:
+    oneOf:
+      - type: object
+        required: ["$for_each", "$as", "$template"]
+        additionalProperties: false
+        properties:
+          "$for_each":
+            $ref: "#/$defs/param_path"
+          "$as":
+            $ref: "#/$defs/identifier"
+          "$key":
+            $ref: "#/$defs/placeholder"
+          "$value":
+            $ref: "#/$defs/placeholder"
+          "$template":
+            $ref: "#/$defs/template_lens_member"
+      - type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/template_lens_member"
+
+  template_routing:
+    type: object
+    required: [lenses, domain_to_role]
+    additionalProperties: false
+    properties:
+      lenses:
+        $ref: "#/$defs/template_lenses"
+      domain_to_role:
+        oneOf:
+          - type: object
+            required: ["$for_each", "$as", "$key", "$value"]
+            additionalProperties: false
+            properties:
+              "$for_each":
+                $ref: "#/$defs/param_path"
+              "$as":
+                $ref: "#/$defs/identifier"
+              "$key":
+                $ref: "#/$defs/tpl_scalar_or_placeholder"
+              "$value":
+                $ref: "#/$defs/tpl_scalar_or_placeholder"
+          - type: object
+            minProperties: 1
+            additionalProperties:
+              $ref: "#/$defs/tpl_role"
+
+  template_finops:
+    type: object
+    required: [currency, fleet_total, per_role, per_domain, max_parallelism]
+    additionalProperties: false
+    properties:
+      currency:
+        $ref: "#/$defs/nonempty"
+      fleet_total:
+        oneOf:
+          - type: number
+          - $ref: "#/$defs/placeholder"
+      per_role:
+        oneOf:
+          - type: object
+            minProperties: 1
+          - $ref: "#/$defs/placeholder"
+      per_domain:
+        oneOf:
+          - type: object
+            minProperties: 1
+          - $ref: "#/$defs/placeholder"
+      max_parallelism:
+        oneOf:
+          - type: integer
+            minimum: 1
+          - $ref: "#/$defs/placeholder"
+
+
+  template_spec:
+    type: object
+    required: [isolation, roles, smes, routing, finops]
+    additionalProperties: false
+    properties:
+      isolation:
+        $ref: "#/$defs/template_isolation"
+      roles:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/template_role"
+      smes:
+        $ref: "#/$defs/template_smes"
+      routing:
+        $ref: "#/$defs/template_routing"
+      finops:
+        $ref: "#/$defs/template_finops"
+
+  # -- params-side (concrete) shapes ---------------------------------------
+  domain_param:
+    type: object
+    required: [name, sme, labels, prompt, platoon, parallelism]
+    additionalProperties: false
+    properties:
+      name:
+        $ref: "#/$defs/domain_id"
+      sme:
+        $ref: "#/$defs/identifier"
+      labels:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/nonempty"
+      prompt:
+        type: string
+        pattern: "^[a-z0-9-]+\\.txt$"
+      platoon:
+        $ref: "#/$defs/identifier"
+      parallelism:
+        type: integer
+        minimum: 1
+        maximum: 64
+
+  model_tiers:
+    type: object
+    required: [brain, volume, verify, escalate]
+    additionalProperties: false
+    properties:
+      brain:
+        $ref: "#/$defs/model_id"
+      volume:
+        $ref: "#/$defs/model_id"
+      verify:
+        $ref: "#/$defs/model_id"
+      escalate:
+        $ref: "#/$defs/model_id"
+
+  budget_param:
+    type: object
+    required: [currency, fleet_total, per_role, per_domain, max_parallelism]
+    additionalProperties: false
+    properties:
+      currency:
+        enum: [USD, EUR, GBP]
+      fleet_total:
+        type: number
+        exclusiveMinimum: 0
+      per_role:
+        type: object
+        minProperties: 1
+        propertyNames:
+          $ref: "#/$defs/role_id"
+        additionalProperties:
+          type: number
+          minimum: 0
+      per_domain:
+        type: object
+        minProperties: 1
+        propertyNames:
+          $ref: "#/$defs/domain_id"
+        additionalProperties:
+          type: number
+          minimum: 0
+      max_parallelism:
+        type: integer
+        minimum: 1
+        maximum: 128
+
+  params_values:
+    type: object
+    required: [repo, domains, model_tiers, budget]
+    additionalProperties: false
+    properties:
+      repo:
+        $ref: "#/$defs/identifier"
+      display_name:
+        $ref: "#/$defs/nonempty"
+      domains:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/domain_param"
+      model_tiers:
+        $ref: "#/$defs/model_tiers"
+      budget:
+        $ref: "#/$defs/budget_param"
+
+  # -- rendered-instance shapes (strict, concrete) -------------------------
+  fleet_isolation:
+    type: object
+    required: [fleet_id, state_prefix, worktree_prefix, lane_namespace, exclusive]
+    additionalProperties: false
+    properties:
+      fleet_id:
+        type: string
+        pattern: "^fleet-[a-z0-9][a-z0-9._-]*$"
+      state_prefix:
+        type: string
+        pattern: "^[.]fleet/[a-z0-9][a-z0-9._-]*$"
+      worktree_prefix:
+        type: string
+        pattern: "^ao-[a-z0-9][a-z0-9._-]*-$"
+      lane_namespace:
+        $ref: "#/$defs/identifier"
+      exclusive:
+        const: true
+
+  fleet_role:
+    type: object
+    required: [id, role, tier, model, transport, effort, description, memory_file, state, parallelism]
+    additionalProperties: false
+    properties:
+      id:
+        $ref: "#/$defs/nonempty"
+      role:
+        $ref: "#/$defs/role_id"
+      tier:
+        $ref: "#/$defs/tier_id"
+      model:
+        $ref: "#/$defs/model_id"
+      transport:
+        $ref: "#/$defs/transport"
+      effort:
+        $ref: "#/$defs/effort"
+      description:
+        $ref: "#/$defs/nonempty"
+      memory_file:
+        type: string
+        pattern: "^[.]fleet/[a-z0-9][a-z0-9._-]*/memory/[a-z0-9._-]+\\.md$"
+      state:
+        $ref: "#/$defs/declared_state"
+      parallelism:
+        type: integer
+        minimum: 1
+        maximum: 64
+
+  fleet_sme:
+    type: object
+    required: [id, domain, sme, role, tier, model, labels, prompt, state]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9._-]*:sme:[a-z0-9-]+$"
+      domain:
+        $ref: "#/$defs/domain_id"
+      sme:
+        $ref: "#/$defs/identifier"
+      role:
+        $ref: "#/$defs/role_id"
+      tier:
+        $ref: "#/$defs/tier_id"
+      model:
+        $ref: "#/$defs/model_id"
+      labels:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/nonempty"
+      prompt:
+        type: string
+        pattern: "^[a-z0-9-]+\\.txt$"
+      state:
+        $ref: "#/$defs/declared_state"
+
+  lens_route:
+    type: object
+    required: [lens, platoon, parallelism, domains]
+    additionalProperties: false
+    properties:
+      lens:
+        type: string
+        pattern: "^lens:[a-z0-9-]+$"
+      platoon:
+        $ref: "#/$defs/identifier"
+      parallelism:
+        type: integer
+        minimum: 1
+        maximum: 64
+      domains:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/domain_id"
+
+  fleet_routing:
+    type: object
+    required: [lenses, domain_to_role]
+    additionalProperties: false
+    properties:
+      lenses:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/lens_route"
+      domain_to_role:
+        type: object
+        minProperties: 1
+        propertyNames:
+          $ref: "#/$defs/domain_id"
+        additionalProperties:
+          $ref: "#/$defs/role_id"
+
+  finops_ceiling:
+    type: object
+    required: [currency, fleet_total, per_role, per_domain, max_parallelism]
+    additionalProperties: false
+    properties:
+      currency:
+        enum: [USD, EUR, GBP]
+      fleet_total:
+        type: number
+        exclusiveMinimum: 0
+      per_role:
+        type: object
+        minProperties: 1
+        propertyNames:
+          $ref: "#/$defs/role_id"
+        additionalProperties:
+          type: number
+          minimum: 0
+      per_domain:
+        type: object
+        minProperties: 1
+        propertyNames:
+          $ref: "#/$defs/domain_id"
+        additionalProperties:
+          type: number
+          minimum: 0
+      max_parallelism:
+        type: integer
+        minimum: 1
+        maximum: 128
+
+  fleet_parallelism:
+    type: object
+    required: [total, per_lens]
+    additionalProperties: false
+    properties:
+      total:
+        type: integer
+        minimum: 1
+        maximum: 512
+      per_lens:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          type: integer
+          minimum: 1
+          maximum: 64
+
+  fleet_definition:
+    type: object
+    required: [repo, roles, smes, routing, finops, parallelism]
+    additionalProperties: false
+    properties:
+      repo:
+        $ref: "#/$defs/identifier"
+      roles:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/fleet_role"
+      smes:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/fleet_sme"
+      routing:
+        $ref: "#/$defs/fleet_routing"
+      finops:
+        $ref: "#/$defs/finops_ceiling"
+      parallelism:
+        $ref: "#/$defs/fleet_parallelism"
+
+  id_list:
+    type: array
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/nonempty"
+
+  run_state_block:
+    type: object
+    required: [observations, declared, tri_state, present, counts]
+    additionalProperties: false
+    properties:
+      observations:
+        type: object
+        required: [source, observed_present]
+        additionalProperties: false
+        properties:
+          source:
+            $ref: "#/$defs/nonempty"
+          observed_present:
+            $ref: "#/$defs/id_list"
+      declared:
+        type: object
+        required: [required, parked]
+        additionalProperties: false
+        properties:
+          required:
+            $ref: "#/$defs/id_list"
+          parked:
+            $ref: "#/$defs/id_list"
+      tri_state:
+        type: object
+        required: [required, parked, unverified]
+        additionalProperties: false
+        properties:
+          required:
+            $ref: "#/$defs/id_list"
+          parked:
+            $ref: "#/$defs/id_list"
+          unverified:
+            $ref: "#/$defs/id_list"
+      present:
+        $ref: "#/$defs/id_list"
+      counts:
+        type: object
+        required: [required, parked, unverified, present]
+        additionalProperties: false
+        properties:
+          required:
+            type: integer
+            minimum: 0
+          parked:
+            type: integer
+            minimum: 0
+          unverified:
+            type: integer
+            minimum: 0
+          present:
+            type: integer
+            minimum: 0
+
+  params_digest:
+    type: object
+    required: [sha256, values]
+    additionalProperties: false
+    properties:
+      sha256:
+        $ref: "#/$defs/sha256"
+      values:
+        $ref: "#/$defs/params_values"
+
+  instance_metadata:
+    type: object
+    required: [repo, display_name, template, template_version, template_sha256, params_sha256, params_source, generated_by]
+    additionalProperties: false
+    properties:
+      repo:
+        $ref: "#/$defs/identifier"
+      display_name:
+        $ref: "#/$defs/nonempty"
+      template:
+        $ref: "#/$defs/identifier"
+      template_version:
+        $ref: "#/$defs/semver"
+      template_sha256:
+        $ref: "#/$defs/sha256"
+      params_sha256:
+        $ref: "#/$defs/sha256"
+      params_source:
+        $ref: "#/$defs/nonempty"
+      generated_by:
+        const: "control-plane/fleet-template/render.py"
+
+# -- the four documents ---------------------------------------------------
+# Each is a standalone JSON Schema: resolve `#/$defs/...` against THIS bundle
+# root (that is how render.py resolves it, and how the jsonschema cross-check
+# builds its standalone copy of the schema).
+template:
+  type: object
+  required: [apiVersion, kind, metadata, parameters, defaults, spec]
+  additionalProperties: false
+  properties:
+    apiVersion:
+      const: "ao.fleet-template/v1"
+    kind:
+      const: "FleetTemplate"
+    metadata:
+      type: object
+      required: [name, version, description]
+      additionalProperties: false
+      properties:
+        name:
+          $ref: "#/$defs/identifier"
+        version:
+          $ref: "#/$defs/semver"
+        description:
+          $ref: "#/$defs/nonempty"
+    parameters:
+      type: array
+      minItems: 1
+      items:
+        $ref: "#/$defs/parameter"
+    defaults:
+      type: object
+    spec:
+      $ref: "#/$defs/template_spec"
+
+params:
+  type: object
+  required: [apiVersion, kind, repo, values]
+  additionalProperties: false
+  properties:
+    apiVersion:
+      const: "ao.fleet-template/v1"
+    kind:
+      const: "FleetParams"
+    repo:
+      $ref: "#/$defs/identifier"
+    observations:
+      $ref: "#/$defs/nonempty"
+    values:
+      $ref: "#/$defs/params_values"
+
+run_state_document:
+  type: object
+  required: [apiVersion, kind, repo, source, observed_present]
+  additionalProperties: false
+  properties:
+    apiVersion:
+      const: "ao.fleet-template/v1"
+    kind:
+      const: "FleetRunStateObservation"
+    repo:
+      $ref: "#/$defs/identifier"
+    source:
+      $ref: "#/$defs/nonempty"
+    observed_present:
+      $ref: "#/$defs/id_list"
+
+instance:
+  type: object
+  required: [apiVersion, kind, metadata, isolation, definition, run_state, params_digest]
+  additionalProperties: false
+  properties:
+    apiVersion:
+      const: "ao.fleet-template/v1"
+    kind:
+      const: "FleetInstance"
+    metadata:
+      $ref: "#/$defs/instance_metadata"
+    isolation:
+      $ref: "#/$defs/fleet_isolation"
+    definition:
+      $ref: "#/$defs/fleet_definition"
+    run_state:
+      $ref: "#/$defs/run_state_block"
+    params_digest:
+      $ref: "#/$defs/params_digest"
