@@ -1,0 +1,32 @@
+# Fleet inventory — kushin77/leaderboard (pilot, issue #151).
+#
+# The second tenant's only repo. Two tenants exist in the pilot so the roll-up
+# is exercised as a real tree: the enterprise total is the sum of tenant totals,
+# and neither tenant's numbers can be affected by the other's.
+schema: ao.rollup/fleet-inventory-v1
+repo: kushin77/leaderboard
+tenant: kushin77-ops
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: platform-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 300
+    spend_usd: 150.00
+    capacity_hours: 32
+    engaged_hours: 14
+    dispatched: 5
+    closed: 4
+  - id: qa-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 260
+    spend_usd: 88.00
+    capacity_hours: 16
+    engaged_hours: 7
+    dispatched: 3
+    closed: 3
+drift:
+  checks: 12
+  findings: 0

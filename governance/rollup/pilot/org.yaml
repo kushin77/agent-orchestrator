@@ -1,0 +1,35 @@
+# Enterprise/GDC org declaration — the pilot hierarchy (issue #151).
+#
+# This is the TOP of the roll-up: one enterprise org, the tenants beneath it,
+# and the repos each tenant owns. It declares the hierarchy only — every
+# aggregate number the org view reports is computed from the per-repo fleet
+# inventories, never from this file.
+#
+# `source: declared` because these are declarations, not measurements: the SME
+# facts in ../pilot/inventory/*.yaml are the pilot's declared week. The contract
+# accepts `measured` as well, and the follow-up that pipes a real measurement
+# feed changes this field and nothing else (docs/ENTERPRISE-ROLLUP.md, honest
+# gaps).
+schema: ao.rollup/org-v1
+source: declared
+generated_at: 2026-09-13
+
+enterprise:
+  id: elevatediq
+  name: ElevatedIQ GDC
+  weekly_spend_ceiling_usd: 3000
+
+tenants:
+  - id: kushin77-platform
+    name: Kushin77 platform modules
+    weekly_spend_ceiling_usd: 2800
+    repos:
+      - kushin77/agent-orchestrator
+      - kushin77/CMR
+      - kushin77/shared-frontend
+
+  - id: kushin77-ops
+    name: Kushin77 operating instrumentation
+    weekly_spend_ceiling_usd: 600
+    repos:
+      - kushin77/leaderboard

@@ -70,4 +70,7 @@ governance/board
 governance/isolation
 governance/lifecycle
 governance/reconcile
+governance/cto-overlay
+governance/authority
+governance/rollup
 scripts

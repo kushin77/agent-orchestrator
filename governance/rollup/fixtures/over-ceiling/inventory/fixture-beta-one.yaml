@@ -1,0 +1,25 @@
+# Over-ceiling provocation, second tenant (issue #151).
+#
+# Within every ceiling, so this repo contributes no finding of its own: it is
+# the control that keeps the provocation honest — the errors the gate requires
+# must come from the deliberate violation, not from the fixture being broken
+# everywhere.
+schema: ao.rollup/fleet-inventory-v1
+repo: fixture/beta-one
+tenant: beta
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: platform-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 90
+    spend_usd: 45
+    capacity_hours: 18
+    engaged_hours: 8
+    dispatched: 3
+    closed: 2
+drift:
+  checks: 3
+  findings: 0

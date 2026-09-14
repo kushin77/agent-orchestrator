@@ -1,0 +1,20 @@
+# The one inventory that IS present in the missing-inventory fixture (#151).
+schema: ao.rollup/fleet-inventory-v1
+repo: fixture/alpha-present
+tenant: alpha
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: platform-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 120
+    spend_usd: 60
+    capacity_hours: 20
+    engaged_hours: 10
+    dispatched: 4
+    closed: 4
+drift:
+  checks: 5
+  findings: 0

@@ -595,5 +595,34 @@ documentation and repository surface (docs.paperclip.ing, the `paperclipai/paper
 repo) were read. **No upstream code was copied into this repository**, and no
 upstream file is a dependency of any fleet primitive named in the analysis.
 
+## 14. Per-repo agent fleet / CTO overlay / authority + roll-up (issue #144)
+
+EPIC #144 generalizes the org's mature per-repo agent-fleet machinery. Every
+asset below was read from a local checkout and **re-implemented for this repo**
+where the mature shape was bash- or GitHub-bound; the verdict says which.
+
+| Source (repo-relative) | Asset | Verdict | Lands in |
+|---|---|---|---|
+| `leaderboard/docs/CTO_OVERLAY.md` | 4-layer overlay spec (BLOCKING/WARNING, non-negotiable signals) | PATTERN | `governance/cto-overlay/` (#147) |
+| `leaderboard/.cto/{config,schema,orchestrator}.yaml` | overlay config + JSON-Schema + master workflow | PATTERN | `governance/cto-overlay/schema.yaml` (#147) |
+| `leaderboard/scripts/cto/{apply-overlay,config-engine,cto-orchestrator}.sh` | severity engine + the upstream `_verdict` no-false-green tally fix | PATTERN | `governance/cto-overlay/overlay.py` (#147) |
+| `capital-underwriting/docs/wiki/ELITE_COMMANDER_LTC_CHARTER.md` | Commander holds the only merge authority; LTC is the execution arm | PATTERN | `governance/authority/matrix.yaml` (#150) |
+| `capital-underwriting/docs/wiki/ELITE_{GENERAL,PLATOON_LEADER,AUDITOR,SCRIBE}_CHARTER.md` | chain-of-command, per-role authority, separation of duties | PATTERN | `governance/authority/model.py` (#150) |
+| `leaderboard/docs/LEADERBOARD_PROTOCOL.md` | worktree-per-session isolation (collision → isolation) | PATTERN | `governance/authority/isolation.py` (#150) |
+| `leaderboard/scripts/data/fleet-metrics-per-model.sh` | per-model invocation/success/failure/cost metric shapes | PATTERN | `governance/rollup/model.py` (#151) |
+| `vendor/CMR/catalog/schemas/gdc-manifest.schema.json` | GDC framing, `owner/name` identity | REFERENCE | `governance/rollup/schema.yaml` (#151) |
+| `vendor/CMR/catalog/topology/topology.json` | drift-flagged edges | REFERENCE | `governance/rollup/model.py` (#151) |
+| `vendor/CMR/onboarding/agent-profiles/role.schema.json` | the closed SME `role` enum used by the pilot tenants | REFERENCE | `governance/rollup/pilot/` (#151) |
+
+**Declared-but-absent upstream assets.** The file names the issues cite are
+**not present** in the populated `vendor/CMR` submodule:
+`catalog/sme-registry.tsv` and `onboarding/agent-profiles/persona-registry.json`
+do not exist, and `grep -rn weekly_spend_ceiling vendor/CMR` returns **zero**
+matches. The per-SME `weekly_spend_ceiling` primitive is therefore **defined by
+this repo** (`governance/rollup/`), not harvested — recorded here so a later
+reader does not hunt for a source that is absent. (Provenance is GR-10: repo,
+path, verdict; see also the PROVENANCE tables in `docs/CTO-OVERLAY.md`,
+`docs/AUTHORITY-MODEL.md` and `docs/ENTERPRISE-ROLLUP.md`.)
+
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*
