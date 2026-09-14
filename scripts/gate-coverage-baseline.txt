@@ -112,3 +112,4 @@ suite	scripts	swept-only	#524
 suite	guardrails/chat	swept-only	#502
 suite	registry/chat	swept-only	#502
 suite	telemetry/chat	swept-only	#502
+suite	governance/modules	swept-only	#445
