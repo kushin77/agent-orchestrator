@@ -25,7 +25,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from governance.modules import health, hub, vendoring
+from governance.modules import audit, health, hub, schema, vendoring
+from governance.modules import policy as acceptance
 from governance.modules.model import (
     CATALOG_MODULE_NOT_MANDATORY,
     NOT_A_MODULE,
@@ -272,11 +273,24 @@ def build(
     targets_path: Optional[Path] = None,
     live: bool = False,
     include_vendoring: bool = True,
+    controls_path: Optional[Path] = None,
+    schema_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Build the registry. Raises :class:`CannotAssess` when the hub is unreadable."""
+    """Build the registry. Raises :class:`CannotAssess` when the hub is unreadable.
+
+    Three artifacts judge the result before it leaves this function (issue #591):
+    the declared acceptance policy (``controls.yaml``, via :mod:`policy`) stamps
+    every refusal and supplies the dispositions the audit trail records; the
+    frozen schema (``module-registry.schema.json``, via :mod:`schema`) is
+    enforced **on the document this function is about to return** rather than
+    asserted later by a test; and :mod:`audit` projects the judged document into
+    the deterministic record set the trail is appended from. Any of the three
+    failing is CANNOT-ASSESS — never a pass.
+    """
     repo_root = Path(repo_root)
     hub_root = Path(hub_root)
     targets_path = Path(targets_path) if targets_path else DEFAULT_TARGETS
+    controls = acceptance.load(controls_path)
 
     catalog = hub.load(hub_root, repo_root, recorded_root=str(hub_root))
     hub_root_str = catalog.root
@@ -335,14 +349,18 @@ def build(
 
     entries.sort(key=lambda entry: entry["id"])
     refused.sort(key=lambda entry: entry["id"])
-    findings = sorted_refusals(refusals)
+    # The declared acceptance policy judges every refusal the registry emits. A
+    # code it does not declare raises here (CANNOT-ASSESS): a refusal nobody
+    # declared is a refusal nobody reviewed, and recording it would look like
+    # evidence.
+    findings = tuple(controls.judge(finding) for finding in sorted_refusals(refusals))
 
     summary: Dict[str, int] = {state: 0 for state in STATES}
     for entry in entries:
         summary[entry["state"]] = summary.get(entry["state"], 0) + 1
     summary[NOT_A_MODULE] = len(refused)
 
-    return {
+    document: Dict[str, Any] = {
         "schema": SCHEMA,
         "states": list(STATES),
         "membership_refusal": NOT_A_MODULE,
@@ -364,7 +382,19 @@ def build(
         "modules": entries,
         "not_modules": refused,
         "refusals": [finding.as_dict() for finding in findings],
+        "policy": controls.as_document(_rel(controls.path, repo_root)),
     }
+
+    records = audit.records(document, controls)
+    document["audit"] = {
+        "schema": audit.SCHEMA,
+        "summary": audit.summary(records),
+        "records": records,
+    }
+    # The generator validates what it emits: the row shape is enforced on the
+    # document about to leave this function, not asserted later by a test.
+    schema.validate(document, schema_path)
+    return document
 
 
 def render(doc: Dict[str, Any]) -> str:
@@ -378,8 +408,40 @@ def render(doc: Dict[str, Any]) -> str:
 
 
 def findings(doc: Dict[str, Any]) -> Tuple[Refusal, ...]:
-    """The document's refusals, back as value objects."""
-    return tuple(Refusal(**finding) for finding in doc.get("refusals") or [])
+    """The document's refusals, back as value objects, with the declared judgment."""
+    return tuple(
+        Refusal(
+            code=finding["code"],
+            subject=finding["subject"],
+            detail=finding["detail"],
+            source=finding.get("source", ""),
+            disposition=finding.get("disposition", ""),
+            condition=finding.get("condition", ""),
+        )
+        for finding in doc.get("refusals") or []
+    )
+
+
+def by_disposition(doc: Dict[str, Any], disposition: str) -> Tuple[Refusal, ...]:
+    """The refusals the declared policy judged with one disposition.
+
+    ``fatal`` and ``recorded`` are read from the document, so the exit code a
+    caller derives follows the *declaration that judged the build* rather than a
+    second copy of the rule.
+    """
+    undeclared = [
+        finding
+        for finding in doc.get("refusals") or []
+        if not finding.get("disposition")
+    ]
+    if undeclared:
+        raise acceptance.PolicyUnavailable(
+            "the document carries {} unjudged refusal(s) ({}): a refusal without a "
+            "declared disposition cannot be weighed".format(
+                len(undeclared), ", ".join(str(item.get("code")) for item in undeclared)
+            )
+        )
+    return tuple(finding for finding in findings(doc) if finding.disposition == disposition)
 
 
 def membership(doc: Dict[str, Any], name: str) -> Tuple[str, Dict[str, Any]]:

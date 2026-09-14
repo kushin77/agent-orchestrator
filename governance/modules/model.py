@@ -96,17 +96,32 @@ class CannotAssess(Exception):
 
 @dataclass(frozen=True)
 class Refusal:
-    """A finding that refuses something, naming the thing it refuses."""
+    """A finding that refuses something, naming the thing it refuses.
+
+    ``disposition`` and ``condition`` are the declared acceptance policy's
+    judgment of this refusal (issue #591): the condition that governs it and the
+    weight it carries. ``registry.build`` stamps every refusal from
+    ``controls.yaml`` before it reaches the document, so a refusal a consumer
+    reads always travels with the reason it is fatal — and a refusal the policy
+    cannot judge raises instead of travelling unjudged.
+    """
 
     code: str
     subject: str
     detail: str
     source: str = ""
+    disposition: str = ""
+    condition: str = ""
 
     def render(self) -> str:
-        """``CODE: subject — detail [source]`` — the one line a gate greps for."""
+        """``CODE: subject — detail [source] (condition, disposition)``.
+
+        The shape a gate greps for is the prefix, unchanged; the declared
+        condition is appended so the line says *why* it is fatal.
+        """
         where = " [" + self.source + "]" if self.source else ""
-        return "{}: {} — {}{}".format(self.code, self.subject, self.detail, where)
+        judged = " ({}, {})".format(self.condition, self.disposition) if self.disposition else ""
+        return "{}: {} — {}{}{}".format(self.code, self.subject, self.detail, where, judged)
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -114,6 +129,8 @@ class Refusal:
             "subject": self.subject,
             "detail": self.detail,
             "source": self.source,
+            "disposition": self.disposition,
+            "condition": self.condition,
         }
 
 

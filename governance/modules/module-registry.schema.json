@@ -1,0 +1,393 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kushin77.github.io/agent-orchestrator/governance/modules/module-registry.schema.json",
+  "title": "ao.module-registry/v1 — the ecosystem module registry document (frozen, issue #591)",
+  "description": "The row shape of the registry document `governance/modules/cli.py build` emits. Frozen because the shape was implicit in registry.py and promised only in prose: a consumer (#447's brief, later projections) must be able to rely on the keys without reading this package's source. Validated against every document the generator emits (`schema.py`, stdlib subset validator) and by the gate, which provokes a violation in a scratch copy of this file. Every row is closed (`additionalProperties: false`): a new field is a schema change, reviewed as one.",
+  "type": "object",
+  "required": [
+    "schema",
+    "states",
+    "membership_refusal",
+    "hub",
+    "declared",
+    "summary",
+    "modules",
+    "not_modules",
+    "refusals",
+    "policy",
+    "audit"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ao.module-registry/v1",
+      "description": "The document's own schema tag (model.SCHEMA)."
+    },
+    "states": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/state" },
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "description": "The three states, in the frozen order — never two, never four."
+    },
+    "membership_refusal": {
+      "const": "not-a-module",
+      "description": "The membership refusal, which is deliberately not a state."
+    },
+    "hub": { "$ref": "#/$defs/hub" },
+    "declared": { "$ref": "#/$defs/declared" },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "registered-mandatory": { "type": "integer" },
+        "target-pending": { "type": "integer" },
+        "catalog-module-not-mandatory": { "type": "integer" },
+        "not-a-module": { "type": "integer" }
+      },
+      "required": [
+        "registered-mandatory",
+        "target-pending",
+        "catalog-module-not-mandatory",
+        "not-a-module"
+      ],
+      "additionalProperties": false,
+      "description": "One count per state, plus the refusal count — a state declared but uncounted is a hole."
+    },
+    "modules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/moduleEntry" },
+      "description": "Every name that resolves to a state, sorted by id."
+    },
+    "not_modules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/refusedEntry" },
+      "description": "Every name whose membership was refused, sorted by id."
+    },
+    "refusals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/refusal" },
+      "description": "Every refusal, each stamped with the condition and disposition the declared acceptance policy gave it."
+    },
+    "policy": { "$ref": "#/$defs/policy" },
+    "audit": { "$ref": "#/$defs/audit" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "state": {
+      "enum": [
+        "registered-mandatory",
+        "target-pending",
+        "catalog-module-not-mandatory"
+      ]
+    },
+    "refusalCode": {
+      "enum": [
+        "MODULE-ASSET-DRIFT",
+        "MODULE-ASSET-NO-LIST",
+        "MODULE-ASSET-NO-SEED",
+        "MODULE-ASSET-UNSAFE",
+        "MODULE-DUPLICATE-ID",
+        "MODULE-MANDATORY-FLAG-INVALID",
+        "MODULE-MANIFEST-INVALID",
+        "MODULE-NAME-DRIFT",
+        "MODULE-NONMANDATORY-DECLARES-ASSETS",
+        "MODULE-TARGET-LANDED-NOT-MANDATORY",
+        "MODULE-UNREGISTERED-FLAG",
+        "MODULE-UNREGISTERED-MANDATORY",
+        "TARGET-WITHOUT-BLOCKING",
+        "TARGET-WITHOUT-ID",
+        "VENDOR-EXTRA-SUBMODULE",
+        "VENDOR-IN-TREE-PACKAGE",
+        "VENDOR-PATH-OUTSIDE-HUB",
+        "VENDOR-SOURCE-IN-TREE"
+      ],
+      "description": "The closed refusal vocabulary (model.REFUSAL_CODES). A code here that the registry cannot emit, or a code the registry emits that is absent here, fails the suite."
+    },
+    "hub": {
+      "type": "object",
+      "required": [
+        "root",
+        "revision",
+        "revision_source",
+        "mandatory_registry",
+        "module_count",
+        "mandatory_count"
+      ],
+      "properties": {
+        "root": { "type": "string" },
+        "revision": { "type": ["string", "null"] },
+        "revision_source": { "type": "string" },
+        "mandatory_registry": { "type": "string" },
+        "module_count": { "type": "integer" },
+        "mandatory_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "declared": {
+      "type": "object",
+      "required": ["targets", "register", "target_count", "watch_count"],
+      "properties": {
+        "targets": { "type": "string" },
+        "register": { "type": "string" },
+        "target_count": { "type": "integer" },
+        "watch_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "reference": {
+      "type": "object",
+      "required": ["kind", "hub", "path", "repo", "pin"],
+      "properties": {
+        "kind": { "type": "string" },
+        "hub": { "type": "string" },
+        "path": { "type": "string" },
+        "repo": { "type": ["string", "null"] },
+        "pin": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false,
+      "description": "A reference, never a copy: where the entry was read from."
+    },
+    "asset": {
+      "type": "object",
+      "required": ["asset", "seed", "seed_present", "present_in_repo"],
+      "properties": {
+        "asset": { "type": "string" },
+        "seed": { "type": ["string", "null"] },
+        "seed_present": { "type": "boolean" },
+        "present_in_repo": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "health": {
+      "type": "object",
+      "required": ["kind", "target", "expect", "status", "reason"],
+      "properties": {
+        "kind": { "type": "string" },
+        "target": { "type": ["string", "null"] },
+        "expect": { "type": ["string", "null"] },
+        "status": {
+          "enum": ["ok", "not-run", "unreachable", "no-tag", "absent", "unknown"]
+        },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "description": "A probe spec plus the status it honestly reached — an unrun probe is never `ok`."
+    },
+    "claim": {
+      "type": ["object", "null"],
+      "properties": {
+        "repo": { "type": ["string", "null"] },
+        "admission": { "type": ["string", "null"] },
+        "request": { "type": ["string", "null"] },
+        "rationale": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false,
+      "description": "The admission register claim, carried as evidence — a claim never confers membership."
+    },
+    "moduleEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "state",
+        "shipped",
+        "mandatory",
+        "consumer_assets",
+        "owning_repo",
+        "pin",
+        "rev",
+        "board_ref",
+        "blocking",
+        "claim",
+        "reference",
+        "assets",
+        "health",
+        "note"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "state": { "$ref": "#/$defs/state" },
+        "shipped": { "type": "boolean" },
+        "mandatory": { "type": ["boolean", "null"] },
+        "consumer_assets": { "type": "array", "items": { "type": "string" } },
+        "owning_repo": { "type": ["string", "null"] },
+        "pin": { "type": ["string", "null"] },
+        "rev": { "type": ["string", "null"] },
+        "board_ref": { "type": ["string", "null"] },
+        "blocking": { "type": "array", "items": { "type": "string" } },
+        "onboarding": { "type": ["string", "null"] },
+        "claim": { "$ref": "#/$defs/claim" },
+        "reference": { "$ref": "#/$defs/reference" },
+        "assets": { "type": "array", "items": { "$ref": "#/$defs/asset" } },
+        "health": { "$ref": "#/$defs/health" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "description": "One name that resolves to a state. `onboarding` is present only on a declared target, which is why it is not required."
+    },
+    "refusedEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "state",
+        "membership",
+        "shipped",
+        "mandatory",
+        "consumer_assets",
+        "owning_repo",
+        "pin",
+        "rev",
+        "board_ref",
+        "blocking",
+        "claim",
+        "reference",
+        "assets",
+        "health",
+        "detail",
+        "note"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "state": { "const": "not-a-module" },
+        "membership": { "const": "refused" },
+        "shipped": { "const": false },
+        "mandatory": { "type": "null" },
+        "consumer_assets": { "type": "array", "items": { "type": "string" } },
+        "owning_repo": { "type": ["string", "null"] },
+        "pin": { "type": ["string", "null"] },
+        "rev": { "type": ["string", "null"] },
+        "board_ref": { "type": ["string", "null"] },
+        "blocking": { "type": "array", "items": { "type": "string" } },
+        "claim": { "$ref": "#/$defs/claim" },
+        "reference": { "$ref": "#/$defs/reference" },
+        "assets": { "type": "array", "items": { "$ref": "#/$defs/asset" } },
+        "health": { "$ref": "#/$defs/health" },
+        "detail": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "description": "A name whose membership was refused: not a module, in no state, with the refusal stated."
+    },
+    "refusal": {
+      "type": "object",
+      "required": ["code", "subject", "detail", "source", "disposition", "condition"],
+      "properties": {
+        "code": { "$ref": "#/$defs/refusalCode" },
+        "subject": { "type": "string" },
+        "detail": { "type": "string" },
+        "source": { "type": "string" },
+        "disposition": { "const": "fatal" },
+        "condition": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "description": "A refusal, stamped by the declared acceptance policy: the condition that governs it and the disposition it carries."
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "schema",
+        "path",
+        "authority",
+        "dispositions",
+        "conditions",
+        "judgments",
+        "refusal_codes"
+      ],
+      "properties": {
+        "schema": { "const": "ao.module-registry/controls-v1" },
+        "path": { "type": "string" },
+        "authority": {
+          "type": "object",
+          "required": ["membership", "claim_effect", "citation"],
+          "properties": {
+            "membership": { "const": "hub-catalog" },
+            "claim_effect": { "const": "none" },
+            "citation": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "dispositions": {
+          "type": "array",
+          "items": { "enum": ["fatal", "recorded"] },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "disposition", "enforced_by", "codes"],
+            "properties": {
+              "id": { "type": "string" },
+              "disposition": { "enum": ["fatal", "recorded"] },
+              "enforced_by": { "enum": ["code", "reader"] },
+              "codes": { "type": "array", "items": { "$ref": "#/$defs/refusalCode" } }
+            },
+            "additionalProperties": false
+          }
+        },
+        "judgments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["subject", "disposition", "statement"],
+            "properties": {
+              "subject": { "enum": ["registered-mandatory", "target-pending", "catalog-module-not-mandatory", "not-a-module"] },
+              "disposition": { "const": "recorded" },
+              "statement": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "refusal_codes": { "type": "array", "items": { "$ref": "#/$defs/refusalCode" } }
+      },
+      "additionalProperties": false,
+      "description": "The declared acceptance policy the document was judged by, as it was read — so the evidence travels with the judgment."
+    },
+    "auditRecord": {
+      "type": "object",
+      "required": [
+        "schema",
+        "kind",
+        "subject",
+        "code",
+        "state",
+        "condition",
+        "disposition",
+        "detail",
+        "source"
+      ],
+      "properties": {
+        "schema": { "const": "ao.module-registry/audit-v1" },
+        "kind": { "enum": ["refusal", "judgment"] },
+        "subject": { "type": "string" },
+        "code": { "type": ["string", "null"] },
+        "state": { "type": ["string", "null"] },
+        "condition": { "type": ["string", "null"] },
+        "disposition": { "enum": ["fatal", "recorded"] },
+        "detail": { "type": "string" },
+        "source": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false,
+      "description": "One append-only record: every key present, absent values explicit nulls, no clock and no absolute path — two builds over one revision are byte-identical."
+    },
+    "audit": {
+      "type": "object",
+      "required": ["schema", "summary", "records"],
+      "properties": {
+        "schema": { "const": "ao.module-registry/audit-v1" },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "refusal": { "type": "integer" },
+            "judgment": { "type": "integer" }
+          },
+          "required": ["refusal", "judgment"],
+          "additionalProperties": false
+        },
+        "records": { "type": "array", "items": { "$ref": "#/$defs/auditRecord" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}
