@@ -40,8 +40,21 @@ def test_promote_off_to_canary_with_green_gate(engine: RolloutEngine) -> None:
 
 
 def test_promotion_without_approval_is_blocked(engine: RolloutEngine) -> None:
+    # Low-risk hops (off -> canary, canary -> gradual) are now policy-auto-
+    # approved (issue #700); the human-gated final promotion (gradual -> full)
+    # still refuses without an approval code.
+    engine.promote("services.registry", "canary", verify_green=True, actor="deployer-sa")
+    engine.promote(
+        "services.registry", "gradual", verify_green=True,
+        actor="deployer-sa", canary_health_ok=True,
+    )
+    for pct in (25, 50, 100):
+        engine.ramp("services.registry", pct, verify_green=True)
     with pytest.raises(RolloutError) as exc:
-        engine.promote("services.registry", "canary", verify_green=True, actor="deployer-sa")
+        engine.promote(
+            "services.registry", "full", verify_green=True, actor="deployer-sa",
+            canary_health_ok=True, gradual_complete=True,
+        )
     assert "approval_code" in str(exc.value) or "approval" in str(exc.value)
 
 

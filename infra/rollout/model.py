@@ -14,10 +14,12 @@ The model guarantees (each is tested):
   declares a default of anything else is rejected.
 * **Strict-forward promotion** - a flag moves OFF -> CANARY -> GRADUAL ->
   FULL one adjacent step at a time; jumps are rejected.
-* **Gated promotion** - every promotion requires green verification evidence
-  plus an approval-as-code id; ramping and full promotion add canary-health
-  and gradual-complete signals (mirroring the issue #43 ``merge_verdict``
-  gate shape, applied to rollout).
+* **Gated promotion** - every promotion requires green verification evidence;
+  low-risk hops (``off`` -> ``canary``, ``canary`` -> ``gradual``) are
+  auto-approved by policy on green evidence with no human approval code, while
+  the final ``full`` promotion still needs an approval-as-code id; ramping and
+  full promotion add canary-health and gradual-complete signals (mirroring the
+  issue #43 ``merge_verdict`` gate shape, applied to rollout).
 * **Deterministic audiences** - a subject is either explicitly targeted or
   consistently hashed into a percentage bucket, so a canary slice is stable
   across calls.
@@ -136,6 +138,23 @@ class StageSpec:
 
 
 @dataclass(frozen=True)
+class ApprovalPolicy:
+    """A policy-based (non-human) approval tier for low-risk transitions.
+
+    ``targets`` are the stages whose promotion is auto-approved on green
+    verification evidence (plus the target's own health/complete signals) with
+    no human ``approval_code``. A stage not listed here (``full``) stays
+    human-gated - the policy can never bypass the final promotion/apply.
+    """
+
+    policy: str
+    targets: Tuple[RolloutStage, ...]
+
+    def auto_approves(self, target: RolloutStage) -> bool:
+        return target in self.targets
+
+
+@dataclass(frozen=True)
 class StageModel:
     """The parsed, validated stage model (data from stage-model.yaml)."""
 
@@ -147,6 +166,7 @@ class StageModel:
     to_gradual_requires: Tuple[str, ...]
     to_full_requires: Tuple[str, ...]
     rollback_target: str
+    approval_policy: Optional[ApprovalPolicy] = None
 
     @classmethod
     def load(cls, doc: Mapping[str, object]) -> "StageModel":
@@ -235,6 +255,24 @@ class StageModel:
         to_gradual = reqs("to_gradual_requires")
         to_full = reqs("to_full_requires")
 
+        approval_policy: Optional[ApprovalPolicy] = None
+        pa = rules.get("policy_auto_approve")
+        if pa is not None:
+            if not isinstance(pa, dict):
+                raise ValueError("promotion_rules.policy_auto_approve must be a mapping")
+            policy_name = pa.get("policy")
+            targets_raw = pa.get("targets")
+            if not isinstance(policy_name, str) or not policy_name:
+                raise ValueError(
+                    "promotion_rules.policy_auto_approve.policy must be a non-empty string"
+                )
+            if not isinstance(targets_raw, list) or not targets_raw:
+                raise ValueError(
+                    "promotion_rules.policy_auto_approve.targets must be a non-empty list"
+                )
+            policy_targets = tuple(RolloutStage.coerce(t) for t in targets_raw)
+            approval_policy = ApprovalPolicy(policy=policy_name, targets=policy_targets)
+
         rollback = doc.get("rollback_rules")
         rollback_target = "off"
         if isinstance(rollback, dict):
@@ -254,6 +292,7 @@ class StageModel:
             to_gradual_requires=to_gradual,
             to_full_requires=to_full,
             rollback_target=rollback_target,
+            approval_policy=approval_policy,
         )
 
     def spec(self, stage: RolloutStage) -> StageSpec:
@@ -362,9 +401,15 @@ def check_promotion(
     elif not flag.stage.can_promote_to(target, jump_allowed=model.jump_allowed):
         reasons.append(f"promotion {flag.stage.value} -> {target.value} is not an allowed step")
     if not reasons:
+        auto_approved = (
+            model.approval_policy is not None
+            and model.approval_policy.auto_approves(target)
+        )
         for requirement in (*model.every_transition_requires, *model.target_requirements(target)):
             if requirement == "audit_record":
                 continue  # engine-level guarantee, audited on every transition
+            if requirement == "approval_code" and auto_approved:
+                continue  # policy auto-approval waives the human approval code
             if not signals.meets(requirement):
                 reasons.append(f"missing gate signal: {requirement}")
     return PromotionVerdict(allowed=not reasons, reasons=tuple(reasons))

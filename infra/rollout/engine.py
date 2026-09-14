@@ -312,22 +312,43 @@ class RolloutEngine:
                 f"promotion {flag.stage.value} -> {target.value} for '{name}' blocked: "
                 + "; ".join(verdict.reasons)
             )
+        policy = self.model.approval_policy
+        auto_approved = policy is not None and policy.auto_approves(target) and not approval_id
         if approval_id:
             self.approvals.require(name, target, actor=actor, approval_id=approval_id)
 
         from_stage = flag.stage
         self._apply_stage(flag, target)
-        self.audit.append(
-            action="promote",
-            flag=name,
-            actor=actor,
-            from_stage=from_stage.value,
-            to_stage=target.value,
-            rollout_pct=flag.rollout_pct,
-            approval_id=approval_id or "",
-            verify_green=bool(verify_green),
-            reason=DEFAULT_REASON,
-        )
+        if auto_approved:
+            # Record the policy auto-approval explicitly (who/when/why/which
+            # policy) - never a silent approval.
+            self.audit.append(
+                action="promote",
+                flag=name,
+                actor=actor,
+                from_stage=from_stage.value,
+                to_stage=target.value,
+                rollout_pct=flag.rollout_pct,
+                approval_id="",
+                approval_kind="policy",
+                policy=policy.policy,
+                verify_green=bool(verify_green),
+                reason=f"auto-approved by policy '{policy.policy}'",
+            )
+        else:
+            self.audit.append(
+                action="promote",
+                flag=name,
+                actor=actor,
+                from_stage=from_stage.value,
+                to_stage=target.value,
+                rollout_pct=flag.rollout_pct,
+                approval_id=approval_id or "",
+                approval_kind="human" if approval_id else "",
+                policy="",
+                verify_green=bool(verify_green),
+                reason=DEFAULT_REASON,
+            )
         return flag
 
     def _apply_stage(self, flag: FlagState, target: RolloutStage) -> None:
