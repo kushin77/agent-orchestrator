@@ -1,0 +1,9 @@
+taskType: code-author
+version: v1
+description: Describe and author the smallest focused code change for a control-plane change request.
+modelTierHint: low
+status: published
+bodyRefs:
+  system: ../bodies/code-author.v1.system.md
+  user: ../bodies/code-author.v1.user.md
+outputSchema: ../output-schemas/code-author.schema.json
