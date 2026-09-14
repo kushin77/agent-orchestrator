@@ -24,9 +24,18 @@ import fcntl
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# The claim gate validates a directive against the claiming fleet's OWN sent
+# mailbox, which `fleet/channel.py` writes under the namespaced runtime dir
+# (`AO_FLEET_DIR`). Reading the one source keeps a second fleet's claims from
+# being refused as "invalid-directive" (#363). The ledger/lock/snapshot stay at
+# `.board/` and shared across fleets.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "fleet"))
+import runtime  # noqa: E402
 
 import order
 from model import (
@@ -50,7 +59,7 @@ DEFAULT_LEDGER = Path(".board/claims.jsonl")
 DEFAULT_CLAIMS_DIR = Path(".board/claims")
 DEFAULT_LOCK_DIR = Path(".board/locks")
 DEFAULT_TTL_HOURS = 24
-SENT_DIR = Path(__file__).resolve().parent.parent.parent / ".fleet" / "sent"
+SENT_DIR = runtime.FLEET_DIR / "sent"
 
 
 class ClaimRefused(Exception):

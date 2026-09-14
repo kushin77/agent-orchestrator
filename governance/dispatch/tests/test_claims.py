@@ -227,6 +227,40 @@ def test_a_brain_directive_authorizes_an_off_frontier_claim(tmp_path, monkeypatc
     assert event.directive_from == "brain"
 
 
+def test_sent_dir_follows_the_namespaced_fleet_runtime():
+    """The claim gate reads the claiming fleet's OWN sent dir, not `<repo>/.fleet`.
+
+    #363: namespacing (``AO_FLEET_DIR``) moved the sister's sent mailbox, but
+    this module kept validating against the hardcoded ``.fleet/sent``, so a
+    second fleet's claim was refused ``invalid-directive`` for its own brain's
+    directive. Proved in a fresh interpreter so a re-hardcode fails even though
+    the two paths coincide when the env var is unset.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    code = (
+        "import sys\n"
+        "sys.path.insert(0, 'governance/dispatch')\n"
+        "sys.path.insert(0, 'fleet')\n"
+        "import claims\n"
+        "print(claims.SENT_DIR)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=root,
+        env={**os.environ, "AO_FLEET_DIR": str(root / ".fleet-claims")},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert result.stdout.strip() == str(root / ".fleet-claims" / "sent")
+
+
 def test_a_brain_directive_must_name_this_issue(tmp_path, monkeypatch, snapshot, base_time):
     sent = tmp_path / "sent"
     monkeypatch.setattr(claims, "SENT_DIR", sent)
