@@ -59,9 +59,6 @@
 # 6, UNWIRED 69, baselined 69.
 # The gate-invocation universe, the match-by-path rule and the rejected
 # alternatives are stated in scripts/check-gate-coverage.sh.
-script	scripts/check-control-verbs.sh	uninvoked	#559	4c2f41fa7467d3bd83f5fcdb7dba3ce08d0b3a81
-script	scripts/check-control-audit.sh	uninvoked	#559	3bd6bf1f048ccfc6950262b677b50e88da13a84b
-script	scripts/check-control-functions.sh	uninvoked	#559	8a5b4f0116ebf8c63cbc252c89f76a7c064cca7f
 suite	guardrails/dlp	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	guardrails/policy	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	guardrails/controls	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16

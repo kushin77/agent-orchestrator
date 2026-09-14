@@ -19,7 +19,8 @@ SHELL := /bin/bash
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety \
-        remediation remediation-scan remediation-dispatch
+        remediation remediation-scan remediation-dispatch \
+        control-verbs control-audit control-functions cockpit
 
 .DEFAULT_GOAL := help
 
@@ -528,6 +529,26 @@ board-gate:
 ## open, and a snapshot whose records lack a body is CANNOT-ASSESS, never OK
 cross-repo-boundary:
 	@bash scripts/check-cross-repo-boundary.sh
+
+## control-verbs — the control-verb vocabulary is closed and cross-referenced (RC-2 #553)
+control-verbs:
+	@bash scripts/check-control-verbs.sh
+
+## control-audit — exactly-once control with the audit record + refusal path (RC-4 #555)
+control-audit:
+	@bash scripts/check-control-audit.sh
+
+## control-functions — every cockpit function declared once (RC-10 #565)
+control-functions:
+	@bash scripts/check-control-functions.sh
+
+## cockpit — the terminal cockpit (RC-11 #566): one frame, then exit. A client
+## of the RC-3 API and the authenticated SSE streams that renders only what the
+## declared function registry names; ships flag-gated OFF (surfaces.cockpit),
+## so while the flag is off this target exits non-zero with the named FLAG_OFF
+## condition -- an unpromoted surface is absent, never silently healthy.
+cockpit:
+	@python3 control-plane/cockpit/cockpit/__main__.py --once
 
 ## audit-read-model — the read-only, filterable audit read model (issue #347):
 ## the tamper-evident trail served as a deterministic read model with

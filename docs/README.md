@@ -24,6 +24,9 @@ Index of the repo's canonical documentation. Agents start at
 | [`REGISTRY-PROVENANCE.md`](REGISTRY-PROVENANCE.md) | Harvest provenance for the profile/persona/SME vocabularies, and the frozen canonical-CMR parity baseline with its refresh command (issue #145). |
 | [`MODULE-ADMISSION.md`](MODULE-ADMISSION.md) | The parent-side sub-module admission contract — what a sub-module is, what each side declares, and what a module must not inherit (EPIC #422, issue #423). |
 | [`CROSS-REPO-SYNC-OWNER.md`](CROSS-REPO-SYNC-OWNER.md) | The standing peer-board triage: dispositions with mandatory provenance, dry-run direction issues, no silent adoption or cross-repo close (EPIC #422, issue #427). |
+| [`REMOTE-CONTROL-GAP-ANALYSIS.md`](REMOTE-CONTROL-GAP-ANALYSIS.md) | Inventoried control-surface gap: every control verb is local; paperclip is the control plane and tmux is a back door, not the mechanism (issue #550). |
+| [`CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md`](CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md) | DeepSeek and peer enhancements consumed/linked by the remote-control program (issue #549). |
+| [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit — the Bloomberg-terminal-grade operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, flag-gated OFF (EPIC #551, issue #566). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
 
