@@ -43,14 +43,14 @@ chooser never returns it as a routing target.
 | Path | Purpose |
 |---|---|
 | [`tiers.yaml`](tiers.yaml) | Declarative model-tier table: ladder, task classes, security floor, escalation thresholds. |
-| [`budgets.yaml`](budgets.yaml) | Seed per-tenant budget config (policy vocabulary `stop\|warn\|fallback`). |
+| [`budgets.yaml`](budgets.yaml) | Seed per-tenant budget config (policy vocabulary `stop\|warn\|fallback`) + the per-role policy defaults (the role **caps** are consumed from `registry/personas/`). |
 | [`loader.py`](loader.py) | Tier-table loader + data model; fail-closed validation; catalog-capability parity helper. |
 | [`complexity.py`](complexity.py) | Difficulty scorer (0-100) driving escalation (hermes-adapted). |
-| [`budget.py`](budget.py) | Per-tenant budget enforcer + `budgets.yaml` loader. |
-| [`metering.py`](metering.py) | `MeteringSink` hook + `CallRecord` + JSONL/list sinks (Phase-5 interface). |
+| [`budget.py`](budget.py) | Per-tenant **and** per-role budget enforcement + `budgets.yaml` loader + the org-chart cap consumer. |
+| [`metering.py`](metering.py) | `MeteringSink` hook + `CallRecord` / `RefusalRecord` + JSONL/list sinks (Phase-5 interface). |
 | [`chooser.py`](chooser.py) | `ModelChooser` — the router the gateway calls. |
 | [`cli.py`](cli.py) | Offline CLI (`table` / `budgets` / `choose` / `demo`) for evidence and demos. |
-| [`tests/`](tests/) | pytest suite (cheapest-capable, escalation, security-never-L0, budgets, metering, health). |
+| [`tests/`](tests/) | pytest suite (cheapest-capable, escalation, security-never-L0, budgets, **role caps**, metering, health). |
 
 ## The tier table
 
@@ -96,11 +96,15 @@ estimated USD cost + reasons + budget action).
    capped by the class's `maxTier`. A task can also escalate **on failure**
    via `escalate_on_failure(choice)` (clamped to `maxTier`;
    `EscalationCapReached` past the cap).
-4. **Budget pre-flight** — `budget.py` classifies one prospective call for the
-   tenant: `stop` raises `BudgetBlocked`; `fallback` downgrades the tier toward
-   the class's cheapest-capable floor (never below it, never below the
-   security floor) instead of blocking; `warn` flags the call. Spend commits to
-   the ledger only after the call is actually made.
+4. **Budget pre-flight** — per **role** first, then per **tenant**. The
+   `RoleBudgetEnforcer` resolves the cap for the persona the call is dispatched
+   for (`agent_id`) and classifies the call: `stop` raises `RoleBudgetBlocked`
+   **and meters a `RefusalRecord`**; `warn` flags it; `fallback` downgrades the
+   tier. The tenant `BudgetEnforcer` then classifies the same call: `stop`
+   raises `BudgetBlocked`; `fallback` downgrades the tier toward the class's
+   cheapest-capable floor (never below it, never below the security floor)
+   instead of blocking; `warn` flags the call. Spend commits to the ledger only
+   after the call is actually made.
 5. **Health-aware model pick** — within the chosen tier the cheapest **healthy**
    model wins. Health is an injected signal (dict or predicate of model id →
    healthy). An unhealthy primary falls back to the next candidate in the same
@@ -123,6 +127,46 @@ changing the chooser:
 | `warn` | allow | allow + warning flag | stop (blocked) |
 | `fallback` | allow | downgrade tier toward class floor, else flag | stop (blocked) |
 
+### Per-role monthly caps (workbook-2)
+
+The workbook declares a **monthly cap per C-suite role** (CEO 300 / CTO 250 /
+COO 100 / CFO 50 / CMO 200 USD). The caps are **consumed, never redefined**:
+they live in the registry's workbook-1 declaration and this lane only reads
+them.
+
+| Where | What it declares |
+|---|---|
+| [`registry/personas/org-chart.yaml`](../../registry/personas/org-chart.yaml) | `roles[].monthlyBudgetCapUsd` — the cap, plus `defaultModelTier` and `heartbeatSchedule` |
+| [`registry/personas/cards/<role>.yaml`](../../registry/personas/cards/) | the bound persona card, whose cap **must agree** with the chart |
+| [`budget.py`](budget.py) `load_role_budgets()` | reads both, asserts they agree, and fails closed on drift / a missing card / a non-numeric cap |
+| [`budgets.yaml`](budgets.yaml) `roles:` | documents the **policy** and points at the cap source — it never restates a number |
+
+The chooser checks the role cap for the persona a call is dispatched for
+(``agent_id``) **before** the tenant budget, because the narrower ceiling is the
+one that must not be crossed: a role at its cap refuses spend even when the
+tenant overall is well inside its own budget. A role with no declared cap has no
+role ceiling and falls through to the tenant axis — it is not silently
+unbudgeted, merely governed by the tenant.
+
+| Policy | Below the cap | At/above the cap |
+|---|---|---|
+| `stop` (role default) | allow | **refuse spend** (`RoleBudgetBlocked`) |
+| `warn` | allow | allow + warning flag |
+| `fallback` | allow | downgrade the tier toward the class floor, else flag |
+
+A role cap **refusal is metered**: ``RoleBudgetBlocked`` carries the
+``BudgetDecision``, and the chooser emits one ``RefusalRecord`` (scope `role`,
+the cap, and the percentage used) to the metering sink before raising — a budget
+alert is raised, never silently absorbed.
+
+The cap path is **deterministic arithmetic only** — a percentage comparison over
+the spend ledger, with no model call and no token spend. This is the workbook
+mechanical rule *"zero-token arithmetic"* (CFO row): deciding whether tokens may
+be spent must never itself spend tokens, and must not depend on a generative
+step. The refusal is **mutation-proved**: `tests/test_role_budget.py` disables
+the hard-cap comparison and then the over-cap policy mapping in
+``RoleBudget.decide`` and asserts the refusal probes die under each mutant.
+
 ### Metering hook (Phase 5)
 
 `metering.py` defines the `MeteringSink` protocol the gateway calls with a
@@ -130,6 +174,12 @@ changing the chooser:
 for per-tenant/per-agent/per-task-class cost attribution. Shipped sinks:
 `JsonlMeteringSink` (append-only JSONL, fleet model-call-audit shape),
 `ListMeteringSink` (tests), `NoopMeteringSink` (default).
+
+A ``RefusalRecord`` is the refusal counterpart: it carries the scope that
+refused (`role` or `tenant`), the cap, and the percentage used, so a cap
+decision is attributed even though no model call happened. The per-role axis
+meters its refusals; the tenant axis deliberately still emits nothing on a
+``STOP``, preserving the issue-#17 contract.
 
 ## Usage
 
@@ -163,6 +213,16 @@ python3 -m pytest gateway/finops/tests -q
 | Cost attribution per agent/tenant/model to the metering store | `metering.py` `MeteringSink` + `CallRecord` |
 | Testable router (task + budgets + health) | `tests/` (injectable enforcer + health signal) |
 
+## Acceptance criteria (issue #633, workbook-2 · per-role monthly budget caps)
+
+| Criterion | Where |
+|---|---|
+| Caps resolved by **consuming** the workbook-1 persona/org-chart fields (never redefined) | `budget.load_role_budgets()` reads `registry/personas/org-chart.yaml` + the bound cards and asserts agreement; `budgets.yaml` `roles:` documents the vocabulary and the cap source |
+| The chooser consults the per-role budget **before** any model call for that persona; caps CEO 300 / CTO 250 / COO 100 / CFO 50 / CMO 200 | `chooser._check_role_budget()` runs before `_check_budget()`; `tests/test_role_budget.py` asserts the caps equal the declaration |
+| stop/warn/fallback applies **per role**; a role at cap refuses spend and records a metered decision | `RoleBudget.decide()` + `RoleBudgetBlocked` + `chooser._record_role_refusal()` (`RefusalRecord`, scope `role`) |
+| CFO enforcement is deterministic — "zero-token arithmetic", no generative loop in the cap path | `RoleBudget.decide()` is a pure percentage comparison; `test_role_enforcer_is_deterministic_and_token_free` bans `random`/`time.`/`subprocess`/… in its source |
+| `budgets.yaml` documents the per-role vocabulary; tests include a **mutation-proved** refusal | `budgets.yaml` `roles:` block; `test_role_cap_refusal_is_mutation_proved` disables the hard-cap comparison then the policy mapping and asserts the refusal probes die |
+
 ## Provenance
 
 Cannibalized and adapted from fleet sources (see
@@ -182,3 +242,8 @@ Cannibalized and adapted from fleet sources (see
   routing + JSONL model-call audit.
 - `CMR` `docs/MODEL-PROFILES.md` + `docs/decision-records/ADR-0022-finops-doctrine.md`
   — frontloading-is-policy and LOW/MED/HIGH/MAX ladder vocabulary.
+- `kushin77/agent-orchestrator` issue #633 (workbook-2 · Pillar 2 budget
+  enforcement) — per-role monthly caps CONSUMED from the workbook-1 declaration
+  (`registry/personas/org-chart.yaml`, issue #632); the workbook mechanical
+  rule "zero-token arithmetic" is honoured by keeping the cap path a pure
+  percentage comparison with no model call.

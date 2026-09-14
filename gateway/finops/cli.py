@@ -11,11 +11,12 @@ Usage (from the repo root):
     python3 gateway/finops/cli.py budgets
     python3 gateway/finops/cli.py choose --class research --complexity 25 --tenant tenant-acme
     python3 gateway/finops/cli.py choose --class security-review --complexity 10 --tenant tenant-gamma
+    python3 gateway/finops/cli.py choose --class finops-meter --complexity 10 --tenant platform --role cfo
     python3 gateway/finops/cli.py demo
 
 ``choose`` prints the routed choice as JSON; ``demo`` runs a small scripted
-batch (with per-tenant budgets, health, and a JSONL metering sink) to show the
-guardrail, escalation, budget and health behavior.
+batch (with per-tenant budgets, per-role caps, health, and a JSONL metering
+sink) to show the guardrail, escalation, budget, role-cap and health behavior.
 """
 
 from __future__ import annotations
@@ -74,8 +75,37 @@ def _cmd_budgets(args: argparse.Namespace) -> int:
         }
         for tid, tb in sorted(enforcer.budgets.items())
     }
+    # Per-role monthly caps (issue #633): consumed from the workbook-1
+    # declaration (registry/personas/org-chart.yaml + the bound cards), shown
+    # here so the per-role view is evidence, not a claim.
+    roles: Dict[str, Any] = {}
+    if enforcer.roles is not None:
+        role_cfg = budget_mod.parse_role_policy(
+            _read_yaml(budget_mod.BUDGETS_PATH)
+        )
+        for key, rb in sorted(enforcer.roles.roles.items()):
+            roles[f"{rb.tenant}/{rb.role_id}"] = {
+                "monthlyCapUsd": rb.monthly_cap_usd,
+                "policy": rb.policy.value,
+                "warnAtPct": rb.warn_at_pct,
+                "hardCapPct": rb.hard_cap_pct,
+                "defaultModelTier": rb.default_model_tier,
+                "heartbeatSchedule": rb.heartbeat_schedule,
+                "spentUsd": enforcer.roles.spend(rb.role_id, tenant=rb.tenant),
+            }
+        out["roleCapSource"] = role_cfg.get("capSource")
+    out["roles"] = roles
     print(json.dumps(out, indent=2, sort_keys=True))
     return 0
+
+
+def _read_yaml(path: Path) -> Dict[str, Any]:
+    """Read a YAML mapping (small local helper; keeps the CLI self-contained)."""
+    import yaml  # type: ignore
+
+    with open(path, "r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    return data if isinstance(data, dict) else {}
 
 
 def _parse_health(raw: Optional[str]) -> Dict[str, bool]:
@@ -104,14 +134,20 @@ def _cmd_choose(args: argparse.Namespace) -> int:
         sink=sink,
         health=health or None,
     )
+    role_id = args.role or args.agent
     try:
         choice: Choice = chooser.choose(
             task_class=args.task_class,
             tenant_id=args.tenant,
-            agent_id=args.agent,
+            agent_id=role_id,
             complexity=args.complexity,
             prompt=args.prompt,
         )
+    except budget_mod.RoleBudgetBlocked as exc:
+        print(
+            json.dumps({"error": str(exc), "role_id": exc.role_id}, indent=2, sort_keys=True)
+        )
+        return 1
     except (loader_mod.ValidationError, chooser_mod.ChooserError) as exc:
         print(json.dumps({"error": str(exc)}, indent=2, sort_keys=True))
         return 1
@@ -163,7 +199,66 @@ def _cmd_demo(args: argparse.Namespace) -> int:
         )
     except budget_mod.BudgetBlocked as exc:
         blocked.append({"tenant_id": "tenant-beta", "error": str(exc)})
-    print(json.dumps({"choices": results, "blocked": blocked}, indent=2, sort_keys=True))
+
+    # ---- per-role cap demo (issue #633) ------------------------------- #
+    # The CFO's workbook cap is $50 and its tier is LOW. Spend $50 of it
+    # deterministically (no model call, no tokens), then show the next call
+    # dispatched for the CFO role being refused by the ROLE cap even though
+    # the tenant (`platform`) is nowhere near its own budget.
+    role_notes: Dict[str, Any] = {}
+    role_choices: List[Dict[str, Any]] = []
+    role_blocked: List[Dict[str, Any]] = []
+    if enforcer.roles is not None:
+        cfo_cap = enforcer.roles.role_for("cfo", tenant="platform")
+        if cfo_cap is not None:
+            enforcer.roles.commit("cfo", cfo_cap.monthly_cap_usd, tenant="platform")
+            role_notes["cfo"] = {
+                "capUsd": cfo_cap.monthly_cap_usd,
+                "spentUsd": enforcer.roles.spend("cfo", tenant="platform"),
+            }
+            try:
+                role_choice = chooser.choose(
+                    task_class="finops-meter",
+                    tenant_id="platform",
+                    agent_id="cfo",
+                    complexity=10,
+                )
+                enforcer.roles.commit(
+                    "cfo", role_choice.estimated_cost_usd, tenant="platform"
+                )
+                role_choices.append(role_choice.to_dict())
+            except budget_mod.RoleBudgetBlocked as exc:
+                role_blocked.append(
+                    {
+                        "role_id": exc.role_id,
+                        "action": exc.action,
+                        "reason": exc.reason,
+                        "error": str(exc),
+                    }
+                )
+        # A role still inside its cap routes normally and is attributed.
+        cto_choice = chooser.choose(
+            task_class="code-author",
+            tenant_id="platform",
+            agent_id="cto",
+            complexity=10,
+        )
+        enforcer.roles.commit("cto", cto_choice.estimated_cost_usd, tenant="platform")
+        role_choices.append(cto_choice.to_dict())
+
+    print(
+        json.dumps(
+            {
+                "choices": results,
+                "blocked": blocked,
+                "roleChoices": role_choices,
+                "roleBlocked": role_blocked,
+                "roleSpend": role_notes,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     print(f"metering records written to {meter_path} "
           f"({len(sink.read_records())} line(s))", file=sys.stderr)
     return 0
@@ -181,6 +276,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_choose.add_argument("--task-class", required=True)
     p_choose.add_argument("--tenant", default="system")
     p_choose.add_argument("--agent", default="anonymous")
+    p_choose.add_argument(
+        "--role",
+        default=None,
+        help=(
+            "persona id the call is dispatched for; its per-role monthly cap "
+            "(issue #633) is consulted before the tenant budget (default: the "
+            "--agent value)"
+        ),
+    )
     p_choose.add_argument("--complexity", type=float, default=None)
     p_choose.add_argument("--prompt", default=None)
     p_choose.add_argument("--budget-config", default=None)
