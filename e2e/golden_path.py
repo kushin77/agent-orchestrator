@@ -34,6 +34,7 @@ if REPO_ROOT not in sys.path:
 from e2e.wiring import (  # noqa: E402
     ENDPOINTS,
     PROVIDER_ANTHROPIC,
+    PROVIDER_COPILOT,
     PROVIDER_DEEPSEEK,
     PROVIDER_HERMES,
     PROVIDER_OLLAMA,
@@ -285,10 +286,10 @@ def _stage_routed_call(control: ControlPlane) -> Dict[str, Any]:
 
 
 def _stage_conformance(control: ControlPlane) -> Dict[str, Any]:
-    """Same task under every provider of the five-agent purebliss team —
-    DeepSeek / local Ollama / paperclip / hermes (LOW) and Claude (anthropic,
-    MED), plus OpenAI for degradation coverage: every provider yields governed,
-    audited, metered behavior."""
+    """Same task under every provider of the six-agent purebliss team —
+    DeepSeek / local Ollama / paperclip / hermes / copilot (LOW) and Claude
+    (anthropic, MED), plus OpenAI for degradation coverage: every provider
+    yields governed, audited, metered behavior."""
     from e2e.wiring import TruthyListCallRecordSink, build_team_gateway
 
     results: List[Dict[str, Any]] = []
@@ -311,6 +312,12 @@ def _stage_conformance(control: ControlPlane) -> Dict[str, Any]:
          {"input": "billing outage"}, CLASSIFY_OK),
         ({"deepseek": False, "openai": False, "ollama": False, "paperclip": False},
          PROVIDER_HERMES, "orchestrator", "classify-route",
+         {"input": "billing outage"}, CLASSIFY_OK),
+        # copilot is the OpenAI-compatible sixth team agent (issue #340); it
+        # reuses the openai adapter and is driven through the same rig.
+        ({"deepseek": False, "openai": False, "ollama": False, "paperclip": False,
+          "hermes": False},
+         PROVIDER_COPILOT, "orchestrator", "classify-route",
          {"input": "billing outage"}, CLASSIFY_OK),
     ]
     for health, provider, agent, task_type, task_input, content in scenarios:

@@ -26,6 +26,7 @@ and memory-scope semantics are normalized to `registry/profiles/catalog.yaml`.
 | `hermes` | `kushin77/hermes-agents` `src/hermes_agent/services/capability_registry.py` + `models/model_tiering.py` | code-gen/refactor/test-gen routing; tier/ceiling/cost model; MED tier |
 | `deepseek` | `kushin77/leaderboard` `lib/fleet-roster.sh` + `config/deepseek-capabilities.txt` + `kushin77/capital-underwriting` `personas.yaml` (ds-worker-*) | role→tier→model chooser; DeepSeek capability catalog; data-analysis/research; MED tier |
 | `claude` | `kushin77/gmail-agent` `src/agent/claude.ts` + `kushin77/CMR` `onboarding/agent-profiles/profiles/architecture-sme.json` | governed Claude client (tiers/p-retry/tool loop); orchestration posture; MED tier |
+| `copilot` | `kushin77/agent-orchestrator` `gateway/providers/openai.py` + `gateway/providers/copilot.py` | OpenAI-compatible adapter mapped onto the copilot provider id; code-author/code-review posture; MED tier |
 
 Cross-cutting field semantics (all seeds):
 

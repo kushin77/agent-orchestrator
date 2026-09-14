@@ -73,17 +73,21 @@ def _base(name: str, base_url: str, api_path: str, tier_models: Mapping[str, str
 
 
 def default_provider_configs() -> dict[str, ProviderConfig]:
-    """Platform-default configurations for the seven shipped providers.
+    """Platform-default configurations for the eight shipped providers.
 
     Model ids are real provider model identifiers (provenance:
     gmail-agent sonnet/opus/haiku tiers, capital-underwriting gemini model
-    constants, deepseek chat/reasoner, local Ollama). The paperclip and
-    hermes model ids are default illustrative identifiers for the vendored
-    modules (issue #255); operators override them via per-tenant mapping. The
+    constants, deepseek chat/reasoner, local Ollama). The paperclip, hermes and
+    copilot model ids are default illustrative identifiers for the vendored
+    modules (issue #255) and the OpenAI-compatible Copilot hop (issue #340);
+    operators override them via per-tenant mapping. The
     default fallback chain for every cloud provider is local Ollama
     (cloud -> local, the defragsuite + gov-ai-scout graceful-degradation
     pattern); hermes is the local hop whose own fallback is also Ollama
-    (frozen map ``hermes -> hermes/ollama``, EPIC #253).
+    (frozen map ``hermes -> hermes/ollama``, EPIC #253). ``copilot`` reuses the
+    existing OpenAI adapter (issue #340 deliverable 4; see
+    ``providers/copilot.py``) and is a distinct provider id only so its rate
+    card and catalog module are addressable.
     """
     configs: dict[str, ProviderConfig] = {
         "anthropic": _base(
@@ -99,6 +103,13 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
             "/chat/completions",
             {"LOW": "deepseek-chat", "MED": "deepseek-chat",
              "HIGH": "deepseek-reasoner", "MAX": "deepseek-reasoner"},
+        ),
+        "copilot": _base(
+            "copilot",
+            "https://api.githubcopilot.com",
+            "/chat/completions",
+            {"LOW": "gpt-4o-mini", "MED": "gpt-4o-mini",
+             "HIGH": "gpt-4o", "MAX": "gpt-4o"},
         ),
         "openai": _base(
             "openai",

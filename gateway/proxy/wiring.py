@@ -281,7 +281,7 @@ def provider_response(
     """Build a provider-appropriate HTTP body for a canned typed output."""
     import json
 
-    if provider in ("deepseek", "openai", "paperclip"):
+    if provider in ("deepseek", "openai", "paperclip", "copilot"):
         body = {
             "choices": [{"message": {"role": "assistant", "content": content}}],
             "usage": {"prompt_tokens": input_tokens, "completion_tokens": output_tokens},

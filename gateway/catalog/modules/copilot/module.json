@@ -1,0 +1,59 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "copilot",
+  "name": "copilot",
+  "description": "GitHub Copilot provider module: OpenAI-compatible chat/completions routing with model tiers, typed-output validation and cloud-to-local (Ollama) graceful degradation. Reuses the existing OpenAI adapter — this entry is the copilot provider identity, not new wire code.",
+  "source": {
+    "repo": "kushin77/agent-orchestrator",
+    "default_branch": "master",
+    "path": "gateway/providers/openai.py"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "copilot", "openai"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.copilot",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "chat-completions",
+      "default": "on",
+      "flags": ["copilot.chat"],
+      "desc": "OpenAI-compatible chat/completions chat with model tiers and typed output validation (inherited from the OpenAI adapter)."
+    },
+    {
+      "id": "openai-adapter-mapping",
+      "default": "on",
+      "flags": ["copilot.openai-mapping"],
+      "desc": "The copilot provider id maps onto the existing OpenAI adapter (providers/copilot.py); no new wire protocol is implemented."
+    },
+    {
+      "id": "graceful-degradation",
+      "default": "on",
+      "flags": ["copilot.fallback"],
+      "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "openai", "type": "adapter-reuse" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-14",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/agent-orchestrator gateway/providers/openai.py",
+    "note": "Gateway-owned catalog entry for the copilot provider (issue #340): the copilot provider id is an explicit mapping onto the existing OpenAI adapter, which the platform already documents as covering the Copilot/GPT deployments. No source file copied; no new wire code."
+  }
+}

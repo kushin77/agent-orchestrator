@@ -1,6 +1,6 @@
 """Per-provider adapter tests (issue #15, criterion 1).
 
-For each of the five providers, against a scripted ``RecordingTransport``:
+For each of the shipped providers, against a scripted ``RecordingTransport``:
 
 - a valid call returns the typed (schema-validated) result with correct
   model_used / usage / latency and the call stamp, and the recorded request
@@ -30,7 +30,7 @@ from providers.transport import RecordingTransport
 from conftest import CONTENT_OBJ, FAKE_KEY, VALID_CONTENT, make_messages
 from support import auth_header_name, config_for, expected_endpoint, ok_response
 
-PROVIDERS = ["anthropic", "deepseek", "openai", "gemini", "ollama", "paperclip", "hermes"]
+PROVIDERS = ["anthropic", "deepseek", "openai", "copilot", "gemini", "ollama", "paperclip", "hermes"]
 
 
 def _credentials(name: str) -> Credentials | None:

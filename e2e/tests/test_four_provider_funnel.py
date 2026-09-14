@@ -25,6 +25,7 @@ import json
 import pytest
 
 from e2e.wiring import (
+    PROVIDER_COPILOT,
     PROVIDER_DEEPSEEK,
     PROVIDER_HERMES,
     PROVIDER_OLLAMA,
@@ -70,6 +71,9 @@ def _classify(wired, **input_vars):
          {"deepseek": False, "openai": False, "ollama": False}),
         (PROVIDER_HERMES, "hermes-1",
          {"deepseek": False, "openai": False, "ollama": False, "paperclip": False}),
+        (PROVIDER_COPILOT, "gpt-4o-mini",
+         {"deepseek": False, "openai": False, "ollama": False, "paperclip": False,
+          "hermes": False}),
     ],
 )
 def test_provider_serves_with_tier_and_usage(provider, model, health):
@@ -156,7 +160,7 @@ def test_all_candidates_unavailable_is_explicit_failure():
     """Every candidate down -> explicit failed, never a silent pass."""
     wired = build_team_gateway()
     for provider in (PROVIDER_DEEPSEEK, "openai", PROVIDER_OLLAMA,
-                     PROVIDER_PAPERCLIP, PROVIDER_HERMES):
+                     PROVIDER_PAPERCLIP, PROVIDER_HERMES, PROVIDER_COPILOT):
         wired.rig.fail(provider, ProviderUnavailableError(f"{provider} down"))
     result = _classify(wired)
     assert result.outcome == contract.OUTCOME_FAILED

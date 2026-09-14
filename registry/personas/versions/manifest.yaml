@@ -120,3 +120,9 @@ entries:
   file: cards/claude.yaml
   sha256: ec3258e215ecf9ac6a624a1e85eaf65163d8ee224c2045d68d02d384fce580cf
   status: published
+- tenant: platform
+  persona: copilot
+  version: 1.0.0
+  file: cards/copilot.yaml
+  sha256: 19d4cff551318e2e570bdb8d34610be5698d732aff88a07a0c1696814cb47c95
+  status: published
