@@ -71,6 +71,7 @@ governance/board
 governance/isolation
 governance/lifecycle
 governance/reconcile
+governance/ticket
 governance/cto-overlay
 governance/authority
 governance/rollup

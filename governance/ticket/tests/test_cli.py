@@ -1,0 +1,100 @@
+"""CLI + rebuildability tests (issue #401)."""
+
+from __future__ import annotations
+
+import json
+
+from conftest import issue, write_board
+from cli import main
+from model import STORE_RELPATH
+
+TICKET_10 = "kushin77/agent-orchestrator#10"
+
+
+def _prepared(root):
+    write_board(root, [issue(10, parent=4)])
+    return root
+
+
+def test_project_then_verify_round_trips(root, capsys):
+    _prepared(root)
+    assert main(["project", "--root", str(root)]) == 0
+    store = root / STORE_RELPATH
+    assert store.is_file()
+    assert main(["verify", "--root", str(root)]) == 0
+    output = capsys.readouterr().out
+    assert "ticket-projection: OK" in output
+
+
+def test_verify_detects_a_tampered_store_and_names_the_field(root, capsys):
+    _prepared(root)
+    assert main(["project", "--root", str(root)]) == 0
+    store = root / STORE_RELPATH
+    payload = json.loads(store.read_text(encoding="utf-8"))
+    payload["generated_at"] = "tampered"
+    store.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    assert main(["verify", "--root", str(root)]) == 1
+    err = capsys.readouterr().err
+    assert "store-mismatch" in err
+    assert "generated_at" in err
+
+
+def test_verify_rebuilds_a_deleted_store(root, capsys):
+    _prepared(root)
+    assert main(["project", "--root", str(root)]) == 0
+    store = root / STORE_RELPATH
+    before = store.read_text(encoding="utf-8")
+    store.unlink()
+
+    assert main(["verify", "--root", str(root)]) == 0
+    capsys.readouterr()
+    assert store.read_text(encoding="utf-8") == before
+
+
+def test_project_is_idempotent_across_runs(root):
+    _prepared(root)
+    assert main(["project", "--root", str(root)]) == 0
+    first = (root / STORE_RELPATH).read_text(encoding="utf-8")
+    assert main(["project", "--root", str(root)]) == 0
+    second = (root / STORE_RELPATH).read_text(encoding="utf-8")
+    assert first == second
+
+
+def test_verify_refuses_a_stamped_store(root, capsys):
+    _prepared(root)
+    assert main(["project", "--root", str(root), "--stamp", "1"]) == 0
+    assert main(["verify", "--root", str(root)]) == 1
+    err = capsys.readouterr().err
+    assert "store-mismatch" in err
+    assert "generated_at" in err
+
+
+def test_a_missing_board_is_cannot_assess(root, capsys):
+    (root / ".board" / "snapshot.json").unlink(missing_ok=True)
+    assert main(["project", "--root", str(root)]) == 2
+    assert "CANNOT-ASSESS" in capsys.readouterr().err
+
+
+def test_negative_control_file_provokes_and_names_the_ticket(root, tmp_path, capsys):
+    _prepared(root)
+    control = tmp_path / "control.json"
+    control.write_text(
+        json.dumps(
+            [
+                {
+                    "ticket": TICKET_10,
+                    "field": "goal",
+                    "producer": "rogue/lane",
+                    "value": "#1",
+                    "where": "negative-control",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert main(["project", "--root", str(root), "--negative-control", str(control)]) == 1
+    err = capsys.readouterr().err
+    assert "authority-two-writers" in err
+    assert TICKET_10 in err
+    assert not (root / STORE_RELPATH).exists()
