@@ -148,6 +148,66 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     `watch` is the worker; cron owns the schedule (code-native automation — no
     workflow files). `scripts/check-reconcile.sh` (in `make verify`) proves every
     outcome against a real repository, the refusal included.
+18. **Bounded work — no queue item is retried forever (fleet, issue #723).**
+    Every dispatched directive carries an **attempt budget** with exponential
+    backoff and a **terminal dead-letter state**; a refusal is a state
+    transition, not a reason to try again next tick. The brain is escalated
+    **once**, and an exhausted directive is never re-read. This rule exists
+    because its absence was measured: a directive left PENDING on a refused
+    claim was re-read every cycle with no counter, no backoff and no
+    dead-letter, producing **49 concurrent `make verify` runs, 43 of them
+    stacked in two worktrees, for ~16 hours**. `scripts/check-runaway-guard.sh`
+    provokes a directive that always fails and must observe it dead-lettered.
+    (Spine: `docs/GOLDEN-RULES.md` AO-GR-21.)
+19. **One gate per worktree, admission-controlled (fleet, issue #724).** At most
+    one composite gate runs per worktree, bounded box-wide; work that cannot get
+    a permit is **parked, not started**. A gate that can be started an unbounded
+    number of times will be. (Spine: AO-GR-22.)
+20. **No work is invisible — commit is pushed before it is gated (fleet, issue
+    #740).** A lane pushes its branch as soon as it commits, **before** the
+    gate. A committed change that exists only locally, or only in a worktree, is
+    not work. This rule exists because the loop pushed only on full success, and
+    a runner failure therefore stalled every lane at "committed, never pushed":
+    measured **31 worktrees holding 46 unpushed commits, including 5 lanes on
+    closed issues whose work `origin/master` did not contain** — invisible to
+    the board *and* to `governance/reconcile`, which can only reclaim what
+    reaches a remote. (Spine: AO-GR-23.)
+21. **A wave is provably file-disjoint before dispatch (fleet, issue #740).**
+    The dispatcher computes each lane's file set and **refuses to dispatch two
+    lanes whose sets intersect**; collisions are resolved by serialising the
+    wave or re-scoping the issue, never by fanning out and rebasing later.
+    Rule 2 forbids two lanes sharing a file; this makes that mechanical. It
+    exists because fan-out by issue produced **27 source-file collisions across
+    14 lanes** (six siblings editing the same seven files) — so **raising the
+    agent count multiplies conflicts, not throughput**. Max-agents fan-out is
+    blocked until this check is green. (Spine: AO-GR-24.)
+22. **Drift is measured against the remote, and never fails open (fleet, issue
+    #739).** A running loop's commit is compared against **`origin/master`** —
+    never the local checkout, which may itself be the stale side — and an
+    unreadable HEAD is **CANNOT-ASSESS**, never healthy. A drifted rung is
+    respawned. This rule exists because the watchdog compared the loop's commit
+    to the *shared checkout*: with the checkout stale (the normal state here)
+    both sides were the same old commit, so it reported `healthy` while running
+    code from before a merged fix — a fix that could thus never reach the
+    running fleet. A control that cannot fail is a formality; one that fails
+    *open* is worse than none. (Spine: AO-GR-25.)
+23. **A loop resolves its own dependencies before taking work (fleet, issue
+    #733).** A loop preflights its runner and required binaries at startup and
+    on every respawn, **before** reading its queue; an unresolvable dependency
+    yields one actionable escalation and a **held queue**, never a per-item
+    failure. This rule exists because the runner was resolved from an inherited
+    PATH the loop did not control (cron omitted `~/.local/bin`), so every
+    dispatch died with `FileNotFoundError: 'claude'` — **a fleet that could not
+    spawn a single subagent while appearing to run**. (Spine: AO-GR-26.)
+24. **A loop honours the signals it is sent, and documents the rest (fleet, issue
+    #733).** Every long-lived loop installs handlers for the signals an operator
+    is told to use; a signal the loop does **not** handle is documented as
+    unhandled, and the recommended restart signal is one that stops **cleanly**
+    (releases claims, takes the in-flight child down). Both loops handle only
+    `SIGTERM`/`SIGINT`; `SIGHUP` is unhandled, so its default action terminates
+    the process **immediately**, bypassing claim release and child teardown. An
+    operator must never be advised to send a signal that is an abrupt kill.
+    (Spine: AO-GR-27.)
 
 ## Directory layout (pillar-aligned)
 
