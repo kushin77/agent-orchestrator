@@ -1,0 +1,222 @@
+{
+  "contract": "metering-boundary",
+  "version": "1.0.0",
+  "title": "Metering/budget field map (fleet <-> peer export)",
+  "description": "The boundary map for the one frozen metering/budget record shape (issue #425). Every canonical field of metering-record.schema.json has exactly one row naming the fleet column it comes from (telemetry/metering / the budget rail) and the peer export column it must map to. A field that exists on one side only is NAMED in 'one_sided', never silently dropped; the parity gate refuses a canonical field with no row (an unmapped field). 'peer_field' is the contract name the direction issue on kushin77/deepseek asks the peer export to emit \u2014 it is a request, not a claim about their current code.",
+  "sides": {
+    "fleet": "telemetry/metering/, telemetry/budgets/, gateway/finops/, integrations/paperclip/budget.py",
+    "peer": "kushin77/deepseek export (kushin77/deepseek#55/#71/#30); kushin77/ollama#199 is the third producer"
+  },
+  "fields": {
+    "schemaVersion": {
+      "fleet_field": "schemaVersion",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "kind": {
+      "fleet_field": "kind",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "identity.tenantId": {
+      "fleet_field": "identity.tenantId",
+      "peer_field": "tenantId",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "identity.agentId": {
+      "fleet_field": "identity.agentId",
+      "peer_field": "agentId",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "identity.runId": {
+      "fleet_field": "identity.runId",
+      "peer_field": "runId",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "identity.recordId": {
+      "fleet_field": "identity.recordId",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "identity.sourceType": {
+      "fleet_field": "identity.sourceType",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "identity.sourceKey": {
+      "fleet_field": "identity.sourceKey",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "quantity.inputTokens": {
+      "fleet_field": "quantity.inputTokens",
+      "peer_field": "inputTokens",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "quantity.outputTokens": {
+      "fleet_field": "quantity.outputTokens",
+      "peer_field": "outputTokens",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "quantity.totalTokens": {
+      "fleet_field": "quantity.totalTokens",
+      "peer_field": "totalTokens",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "quantity.costUsd": {
+      "fleet_field": "quantity.costUsd",
+      "peer_field": "costUsd",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "quantity.costSource": {
+      "fleet_field": "quantity.costSource",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "quantity.currency": {
+      "fleet_field": "quantity.currency",
+      "peer_field": "currency",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "quantity.metered": {
+      "fleet_field": "quantity.metered",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "quantity.billable": {
+      "fleet_field": "quantity.billable",
+      "peer_field": "billable",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "quantity.cacheHit": {
+      "fleet_field": "quantity.cacheHit",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "quantity.unmeteredReason": {
+      "fleet_field": "quantity.unmeteredReason",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "receipt.ticket": {
+      "fleet_field": "receipt.ticket",
+      "peer_field": "ticket",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "receipt.receipt": {
+      "fleet_field": "receipt.receipt",
+      "peer_field": "receipt",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "receipt.evidence": {
+      "fleet_field": "receipt.evidence",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "attribution.provider": {
+      "fleet_field": "attribution.provider",
+      "peer_field": "provider",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.model": {
+      "fleet_field": "attribution.model",
+      "peer_field": "model",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.route": {
+      "fleet_field": "attribution.route",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "attribution.tier": {
+      "fleet_field": "attribution.tier",
+      "peer_field": "tier",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.taskClass": {
+      "fleet_field": "attribution.taskClass",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    },
+    "attribution.outcome": {
+      "fleet_field": "attribution.outcome",
+      "peer_field": "outcome",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.scope.level": {
+      "fleet_field": "attribution.scope.level",
+      "peer_field": "level",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.scope.id": {
+      "fleet_field": "attribution.scope.id",
+      "peer_field": "id",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.period": {
+      "fleet_field": "attribution.period",
+      "peer_field": "period",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.cap": {
+      "fleet_field": "attribution.cap",
+      "peer_field": "cap",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.spent": {
+      "fleet_field": "attribution.spent",
+      "peer_field": "spent",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.hardStop": {
+      "fleet_field": "attribution.hardStop",
+      "peer_field": "hardStop",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "attribution.burnRateAlertPct": {
+      "fleet_field": "attribution.burnRateAlertPct",
+      "peer_field": "burnRateAlertPct",
+      "one_sided": null,
+      "note": "mapped both sides"
+    },
+    "claims": {
+      "fleet_field": "claims",
+      "peer_field": null,
+      "one_sided": "fleet",
+      "note": "fleet-only today; the direction issue asks the peer export to emit it"
+    }
+  }
+}

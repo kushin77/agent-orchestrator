@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/docs/contracts/metering/metering-record.schema.json",
+  "title": "Metering/budget record — the one frozen shape across the repo boundary",
+  "description": "The single metering/budget record shape frozen before our budget adapter's receipt shape hardens into a third variant (issue #425). One record carries four groups: identity (which tenant/agent/run the row belongs to), quantity (the measured tokens/cost and the currency they are stated in), receipt (the per-task receipt that ties the row to a ticket), and attribution (the provider/model/tier/scope the row is charged against). Field names are the live vocabulary of telemetry/metering (UsageRecord.to_dict) and the budget rail — never invented. A record may also carry claims[]: an asserted cap or saving, each of which must name the evidence that measures it, so a claim that cannot be measured is refused rather than asserted. See docs/contracts/metering/README.md.",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "identity", "quantity", "receipt", "attribution", "claims"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "The record-shape version. Bumping it is a contract change (a new file), never a silent extension."
+    },
+    "kind": {
+      "const": "metering",
+      "description": "The record kind. A metering/budget row is exactly this kind; a second kind in this shape is a contract change."
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenantId", "agentId", "runId", "recordId", "sourceType", "sourceKey"],
+      "description": "Which tenant, agent and run the row belongs to, and where it came from. tenantId/agentId are the metering store's attribution keys; runId is the run (session) that emitted the call; sourceType/sourceKey record which sibling record shape the row was absorbed from, so an absorbed row is never anonymous.",
+      "properties": {
+        "tenantId": { "type": "string", "minLength": 1, "description": "The tenant the spend is attributed to (telemetry/metering tenantId)." },
+        "agentId": { "type": "string", "minLength": 1, "description": "The agent whose call this is (telemetry/metering agentId) — the agent-scope attribution key." },
+        "runId": { "type": "string", "minLength": 1, "description": "The run/session identity that emitted the call (governance/isolation minted session id; the paperclip X-Paperclip-Run-Id on the peer side)." },
+        "recordId": { "type": "string", "minLength": 1, "description": "The row's own id (telemetry/metering recordId) — the record's identity, not authority-tracked." },
+        "sourceType": {
+          "enum": ["model_call_event", "call_record", "metering_record", "gateway_record", "unknown"],
+          "description": "Which sibling record shape this row was absorbed from (telemetry/metering SOURCE_*)."
+        },
+        "sourceKey": { "type": "string", "description": "The source record's key within its own shape (telemetry/metering sourceKey)." }
+      }
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputTokens", "outputTokens", "totalTokens", "costUsd", "costSource", "currency", "metered", "billable", "cacheHit", "unmeteredReason"],
+      "description": "The measured quantity: real token counts, the resolved cost estimate and WHY it is trustworthy (costSource), and the currency both are stated in. costUsd is null — never 0 — when the cost could not be measured; metered/costSource/unmeteredReason carry the honesty of that null.",
+      "properties": {
+        "inputTokens": { "type": "integer", "minimum": 0, "description": "Prompt/input tokens (telemetry/metering inputTokens)." },
+        "outputTokens": { "type": "integer", "minimum": 0, "description": "Completion/output tokens (telemetry/metering outputTokens)." },
+        "totalTokens": { "type": "integer", "minimum": 0, "description": "inputTokens + outputTokens (telemetry/metering totalTokens)." },
+        "costUsd": { "type": ["number", "null"], "minimum": 0, "description": "Resolved cost in the stated currency (telemetry/metering costUsd). null means unmetered — deliberately unknown, never silently zero." },
+        "costSource": {
+          "enum": ["rate_card", "attached", "cache_hit", null],
+          "description": "Why the cost figure is trustworthy (telemetry/metering COST_SOURCE_*): priced from a rate card, an attached positive estimate, or the explicit zero-cost cache-hit path. null = unmetered."
+        },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO-4217 currency of costUsd (fleet vendor caps are USD; the rail's declared currency)." },
+        "metered": { "type": "boolean", "description": "True when a cost was resolved; false means unmetered (fail closed — never a zero-cost call)." },
+        "billable": { "type": "boolean", "description": "True when the call is billable (telemetry/metering billable); non-billable outcomes carry no usage." },
+        "cacheHit": { "type": "boolean", "description": "The explicit zero-cost cache-hit path (telemetry/metering cacheHit)." },
+        "unmeteredReason": { "type": ["string", "null"], "description": "Why the row is unmetered (telemetry/metering unmeteredReason) — named, never dropped." }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ticket", "receipt", "evidence"],
+      "description": "The receipt that ties the row to a ticket. receipt is the per-task receipt id; ticket is the ticket that funded the spend; evidence is the delivery evidence reference that backs the receipt — the same object style the ticket's evidence[] carries (#400/#401). An empty evidence reference is not a receipt, and the gate refuses it.",
+      "properties": {
+        "ticket": { "type": "string", "minLength": 1, "description": "The ticket the spend is tied to (e.g. kushin77/agent-orchestrator#425)." },
+        "receipt": { "type": "string", "minLength": 1, "description": "The per-task receipt id (telemetry/budgets ledger receipt; upstream cost receipt)." },
+        "evidence": { "type": "string", "description": "The evidence reference backing the receipt (the ticket evidence[] ref / ledger entry). Must be non-empty — checked by the parity gate." }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "route", "tier", "taskClass", "outcome", "scope", "period", "cap", "spent", "hardStop", "burnRateAlertPct"],
+      "description": "The attribution fields: which provider/model/tier produced the call, the routing outcome, and the budget scope the spend is charged against (the ticket facet's closed budget shape).",
+      "properties": {
+        "provider": { "type": "string", "description": "The provider id (telemetry/metering provider)." },
+        "model": { "type": "string", "description": "The concrete model id (telemetry/metering model)." },
+        "route": { "type": "string", "description": "The route taken (telemetry/metering route)." },
+        "tier": { "enum": ["flash", "pro", "auditor"], "description": "The effective model tier (gateway finops chooser tier)." },
+        "taskClass": { "type": "string", "description": "The task class the chooser attributed the call to (gateway finops task_class)." },
+        "outcome": { "type": "string", "description": "The call outcome (telemetry/metering outcome; non-billable outcomes name a guard/policy decision)." },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "id"],
+          "description": "What the cap applies to (the ticket facet's budget.scope).",
+          "properties": {
+            "level": { "enum": ["agent", "team", "project"], "description": "The scoping level of the cap." },
+            "id": { "type": "string", "minLength": 1, "description": "The agent / team / project id the cap applies to." }
+          }
+        },
+        "period": { "type": "string", "minLength": 1, "description": "The budget window (fleet: month — the vendor cap window in telemetry/budgets/budget.py)." },
+        "cap": { "type": "number", "minimum": 0, "description": "The spend limit for the period, in the stated currency." },
+        "spent": { "type": "number", "minimum": 0, "description": "Spend already consumed in the period, in the stated currency." },
+        "hardStop": { "type": "boolean", "description": "True when the cap is absolute: spend at or above it always stops with a graceful hand-off." },
+        "burnRateAlertPct": { "type": "number", "minimum": 0, "maximum": 100, "description": "Burn-rate alert threshold, as a percentage of cap, that warns before the hard stop." }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "description": "An asserted cap or saving the row makes (a metering claim). Every claim must name the evidence field that measures it; the parity gate refuses a claim whose evidence is empty, so a saving or a cap that cannot be measured is not claimed.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "metric", "value", "evidence"],
+        "properties": {
+          "kind": { "enum": ["cap", "saving"], "description": "What is being claimed: a cap that was held, or a saving that was realised." },
+          "metric": { "type": "string", "minLength": 1, "description": "The measured quantity the claim is about (e.g. costUsd, totalTokens)." },
+          "value": { "type": "number", "description": "The claimed value, in the metric's own unit." },
+          "evidence": { "type": "string", "description": "The evidence that measures the claim (a receipt id, a ledger reference, a measurement). Must be non-empty — the gate refuses an empty one." }
+        }
+      }
+    }
+  }
+}
