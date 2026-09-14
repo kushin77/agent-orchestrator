@@ -76,6 +76,7 @@ writes the real ADR.
 | [ADR-0015](ADR-0015-routing-seam-single-authority.md) | Routing seam — the extracted tier-routing package is a policy source we map, not a runtime we couple | accepted | issue #426 (M28) |
 | [ADR-0016](ADR-0016-paperclip-boundary-single-module.md) | One home for the paperclip boundary adapter — consolidate the parity adapters under `integrations/paperclip/` | accepted | issue #457 (M27) |
 | [ADR-0017](ADR-0017-diagrams-authority-on-the-operator-surface.md) | The diagrams blueprint on the operator surface — a read-only `evidence[]` signal, never a new facet | accepted | issue #463 (EPIC #461, M27) |
+| [ADR-0018](ADR-0018-codeidx-consumption-and-index-authority.md) | The two-index authority split + the no-re-derivation rule | accepted | issue #474 (EPIC #472) |
 
 The reserved set covers every pillar contract named in EPIC-00 (issue #4) and
 [`ARCHITECTURE.md`](../ARCHITECTURE.md): agent-registry, model-gateway,
