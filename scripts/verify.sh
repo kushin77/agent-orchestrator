@@ -80,6 +80,11 @@ checks=(
   'lessons|bash scripts/check-lessons.sh'
   'paperclip-integration|bash scripts/check-paperclip-integration.sh'
   'ticket-projection|bash scripts/check-ticket-projection.sh'
+  # pmo-rollup (issue #403): the PMO views are derived queries over the ticket
+  # graph, never a store — no ledger, no surviving cache, no second source of
+  # status; the gate provokes an owner-less risk, a RAID set that disagrees with
+  # the graph and a rollup from a stale cache, and proves nothing is written.
+  'pmo-rollup|bash scripts/check-pmo-rollup.sh'
   'secrets|bash scripts/check-secrets.sh'
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'
