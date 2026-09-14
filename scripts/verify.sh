@@ -51,10 +51,22 @@ checks=(
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'cross-reference|bash scripts/check-cross-reference.sh'
   'conformance|bash scripts/check-conformance.sh'
+  'surface-class|bash scripts/check-surface-class.sh'
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'
   'cross-repo-boundary|bash scripts/check-cross-repo-boundary.sh'
+  # audit-read-model (issue #347): the tamper-evident trail served as a
+  # read-only, deterministic, filterable read model; verify-chain is OK on an
+  # intact chain and refuses a modified / reordered / removed record, and the
+  # check mutates a temp copy of the chain, so it cannot pass vacuously.
+  'audit-read-model|bash scripts/check-audit-read-model.sh'
   'gateway-catalog-parity|bash scripts/check-gateway-catalog-parity.sh'
+  'guardrail-controls|bash scripts/check-guardrail-controls.sh'
+  # agent-identity-parity (issue #346): the shared agent-identity schema's
+  # closed vocabularies must equal agent-profile.schema.json + catalog.yaml and
+  # every seed must validate as a projected identity; the check mutates its own
+  # input, so it cannot pass vacuously.
+  'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
   'paperclip-adapter|bash scripts/check-paperclip-integration-adapter.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
@@ -72,6 +84,11 @@ checks=(
   'fleet-template|bash scripts/check-fleet-template.sh'
   'sme-routing|bash scripts/check-sme-routing.sh'
   'registry-parity|bash scripts/check-registry-parity.sh'
+  # EPIC #422 (cross-repo integration gaps) — each tri-state, each proving its
+  # own negative control.
+  'module-admission|bash scripts/check-module-admission.sh'
+  'routing-seam|bash scripts/check-routing-seam.sh'
+  'cross-repo-sync|bash scripts/check-cross-repo-sync.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master

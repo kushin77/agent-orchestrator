@@ -20,6 +20,7 @@
 
 guardrails/dlp
 guardrails/policy
+guardrails/controls
 guardrails/honesty
 guardrails/isolation
 guardrails/sandbox
@@ -48,6 +49,7 @@ engine/memory
 engine/queue
 engine/core
 telemetry/ledger
+telemetry/audit
 telemetry/observability
 telemetry/metering
 telemetry/budgets

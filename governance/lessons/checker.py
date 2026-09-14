@@ -37,6 +37,7 @@ from model import (
     CODE_CORRECTIVE_ACTION_WITHOUT_EVIDENCE,
     CODE_CORRECTIVE_ACTION_WITHOUT_OWNER,
     CODE_DUPLICATE_ID,
+    CODE_EDGE_UNRESOLVED,
     CODE_EVIDENCE_UNRESOLVABLE,
     CODE_INCIDENT_CLOSED_WITHOUT_LESSON,
     CODE_INCIDENT_WITHOUT_RCA,
@@ -76,6 +77,11 @@ from model import (
     now_iso,
     validate_record,
 )
+
+# The typed-edge layer (issue #402) is the single place a lessons cross-record
+# reference becomes a ticket node id, so no reader re-parses ``origin`` or
+# ``remediation_issue`` for itself.
+import edges as _edges  # noqa: E402
 
 LEDGER_RELPATH = "governance/lessons/ledger.jsonl"
 TEMPLATE_RELPATH = "governance/lessons/rca-template.md"
@@ -368,6 +374,7 @@ def check_ledger(
             )
         )
 
+    findings.extend(_check_edges(ledger.records))
     findings.extend(_check_references(ledger, rcas, actions, lessons))
     findings.extend(_check_rca_artifacts(rcas, root=root, probe=probe))
     findings.extend(_check_origins(rcas, snapshot=snapshot, probe=probe))
@@ -430,6 +437,25 @@ def check_ledger(
         counts=counts,
         findings=findings,
     )
+
+
+def _check_edges(records: Mapping[str, Dict[str, Any]]) -> List[Finding]:
+    """Every cross-record reference must be typable as a ticket edge (#402).
+
+    A reference that cannot be typed is refused rather than passed through as
+    free text, so ``origin`` / ``remediation_issue`` resolve in exactly one
+    place (``governance/lessons/edges.py``).
+    """
+    return [
+        Finding(
+            code=CODE_EDGE_UNRESOLVED,
+            message=message,
+            subject=message.split(":", 1)[0],
+            severity=SEVERITY_ERROR,
+            remediation="type the reference as a ticket target (#<n> for an issue)",
+        )
+        for message in _edges.findings(records.values())
+    ]
 
 
 def _check_references(ledger, rcas, actions, lessons) -> List[Finding]:
@@ -756,7 +782,9 @@ def _check_actions(actions, rcas, *, root: Path, probe: GitProbe) -> List[Findin
                 )
             )
         if action.get("status") == STATUS_OPEN:
-            issue_ref = str(action.get("remediation_issue", "")).strip()
+            # Resolved through the typed-edge layer, never read as free text.
+            target = _edges.remediation_issue(action)
+            issue_ref = "#" + target.split("-", 1)[1] if target else ""
             if not issue_ref:
                 findings.append(
                     Finding(

@@ -1,0 +1,30 @@
+{
+  "schema": "paperclip-skills-registry/v1",
+  "declarations": [
+    {
+      "id": "board-sync-plugin",
+      "kind": "plugin",
+      "declaration": "plugins/board-sync-plugin/SKILL.md"
+    },
+    {
+      "id": "claim-gate-check",
+      "kind": "plugin",
+      "declaration": "plugins/claim-gate-check/SKILL.md"
+    },
+    {
+      "id": "mcp-tool-projection",
+      "kind": "skill",
+      "declaration": "library/mcp-tool-projection/SKILL.md"
+    },
+    {
+      "id": "sme-card-authoring",
+      "kind": "skill",
+      "declaration": "library/sme-card-authoring/SKILL.md"
+    },
+    {
+      "id": "ticket-contract-read",
+      "kind": "skill",
+      "declaration": "library/ticket-contract-read/SKILL.md"
+    }
+  ]
+}

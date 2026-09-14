@@ -26,9 +26,9 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from .model import Budget, Cost, Issue, Persona, Profile
+from .model import Activity, Budget, Cost, Issue, Persona, Profile
 
 #: The three frozen seam contracts and their schemas.
 SCHEMA_KINDS: Tuple[str, ...] = ("heartbeat", "ticket", "budget")
@@ -682,3 +682,34 @@ def validate_plan(plan: Dict[str, Any], schemas: Dict[str, Dict[str, Any]]) -> L
         for i, record in enumerate(records):
             findings.extend(validate(record, schema, f"{section}[{i}]"))
     return findings
+
+
+# ==========================================================================
+# Audit -> Activity projection (issue #347)
+# ==========================================================================
+
+
+def activity_from_audit(record: Dict[str, Any]) -> Activity:
+    """Map one audit record onto the upstream ``Activity`` shape (issue #347).
+
+    The tamper-evident audit trail (``telemetry/ledger``) is served read-only as
+    the shell's Audit view; this pure projection makes each stored audit record
+    an upstream activity entry. ``id`` is ``<tenantId>:<seq>`` (stable and unique
+    within a tenant chain), ``actor`` is the canonical ``kind:id`` principal,
+    ``verb`` is the action, ``object_ref`` is the audited resource and ``ts`` is
+    the record's own RFC 3339 stamp. No I/O and no mutation: the input record is
+    only read. The record is expected to come from the read model's
+    ``filter``/``records`` (see ``telemetry/audit/README.md``).
+    """
+    return Activity(
+        id=f"{record.get('tenantId', '')}:{record.get('seq', '')}",
+        actor=str(record.get("actor", "")),
+        verb=str(record.get("action", "")),
+        object_ref=str(record.get("resource") or ""),
+        ts=str(record.get("ts", "")),
+    )
+
+
+def map_audit_activities(records: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Project audit records into the ``Activity`` records the /api surface carries."""
+    return [activity_from_audit(record).to_dict() for record in records]

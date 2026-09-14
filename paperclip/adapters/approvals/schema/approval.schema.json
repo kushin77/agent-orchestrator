@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/paperclip/adapters/approvals/schema/approval.schema.json",
+  "title": "Paperclip-ing approval projection (issue #416)",
+  "description": "The projected approval object. An approval is a PROJECTION of an existing authority, never a second one (EPIC #410): state is derived from the authoritative record named by authority + decision_ref, and a pending approval (no decision record) can never be promoted by editing the projection. There is no store behind this schema.",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "subject",
+    "state",
+    "authority",
+    "authority_store"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Deterministic projection id: approval-<kind>-<subject>."
+    },
+    "kind": {
+      "enum": ["hire", "top-up", "override"],
+      "description": "The approval kind. Each kind names exactly one authoritative surface."
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What is approved (fleet: issue:<N> for a hire/override, budget:<scope> for a top-up)."
+    },
+    "state": {
+      "enum": ["pending", "granted", "denied"],
+      "description": "Derived state: pending exactly when no authoritative decision record exists. A pending approval is distinguishable from a granted one by construction."
+    },
+    "authority": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The authoritative surface the decision is read from (governance/dispatch, .fleet/sent, or fleet/control.py)."
+    },
+    "authority_store": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The authoritative store the decision records live in (e.g. .board/claims/*.json)."
+    },
+    "actor": {
+      "type": "string",
+      "description": "The decider recorded on the authoritative record. Empty while pending."
+    },
+    "role": {
+      "enum": ["", "operator", "brain", "agent", "sister", "subagent"],
+      "description": "The decider's role. Must be in the kind's declared decider set, or the decision is refused as unauthorised."
+    },
+    "decision": {
+      "enum": ["", "grant", "deny"],
+      "description": "The decision read from the authority. Empty while pending."
+    },
+    "decision_ref": {
+      "type": "string",
+      "description": "The authoritative record id the state was read from. Empty exactly when pending — a non-empty state with an empty ref is a projection with no record and fails verification."
+    },
+    "request_ref": {
+      "type": "string",
+      "description": "The request record that made this approval visible (may be empty when the authority recorded a decision directly)."
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "Who asked for the approval, from the request record."
+    },
+    "reason": {
+      "type": "string",
+      "description": "The requester's reason, carried through from the request record."
+    }
+  }
+}

@@ -3,10 +3,11 @@
 
 The index catalogue carries *items* (nodes); this module carries the *edges*.
 It is a deterministic builder: it walks the sources of truth — ADR front-matter,
-the committed board snapshot, the RCA/lessons ledger and ``cmr-refs:`` markers
-in tracked markdown — and emits a sorted, deduplicated list of
-:class:`~model.Relationship` edges. Two runs over one revision produce identical
-bytes, because the edges carry no timestamps and are ordered by a stable key.
+the committed board snapshot, the ticket graph (the lessons register emits typed
+ticket edges, issue #402) and ``cmr-refs:`` markers in tracked markdown — and
+emits a sorted, deduplicated list of :class:`~model.Relationship` edges. Two runs
+over one revision produce identical bytes, because the edges carry no timestamps
+and are ordered by a stable key.
 
 The same module owns the *resolution* rules the gate uses: a target resolves
 when it is a file that exists, an entity id present in the catalogue / board
@@ -16,9 +17,11 @@ A target that cannot be validated is a failure, never a skip.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -50,13 +53,33 @@ RE_LEDGER_ID = re.compile(r"^(RCA|INC|CA|LESSON|SUGGEST)-\d+$")
 RE_PR_NODE = re.compile(r"^pr-\d+$")
 RE_COMMIT_NODE = re.compile(r"^commit-[0-9a-fA-F]{7,40}$")
 RE_EVENT_NODE = re.compile(r"^event-.+$")
-RE_ORIGIN_SHA = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
-# Marker target forms (the closed marker vocabulary; CA- / SUGGEST- are valid
-# edge endpoints but not valid marker targets).
+# Marker target forms (the closed marker vocabulary). ``CA-`` stays out: a
+# corrective action is a sub-part of an RCA, not an addressable node. ``SUGGEST-``
+# is in (issue #402): an open suggestion is a ticket of kind ``suggestion``, so
+# it is addressable like a closed ``LESSON-``.
 RE_MARKER_RCA = re.compile(r"^RCA-\d+$")
 RE_MARKER_LESSON = re.compile(r"^LESSON-\d+$")
+RE_MARKER_SUGGEST = re.compile(r"^SUGGEST-\d+$")
 RE_MARKER_INC = re.compile(r"^INC-\d+$")
+
+# -- ticket-graph edge sources (issue #402) -----------------------------------
+#
+# The lessons register is an ordinary edge source: it declares typed ticket
+# edges (``governance/lessons/edges.py``) and this module consumes them exactly
+# like the ADR front-matter, the board snapshot and the ``cmr-refs:`` markers.
+# The list is data, not a branch — a new source is one entry, not new code here.
+TICKET_EDGE_SOURCES = ("governance/lessons/edges.py",)
+
+#: Ticket edge type -> spine relationship type. The spine's vocabulary is closed
+#: at nine types (:data:`model.RELATIONSHIP_TYPES`); a ticket edge type the spine
+#: does not carry (``remediation-of``) stays a ticket-graph edge and is not
+#: emitted into the spine, so no ungoverned type is ever invented.
+TICKET_TO_SPINE: Dict[str, str] = {
+    "caused-by": RELATIONSHIP_CAUSED_BY,
+    "origin": RELATIONSHIP_ORIGIN,
+    "mitigates": RELATIONSHIP_MITIGATES,
+}
 
 _EXCLUDED_PREFIXES = ("vendor/", ".research/", ".git/")
 
@@ -214,10 +237,12 @@ def classify_marker_target(token: str) -> Optional[str]:
     """``None`` when the token is a well-formed marker target, else the reason.
 
     The marker vocabulary is closed: ``ADR-<n>``, ``GR-<n>``, ``#<n>``,
-    ``RCA-<n>``, ``LESSON-<n>``, ``INC-<n>``, or a repo-relative path in
-    backticks. Anything else — including ``CA-<n>`` / ``SUGGEST-<n>`` — is
+    ``RCA-<n>``, ``LESSON-<n>``, ``SUGGEST-<n>``, ``INC-<n>``, or a
+    repo-relative path in backticks. Anything else — including ``CA-<n>`` — is
     malformed, because a target form that was never declared cannot be silently
-    accepted.
+    accepted. An open ``SUGGEST-<n>`` is a ticket of kind ``suggestion``
+    (ADR-0014), so it is addressable exactly like a closed ``LESSON-<n>``
+    (issue #402).
     """
     if not token:
         return "empty target"
@@ -232,6 +257,8 @@ def classify_marker_target(token: str) -> Optional[str]:
     if RE_MARKER_RCA.match(token):
         return None
     if RE_MARKER_LESSON.match(token):
+        return None
+    if RE_MARKER_SUGGEST.match(token):
         return None
     if RE_MARKER_INC.match(token):
         return None
@@ -402,52 +429,50 @@ def _board_edges(root: Path) -> List[Tuple[str, str, str, str]]:
     return edges
 
 
-def _normalize_origin(origin: Any) -> str:
-    """Normalize a ledger origin dict to a resolvable node id, else ``""``."""
-    if not isinstance(origin, dict):
-        return ""
-    kind = str(origin.get("kind", "")).strip()
-    ref = str(origin.get("ref", "")).strip()
-    if not kind or not ref:
-        return ""
-    if kind == "issue":
-        match = RE_ISSUE_REF.match(ref)
-        return ("issue-" + match.group(1)) if match else ""
-    if kind == "pr":
-        match = RE_ISSUE_REF.match(ref)
-        return ("pr-" + match.group(1)) if match else ""
-    if kind == "commit":
-        return ("commit-" + ref) if RE_ORIGIN_SHA.match(ref) else ""
-    if kind == "event":
-        return "event-" + ref
-    return ""
+def _load_edge_source(path: Path):
+    """Load a declared ticket-graph edge source module by file path.
+
+    The source is loaded under a private name rather than as a bare module, so
+    it cannot collide with a same-named module the host process already holds.
+    An absent source is skipped (it is legitimately optional, like an absent
+    ledger); a source that exists but cannot be loaded is a hard error, never a
+    silent skip — an edge source that vanishes would be a false green.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "ao_ticket_source_" + path.stem, path
+    )
+    if spec is None or spec.loader is None:  # pragma: no cover - defensive
+        raise RuntimeError("cannot load ticket edge source %s" % path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
-def _ledger_edges(root: Path) -> List[Tuple[str, str, str, str]]:
-    records = ledger_records(root)
+def _ticket_edges(root: Path) -> List[Tuple[str, str, str, str]]:
+    """Typed edges declared by the ticket-graph sources, mapped to the spine.
+
+    This replaces the lessons-specific branch this module used to carry: the
+    knowledge of what a lessons reference *means* now lives in the lessons lane
+    (``governance/lessons/edges.py``), and the spine only maps the ticket edge
+    types it can carry.
+    """
     edges: List[Tuple[str, str, str, str]] = []
-    for record in records.values():
-        record_id = str(record.get("id", ""))
-        kind = record.get("kind")
-        if kind == "rca":
-            incident = str(record.get("incident", "")).strip()
-            if incident and incident in records:
-                edges.append((record_id, RELATIONSHIP_CAUSED_BY, incident, record_id))
-        elif kind == "corrective-action":
-            rca = str(record.get("rca", "")).strip()
-            if rca and rca in records:
-                edges.append((record_id, RELATIONSHIP_MITIGATES, rca, record_id))
-        elif kind == "lesson":
-            rca = str(record.get("rca", "")).strip()
-            rca_record = records.get(rca)
-            if rca_record and rca_record.get("kind") == "rca":
-                incident = str(rca_record.get("incident", "")).strip()
-                if incident and incident in records:
-                    edges.append((record_id, RELATIONSHIP_MITIGATES, incident, record_id))
-        if kind in ("rca", "incident"):
-            normalized = _normalize_origin(record.get("origin"))
-            if normalized:
-                edges.append((record_id, RELATIONSHIP_ORIGIN, normalized, record_id))
+    for rel in TICKET_EDGE_SOURCES:
+        path = Path(root) / rel
+        if not path.is_file():
+            continue
+        module = _load_edge_source(path)
+        emit = getattr(module, "ticket_edges", None)
+        if emit is None:
+            raise RuntimeError("%s declares no ticket_edges() function" % rel)
+        for edge in emit(root):
+            spine_type = TICKET_TO_SPINE.get(str(edge.type))
+            if spine_type is None:
+                continue
+            edges.append(
+                (str(edge.from_id), spine_type, str(edge.to_id), str(edge.from_id))
+            )
     return edges
 
 
@@ -476,7 +501,7 @@ def build_relationships(root: Path) -> List[Relationship]:
     edges: List[Tuple[str, str, str, str]] = []
     edges.extend(_adr_edges(root))
     edges.extend(_board_edges(root))
-    edges.extend(_ledger_edges(root))
+    edges.extend(_ticket_edges(root))
     edges.extend(_refs_edges(root))
     unique = sorted(set(edges), key=lambda edge: (edge[1], edge[0], edge[2], edge[3]))
     return [
