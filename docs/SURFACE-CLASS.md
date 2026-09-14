@@ -18,7 +18,7 @@ vocabulary here is closed and identical to
 [`governance/conformance/model.py`](../governance/conformance/model.py) — the
 suite asserts the two gates cannot drift apart.
 
-## The declared surfaces (measured 2026-09-14, issue #351)
+## The declared surfaces (measured 2026-09-14, issue #351; scope widened by #590)
 
 | Surface | Path | Declared class | Measured class | Why this rung |
 |---|---|---|---|---|
@@ -27,6 +27,15 @@ suite asserts the two gates cannot drift apart.
 | `gateway` | `gateway` | `faang` | `faang` | Contract, per-package suites, real controls, an MCP audit trail + schema, and the catalog-parity gate. No live-sync module, so not `elite`. |
 | `telemetry` | `telemetry` | `enterprise` | `enterprise` | Contract, four suites, real controls, an audit trail and a schema. It has no dedicated `scripts/check-*telemetry*` gate, so it stops at `enterprise`. |
 | `registry` | `registry` | `faang` | `faang` | Contract, six suites, owned schemas, an append-only event log + pack attestation (audit), a drift control and the parity gate. No live-sync module, so not `elite`. |
+| `module-registry` | `governance/modules` | `faang` | `faang` | The ecosystem module registry (#445, hardened by #591): contract, a suite, an owned schema for the row shape, the declared acceptance policy (`controls.yaml` + `policy.py`, **read by** `registry.py`) and an append-only audit trail of every refusal. Its dedicated gate carries it past `enterprise`; no live-sync module, so not `elite`. |
+| `module-brief` | `integrations/paperclip/reporting` | `faang` | `faang` | The paperclip reporting agent's module brief (#447, hardened by #592): contract, a suite, an owned schema for the artifact, the declared claim-resolution policy (`claim-policy.json` + `policy.py`, **read by** `composer.py`) and an append-only audit trail. Its dedicated gate carries it past `enterprise`; no live-sync module, so not `elite`. |
+
+**Scope widened by [#590](https://github.com/kushin77/agent-orchestrator/issues/590).**
+`surface_roots` named only `portal`, `gateway`, `telemetry` and `registry`, so two
+surfaces this program had just shipped were held to **no class at all** — the gate
+never looked at them and reported OK while both sat at `pattern`. The roots
+`governance` and `integrations` are now in scope and both surfaces are declared at
+the rung their evidence **measures**.
 
 The declared class is **measured, never aspirational**: a surface is never
 declared above the evidence its own tree shows, because raising one fails the
@@ -69,7 +78,7 @@ files under `tests/` are excluded so a test cannot stand in for the artifact):
 
 | Evidence | Why it is manual | Reported for |
 |---|---|---|
-| `rollback` | A documented rollout + rollback procedure (CMR "enterprise") is prose, not a machine-checkable artifact in this tree. | `gateway`, `telemetry`, `registry` |
+| `rollback` | A documented rollout + rollback procedure (CMR "enterprise") is prose, not a machine-checkable artifact in this tree. | `gateway`, `telemetry`, `registry`, `module-registry`, `module-brief` |
 
 A manual requirement is reported, never assumed met: the three surfaces above
 show the open gap every run until the procedure is recorded and the requirement
