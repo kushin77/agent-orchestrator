@@ -17,7 +17,7 @@ SHELL := /bin/bash
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
-        brain-profile conformance lessons ticket secrets feature-flags cloudbuild terraform tf-fmt surface-class \
+        brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
 
@@ -323,6 +323,15 @@ cross-reference:
 ## cannot pass vacuously
 ticket:
 	@bash scripts/check-ticket-projection.sh
+
+## pmo — PMO rollup + RAID as derived views over the ticket graph (#403,
+## CMR PROGRAM-MANAGEMENT): deps/lanes/report/raid/aging are queries over the
+## ticket projection, never a store — no new ledger, no cache that survives a
+## rebuild, no second source of status; every view runs offline and exits
+## tri-state, and the check provokes each refusal (owner-less risk, a RAID set
+## that disagrees with the graph, a rollup from a stale cache) for real
+pmo:
+	@bash scripts/check-pmo-rollup.sh
 
 ## conformance — CMR class/pattern/template enforcement (issue #140): every
 ## milestoned issue must be classified, and the class it declares must hold
