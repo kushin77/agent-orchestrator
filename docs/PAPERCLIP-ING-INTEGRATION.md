@@ -311,6 +311,35 @@ auth mismatches as adoption work:
     credentials is adoption work owned by the cross-boundary auth lane (#412,
     milestone M27).
 
+### 5.1 Resolution record — #428 (commit `9cd5794`)
+
+The lane that resolves this mismatch list is **#428** (PR #433, commit
+`9cd5794`) — the `integrations/paperclip/**` boundary adapter, enforced offline
+by `scripts/check-paperclip-integration-adapter.sh` in `make verify`. Each row
+below records the honest verdict: **resolved** where a file under
+`integrations/paperclip/` answers the mismatch, **deferred (derived)** where the
+mapping is derived but the native fleet producer is still adoption work owned by
+a named lane. A deferred row is not a resolved one.
+
+| # | Mismatch | Verdict by #428 | Where / owner |
+|---|---|---|---|
+| 1 | Heartbeat granularity | **resolved** | `integrations/paperclip/mapping.py` (`map_heartbeats`) |
+| 2 | Heartbeat state vocabulary | **resolved** | `integrations/paperclip/mapping.py` (`_WAKE_CAUSE`) |
+| 3 | Cadence is implicit | **resolved** | `integrations/paperclip/mapping.py` (derived `cadence_seconds`/`tick`) |
+| 4 | Ticket status is not first-class | **resolved** | `integrations/paperclip/mapping.py` (`_ticket_status`) |
+| 5 | No goal reference on a claim | **resolved** | `integrations/paperclip/mapping.py` (`map_tickets`) |
+| 6 | Evidence is a convention, not a field | **resolved (derived); field deferred** | mapped in `mapping.py`; native structured field owned by #401 |
+| 7 | Budget scope differs | **deferred (producer)** | shapes mapped in `mapping.py`; per-agent producer owned by #415 |
+| 8 | No explicit currency | **resolved (derived)** | `integrations/paperclip/mapping.py` (`currency`) |
+| 9 | Hard stop is a percentage, not a boolean | **resolved (derived)** | `integrations/paperclip/mapping.py` (`hard_stop`) |
+| 10 | No per-task receipt field | **resolved (derived); receipt deferred** | `receipt_ref` in `mapping.py`; native receipt owned by #415 |
+| 11 | Auth models do not meet natively | **resolved (transport); adoption deferred** | `integrations/paperclip/client.py`; cross-boundary auth owned by #412 |
+
+The canonical home of the boundary adapter is `integrations/paperclip/` — see
+[`../integrations/paperclip/README.md`](../integrations/paperclip/README.md). A
+second top-level paperclip module is refused by name by
+`scripts/check-paperclip-canonical-module.sh` (issue #448).
+
 Every mismatch above is now either **resolved** by a file under
 `integrations/paperclip/` (enforced offline by
 `scripts/check-paperclip-integration-adapter.sh` in `make verify`) or **deferred**

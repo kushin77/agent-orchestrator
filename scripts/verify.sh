@@ -68,6 +68,7 @@ checks=(
   # input, so it cannot pass vacuously.
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
   'paperclip-adapter|bash scripts/check-paperclip-integration-adapter.sh'
+  'paperclip-canonical-module|bash scripts/check-paperclip-canonical-module.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
