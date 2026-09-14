@@ -3,7 +3,7 @@
 #
 # Upstream paperclip.ing models an approval as a first-class object; the fleet
 # already holds the *authority* (a brain directive, a claim event, the control
-# verb) but had no object to act on. paperclip/adapters/approvals/ is that
+# verb) but had no object to act on. integrations/paperclip/adapters/approvals/ is that
 # projection, and the EPIC's rule is decisive: an approval is a PROJECTION of an
 # existing authority, never a second one. A projection that nothing validates is
 # a formality (no-false-green doctrine, GR-12), so this gate fails, by name, when
@@ -39,7 +39,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-adapter="paperclip/adapters/approvals"
+adapter="integrations/paperclip/adapters/approvals"
 if [ ! -d "$adapter" ]; then
   echo "check-paperclip-approvals: FAIL — $adapter/ is missing" >&2
   exit 1
@@ -61,7 +61,7 @@ for entry in "hire:governance/dispatch" "top-up:.fleet/sent" "override:fleet/con
   want="${entry#*:}"
   got="$(python3 - "$kind" <<'PY'
 import sys
-from paperclip.adapters.approvals.model import authority_for
+from integrations.paperclip.adapters.approvals.model import authority_for
 print(authority_for(sys.argv[1]).surface)
 PY
 )" || fail "cannot read the authority for kind '$kind'"
@@ -74,7 +74,7 @@ done
 # A kind with no authority behind it must be refused, by name.
 if python3 - <<'PY'
 import sys
-from paperclip.adapters.approvals.model import ApprovalRefused, authority_for
+from integrations.paperclip.adapters.approvals.model import ApprovalRefused, authority_for
 try:
     authority_for("transfer")
 except ApprovalRefused as exc:
@@ -115,7 +115,7 @@ echo "== approvals: clean-tree project + verify + determinism =="
 python3 - "$clean" <<'PY' || fail "cannot build the clean fixture tree"
 import sys
 from pathlib import Path
-from paperclip.adapters.approvals import fixtures
+from integrations.paperclip.adapters.approvals import fixtures
 fixtures.build_tree(Path(sys.argv[1]))
 PY
 
@@ -140,7 +140,7 @@ python3 - "$clean" "$mutated" <<'PY' || fail "cannot build the mutated fixture t
 import shutil
 import sys
 from pathlib import Path
-from paperclip.adapters.approvals import fixtures
+from integrations.paperclip.adapters.approvals import fixtures
 source, target = Path(sys.argv[1]), Path(sys.argv[2])
 shutil.copytree(source, target)
 fixtures.write_record(
