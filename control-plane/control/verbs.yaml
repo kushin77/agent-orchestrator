@@ -283,6 +283,41 @@ verbs:
       verb here un-files it. This is the verb that makes the authority split
       concrete: it files, it does not act silently.
 
+  # -- the A2A dead-letter pair (issue #754) --------------------------------
+  - id: fleet.drop
+    source: fleet/control.py
+    local: drop
+    effect_class: irreversible
+    capability: fleet:operate
+    audit: fleet.drop
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 422, 503]
+    note: >-
+      Dead-letters a NAMED directive over the control channel: the sister moves
+      the order to `.fleet/dead-letter/`, records why and who dropped it, and
+      acks the sender. Irreversible in the sense that matters -- the directive
+      leaves the queue and `channel watch` will never return it again -- and
+      the reasoning is the runaway guard's (#723), whose store this shares.
+      This is the protocol route that replaces `mv`-ing a file out of
+      `.fleet/inbox/` while the loop reads it. Reversible only by the operator
+      verb `runaway rearm`, which is a separate, deliberately human lever. It
+      names `task.directive` (the target), not `task.issue`.
+
+  - id: fleet.dead-letter
+    source: fleet/control.py
+    local: dead-letter
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: >-
+      Lists or inspects the dead-letter mailbox, so an operator or the brain
+      reads it by verb instead of walking the runtime directory. Read-only:
+      it changes nothing and is not a control act.
+
   # -- fleet/channel.py: the steering transport ------------------------------
   - id: channel.verify
     source: fleet/channel.py
