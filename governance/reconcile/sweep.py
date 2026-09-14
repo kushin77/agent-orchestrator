@@ -37,6 +37,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from governance.lifecycle.report import (
+    DEFAULT_LABELS,
+    BoardReport,
+    BoardReporter,
+    finding_key,
+)
 from governance.reconcile.heartbeat import (
     DEFAULT_TTL_MINUTES,
     ORPHAN,
@@ -96,6 +102,7 @@ class SweepReport:
     """Every session's disposition for one pass."""
 
     actions: list[Action] = field(default_factory=list)
+    board_reports: list[BoardReport] = field(default_factory=list)
     applied: bool = False
     at: float = 0.0
 
@@ -128,6 +135,10 @@ class SweepReport:
             "applied": self.applied,
             "counts": {outcome: len(self.by_outcome(outcome)) for outcome in
                        (RECLAIMED, PARKED, SHELVED_OUTCOME, REPORTED, FAILED_OUTCOME)},
+            "board_reports": [
+                {"key": r.key, "action": r.action, "number": r.number}
+                for r in self.board_reports
+            ],
             "actions": [
                 {
                     "session_id": action.session_id,
@@ -256,11 +267,17 @@ def sweep(
     at: float | None = None,
     alive: dict[str, bool] | None = None,
     ops: ReconcileOps | None = None,
+    reporter: BoardReporter | None = None,
 ) -> SweepReport:
     """One reconciliation pass over every session with a heartbeat.
 
     ``alive`` overrides pid liveness per session id (the seam that makes "kill the
     process and watch it get flagged" testable without killing anything).
+
+    ``reporter`` is the board-reporting seam (issue #321): when it is given, a
+    shelved, failed or suspect finding is filed on the board (idempotently, and
+    only when ``apply`` is true), and a shelved lane whose work has since landed
+    is resolved. The gate never passes one, so its offline proofs are untouched.
     """
     if ops is None:
         raise ValueError("sweep requires an operations port (see RepoOps)")
@@ -277,20 +294,136 @@ def sweep(
         # A shelved lane is re-evaluated every pass, not written off: once its
         # work lands or is pushed, the next sweep reclaims it.
         if verdict.reclaimable or session.state == SHELVED:
-            report.actions.append(_teardown(session, verdict, ops, apply))
+            action = _teardown(session, verdict, ops, apply)
         else:
-            report.actions.append(
-                Action(
-                    session_id=session.session_id,
-                    issue=session.issue,
-                    agent=session.agent,
-                    status=verdict.status,
-                    reason=verdict.reason,
-                    outcome=REPORTED,
-                    steps=[Step("report", SKIPPED, "session is active; left alone")],
-                )
+            action = Action(
+                session_id=session.session_id,
+                issue=session.issue,
+                agent=session.agent,
+                status=verdict.status,
+                reason=verdict.reason,
+                outcome=REPORTED,
+                steps=[Step("report", SKIPPED, "session is active; left alone")],
             )
+        report.actions.append(action)
+        if reporter is not None:
+            report.board_reports.extend(board_report_action(reporter, session, action, apply))
     return report
+
+
+def board_report_action(
+    reporter: BoardReporter,
+    session: Session,
+    action: Action,
+    apply: bool,
+) -> list[BoardReport]:
+    """Surface (or resolve) a reconciliation finding on the board (#321).
+
+    A lane whose unmerged work exists nowhere else, a teardown that could not
+    finish, and a session whose process is gone behind a fresh beat are each a
+    finding the fleet must see. The opposite of a finding is a resolution: a
+    previously shelved lane whose work has since landed is reclaimed (or parked),
+    and its finding is then dropped so a genuinely new shelve files again.
+    """
+    shelved_key = finding_key("reconcile:shelved", f"#{session.issue}")
+    if action.outcome == SHELVED_OUTCOME:
+        return [
+            reporter.report(
+                shelved_key,
+                title=f"[reconcile] shelved lane #{session.issue} — unmerged work at risk",
+                body=_shelved_body(session, action),
+                labels=DEFAULT_LABELS,
+                apply=apply,
+            )
+        ]
+    if action.outcome == FAILED_OUTCOME:
+        return [
+            reporter.report(
+                finding_key("reconcile:failed", session.session_id),
+                title=f"[reconcile] failed to reconcile #{session.issue}",
+                body=_failed_body(session, action),
+                labels=DEFAULT_LABELS,
+                apply=apply,
+            )
+        ]
+    if action.status == SUSPECT:
+        return [
+            reporter.report(
+                finding_key("reconcile:suspect", session.session_id),
+                title=f"[reconcile] suspect session #{session.issue}",
+                body=_suspect_body(session, action),
+                labels=DEFAULT_LABELS,
+                apply=apply,
+            )
+        ]
+    if session.state == SHELVED and action.outcome in (RECLAIMED, PARKED):
+        reporter.resolve(
+            shelved_key,
+            comment=_resolved_body(session, action),
+            apply=apply,
+        )
+    return []
+
+
+def _shelved_body(session: Session, action: Action) -> str:
+    return (
+        "A reconciliation sweep shelved a lane whose unmerged work exists "
+        "nowhere else.\n\n"
+        f"- lane: `{session.lane or '(unknown)'}`\n"
+        f"- branch: `{session.branch or '(unknown)'}`\n"
+        f"- worktree: `{session.worktree or '(gone)'}`\n"
+        f"- session: `{session.session_id}`\n"
+        f"- issue: #{session.issue}\n"
+        f"- agent: `{session.agent or '(unknown)'}`\n"
+        f"- reason: {action.reason}\n\n"
+        "The worker never trades unmerged work for an unlocked issue, so the "
+        "lane, its branch and its claim are kept. The next sweep reclaims it "
+        "automatically once the work lands on `master` (or is pushed); this "
+        "finding resolves then.\n\n"
+        "Reported by `governance/reconcile` (issue #321).\n"
+    )
+
+
+def _failed_body(session: Session, action: Action) -> str:
+    failed = [f"  - {step.action}: {step.detail}" for step in action.steps if step.outcome == FAILED]
+    return (
+        "A reconciliation sweep could not finish teardown for a lane.\n\n"
+        f"- session: `{session.session_id}`\n"
+        f"- issue: #{session.issue}\n"
+        f"- agent: `{session.agent or '(unknown)'}`\n"
+        f"- lane: `{session.lane or '(unknown)'}`\n"
+        f"- branch: `{session.branch or '(unknown)'}`\n"
+        f"- reason: {action.reason}\n\n"
+        "Failed step(s):\n"
+        + ("\n".join(failed) or "  - (none recorded)")
+        + "\n\nReported by `governance/reconcile` (issue #321).\n"
+    )
+
+
+def _suspect_body(session: Session, action: Action) -> str:
+    return (
+        "A session's heartbeat is fresh but its recorded process is gone.\n\n"
+        f"- session: `{session.session_id}`\n"
+        f"- issue: #{session.issue}\n"
+        f"- agent: `{session.agent or '(unknown)'}`\n"
+        f"- lane: `{session.lane or '(unknown)'}`\n"
+        f"- pid: {session.pid}\n"
+        f"- reason: {action.reason}\n\n"
+        "Reported, not reclaimed: absence alone is weak evidence of death, and "
+        "reclaiming a live lane on that evidence would destroy work. The sweep "
+        "treats it as an orphan once its beat passes the TTL.\n\n"
+        "Reported by `governance/reconcile` (issue #321).\n"
+    )
+
+
+def _resolved_body(session: Session, action: Action) -> str:
+    return (
+        "Resolved: the shelved lane's work has landed, so the sweep "
+        f"{action.outcome} it.\n\n"
+        f"- session: `{session.session_id}`\n"
+        f"- issue: #{session.issue}\n"
+        f"- branch: `{session.branch or '(unknown)'}`\n"
+    )
 
 
 class RepoOps:

@@ -28,6 +28,12 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from governance.lifecycle.report import (  # noqa: E402
+    DEDUPED,
+    FILED,
+    BoardReporter,
+    GhFiler,
+)
 from governance.reconcile.heartbeat import (  # noqa: E402
     DEFAULT_BEAT_SECONDS,
     DEFAULT_TTL_MINUTES,
@@ -50,6 +56,22 @@ from governance.reconcile.sweep import (  # noqa: E402
 EXIT_OK = 0
 EXIT_NOT_OK = 1
 EXIT_CANNOT_ASSESS = 2
+
+
+def _reporter(root: str) -> BoardReporter:
+    """The board-reporting seam for this repo (issue #321), dry-run gated by
+    the command's own ``--apply`` flag."""
+    return BoardReporter(GhFiler(), ledger=Path(root) / ".fleet" / "board-reports.json")
+
+
+def _print_board_reports(reports: list) -> None:
+    for board_report in reports:
+        if board_report.action == FILED:
+            print(f"board: filed #{board_report.number} for {board_report.key}")
+        elif board_report.action == DEDUPED:
+            print(f"board: already filed (#{board_report.number}) for {board_report.key}")
+        else:
+            print(f"board: dry-run — would file for {board_report.key}")
 
 
 def cmd_stamp(args: argparse.Namespace) -> int:
@@ -111,11 +133,13 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         ttl_minutes=args.ttl_minutes,
         apply=args.apply,
         ops=RepoOps(args.root),
+        reporter=_reporter(args.root),
     )
     if args.json:
         print(json.dumps(report.to_json(), indent=2))
     else:
         print(describe(report))
+        _print_board_reports(report.board_reports)
     if report.failed:
         print(f"reconcile: NOT-OK — {len(report.failed)} session(s) could not be reconciled", file=sys.stderr)
         return EXIT_NOT_OK
@@ -146,6 +170,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
                 ttl_minutes=args.ttl_minutes,
                 apply=args.apply,
                 ops=RepoOps(args.root),
+                reporter=_reporter(args.root),
             )
             counts = ", ".join(
                 f"{name}={len(report.by_outcome(name))}"
@@ -156,6 +181,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
                 for action in report.actions:
                     if action.outcome != "reported":
                         print(f"    {action}", flush=True)
+                _print_board_reports(report.board_reports)
         except Exception as exc:  # noqa: BLE001 - the worker outlives a bad pass
             print(f"reconcile[{passes}]: pass failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         if args.once:

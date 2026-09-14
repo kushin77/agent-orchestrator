@@ -83,3 +83,20 @@ provoked, including the load-bearing negative: an orphan with unmerged work is
 The bookkeeping steps (`forget-lane`, `release-claim`, `clear-heartbeat`) are
 asserted by `governance/reconcile/tests`, since a scratch repository has no
 `governance/` of its own to call.
+
+## 6. Board reporting
+
+A finding must reach the board, not only a log line. A `shelved`, `failed` or
+`suspect` outcome files a GitHub issue carrying the named violation and its
+evidence (`governance/lifecycle/report.py`, issue #321); a previously shelved
+lane whose work has since landed is *resolved* — the finding is dropped so a
+genuinely new shelve files again.
+
+- **Idempotent.** One issue per fingerprint (the lane's issue number or session
+  id), deduped through `.fleet/board-reports.json`, so repeated passes do not
+  spam the board for the same unresolved lane.
+- **Dry-run by default.** No board write happens without `--apply`; a dry-run
+  pass prints `board: dry-run — would file for …`.
+- **Offline-testable.** The board effects are an injected port, exercised by
+  `governance/reconcile/tests/test_boardreport.py` with no network.
+

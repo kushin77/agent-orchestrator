@@ -31,6 +31,11 @@ from typing import Callable, Protocol
 
 from governance.lifecycle.audit import Finding, audit_item
 from governance.lifecycle.model import owes_closure
+from governance.lifecycle.report import (
+    BoardReport,
+    BoardReporter,
+    board_report_findings,
+)
 
 #: How a step ended.
 PERFORMED = "performed"
@@ -92,6 +97,7 @@ class CloseOutResult:
     issue: int
     steps: list[Step] = field(default_factory=list)
     remaining: list[Finding] = field(default_factory=list)
+    board_reports: list[BoardReport] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -122,11 +128,21 @@ def _run(result: CloseOutResult, action: str, op: Callable[[], str], needed: boo
     return True
 
 
-def closeout(item: dict, ops: CloseOutOps, evidence: str = "") -> CloseOutResult:
+def closeout(
+    item: dict,
+    ops: CloseOutOps,
+    evidence: str = "",
+    reporter: BoardReporter | None = None,
+    apply: bool = False,
+) -> CloseOutResult:
     """Drive one item to hygiene in dependency order.
 
     Returns the steps taken and the invariants still broken. ``ok`` is true only
     when nothing remains — the caller may never treat it as advisory.
+
+    ``reporter`` is the board-reporting seam (issue #321): when it is given and a
+    non-terminal artifact remains, each finding is filed on the board —
+    idempotently, and only when ``apply`` is true.
     """
     issue = int(item.get("issue") or 0)
     result = CloseOutResult(issue=issue)
@@ -139,7 +155,7 @@ def closeout(item: dict, ops: CloseOutOps, evidence: str = "") -> CloseOutResult
             Step("inspect", SKIPPED, "the change has not landed (no merged pull request); close-out applies once it has")
         )
         result.remaining = audit_item(item)
-        return result
+        return _finish(result, reporter, apply)
 
     pr = item.get("pr") or {}
     verify = item.get("verify") or {}
@@ -203,6 +219,13 @@ def closeout(item: dict, ops: CloseOutOps, evidence: str = "") -> CloseOutResult
     # the effects above have run; auditing it would report a successful close as
     # NOT-OK.
     result.remaining = audit_item(ops.refresh(item))
+    return _finish(result, reporter, apply)
+
+
+def _finish(result: CloseOutResult, reporter: BoardReporter | None, apply: bool) -> CloseOutResult:
+    """Surface any remaining findings on the board, then return the result."""
+    if reporter is not None and result.remaining:
+        result.board_reports = board_report_findings(result.remaining, reporter, apply=apply)
     return result
 
 

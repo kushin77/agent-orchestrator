@@ -108,3 +108,18 @@ provoking it fails the gate rather than shipping an unexercised rule.
 The execution loop ([`fleet/terminal.py`](../../fleet/terminal.py)) runs close-out
 after every dispatch and carries its verdict in the report, so a partial close
 reaches the brain instead of being discovered later by hand.
+
+## 7. Board reporting
+
+A finding must reach the board, not only a log line. `cli.py audit --apply` and
+`cli.py close --apply` file a GitHub issue per non-terminal artifact carrying the
+named violation and its remediation (`report.py`, issue #321).
+
+- **Idempotent.** One issue per fingerprint (`lifecycle:<code>:<subject>`), deduped
+  through `.fleet/board-reports.json`, so repeated passes do not spam the board for
+  the same unresolved invariant.
+- **Dry-run by default.** No board write happens without `--apply`; a dry-run
+  prints `board: dry-run — would file for …`.
+- **Offline-testable.** The board effects are an injected port, exercised by
+  `governance/lifecycle/tests/test_boardreport.py` with no network.
+
