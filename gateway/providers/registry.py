@@ -41,6 +41,7 @@ from providers.contract import (
     ChatOptions,
     ChatResult,
 )
+from providers.copilot import CopilotProvider
 from providers.deepseek import DeepSeekProvider
 from providers.hermes import HermesProvider
 from providers.errors import (
@@ -75,6 +76,7 @@ PROVIDER_CLASSES: dict[str, type] = {
     cls.name: cls
     for cls in (
         AnthropicProvider,
+        CopilotProvider,
         DeepSeekProvider,
         HermesProvider,
         OpenAIProvider,

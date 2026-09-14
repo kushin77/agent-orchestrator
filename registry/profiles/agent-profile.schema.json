@@ -72,9 +72,111 @@
     "guardrailPolicyRef": {
       "$ref": "#/definitions/guardrailPolicyId",
       "description": "Single reference to the guardrail policy (atomic or bundle id from the guardrail-policy catalog) bound to this profile. Unknown policy ids are rejected (fail closed). Atomic ids name one policy; bundle ids expand to a policy list (catalog.yaml bundles)."
+    },
+    "role": {
+      "$ref": "#/definitions/roleId",
+      "description": "Canonical CMR agent role this profile fills (CMR onboarding/agent-profiles/role.schema.json). Optional: a platform profile need not name a role, but when it does the id must exist in the canonical CMR role vocabulary. The registry/parity gate fails if the declared set drifts from CMR (issue #145)."
+    },
+    "model": {
+      "$ref": "#/definitions/workerModel",
+      "description": "Concrete worker model for the default tier (flash or pro). Separates the MODEL axis from the tier axis (leaderboard fleet-roster ROLE/TIER/MODEL/TRANSPORT/EFFORT separation). Optional."
+    },
+    "transport": {
+      "$ref": "#/definitions/transport",
+      "description": "How the model is carried: a provider API (deepseek/api) or the running CLI session (session). Separates the TRANSPORT axis (leaderboard lib/fleet-roster.sh role_transport). Optional."
+    },
+    "effort": {
+      "$ref": "#/definitions/effort",
+      "description": "Reasoning effort for this profile's dispatches (low/medium/high; leaderboard lib/fleet-roster.sh role_effort). Separates the EFFORT axis. Optional."
+    },
+    "capabilityTier": {
+      "$ref": "#/definitions/capabilityTier",
+      "description": "Capability tier (deep/balanced/fast; leaderboard fleet-roster three-tier routing) chosen from dispatch complexity, distinct from the semantic model tier. Optional."
+    },
+    "fallbackChain": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/roleId" },
+      "description": "Ordered fallback chain of canonical role ids to dispatch when this profile cannot serve the task (capital-underwriting config/leaderboard/capability-registry.json 'fallback' pattern). Every id must be a canonical CMR role. Optional."
+    },
+    "canonicalLanes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/canonicalLane" },
+      "description": "Canonical CMR lane ids this profile owns (CMR role schema ownedLanes). Optional cross-walk to the CMR lane taxonomy; distinct from a persona card's free-form ownedLanes."
+    },
+    "weekly_spend_ceiling": {
+      "$ref": "#/definitions/weeklySpendCeiling",
+      "description": "First-class per-profile FinOps ceiling: the maximum the platform may spend on this profile in a rolling week, in USD. Optional; when absent the profile is governed by the platform default budget guardrail. When present it must be a non-negative number (a negative ceiling is refused by the schema and by registry/profiles/validate.py)."
     }
   },
   "definitions": {
+    "roleId": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "architecture-sme",
+        "iac-sme",
+        "security-sme",
+        "sync-sme",
+        "platform-sme",
+        "qa-sme",
+        "frontend-sme",
+        "pmo-sme",
+        "general",
+        "vendor",
+        "spoke-consumer"
+      ],
+      "description": "Canonical CMR agent-role vocabulary (CMR onboarding/agent-profiles/role.schema.json properties.role.enum), backfilled per issue #145. The registry/parity gate fails if this set drifts from the canonical CMR role set in either direction."
+    },
+    "workerModel": {
+      "type": "string",
+      "enum": ["flash", "pro"],
+      "description": "Concrete worker model (CMR role schema model.model): flash = the volume tier, pro = the reasoning tier."
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["deepseek", "session", "api"],
+      "description": "Transport that carries the model (leaderboard lib/fleet-roster.sh role_transport): deepseek = the DeepSeek API path; api = the Anthropic API path; session = the running CLI session."
+    },
+    "effort": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Reasoning effort (leaderboard lib/fleet-roster.sh role_effort)."
+    },
+    "capabilityTier": {
+      "type": "string",
+      "enum": ["deep", "balanced", "fast"],
+      "description": "Capability tier (leaderboard fleet-roster three-tier routing: deep/balanced/fast)."
+    },
+    "canonicalLane": {
+      "type": "string",
+      "enum": [
+        "arch",
+        "gov-iac",
+        "security",
+        "sync-engine",
+        "harvest",
+        "module-contract",
+        "catalog",
+        "registry",
+        "gates",
+        "observability",
+        "pilot-frontend",
+        "guardrails",
+        "standards",
+        "dx",
+        "meta",
+        "hygiene",
+        "pmo"
+      ],
+      "description": "Canonical CMR lane vocabulary (CMR role schema properties.ownedLanes.items.enum), backfilled per issue #145. The registry/parity gate fails on drift."
+    },
+    "weeklySpendCeiling": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Non-negative weekly spend ceiling in USD. Draft-07 treats booleans as a distinct type, so true/false fail here; registry/profiles/validate.py additionally refuses a negative or non-numeric value fail-closed."
+    },
     "toolId": {
       "type": "string",
       "enum": [

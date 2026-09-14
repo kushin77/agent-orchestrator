@@ -1,0 +1,54 @@
+# AgentProfile seed: finops-steward (budget / FinOps governor) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/leaderboard lib/fleet-roster.sh (ROLE/TIER/MODEL/TRANSPORT/EFFORT separation;
+#     role_capabilities() cost_tier/cost_per_mtok data)
+#   - kushin77/capital-underwriting config/leaderboard/tier-policy.json (complexity -> tier ->
+#     model mapping with a fallback chain; max_tokens/timeout per tier)
+#   - kushin77/capital-underwriting config/leaderboard/capability-registry.json (agent fallback
+#     chains; per-role tool allowlists)
+#   - kushin77/CMR onboarding/agent-profiles/role.schema.json (canonical role/tier/model vocabulary)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+#
+# weekly_spend_ceiling is a NEW first-class field defined in this repository
+# (issue #145): the declared CMR source that was expected to carry it,
+# vendor/CMR/catalog/sme-registry.tsv, does not exist in the populated submodule
+# (grep -rn weekly_spend_ceiling vendor/CMR returns 0 matches).
+id: finops-steward
+version: 1.0.0
+owner: platform/finops
+systemPromptRef: finops-steward/primary@v1
+role: general
+model: flash
+transport: deepseek
+effort: medium
+capabilityTier: balanced
+fallbackChain:
+  - architecture-sme
+  - general
+canonicalLanes:
+  - observability
+  - gates
+toolAllowlist:
+  - gh_issue
+  - file_read
+  - shell_exec
+  - sql_query
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - verify-before-done
+  - evidence-on-pr
+  - no-debug-leftovers
+capabilitySet:
+  - finops-meter
+  - data-analysis
+  - audit
+  - memory-ops
+defaultModelTier: MED
+memoryScope:
+  - repository
+  - session
+guardrailPolicyRef: worker-bundle
+weekly_spend_ceiling: 250

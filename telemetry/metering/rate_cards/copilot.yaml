@@ -1,0 +1,18 @@
+# telemetry/metering rate card — Copilot (GitHub Copilot, OpenAI-compatible)
+#
+# POINT-IN-TIME USD list prices per 1,000,000 tokens (input/output split),
+# for COST ESTIMATION ONLY — not live pricing, not customer billing. Copilot is
+# served through its OpenAI-compatible endpoint, so the model ids and prices
+# mirror the OpenAI GPT card (issue #340).
+schemaVersion: 1
+provider: copilot
+note: "GitHub Copilot (OpenAI-compatible), USD per 1M tokens. Point-in-time 2026-09."
+models:
+  gpt-4o-mini:
+    standard:
+      inputUsdPerMillion: 0.15
+      outputUsdPerMillion: 0.60
+  gpt-4o:
+    standard:
+      inputUsdPerMillion: 2.50
+      outputUsdPerMillion: 10.00

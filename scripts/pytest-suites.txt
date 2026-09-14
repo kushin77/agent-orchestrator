@@ -26,6 +26,7 @@ guardrails/sandbox
 gateway/finops
 gateway/health
 gateway/providers
+gateway/catalog
 gateway/limits
 gateway/mcp
 gateway/proxy
@@ -75,4 +76,5 @@ governance/authority
 governance/rollup
 control-plane/fleet-template
 gateway/sme-routing
+registry/parity
 scripts

@@ -613,6 +613,12 @@ where the mature shape was bash- or GitHub-bound; the verdict says which.
 | `leaderboard/docker/worker-fleet/personas.yaml` + `config/platoons.yaml` | fleet composition + lens→fleet→parallelism routing | PATTERN | `control-plane/fleet-template/template.yaml` (#146) |
 | `leaderboard/lib/fleet-roster.sh` | ROLE/TIER/MODEL/TRANSPORT/EFFORT roster as single source of truth | PATTERN | `control-plane/fleet-template/schema.yaml` (#146) |
 | `capital-underwriting/infra/docker/worker-fleet/personas.yaml` | 30-persona fleet + definition-vs-run-state split | PATTERN | run-state model, `control-plane/fleet-template/` (#146) |
+| `leaderboard/lib/fleet-roster.sh` | ROLE/TIER/MODEL/TRANSPORT/EFFORT separation + measured per-model capability JSON | PATTERN | `registry/profiles/agent-profile.schema.json`, `registry/personas/persona-card.schema.json` (#145) |
+| `leaderboard/docker/worker-fleet/personas.yaml` | 15 container personas (role/description/env/memory_file/cron_lines) | READY | seeded profiles + SME cards (#145) |
+| `capital-underwriting/config/leaderboard/{capability-registry,route-policy,tier-policy}.json` | agent roles + worker fleets, complexity/risk→chain+tier, model tiers with caps/fallbacks | PATTERN | registry vocabulary: roles, tool allowlists, fallback chains, model tiers (#145) |
+| `capital-underwriting/scripts/agent/sme/*.txt` + `sme-dispatch.sh` | DOMAIN→SME system-prompt library (6 files) | REFERENCE | SME cards + domain mapping (#145) |
+| `deepseek/config/capabilities.toml` + `docs/operations/sme-card-template.md` + `scripts/sme-card-check.py` | declared-data capability catalog + SME-card shape enforcement | PATTERN | card/profile shape (#145) |
+| `vendor/CMR/onboarding/agent-profiles/role.schema.json` (+ `profiles/`, `validate.sh`) | the canonical CMR role vocabulary | READY | `registry/parity/canonical/cmr-role-vocabulary.json` frozen baseline (#145) |
 | `capital-underwriting/docs/operations/{SME_SQUAD_DESIGN,TWO_PLATOON_SPLIT_DESIGN}.md` | 7-domain SME routing + platoon lane split | PATTERN | `gateway/sme-routing/policies/` (#149) |
 | `capital-underwriting/config/leaderboard/capability-registry.json` | agent roles (planner/executor/verifier/critic) + worker fleets with access levels + dispatch chains | READY | `gateway/sme-routing/policies/capability-registry.yaml` (#149) |
 | `capital-underwriting/config/leaderboard/route-policy.json` | complexity/risk → chain + tier (fast/deep/strict), keyword thresholds | READY | `gateway/sme-routing/policies/route-policy.yaml` (#149) |
@@ -637,6 +643,16 @@ is cited by issue #146 and **does not exist** in the local checkout (that
 directory holds `personas.yaml`, `fleet.cron`, `docker-compose.worker-fleet.yml`,
 `entrypoint.sh`, …). It is recorded as `NOT FOUND` in the #146 PROVENANCE table
 rather than silently substituted.
+
+**Third and fourth declared-but-absent sources (issue #145).**
+`vendor/CMR/catalog/sme-registry.tsv` — the file credited with the
+`weekly_spend_ceiling` primitive — **does not exist**, and
+`grep -rn weekly_spend_ceiling vendor/CMR` returns **0 matches**; the field is
+therefore **defined by this repo** (`registry/profiles/agent-profile.schema.json`,
+`minimum: 0`) and documented as such. Also absent:
+`capital-underwriting/.claude/agents/{gcp-gatekeeper-sme,ltc-brain-fleet-sre,qa-playwright-sme}.md`
+(the directory holds only `session.json`s). Per-asset detail:
+`docs/REGISTRY-PROVENANCE.md`.
 
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*

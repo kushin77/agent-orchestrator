@@ -26,6 +26,8 @@ and memory-scope semantics are normalized to `registry/profiles/catalog.yaml`.
 | `hermes` | `kushin77/hermes-agents` `src/hermes_agent/services/capability_registry.py` + `models/model_tiering.py` | code-gen/refactor/test-gen routing; tier/ceiling/cost model; MED tier |
 | `deepseek` | `kushin77/leaderboard` `lib/fleet-roster.sh` + `config/deepseek-capabilities.txt` + `kushin77/capital-underwriting` `personas.yaml` (ds-worker-*) | role→tier→model chooser; DeepSeek capability catalog; data-analysis/research; MED tier |
 | `claude` | `kushin77/gmail-agent` `src/agent/claude.ts` + `kushin77/CMR` `onboarding/agent-profiles/profiles/architecture-sme.json` | governed Claude client (tiers/p-retry/tool loop); orchestration posture; MED tier |
+| `finops-steward` | `kushin77/leaderboard` `lib/fleet-roster.sh` (`role_capabilities()` cost_tier / cost_per_mtok) + `kushin77/capital-underwriting` `config/leaderboard/{tier-policy,capability-registry}.json` (complexity->tier->model with fallback chains; per-role tool allowlists) | FinOps metering posture; `fallbackChain`; the first-class `weekly_spend_ceiling` (issue #145) |
+| `copilot` | `kushin77/agent-orchestrator` `gateway/providers/openai.py` + `gateway/providers/copilot.py` | OpenAI-compatible adapter mapped onto the copilot provider id; code-author/code-review posture; MED tier |
 
 Cross-cutting field semantics (all seeds):
 
@@ -37,3 +39,44 @@ Cross-cutting field semantics (all seeds):
 | snake_case tool ids | `kushin77/gmail-agent` `src/agent/tools.ts` (get_gmail_thread, create_calendar_event, search_memory, ...) |
 | guardrail/constraint ids | `kushin77/agent-orchestrator` `AGENTS.md` hard DON'Ts + `docs/GOLDEN-RULES.md` (GR-4/5/6/12, AO-GR-1/2/3/6) |
 | agent_class reviewer/orchestrator/investigator | `kushin77/shared-governance` `GLOBAL_STANDARDS/schemas/agent-task.schema.json` |
+
+## Backfilled schema vocabulary (issue #145)
+
+The profile schema gained the ROLE/TIER/MODEL/TRANSPORT/EFFORT separation plus
+tool-allowlist/fallback-chain/model-tier fields, harvested from:
+
+| New schema axis | Derived from | Notes |
+|---|---|---|
+| `role` (12 canonical ids) | `kushin77/CMR` `onboarding/agent-profiles/role.schema.json` (`properties.role.enum`) | mirrored exactly; `registry/parity` fails if it drifts |
+| `model` (flash/pro) | same schema (`model.model.enum`) | separates MODEL from `defaultModelTier` |
+| `transport` (deepseek/session/api) | `kushin77/leaderboard` `lib/fleet-roster.sh` `role_transport()` | not a CMR axis (documented) |
+| `effort` (low/medium/high) | `kushin77/leaderboard` `lib/fleet-roster.sh` `role_effort()` | not a CMR axis (documented) |
+| `capabilityTier` (deep/balanced/fast) | `kushin77/leaderboard` `lib/fleet-roster.sh` `role_capability_tier()` | not a CMR axis (documented) |
+| `fallbackChain` (role-id list) | `kushin77/capital-underwriting` `config/leaderboard/capability-registry.json` (`fallback`) | every id must be a canonical CMR role |
+| `canonicalLanes` (17 canonical ids) | `kushin77/CMR` role schema (`ownedLanes.items.enum`) | mirrored exactly; parity-checked |
+| `weekly_spend_ceiling` (number >= 0) | **defined here** — the declared CMR source `catalog/sme-registry.tsv` is absent | see `docs/REGISTRY-PROVENANCE.md` |
+
+All new fields are **optional with a documented default** (absence = the platform
+budget guardrail governs), so the existing published seeds and their sha256
+ledger entries are unchanged.
+
+## Persona SME-card provenance (issue #145)
+
+The five SME cards added by issue #145 carry their own `provenance` field:
+
+| Card | Derived from |
+|---|---|
+| `platform-sme` | `kushin77/CMR` `onboarding/agent-profiles/profiles/platform-sme.json` + role schema |
+| `pmo-sme` | `kushin77/CMR` `onboarding/agent-profiles/profiles/pmo-sme.json` + leaderboard PMO personas |
+| `sync-sme` | `kushin77/CMR` `onboarding/agent-profiles/profiles/sync-sme.json` + leaderboard `sync-daemon` persona |
+| `gcp-gatekeeper-sme` | `kushin77/capital-underwriting` `docs/strategy/gcp-gatekeeper-p0-roadmap.md` + CMR `iac-sme` card (the declared `.claude/agents/gcp-gatekeeper-sme.md` is absent) |
+| `mechanical-sme` | `kushin77/deepseek` `docs/operations/sme-card-template.md` + `scripts/sme-card-check.py` + leaderboard fleet-roster |
+
+The full repo/path/license/verdict table, including the sources that were
+verified **absent**, is in `docs/REGISTRY-PROVENANCE.md`.
+
+## Parity gate (issue #145)
+
+`registry/parity/` compares the registry's declared vocabulary against the
+canonical CMR catalog and is tri-state (0 OK / 1 NOT-OK / 2 CANNOT-ASSESS). See
+`registry/parity/README.md` for the direction contract.
