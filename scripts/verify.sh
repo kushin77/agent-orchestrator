@@ -220,6 +220,16 @@ checks=(
   'diagrams-capability-tracker|bash scripts/track-diagrams-capabilities.sh'
   'codeidx-capability-register|bash scripts/check-codeidx-capability-register.sh'
   'codeidx-capability-tracker|bash scripts/track-codeidx-capabilities.sh'
+  # EPIC #500 (the enterprise chat surface), issue #568: the seventh chat gate.
+  # #503 (PR #564) shipped `scripts/check-chat-surface.sh` -- the OpenAI-/
+  # Ollama-compatible contract and its flag gate -- but nothing invoked it, so
+  # the `gate-coverage` detector (#526) failed it BY NAME and the gate of record
+  # went red on master: an artifact no gate runs is a formality (GR-12). Its six
+  # siblings (`chat-eval`, `chat-finops`, `chat-guardrails`, `chat-identity`,
+  # `chat-tools`, `chat-ux`) are wired by the #502 lane; this one landed after
+  # that lane's PR was opened, which is why it needed its own fix. Offline and
+  # deterministic -- no network, no `vendor/CMR` seed -- so it RUNS for real.
+  'chat-surface|bash scripts/check-chat-surface.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
