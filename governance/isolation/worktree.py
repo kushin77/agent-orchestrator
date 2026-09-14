@@ -28,6 +28,26 @@ RECORD_DIR = ".fleet/lanes"
 #: A worktree root inside the checkout would put lanes back in the shared tree.
 REFUSED_ROOTS = (".git",)
 
+#: Filesystems a lane may not be provisioned onto. ``/tmp`` is a tmpfs on this
+#: fleet's machines: it costs RAM and inodes instead of disk, and it is **lost
+#: on reboot**, so a lane parked there silently evaporates (issue #516).
+REFUSED_FILESYSTEMS = ("tmpfs", "ramfs")
+
+#: Where the mount table is read from. A parameter of the check, never an
+#: environment variable: turning the rule off must be a code-level decision.
+DEFAULT_MOUNTS = "/proc/self/mounts"
+
+# Refusal codes. Every provisioning refusal names itself, so a finding can be
+# grepped for and a reader of the README's refusal table can match prose to
+# cause. ``lane-worktree-on-tmpfs`` is the one issue #516 adds.
+REFUSAL_SHARED_CHECKOUT = "lane-worktree-is-the-shared-checkout"
+REFUSAL_INSIDE_CHECKOUT = "lane-worktree-inside-the-shared-checkout"
+REFUSAL_EXISTS = "lane-path-exists-but-is-not-a-worktree"
+REFUSAL_BASE_UNRESOLVED = "lane-base-ref-unresolved"
+REFUSAL_ADD_FAILED = "git-worktree-add-failed"
+REFUSAL_UNSAFE_NAME = "unsafe-lane-name"
+REFUSAL_TMPFS = "lane-worktree-on-tmpfs"
+
 
 class ProvisionRefused(RuntimeError):
     """The lane cannot be provisioned safely; nothing was created."""
@@ -88,12 +108,68 @@ def enable_worktree_config(main: Path | str) -> None:
 
 def _guard_paths(main: Path, worktree: Path) -> None:
     if worktree.resolve() == main.resolve():
-        raise ProvisionRefused("the lane worktree path is the shared checkout itself")
+        raise ProvisionRefused(f"{REFUSAL_SHARED_CHECKOUT}: the lane worktree path is the shared checkout itself")
     try:
         worktree.resolve().relative_to(main.resolve())
     except ValueError:
         return
-    raise ProvisionRefused(f"lane worktree {worktree} sits inside the shared checkout {main}; it would not be isolated")
+    raise ProvisionRefused(
+        f"{REFUSAL_INSIDE_CHECKOUT}: lane worktree {worktree} sits inside the shared checkout {main}; "
+        "it would not be isolated"
+    )
+
+
+def _unescape_mount_point(field: str) -> str:
+    """Undo the octal escaping the mount table applies to spaces and tabs."""
+    return re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), field)
+
+
+def filesystem_type(path: Path | str, mounts: Path | str | None = None) -> str:
+    """The filesystem ``path`` lives on, per the mount table (``""`` if unknown).
+
+    A worktree root that does not exist yet is classified by the deepest
+    *existing* ancestor, because that is the filesystem ``git worktree add``
+    would create it on. ``mounts`` is a parameter rather than an environment
+    variable so the rule can be proved offline, against a declared table,
+    instead of whatever the running machine happens to mount.
+    """
+    probe = Path(path)
+    try:
+        probe = probe.resolve()
+    except OSError:
+        return ""
+    while not probe.exists() and probe.parent != probe:
+        probe = probe.parent
+    try:
+        table = Path(mounts if mounts is not None else DEFAULT_MOUNTS).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    best, best_depth = "", -1
+    for line in table.splitlines():
+        fields = line.split()
+        if len(fields) < 3:
+            continue
+        mount_point = Path(_unescape_mount_point(fields[1]))
+        try:
+            probe.relative_to(mount_point)
+        except ValueError:
+            continue
+        depth = len(mount_point.parts)
+        if depth > best_depth:
+            best, best_depth = fields[2].lower(), depth
+    return best
+
+
+def tmpfs_lane_root(path: Path | str, mounts: Path | str | None = None) -> str:
+    """The refusal message when the lane root is RAM-backed, else ``""``."""
+    filesystem = filesystem_type(path, mounts)
+    if filesystem not in REFUSED_FILESYSTEMS:
+        return ""
+    return (
+        f"{REFUSAL_TMPFS}: lane worktree root {path} is on {filesystem} — RAM and inodes rather than "
+        "disk, and lost on reboot; pass a root on a persistent filesystem (or allow_tmpfs=True for "
+        "throwaway scratch that cannot outlive the run)"
+    )
 
 
 def resolve_base(main: Path | str, base: str) -> str:
@@ -101,8 +177,8 @@ def resolve_base(main: Path | str, base: str) -> str:
     result = git(main, "rev-parse", "--verify", f"{base}^{{commit}}")
     if result.returncode != 0:
         raise ProvisionRefused(
-            f"base ref {base!r} does not resolve in {main}: {result.stderr.strip()[-200:]} "
-            "(fetch the remote, or pass an explicit base)"
+            f"{REFUSAL_BASE_UNRESOLVED}: base ref {base!r} does not resolve in {main}: "
+            f"{result.stderr.strip()[-200:]} (fetch the remote, or pass an explicit base)"
         )
     return result.stdout.strip()
 
@@ -145,21 +221,34 @@ def provision(
     main: Path | str,
     base: str = "origin/master",
     fetch_remote: str = "",
+    *,
+    allow_tmpfs: bool = False,
+    mounts: Path | str | None = None,
 ) -> Provision:
     """Create the lane: worktree on the issue branch, identity stamped inside.
 
     Idempotent — re-provisioning an existing lane re-stamps its identity and
     returns ``created=False`` instead of forking a second worktree.
+
+    Two guards run **before** anything is created: the worktree may not sit in
+    the shared checkout, and — unless the caller explicitly accepts throwaway
+    scratch — it may not sit on a RAM-backed filesystem such as ``/tmp``
+    (``lane-worktree-on-tmpfs``, issue #516). ``mounts`` is the mount table the
+    filesystem check reads, so the refusal is provable offline.
     """
     main_root = main_repo_root(main)
     _guard_paths(main_root, identity.worktree)
+    if not allow_tmpfs:
+        refusal = tmpfs_lane_root(identity.worktree, mounts)
+        if refusal:
+            raise ProvisionRefused(refusal)
 
     if fetch_remote:
         git(main_root, "fetch", fetch_remote, "master")
 
     if identity.worktree.exists():
         if not is_linked_worktree(identity.worktree):
-            raise ProvisionRefused(f"{identity.worktree} exists but is not a git worktree")
+            raise ProvisionRefused(f"{REFUSAL_EXISTS}: {identity.worktree} exists but is not a git worktree")
         enable_worktree_config(main_root)
         stamp_identity(identity.worktree, identity)
         return Provision(identity, created=False)
@@ -174,7 +263,7 @@ def provision(
     else:
         add = git(main_root, "worktree", "add", "-b", identity.branch, str(identity.worktree), base)
     if add.returncode != 0:
-        raise ProvisionRefused(f"git worktree add failed: {add.stderr.strip()[-300:]}")
+        raise ProvisionRefused(f"{REFUSAL_ADD_FAILED}: git worktree add failed: {add.stderr.strip()[-300:]}")
 
     enable_worktree_config(main_root)
     stamp_identity(identity.worktree, identity)
@@ -249,5 +338,5 @@ def lane_path(issue: int, session_id: str, root: Path | str | None = None) -> Pa
 def guard_lane_name(name: str) -> str:
     """Reject a lane name that is not a plain worktree directory name."""
     if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", name):
-        raise ProvisionRefused(f"unsafe lane name {name!r}")
+        raise ProvisionRefused(f"{REFUSAL_UNSAFE_NAME}: unsafe lane name {name!r}")
     return name

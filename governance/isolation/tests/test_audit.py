@@ -92,11 +92,11 @@ def test_a_missing_worktree_is_a_violation(lane, repo: Path):
     assert "worktree-missing" in codes(audit_lane(lane, repo))
 
 
-def test_audit_all_covers_every_recorded_lane(repo: Path, tmp_path: Path):
+def test_audit_all_covers_every_recorded_lane(repo: Path, tmp_path: Path, mounts: Path):
     first = mint(263, "copilot-brain", "governance-isolation", worktree_root=tmp_path / "lanes")
     second = mint(264, "qa-sme", "verification", worktree_root=tmp_path / "lanes")
     for identity in (first, second):
-        provision(identity, repo, base="HEAD")
+        provision(identity, repo, base="HEAD", mounts=mounts)
         write_record(identity, repo)
     commit(second.worktree, "work.txt", "no ticket reference here")
 

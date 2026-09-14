@@ -61,7 +61,19 @@ def cmd_open(args: argparse.Namespace) -> int:
     if not main.exists():
         print(f"open: CANNOT-ASSESS — {main} does not exist", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
-    result = provision(identity, main, base=args.base, fetch_remote="origin" if args.fetch else "")
+    try:
+        result = provision(
+            identity,
+            main,
+            base=args.base,
+            fetch_remote="origin" if args.fetch else "",
+            allow_tmpfs=args.allow_tmpfs_root,
+        )
+    except ProvisionRefused as refused:
+        # A refusal is a decision, not a crash. Nothing was created, and the
+        # reason names itself — e.g. lane-worktree-on-tmpfs (issue #516).
+        print(f"open: NOT-OK — {refused}", file=sys.stderr)
+        return EXIT_NOT_OK
     write_record(identity, main)
     problems = audit_lane(identity, main) if result.ok else []
     payload = {
@@ -175,6 +187,11 @@ def build_parser() -> argparse.ArgumentParser:
     open_cmd.add_argument("--main", default=default_main(), help="the repository to add the worktree to")
     open_cmd.add_argument("--base", default="origin/master", help="the commit the lane branches from")
     open_cmd.add_argument("--fetch", action="store_true", help="fetch origin/master first")
+    open_cmd.add_argument(
+        "--allow-tmpfs-root",
+        action="store_true",
+        help="accept a RAM-backed worktree root — throwaway gate scratch only; a lane on tmpfs is lost on reboot (#516)",
+    )
     open_cmd.set_defaults(func=cmd_open)
 
     env_cmd = sub.add_parser("env", help="print the session environment (id + signature)")
