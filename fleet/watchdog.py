@@ -70,6 +70,16 @@ RESPAWN_VERIFY_SECONDS = 10.0
 RESPAWN_SETTLE_SECONDS = 1.0
 RESPAWN_POLL_SECONDS = 0.25
 
+#: The closed rung-state vocabulary `decide` returns. Declared here, as named
+#: constants, so a consumer (the fleet-health publisher, issue #498) IMPORTS the
+#: rung states instead of re-typing their literals at its own boundary — the
+#: same no-vocabulary-copy rule ADR-0022 D4 fixes for the SLO family.
+HEALTHY = "healthy"
+MISSING = "missing"
+STALE = "stale"
+DRIFTED = "drifted"
+RUNG_STATES = (MISSING, STALE, DRIFTED, HEALTHY)
+
 
 def rung_log(name: str) -> Path:
     """The capture log for a rung: `.fleet/<rung>.log`.
@@ -161,18 +171,18 @@ def run_in_flight() -> bool:
 def decide(pid: int | None, beat: dict | None, head: str) -> tuple[str, str]:
     """Classify a rung: missing / stale / drifted / healthy, with a reason."""
     if pid is None:
-        return "missing", "no loop process"
+        return MISSING, "no loop process"
     if beat is None:
-        return "stale", "no heartbeat from a live loop"
+        return STALE, "no heartbeat from a live loop"
     age = channel.heartbeat_age_seconds(beat)
     if age is None:
-        return "stale", "heartbeat has no timestamp"
+        return STALE, "heartbeat has no timestamp"
     if age > channel.STALE_HEARTBEAT_SECONDS:
-        return "stale", f"last beat {int(age)}s ago"
+        return STALE, f"last beat {int(age)}s ago"
     running = str(beat.get("commit", "unknown"))
     if head != "unknown" and running != head:
-        return "drifted", f"running {running}, HEAD {head}"
-    return "healthy", ""
+        return DRIFTED, f"running {running}, HEAD {head}"
+    return HEALTHY, ""
 
 
 def rung_came_up(
@@ -260,9 +270,9 @@ def rung_action(name: str, pattern: str, script: str, beat_path: Path, force: bo
     if force:
         state, reason = "forced", "operator asked to respawn"
     capability = channel.capability_line(channel.capability_finding(name, beat, head))
-    if state == "healthy":
+    if state == HEALTHY:
         return f"{name}: healthy | {capability}"
-    if state == "drifted" and name == "sister" and run_in_flight():
+    if state == DRIFTED and name == "sister" and run_in_flight():
         return f"{name}: drifted ({reason}) but a run is in flight — left alone | {capability}"
     ok = respawn(pattern, script, name)
     return f"{name}: {state} ({reason}) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
