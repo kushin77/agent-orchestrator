@@ -95,12 +95,21 @@
 #       trusted. The `swept-only` SUITE rows are exempt: they record a permanent
 #       state (run only by the manifest sweep), not a deferred wiring, so a
 #       closed epic that established them does not make them dishonest.
-#     * a row for an artifact that did not exist at the baseline's OWN
-#       last-touched commit fails — "newly delivered" is now computable.
-#       Offline: `git log -1 --format=%H -- scripts/gate-coverage-baseline.txt`
-#       names that commit, and `git cat-file -e <sha>:<path>` proves the
-#       artifact predates it. A row for an artifact that does not is a planted
-#       grandfathered row and is refused, naming the path.
+#     * a row for an artifact that did not exist at the commit the row ITSELF
+#       declares (column 5), OR at the baseline's last-touched commit, fails —
+#       "newly delivered" is computable, and the row's own provenance is what
+#       makes it so (#725). The row's own sha is the IMMUTABLE anchor and is
+#       checked first; the baseline's last-touched commit moves forward with
+#       every later baseline edit, so anchoring to it alone left the row's own
+#       claim unchecked — a lane could deliver an artifact and cite a commit at
+#       which that artifact did not yet exist. Measured on master before #725:
+#       that planted row was ACCEPTED (RC=0), so a row newer than its own
+#       provenance is now refused, naming the path and the anchor(s) it failed.
+#       Offline, no network:
+#         * `git cat-file -e <row-sha>:<path>`  — the row's own declaration;
+#         * `git cat-file -e <base-sha>:<path>` — the moving backstop, whose
+#           commit `git log -1 --format=%H -- scripts/gate-coverage-baseline.txt`
+#           names.
 #     * every ACCEPTED script deferral is REPORTED by name (path, tracker) in
 #       the output below — never silently accepted.
 #   REJECTED ALTERNATIVE: a single mode flag ("allow: manifest-swept suites"),
@@ -515,12 +524,16 @@ def main():
                 continue  # stale: no such delivered check script (reported above)
             if kind == "suite" and path not in suites:
                 continue  # stale: no longer declared (reported above)
-            if not git_object_exists("%s:%s" % (base_sha, path)):
+            anchors = ((sha, "the commit the row itself declares"),
+                       (base_sha, "the baseline's last-touched commit"))
+            missing = [anchor for anchor, _ in anchors
+                       if not git_object_exists("%s:%s" % (anchor, path))]
+            if missing:
                 findings.append(
-                    "baseline %s %s (newly delivered: %s did not exist at %s, "
-                    "the baseline's last-touched commit — a row for a new "
-                    "artifact is never grandfathered)"
-                    % (kind, path, path, base_sha[:12]))
+                    "baseline %s %s (newly delivered: %s did not exist at %s — "
+                    "a row for an artifact newer than its own provenance is "
+                    "never grandfathered)"
+                    % (kind, path, path, ", ".join(a[:12] for a in missing)))
 
     unlisted_checks = [p for p in unwired_checks if p not in baselined_checks]
     unlisted_suites = [s for s in unwired_suites if s not in baselined_suites]
