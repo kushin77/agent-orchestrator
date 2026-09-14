@@ -63,9 +63,10 @@ sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
 import channel  # noqa: E402
 import routing  # noqa: E402
+import runtime  # noqa: E402
 import singleton  # noqa: E402
 
-FLEET_DIR = ROOT / ".fleet"
+FLEET_DIR = runtime.FLEET_DIR
 HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
 # Where this process's stdout is captured. The watchdog owns the spawn and opens
 # exactly this path (`fleet/watchdog.py`); it is named here only so the startup
@@ -453,7 +454,7 @@ def dispatch(order: dict) -> tuple[bool, str]:
     return ok, output
 
 
-WAVES = ROOT / ".fleet" / "waves"
+WAVES = FLEET_DIR / "waves"
 
 
 def gh_issue_create(title: str, body: str) -> int:

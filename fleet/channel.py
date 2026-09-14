@@ -36,19 +36,22 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
+FLEET_DIR = runtime.FLEET_DIR
 SCHEMA_PATH = ROOT / "fleet" / "schema" / "message.schema.json"
-INBOX = ROOT / ".fleet" / "inbox"
-BRAIN_INBOX = ROOT / ".fleet" / "brain" / "inbox"
-BRAIN_OUTBOX = ROOT / ".fleet" / "brain" / "outbox"
-BRAIN_DONE = ROOT / ".fleet" / "brain" / "done"
-BRAIN_SENT = ROOT / ".fleet" / "brain" / "sent"
-SENT = ROOT / ".fleet" / "sent"
-OUTBOX = ROOT / ".fleet" / "outbox"
-DONE = ROOT / ".fleet" / "done"
-SLOG = ROOT / ".fleet" / "slog.jsonl"
-HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
-BRAIN_HEARTBEAT = ROOT / ".fleet" / "brain.heartbeat.json"
+INBOX = FLEET_DIR / "inbox"
+BRAIN_INBOX = FLEET_DIR / "brain" / "inbox"
+BRAIN_OUTBOX = FLEET_DIR / "brain" / "outbox"
+BRAIN_DONE = FLEET_DIR / "brain" / "done"
+BRAIN_SENT = FLEET_DIR / "brain" / "sent"
+SENT = FLEET_DIR / "sent"
+OUTBOX = FLEET_DIR / "outbox"
+DONE = FLEET_DIR / "done"
+SLOG = FLEET_DIR / "slog.jsonl"
+HEARTBEAT = FLEET_DIR / "sister.heartbeat.json"
+BRAIN_HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
 
 # The FinOps vocabulary is harvested, not invented (issue #164) and is declared
 # once in governance/finops/policy.json: tiers from capital-underwriting

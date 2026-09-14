@@ -51,11 +51,21 @@ import time
 import uuid
 from pathlib import Path
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 # The operator's live session. One name, used by the verb, by run-fleet.sh and by
 # the header of the dashboard, so "attach to the fleet" means exactly one thing.
-SESSION = "fleet"
+SESSION = runtime.SESSION
+# The runtime dir relative to the checkout (or absolute when AO_FLEET_DIR points
+# outside it). control.py keeps deriving `ROOT / FLEET_SUBDIR` at call time so the
+# tests' `control.ROOT` redirect still works, while a second fleet points at its
+# own tree.
+try:
+    FLEET_SUBDIR = runtime.FLEET_DIR.relative_to(runtime.ROOT)
+except ValueError:
+    FLEET_SUBDIR = runtime.FLEET_DIR
 # The rungs the operator wants to see, in the order the windows are created.
 LIVE_RUNGS = ("brain", "sister", "monitor")
 
@@ -76,7 +86,7 @@ def _send_control(action: str) -> None:
         "control": action,
         "body": f"control:{action}",
     }
-    path = ROOT / ".fleet" / f"control-{uuid.uuid4().hex[:8]}.json"
+    path = ROOT / FLEET_SUBDIR / f"control-{uuid.uuid4().hex[:8]}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(message))
     _run(["python3", CHANNEL, "send", "--message", str(path)])
@@ -107,7 +117,7 @@ def _loop_pid() -> int | None:
     child run while a task is in flight, so a control message would sit unread
     until the task ends. Signals are how a caller takes effect immediately.
     """
-    beat = ROOT / ".fleet" / "sister.heartbeat.json"
+    beat = ROOT / FLEET_SUBDIR / "sister.heartbeat.json"
     try:
         return int(json.loads(beat.read_text(encoding="utf-8")).get("pid"))
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
@@ -162,7 +172,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         print("both rungs are already up — use status, or stop/kill/restart")
         return 0
 
-    fleet = ROOT / ".fleet"
+    fleet = ROOT / FLEET_SUBDIR
     starting_sister = any(rung == "sister" for rung, _ in missing)
     if starting_sister:
         for flag in ("paused", "stopping"):
@@ -187,7 +197,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 def cmd_status(args: argparse.Namespace) -> int:
     print("== status: rungs, flags, runs ==")
     _run(["python3", CHANNEL, "status"], check=False)
-    fleet = ROOT / ".fleet"
+    fleet = ROOT / FLEET_SUBDIR
     for flag in ("paused", "stopping"):
         print(f"  {flag}: {'yes' if (fleet / flag).exists() else 'no'}")
     runs = sorted(p.name for p in (fleet / "runs").glob("*.json")) if (fleet / "runs").exists() else []
@@ -253,7 +263,7 @@ def cmd_override(args: argparse.Namespace) -> int:
         "task": {"issue": args.issue, "lane": args.lane or "override", "override": True},
         "body": args.body or f"operator override: dispatch #{args.issue} now, taking over any live claim",
     }
-    path = ROOT / ".fleet" / f"override-{uuid.uuid4().hex[:8]}.json"
+    path = ROOT / FLEET_SUBDIR / f"override-{uuid.uuid4().hex[:8]}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(order))
     _run(["python3", CHANNEL, "order", "--message", str(path)])
@@ -274,7 +284,7 @@ def cmd_debug(args: argparse.Namespace) -> int:
     print("== board ==")
     _run(["python3", "governance/dispatch/cli.py", "status"], check=False)
     print("== slog tail ==")
-    slog = ROOT / ".fleet" / "slog.jsonl"
+    slog = ROOT / FLEET_SUBDIR / "slog.jsonl"
     if slog.exists():
         lines = slog.read_text().splitlines()
         for line in lines[-args.tail :]:
@@ -314,7 +324,7 @@ def rung_log(name: str) -> Path:
     (`fleet/console.py`) and the tail windows, and `fleet/monitor.py` sets the
     precedent of each module naming the runtime paths it touches.
     """
-    return ROOT / ".fleet" / f"{name}.log"
+    return ROOT / FLEET_SUBDIR / f"{name}.log"
 
 
 def ensure_logs() -> list[Path]:
@@ -340,11 +350,11 @@ def live_layout() -> list[list[str]]:
     """
     return [
         ["tmux", "new-session", "-d", "-s", SESSION, "-n", "dashboard", "python3", "fleet/console.py"],
-        ["tmux", "new-window", "-t", SESSION, "-n", "brain", "tail", "-f", ".fleet/brain.log"],
-        ["tmux", "new-window", "-t", SESSION, "-n", "sister", "tail", "-f", ".fleet/sister.log"],
-        ["tmux", "new-window", "-t", SESSION, "-n", "monitor", "tail", "-f", ".fleet/monitor.log"],
-        ["tmux", "new-window", "-t", SESSION, "-n", "events", "tail", "-f", ".fleet/slog.jsonl"],
-        ["tmux", "set-option", "-t", SESSION, "status-right", "fleet · 3 rungs · dashboard"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "brain", "tail", "-f", f"{FLEET_SUBDIR}/brain.log"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "sister", "tail", "-f", f"{FLEET_SUBDIR}/sister.log"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "monitor", "tail", "-f", f"{FLEET_SUBDIR}/monitor.log"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "events", "tail", "-f", f"{FLEET_SUBDIR}/slog.jsonl"],
+        ["tmux", "set-option", "-t", SESSION, "status-right", f"{SESSION} · 3 rungs · dashboard"],
         ["tmux", "select-window", "-t", f"{SESSION}:dashboard"],
     ]
 
@@ -369,7 +379,7 @@ def cmd_live(args: argparse.Namespace) -> int:
     logs = ensure_logs()
     # The events window tails the audit stream; create it so `tail -f` has a
     # file to follow even before the first directive is written.
-    slog = ROOT / ".fleet" / "slog.jsonl"
+    slog = ROOT / FLEET_SUBDIR / "slog.jsonl"
     slog.parent.mkdir(parents=True, exist_ok=True)
     slog.touch(exist_ok=True)
     layout = live_layout()

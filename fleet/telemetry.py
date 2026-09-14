@@ -26,8 +26,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
-RUNS_LOG = ROOT / ".fleet" / "runs.jsonl"
+RUNS_LOG = runtime.FLEET_DIR / "runs.jsonl"
 
 RUN_STATUSES = ("started", "done", "failed")
 

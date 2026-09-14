@@ -30,8 +30,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
-FLEET_DIR = ROOT / ".fleet"
+FLEET_DIR = runtime.FLEET_DIR
 LOG = FLEET_DIR / "open-eye.log"
 # The monitor's liveness, in the same JSON shape the brain/sister rungs publish:
 # `fleet/console.py` reads exactly this path as the monitor row's beat.

@@ -35,20 +35,22 @@ import subprocess
 import sys
 from pathlib import Path
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
 MARKER = "ao-fleet-watchdog"
-LOG = ROOT / ".fleet" / "watchdog.log"
+LOG = runtime.FLEET_DIR / "watchdog.log"
 
 # The retention job (issue #280) is the second marked line: daily, off the
 # watchdog's every-N-minutes cadence, because mailbox aging is measured in days.
 PRUNE_MARKER = "ao-fleet-prune"
-PRUNE_LOG = ROOT / ".fleet" / "prune.log"
+PRUNE_LOG = runtime.FLEET_DIR / "prune.log"
 PRUNE_SCHEDULE = "23 4 * * *"
 # The reconciliation worker (issue #304) is the third marked line. It rides the
 # watchdog's cadence rather than a daily one: an orphaned lane blocks work, and a
 # pass with no sessions to reconcile is a no-op, so the tick is cheap.
 RECONCILE_MARKER = "ao-fleet-reconcile"
-RECONCILE_LOG = ROOT / ".fleet" / "reconcile.log"
+RECONCILE_LOG = runtime.FLEET_DIR / "reconcile.log"
 MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER)
 
 

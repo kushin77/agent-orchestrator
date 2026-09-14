@@ -57,6 +57,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
@@ -104,6 +106,8 @@ def repo_root(root: Path | str | None = None) -> Path:
 
 
 def fleet_dir(root: Path | str | None = None) -> Path:
+    if root is None:
+        return runtime.FLEET_DIR
     return repo_root(root) / ".fleet"
 
 

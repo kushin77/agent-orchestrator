@@ -56,8 +56,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
-FLEET_DIR = ROOT / ".fleet"
+FLEET_DIR = runtime.FLEET_DIR
 RUNS_DIR = FLEET_DIR / "runs"
 CLAIMS_LEDGER = ROOT / ".board" / "claims.jsonl"
 

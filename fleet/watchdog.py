@@ -42,6 +42,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fleet"))
 
 import channel  # noqa: E402
+import runtime  # noqa: E402
 
 RUNGS = (
     ("brain", "fleet/brain.py", "fleet/brain.sh", channel.BRAIN_HEARTBEAT),
@@ -49,7 +50,7 @@ RUNGS = (
 )
 MONITOR_PATTERN = "fleet/monitor.py"
 MONITOR_NAME = "monitor"
-FLEET_DIR = ROOT / ".fleet"
+FLEET_DIR = runtime.FLEET_DIR
 RUNS_DIR = FLEET_DIR / "runs"
 
 # Respawn verification window (issue #276). After spawning, wait up to

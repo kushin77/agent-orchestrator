@@ -18,7 +18,9 @@ import json
 import os
 from pathlib import Path
 
-FLEET = Path(__file__).resolve().parent.parent / ".fleet"
+import runtime
+
+FLEET = runtime.FLEET_DIR
 
 
 def lock_path(rung: str) -> Path:
