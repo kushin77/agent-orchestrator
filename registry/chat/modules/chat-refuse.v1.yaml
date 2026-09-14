@@ -1,0 +1,14 @@
+taskType: chat-refuse
+version: v1
+description: >
+  State, honestly, that a chat turn could not be grounded - no supplied fragment
+  answered it, a fragment belonged to another tenant, a supplied source was
+  quarantined, or the request itself carried a credential - with the reason code
+  and an empty citations envelope. This module answers nothing.
+modelTierHint: low
+status: published
+groundingPolicy: refuse-without-citations
+bodyRefs:
+  system: ../bodies/chat-refuse.v1.system.md
+  user: ../bodies/chat-refuse.v1.user.md
+outputSchema: ../output-schemas/refusal.schema.json

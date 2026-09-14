@@ -1,0 +1,12 @@
+schema: chat-prompt-manifest/v1
+taskTypes:
+  chat-answer:
+    pinned: v1
+    published:
+    - digest: sha256:f857cf613647dda5ec68e23dc247c9d5c36f6078d03efe0cb5b93383bd5a93d2
+      version: v1
+  chat-refuse:
+    pinned: v1
+    published:
+    - digest: sha256:c17835b816eee4e227f93df7a598d20a0252b72a48273e8b7434d4c6a7463c1c
+      version: v1

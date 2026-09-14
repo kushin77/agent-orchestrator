@@ -1,0 +1,66 @@
+schema: chat-feedback-events/v1
+description: >
+  Synthetic chat feedback (issue #509), captured against the triple
+  (prompt module version, model, tier). A thumbs-up agrees with the turn so
+  predicted and truth coincide; a thumbs-down that carries a correctedOutcome
+  declares the truth and therefore produces the FP/FN the loop scores. A
+  thumbs-down with no correction is captured but not scored, and is reported as
+  unscored rather than averaged in. No real tenant data and no end-user
+  identifiers: message ids are synthetic and the model/tier names are the
+  platform's own vocabulary.
+events:
+  - messageId: msg-0001
+    promptId: chat-answer@v1
+    model: deepseek-v4-flash
+    tier: flash
+    verdict: thumbs-up
+    outcome: ANSWER
+    cited: true
+  - messageId: msg-0002
+    promptId: chat-answer@v1
+    model: deepseek-v4-flash
+    tier: flash
+    verdict: thumbs-down
+    outcome: ANSWER
+    cited: true
+    correctedOutcome: NO_DATA
+    correctedCited: false
+  - messageId: msg-0003
+    promptId: chat-answer@v1
+    model: deepseek-v4-flash
+    tier: flash
+    verdict: thumbs-down
+    outcome: ANSWER
+    cited: true
+    correctedOutcome: NO_DATA
+    correctedCited: false
+  - messageId: msg-0004
+    promptId: chat-answer@v1
+    model: deepseek-v4-pro
+    tier: pro
+    verdict: thumbs-up
+    outcome: ANSWER
+    cited: true
+  - messageId: msg-0005
+    promptId: chat-answer@v1
+    model: deepseek-v4-pro
+    tier: pro
+    verdict: thumbs-down
+    outcome: ANSWER
+    cited: true
+  - messageId: msg-0006
+    promptId: chat-refuse@v1
+    model: deepseek-v4-flash
+    tier: flash
+    verdict: thumbs-up
+    outcome: NO_DATA
+    cited: false
+  - messageId: msg-0007
+    promptId: chat-refuse@v1
+    model: deepseek-v4-flash
+    tier: flash
+    verdict: thumbs-down
+    outcome: NO_DATA
+    cited: false
+    correctedOutcome: ANSWER
+    correctedCited: true

@@ -28,11 +28,20 @@ _here = os.path.dirname(os.path.abspath(__file__))
 _gateway_root = os.path.dirname(os.path.dirname(_here))
 if _gateway_root not in sys.path:
     sys.path.insert(0, _gateway_root)
+# The repo root is prepended too (house convention, issue #504): the enterprise
+# family consumes sibling authorities by module path - ``telemetry.ledger.store``
+# and ``engine.memory.prompt_cache`` are imported by
+# ``mcp.sources``/``mcp.grounding`` - so the checkout root must resolve. It does
+# not shadow ``mcp``: there is no ``mcp`` at the repo root, so the entry above
+# still wins for this package.
+_repo_root = os.path.dirname(_gateway_root)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
 _identity_root = os.path.join(_gateway_root, "..", "identity")
 if _identity_root not in sys.path:
     sys.path.append(_identity_root)
 
-from mcp import authn
+from mcp import authn, fixtures
 from mcp.audit import HashChainAuditLog
 from mcp.authz import AuthzDecision
 from mcp.gateway import MCPToolGateway
@@ -215,3 +224,37 @@ def make_gateway() -> object:
 @pytest.fixture
 def in_memory_audit() -> HashChainAuditLog:
     return HashChainAuditLog()
+
+
+# --------------------------------------------------------------------------- #
+# enterprise family fixtures (issue #504) - a hermetic authority tree
+#
+# The tree itself is built by ``mcp.fixtures``, the *declared fixture surface*
+# (labelled fixture-only in code): the gate of record loads the same builders,
+# so the suite and the gate cannot drift apart on what a fixture authority is.
+# --------------------------------------------------------------------------- #
+@pytest.fixture
+def chat_root(tmp_path) -> str:
+    """A hermetic checkout tree holding every authority the family reads."""
+    fixtures.write_fixture_authorities(tmp_path)
+    return str(tmp_path)
+
+
+@pytest.fixture
+def fixture_bridge() -> fixtures.FixtureBridge:
+    """The labelled fixture stand-in for the ``ao.bridge/v1`` read surface."""
+    return fixtures.FixtureBridge()
+
+
+@pytest.fixture
+def chat_catalog(chat_root):
+    """The family's read-only catalogue over the hermetic tree (fixture mode)."""
+    return fixtures.fixture_catalog(chat_root)
+
+
+@pytest.fixture
+def chat_gateway(chat_catalog, make_gateway, in_memory_audit):
+    """A gateway over the full declared catalogue reading the hermetic tree."""
+    from mcp.tools import build_registry
+
+    return make_gateway(registry=build_registry(chat_catalog), audit=in_memory_audit)

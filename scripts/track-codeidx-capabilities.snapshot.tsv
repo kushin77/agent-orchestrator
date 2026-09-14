@@ -1,0 +1,38 @@
+# codeidx capability register — recorded board state (issue #479, EPIC #473)
+# recorded: 2026-09-14T15:10:22Z
+# source: gh api repos/<owner>/<repo>/issues/<n> --jq '[.state, (if .pull_request then "pull-request" else "issue" end)] | @tsv'
+# re-record: bash scripts/track-codeidx-capabilities.sh --live   (opt-in; needs the network)
+# format: <owner>/<repo>#<number> <TAB> <open|closed> <TAB> <issue|pull-request>
+# scope: every `ref` cell of docs/CODEIDX-CAPABILITY-REGISTER.md — the vendor's board, CMR's, and this repository's
+kushin77/code-indexing#55	closed	issue
+kushin77/code-indexing#5	closed	issue
+kushin77/code-indexing#46	closed	issue
+kushin77/code-indexing#80	closed	issue
+kushin77/code-indexing#30	closed	issue
+kushin77/code-indexing#19	closed	issue
+kushin77/code-indexing#27	closed	issue
+kushin77/code-indexing#73	closed	issue
+kushin77/code-indexing#59	closed	issue
+kushin77/code-indexing#161	open	issue
+kushin77/code-indexing#162	open	issue
+kushin77/code-indexing#163	open	issue
+kushin77/code-indexing#128	open	issue
+kushin77/code-indexing#106	open	issue
+kushin77/code-indexing#104	open	issue
+kushin77/code-indexing#107	open	issue
+kushin77/code-indexing#108	open	issue
+kushin77/code-indexing#126	open	issue
+kushin77/code-indexing#111	open	issue
+kushin77/code-indexing#132	open	issue
+kushin77/code-indexing#119	open	issue
+kushin77/code-indexing#122	open	issue
+kushin77/code-indexing#147	open	issue
+kushin77/code-indexing#134	open	issue
+kushin77/code-indexing#129	open	issue
+kushin77/code-indexing#130	open	issue
+kushin77/CMR#1010	open	issue
+kushin77/agent-orchestrator#474	closed	issue
+kushin77/agent-orchestrator#475	closed	issue
+kushin77/agent-orchestrator#476	closed	issue
+kushin77/agent-orchestrator#477	closed	issue
+kushin77/agent-orchestrator#481	closed	issue
