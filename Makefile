@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -440,6 +440,15 @@ codeidx:
 	@bash scripts/check-codeidx-surface.sh
 	@bash scripts/check-codeidx-backend.sh
 	@bash scripts/check-context-pack-consumption.sh
+
+## monitoring-declaration — the monitoring declaration surface (EPIC #494;
+## issue #499 is the wiring lane): the repo's monitoring integration
+## (`module.json`, the flat {id,type} shape ADR-0022 D3 froze, no invented pin
+## key) and its producer/consumer boundary (`docs/OBSERVABILITY.md`) must BOTH
+## be declared; the check stages a deliberately damaged scratch copy of each and
+## requires it to be refused BY NAME, so it cannot pass vacuously
+monitoring-declaration:
+	@bash scripts/check-monitoring-declaration.sh
 
 ## paperclip-auth — cross-boundary auth for the paperclip seam (issue #412,
 ## ADR-0013/ADR-0012): agent identity is minted/verified from the fleet's own
