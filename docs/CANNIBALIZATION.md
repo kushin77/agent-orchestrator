@@ -510,7 +510,63 @@ The private key is discarded after signing (GR-6: env/secret-manager-only at
 publish time); all four release signatures verify against the committed public
 key via `registry/packs/validate.py`.
 
-## 12. paperclip.ing gap analysis (issue #368) — upstream product vs fleet primitives
+## 12. Leaderboard worker-fleet hardening harvest (issue #240)
+
+The worker-fleet hardening idioms the orchestrator's own ops lane will adopt are
+**consumed prior art**, read-only, harvested **2026-09-13** from the local clone of
+`kushin77/leaderboard` at `/home/akushnir/leaderboard` (`HEAD` `f7bc4715`). The
+source repo carries the license **"Copyright (c) 2026 kushin77. All Rights
+Reserved. PROPRIETARY — INTERNAL USE ONLY"** (`LICENSE` at its root) — the same
+owner as this repo. What is reused is therefore the **pattern**, re-implemented for
+this repo's Python/JSON substrate; **no source file was copied** into this repo, so
+no `harvested_from` code marker applies. Verdicts follow §0. The issue named
+`docker/worker-fleet` + `scripts/fleet` as the source; **each cited path was opened
+and checked** and the tables below say which named pattern is where — including one
+the issue's phrasing implies is in a different file (it is not).
+
+| Source (repo-relative) | Asset | Verdict | What we adopt |
+|---|---|---|---|
+| `docker/worker-fleet/fleet.cron` | `flock -n -E 99` **distinct-exit singleton idiom** — a cron tick guarded by a non-blocking lock whose conflict exit is `99`, so "skipped, lock held" is distinguishable from "ran and failed" | PATTERN | A scheduled job's skip must not look like a failure. Adopt an explicit, out-of-band skip exit code rather than a bare `flock -n` (whose conflict exit `1` is indistinguishable from the guarded command failing, and prints nothing). The measured backstory is in the file's own comment: four concurrent `qa-gatekeeper --strict` invocations aged 422s/303s/183s/63s at 198% CPU on 2026-08-14 — a `*/2` tick outliving four ticks. |
+| `scripts/fleet/fleet-up-verify.sh` | **tri-state exit codes** — `0` success, `1` usage/verify failure, `2` cannot-assess (a required dependency, `docker-api.sh`, is missing) | PATTERN | Our ops scripts keep the `0 OK / 1 NOT-OK / 2 CANNOT-ASSESS` contract used across this repo's own gates; a script that cannot evaluate its subject must say so, never report a pass. |
+| `docker/worker-fleet/docker-compose.worker-fleet.yml` | **`secrets.env` bind-mount contract** — secrets are mounted read-only into the container, deliberately **not** listed under `env_file` | PATTERN | A secret is mounted or injected, never placed in the container/service spec where `docker inspect` / `compose config` would print it. The file states the rule and the reason: `env_file` puts the values in the spec, so a bind-mount at `:ro` is the contract. (The same file's `env_file:` block carries only non-secret config.) |
+| `docker/worker-fleet/entrypoint.sh` | **`GH_TOKEN` non-clobber guard** — `export GH_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN:-$GH_TOKEN}"`, re-exporting the alternate only when it is actually set | PATTERN | Never overwrite a populated credential with an empty one. The file records the incident: an unconditional re-export clobbered a correctly-populated `GH_TOKEN` with an empty string on every boot, silently breaking every raw `git fetch`/`push` while `gh auth status` still looked fine. Our env/secret handling keeps the same rule. |
+| `docker/worker-fleet/Dockerfile` | **digest-pinned base image + build-time validation** — `FROM node:22-slim@sha256:6c74791e…` and a build-time `RUN` that checks a manifest of required fleet scripts is present and parses the compose YAML, so a missing script fails the **build**, not the running fleet | PATTERN | Pin by digest, not a floating tag, and validate at build time. Adopt the intent (fail the build, not the fleet). **Reported honestly:** the digest pin is on the *main* `Dockerfile` only — the sibling `docker/worker-fleet/hot-executor.Dockerfile` and `docker/worker-fleet/pool-sidecar/Dockerfile` both use `FROM alpine:latest`, i.e. **unpinned**. The named pattern is present but not applied uniformly in the source; we adopt it uniformly. |
+| `docker/worker-fleet/git-guard.sh` | **destructive-git guard** — a `git` wrapper installed at `/usr/local/bin/git` (earlier in `PATH` than `/usr/bin`) that blocks `reset --hard`, `clean`, and `worktree add/remove/prune` on bind-mounted repos, passing everything else through | PATTERN | A shared/self-hosted checkout needs a mechanical guard against destructive git ops; the source's own root-cause note is a container that ran `git reset origin/<branch>` and **deleted** `scripts/`, `lib/`, `config/`, `docker/` from the host tree. Our lanes already forbid force-push/history rewrite; this is the mechanical precedent for putting the refusal in front of the command. |
+| `scripts/fleet/docker-api.sh` | **Docker Engine API via curl over the unix socket** — programmatic container status/restart/logs/stats, cheaper and more consistent than shelling out to the compose CLI; carries its own security note that the socket is host-root-equivalent | PATTERN | Talk to the daemon's API directly for read/scrape paths rather than parsing CLI output; and treat the socket mount as the privileged thing it is. Only the *shape* is reusable here — this repo's FleetOps lane is Python and container-free by #239. |
+| `config/fleet-jobs.json` | Declarative job catalog (which job kinds exist and their parameters) | REFERENCE | Read for shape only: a job's definition is data in a catalog, not an ad-hoc code path. |
+
+**Path check (GR-10 honesty).** The issue points at `docker/worker-fleet`,
+`scripts/fleet` and `config/fleet-jobs.json`; all three exist. Two specifics worth
+flagging rather than paraphrasing:
+
+- The `flock -n -E 99` idiom is **not** in `docker/worker-fleet/up.sh` — the file
+  the issue's wording most suggests — nor in `scripts/fleet/fleet-up-verify.sh`. It
+  is in `docker/worker-fleet/fleet.cron` (lines 62, 91–92), where the skip is logged
+  as `SKIPPED … previous run still holds the lock`. `up.sh` exists but carries no
+  `flock`.
+- `git-guard.sh` is at `docker/worker-fleet/git-guard.sh`, **not** under
+  `scripts/fleet/`; `docker-api.sh` **is** at `scripts/fleet/docker-api.sh` as the
+  issue says.
+
+**Adopted as pattern, never as code.** These idioms inform this repo's own ops
+tooling (a distinct skip exit, a secret mounted not specced, a credential never
+clobbered, a digest pin, a build-time validation, a destructive-git refusal). They
+are **not** a licence to copy the source's bash or container stack, and none of its
+files are committed here.
+
+**Cross-ref.** The container-free mechanical execution lane that consumes the same
+source — `docker/worker-fleet` pool/executor/fanout — is specified separately in
+[`MECHANICAL-EXECUTION-LAYER.md`](MECHANICAL-EXECUTION-LAYER.md) (issue #239).
+
+**Provenance (GR-10):** `harvested_from:` `kushin77/leaderboard`
+(`docker/worker-fleet/fleet.cron`, `scripts/fleet/fleet-up-verify.sh`,
+`docker/worker-fleet/docker-compose.worker-fleet.yml`,
+`docker/worker-fleet/entrypoint.sh`, `docker/worker-fleet/Dockerfile`,
+`docker/worker-fleet/git-guard.sh`, `scripts/fleet/docker-api.sh`,
+`config/fleet-jobs.json`) — pattern/REFERENCE only, kushin77 proprietary /
+internal use only, no code copied.
+
+## 13. paperclip.ing gap analysis (issue #368) — upstream product vs fleet primitives
 
 Issue #368 analyses the upstream product **paperclip.ing**
 (`paperclipai/paperclip`, **MIT License**, latest release seen v2026.831.1,

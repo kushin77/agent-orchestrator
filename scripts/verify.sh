@@ -44,6 +44,7 @@ checks=(
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'
+  'lease-policy|bash scripts/check-lease-policy.sh'
   'paperclip-gap-analysis|bash scripts/check-paperclip-gap-analysis.sh'
   'brain-profile|bash scripts/check-brain-profile.sh'
   'knowledge-index|bash scripts/check-knowledge-index.sh'

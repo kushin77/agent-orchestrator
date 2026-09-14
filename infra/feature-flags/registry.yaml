@@ -87,3 +87,20 @@ services:
     phase: 7
     tf_flag: enable_web
     description: Public web surface (portal + shared-frontend) served at ai.purebliss.app.
+
+# Endpoint-level surfaces: a single endpoint family inside a service that is
+# promoted independently of the service flag around it (the service flag alone
+# is not enough — GR-5: a new surface ships OFF until a reviewed go-live).
+# `portal/server/fleet.py` reads this section and refuses every route while the
+# surface's `default` is `off`, so the gate is code-enforced, not advisory.
+surfaces:
+  fleet_projection:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Web single-pane-of-glass (issue #331): read-only projection of
+      fleet/console.py snapshot() served at GET /api/fleet/snapshot, the
+      push channel GET /api/fleet/stream (SSE), and the history endpoint
+      GET /api/fleet/events. Offline (no tmux, no TTY, no network egress).
