@@ -268,4 +268,20 @@ surfaces:
       is checked BEFORE AuthN: while it is off the whole family answers 404
       `feature_disabled`, because an unpromoted surface is absent rather than
       merely unauthorised (the `live_bridge` and `chat` precedent).
+  cockpit:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      The terminal cockpit (issue #566, RC-11 of EPIC #551; ADR-0026): the
+      Bloomberg-terminal-grade operator client of the RC-3 control API and the
+      two authenticated SSE streams (fleet_projection, telemetry_live_feed).
+      A keyboard-first, role-tiered terminal client that renders only what the
+      declared cockpit function registry (control-plane/functions/
+      functions.yaml, RC-10) declares, commands through the RC-5 client half,
+      holds no credential of its own and writes no fleet state. Ships OFF: while
+      the flag is off the client refuses to start with the named FLAG_OFF
+      condition, and every panel whose own surface flag is off renders the
+      disabled condition naming that flag.
 
