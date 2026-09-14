@@ -143,6 +143,23 @@ checks=(
   # `git submodule update --init vendor/CMR` has run -- the normal state of a
   # fresh worktree -- while a genuinely wrong declaration (rc 1) still fails.
   'diagrams-declaration|bash scripts/check-diagrams-declaration.sh'
+  # EPIC #472 (the codeidx consumption chain): the three gates that keep the
+  # consumed indexer surface from silently rotting. `codeidx-surface` (#475)
+  # proves the root .mcp.json carries the indexer server entry in the vendored
+  # seed's shape AND that the root gdc-manifest.yaml still declares the
+  # `code-indexing.mcp` pin; `codeidx-backend` (#476) proves the real indexer
+  # backend is flag-gated OFF, labelled per path, and that an unreachable indexer
+  # degrades explicitly instead of inventing results; `context-pack-consumption`
+  # (#477) proves assemble_prefix consumes a pre-fetched codeidx pack as opaque
+  # bytes from the published contract and leaves the absent-pack bytes exactly as
+  # they were. `codeidx-surface` derives its expectation from the vendored seed,
+  # so like its #461 sibling above it is CANNOT-ASSESS (rc 2, visibly SKIPped)
+  # until `git submodule update --init vendor/CMR` has run -- the normal state of
+  # a fresh worktree -- while a missing/drifted .mcp.json or a dropped pin (rc 1)
+  # still fails.
+  'codeidx-surface|bash scripts/check-codeidx-surface.sh'
+  'codeidx-backend|bash scripts/check-codeidx-backend.sh'
+  'context-pack-consumption|bash scripts/check-context-pack-consumption.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
