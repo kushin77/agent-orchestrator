@@ -529,6 +529,18 @@ control that fails *open* is worse than none.
   negative control proves this exact case).
 - `HEAD == unknown` ⇒ CANNOT-ASSESS, never healthy; the watchdog line names both
   commits.
+- `bash scripts/check-fleet-drift.sh` runs the real classifier against the
+  measured case and mutation-proves itself: a mutant restoring the local-HEAD
+  baseline, and one restoring the fail-open `head != "unknown"` guard, must each
+  be caught. It is wired into `scripts/verify.sh` as `fleet-drift`.
+
+**Baseline tradeoff.** The baseline is the *fetched* `origin/master`
+remote-tracking ref; the watchdog does **not** fetch on every tick (a 2-minute
+cadence would put the network on a local pass's critical path, and a swallowed
+fetch failure would disable the control it serves). Lanes fetch before cutting a
+worktree, so the ref tracks the remote as closely as the fleet pulls; the lag is
+bounded by that and is made visible by printing the baseline in the watchdog
+line.
 
 ### AO-GR-26 — A long-lived loop resolves its own dependencies before taking work
 

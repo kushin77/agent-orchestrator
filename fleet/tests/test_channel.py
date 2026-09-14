@@ -219,11 +219,11 @@ def test_status_reports_liveness_and_a_running_commit(tmp_path, monkeypatch, cap
     _status_paths(monkeypatch, tmp_path)
     _beat(channel.HEARTBEAT, "abc1234")
     _beat(channel.BRAIN_HEARTBEAT, "abc1234")
-    monkeypatch.setattr(channel, "head_commit", lambda: "abc1234")
+    monkeypatch.setattr(channel, "remote_head_commit", lambda: "abc1234")
     assert channel.cmd_status(type("Args", (), {})()) == EXIT_OK
     out = capsys.readouterr().out
     assert "sister: live" in out and "brain: live" in out
-    assert "running commit abc1234 | HEAD abc1234" in out
+    assert "running commit abc1234 | origin/master abc1234" in out
 
 
 def test_status_flags_a_loop_running_stale_code(tmp_path, monkeypatch, capsys):
@@ -231,9 +231,34 @@ def test_status_flags_a_loop_running_stale_code(tmp_path, monkeypatch, capsys):
     _status_paths(monkeypatch, tmp_path)
     _beat(channel.HEARTBEAT, "old0000", state="working")
     _beat(channel.BRAIN_HEARTBEAT, "old0000")
-    monkeypatch.setattr(channel, "head_commit", lambda: "beef999")
+    monkeypatch.setattr(channel, "remote_head_commit", lambda: "beef999")
     assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
     assert "CODE DRIFT" in capsys.readouterr().out
+
+
+def test_status_drift_is_measured_against_the_remote_not_the_checkout(tmp_path, monkeypatch, capsys):
+    """#739: a stale checkout must not hide drift — the local HEAD is irrelevant."""
+    _status_paths(monkeypatch, tmp_path)
+    _beat(channel.HEARTBEAT, "592b132")
+    _beat(channel.BRAIN_HEARTBEAT, "592b132")
+    # The local checkout equals the running commit — the measured trap. The
+    # remote is ahead; drift must still be reported.
+    monkeypatch.setattr(channel, "head_commit", lambda: "592b132")
+    monkeypatch.setattr(channel, "remote_head_commit", lambda: "47a068b")
+    assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
+    out = capsys.readouterr().out
+    assert "CODE DRIFT" in out
+    assert "origin/master 47a068b" in out
+
+
+def test_status_cannot_assess_when_the_baseline_is_unreadable(tmp_path, monkeypatch, capsys):
+    """Fail-closed: an unreadable baseline is NOT-OK, never a silent pass."""
+    _status_paths(monkeypatch, tmp_path)
+    _beat(channel.HEARTBEAT, "abc1234")
+    _beat(channel.BRAIN_HEARTBEAT, "abc1234")
+    monkeypatch.setattr(channel, "remote_head_commit", lambda: "unknown")
+    assert channel.cmd_status(type("Args", (), {})()) == EXIT_NOT_OK
+    assert "CANNOT ASSESS DRIFT" in capsys.readouterr().out
 
 
 def test_status_reports_a_dead_fleet_when_no_rung_is_alive(tmp_path, monkeypatch, capsys):

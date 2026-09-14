@@ -108,13 +108,17 @@ def stalest_claim_minutes(ledger_path: Path) -> float | None:
 
 
 def rung_health(
-    name: str, heartbeat_path: Path, start_cmd: str, probe: Callable[[], bool], head: str
+    name: str, heartbeat_path: Path, start_cmd: str, probe: Callable[[], bool], baseline: str
 ) -> tuple[int, str | None]:
-    """One rung's level + reason; down, unreported, stale or drifted is degraded.
+    """One rung's level + reason; down, unreported, stale, drifted or unjudgeable is degraded.
 
     Mirrors `channel.report_rung`'s two truths — the rung must be alive *and*
-    running the commit it declares — so health cannot disagree with `channel.py
-    status` about a rung.
+    running current code — so health cannot disagree with `channel.py status`
+    about a rung. The commit it is judged against is the **remote** baseline
+    (`origin/master`), never the local checkout: the checkout is routinely the
+    stale side, and comparing a loop's commit to it makes a loop on pre-fix code
+    report healthy (#739, AO-GR-25). An unreadable baseline is DEGRADED, not
+    healthy — health must not fail open either.
     """
     if not probe():
         return DEGRADED, f"{name}: not running — this rung is down (start: {start_cmd})"
@@ -133,11 +137,13 @@ def rung_health(
             f"{channel.STALE_HEARTBEAT_SECONDS}s) — the loop is not making progress"
         )
     running = str(beat.get("commit", "unknown"))
-    if head != "unknown" and running != head:
+    drift_state, drift_reason = channel.classify_drift(running, baseline)
+    if drift_state == channel.DRIFT_DRIFTED:
         return DEGRADED, (
-            f"{name}: running {running} but HEAD is {head} — merged fixes are not live "
-            f"(restart: {start_cmd})"
+            f"{name}: {drift_reason} — merged fixes are not live (restart: {start_cmd})"
         )
+    if drift_state == channel.DRIFT_CANNOT_ASSESS:
+        return DEGRADED, f"{name}: CANNOT ASSESS DRIFT — {drift_reason}"
     return HEALTHY, None
 
 
@@ -147,13 +153,15 @@ def evaluate(stale_minutes: float, ledger_path: Path) -> tuple[int, list[str]]:
         return FAILING, ["fleet/terminal.py is not running — the never-idle loop is dead"]
 
     level = HEALTHY
-    head = channel.head_commit()
+    # The drift baseline is the REMOTE (`.fleet` heartbeat vs `origin/master`),
+    # never the local checkout — see `rung_health` (#739, AO-GR-25).
+    baseline = channel.remote_head_commit()
     # Probe BOTH rungs, exactly as `channel.py status` does: a dead brain while the
     # sister still beats is at least degraded, never healthy. Freshness is the rung
     # heartbeat's age, not `.fleet/slog.jsonl`'s mtime — an idle-but-healthy fleet
     # writes no messages, and reading that as degraded was the second half of #277.
     for name, beat_path, start_cmd, probe in rungs():
-        rung_level, rung_reason = rung_health(name, beat_path, start_cmd, probe, head)
+        rung_level, rung_reason = rung_health(name, beat_path, start_cmd, probe, baseline)
         level = max(level, rung_level)
         if rung_reason:
             reasons.append(rung_reason)

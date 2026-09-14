@@ -245,23 +245,23 @@ def test_the_capabilities_cli_provokes_each_case(tmp_path, capsys):
     """The inspector separates the three cases, exit code included."""
     current = tmp_path / "current.json"
     current.write_text(json.dumps(_beat(HEAD)), encoding="utf-8")
-    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(current), "--head", HEAD]) == 0
+    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(current), "--commit", HEAD]) == 0
     assert "capabilities current" in capsys.readouterr().out
 
     drifted = tmp_path / "drifted.json"
     drifted.write_text(json.dumps(_beat(ROOT_COMMIT)), encoding="utf-8")
-    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(drifted), "--head", HEAD]) == 1
+    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(drifted), "--commit", HEAD]) == 1
     out = capsys.readouterr().out
     assert channel.CASE_LABELS[channel.KIND_DRIFTED] in out and "CAPABILITY STALE" in out
 
-    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(tmp_path / "absent.json"), "--head", HEAD]) == 1
+    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(tmp_path / "absent.json"), "--commit", HEAD]) == 1
     assert channel.CASE_LABELS[channel.KIND_DOWN] in capsys.readouterr().out
 
     missing = tmp_path / "missing.json"
     missing.write_text(
         json.dumps(_beat(HEAD, capabilities_version=1, capabilities=[])), encoding="utf-8"
     )
-    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(missing), "--head", HEAD]) == 1
+    assert watchdog.main(["capabilities", "--rung", "sister", "--beat", str(missing), "--commit", HEAD]) == 1
     out = capsys.readouterr().out
     assert channel.CASE_LABELS[channel.KIND_CAPABILITY_STALE] in out and "CAPABILITY STALE" in out
 
@@ -274,13 +274,19 @@ def test_the_cli_refuses_a_beat_shared_by_two_rungs(tmp_path, capsys):
 # --- backward compatibility ----------------------------------------------------
 
 
-def test_decide_still_classifies_the_four_historic_states(monkeypatch):
-    """The commit comparison is unchanged: the capability set is added, not swapped."""
+def test_decide_still_classifies_the_historic_states_against_the_remote(monkeypatch):
+    """The capability set is added, not swapped — and the baseline is the remote (#739).
+
+    The reason string changed from `HEAD <sha>` to `origin/master <sha>` on purpose:
+    the old baseline was the local checkout, which is the defect this test now
+    pins shut. The *classes* the function returns are unchanged apart from the
+    new CANNOT-ASSESS state.
+    """
     monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
-    assert watchdog.decide(None, None, "head") == ("missing", "no loop process")
-    assert watchdog.decide(111, None, "head") == ("stale", "no heartbeat from a live loop")
+    assert watchdog.decide(None, None, "base") == ("missing", "no loop process")
+    assert watchdog.decide(111, None, "base") == ("stale", "no heartbeat from a live loop")
     assert watchdog.decide(111, _beat("old0000"), "head1111") == (
         "drifted",
-        "running old0000, HEAD head1111",
+        "running old0000, origin/master head1111",
     )
     assert watchdog.decide(111, _beat("head1111"), "head1111") == ("healthy", "")

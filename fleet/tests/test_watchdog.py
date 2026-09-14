@@ -22,18 +22,130 @@ def _beat(commit="abc1234", age=10):
 # --- the decision -------------------------------------------------------------
 
 
-def test_decide_classifies_all_four_states(monkeypatch):
-    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat: 10)
-    assert watchdog.decide(None, None, "head") == ("missing", "no loop process")
-    assert watchdog.decide(111, None, "head") == ("stale", "no heartbeat from a live loop")
-    assert watchdog.decide(111, _beat(commit="old0000"), "head1111") == ("drifted", "running old0000, HEAD head1111")
-    assert watchdog.decide(111, _beat(commit="head1111"), "head1111") == ("healthy", "")
+def test_decide_classifies_all_five_states(monkeypatch):
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    assert watchdog.decide(None, None, "base") == ("missing", "no loop process")
+    assert watchdog.decide(111, None, "base") == ("stale", "no heartbeat from a live loop")
+    assert watchdog.decide(111, _beat(commit="old0000"), "base1111") == (
+        "drifted",
+        "running old0000, origin/master base1111",
+    )
+    assert watchdog.decide(111, _beat(commit="base1111"), "base1111") == ("healthy", "")
+    # #739 / AO-GR-25: an unreadable baseline is CANNOT-ASSESS, never healthy.
+    state, reason = watchdog.decide(111, _beat(commit="base1111"), "unknown")
+    assert state == watchdog.CANNOT_ASSESS
+    assert "origin/master" in reason
 
 
 def test_decide_flags_a_stale_beat(monkeypatch):
-    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat: 999)
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 999)
     state, _reason = watchdog.decide(111, _beat(), "head")
     assert state == "stale"
+
+
+# --- the measured defect (#739, AO-GR-25) -------------------------------------
+#
+# The 2026-09-14 measurement: the sister loop (pid 17797, started 19:18Z) was
+# executing code from before a fix that merged at ~23:00Z, while the watchdog
+# logged `sister: healthy` every tick. Both sides of the comparison were the
+# *shared checkout* — `running == head == 592b132` — so the loop's own start
+# commit read back as the baseline it was judged against.
+
+
+def test_local_stale_checkout_masquerading_as_running_commit_is_drifted(monkeypatch):
+    """THE regression test: running == local-stale, but != origin/master ⇒ DRIFTED.
+
+    This is the exact measured case. `head_commit()` (the local checkout) is
+    asserted *equal* to the loop's commit, so the only correct way to reach
+    DRIFTED is to compare against the remote — the comparison the bug got wrong.
+    """
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    stale = "592b132"
+    monkeypatch.setattr(watchdog.channel, "head_commit", lambda: stale)
+    monkeypatch.setattr(watchdog.channel, "remote_head_commit", lambda: "47a068b")
+    state, reason = watchdog.decide(111, _beat(commit=stale), "47a068b")
+    assert state == "drifted", "a loop on pre-fix code must not read healthy just because the checkout is behind too"
+    assert reason == f"running {stale}, origin/master 47a068b"
+
+
+def test_an_unreadable_baseline_is_cannot_assess_not_healthy(monkeypatch):
+    """Fail-closed: the old `head != "unknown"` guard disabled drift detection."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    for baseline in ("unknown", ""):
+        state, reason = watchdog.decide(111, _beat(commit="592b132"), baseline)
+        assert state == watchdog.CANNOT_ASSESS, f"baseline {baseline!r} must not read healthy"
+        assert state != watchdog.HEALTHY
+        assert "unreadable" in reason
+
+
+def test_a_loop_reporting_no_commit_is_cannot_assess(monkeypatch):
+    """The other half of fail-closed: we cannot compare a commit nobody reported."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    state, reason = watchdog.decide(111, _beat(commit="unknown"), "47a068b")
+    assert state == watchdog.CANNOT_ASSESS
+    assert "47a068b" in reason
+
+
+def test_a_current_loop_is_healthy(monkeypatch):
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    assert watchdog.decide(111, _beat(commit="47a068b"), "47a068b") == ("healthy", "")
+
+
+def test_the_watchdog_line_names_both_commits(monkeypatch):
+    """Requirement 3: an operator must see the comparison that was made."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit="592b132"))
+    monkeypatch.setattr(watchdog, "respawn", lambda *a, **k: True)
+    monkeypatch.setattr(
+        watchdog.channel,
+        "capability_line",
+        lambda finding: f"{finding.rung}: {finding.case}",
+    )
+    line = watchdog.rung_action(
+        "brain", "fleet/brain.py", "fleet/brain.sh", Path("/tmp/x"), False, "47a068b"
+    )
+    assert "running 592b132" in line
+    assert "origin/master 47a068b" in line
+
+
+def test_a_healthy_line_names_both_commits(monkeypatch):
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit="47a068b"))
+    monkeypatch.setattr(
+        watchdog.channel, "capability_line", lambda finding: f"{finding.rung}: {finding.case}"
+    )
+    line = watchdog.rung_action(
+        "brain", "fleet/brain.py", "fleet/brain.sh", Path("/tmp/x"), False, "47a068b"
+    )
+    assert line.startswith("brain: healthy (running 47a068b, origin/master 47a068b)")
+
+
+def test_watchdog_once_exits_2_when_the_baseline_is_unreadable(monkeypatch, capsys):
+    """CANNOT-ASSESS is exit 2 — never 0. A control that cannot fail is a formality."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    monkeypatch.setattr(watchdog.channel, "remote_head_commit", lambda: "unknown")
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit="592b132"))
+    monkeypatch.setattr(watchdog, "respawn", lambda *a, **k: True)
+    monkeypatch.setattr(watchdog, "monitor_missing", lambda: False)
+    assert watchdog.watchdog_once() == watchdog.channel.EXIT_CANNOT_ASSESS
+    assert "cannot-assess" in capsys.readouterr().out
+
+
+def test_watchdog_once_exits_1_over_2_when_a_respawn_also_failed(monkeypatch, capsys):
+    """A known failure outranks an unassessable one."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    monkeypatch.setattr(watchdog.channel, "remote_head_commit", lambda: "unknown")
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: None)
+    monkeypatch.setattr(watchdog, "loop_pids", lambda pattern: [])
+    monkeypatch.setattr(watchdog, "RESPAWN_VERIFY_SECONDS", 0.0)
+    monkeypatch.setattr(watchdog, "spawn", lambda name, command: None)
+    monkeypatch.setattr(watchdog, "monitor_missing", lambda: False)
+    assert watchdog.watchdog_once() == watchdog.channel.EXIT_NOT_OK
+    assert "RESPAWN FAILED" in capsys.readouterr().out
 
 
 def test_a_missing_loop_is_respawned(monkeypatch):
@@ -49,7 +161,7 @@ def test_a_missing_loop_is_respawned(monkeypatch):
 
 def test_a_drifted_sister_with_a_run_in_flight_is_left_alone(monkeypatch):
     """The watchdog's one rule: never restart a run just to update code."""
-    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat: 10)
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
     monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
     monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit="old0000"))
     monkeypatch.setattr(watchdog, "run_in_flight", lambda: True)
@@ -59,7 +171,7 @@ def test_a_drifted_sister_with_a_run_in_flight_is_left_alone(monkeypatch):
 
 
 def test_a_drifted_idle_sister_is_respawned(monkeypatch):
-    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat: 10)
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
     monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
     monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit="old0000"))
     monkeypatch.setattr(watchdog, "run_in_flight", lambda: False)
@@ -67,6 +179,23 @@ def test_a_drifted_idle_sister_is_respawned(monkeypatch):
     monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name="": calls.append(script) or True)
     watchdog.rung_action("sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "head1111")
     assert calls == ["fleet/terminal.sh"]
+
+
+def test_a_cannot_assess_rung_is_respawned_but_says_why(monkeypatch):
+    """Fail-closed still acts: it cannot certify the rung, so it respawns and says why."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit="old0000"))
+    monkeypatch.setattr(watchdog, "run_in_flight", lambda: False)
+    calls = []
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name="": calls.append(script) or True)
+    line = watchdog.rung_action(
+        "sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "unknown"
+    )
+    assert calls == ["fleet/terminal.sh"], "an unassessable rung is not left running unjudged"
+    assert "respawned" in line
+    assert "cannot-assess" in line
+    assert "unreadable" in line
 
 
 # --- the capture log (A: the rung's stream must survive the spawn) ------------

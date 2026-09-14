@@ -70,6 +70,18 @@ checks=(
   # dispatched, the queue held), and mutation-proves it with two mutants of the
   # real loop — the preflight neutralised, and the hold removed.
   'runner-preflight|bash scripts/check-fleet-runner-preflight.sh'
+  # fleet-drift (issue #739, AO-GR-25): the code-drift detector compared the
+  # running loop's commit to the *shared checkout's* HEAD, so when the checkout
+  # was itself behind, both sides were the same stale commit and a loop running
+  # pre-fix code reported `healthy` — the control that exists to catch a merged
+  # fix never reaching the fleet could not fire. It also failed open: `head !=
+  # "unknown"` made an unreadable HEAD read as healthy. The check proves drift is
+  # measured against origin/master (the measured case: running == local, !=
+  # remote ⇒ drifted), that an unreadable baseline is CANNOT-ASSESS and exit 2,
+  # that the operator line names both commits, and mutation-proves it with two
+  # mutants of the real classifier — the local-HEAD baseline restored, and the
+  # fail-open guard restored.
+  'fleet-drift|bash scripts/check-fleet-drift.sh'
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'

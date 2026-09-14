@@ -457,6 +457,50 @@ loop rung, restarts the **monitor** when it is missing, and does nothing when
 the fleet is healthy — so a tick is cheap and idempotent. A run in flight is
 never restarted just to update code (the one rule the watchdog never breaks).
 
+### What "drifted" is measured against (AO-GR-25, issue #739)
+
+The baseline is **`origin/master`** — never the shared checkout's HEAD. This
+matters more than it sounds. The shared checkout is routinely *behind* (it is
+wherever a human or a lane last left it), so comparing a loop's commit to it can
+compare **stale-to-stale**: the loop's own start commit reads back as the
+baseline it is judged against, and a loop executing pre-fix code reports
+`healthy`. That was measured on 2026-09-14 — the sister loop (pid 17797, started
+19:18Z) ran code from before a fix that merged at ~23:00Z, and the watchdog
+logged `sister: healthy` on every tick.
+
+Two consequences worth knowing:
+
+* **`origin/master` here is the already-fetched remote-tracking ref — the
+  watchdog does not fetch.** A tick runs every 2 minutes; a fetch per tick would
+  put the network on the critical path of a pass that is otherwise local, and
+  would have to either slow the fleet or swallow its own failure. Reading
+  `refs/remotes/origin/master` costs nothing and cannot fail open. The ref is
+  refreshed by the lanes: every lane fetches before it cuts a worktree, so it
+  tracks the remote as closely as the fleet actually pulls. The tradeoff is that
+  a fix merged **after** the last fetch is invisible until the next one — which is
+  exactly why the watchdog line prints the baseline it used, so an operator can
+  see how far behind the comparison is rather than trusting a bare `healthy`.
+
+* **An unreadable baseline is `cannot-assess`, and the pass exits 2.** It is
+  never folded into `healthy`. The pre-#739 rule was guarded by
+  `head != "unknown"`, so an unreadable HEAD *silently disabled drift detection
+  entirely* — a control that fails open, which is worse than no control.
+
+```
+[watchdog] brain: healthy (running 47a068b, origin/master 47a068b)
+[watchdog] sister: drifted (running 592b132, origin/master 47a068b) — respawned
+[watchdog] monitor: healthy
+```
+
+Exit codes are the repo's tri-state: **0** every rung healthy, **1** a definite
+failure (`RESPAWN FAILED`, or a `CAPABILITY STALE` rung), **2** CANNOT-ASSESS —
+no readable baseline, so the comparison could not be made. A known failure
+outranks an unassessable one.
+
+`bash scripts/check-fleet-drift.sh` proves all of this against the real
+classifier (a mutation-proof pair restores the local-HEAD baseline and the
+fail-open guard, and requires each to be caught).
+
 Every rung it respawns is started detached with stdout+stderr appended to
 `.fleet/<rung>.log` — the capture the `brain`, `sister` and `monitor` windows of
 the live session tail, and the only reason the brain is observable at all (it
@@ -616,4 +660,15 @@ it back.
 > code it started with, and the watchdog only replaces it when it is missing,
 > stale, or **drifted from `origin/master`** (AO-GR-25). If a fix is merged and
 > the fleet is still behaving like the old one, compare the running rung's commit
-> against `origin/master` before assuming the fix did not work.
+> against `origin/master` before assuming the fix did not work — and remember the
+> watchdog's baseline is the **fetched** `origin/master`, so fetch before you
+> compare or you will be reading a stale ref too.
+
+```bash
+# What is the running loop actually executing, and what is the baseline?
+python3 -c "import sys;sys.path.insert(0,'fleet');import channel;print(channel.head_commit(), channel.remote_head_commit())"
+tail -3 .fleet/watchdog.log   # the last pass names both commits per rung
+
+# Force the loop onto current code without a restart: it pulls, gates, re-execs.
+python3 fleet/channel.py send ... # a `refresh` control
+```
