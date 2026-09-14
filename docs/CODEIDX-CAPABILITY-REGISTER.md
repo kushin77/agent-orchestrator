@@ -249,3 +249,70 @@ So the enforcement lane does not have to reverse-engineer this document from pro
   vendor board and therefore need network access; `make verify` is offline and deterministic by
   doctrine, so the gate checks that `verify` is a non-empty command and does not execute it. Running
   a row's `verify` is a reviewer's act, and each one is a command that can fail.
+
+## Reconciliation — the register against the board it cites (`agent-orchestrator#479`)
+
+This section is **generated** by `scripts/track-codeidx-capabilities.sh --emit-doc-section`;
+run the tracker rather than editing it by hand. It is not the register: the register's own rows
+are the table under [the register](#the-register), and this is that table's `ref` column
+reconciled against a recorded board state — the two are read together and are never confused
+for one another.
+
+**Recorded board state:** `scripts/track-codeidx-capabilities.snapshot.tsv`, recorded 2026-09-14T15:10:22Z
+across the boards the register cites. The tracker reconciles that recording **offline and
+deterministically** — `--live` reads the boards through the GitHub API and is opt-in, so nothing
+here, and nothing in `make verify`, needs the network.
+
+Every `ref` is reconciled, on whichever board it lives — the vendor's, CMR's, or this
+repository's own board. A `ref` this tracker skipped would be the staleness it exists to catch,
+so the board breakdown is reported rather than assumed: **32 row(s), 32 ref(s)** — `code-indexing` 26, `CMR` 1, `agent-orchestrator` 5.
+
+| Row | Declared | Referenced issue | Live | Reconciliation |
+|---|---|---|---|---|
+| `C-01` | `shipped` | `kushin77/code-indexing#55` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-02` | `shipped` | `kushin77/code-indexing#5` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-03` | `shipped` | `kushin77/code-indexing#46` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-04` | `shipped` | `kushin77/code-indexing#80` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-05` | `shipped` | `kushin77/code-indexing#30` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-06` | `shipped` | `kushin77/code-indexing#19` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-07` | `shipped` | `kushin77/code-indexing#27` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-08` | `shipped` | `kushin77/code-indexing#73` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-09` | `shipped` | `kushin77/code-indexing#59` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-10` | `gap` | `kushin77/code-indexing#161` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-11` | `gap` | `kushin77/code-indexing#162` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-12` | `gap` | `kushin77/code-indexing#163` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-13` | `UNVERIFIED` | `kushin77/code-indexing#128` | `open` | `ok` — UNVERIFIED, and the provider's issue is still open |
+| `C-14` | `gap` | `kushin77/code-indexing#106` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-15` | `gap` | `kushin77/code-indexing#104` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-16` | `gap` | `kushin77/code-indexing#107` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-17` | `gap` | `kushin77/code-indexing#108` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-18` | `gap` | `kushin77/code-indexing#126` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-19` | `gap` | `kushin77/code-indexing#111` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-20` | `in-flight` | `kushin77/code-indexing#132` | `open` | `ok` — in-flight, and the issue it cites is still open |
+| `C-21` | `in-flight` | `kushin77/code-indexing#119` | `open` | `ok` — in-flight, and the issue it cites is still open |
+| `C-22` | `gap` | `kushin77/code-indexing#122` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-23` | `gap` | `kushin77/code-indexing#147` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-24` | `gap` | `kushin77/code-indexing#134` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-25` | `gap` | `kushin77/CMR#1010` | `open` | `ok` — gap, and the issue it cites is still open |
+| `C-26` | `shipped` | `kushin77/agent-orchestrator#474` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-27` | `shipped` | `kushin77/agent-orchestrator#475` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-28` | `shipped` | `kushin77/agent-orchestrator#476` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-29` | `in-flight` | `kushin77/code-indexing#129` | `open` | `ok` — in-flight, and the issue it cites is still open |
+| `C-30` | `shipped` | `kushin77/agent-orchestrator#477` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+| `C-31` | `in-flight` | `kushin77/code-indexing#130` | `open` | `ok` — in-flight, and the issue it cites is still open |
+| `C-32` | `shipped` | `kushin77/agent-orchestrator#481` | `closed` | `ok` — shipped, closed, with a cited completion signal |
+
+**Totals:** 32 row(s), 32 matching, 0 mismatching (0 of them `UNVERIFIED`). A mismatch is exit 1 and every one is named above; a row
+whose `ref` cannot be read at all is exit 2 and is never reported as `ok` — the tracker fails
+closed.
+
+### The mismatch classes this tracker names
+
+| Class | The disagreement | What it means for the register |
+|---|---|---|
+| `SHIPPED-BUT-OPEN` | a row declares `shipped` and the issue it cites is **open** | the completion claim is ahead of the board: either the issue is open and the row overstates, or the row's `ref` is the wrong issue |
+| `SHIPPED-NO-SIGNAL` | a row declares `shipped`, its issue is closed, and the row cites no `signal=` | a closed issue is not a completion signal, so the row is misclassified and belongs in `UNVERIFIED` |
+| `UNVERIFIED` | a row declares `in-flight`/`gap`, its issue is closed, and no `signal=` is cited | the direction's outcome is unknown from here: the row can no longer be called a gap and cannot be called shipped either |
+| `STALE-DECLARED` | a row declares `in-flight`/`gap`, its issue is closed, and a `signal=` **is** cited | the direction landed: the row is stale and must be re-grounded against the cited signal |
+| `UNVERIFIED-BUT-CLOSED` | a row declares `UNVERIFIED` and its issue is closed | the provider may have published the contract after all, so the row's honest state must be re-checked |
+| `REF-NOT-AN-ISSUE` | the `ref` resolves to a pull request | the register's `ref` grammar requires an issue link, and a board numbers issues and pull requests in one sequence, so a pull request is not a row's grounding |
