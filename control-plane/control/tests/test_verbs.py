@@ -13,6 +13,7 @@ the build files. RC-8 must add `control-plane/control` to that manifest and
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -208,6 +209,77 @@ def test_an_omitted_local_verb_is_refused():
     doc["verbs"] = [v for v in doc["verbs"] if v["id"] != "fleet.stop"]
     findings = cli.cross_reference(doc)
     assert any("MISSING" in f and "'stop'" in f for f in findings)
+
+
+# --- contract-first: no surface change without a contract entry ------------
+
+# The #367/#677 incident: a producer lane added verbs to fleet/channel.py
+# without declaring them in verbs.yaml, and the gate did not refuse the surface
+# change by name. Contract-first (#697) makes the registry the single source of
+# truth: a surface-only change is refused, and the matching contract entry clears
+# it — proven end-to-end against the real lever file.
+
+_CHANNEL = ROOT / "fleet" / "channel.py"
+_PROBE = 'add_parser("probe-verb", help="contract-first probe")'
+
+
+def _inject_surface_verb(path: Path, statement: str):
+    """Append one add_parser(...) statement to the surface, returning the undo."""
+    original = path.read_text(encoding="utf-8")
+    path.write_text(original.rstrip("\n") + "\n\n" + statement + "\n", encoding="utf-8")
+    return original
+
+
+def _probe_registry_entry() -> dict:
+    return {
+        "id": "channel.probe-verb",
+        "source": "fleet/channel.py",
+        "local": "probe-verb",
+        "effect_class": "read",
+        "capability": "fleet:read",
+        "audit": None,
+        "idempotent": True,
+        "exposed": False,
+        "why_not_exposed": "Contract-first probe; internal only.",
+        "refusals": [401, 403, 503],
+    }
+
+
+def test_surface_verb_without_contract_entry_is_refused():
+    """A producer that adds a verb to fleet/channel.py WITHOUT landing the
+    matching verbs.yaml + schema entry is refused by name, with rc != 0."""
+    original = _CHANNEL.read_text(encoding="utf-8")
+    assert "probe-verb" not in original  # the surface does not yet carry the verb
+    before = hashlib.sha256(_CHANNEL.read_bytes()).hexdigest()
+    try:
+        _inject_surface_verb(_CHANNEL, _PROBE)
+        after = hashlib.sha256(_CHANNEL.read_bytes()).hexdigest()
+        # Mutation proof: the producer change really landed on the surface.
+        assert before != after
+
+        findings = cli.cross_reference(REGISTRY)
+        assert any(
+            "MISSING" in f and "probe-verb" in f for f in findings
+        ), f"the gate must name the missing contract entry; got {findings}"
+
+        # The full gate refuses the surface-only change (rc != 0).
+        assert cli.main(["validate"]) == 1
+    finally:
+        _CHANNEL.write_text(original, encoding="utf-8")
+
+
+def test_matching_contract_entry_makes_the_surface_change_pass():
+    """Landing the matching verbs.yaml entry (the contract) clears the same
+    surface change — a producer is not refused once the contract moved first."""
+    original = _CHANNEL.read_text(encoding="utf-8")
+    try:
+        _inject_surface_verb(_CHANNEL, _PROBE)
+        doc = copy.deepcopy(REGISTRY)
+        doc["verbs"].append(_probe_registry_entry())
+        findings = cli.cross_reference(doc)
+        assert findings == [], f"the matching contract entry must clear the gate; got {findings}"
+    finally:
+        _CHANNEL.write_text(original, encoding="utf-8")
 
 
 # --- the YAML is the single source, not a copy ------------------------------

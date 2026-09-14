@@ -14,10 +14,17 @@ fleet can actually do:
 
 Two directions are checked, and both matter:
 
-  * MISSING  — a local verb with no registry entry. An undeclared verb is the
-    thing this issue exists to prevent: it is how a lane invents a verb.
+  * MISSING  — a surface verb with no registry entry. This is the contract-first
+    enforcement: a producer lane that adds a verb to a lever file without landing
+    the matching ``verbs.yaml`` + schema entry first is refused BY NAME.
   * ABSENT   — a registry entry whose local verb has disappeared. This is rot:
     the registry would describe a lever that no longer exists.
+
+``SOURCES`` is the anti-vacuity FLOOR, not a closed set: it names the canonical
+verbs each lever file must keep providing, and the gate refuses a canonical verb
+that vanishes from BOTH the registry and the surface (a silent loss must never
+read as a pass). A producer extends the surface only by landing a registry entry
+first — never by editing ``SOURCES``.
 
 Exit contract (this repo's tri-state): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 CANNOT-ASSESS must never read as a pass.
@@ -42,8 +49,10 @@ SCHEMA = ROOT / "control-plane" / "control" / "schema" / "verbs.schema.json"
 # "the file must contain this subcommand" direction.
 SELF_SOURCE = "control-plane/control/verbs.yaml"
 
-# file -> (expected local verbs). The expected set is asserted so a file that
-# silently loses a verb fails here rather than passing vacuously.
+# file -> the canonical local verbs this file MUST keep providing. This is the
+# anti-vacuity FLOOR, not a closed set: a canonical verb that vanishes from BOTH
+# the surface and the registry is refused. A producer adds a verb only by landing
+# the matching verbs.yaml entry first (contract-first) — never by editing this map.
 SOURCES: dict[str, set[str]] = {
     "fleet/control.py": {
         "start", "status", "refresh", "update", "poke", "pause", "resume",
@@ -180,22 +189,29 @@ def cross_reference(doc: dict) -> list[str]:
         if src and local:
             declared.setdefault(str(src), set()).add(str(local))
 
-    for path, expected in SOURCES.items():
+    for path, canonical in SOURCES.items():
         actual = verbs_in(path)
         if not actual:
             findings.append(
                 f"CANNOT-ASSESS: {path} yielded no verbs — the reader is wrong, not the registry"
             )
             continue
-        if actual != expected:
+        declared_here = declared.get(path, set())
+        # Contract-first floor (anti-vacuity): the registry must still declare
+        # every canonical verb for this file. A canonical verb that vanishes from
+        # BOTH the surface and the registry is refused here, so a silent loss
+        # cannot pass the gate vacuously.
+        lost = sorted(canonical - declared_here)
+        if lost:
             findings.append(
-                f"{path}: the reader found {sorted(actual)}, the gate expects {sorted(expected)} "
-                "— update SOURCES deliberately if the file really changed"
+                f"{path}: the registry no longer declares the canonical verb(s) {lost} "
+                "— a canonical verb is never silently retired; restore it in verbs.yaml"
             )
-        missing = sorted(actual - declared.get(path, set()))
+        missing = sorted(actual - declared_here)
         for name in missing:
             findings.append(
-                f"MISSING: {path} declares the verb {name!r}, which the registry does not declare"
+                f"MISSING: {path} declares the verb {name!r}, which the registry does not declare "
+                "— land the matching verbs.yaml + schema entry first (contract-first)"
             )
 
     for path in declared:
