@@ -22,6 +22,7 @@ python3 governance/pmo/cli.py lanes   # owner × lane occupancy
 python3 governance/pmo/cli.py report  # tickets by goal / status / owner
 python3 governance/pmo/cli.py raid    # R / A / I / D + dependency edges
 python3 governance/pmo/cli.py aging   # what has been waiting, tiered
+python3 governance/pmo/cli.py gates   # review-gate state + escalation rung (#635)
 bash scripts/check-pmo-rollup.sh      # the gate (in `make verify`)
 make pmo                              # the gate, as a make target
 ```
@@ -34,7 +35,7 @@ Exit-code contract: **0 OK / 1 NOT-OK / 2 CANNOT-ASSESS**. A graph that cannot b
 built (an unreadable board or ledger, a projection that refuses to build, no
 timestamp to anchor an age) is `2` — **never reported as a pass**.
 
-## The five views
+## The views
 
 | Subcommand | Derived from | Replaces |
 |---|---|---|
@@ -43,6 +44,7 @@ timestamp to anchor an age) is `2` — **never reported as a pass**.
 | `report` | tickets by `goal` / `status` / `owner` | the status rollup over several ledgers |
 | `raid` | **R** = live risks, **A** = assumptions, **I** = incident-kind, **D** = decision-kind + dependency edges | a RAID register assembled from four sources |
 | `aging` | ticket timestamps and status age, tiered | nothing (this did not exist) |
+| `gates` | per-task review-gate state + escalation rung (issue #635) | gate state read out of the lifecycle by hand |
 
 ### `raid` — the derived register
 
@@ -78,6 +80,39 @@ inputs give no timestamp for is reported under `unauditable`, with the reason
 honestly aged), and `candidates` is the sum of aged and unauditable. That split
 is rendered, not hidden — but it is not a finding, because it is a property of
 the board's shape rather than a governance failure.
+
+### `gates` — the review gate, per task (issue #635)
+
+The workbook-4 review gate ([`governance/merge/gates.py`](../merge/README.md))
+is a step on the tenant task lifecycle. This view surfaces its state per task as
+a **derivation** over facts the graph already carries — never a store:
+
+* the ticket's `status` (the claim ledger's verdict) says whether the gate is
+  **open** (`in-review` / `done`), **closed** (a red/rejected verdict), or
+  **pending** (in flight, not yet reviewed);
+* the board issue's `review-gate:<verdict>` label carries the **verdict** the
+  review produced, when one was recorded (`open` / `red` / `rejected` / …);
+* the `review-escalation:<rung>` label carries the C-suite rung a closed gate
+  reached. The declared chain is `rungs: ["COO", "CEO"]` — COO (pacing) then CEO
+  (board escalation), and it terminates.
+
+The **verdict label is authoritative** when present (it is the review's own
+finding), and `status` is the fallback for a task that has not recorded one.
+The findings are the conditions the workbook forbids:
+
+| Finding | Meaning |
+|---|---|
+| `gate-closed-but-done` | the task is done but its gate reads closed — **a red gate yielded a closed task** |
+| `gate-verdict-missing` | a gate-scoped task is done and records no verdict (a close nobody can evidence) |
+| `gate-escalation-missing` | the gate is closed but no escalation rung is named |
+| `gate-escalation-unrunged` | the named rung is not in the declared chain |
+
+Adoption is **explicit**: the gate contract applies to a task that carries a
+`review-gate:*` or `review-escalation:*` label. A legacy close that predates the
+gate carries neither and is reported as gate state (`open` for a done task)
+rather than failed — a view that fails on all history is not a view. (Measured
+2026-09-14: over the committed 166-ticket graph the view exits **0 OK**; planting
+a gate-scoped close with no verdict flips it to **1 NOT-OK**, naming the ticket.)
 
 ## What makes the views falsifiable (GR-12)
 

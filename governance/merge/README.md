@@ -67,6 +67,7 @@ governance/merge/
 ├── gate.py              # verify-gate tri-state model (mirrors merge-gate.sh semantics)
 ├── reviewer.py          # independent SME reviewer/auditor assignment (issue #11)
 ├── engine.py            # offline engine composing gate + review + machine + audit
+├── gates.py             # task-lifecycle review gate + C-suite escalation (#635)
 └── tests/               # pytest suite (offline)
 ```
 
@@ -143,6 +144,75 @@ Every decision is append-only on the PR (`MergePr.audit`):
 the PR record both name the **attested evidence commit**. Blocked decisions
 record their closed reason (e.g. `verify-gate-not-green`,
 `sme-reviewer-not-assigned`, `self-merge-without-owner-carve-out`).
+
+## Review gates on the tenant task lifecycle (issue #635, workbook-4)
+
+The merge verdict above is **PR-scoped**. Workbook-4 (issue #635) applies the
+*same* rule to a **tenant task** on the workbook-3 lifecycle
+(`engine/core/tickets/**`: `created → decomposed → dispatched → executed →
+reviewed → closed`). `gates.py` is that join, and it redefines nothing: the
+single rule stays `model.merge_verdict`; the verify result stays
+`gate.VerifyOutcome`; the reviewer rule stays `reviewer.PersonaAssigner`.
+
+```python
+import gates
+from gate import outcome_from_exit_code
+
+outcome = gates.review_gate(
+    task_id="TCK-1042",
+    verify=outcome_from_exit_code(rc=0, commit="abc123"),   # green OR red
+    reviewer_id="reviewer", reviewer_approved=True,
+    executor="coder",
+)
+outcome.open_gate          # False when the gate is closed
+outcome.step_review()      # {"reviewed_by": ..., "approved": bool, "rationale": ...}
+
+# the mapping is injected verbatim as the ticket's review verdict:
+spec = ticket_workflow(..., review=outcome.step_review())
+```
+
+The gate consumes the three merge conditions, task-scoped:
+
+1. **Green verify named to a commit.** `gate.VerifyOutcome.is_green` decides.
+   The *specific* failure is preserved from the honesty tri-state: an
+   unattested OK verdict is `verify-gate-no-commit-attestation`, a CANNOT-ASSESS
+   verdict is `verify-gate-cannot-assess`, a genuine failure is
+   `verify-gate-not-green`.
+2. **Independent reviewer.** A reviewer must be **named**, of ``reviewer``
+   posture, and **distinct from the executor** — otherwise `sme-reviewer-is-author`
+   / `sme-reviewer-not-assigned` (separation of duties, AO-GR-14).
+3. **No-self-merge.** The concluder (default: the executor) may not conclude its
+   own task without the owner autonomous-merge carve-out — and the carve-out
+   still requires the green evidence.
+
+`step_review()` produces exactly the mapping
+`engine/core/tickets/handlers.py::TicketReviewHandler` accepts; a closed gate
+becomes `approved=False`, which is recorded as `gate_open=False` and makes the
+ticket's `TicketCloseHandler` **fail closed**. That is why **a red gate can
+never yield a closed task** — proven end-to-end in
+`tests/test_task_review_gate.py` (the task ends at `reviewed`, never `closed`).
+`require_open(outcome)` is the mechanical guard for a caller: it raises
+`GateBlocked` rather than returning a falsy value a careless caller could ignore.
+
+## C-suite escalation (COO pacing → CEO board escalation)
+
+A **blocked** task (a closed gate) escalates along a declared, finite chain
+(`ESCALATION_EDGES`), never an ad-hoc path:
+
+```
+task --blocked--> COO (pacing) --> CEO (board-escalation) --> (terminal)
+```
+
+- **Declared edges.** `role → (successor | None, trigger)`; the successor comes
+  from the table, never from the caller.
+- **It terminates.** `ESCALATION_DEPTH` is the longest path (2); the terminal
+  rung (`CEO`) has no successor, and `Escalation.escalate()` raises
+  `EscalationTerminated` past it rather than looping. The chain is bounded by
+  construction, not by a counter a caller could forget.
+- **An open gate escalates nowhere** (`outcome.escalated == ()`), and escalation
+  can be opted out entirely (`escalate_on_block=False`).
+
+`governance/pmo` surfaces this per task through the `gates` view (below).
 
 ## Usage
 

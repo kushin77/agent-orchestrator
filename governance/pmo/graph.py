@@ -65,6 +65,7 @@ class Graph:
     anchors: dict[str, str] = field(default_factory=dict)
     lanes: dict[str, str] = field(default_factory=dict)
     state: dict[int, str] = field(default_factory=dict)
+    labels: dict[int, tuple[str, ...]] = field(default_factory=dict)
     generated_at: str = ""
     clock: str = ""
 
@@ -115,6 +116,19 @@ class Graph:
     def blocked_by(self, ticket_id: str) -> list[str]:
         value = (self.tickets.get(ticket_id) or {}).get("blocked_by")
         return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+    def labels_for(self, ticket_id: str) -> tuple[str, ...]:
+        """The board issue's labels, when the ticket names a board issue.
+
+        Labels are the board's own per-issue facts (they are not ``status``, so
+        they are not a second source of the claim ledger's verdict).  The gate
+        view derives *review-gate state* from them plus the ticket's ``status``
+        — a derivation, never a store, exactly like the other views.
+        """
+        number = self.issue_number(ticket_id)
+        if number is None:
+            return ()
+        return self.labels.get(number, ())
 
 
 # --- ids ---------------------------------------------------------------------
@@ -302,6 +316,14 @@ def load(root: Path | str = ".") -> Graph:
     graph.tickets = dict(projection.tickets)
     graph.state = {
         number: str(issue.get("state", "")) for number, issue in board.items()
+    }
+    graph.labels = {
+        number: tuple(
+            str(label)
+            for label in (issue.get("labels") or ())
+            if isinstance(label, str)
+        )
+        for number, issue in board.items()
     }
 
     # anchors + lanes: the last event that set each ticket's current state wins.
