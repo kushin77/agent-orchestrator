@@ -123,6 +123,26 @@ The report carries the deterministic `block_text` and its `cache_footprint`
 (sha256), so callers can log exactly what entered the prompt and at what
 token cost.
 
+## Sliding-window memory policy (redundant-context trimming)
+
+`window.py` (`WindowPolicy` + `slide_window`) sits ahead of the budget gate
+and drops a hit whose content is *already represented* in the window before
+it costs a token. Providers cache from token 0, so a redundant hit re-emits
+bytes the cache already holds — pure cost, zero new information:
+
+* **duplicate text** — a hit whose normalized `text` is byte-identical to an
+  already-kept hit's text is dropped;
+* **subsumed text** — a hit whose normalized `text` is fully contained in an
+  already-kept hit's text (a repeated prefix/suffix) is dropped.
+
+Both rules are deterministic over the score-ordered hits, so **what stays is
+byte-stable** — the surviving block remains a pure function of the logical
+memory set and prefix caching is not defeated. The drop count is reported as
+`redundant_dropped` (and `window:redundant=` in `reason_codes`). The policy is
+configurable (`EnrichmentPolicy.window`, or a per-call `window=` override);
+`WindowPolicy(dedupe_text=False, drop_subsumed=False)` opts a tenant back into
+keeping near-duplicate records.
+
 ## Prompt-cache compatibility
 
 `prompt_cache.py` implements the discipline lifted from
@@ -162,10 +182,11 @@ engine/memory/
 ├── store.py               # MemoryStore / InMemoryStore / FileStore (isolation+TTL+eviction)
 ├── retrieval.py           # Retriever + Hit (scope-aware semantic search)
 ├── enrich.py              # ContextEnricher / EnrichmentReport (bounded, measured)
+├── window.py              # WindowPolicy + slide_window (redundant-context trimming)
 ├── prompt_cache.py        # deterministic block render + prefix discipline
 ├── gdpr.py                # export_memory / forget
 ├── cli.py                 # offline operator CLI (python -m engine.memory.cli)
-└── tests/                 # 91 pytest cases (conftest + 7 files), all offline
+└── tests/                 # pytest cases (conftest + 8 files), all offline
 ```
 
 ## CLI
@@ -189,13 +210,14 @@ Run from the repo root (offline, no network):
 
 ```bash
 python3 -m compileall -q engine/memory
-python3 -m pytest engine/memory/tests -p no:cacheprovider -q   # 91 passed
+python3 -m pytest engine/memory/tests -p no:cacheprovider -q   # 121 passed
 ```
 
 The suite covers the negatives (cross-tenant, cross-session, cross-agent),
 TTL expiry with a pinned clock, LRU/FIFO capacity eviction, semantic ranking,
-the three enrichment gates, deterministic/cache-safe rendering + prefix
-discipline, GDPR forget/export, and `FileStore` persistence round-trips.
+the three enrichment gates, the sliding-window redundant-context trimming,
+deterministic/cache-safe rendering + prefix discipline, GDPR forget/export,
+and `FileStore` persistence round-trips.
 
 ## Provenance (GR-10)
 
