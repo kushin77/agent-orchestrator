@@ -1,0 +1,223 @@
+{
+  "issues": {
+    "100": {
+      "closed_at": "2026-09-03T17:24:08Z",
+      "comment_count": 2,
+      "comment_ids": [
+        5529493429,
+        5544233601
+      ],
+      "created_at": "2026-09-02T19:07:51Z",
+      "state": "closed",
+      "title": "Phase 2: Build dashboard with auto-generated architecture diagrams"
+    },
+    "128": {
+      "closed_at": "2026-09-04T00:13:01Z",
+      "comment_count": 1,
+      "comment_ids": [
+        5533797211
+      ],
+      "created_at": "2026-09-03T16:25:01Z",
+      "state": "closed",
+      "title": "feat: Finding data model + API + admin UI for tracked security/governance findings"
+    },
+    "147": {
+      "closed_at": "2026-09-03T19:57:40Z",
+      "comment_count": 1,
+      "comment_ids": [
+        5531345325
+      ],
+      "created_at": "2026-09-03T18:34:57Z",
+      "state": "closed",
+      "title": "Blueprint Engine: diagram to Terraform generation"
+    },
+    "148": {
+      "closed_at": "2026-09-03T19:58:02Z",
+      "comment_count": 2,
+      "comment_ids": [
+        5530877755,
+        5531349494
+      ],
+      "created_at": "2026-09-03T18:34:59Z",
+      "state": "closed",
+      "title": "Drift detection (live state vs. Terraform-declared state)"
+    },
+    "176": {
+      "closed_at": "2026-09-04T00:13:15Z",
+      "comment_count": 2,
+      "comment_ids": [
+        5530883244,
+        5533799147
+      ],
+      "created_at": "2026-09-03T19:02:07Z",
+      "state": "closed",
+      "title": "Pattern: Topology extraction→graph→render→overlay — shared abstraction for the #157 role-coverage cluster"
+    },
+    "225": {
+      "closed_at": "2026-09-05T03:21:26Z",
+      "comment_count": 3,
+      "comment_ids": [
+        5544662135,
+        5545718186,
+        5549010977
+      ],
+      "created_at": "2026-09-04T17:34:01Z",
+      "state": "closed",
+      "title": "Drift checks are on-demand only — no scheduled execution or external alerting (Slack/email)"
+    },
+    "310": {
+      "closed_at": "2026-09-07T23:26:21Z",
+      "comment_count": 3,
+      "comment_ids": [
+        5575642767,
+        5576675318,
+        5576694036
+      ],
+      "created_at": "2026-09-06T17:01:23Z",
+      "state": "closed",
+      "title": "[TASK] Publish/vendor the hermetic E2E stack as a versioned contract"
+    },
+    "312": {
+      "closed_at": "2026-09-07T23:41:40Z",
+      "comment_count": 4,
+      "comment_ids": [
+        5575646342,
+        5575807277,
+        5575908919,
+        5576814350
+      ],
+      "created_at": "2026-09-06T17:01:43Z",
+      "state": "closed",
+      "title": "[TASK] Export + freeze the REST (OpenAPI) and Socket.IO event contract"
+    },
+    "368": {
+      "closed_at": null,
+      "comment_count": 6,
+      "comment_ids": [
+        5575933665,
+        5575943650,
+        5578769761,
+        5606463732,
+        5608035715,
+        5609166221
+      ],
+      "created_at": "2026-09-07T21:23:23Z",
+      "state": "open",
+      "title": "CMR:ENH-DIAG-001 · Fleet-wide auto-ingest: repo topology → architecture.yaml on every governed repo"
+    },
+    "369": {
+      "closed_at": "2026-09-07T23:53:52Z",
+      "comment_count": 4,
+      "comment_ids": [
+        5575933795,
+        5576125867,
+        5576932703,
+        5576934810
+      ],
+      "created_at": "2026-09-07T21:23:26Z",
+      "state": "closed",
+      "title": "CMR:ENH-DIAG-002 · Blueprint-as-verified-artifact: conformance gate (drift → exit code)"
+    },
+    "372": {
+      "closed_at": "2026-09-07T23:55:09Z",
+      "comment_count": 4,
+      "comment_ids": [
+        5575934601,
+        5576076146,
+        5576943310,
+        5576944288
+      ],
+      "created_at": "2026-09-07T21:23:34Z",
+      "state": "closed",
+      "title": "CMR:ENH-DIAG-005 · Cross-reference layer (EPIC-25) integration: cmr-refs markers on findings + distributed issues"
+    },
+    "373": {
+      "closed_at": null,
+      "comment_count": 5,
+      "comment_ids": [
+        5575934713,
+        5578755946,
+        5606456129,
+        5609166565,
+        5610770941
+      ],
+      "created_at": "2026-09-07T21:23:36Z",
+      "state": "open",
+      "title": "CMR:ENH-DIAG-006 · Fleet FinOps: architecture-cost attribution + agent-hour-savings telemetry"
+    },
+    "374": {
+      "closed_at": "2026-09-10T00:23:20Z",
+      "comment_count": 5,
+      "comment_ids": [
+        5575934842,
+        5578772841,
+        5606454174,
+        5609166400,
+        5610698989
+      ],
+      "created_at": "2026-09-07T21:23:39Z",
+      "state": "closed",
+      "title": "CMR:ENH-DIAG-007 · Agent-facing blueprint API for SME agents"
+    },
+    "375": {
+      "closed_at": "2026-09-09T20:59:56Z",
+      "comment_count": 6,
+      "comment_ids": [
+        5575935011,
+        5578789489,
+        5606471091,
+        5608035891,
+        5608669734,
+        5608670914
+      ],
+      "created_at": "2026-09-07T21:23:41Z",
+      "state": "closed",
+      "title": "CMR:ENH-DIAG-008 · Blueprint diff/PR rendering + drift→direction-issue automation"
+    },
+    "513": {
+      "closed_at": null,
+      "comment_count": 0,
+      "comment_ids": [],
+      "created_at": "2026-09-14T13:20:00Z",
+      "state": "open",
+      "title": "Direction from kushin77/agent-orchestrator · carry the decision alongside the state — supplied/dependency-graph rendering + opaque decision annotation on nodes and edges"
+    },
+    "514": {
+      "closed_at": null,
+      "comment_count": 0,
+      "comment_ids": [],
+      "created_at": "2026-09-14T13:20:01Z",
+      "state": "open",
+      "title": "Direction from kushin77/agent-orchestrator · a diagram as a gate artifact — deterministic offline render, content_hash, first-class Mermaid export"
+    },
+    "515": {
+      "closed_at": null,
+      "comment_count": 0,
+      "comment_ids": [],
+      "created_at": "2026-09-14T13:20:02Z",
+      "state": "open",
+      "title": "Direction from kushin77/agent-orchestrator · a versioned consumer contract, a published offline fixture, and a completion signal on #368 / #373"
+    },
+    "516": {
+      "closed_at": null,
+      "comment_count": 0,
+      "comment_ids": [],
+      "created_at": "2026-09-14T14:54:59Z",
+      "state": "open",
+      "title": "Direction from kushin77/agent-orchestrator · a machine-checkable completion signal on close — telling \"closed\" from \"shipped\", and both from \"closed as superseded\""
+    }
+  },
+  "note": "A recorded read of the vendor board, committed so the tracker runs with the network blocked. It records the issue state, the close date and the comment ids of every issue the register cites, plus the one tag the register cites by ref, so a cited completion signal can be re-checked offline. It is a snapshot, not a second source of truth: regenerate it with --live, never by hand.",
+  "recorded_at": "2026-09-14",
+  "recorded_by": "Copilot (Relentless) for kushin77/agent-orchestrator#468",
+  "recorded_with": [
+    "gh api repos/kushin77/diagrams/issues/<n>",
+    "gh api 'repos/kushin77/diagrams/issues/<n>/comments?per_page=100'",
+    "gh api 'repos/kushin77/diagrams/git/ref/tags/e2e-harness%2Fv1.0.0'"
+  ],
+  "schema": "ao.diagrams.vendor-board-snapshot/v1",
+  "tags": {
+    "refs/tags/e2e-harness/v1.0.0": "79521e76384a6bf8d5af64f9231b9ccc43564fc3"
+  },
+  "vendor_repo": "kushin77/diagrams"
+}
