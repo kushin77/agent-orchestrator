@@ -91,3 +91,43 @@ def signed_doc(private_pem, pack_id="worker-platform", version="1.0.0",
                    lifecycle=lifecycle)
     doc.update(overrides)
     return attestation.sign_pack(doc, private_pem, kid="ao-pack-publisher-v1")
+
+
+# -- Skill Studio fixtures (issue #640) ---------------------------------------
+
+SKILL_CASES_PATH = os.path.join(FIXTURES_DIR, "skill-eval-cases.yaml")
+
+
+def skill_evidence(cases=2, passed=2, failed=0, eval_id="codemod@1.0.0"):
+    """A workbook-8-shaped eval-evidence block for a skill (issue #640)."""
+    return {"harness": "registry/prompts/evals.py", "evalId": eval_id,
+            "cases": cases, "passed": passed, "failed": failed}
+
+
+def skill_content(skill_id="codemod", version="1.0.0"):
+    return ("skill: %s\nversion: %s\nsteps:\n  - apply-patch\n  - run-tests\n"
+            % (skill_id, version)).encode("utf-8")
+
+
+def skill_entry(skill_id="codemod", version="1.0.0",
+                category="code-authoring", lifecycle="published",
+                evidence=None, content=None):
+    """A schema-valid ``contents.skill`` entry (issue #640)."""
+    from packs.skills import skill_artifact_entry  # noqa: E402
+    return skill_artifact_entry(
+        skill_id, version, category,
+        content if content is not None else skill_content(skill_id, version),
+        evidence=evidence if evidence is not None
+        else skill_evidence(eval_id="%s@%s" % (skill_id, version)),
+        lifecycle=lifecycle)
+
+
+def skill_pack_doc(private_pem, pack_id="worker-platform", version="1.0.0",
+                   skill_id="codemod", skill_version="1.0.0",
+                   category="code-authoring", evidence=None):
+    """A signed pack that bundles exactly one published skill (issue #640)."""
+    doc = pack_doc(pack_id=pack_id, version=version)
+    doc["contents"] = {"skill": [skill_entry(
+        skill_id=skill_id, version=skill_version, category=category,
+        evidence=evidence)]}
+    return attestation.sign_pack(doc, private_pem, kid="ao-pack-publisher-v1")

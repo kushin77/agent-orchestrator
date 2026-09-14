@@ -77,10 +77,25 @@ REQUIRED_FIELDS = [
 ]
 LIFECYCLE_STATES = ("planned", "live", "paused", "retired")
 
+# Skill Studio closed vocabulary (issue #640). Mirrors pack-catalog.yaml
+# skillCategories / skillLifecycleStates; the parity gate below enforces it.
+SKILL_CATEGORIES = (
+    "code-authoring", "code-review", "testing", "analysis", "data",
+    "operations", "security", "communication",
+)
+SKILL_LIFECYCLE_STATES = ("draft", "tested", "published", "deprecated")
+SKILL_ENTRY_REQUIRED = (
+    "ref", "skillId", "skillVersion", "skillCategory", "skillLifecycle",
+    "evalEvidence", "data", "sha256",
+)
+EVAL_EVIDENCE_REQUIRED = ("harness", "evalId", "cases", "passed", "failed")
+EVAL_HARNESS = "registry/prompts/evals.py"
+
 # schema definitions name -> catalog section name (parity gate)
 _DEF_TO_CATALOG = {
     "categoryId": "categories",
     "artifactType": "artifactTypes",
+    "skillCategoryId": "skillCategories",
 }
 
 
@@ -121,6 +136,7 @@ def catalog_vocab(catalog):
     return {
         "categories": set((catalog.get("categories") or {}).keys()),
         "artifactTypes": set((catalog.get("artifactTypes") or {}).keys()),
+        "skillCategories": set((catalog.get("skillCategories") or {}).keys()),
         "lifecycleStates": set(catalog.get("lifecycleStates") or []),
     }
 
@@ -164,6 +180,16 @@ def parity_errors(schema, catalog):
         errors.append("parity: lifecycleState enum %s does not equal "
                       "catalog.lifecycleStates %s"
                       % (sorted(lc_def), sorted(lc_cat)))
+    # Skill Studio lifecycle (issue #640) has the same no-drift contract.
+    sk_def = set((defs.get("skillLifecycleState") or {}).get("enum") or [])
+    sk_cat = set(catalog.get("skillLifecycleStates") or [])
+    if sk_def != sk_cat:
+        errors.append("parity: skillLifecycleState enum %s does not equal "
+                      "catalog.skillLifecycleStates %s"
+                      % (sorted(sk_def), sorted(sk_cat)))
+    if not sk_def:
+        errors.append("parity: schema definition 'skillLifecycleState' is "
+                      "missing or empty")
     return errors
 
 
@@ -183,6 +209,76 @@ def schema_errors(data, schema, label):
             errors.append("%s: schema %s: %s" % (label, path, err.message))
     except Exception as exc:  # pragma: no cover - defensive
         errors.append("%s: schema validation crashed: %s" % (label, exc))
+    return errors
+
+
+def _skill_entry_errors(entries, label):
+    """Code-native validation of ``contents.skill`` entries (issue #640).
+
+    A skill is a first-class artifact, so its bundle entry carries its own
+    identity, closed Skill Studio category, author -> test -> publish state and
+    **mandatory eval evidence**. The evidence rule enforced here is the one the
+    publish gate enforces (``registry/packs/skills.py``): evidence must be
+    present, name the workbook-8 harness, and be *green* — more than zero cases
+    with no failures. A skill entry with absent/unevaluated/failing evidence is
+    INVALID, so an unevaluated skill can never ship inside a pack.
+    """
+    errors = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue  # already reported by the generic entry loop
+        ref = entry.get("ref", "?")
+        for field in SKILL_ENTRY_REQUIRED:
+            if field not in entry:
+                errors.append("%s: contents.skill/%s missing '%s'"
+                              % (label, ref, field))
+        sid = entry.get("skillId")
+        if isinstance(sid, str) and not ID_RE.match(sid):
+            errors.append("%s: contents.skill/%s skillId '%s' must match "
+                          "^[a-z][a-z0-9-]*$" % (label, ref, sid))
+        sver = entry.get("skillVersion")
+        if isinstance(sver, str) and not VERSION_RE.match(sver):
+            errors.append("%s: contents.skill/%s skillVersion '%s' must be "
+                          "semantic X.Y.Z" % (label, ref, sver))
+        cat = entry.get("skillCategory")
+        if cat is not None and cat not in SKILL_CATEGORIES:
+            errors.append("%s: contents.skill/%s skillCategory '%s' is not a "
+                          "closed Skill Studio category (valid: %s)"
+                          % (label, ref, cat, ", ".join(SKILL_CATEGORIES)))
+        lc = entry.get("skillLifecycle")
+        if lc is not None and lc not in SKILL_LIFECYCLE_STATES:
+            errors.append("%s: contents.skill/%s skillLifecycle '%s' must be "
+                          "one of %s" % (label, ref, lc,
+                                         ", ".join(SKILL_LIFECYCLE_STATES)))
+        errors.extend(_eval_evidence_errors(entry.get("evalEvidence"), label,
+                                            "contents.skill/%s" % ref, sid))
+    return errors
+
+
+def _eval_evidence_errors(evidence, label, where, skill_id):
+    """The mandatory eval-evidence gate for a published skill (fail closed)."""
+    errors = []
+    if not isinstance(evidence, dict) or not evidence:
+        return ["%s: %s has no evalEvidence — a skill cannot ship without "
+                "evidence from %s (author -> test -> publish)"
+                % (label, where, EVAL_HARNESS)]
+    for field in EVAL_EVIDENCE_REQUIRED:
+        if field not in evidence:
+            errors.append("%s: %s evalEvidence missing '%s'"
+                          % (label, where, field))
+    if evidence.get("harness") != EVAL_HARNESS:
+        errors.append("%s: %s evalEvidence.harness must be '%s'"
+                      % (label, where, EVAL_HARNESS))
+    cases = evidence.get("cases")
+    failed = evidence.get("failed")
+    if not isinstance(cases, int) or isinstance(cases, bool) or cases <= 0:
+        errors.append("%s: %s evalEvidence is UNEVALUATED (cases=%r); an "
+                      "unevaluated skill must not be bundled"
+                      % (label, where, cases))
+    elif not isinstance(failed, int) or isinstance(failed, bool) \
+            or failed > 0:
+        errors.append("%s: %s evalEvidence is not green (%r of %r case(s) "
+                      "failed)" % (label, where, failed, cases))
     return errors
 
 
@@ -272,6 +368,8 @@ def membership_errors(data, vocab, label):
                     errors.append("%s: contents.%s/%s data hash does not match "
                                   "declared sha256 (tampered content)"
                                   % (label, type_, ref))
+            if type_ == "skill":
+                errors.extend(_skill_entry_errors(entries, label))
 
     deps = data.get("dependencies") or []
     if not isinstance(deps, list):
