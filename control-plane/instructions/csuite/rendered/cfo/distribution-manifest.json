@@ -1,0 +1,13 @@
+{
+  "canonical": {
+    "id": "csuite-cfo",
+    "version": "1.0.0"
+  },
+  "mirrors": {
+    ".cursorrules": "5a122d698d412dc39de87af0001c7c010b5f28418445af7ae0eddda6a8af3c19",
+    "AGENTS.md": "fd9c8ed7b25c11160a10a14229f3a7d683e4049481439cc73099880abfbd7298",
+    "CLAUDE.md": "1710c0e0f2effd10b1da355d9b17b89329d61131c6e80e31aa8a337e0b0fde6c",
+    "copilot-instructions.md": "c0c3e0de81ebaafceccaae9a1306d065e1615939265ae4ace75103e64db0063a"
+  },
+  "schema": "ao.instructions.distribution/v1"
+}
