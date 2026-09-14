@@ -395,3 +395,37 @@ surfaced by name instead of hidden or called shipped.
 | C21 | [kushin77/diagrams#374](https://github.com/kushin77/diagrams/issues/374) | UNVERIFIED | closed | finding closed-without-signal |
 | C22 | [kushin77/diagrams#373](https://github.com/kushin77/diagrams/issues/373) | in-flight | open | consistent |
 | C23 | [kushin77/diagrams#147](https://github.com/kushin77/diagrams/issues/147) | shipped | closed | consistent |
+
+## The capabilities EPIC #461 relies on, against this register
+
+Rule 6 of `scripts/check-diagrams-capability-register.sh`
+([kushin77/agent-orchestrator#469](https://github.com/kushin77/agent-orchestrator/issues/469))
+enforces the integration EPIC's capability set in two ways: by reading the
+capability tokens out of
+[#461](https://github.com/kushin77/agent-orchestrator/issues/461), and by
+cross-checking **this** table. The table was added by
+[kushin77/agent-orchestrator#546](https://github.com/kushin77/agent-orchestrator/issues/546);
+before it existed the gate printed, on every run, that the rule-6 mapping
+cross-check (its sub-checks 6a, 6b and 6c) was inert — and a sub-check that can
+never fire is a formality rather than a rule (GR-12). Nothing above this section
+was altered, reordered or reformatted to make room for it.
+
+Every capability #461 names resolves to the register row that answers it. The
+three feature tokens are the ones #461's own authority table quotes; the two
+assets are the mandatory consumer assets its definition of done names;
+`blueprint-engine` is named by #461 only to place it out of the integration's
+path, and it is still accounted for rather than left unmapped.
+
+| Capability #461 relies on | Rows |
+|---|---|
+| `ssot-extract` — extract a governed repo's real resource inventory, the raw input every other capability is computed from | C2 |
+| `blueprint-gen` — render the extracted topology into a diagram | C4 |
+| `drift-detect` — deterministic live-vs-declared comparison surfaced as Findings | C5 |
+| `architecture.yaml` — this repo's own declaration, the file the module's fleet sync ingests | C1 |
+| `gdc-manifest.yaml` — the mandatory consumer asset carrying the `diagrams.blueprint` pin | C1 |
+| `blueprint-engine` — reverse-direction diagram-to-Terraform codegen, named by #461 as out of the integration's path | C23 |
+
+`architecture.yaml` and `gdc-manifest.yaml` resolve to the same row on purpose:
+they are the two halves of the declaration row C1, the one row in the register
+whose capability spans both files. No row id named here is absent from the
+register, and no capability #461 names is absent from this table.
