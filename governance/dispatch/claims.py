@@ -1,11 +1,17 @@
 """The claim ledger: claim records, the single-claim lock, and the audit.
 
-* **Claim record** — one JSON object per line in the append-only
-  ``.board/claims.jsonl`` (agent, lane, base commit, reason, snapshot hash,
-  timestamp, TTL). The record is the evidence that a claim was order-checked.
+* **Claim record** — one JSON object per event. New events are written one file
+  per event into ``.board/claims/`` (atomic, collision-proof, one path per
+  event), so two concurrent lanes never share a file and a git conflict on the
+  ledger is impossible by construction. The pre-#170 single-file ledger
+  ``.board/claims.jsonl`` is frozen history, read first so replay stays
+  time-ordered.
 * **Single-claim lock** — ``.board/locks/<issue>.lock`` is created
   ``O_CREAT|O_EXCL``; a second claim on an in-flight issue fails loudly. A claim
   whose TTL has expired may be taken over (a dead agent cannot wedge the chain).
+* **Snapshot staleness** — a claim validated against a snapshot older than
+  ``DEFAULT_STALENESS_MINUTES`` is refused with ``snapshot-stale`` (fail closed),
+  never judged against stale board state.
 * **Audit** — replays the ledger against the committed snapshot and reports every
   structural violation: malformed record, duplicate active claim, release without
   claim, claim on a closed issue, and a recorded reason the snapshot does not
@@ -17,6 +23,8 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -36,9 +44,10 @@ from model import (
     Snapshot,
     parse_claim_event,
 )
-from snapshot import now_iso, parse_iso
+from snapshot import DEFAULT_STALENESS_MINUTES, age_minutes, is_stale, now_iso, parse_iso
 
 DEFAULT_LEDGER = Path(".board/claims.jsonl")
+DEFAULT_CLAIMS_DIR = Path(".board/claims")
 DEFAULT_LOCK_DIR = Path(".board/locks")
 DEFAULT_TTL_HOURS = 24
 SENT_DIR = Path(__file__).resolve().parent.parent.parent / ".fleet" / "sent"
@@ -53,9 +62,14 @@ class ClaimRefused(Exception):
         self.detail = detail
 
 
-def read_ledger(path: Path | str = DEFAULT_LEDGER) -> list[ClaimEvent]:
-    """Parse the ledger. Raises ValueError naming the offending line."""
-    target = Path(path)
+def _slug(text: str) -> str:
+    """A filename-safe form of an agent id (path separators are the hazard)."""
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", text)
+    return sanitized or "agent"
+
+
+def _read_file_ledger(target: Path) -> list[ClaimEvent]:
+    """Parse the legacy single-file ledger. Raises ValueError naming the line."""
     if not target.exists():
         return []
     events: list[ClaimEvent] = []
@@ -70,18 +84,105 @@ def read_ledger(path: Path | str = DEFAULT_LEDGER) -> list[ClaimEvent]:
     return events
 
 
-def append_event(event: ClaimEvent, path: Path | str = DEFAULT_LEDGER) -> None:
-    """Append one record under an exclusive lock (parallel agents share this file)."""
+def _read_dir_ledger(target: Path) -> list[ClaimEvent]:
+    """Parse the one-file-per-event ledger. Sorted by name == write order."""
+    if not target.is_dir():
+        return []
+    events: list[ClaimEvent] = []
+    for path in sorted(target.glob("*.json")):
+        try:
+            obj = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{path}: unreadable claim record ({exc})") from exc
+        events.append(parse_claim_event(obj, where=str(path)))
+    return events
+
+
+def read_ledger(path: Path | str = DEFAULT_CLAIMS_DIR) -> list[ClaimEvent]:
+    """Replay the full claim history in temporal order.
+
+    Two sources are concatenated: the legacy single-file ledger
+    (``.board/claims.jsonl``, frozen before #170) and the one-file-per-event
+    directory (``.board/claims/``, the only place new events are written). Every
+    legacy event predates every directory event, so (legacy, then directory) is
+    time-ordered; within the directory, filenames embed the nanosecond write
+    time, so a lexical sort reproduces write order.
+
+    ``path`` may name either source — the sibling source is merged in — so a
+    reader that still points at the legacy file (fleet health/report) keeps
+    seeing new claims, and the claim directory gets the frozen history too.
+    """
     target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(event.to_json(), sort_keys=False) + "\n"
-    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        os.write(fd, payload.encode("utf-8"))
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
+    if target.is_file():
+        events = _read_file_ledger(target)
+        sibling_dir = target.parent / DEFAULT_CLAIMS_DIR.name
+        if sibling_dir.is_dir():
+            events.extend(_read_dir_ledger(sibling_dir))
+        return events
+    # Directory (existing or not yet created): the frozen legacy file comes
+    # first, then the one-file-per-event directory. This also covers a fresh
+    # checkout where the claims directory has not been created yet.
+    events: list[ClaimEvent] = []
+    sibling_file = target.parent / DEFAULT_LEDGER.name
+    if sibling_file.is_file():
+        events.extend(_read_file_ledger(sibling_file))
+    if target.is_dir():
+        events.extend(_read_dir_ledger(target))
+    return events
+
+
+def _write_event_file(event: ClaimEvent, claims_dir: Path) -> Path:
+    """Write one event as its own file, atomically and collision-proof.
+
+    The file is created ``O_CREAT|O_EXCL`` under a name that embeds the
+    nanosecond write time, so two lanes never share a path and a same-nanosecond
+    collision is retried with a suffix rather than overwriting. The name's
+    nanosecond prefix makes a lexical sort reproduce write order, which is what
+    keeps replay deterministic.
+    """
+    target = Path(claims_dir)
+    target.mkdir(parents=True, exist_ok=True)
+    stem = f"{time.time_ns():020d}-{event.issue:05d}-{_slug(event.agent)}-{event.event}"
+    for attempt in range(1_000_000):
+        name = f"{stem}.json" if attempt == 0 else f"{stem}-{attempt}.json"
+        path = target / name
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        except FileExistsError:
+            continue
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(event.to_json(), handle, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError:
+            path.unlink(missing_ok=True)
+            raise
+        return path
+    raise OSError("could not allocate a unique claim record path")
+
+
+def append_event(event: ClaimEvent, path: Path | str = DEFAULT_CLAIMS_DIR) -> None:
+    """Record one event.
+
+    A ``*.jsonl`` path appends to the legacy single-file ledger (one line under
+    an exclusive lock); any other path is a claims directory and gets one
+    collision-proof file per event. Production writes go to the directory.
+    """
+    target = Path(path)
+    if target.suffix == ".jsonl":
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(event.to_json(), sort_keys=False) + "\n"
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            os.write(fd, payload.encode("utf-8"))
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+    else:
+        _write_event_file(event, target)
 
 
 def active_claims(events: list[ClaimEvent], now: datetime | None = None) -> dict[int, ClaimEvent]:
@@ -116,7 +217,7 @@ def replay(events: list[ClaimEvent]) -> dict[int, ClaimEvent]:
 
 def reap(
     older_than_minutes: int,
-    ledger: Path | str = DEFAULT_LEDGER,
+    ledger: Path | str = DEFAULT_CLAIMS_DIR,
     lock_dir: Path | str = DEFAULT_LOCK_DIR,
     now: datetime | None = None,
     issue: int | None = None,
@@ -210,13 +311,14 @@ def claim(
     agent: str,
     lane: str,
     snapshot: Snapshot,
-    ledger: Path | str = DEFAULT_LEDGER,
+    ledger: Path | str = DEFAULT_CLAIMS_DIR,
     lock_dir: Path | str = DEFAULT_LOCK_DIR,
     base_commit: str = "",
     snapshot_sha256: str = "",
     ttl_hours: int = DEFAULT_TTL_HOURS,
     now: datetime | None = None,
     directive_id: str = "",
+    stale_minutes: int = DEFAULT_STALENESS_MINUTES,
 ) -> ClaimEvent:
     """Claim an issue after checking order. Raises ClaimRefused when it is not the next step."""
     moment = now or datetime.now(timezone.utc)
@@ -235,6 +337,15 @@ def claim(
         raise ClaimRefused("already-claimed", f"#{issue_number} is held by {held.agent} until its TTL elapses")
     if latest is not None and is_expired(latest, moment) and latest.agent != agent:
         takeover = True
+
+    # A stale snapshot cannot be trusted to judge order: refuse before using it.
+    if is_stale(snapshot, stale_minutes, moment):
+        age = age_minutes(snapshot, moment)
+        raise ClaimRefused(
+            "snapshot-stale",
+            f"snapshot is {age:.1f}m old (threshold {stale_minutes}m) — "
+            "refresh first: python3 governance/dispatch/cli.py snapshot --from-github",
+        )
 
     # Structural checks hold for every path, directive or not.
     issue = snapshot.get(issue_number)
@@ -289,7 +400,7 @@ def claim(
 def release(
     issue_number: int,
     agent: str,
-    ledger: Path | str = DEFAULT_LEDGER,
+    ledger: Path | str = DEFAULT_CLAIMS_DIR,
     lock_dir: Path | str = DEFAULT_LOCK_DIR,
     now: datetime | None = None,
 ) -> ClaimEvent:
@@ -475,6 +586,67 @@ def _released(events: list[ClaimEvent], event: ClaimEvent) -> bool:
         and later.agent == event.agent
         for later in events
     )
+
+
+def _collect_file_events(path: Path, problems: list[str]) -> list[ClaimEvent]:
+    """Parse a legacy ledger file, reporting malformed lines as problems."""
+    events: list[ClaimEvent] = []
+    if not path.exists():
+        return events
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            events.append(parse_claim_event(json.loads(line), where=f"{path}:{lineno}"))
+        except (json.JSONDecodeError, ValueError) as exc:
+            problems.append(f"{path}:{lineno}: malformed record ({exc})")
+    return events
+
+
+def _collect_dir_events(path: Path, problems: list[str]) -> list[ClaimEvent]:
+    """Parse a claims directory, reporting malformed records as problems."""
+    events: list[ClaimEvent] = []
+    if not path.is_dir():
+        return events
+    for child in sorted(path.glob("*.json")):
+        try:
+            obj = json.loads(child.read_text(encoding="utf-8"))
+            events.append(parse_claim_event(obj, where=str(child)))
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            problems.append(f"{child}: malformed record ({exc})")
+    return events
+
+
+def audit_ledger(
+    path: Path | str = DEFAULT_CLAIMS_DIR,
+    snapshot: Snapshot | None = None,
+    now: datetime | None = None,
+) -> list[str]:
+    """Audit the full ledger (legacy file + claims directory) against the snapshot.
+
+    Malformed records are reported as problems rather than raised, so the gate
+    names them instead of crashing — the same contract as ``audit_text``, but
+    over both storage forms in temporal order.
+    """
+    problems: list[str] = []
+    events: list[ClaimEvent] = []
+    target = Path(path)
+    if target.is_file():
+        events.extend(_collect_file_events(target, problems))
+        sibling_dir = target.parent / DEFAULT_CLAIMS_DIR.name
+        if sibling_dir.is_dir():
+            events.extend(_collect_dir_events(sibling_dir, problems))
+    else:
+        # Directory (existing or not yet created): the frozen legacy file comes
+        # first, then the one-file-per-event directory.
+        sibling_file = target.parent / DEFAULT_LEDGER.name
+        if sibling_file.is_file():
+            events.extend(_collect_file_events(sibling_file, problems))
+        if target.is_dir():
+            events.extend(_collect_dir_events(target, problems))
+    if snapshot is not None:
+        problems.extend(audit(events, snapshot, now))
+    return problems
 
 
 def audit_text(text: str, snapshot: Snapshot, now: datetime | None = None) -> list[str]:

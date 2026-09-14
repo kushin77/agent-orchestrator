@@ -75,7 +75,8 @@ def test_an_expired_claim_can_be_taken_over(tmp_path, snapshot, base_time):
     claims.claim(601, "agent-a", "governance", snapshot, ledger=ledger, lock_dir=locks, ttl_hours=1, now=base_time)
 
     later = base_time + timedelta(hours=2)
-    event = claims.claim(601, "agent-b", "governance", snapshot, ledger=ledger, lock_dir=locks, now=later)
+    fresh = Snapshot(generated_at=later.strftime("%Y-%m-%dT%H:%M:%SZ"), source="test", issues=snapshot.issues)
+    event = claims.claim(601, "agent-b", "governance", fresh, ledger=ledger, lock_dir=locks, now=later)
 
     assert event.event == "take-over"
     assert claims.active_claims(claims.read_ledger(ledger), later)[601].agent == "agent-b"
