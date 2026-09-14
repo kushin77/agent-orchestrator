@@ -238,3 +238,87 @@ the loop's call turns the wiring assertion red.
 AO-GR-24's standing condition — *"Max-agents fan-out is blocked until this check
 is green: the raising change and this gate land together or not at all"* — is
 satisfied by this lane: the raising change (#718) and the gate landed together.
+
+## 9. Gate admission control (issue #724)
+
+The operator measured **49 concurrent `make verify` runs, 43 of them stacked in
+two worktrees, ~16 hours of duplicated work**. Nothing bounded them, so the gate
+now admits work instead of assuming it:
+
+* **one composite gate per worktree.** A gate holds an exclusive `flock` on a
+  lock file keyed by the worktree path, so a second gate in the *same* worktree
+  refuses to start and names the process that holds it. Two different worktrees
+  never collide: the key is the worktree, not the machine.
+* **a box-wide permit bound.** A gate must also take one of
+  `AO_GATE_MAX_CONCURRENT` permit slots before it starts. No free slot means
+  **PARKED**: the gate runs no check and overwrites no previous attestation.
+* **release on signal and on crash.** `acquire` forks a holder that keeps the
+  descriptors open, so a gate killed with `SIGKILL` — where no trap can run —
+  still releases its permit. A holder killed outright leaves its record behind;
+  the next gate reclaims it while **naming the owner** it took it from.
+
+The permit store must not live in a workspace (every worktree has its own copy of
+the repository, so a bound stored there would be edited per lane). It is shared,
+stable, and outside every checkout:
+
+| Env var | Default | Meaning |
+|---------|---------|---------|
+| `AO_GATE_LOCK_ROOT` | `${XDG_RUNTIME_DIR:-/tmp}/agent-orchestrator-gates` | the shared permit store |
+| `AO_GATE_MAX_CONCURRENT` | `4` | box-wide cap on concurrent gates |
+| `AO_GATE_LOCK_TTL` | `900` | seconds before a leftover record is called stale |
+
+`/tmp` on this box is a 16 GB tmpfs that has silently truncated writes to 0
+bytes, so the store verifies its own writes (a grant it cannot evidence is an
+error, not a grant), and a 0-byte record is never read as an empty slot: the
+`flock`, not the bytes, is the exclusion.
+
+**The wiring is RC-8 territory (issue #559) and is NOT yet applied.**
+`scripts/verify.sh` is single-writer territory, so the admission block ships as
+the exact snippet below and the wiring lane inserts it. It goes immediately
+after the `mode="${1:-verify}"` line in `scripts/verify.sh` — *before*
+`verify_dir`/`log` are reset, so a parked gate leaves the previous attestation
+untouched instead of truncating the only evidence of the last real run.
+
+Until the snippet lands, `scripts/check-gate-lock.sh` is delivered but invoked by
+no gate file, so `scripts/check-gate-coverage.sh` reports it as `uninvoked`.
+Applying the snippet is what makes it wired: no baseline row is involved, and a
+baseline row for it would be refused by the detector anyway.
+
+```bash
+# --- admission control (issue #724) -----------------------------------------
+# One composite gate per worktree, bounded box-wide by a permit store outside
+# every workspace. A gate that cannot get a permit is PARKED: it runs no check
+# and it overwrites no previous attestation. Exit codes: 10 another gate holds
+# this worktree, 11 the box-wide cap is reached, 12 the permit store is unusable.
+bash "$root/scripts/gate-lock.sh" acquire --worktree "$root" --mode "$mode" \
+  --owner-pid $$
+lock_rc=$?
+if [ "$lock_rc" -ne 0 ]; then
+  case "$lock_rc" in
+    10) echo "verify: PARKED — another gate already holds this worktree; nothing was run" >&2 ;;
+    11) echo "verify: PARKED — the box-wide gate cap is reached; nothing was run" >&2 ;;
+    *) echo "verify: CANNOT-ASSESS — the gate permit store is unusable; nothing was run" >&2 ;;
+  esac
+  exit "$lock_rc"
+fi
+# Only a gate that holds the lock installs the release traps: a refused gate
+# must never release the lock it was refused by, and release refuses anyway when
+# the lock belongs to another gate that is still alive.
+trap 'bash "$root/scripts/gate-lock.sh" release --worktree "$root" --owner-pid $$ >/dev/null 2>&1' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+```
+
+The `release` call belongs in the EXIT trap and the signal traps map to a real
+exit code, so the trap runs on `Ctrl-C` (`exit 130`) and on `TERM` (`exit 143`)
+and every one of those paths releases the worktree lock and the permit slot.
+Until that trap exists — the admission window itself — the holder is what keeps
+the bound: `--owner-pid $$` makes it watch the gate's own pid and release the
+moment that process is gone, however it died, `SIGKILL` included.
+
+`scripts/gate-lock.sh acquire|release|status` is the only interface a gate needs;
+`fleet/gatelock.py` holds the mechanism and `scripts/check-gate-lock.sh` proves
+the refusals — including a mutant whose exclusion always grants, so the refusal
+proof cannot pass vacuously.
+
