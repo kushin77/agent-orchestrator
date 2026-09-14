@@ -240,7 +240,7 @@ def _run_one_cycle(monkeypatch) -> list[list[str]]:
     monkeypatch.setattr(terminal, "provision_worktree", lambda *a, **k: None)
     monkeypatch.setattr(terminal, "run_once", lambda *a, **k: (0, "runner finished"))
     monkeypatch.setattr(terminal, "release_in_flight", lambda *a, **k: None)
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "`make verify` rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "`make verify` rc=0"))
     monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, f"#{DIRECTIVE_ISSUE} is closed"))
     monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
 

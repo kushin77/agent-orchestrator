@@ -109,6 +109,12 @@ def spawn(name: str, command: list[str]) -> subprocess.Popen:
     The parent closes its copy of the handle as soon as the child holds its own:
     the log stays open for the child's lifetime without leaking a descriptor into
     a watchdog that exits a moment later.
+
+    The environment is passed explicitly — ``runtime.runner_env()``, the same PATH
+    the executor resolves its runner against. The watchdog is cron's own child, so
+    without this the whole chain (watchdog -> launcher -> loop -> subagent)
+    inherits cron's minimal PATH: measured 2026-09-14 (#733), the sister could not
+    spawn a single subagent because ``~/.local/bin`` was not on it.
     """
     handle = open_log(name)
     try:
@@ -117,6 +123,7 @@ def spawn(name: str, command: list[str]) -> subprocess.Popen:
             cwd=ROOT,
             stdout=handle,
             stderr=subprocess.STDOUT,
+            env=runtime.runner_env(),
         )
     finally:
         handle.close()

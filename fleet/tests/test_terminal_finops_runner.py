@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import signal
 
 import terminal
@@ -157,7 +158,7 @@ def _stub_loop(monkeypatch, directive: dict, *, runner: str = BASE_RUNNER) -> _R
     monkeypatch.setattr(terminal, "claim_issue", fake_claim)
     monkeypatch.setattr(terminal, "provision_worktree", lambda *a, **k: None)
     monkeypatch.setattr(terminal, "release_in_flight", lambda *a, **k: None)
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "`make verify` rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "`make verify` rc=0"))
     monkeypatch.setattr(
         terminal, "landed_evidence", lambda *a, **k: (True, f"#{DIRECTIVE_ISSUE} is closed")
     )
@@ -211,7 +212,12 @@ def test_a_declared_tier_selects_the_model_the_runner_is_invoked_with(monkeypatc
     assert run.returned == 0, "the loop did not complete its cycle"
     assert len(run.spawned) == 1, f"expected exactly one runner child, got {run.spawned}"
     command = run.spawned[0]
-    assert command[:4] == ["claude", "-p", "--model", PRO_MODEL], (
+    # The loop hands the child an ABSOLUTE runner path (#733), so the expected
+    # argv[0] is what PATH resolves to — pinned by the suite's stand-in `claude`
+    # (fleet/tests/conftest.py) instead of depending on the host's install.
+    resolved = shutil.which("claude")
+    assert resolved is not None, "the suite's stand-in runner is not on PATH"
+    assert command[:4] == [resolved, "-p", "--model", PRO_MODEL], (
         f"the runner was not invoked with the tier's model: {command!r}"
     )
     assert command[-1].startswith("You are an epic-focused subagent"), (
