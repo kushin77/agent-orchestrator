@@ -108,7 +108,9 @@ class ConsoleApplication:
         self.static_dir = Path(static_dir) if static_dir else (
             self.repo_root / "portal" / "static"
         )
-        self.state = state if state is not None else seed_state()
+        self.state = (
+            state if state is not None else seed_state(repo_root=self.repo_root)
+        )
         self.sso = sso if sso is not None else ConsoleSso(
             repo_root=self.repo_root,
             root_admin_emails=root_admin_emails,

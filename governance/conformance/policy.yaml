@@ -64,6 +64,26 @@ prefixed:
   - phase
   - source
 
+# Filing (issue #320) — the declaring labels a NEWLY FILED issue derives from this
+# policy, so the conformance gate stops being a repair queue. Every code path that
+# files an issue derives its labels here (`governance/conformance/filing.py`) and
+# passes them to `gh issue create`; a filing that cannot derive a required label is
+# REFUSED before `gh` runs, rather than filed and rejected afterwards. #174 owns
+# repairing the legacy issues that were filed unclassified (#253/#254/#255/#259);
+# this block owns prevention.
+#
+# `default_class` is the rung an auto-filed micro-task is held to when its spec
+# names none (the fleet's standard), and `defaults` are the companion labels a
+# filing may leave unstated. Removing either turns the corresponding filing into a
+# refusal instead of an unclassified issue — which is what `filing-check` exercises.
+filing:
+  default_class: enterprise
+  defaults:
+    type: feature
+    priority: P2
+    area: governance
+    gdc: enterprise
+
 # The rungs at which an issue must also cite the CMR standards it maps to. Kept
 # informational: the offline board snapshot carries labels, not bodies.
 standards_citation:

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/docs/contracts/paperclip/ticket.schema.json",
+  "title": "Paperclip-ing ticket contract (fleet claim -> upstream issue)",
+  "description": "The frozen ticket seam between the fleet's claim ledger (governance/dispatch/) and the upstream issue surface (issue #370, ADR-0013). A ticket has one accountable owner, a status in in-progress / blocked / in-review / done, explicit blocked-by relations, a goal reference and evidence. See docs/PAPERCLIP-ING-INTEGRATION.md.",
+  "type": "object",
+  "required": ["id", "owner", "status", "blocked_by", "goal", "evidence"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ticket identifier (fleet: the issue number as kushin77/agent-orchestrator#N)."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The single accountable agent that owns this ticket — never a set."
+    },
+    "status": {
+      "enum": ["in-progress", "blocked", "in-review", "done"],
+      "description": "Ticket lifecycle state. done is a verdict, not a self-report."
+    },
+    "blocked_by": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Explicit blocked-by relations: the ticket ids this ticket waits on (empty when unblocked)."
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Goal / milestone reference this ticket serves (fleet: the epic, e.g. EPIC-00 = issue #4)."
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Evidence references backing the status — the Verify: command and its real output, at minimum (GR-12)."
+    }
+  }
+}

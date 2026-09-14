@@ -1,22 +1,50 @@
-"""portal.server.state — console data model + deterministic seed.
+"""portal.server.state — console data model projected from the LIVE stores.
 
 The console is a *projection* over the control-plane entities, never a second
-source of truth (CMR portal doctrine). This module holds the offline demo
-state seeded against the frozen vocabulary of the merged pillar lanes:
+source of truth (CMR portal doctrine). This module holds the console state and
+hydrates it from the control plane's real stores on this checkout (issue #348):
 
-* tenant (agent org) — ``identity/rbac`` Org-as-tenant model (issue #12)
-* agents + statuses registered/active/paused/retired — ``registry/service``
+* **agent roster** — every agent's profile identity (capabilities, model tier,
+  owner) is resolved from the live AgentProfile registry
+  (``registry/profiles/seeds`` via :class:`~portal.server.livestore.RegistrySnapshot`).
+  A roster referencing a profile the registry does not publish **fails closed**
+  at load, so the console can never drift from the registry.
+* **budgets/quota/usage** — read from the live telemetry policy + durable
+  metering feed (``telemetry/budgets|metering`` via
+  :class:`~portal.server.livestore.TelemetrySnapshot`). A tenant with no declared
+  telemetry policy reads as no declared budget and no metered spend — an honest
+  "nothing declared", never an invented number.
+* tenant (agent org) — ``identity/rbac`` Org-as-tenant model (issue #12); the
+  org directory + per-tenant agent *bindings* are console configuration.
 * persona cards + prompt modules (versions) — ``registry/personas|prompts``
-* budgets/quota + usage — ``telemetry/budgets|metering``
 * approval-gated destructive ops — ``identity/cpapi`` approvals shape
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
 
 from portal.server.auditlog import AuditLedger
+from portal.server.livestore import (
+    RegistrySnapshot,
+    TelemetrySnapshot,
+    UsagePoint,
+)
+
+__all__ = [
+    "Approval",
+    "ConsoleState",
+    "OrgAgent",
+    "OrgBinding",
+    "PersonaCard",
+    "PromptModule",
+    "PromptVersion",
+    "Tenant",
+    "UsagePoint",
+    "seed_state",
+]
 
 
 @dataclass
@@ -87,16 +115,6 @@ class Approval:
 
 
 @dataclass
-class UsagePoint:
-    day: str
-    vendor: str
-    model: str
-    calls: int
-    tokens: int
-    cost_usd: float
-
-
-@dataclass
 class OrgBinding:
     email: str
     tenant_id: str
@@ -104,9 +122,21 @@ class OrgBinding:
 
 
 class ConsoleState:
-    """All console state + server-side stores (audit chain, policy controls)."""
+    """All console state + server-side stores (audit chain, policy controls).
 
-    def __init__(self) -> None:
+    ``registry`` and ``telemetry`` are the read-only views of the live stores
+    the projection is hydrated from (issue #348). They are carried on the state
+    so every read-model stays a pure projection of the same live sources.
+    """
+
+    def __init__(
+        self,
+        *,
+        registry: Optional[RegistrySnapshot] = None,
+        telemetry: Optional[TelemetrySnapshot] = None,
+    ) -> None:
+        self.registry = registry
+        self.telemetry = telemetry
         self.tenants: dict[str, Tenant] = {}
         self.agents: dict[str, list[OrgAgent]] = {}
         self.personas: list[PersonaCard] = []
@@ -130,109 +160,113 @@ class ConsoleState:
         normalized = email.strip().lower()
         return [binding for binding in self.bindings if binding.email == normalized]
 
+    def roster_profile_ids(self) -> set[str]:
+        """Every profile id the roster resolves to (the registry-backed roster)."""
+        return {
+            agent.profile_id
+            for agents in self.agents.values()
+            for agent in agents
+        }
 
-def seed_state() -> ConsoleState:
-    """Deterministic offline demo state (vocabulary-consumed seed rows)."""
-    state = ConsoleState()
 
-    # -- tenants (org-as-tenant, issue #12) ---------------------------------
-    tenants = [
-        Tenant(
-            id="acme",
-            name="Acme Platform",
-            plan="enterprise",
-            subscription_status="active",
-            primary_domain="acme.example.com",
-            monthly_budget_usd=2500.0,
-            daily_token_limit=8_000_000,
-            usage_month_usd=1412.30,
-            usage_today_tokens=3_214_000,
-        ),
-        Tenant(
-            id="globex",
-            name="Globex Corp",
-            plan="smb",
-            subscription_status="active",
-            primary_domain="globex.example.com",
-            monthly_budget_usd=600.0,
-            daily_token_limit=1_500_000,
-            usage_month_usd=412.75,
-            usage_today_tokens=702_000,
-        ),
-        Tenant(
-            id="initech",
-            name="Initech",
-            plan="startup",
-            subscription_status="trial",
-            primary_domain="initech.example.com",
-            monthly_budget_usd=300.0,
-            daily_token_limit=800_000,
-            usage_month_usd=148.10,
-            usage_today_tokens=254_000,
-        ),
-        Tenant(
-            id="purebliss",
-            name="Purebliss",
-            plan="enterprise",
-            subscription_status="active",
-            primary_domain="ai.purebliss.app",
-            monthly_budget_usd=1200.0,
-            daily_token_limit=5_000_000,
-            usage_month_usd=318.40,
-            usage_today_tokens=1_106_000,
-        ),
-    ]
-    for tenant in tenants:
-        state.tenants[tenant.id] = tenant
-        state.audit[tenant.id] = AuditLedger(tenant.id)
-
-    # -- agents (registry/service status vocabulary) ------------------------
-    state.agents["acme"] = [
-        OrgAgent("coder-1", "platform", "coder", "active", "flash",
-                 ["code", "review"]),
-        OrgAgent("reviewer-1", "platform", "reviewer", "active", "pro",
-                 ["review", "audit"]),
-        OrgAgent("ci-ops", "platform", "orchestrator", "registered", "flash",
-                 ["plan", "dispatch"]),
-        OrgAgent("researcher-1", "research", "researcher", "active", "pro",
-                 ["research"]),
-        OrgAgent("data-extract", "research", "data-agent", "paused", "flash",
-                 ["extract", "transform"]),
-        OrgAgent("sales-copilot", "revenue", "orchestrator", "registered", "flash",
-                 ["plan", "dispatch"]),
-    ]
-    state.agents["globex"] = [
-        OrgAgent("engineer-1", "platform", "coder", "active", "flash",
-                 ["code", "review"]),
-        OrgAgent("docbot", "platform", "docs-author", "active", "flash",
-                 ["docs"]),
-        OrgAgent("triage-1", "support", "data-agent", "registered", "flash",
-                 ["classify"]),
-    ]
-    state.agents["initech"] = [
-        OrgAgent("tps-1", "platform", "coder", "paused", "flash", ["code"]),
-        OrgAgent("cover-1", "platform", "researcher", "active", "pro",
-                 ["research", "summarize"]),
-    ]
-
+#: The console's per-tenant agent *bindings*: which agent instances a tenant
+#: runs, their team and lifecycle status. The agent's *identity* — its closed
+#: capability set and model tier — is NOT stated here; it is resolved from the
+#: live registry (fail closed) so the roster can never drift from it.
+_ROSTER: dict[str, list[tuple[str, str, str, str]]] = {
+    "acme": [
+        ("coder-1", "platform", "coder", "active"),
+        ("reviewer-1", "platform", "reviewer", "active"),
+        ("ci-ops", "platform", "orchestrator", "registered"),
+        ("researcher-1", "research", "researcher", "active"),
+        ("data-extract", "research", "data-agent", "paused"),
+        ("sales-copilot", "revenue", "orchestrator", "registered"),
+    ],
+    "globex": [
+        ("engineer-1", "platform", "coder", "active"),
+        ("docbot", "platform", "paperclip", "active"),
+        ("triage-1", "support", "data-agent", "registered"),
+    ],
+    "initech": [
+        ("tps-1", "platform", "coder", "paused"),
+        ("cover-1", "platform", "researcher", "active"),
+    ],
     # -- purebliss team (issue #256) ----------------------------------------
     # The platform's own five-agent ecosystem, frozen by EPIC #253: agent ids
-    # ollama/paperclip/hermes/deepseek/claude under team id `purebliss`, all
-    # active. Model tier + capabilities stay consistent with the registry
-    # profiles (registry lane #254): claude runs at `pro` (anthropic);
-    # ollama/paperclip/hermes/deepseek run at `flash`.
-    state.agents["purebliss"] = [
-        OrgAgent("ollama", "purebliss", "ollama", "active", "flash",
-                 ["research", "summarize"]),
-        OrgAgent("paperclip", "purebliss", "paperclip", "active", "flash",
-                 ["docs", "summarize"]),
-        OrgAgent("hermes", "purebliss", "hermes", "active", "flash",
-                 ["code", "test"]),
-        OrgAgent("deepseek", "purebliss", "deepseek", "active", "flash",
-                 ["code", "research"]),
-        OrgAgent("claude", "purebliss", "claude", "active", "pro",
-                 ["review", "audit"]),
+    # ollama/paperclip/hermes/deepseek/claude under team id `purebliss`. Each
+    # agent's capabilities + model tier come from its live registry profile
+    # (registry/profiles/seeds/), never from a hand-written literal here.
+    "purebliss": [
+        ("ollama", "purebliss", "ollama", "active"),
+        ("paperclip", "purebliss", "paperclip", "active"),
+        ("hermes", "purebliss", "hermes", "active"),
+        ("deepseek", "purebliss", "deepseek", "active"),
+        ("claude", "purebliss", "claude", "active"),
+    ],
+}
+
+
+def _default_repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def seed_state(
+    repo_root: Path | str | None = None,
+    *,
+    usage_store_path: Path | str | None = None,
+) -> ConsoleState:
+    """Hydrate console state from the LIVE registry + telemetry stores.
+
+    The roster's agent identity is resolved from the live registry and the
+    budgets/quota/usage from the live telemetry policy + metering feed; a
+    roster profile the registry does not publish fails closed.
+    """
+    root = Path(repo_root) if repo_root is not None else _default_repo_root()
+    state = ConsoleState(
+        registry=RegistrySnapshot(root),
+        telemetry=TelemetrySnapshot(root, usage_store_path=usage_store_path),
+    )
+    registry = state.registry
+    telemetry = state.telemetry
+    assert registry is not None and telemetry is not None  # for type checkers
+
+
+    # -- tenants (org-as-tenant, issue #12) ---------------------------------
+    # The console owns the org *directory* (id, display name, subscription
+    # status, primary domain). Every budget/quota figure is READ from the live
+    # telemetry policy + metering feed — the console restates none of it.
+    tenants = [
+        Tenant(id="acme", name="Acme Platform", subscription_status="active",
+               primary_domain="acme.example.com"),
+        Tenant(id="globex", name="Globex Corp", subscription_status="active",
+               primary_domain="globex.example.com"),
+        Tenant(id="initech", name="Initech", subscription_status="trial",
+               primary_domain="initech.example.com"),
+        Tenant(id="purebliss", name="Purebliss", subscription_status="active",
+               primary_domain="ai.purebliss.app"),
     ]
+    for tenant in tenants:
+        budget = telemetry.budget(tenant.id)
+        tenant.plan = budget.plan
+        tenant.monthly_budget_usd = budget.monthly_budget_usd
+        tenant.daily_token_limit = budget.daily_token_limit
+        tenant.usage_month_usd = telemetry.usage_totals(tenant.id)["cost_usd"]
+        tenant.usage_today_tokens = telemetry.daily_tokens(tenant.id)
+        state.tenants[tenant.id] = tenant
+        state.audit[tenant.id] = AuditLedger(tenant.id)
+        state.usage[tenant.id] = telemetry.usage_series(tenant.id)
+
+    # -- agents (registry/service status vocabulary) ------------------------
+    # Each agent's identity is RESOLVED from the live registry, never stated
+    # here: an unknown profile reference raises (fail closed), so the console
+    # roster cannot drift from registry/profiles/seeds.
+    for tenant_id, bindings in _ROSTER.items():
+        state.agents[tenant_id] = [
+            OrgAgent(agent_id, team, profile_ref, status, profile.model,
+                     list(profile.capabilities))
+            for agent_id, team, profile_ref, status in bindings
+            for profile in (registry.profile(profile_ref),)
+        ]
 
     # -- personas (registry/personas cards) ---------------------------------
     for pid, pname, powner, tags in [
@@ -292,23 +326,9 @@ def seed_state() -> ConsoleState:
         ),
     ]
 
-    # -- usage series (telemetry metering vocabulary) -----------------------
-    state.usage["acme"] = [
-        UsagePoint("2026-09-04", "anthropic", "claude-3-5-sonnet", 1810, 1_210_000, 21.4),
-        UsagePoint("2026-09-05", "anthropic", "claude-3-5-sonnet", 1755, 1_185_000, 20.9),
-        UsagePoint("2026-09-06", "openai", "gpt-4o-mini", 2400, 1_402_000, 12.1),
-        UsagePoint("2026-09-07", "deepseek", "deepseek-chat", 6200, 2_040_000, 9.3),
-        UsagePoint("2026-09-08", "anthropic", "claude-3-5-sonnet", 1620, 1_180_000, 20.6),
-    ]
-    state.usage["globex"] = [
-        UsagePoint("2026-09-06", "deepseek", "deepseek-chat", 2100, 640_000, 2.9),
-        UsagePoint("2026-09-07", "deepseek", "deepseek-chat", 2350, 705_000, 3.2),
-        UsagePoint("2026-09-08", "openai", "gpt-4o-mini", 980, 420_000, 3.6),
-    ]
-    state.usage["initech"] = [
-        UsagePoint("2026-09-07", "deepseek", "deepseek-chat", 900, 230_000, 1.1),
-        UsagePoint("2026-09-08", "anthropic", "claude-3-5-sonnet", 310, 210_000, 3.4),
-    ]
+    # -- usage series -------------------------------------------------------
+    # Populated above, straight from the live metering feed
+    # (telemetry/metering usage store) — never a hardcoded series.
 
     # -- org directory (rbac role vocabulary, issue #12) --------------------
     state.bindings = [
