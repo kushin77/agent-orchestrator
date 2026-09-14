@@ -35,6 +35,7 @@ network, no server, no npm/node.
 | SLO exporter feeding tenant dashboards; chargeback report generator for tenant billing | `exporter.py` (`BudgetStateExporter`), `chargeback.py` (`ChargebackReportGenerator`) |
 | Quota overrides per plan (entitlements link, Phase 6) | `quota.py` plan-default resolution, `config/quotas.yaml` |
 | Audit of budget decisions (BLOCK/WARN events) | `audit.py` (`BudgetAuditStore`, `JsonlAuditStore`) |
+| Soft vs hard cap semantics + spend alerts on warning/alert thresholds (issue #341) | `budget.py` (`BudgetLimit.cap`), `alerts.py` (`SpendAlertEvaluator`) |
 
 ## Consumed vocabulary (never redefined)
 
@@ -142,13 +143,14 @@ an honest sum; unmetered calls are surfaced separately, never billed as zero.
 |------|---------|
 | `model.py` | Decision/resource/window vocabulary + `EnforcerDecision` value object. |
 | `ledger.py` | `SpendLedger` protocol + `MeteringReporterLedger` adapter (consumes the issue-#33 feed). |
-| `budget.py` | `BudgetEnforcer` — per-tenant/per-vendor warn→block ladder, observe/enforce modes. |
+| `budget.py` | `BudgetEnforcer` — per-tenant/per-vendor warn→block ladder, observe/enforce modes, soft/hard caps. |
 | `quota.py` | `QuotaEnforcer` — soft/hard quotas + plan-default resolution + live probe. |
 | `killswitch.py` | `KillSwitchController` — global pause (flag-gated OFF), audited set/clear/refuse. |
 | `audit.py` | `BudgetAuditStore` / `JsonlAuditStore` — durable BLOCK/WARN/refusal audit feed. |
 | `preflight.py` | `CallPreflight` — composed pre-dispatch check (kill switch → quota → budget). |
 | `exporter.py` | `BudgetStateExporter` — machine-readable state + SLO feed for dashboards/alerts. |
 | `chargeback.py` | `ChargebackReportGenerator` — per-tenant chargeback lines for billing. |
+| `alerts.py` | `SpendAlertEvaluator` — warning/alert thresholds per limit; fires on breach, honest `NO_DATA` (never a fabricated zero). |
 | `config/` | `policies.yaml`, `quotas.yaml`, `killswitch.yaml` seed configs. |
 | `cli.py` | Offline operator CLI (`python3 -m telemetry.budgets.cli …`). |
 | `tests/` | pytest suite incl. the fail-closed negatives. |

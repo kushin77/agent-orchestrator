@@ -106,6 +106,22 @@ WINDOW_MONTH = "month"
 WINDOWS = frozenset({WINDOW_DAY, WINDOW_MONTH})
 
 # --------------------------------------------------------------------------- #
+# Cap semantics (issue #341 / FinOps Foundation showback-chargeback vocabulary)
+# --------------------------------------------------------------------------- #
+#: A SOFT cap is a *target*: reaching it raises the alarm (warn, and the alert
+#: feed's breach severity) but never refuses the call — the tenant may overrun.
+#: A HARD cap is a *limit*: reaching it refuses the call in enforce mode.
+#: Both caps alert; only the hard cap blocks.
+CAP_SOFT = "soft"
+CAP_HARD = "hard"
+CAPS = frozenset({CAP_SOFT, CAP_HARD})
+
+#: Default alert threshold as a fraction of a limit (the limit itself).
+#: The warning threshold (``warnAtPct``) sits at or below it: crossing warn
+#: raises a warning, crossing alert is a breach that fires (issue #341).
+DEFAULT_ALERT_AT_PCT = 1.0
+
+# --------------------------------------------------------------------------- #
 # Time helpers (mirror the metering/observability RFC 3339 ``Z`` shape)
 # --------------------------------------------------------------------------- #
 def now_utc_iso() -> str:
@@ -163,6 +179,8 @@ class EnforcerDecision:
     warn_at: Optional[float] = None
     mode: Optional[str] = None
     outcome: Optional[str] = None
+    #: Cap semantics of the limit this decision came from (soft never blocks).
+    cap: Optional[str] = None
     decision_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     def __post_init__(self) -> None:
@@ -170,6 +188,8 @@ class EnforcerDecision:
             raise ValueError(f"unknown decision: {self.decision!r}")
         if self.kind not in {KIND_BUDGET, KIND_QUOTA, KIND_KILL_SWITCH}:
             raise ValueError(f"unknown enforcer kind: {self.kind!r}")
+        if self.cap is not None and self.cap not in CAPS:
+            raise ValueError(f"unknown cap semantics: {self.cap!r}")
 
     @property
     def allowed(self) -> bool:
@@ -214,5 +234,6 @@ class EnforcerDecision:
             "limit": None if self.limit is None else round(self.limit, 8),
             "warnAt": None if self.warn_at is None else round(self.warn_at, 8),
             "mode": self.mode,
+            "cap": self.cap,
             "outcome": self.outcome,
         }

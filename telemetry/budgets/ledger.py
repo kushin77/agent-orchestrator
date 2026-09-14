@@ -59,6 +59,16 @@ class SpendLedger(Protocol):
     ) -> float:
         """Billable estimated cost (USD) for one vendor, one tenant, one month."""
 
+    def has_data(self, tenant_id: str) -> bool:
+        """Whether the ledger holds any billable record for ``tenant_id``.
+
+        The no-data honesty probe (issue #341): a ledger that has never seen a
+        record for a tenant cannot distinguish "no spend" from "not metered",
+        so a spend surface must report NO_DATA instead of a measured zero.
+        The counterpart of a ledger that simply reads 0 is a tenant whose
+        records really do sum to zero (e.g. cache hits or local models only).
+        """
+
 
 class StaticLedger:
     """A dict-backed ledger for unit tests and offline seeding.
@@ -124,6 +134,18 @@ class StaticLedger:
                 (tenant_id, vendor, month or this_month_utc()), 0.0
             )
         )
+
+    def has_data(self, tenant_id: str) -> bool:
+        """True when any seeded figure exists for the tenant."""
+        keys = (
+            list(self._costs)
+            + list(self._daily_costs)
+            + list(self._tokens)
+            + list(self._calls)
+        )
+        if any(key[0] == tenant_id for key in keys):
+            return True
+        return any(key[0] == tenant_id for key in self._vendor_costs)
 
 
 class MeteringReporterLedger:
@@ -206,6 +228,24 @@ class MeteringReporterLedger:
             if len(key) >= 3 and key[0] == month and key[2] == vendor:
                 total += float(agg.cost_usd)
         return total
+
+    def has_data(self, tenant_id: str) -> bool:
+        """True when the metering feed holds any billable record for the tenant.
+
+        Reads the durable feed itself (not a rollup figure), so a tenant whose
+        records are entirely unpriced still reads as *data-bearing* — the
+        caller decides how to present an unknown cost, but it must never be
+        presented as "no spend".
+        """
+        records = getattr(self._reporter, "records", None)
+        if callable(records):
+            return any(
+                getattr(record, "tenant_id", None) == tenant_id
+                and bool(getattr(record, "billable", False))
+                for record in records()
+            )
+        rows = self._reporter.tenant_daily(tenant_id)  # type: ignore[attr-defined]
+        return bool(rows)
 
 
 # Re-exported bucket helpers so callers/tests share one import path.
