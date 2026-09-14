@@ -25,7 +25,21 @@ authoritative ledger, so it is offline and deterministic:
       lessons back as dispatch hints" is the brain-directive / claim chain;
     * a reference that would **close a peer issue from here** is refused
       (cross-repo `Closes` is not used — same-owner cross-repo `Closes` *does*
-      auto-close, so it must never be written by accident).
+      auto-close, so it must never be written by accident);
+    * the **second lessons ledger** — the `kushin77/CMR` `docs/LESSONS.md`
+      consolidated index — is **declared** in the contract, its reference
+      **resolves** against a frozen baseline, and **every CMR index record
+      carries an explicit disposition** (`hub-only`, or `mirrors` naming a local
+      counterpart that must resolve); a record with no disposition, or a mapping
+      whose counterpart is missing, is reported **by id**, never silently
+      dropped.
+
+The CMR index is frozen as a committed input (`cmr-ledger.json`) because
+`vendor/CMR` is an **unpopulated submodule in a fresh worktree**, so the default
+mode can never read the live source there. The default pass therefore reconciles
+against the freeze and is fully offline; `--verify-cmr-source` re-resolves the
+freeze against the live `vendor/CMR/docs/LESSONS.md` when it is populated, and a
+missing or empty live source is CANNOT-ASSESS (`2`), never a pass.
 
 Exit-code contract (the repo tri-state, `guardrails/honesty`): `0` OK / `1`
 NOT-OK (findings) / `2` CANNOT-ASSESS. A required input that is missing,
@@ -52,6 +66,16 @@ from typing import Any, Callable, Iterable
 OUR_REPO = "kushin77/agent-orchestrator"
 WRITER_ROLE = "writer"
 DERIVED_ROLE = "derived-view"
+
+# The second lessons ledger — the CMR hub's consolidated index. It lives in the
+# pinned `vendor/CMR` submodule, which is UNPOPULATED in a fresh git worktree, so
+# the live read is behind an explicit flag and the default pass reconciles against
+# the frozen contract input `governance/lessons-sync/cmr-ledger.json`.
+CMR_VENDOR_DIR = "vendor/CMR"
+CMR_LESSONS_REL = "docs/LESSONS.md"
+CMR_DISPOSITIONS = frozenset({"hub-only", "mirrors"})
+CMR_ROW_ID_RE = re.compile(r"^(?:LESSON|SUGGEST)-\d+$")
+LEDGER_REL = "governance/lessons/ledger.jsonl"
 
 # A foreign-repo close reference: `Closes owner/repo#N` (and Fixes/Resolves).
 FOREIGN_CLOSE_RE = re.compile(
@@ -137,10 +161,13 @@ def check_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
             "symmetric-stores", "contract",
             f"expected exactly one '{WRITER_ROLE}', found {len(writers)} ({sorted(writers)}) "
             f"— two symmetric stores are refused"))
-    if len(derived) != 1:
+    # One writer, and at least one derived view. More than one *derived* view is
+    # read-only fan-out of the single writer (the CMR hub is the second one); it is
+    # not a symmetric store — only a second *writer* is.
+    if len(derived) < 1:
         findings.append(_finding(
             "contract-invalid", "contract",
-            f"expected exactly one '{DERIVED_ROLE}', found {len(derived)} ({sorted(derived)})"))
+            f"expected at least one '{DERIVED_ROLE}', found {len(derived)} ({sorted(derived)})"))
     sync = contract.get("sync")
     if not isinstance(sync, dict) or not str(sync.get("direction", "")).strip():
         findings.append(_finding(
@@ -155,8 +182,9 @@ def check_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
 def check_ledger_ref(contract: dict[str, Any], peer: dict[str, Any],
                      live: Callable[[str, int], bool] | None = None) -> list[dict[str, str]]:
     """C2 — the deepseek ledger reference resolves."""
-    derived = next((v for v in contract.values()
-                    if isinstance(v, dict) and v.get("role") == DERIVED_ROLE), None)
+    # The deepseek relationship is the `derived` key explicitly; the CMR-hub
+    # relationship is `cmr_hub` (checked by check_cmr_ledger).
+    derived = contract.get("derived") if isinstance(contract.get("derived"), dict) else None
     ref = (derived or {}).get("ledger_ref")
     if not isinstance(ref, dict):
         return [_finding("ledger-ref-unresolved", "contract",
@@ -277,8 +305,259 @@ def check_peer_close(*documents: Any) -> list[dict[str, str]]:
     return findings
 
 
+def _sha256_file(path: str) -> str:
+    import hashlib
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def parse_cmr_index(text: str) -> list[dict[str, str]]:
+    """Parse the CMR consolidated-index rows into {id, kind, status} records.
+
+    Pure and deterministic: the id is the first table cell and must match the
+    `LESSON-NNN` / `SUGGEST-NNN` vocabulary; the kind and status are the next two
+    cells. A `|` inside the free-text lesson column cannot affect the first four
+    cells.
+    """
+    records: list[dict[str, str]] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if len(cells) < 4 or not CMR_ROW_ID_RE.match(cells[0]):
+            continue
+        records.append({"id": cells[0], "kind": cells[2], "status": cells[3]})
+    return records
+
+
+def _load_cmr_baseline(path: str) -> dict[str, Any]:
+    doc = _load_json(path)
+    if not isinstance(doc, dict):
+        raise InputError("cmr baseline is not an object")
+    records = doc.get("records")
+    if not isinstance(records, list) or not records:
+        raise InputError("cmr baseline declares no records")
+    if not isinstance(doc.get("local_only"), list):
+        raise InputError("cmr baseline has no 'local_only' list")
+    if not isinstance(doc.get("ledger_ref"), dict):
+        raise InputError("cmr baseline declares no ledger_ref")
+    if not isinstance(doc.get("_provenance"), dict):
+        raise InputError("cmr baseline declares no _provenance block")
+    return doc
+
+
+def _cmr_source_path(root: str, override: str | None) -> str:
+    if override:
+        return override if os.path.isabs(override) else os.path.join(root, override)
+    return os.path.join(root, CMR_VENDOR_DIR, CMR_LESSONS_REL)
+
+
+def check_cmr_ledger(contract: dict[str, Any], cmr_doc: dict[str, Any],
+                     ledger_ids: set[str]) -> list[dict[str, str]]:
+    """C7/C8 — the second lessons ledger: declared, ref resolves, no silent drop.
+
+    Every CMR index record must carry an explicit disposition. `hub-only` says it
+    is org-scoped and deliberately not mirrored here; `mirrors` names the local
+    counterpart it maps to, which must resolve in the authoritative ledger. A
+    record with neither is reported **by id**; so is a mapping whose counterpart is
+    missing. An unconfirmed relationship (`confirmed: false`) may assert no
+    `mirrors` mapping at all.
+    """
+    findings: list[dict[str, str]] = []
+    hub = contract.get("cmr_hub")
+    if not isinstance(hub, dict):
+        return [_finding("ledger-undeclared", "contract",
+                         "the CMR-hub lessons ledger is not declared in the contract")]
+    if not str(hub.get("role", "")).strip() or not str(hub.get("direction", "")).strip():
+        findings.append(_finding(
+            "contract-invalid", "cmr_hub",
+            "cmr_hub must declare both a role and a direction of flow"))
+
+    ref = hub.get("ledger_ref")
+    base_ref = cmr_doc.get("ledger_ref")
+    if not isinstance(ref, dict):
+        findings.append(_finding(
+            "ledger-ref-unresolved", "cmr_hub",
+            "cmr_hub declares no ledger_ref to resolve"))
+    elif not (isinstance(base_ref, dict)
+              and base_ref.get("repo") == ref.get("repo")
+              and base_ref.get("path") == ref.get("path")):
+        findings.append(_finding(
+            "ledger-ref-unresolved", f"{ref.get('repo')} {ref.get('path')}",
+            "the CMR ledger reference does not resolve in the frozen baseline"))
+
+    confirmed = hub.get("confirmed") is True
+    cmr_ids: dict[str, dict[str, Any]] = {}
+    for rec in cmr_doc["records"]:
+        if not isinstance(rec, dict) or not isinstance(rec.get("id"), str):
+            raise InputError("cmr baseline record is not an object carrying an id")
+        cmr_ids[rec["id"]] = rec
+
+    mirrored_locals: set[str] = set()
+    for rid in sorted(cmr_ids):
+        rec = cmr_ids[rid]
+        disposition = rec.get("disposition")
+        if disposition == "mirrors":
+            if not confirmed:
+                findings.append(_finding(
+                    "mapping-unconfirmed", rid,
+                    f"CMR record {rid} asserts a counterpart while the relationship "
+                    f"is a declared intent (confirmed=false)"))
+            local_id = rec.get("mirrors")
+            if not isinstance(local_id, str) or local_id not in ledger_ids:
+                findings.append(_finding(
+                    "local-counterpart-missing", rid,
+                    f"CMR record {rid} mirrors {local_id!r} which is not recorded in "
+                    f"the authoritative ledger"))
+            else:
+                mirrored_locals.add(local_id)
+        elif disposition != "hub-only":
+            findings.append(_finding(
+                "cmr-record-undisclosed", rid,
+                f"CMR index record {rid} carries no disposition (hub-only, or mirrors "
+                f"naming a local counterpart) — reported by id, never dropped"))
+
+    local_only = cmr_doc["local_only"]
+    for lid in sorted(str(x) for x in local_only):
+        if lid not in ledger_ids:
+            findings.append(_finding(
+                "local-record-unknown", lid,
+                "declared local-only id is not recorded in the authoritative ledger"))
+    accounted = set(mirrored_locals) | {str(x) for x in local_only}
+    for lid in sorted(ledger_ids - accounted):
+        findings.append(_finding(
+            "local-record-undisclosed", lid,
+            f"authoritative ledger record {lid} has no counterpart declaration and is "
+            f"not listed local-only — reported by id, never dropped"))
+    return findings
+
+
+def check_cmr_source(cmr_doc: dict[str, Any], source_path: str) -> list[dict[str, str]]:
+    """--verify-cmr-source — re-resolve the freeze against the live vendor file.
+
+    A missing, unreadable, or empty live source is CANNOT-ASSESS (raised as
+    InputError → rc 2), never a pass.
+    """
+    prov = cmr_doc["_provenance"]
+    if not source_path or not os.path.isfile(source_path):
+        raise InputError(
+            f"live CMR lessons source unavailable: {source_path} "
+            f"(CANNOT-ASSESS, never a pass)")
+    if os.path.getsize(source_path) == 0:
+        raise InputError(f"live CMR lessons source is empty: {source_path}")
+    findings: list[dict[str, str]] = []
+    actual = _sha256_file(source_path)
+    expected = prov.get("source_sha256")
+    if actual != expected:
+        findings.append(_finding(
+            "cmr-baseline-stale", os.path.basename(source_path),
+            f"frozen source_sha256 {expected} != live {actual}"))
+    with open(source_path, encoding="utf-8") as fh:
+        live = parse_cmr_index(fh.read())
+    live_ids = {r["id"] for r in live}
+    frozen_ids = {r["id"] for r in cmr_doc["records"]}
+    for rid in sorted(live_ids - frozen_ids):
+        findings.append(_finding(
+            "cmr-record-undisclosed", rid,
+            f"CMR index record {rid} is present live but has no disposition in the "
+            f"frozen baseline — reported by id"))
+    for rid in sorted(frozen_ids - live_ids):
+        findings.append(_finding(
+            "cmr-baseline-stale", rid,
+            f"frozen baseline record {rid} is absent from the live CMR index"))
+    return findings
+
+
+def refresh_cmr_baseline(root: str, source_path: str, out_path: str,
+                         vendor_commit: str | None = None,
+                         extracted: str | None = None) -> int:
+    """Regenerate the frozen CMR baseline from the live index (populated vendor).
+
+    Preserves each existing record's declared disposition by id, updates the
+    provenance `source_sha256`, and recomputes `local_only` from the authoritative
+    ledger minus mirror targets. A record that is new in the live index is written
+    with no disposition on purpose, so it surfaces as `cmr-record-undisclosed`
+    until it is dispositioned by name.
+    """
+    if not source_path or not os.path.isfile(source_path):
+        print(f"lessons-sync: CANNOT-ASSESS — live CMR source unavailable: {source_path}",
+              file=sys.stderr)
+        return CANNOT_ASSESS
+    with open(source_path, encoding="utf-8") as fh:
+        live = parse_cmr_index(fh.read())
+    if not live:
+        print("lessons-sync: CANNOT-ASSESS — live CMR index parsed zero records",
+              file=sys.stderr)
+        return CANNOT_ASSESS
+    previous: dict[str, dict[str, Any]] = {}
+    if os.path.isfile(out_path):
+        try:
+            with open(out_path, encoding="utf-8") as fh:
+                for rec in json.load(fh).get("records", []):
+                    previous[rec["id"]] = rec
+        except (ValueError, OSError, TypeError):
+            previous = {}
+
+    records: list[dict[str, str]] = []
+    for entry in live:
+        old = previous.get(entry["id"], {})
+        record = dict(entry)
+        if old.get("disposition") in CMR_DISPOSITIONS:
+            record["disposition"] = old["disposition"]
+            if old.get("disposition") == "mirrors" and isinstance(old.get("mirrors"), str):
+                record["mirrors"] = old["mirrors"]
+        records.append(record)
+
+    ledger_ids = sorted(_load_ledger_ids(os.path.join(root, LEDGER_REL)))
+    mirrored = {r["mirrors"] for r in records
+                if r.get("disposition") == "mirrors" and isinstance(r.get("mirrors"), str)}
+    prev_prov = {}
+    if os.path.isfile(out_path):
+        try:
+            with open(out_path, encoding="utf-8") as fh:
+                prev_prov = json.load(fh).get("_provenance", {})
+        except (ValueError, OSError):
+            prev_prov = {}
+    documented = {
+        "_provenance": {
+            "vendor_repo": "kushin77/CMR",
+            "source_path": CMR_LESSONS_REL,
+            "vendor_commit": vendor_commit or prev_prov.get("vendor_commit", "unrecorded"),
+            "source_sha256": _sha256_file(source_path),
+            "extracted": extracted or prev_prov.get("extracted", "unrecorded"),
+            "note": "Durable contract input: the kushin77/CMR consolidated lessons index, "
+                    "frozen so the default lessons-sync gate is deterministic and offline.",
+            "frozen_because": "vendor/CMR is a git submodule that is UNPOPULATED in a fresh "
+                              "git worktree, so the default gate cannot read the live index "
+                              "there; --verify-cmr-source re-resolves the freeze when the "
+                              "submodule is populated.",
+            "refresh_command": "python3 governance/lessons-sync/lessons_sync.py "
+                               "--refresh-cmr-baseline    # run where vendor/CMR is populated",
+            "verify_command": "bash scripts/check-cross-repo-lessons.sh --verify-cmr-source",
+        },
+        "ledger_ref": {"repo": "kushin77/CMR", "path": CMR_LESSONS_REL,
+                       "kind": "org-consolidated-index"},
+        "records": records,
+        "local_only": [lid for lid in ledger_ids if lid not in mirrored],
+    }
+    directory = os.path.dirname(out_path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump(documented, fh, indent=2, sort_keys=False)
+        fh.write("\n")
+    print(f"lessons-sync: refreshed {os.path.relpath(out_path, root)} "
+          f"({len(records)} CMR record(s), {len(documented['local_only'])} local-only)")
+    return OK
+
+
 def evaluate(contract: dict[str, Any], peer: dict[str, Any], hints_doc: Any,
-             ledger_ids: set[str], *, commit_exists: Callable[[str], bool] | None = None,
+             ledger_ids: set[str], cmr_doc: dict[str, Any],
+             *, commit_exists: Callable[[str], bool] | None = None,
              live: Callable[[str, int], bool] | None = None) -> list[dict[str, str]]:
     """Pure evaluation: the ordered, deterministic finding list."""
     if isinstance(hints_doc, dict):
@@ -294,6 +573,7 @@ def evaluate(contract: dict[str, Any], peer: dict[str, Any], hints_doc: Any,
     findings += check_contract(contract)
     findings += check_ledger_ref(contract, peer, live=live)
     findings += check_discoverable(ledger_ids, hints, peer, commit_exists=commit_exists)
+    findings += check_cmr_ledger(contract, cmr_doc, ledger_ids)
     findings += check_peer_close(contract, peer, hints_doc)
     # Deterministic ordering: sort by (code, id, message).
     return sorted(findings, key=lambda f: (f["code"], f["id"], f["message"]))
@@ -331,6 +611,7 @@ def run(args: argparse.Namespace) -> int:
     peer_path = _resolve(root, args.peer)
     hints_path = _resolve(root, args.hints)
     ledger_path = _resolve(root, args.ledger)
+    cmr_path = _resolve(root, args.cmr)
 
     live = _gh_issue_exists if args.live else None
     try:
@@ -338,12 +619,16 @@ def run(args: argparse.Namespace) -> int:
         peer = _load_json(peer_path)
         hints_doc = _load_json(hints_path)
         ledger_ids = _load_ledger_ids(ledger_path)
+        cmr_doc = _load_cmr_baseline(cmr_path)
         if not isinstance(contract, dict):
             raise InputError("contract input is not an object")
         if not isinstance(peer, dict):
             raise InputError("peer snapshot is not an object")
-        findings = evaluate(contract, peer, hints_doc, ledger_ids,
+        findings = evaluate(contract, peer, hints_doc, ledger_ids, cmr_doc,
                             commit_exists=_git_commit_exists, live=live)
+        if args.verify_cmr_source:
+            findings += check_cmr_source(cmr_doc, _cmr_source_path(root, args.cmr_source))
+            findings = sorted(findings, key=lambda f: (f["code"], f["id"], f["message"]))
     except InputError as exc:
         report = {"ok": False, "rc": CANNOT_ASSESS, "findings": [],
                   "cannot_assess": str(exc)}
@@ -361,7 +646,9 @@ def run(args: argparse.Namespace) -> int:
             "peer": os.path.relpath(peer_path, root) if peer_path.startswith(root) else peer_path,
             "hints": os.path.relpath(hints_path, root) if hints_path.startswith(root) else hints_path,
             "ledger": os.path.relpath(ledger_path, root) if ledger_path.startswith(root) else ledger_path,
+            "cmr": os.path.relpath(cmr_path, root) if cmr_path.startswith(root) else cmr_path,
             "live": bool(args.live),
+            "cmr_source_verified": bool(args.verify_cmr_source),
         },
         "finding_count": len(findings),
     }
@@ -387,24 +674,43 @@ def _write_report(path: str | None, report: dict[str, Any]) -> None:
 def self_test() -> int:
     """Provoke every refusal on in-memory inputs so the gate cannot pass vacuously."""
     base_contract = {
-        "authoritative": {"repo": OUR_REPO, "role": WRITER_ROLE, "ledger": "governance/lessons/ledger.jsonl"},
+        "authoritative": {"repo": OUR_REPO, "role": WRITER_ROLE, "ledger": LEDGER_REL},
         "derived": {"repo": "kushin77/deepseek", "role": DERIVED_ROLE,
                     "ledger_ref": {"repo": "kushin77/deepseek", "issue": 84}},
+        "cmr_hub": {"repo": "kushin77/CMR", "role": DERIVED_ROLE, "confirmed": False,
+                    "direction": "one-way:agent-orchestrator->CMR",
+                    "ledger_ref": {"repo": "kushin77/CMR", "path": CMR_LESSONS_REL,
+                                   "kind": "org-consolidated-index"}},
         "sync": {"direction": "one-way:writer->derived", "symmetric": False},
     }
     base_peer = {"repo": "kushin77/deepseek", "issues": [{"number": 84, "state": "open"}],
                  "peer_lessons": []}
     base_hints = {"hints": [{"id": "hint-0001", "lesson_id": "L-1", "issue": "#402",
                              "commit": "b87cdf9"}]}
+    base_cmr = {
+        "_provenance": {"vendor_repo": "kushin77/CMR", "source_path": CMR_LESSONS_REL,
+                        "source_sha256": "0" * 64},
+        "ledger_ref": {"repo": "kushin77/CMR", "path": CMR_LESSONS_REL,
+                       "kind": "org-consolidated-index"},
+        "records": [{"id": "LESSON-001", "kind": "lesson", "status": "closed",
+                     "disposition": "hub-only"}],
+        "local_only": ["L-1"],
+    }
     ledger = {"L-1"}
 
-    def rc_of(contract, peer, hints, ids=ledger):
-        return evaluate(contract, peer, hints, set(ids), commit_exists=lambda _s: True)
+    def rc_of(contract, peer, hints, ids=ledger, cmr=None):
+        doc = base_cmr if cmr is None else cmr
+        return evaluate(contract, peer, hints, set(ids), _copy_doc(doc),
+                        commit_exists=lambda _s: True)
+
+    import copy as _copy
+
+    def _copy_doc(value):
+        return _copy.deepcopy(value)
 
     controls = []
     controls.append(("baseline clean", rc_of(base_contract, base_peer, base_hints) == []))
 
-    import copy as _copy
     sym = _copy.deepcopy(base_contract)
     sym["derived"]["role"] = WRITER_ROLE
     codes = {f["code"] for f in rc_of(sym, base_peer, base_hints)}
@@ -436,6 +742,42 @@ def self_test() -> int:
     codes = {f["code"] for f in rc_of(base_contract, base_peer, close)}
     controls.append(("peer-close reference refused", "peer-close-refused" in codes))
 
+    # --- the second ledger (CMR hub) --------------------------------------
+    no_hub = _copy.deepcopy(base_contract)
+    del no_hub["cmr_hub"]
+    codes = {f["code"] for f in rc_of(no_hub, base_peer, base_hints)}
+    controls.append(("undeclared CMR ledger refused", "ledger-undeclared" in codes))
+
+    bad_cmr_ref = _copy.deepcopy(base_contract)
+    bad_cmr_ref["cmr_hub"]["ledger_ref"]["path"] = "docs/OTHER.md"
+    codes = {f["code"] for f in rc_of(bad_cmr_ref, base_peer, base_hints)}
+    controls.append(("CMR ledger reference unresolved refused",
+                     "ledger-ref-unresolved" in codes))
+
+    undisposed = _copy.deepcopy(base_cmr)
+    del undisposed["records"][0]["disposition"]
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=undisposed)
+    controls.append(("CMR record with no disposition reported by id",
+                     any(f["code"] == "cmr-record-undisclosed" and f["id"] == "LESSON-001"
+                         for f in findings)))
+
+    bad_mirror = _copy.deepcopy(base_cmr)
+    bad_mirror["records"][0] = {"id": "LESSON-001", "kind": "lesson", "status": "closed",
+                                "disposition": "mirrors", "mirrors": "L-404"}
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=bad_mirror)
+    controls.append(("CMR mirror with a missing local counterpart reported by id",
+                     any(f["code"] == "local-counterpart-missing" and f["id"] == "LESSON-001"
+                         for f in findings)))
+    controls.append(("unconfirmed relationship may not assert a mapping",
+                     any(f["code"] == "mapping-unconfirmed" for f in findings)))
+
+    unaccounted = _copy.deepcopy(base_cmr)
+    unaccounted["local_only"] = []
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=unaccounted)
+    controls.append(("local record with no counterpart declaration reported by id",
+                     any(f["code"] == "local-record-undisclosed" and f["id"] == "L-1"
+                         for f in findings)))
+
     ok = True
     for name, passed in controls:
         print(f"  [{'PASS' if passed else 'FAIL'}] {name}")
@@ -450,13 +792,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--contract", default="governance/lessons-sync/contract.json")
     parser.add_argument("--peer", default="governance/lessons-sync/peer-issues.json")
     parser.add_argument("--hints", default="governance/lessons-sync/hints.json")
-    parser.add_argument("--ledger", default="governance/lessons/ledger.jsonl")
+    parser.add_argument("--ledger", default=LEDGER_REL)
+    parser.add_argument("--cmr", default="governance/lessons-sync/cmr-ledger.json",
+                        help="the frozen CMR-hub ledger baseline (committed input)")
+    parser.add_argument("--cmr-source", default=None,
+                        help="override the live CMR index path (default "
+                             "vendor/CMR/docs/LESSONS.md under --root)")
     parser.add_argument("--report", default=None, help="write the JSON report here")
     parser.add_argument("--live", action="store_true",
                         help="resolve the peer reference with live `gh` (needs network)")
+    parser.add_argument("--verify-cmr-source", action="store_true",
+                        help="re-resolve the frozen CMR baseline against the live "
+                             "vendor/CMR/docs/LESSONS.md (CANNOT-ASSESS if absent)")
+    parser.add_argument("--refresh-cmr-baseline", action="store_true",
+                        help="regenerate the frozen CMR baseline from the live source "
+                             "(run where vendor/CMR is populated)")
+    parser.add_argument("--vendor-commit", default=None,
+                        help="the vendor/CMR pin to record in the refreshed provenance")
+    parser.add_argument("--extracted", default=None,
+                        help="the extraction date to record in the refreshed provenance")
     parser.add_argument("--self-test", action="store_true",
                         help="provoke every refusal on in-memory inputs")
     args = parser.parse_args(argv)
+    if args.refresh_cmr_baseline:
+        return refresh_cmr_baseline(args.root, _cmr_source_path(args.root, args.cmr_source),
+                                    _resolve(args.root, args.cmr),
+                                    vendor_commit=args.vendor_commit,
+                                    extracted=args.extracted)
     if args.self_test:
         return self_test()
     return run(args)

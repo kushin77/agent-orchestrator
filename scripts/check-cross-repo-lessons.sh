@@ -15,7 +15,19 @@
 #   * a dispatch hint carries provenance (issue ref + commit), never a bare
 #     string;
 #   * a reference that would close a peer issue from here is refused
-#     (cross-repo Closes is not used).
+#     (cross-repo Closes is not used);
+#   * the SECOND lessons ledger — the kushin77/CMR docs/LESSONS.md consolidated
+#     index — is declared, its reference resolves against a frozen baseline, and
+#     every CMR index record carries an explicit disposition (hub-only, or
+#     mirrors naming a local counterpart that must resolve). A record with no
+#     disposition, or a mapping whose counterpart is missing, is reported BY ID,
+#     never silently dropped.
+#
+# The CMR index is a *frozen* committed input (governance/lessons-sync/cmr-ledger.json)
+# because vendor/CMR is an unpopulated submodule in a fresh worktree: the default
+# mode is therefore fully offline and deterministic. Pass --verify-cmr-source to
+# re-resolve the freeze against the live vendor/CMR/docs/LESSONS.md; a missing or
+# empty live source is CANNOT-ASSESS (2), never a pass.
 #
 # The pass is governance/lessons-sync/lessons_sync.py: stdlib-only, one read per
 # pinned input, no network and no `gh` in the default mode, no wall clock — so
@@ -27,6 +39,7 @@
 # pinned input exits 2, not 0.
 #
 # Usage: bash scripts/check-cross-repo-lessons.sh [extra lessons_sync.py args]
+#   e.g. bash scripts/check-cross-repo-lessons.sh --verify-cmr-source
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

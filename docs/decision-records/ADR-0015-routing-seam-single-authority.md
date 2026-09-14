@@ -160,3 +160,20 @@ Nothing is foreclosed by rejecting this option, and a later reversal is a new AD
   `gateway/sme-routing/`**; the router is the authority and any change to it is a
   separate issue on that lane. The provider adapters and `gateway/finops/` are
   untouched. The ownership map, not the router, is where the seam is expressed.
+
+## Direction issue
+
+The Negative consequence above names the handover this ADR owes the peer board. It
+was filed — and only filed — as **one** direction issue on `kushin77/hermes-agents`,
+conveying this ADR's decision (this repository owns the routing authority; their
+`#2` extraction is a **policy source we map**, never a runtime) and asking them to
+keep the extracted package backend-agnostic and to record on their side that this
+repository runs the single authority:
+
+- **`kushin77/hermes-agents#4`** —
+  <https://github.com/kushin77/hermes-agents/issues/4>
+
+It references `kushin77/hermes-agents#2` and our `docs/contracts/routing/` seam
+without closing or modifying anything on that board, and carries no peer-closing
+reference. Recording it beside the decision is what makes the promise the
+Consequences section makes traceable.

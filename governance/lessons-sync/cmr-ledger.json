@@ -1,0 +1,215 @@
+{
+  "_provenance": {
+    "vendor_repo": "kushin77/CMR",
+    "source_path": "docs/LESSONS.md",
+    "vendor_commit": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224",
+    "source_sha256": "c9c6b54f8a90babd0e895317501d94eda3769b42158134fa6f8b2e9ec75170b4",
+    "extracted": "2026-09-14",
+    "note": "Durable contract input: the kushin77/CMR consolidated lessons index, frozen so the default lessons-sync gate is deterministic and offline.",
+    "frozen_because": "vendor/CMR is a git submodule that is UNPOPULATED in a fresh git worktree, so the default gate cannot read the live index there; --verify-cmr-source re-resolves the freeze when the submodule is populated.",
+    "refresh_command": "python3 governance/lessons-sync/lessons_sync.py --refresh-cmr-baseline    # run where vendor/CMR is populated",
+    "verify_command": "bash scripts/check-cross-repo-lessons.sh --verify-cmr-source"
+  },
+  "ledger_ref": {
+    "repo": "kushin77/CMR",
+    "path": "docs/LESSONS.md",
+    "kind": "org-consolidated-index"
+  },
+  "records": [
+    {
+      "id": "LESSON-001",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-002",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-003",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-004",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-005",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-006",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-007",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-008",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-009",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-010",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-011",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-012",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-013",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-014",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-015",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-016",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-017",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "LESSON-018",
+      "kind": "lesson",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-001",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-002",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-003",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-004",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-005",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-006",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-007",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-008",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-009",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    },
+    {
+      "id": "SUGGEST-010",
+      "kind": "suggestion",
+      "status": "closed",
+      "disposition": "hub-only"
+    }
+  ],
+  "local_only": [
+    "CA-0001",
+    "CA-0002",
+    "CA-0003",
+    "CA-0004",
+    "CA-0005",
+    "CA-0006",
+    "CA-0007",
+    "INC-0001",
+    "INC-0002",
+    "INC-0003",
+    "INC-0004",
+    "INC-0005",
+    "LESSON-0001",
+    "LESSON-0002",
+    "LESSON-0003",
+    "LESSON-0004",
+    "RCA-0001",
+    "RCA-0002",
+    "RCA-0003",
+    "RCA-0004",
+    "RCA-0005",
+    "SUGGEST-0001",
+    "SUGGEST-0002",
+    "SUGGEST-0003"
+  ],
+  "disposition_note": "Every CMR index record is dispositioned by id. hub-only = org-scoped, deliberately not mirrored into governance/lessons/ledger.jsonl; mirrors = maps to a local counterpart that must resolve. A record with neither is a finding."
+}

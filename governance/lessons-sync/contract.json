@@ -1,6 +1,6 @@
 {
   "decision": "one authoritative ledger",
-  "decision_detail": "governance/lessons/ledger.jsonl (kushin77/agent-orchestrator) is the single writer; kushin77/deepseek's view is derived and read-only; sync is one-way writer -> derived; peer lessons enter only through a reviewed direction/harvest item carrying provenance, so two symmetric stores can never exist.",
+  "decision_detail": "governance/lessons/ledger.jsonl (kushin77/agent-orchestrator) is the single writer; kushin77/deepseek's view is derived and read-only; the kushin77/CMR docs/LESSONS.md consolidated index is the second (org-level) derived view, declared but unconfirmed; sync is one-way writer -> derived; peer lessons enter only through a reviewed direction/harvest item carrying provenance, so two symmetric stores can never exist.",
   "authoritative": {
     "repo": "kushin77/agent-orchestrator",
     "role": "writer",
@@ -16,6 +16,20 @@
       "path": "governance/lessons/ledger.jsonl"
     }
   },
+  "cmr_hub": {
+    "repo": "kushin77/CMR",
+    "role": "derived-view",
+    "direction": "one-way:agent-orchestrator->CMR",
+    "confirmed": false,
+    "relationship": "declared-intent",
+    "ledger_ref": {
+      "repo": "kushin77/CMR",
+      "path": "docs/LESSONS.md",
+      "kind": "org-consolidated-index",
+      "state": "declared-intent-unconfirmed"
+    },
+    "note": "Second lessons ledger: the CMR hub's consolidated index. No mechanical coupling with governance/lessons/ledger.jsonl exists today (no shared record ids, no cross-reference), so this is a DECLARED INTENT, not a confirmed mapping. The frozen baseline is governance/lessons-sync/cmr-ledger.json; every CMR record must carry a disposition (hub-only, or mirrors naming a local counterpart) and a record with none is reported by id."
+  },
   "sync": {
     "direction": "one-way:writer->derived",
     "symmetric": false
@@ -30,6 +44,8 @@
     "kushin77/agent-orchestrator#181 gap 6 (closed without a standing mechanism)",
     "kushin77/deepseek#84 and #79 (the peer lessons loop)",
     "kushin77/deepseek#74 and #78 (peer board as code)",
-    "kushin77/CMR#865 (board sync is one-directional)"
+    "kushin77/CMR#865 (board sync is one-directional)",
+    "kushin77/CMR docs/LESSONS.md (the hub's consolidated index; the second lessons ledger, declared as a derived view with no confirmed mapping)",
+    "kushin77/CMR#1009 (direction issue recording the declared CMR-hub relationship)"
   ]
 }
