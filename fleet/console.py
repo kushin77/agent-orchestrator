@@ -47,6 +47,47 @@ GLYPH_DISPATCHED = "\u25b6"
 GLYPH_PENDING = "\u00b7"
 WIDTH = 96
 
+# --- colour (interactive only) ----------------------------------------------
+# The frame is built by PURE functions the tests assert, so colour is opt-in:
+# `render` stays colourless until `enable_color(True)`, which only the
+# interactive loop calls when stdout is a TTY. Tests therefore never see ANSI.
+ANSI = {
+    "green": "\033[32m",
+    "yellow": "\033[33m",
+    "red": "\033[31m",
+    "dim": "\033[2m",
+    "bold": "\033[1m",
+    "reset": "\033[0m",
+}
+_COLOR = False
+
+# Health -> colour, per rung state. Unknown is dim, never red: a state the frame
+# has not met before must not read as a failure.
+HEALTHY_STATES = frozenset({"healthy", "idle", "working", "running", "alive", "ok"})
+DEGRADED_STATES = frozenset({"degraded", "stale", "drifted", "suspect", "paused", "stopping"})
+FAILING_STATES = frozenset({"failing", "down", "no-heartbeat", "missing", "dead", "error", "critical"})
+
+
+def enable_color(on: bool) -> None:
+    global _COLOR
+    _COLOR = bool(on)
+
+
+def paint(text: str, code: str) -> str:
+    if not _COLOR:
+        return text
+    return f"{ANSI[code]}{text}{ANSI['reset']}"
+
+
+def state_color(state: str) -> str:
+    if state in FAILING_STATES:
+        return "red"
+    if state in DEGRADED_STATES:
+        return "yellow"
+    if state in HEALTHY_STATES:
+        return "green"
+    return "dim"
+
 
 # --- paths (resolved per call, so a test can redirect the whole tree) --------
 
@@ -60,7 +101,7 @@ def watchdog_log() -> Path:
 
 
 def monitor_heartbeat() -> Path:
-    return FLEET_DIR / "open-eye.heartbeat"
+    return FLEET_DIR / "monitor.heartbeat.json"
 
 
 def rung_log(name: str) -> Path:
@@ -186,6 +227,7 @@ def rungs_snapshot() -> dict:
             "state": state,
             "commit": str((beat or {}).get("commit") or "-"),
             "beat_age": None if age is None else int(age),
+            "started_at": (beat or {}).get("started_at") or None,
         }
     return snapshot
 
@@ -217,6 +259,14 @@ def claims_snapshot() -> list[str]:
     return [line.strip() for line in result.stdout.splitlines() if "held by" in line]
 
 
+def _as_int(value: object) -> int | None:
+    """A value coerced to int, or None — a malformed wave file must not crash the frame."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def wave_plans() -> list[dict]:
     """Every wave plan, lowest parent first."""
     plans: list[dict] = []
@@ -227,7 +277,7 @@ def wave_plans() -> list[dict]:
         plan = read_json(path)
         if plan is not None and "parent" in plan:
             plans.append(plan)
-    plans.sort(key=lambda plan: int(plan.get("parent") or 0))
+    plans.sort(key=lambda plan: _as_int(plan.get("parent")) or 0)
     return plans
 
 
@@ -286,13 +336,43 @@ def events_snapshot(limit: int = 8) -> list[dict]:
     return events
 
 
+def human_duration(seconds: int) -> str:
+    """A compact age: `up 42s` / `up 3m` / `up 1h05m`."""
+    if seconds < 60:
+        return f"up {seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"up {minutes}m"
+    return f"up {minutes // 60}h{minutes % 60:02d}m"
+
+
+def fleet_uptime(rungs: dict, now: str) -> str:
+    """The age of the oldest live rung — how long the fleet has been up."""
+    started = [
+        info.get("started_at")
+        for info in rungs.values()
+        if isinstance(info, dict) and info.get("started_at")
+    ]
+    if not started:
+        return "up ?"
+    try:
+        born = datetime.strptime(min(started), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        current = datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return "up ?"
+    return human_duration(max(0, int((current - born).total_seconds())))
+
+
 def snapshot() -> dict:
     """Everything the frame shows, gathered once. The only part that does I/O."""
+    rungs = rungs_snapshot()
+    now = now_iso()
     return {
         "repo": REPO,
         "head": channel.head_commit(),
-        "now": now_iso(),
-        "rungs": rungs_snapshot(),
+        "now": now,
+        "uptime": fleet_uptime(rungs, now),
+        "rungs": rungs,
         "orders": orders_snapshot(),
         "dispatches": dispatches_snapshot(),
         "claims": claims_snapshot(),
@@ -322,7 +402,7 @@ def header_section(snap: dict) -> str:
     return "\n".join(
         (
             "═" * WIDTH,
-            f"  {snap.get('repo', REPO)} — fleet session · HEAD {snap.get('head', 'unknown')} · {snap.get('now', '')}",
+            f"  {snap.get('repo', REPO)} — fleet session · HEAD {snap.get('head', 'unknown')} · {snap.get('now', '')} · {snap.get('uptime', 'up ?')}",
             "  attach: tmux attach -t fleet      detach: Ctrl-b d      logs: .fleet/<rung>.log",
             "═" * WIDTH,
         )
@@ -334,9 +414,11 @@ def rungs_section(rungs: dict) -> str:
     for name, info in rungs.items():
         pid = info.get("pid")
         age = info.get("beat_age")
+        state = str(info.get("state", "?"))
         beat = "no beat" if age is None else f"beat {age}s ago"
+        state_label = paint(f"{state:<10}", state_color(state))
         body.append(
-            f"  {name:<8} pid {str(pid) if pid else '-':<8} {str(info.get('state', '?')):<10} "
+            f"  {name:<8} pid {str(pid) if pid else '-':<8} {state_label} "
             f"commit {str(info.get('commit', '-')):<10} {beat}"
         )
     return section("RUNGS", body)
@@ -363,16 +445,31 @@ def dispatches_section(dispatches: list[dict]) -> str:
     return section("DISPATCHES (brain \u2192 operator)", body or ["  (no brain acks yet)"])
 
 
+MAX_CLAIMS = 8
+
+
 def claims_section(claims: list[str]) -> str:
-    return section("LIVE CLAIMS", [f"  {truncate(claim, WIDTH - 4)}" for claim in claims] or ["  (none)"])
+    """The live claims, bounded: an unbounded claim list is the one input that
+    can push the frame past the screen, so the tail is summarised instead."""
+    if not claims:
+        return section("LIVE CLAIMS", ["  (none)"])
+    body = [f"  {truncate(claim, WIDTH - 4)}" for claim in claims[:MAX_CLAIMS]]
+    if len(claims) > MAX_CLAIMS:
+        body.append(f"  \u2026 +{len(claims) - MAX_CLAIMS} more claim(s)")
+    return section("LIVE CLAIMS", body)
 
 
 def wave_line(plan: dict, closed: set[int]) -> str:
     """`#219  #232 ✓  #233 ▶  #234 ·` — closed / dispatched / still pending."""
-    dispatched = {int(issue) for issue in plan.get("dispatched") or []}
+    dispatched = {_as_int(issue) for issue in plan.get("dispatched") or []}
+    dispatched.discard(None)
     parts = []
     for child in plan.get("children") or []:
-        issue = int(child.get("issue"))
+        if not isinstance(child, dict):
+            continue
+        issue = _as_int(child.get("issue"))
+        if issue is None:
+            continue
         if issue in closed:
             glyph = GLYPH_CLOSED
         elif issue in dispatched:
@@ -402,12 +499,61 @@ def watchdog_section(lines: list[str]) -> str:
     return section("WATCHDOG", [f"  {truncate(line, WIDTH - 4)}" for line in lines] or ["  (no pass yet)"])
 
 
+def fleet_status(rungs: dict) -> str:
+    """The fleet's single tri-state: any failing rung fails the fleet; else any
+    rung that is not healthy degrades it; else healthy."""
+    states = [str(info.get("state", "?")) for info in rungs.values() if isinstance(info, dict)]
+    if any(state in FAILING_STATES for state in states):
+        return "failing"
+    if any(state not in HEALTHY_STATES for state in states):
+        return "degraded"
+    return "healthy"
+
+
+def wave_progress(plan: dict, closed: set[int]) -> tuple[int, int]:
+    """(done, total) children of one wave — closed or dispatched counts as done."""
+    dispatched = {_as_int(issue) for issue in plan.get("dispatched") or []}
+    dispatched.discard(None)
+    done = 0
+    total = 0
+    for child in plan.get("children") or []:
+        if not isinstance(child, dict):
+            continue
+        issue = _as_int(child.get("issue"))
+        if issue is None:
+            continue
+        total += 1
+        if issue in closed or issue in dispatched:
+            done += 1
+    return done, total
+
+
+def status_line(snap: dict) -> str:
+    """The one-line summary under the header, e.g.
+    `fleet: healthy · 3 rungs · 0 claims · wave #219 2/3 done`."""
+    rungs = snap.get("rungs") or {}
+    status = fleet_status(rungs)
+    n_claims = len(snap.get("claims") or [])
+    waves = snap.get("waves") or []
+    closed = {int(issue) for issue in snap.get("closed") or []}
+    wave = ""
+    if waves:
+        done, total = wave_progress(waves[0], closed)
+        wave = f" · wave #{waves[0].get('parent', '?')} {done}/{total} done"
+    return f"fleet: {status} · {len(rungs)} rungs · {n_claims} claims{wave}"
+
+
 def render(snap: dict) -> str:
     """The whole frame. Pure: everything it needs is already in `snap`."""
     closed = {int(issue) for issue in snap.get("closed") or []}
+    summary = status_line(snap)
+    if _COLOR:
+        status = fleet_status(snap.get("rungs") or {})
+        summary = summary.replace(f"fleet: {status}", f"fleet: {paint(status, state_color(status))}", 1)
     return "\n".join(
         (
             header_section(snap),
+            "  " + summary,
             rungs_section(snap.get("rungs") or {}),
             orders_section(snap.get("orders") or {}),
             dispatches_section(snap.get("dispatches") or []),
@@ -430,16 +576,30 @@ def _request_stop(signum: int, frame: object) -> None:
 
 
 def refresh_loop(interval: float = REFRESH_SECONDS) -> int:
-    """Redraw until interrupted; each frame clears the screen before it draws."""
-    while not _stop:
-        sys.stdout.write("\033[2J\033[H" + render(snapshot()) + "\n")
-        sys.stdout.flush()
-        # Sleep in one-second slices so SIGINT/SIGTERM is honoured immediately
-        # instead of after a whole refresh interval.
-        for _ in range(max(1, int(interval))):
-            if _stop:
-                break
-            time.sleep(1)
+    """Redraw until interrupted.
+
+    Non-flickering: the alternate screen is entered once, and each frame homes
+    the cursor and erases only what is left below it, so a shorter frame does
+    not blank-and-redraw the whole terminal. The previous screen is restored on
+    exit, and colour is on only when stdout is a real TTY.
+    """
+    enable_color(sys.stdout.isatty())
+    out = sys.stdout
+    out.write("\033[?1049h\033[?25l")  # alternate screen + hide cursor
+    out.flush()
+    try:
+        while not _stop:
+            out.write("\033[H" + render(snapshot()) + "\n\033[J")
+            out.flush()
+            # Sleep in one-second slices so SIGINT/SIGTERM is honoured
+            # immediately instead of after a whole refresh interval.
+            for _ in range(max(1, int(interval))):
+                if _stop:
+                    break
+                time.sleep(1)
+    finally:
+        out.write("\033[?25h\033[?1049l")  # show cursor + leave alternate screen
+        out.flush()
     return 0
 
 
@@ -455,6 +615,7 @@ def main(argv: list[str] | None = None) -> int:
     fit_width()
     signal.signal(signal.SIGTERM, _request_stop)
     signal.signal(signal.SIGINT, _request_stop)
+    enable_color(sys.stdout.isatty())
     if args.once:
         print(render(snapshot()))
         return 0

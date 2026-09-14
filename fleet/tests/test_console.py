@@ -23,6 +23,7 @@ def _snap(**overrides):
         "repo": "kushin77/agent-orchestrator",
         "head": "8d9c219",
         "now": "2026-09-13T21:49:12Z",
+        "uptime": "up 3m",
         "rungs": {
             "brain": {"pid": 42, "state": "idle", "commit": "8d9c219", "beat_age": 3},
             "sister": {"pid": 43, "state": "working", "commit": "8d9c219", "beat_age": 1},
@@ -193,7 +194,7 @@ def test_snapshot_carries_every_key_and_survives_an_empty_fleet(monkeypatch):
     monkeypatch.setattr(console, "closed_issues", lambda **kwargs: set())
     snap = console.snapshot()
     assert set(snap) == {
-        "repo", "head", "now", "rungs", "orders", "dispatches",
+        "repo", "head", "now", "uptime", "rungs", "orders", "dispatches",
         "claims", "waves", "closed", "events", "watchdog",
     }
     assert set(snap["rungs"]) == {"brain", "sister", "monitor"}
@@ -231,7 +232,7 @@ def test_main_once_prints_exactly_one_frame(monkeypatch, capsys):
     assert "\033[2J" not in out, "--once is the non-interactive frame; it does not clear a screen"
 
 
-def test_refresh_loop_clears_before_every_frame_and_stops_cleanly(monkeypatch, capsys):
+def test_refresh_loop_redraws_without_flicker_and_stops_cleanly(monkeypatch, capsys):
     frames = {"n": 0}
 
     def counting_snapshot():
@@ -243,7 +244,10 @@ def test_refresh_loop_clears_before_every_frame_and_stops_cleanly(monkeypatch, c
     monkeypatch.setattr(console, "_stop", False)
     monkeypatch.setattr(console, "snapshot", counting_snapshot)
     assert console.refresh_loop(interval=1) == 0
-    assert capsys.readouterr().out.count("\033[2J") == 2
+    out = capsys.readouterr().out
+    assert out.count("\033[H") == 2, "one home sequence before each frame"
+    assert "\033[?1049h" in out and "\033[?1049l" in out, "alternate screen entered and left"
+    assert "\033[?25l" in out and "\033[?25h" in out, "cursor hidden during redraw and restored"
 
 
 def test_the_stop_handler_reacts_to_ctrl_c_and_sigterm(monkeypatch):
@@ -251,3 +255,51 @@ def test_the_stop_handler_reacts_to_ctrl_c_and_sigterm(monkeypatch):
         monkeypatch.setattr(console, "_stop", False)
         console._request_stop(signum, None)
         assert console._stop is True
+
+
+# --- the status summary + colour --------------------------------------------
+
+
+def test_fleet_status_is_the_worst_of_the_rungs():
+    assert console.fleet_status({"a": {"state": "healthy"}, "b": {"state": "working"}}) == "healthy"
+    assert console.fleet_status({"a": {"state": "healthy"}, "b": {"state": "stale"}}) == "degraded"
+    assert console.fleet_status({"a": {"state": "healthy"}, "b": {"state": "down"}}) == "failing"
+    assert console.fleet_status({}) == "healthy"
+
+
+def test_status_line_summarizes_the_fleet():
+    line = console.status_line(_snap())
+    assert "fleet: healthy" in line
+    assert "3 rungs" in line
+    assert "1 claims" in line
+    assert "wave #219 2/2 done" in line  # 232 closed + 233 dispatched
+
+
+def test_state_color_maps_the_four_health_bands():
+    assert console.state_color("healthy") == "green"
+    assert console.state_color("degraded") == "yellow"
+    assert console.state_color("failing") == "red"
+    assert console.state_color("mystery") == "dim"
+
+
+def test_paint_is_a_no_op_until_color_is_enabled(monkeypatch):
+    monkeypatch.setattr(console, "_COLOR", False)
+    assert console.paint("healthy", "green") == "healthy"
+    console.enable_color(True)
+    assert console.paint("healthy", "green") == "\033[32mhealthy\033[0m"
+    console.enable_color(False)
+    assert console.paint("healthy", "green") == "healthy"
+
+
+def test_render_emits_no_ansi_by_default(monkeypatch):
+    monkeypatch.setattr(console, "_COLOR", False)
+    assert "\033[" not in console.render(_snap())
+
+
+def test_claims_section_bounds_a_long_claim_list():
+    claims = [f"#1 held by a{i}" for i in range(30)]
+    body = console.claims_section(claims)
+    assert "#1 held by a0" in body
+    assert "#1 held by a7" in body
+    assert "#1 held by a8" not in body
+    assert "+22 more claim(s)" in body

@@ -414,14 +414,16 @@ subcommands are reachable from the control plane:
 every 20s and appends one timestamped line to `.fleet/open-eye.log` only when
 the fleet's observable state changed since the previous tick — sister/brain
 state, held claims, the wave dispatch list and git HEAD — and rewrites
-`.fleet/open-eye.heartbeat` with its own liveness line every tick. It exits
-cleanly on SIGTERM, and the watchdog restarts it whenever it is missing, so
-the monitor is durable and self-healing rather than a one-off runtime script.
+`.fleet/monitor.heartbeat.json` with a JSON liveness beat (`pid`, `state`,
+`commit`, `ts`) every tick, in the same shape the brain and sister publish, so
+the console reads all three rungs with one code path. It exits cleanly on
+SIGTERM, and the watchdog restarts it whenever it is missing, so the monitor
+is durable and self-healing rather than a one-off runtime script.
 
 ```bash
-python3 fleet/monitor.py        # the resident monitor (normally started by the watchdog)
-tail -f .fleet/open-eye.log     # the change-only progress log
-cat .fleet/open-eye.heartbeat   # the monitor's liveness marker
+python3 fleet/monitor.py              # the resident monitor (normally started by the watchdog)
+tail -f .fleet/open-eye.log           # the change-only progress log
+cat .fleet/monitor.heartbeat.json     # the monitor's liveness beat (JSON)
 ```
 
 All monitor output lives under the gitignored `.fleet/` directory; the module

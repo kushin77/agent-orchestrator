@@ -333,12 +333,18 @@ def live_layout() -> list[list[str]]:
 
     Pure construction, so `--dry-run` can print exactly what would run and the
     tests can assert the layout without a tmux server or an attached terminal.
+
+    The layout is one pane per surface: the summary dashboard (the console), the
+    three rung capture logs, and the audit stream (the slog) — everything the
+    single-pane-of-glass summarizes, with a status bar naming the session.
     """
     return [
         ["tmux", "new-session", "-d", "-s", SESSION, "-n", "dashboard", "python3", "fleet/console.py"],
         ["tmux", "new-window", "-t", SESSION, "-n", "brain", "tail", "-f", ".fleet/brain.log"],
         ["tmux", "new-window", "-t", SESSION, "-n", "sister", "tail", "-f", ".fleet/sister.log"],
         ["tmux", "new-window", "-t", SESSION, "-n", "monitor", "tail", "-f", ".fleet/monitor.log"],
+        ["tmux", "new-window", "-t", SESSION, "-n", "events", "tail", "-f", ".fleet/slog.jsonl"],
+        ["tmux", "set-option", "-t", SESSION, "status-right", "fleet · 3 rungs · dashboard"],
         ["tmux", "select-window", "-t", f"{SESSION}:dashboard"],
     ]
 
@@ -361,6 +367,11 @@ def _attach() -> int:
 def cmd_live(args: argparse.Namespace) -> int:
     """Ensure the rungs are up, then put the operator in front of the live fleet."""
     logs = ensure_logs()
+    # The events window tails the audit stream; create it so `tail -f` has a
+    # file to follow even before the first directive is written.
+    slog = ROOT / ".fleet" / "slog.jsonl"
+    slog.parent.mkdir(parents=True, exist_ok=True)
+    slog.touch(exist_ok=True)
     layout = live_layout()
     if args.dry_run:
         print(f"fleet live --dry-run — the tmux session this would build (rung logs: {logs[0].parent}):")

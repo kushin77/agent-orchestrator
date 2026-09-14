@@ -12,9 +12,11 @@ missing — so the monitor survives a crash or a reboot without a human.
 It polls every ``POLL_SECONDS`` and appends ONE timestamped line to
 ``.fleet/open-eye.log`` only when the observable state changed since the previous
 tick (sister/brain state, held claims, wave dispatch list, git HEAD). Every tick
-it rewrites ``.fleet/open-eye.heartbeat`` with its own liveness line. It exits
-cleanly on SIGTERM/SIGINT. Runtime output lives entirely under the gitignored
-``.fleet/`` directory; this module itself is tracked.
+it rewrites ``.fleet/monitor.heartbeat.json`` with a JSON liveness beat in the
+same shape the brain and sister publish (``pid``, ``state``, ``commit``, ``ts``),
+so the dashboard's RUNGS row reads the monitor the same way it reads its sibling
+rungs. It exits cleanly on SIGTERM/SIGINT. Runtime output lives entirely under
+the gitignored ``.fleet/`` directory; this module itself is tracked.
 """
 
 from __future__ import annotations
@@ -31,7 +33,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FLEET_DIR = ROOT / ".fleet"
 LOG = FLEET_DIR / "open-eye.log"
-HEARTBEAT = FLEET_DIR / "open-eye.heartbeat"
+# The monitor's liveness, in the same JSON shape the brain/sister rungs publish:
+# `fleet/console.py` reads exactly this path as the monitor row's beat.
+HEARTBEAT = FLEET_DIR / "monitor.heartbeat.json"
 WAVES_DIR = FLEET_DIR / "waves"
 SISTER_HEARTBEAT = FLEET_DIR / "sister.heartbeat.json"
 BRAIN_HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
@@ -42,6 +46,28 @@ _stop = False
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def write_heartbeat(*, started_at: str, commit: str) -> None:
+    """Publish the monitor's liveness as a JSON beat (brain/sister shape).
+
+    Written atomically (tmp + rename) so a reader never sees a half-written
+    beat, and in JSON so `fleet/console.py` reads it with the same code path as
+    the other rungs — the plain-text `open-eye.heartbeat` this replaced was
+    unparseable as JSON, which is why the dashboard printed `monitor
+    no-heartbeat` while the monitor was alive.
+    """
+    entry = {
+        "pid": os.getpid(),
+        "state": "healthy",
+        "started_at": started_at,
+        "commit": commit,
+        "ts": now_iso(),
+    }
+    HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
+    tmp = HEARTBEAT.with_suffix(".tmp")
+    tmp.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+    tmp.replace(HEARTBEAT)
 
 
 def _heartbeat_state(path: Path) -> str:
@@ -121,11 +147,13 @@ def _request_stop(signum: int, frame: object) -> None:
 
 def run() -> int:
     FLEET_DIR.mkdir(parents=True, exist_ok=True)
+    started_at = now_iso()
     # The monitor's stdout is captured to `.fleet/monitor.log` by whoever spawns
     # it (the watchdog, or `control.py`), and that is what the `monitor` window in
     # the `fleet` tmux session tails. Without these two prints the capture would be
     # an empty file that looks like a dead rung.
     print(f"[monitor] up {now_iso()} pid={os.getpid()} poll={POLL_SECONDS}s log={LOG}", flush=True)
+    write_heartbeat(started_at=started_at, commit=git_head())
     last: str | None = None
     while not _stop:
         current = snapshot()
@@ -135,7 +163,7 @@ def run() -> int:
                 fh.write(f"{stamp} {current}\n")
             print(f"[monitor] {stamp} {current}", flush=True)
             last = current
-        HEARTBEAT.write_text(f"{stamp} alive pid={os.getpid()}\n", encoding="utf-8")
+        write_heartbeat(started_at=started_at, commit=git_head())
         # Sleep in small slices so a SIGTERM is honoured within a second.
         for _ in range(POLL_SECONDS):
             if _stop:
