@@ -32,11 +32,15 @@ import yaml
 
 from telemetry.budgets.ledger import SpendLedger
 from telemetry.budgets.model import (
+    CAP_HARD,
+    CAP_SOFT,
+    CAPS,
     DECISION_ALLOW,
     DECISION_BLOCK,
     DECISION_WARN,
     DECISION_WOULD_BLOCK,
     DECISION_WOULD_WARN,
+    DEFAULT_ALERT_AT_PCT,
     EnforcerDecision,
     KIND_BUDGET,
     MODE_ENFORCE,
@@ -56,11 +60,21 @@ DEFAULT_WARN_AT_PCT = 0.8
 
 @dataclass(frozen=True)
 class BudgetLimit:
-    """One limit (cost USD or token count) over one window."""
+    """One limit (cost USD or token count) over one window.
+
+    ``cap`` is the cap semantics: ``hard`` (the default — reaching the limit
+    refuses the call in enforce mode) or ``soft`` (the limit is an advisory
+    target: reaching it warns and alerts, but never refuses). Existing policies
+    declare no ``cap`` and therefore keep their hard-cap behaviour unchanged.
+    ``alert_at_pct`` is the alert threshold (default: the limit itself); it may
+    not sit below ``warn_at_pct``.
+    """
 
     window: str  # day | month
     limit: float  # USD or tokens
     warn_at_pct: float = DEFAULT_WARN_AT_PCT
+    cap: str = CAP_HARD
+    alert_at_pct: float = DEFAULT_ALERT_AT_PCT
 
     def __post_init__(self) -> None:
         if self.window not in WINDOWS:
@@ -69,17 +83,35 @@ class BudgetLimit:
             raise ValueError("budget limit must be positive")
         if not 0.0 < self.warn_at_pct <= 1.0:
             raise ValueError("warnAtPct must be in (0, 1]")
+        if self.cap not in CAPS:
+            raise ValueError(f"unknown cap semantics: {self.cap!r}")
+        if self.alert_at_pct <= 0.0:
+            raise ValueError("alertAtPct must be positive")
+        if self.alert_at_pct < self.warn_at_pct:
+            raise ValueError("alertAtPct must be at or above warnAtPct")
 
     @property
     def warn_at(self) -> float:
         """The absolute threshold at which a call is flagged warn."""
         return self.warn_at_pct * self.limit
 
+    @property
+    def alert_at(self) -> float:
+        """The absolute threshold at which a spend alert fires (a breach)."""
+        return self.alert_at_pct * self.limit
+
+    @property
+    def soft(self) -> bool:
+        """True when this limit is an advisory target (never refuses a call)."""
+        return self.cap == CAP_SOFT
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "window": self.window,
             "limit": round(self.limit, 8),
             "warnAtPct": self.warn_at_pct,
+            "alertAtPct": self.alert_at_pct,
+            "cap": self.cap,
         }
 
 
@@ -96,6 +128,8 @@ class VendorBudgetCap:
     window: str = "month"
     limit_usd: float = 0.0
     warn_at_pct: float = DEFAULT_WARN_AT_PCT
+    cap: str = CAP_HARD
+    alert_at_pct: float = DEFAULT_ALERT_AT_PCT
 
     def __post_init__(self) -> None:
         if not self.vendor:
@@ -107,6 +141,12 @@ class VendorBudgetCap:
             raise ValueError("vendor cap limit must be positive")
         if not 0.0 < self.warn_at_pct <= 1.0:
             raise ValueError("warnAtPct must be in (0, 1]")
+        if self.cap not in CAPS:
+            raise ValueError(f"unknown cap semantics: {self.cap!r}")
+        if self.alert_at_pct <= 0.0:
+            raise ValueError("alertAtPct must be positive")
+        if self.alert_at_pct < self.warn_at_pct:
+            raise ValueError("alertAtPct must be at or above warnAtPct")
 
     @property
     def limit(self) -> float:
@@ -117,12 +157,24 @@ class VendorBudgetCap:
     def warn_at(self) -> float:
         return self.warn_at_pct * self.limit_usd
 
+    @property
+    def alert_at(self) -> float:
+        """The absolute threshold at which this vendor's alert fires."""
+        return self.alert_at_pct * self.limit_usd
+
+    @property
+    def soft(self) -> bool:
+        """True when this cap is an advisory target (never refuses a call)."""
+        return self.cap == CAP_SOFT
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "vendor": self.vendor,
             "window": self.window,
             "limitUsd": round(self.limit_usd, 8),
             "warnAtPct": self.warn_at_pct,
+            "alertAtPct": self.alert_at_pct,
+            "cap": self.cap,
         }
 
 
@@ -188,6 +240,10 @@ def load_budget_policies(path: Path = DEFAULT_POLICY_CONFIG) -> Dict[str, Tenant
                     window=str(cap.get("window") or "month"),
                     limit_usd=float(cap.get("limitUsd") or 0.0),
                     warn_at_pct=float(cap.get("warnAtPct") or DEFAULT_WARN_AT_PCT),
+                    cap=str(cap.get("cap") or CAP_HARD),
+                    alert_at_pct=float(
+                        cap.get("alertAtPct") or DEFAULT_ALERT_AT_PCT
+                    ),
                 )
             )
         cost = entry.get("cost") or {}
@@ -207,7 +263,8 @@ def _parse_limit(block: Mapping[str, Any], path: Path, label: str) -> Optional[B
 
     ``cost`` limits default to the monthly window; ``tokens`` limits are
     daily (the metering feed's daily token budget, issue #33) — both are the
-    windows the durable ledger can actually measure.
+    windows the durable ledger can actually measure.  ``cap`` selects the cap
+    semantics (``hard`` when absent, so shipped policies are unchanged).
     """
     if not block:
         return None
@@ -224,6 +281,10 @@ def _parse_limit(block: Mapping[str, Any], path: Path, label: str) -> Optional[B
         window=window,
         limit=float(limit),
         warn_at_pct=float(block.get("warnAtPct") or DEFAULT_WARN_AT_PCT),
+        cap=str(block.get("cap") or CAP_HARD),
+        alert_at_pct=float(
+            block.get("alertAtPct") or DEFAULT_ALERT_AT_PCT
+        ),
     )
 
 
@@ -395,6 +456,37 @@ class BudgetEnforcer:
             else f"budget.{kind_code}"
         )
         if projected >= limit_value:
+            if limit.soft:
+                # A SOFT cap is a target, not a limit: crossing it is reported
+                # (warn / would_warn) and the alert feed carries the breach,
+                # but the call is never refused — the tenant may overrun.
+                soft_decision = (
+                    DECISION_WARN
+                    if policy.mode == MODE_ENFORCE
+                    else DECISION_WOULD_WARN
+                )
+                return EnforcerDecision(
+                    tenant_id=tenant_id,
+                    kind=KIND_BUDGET,
+                    decision=soft_decision,
+                    reason=(
+                        f"{'enforce' if policy.mode == MODE_ENFORCE else 'observe'}: "
+                        f"projected {requested_label}={projected:.6g} >= "
+                        f"soft cap {limit_value:.6g} ({code_base}) — advisory, "
+                        "never refuses the call"
+                    ),
+                    code=f"{code_base}.soft_exceeded",
+                    agent_id=agent_id,
+                    vendor=vendor_name or vendor,
+                    model=model,
+                    window=limit.window,
+                    current=current,
+                    requested=requested,
+                    limit=limit_value,
+                    warn_at=warn_at,
+                    mode=policy.mode,
+                    cap=limit.cap,
+                )
             decision, code_suffix = (
                 (DECISION_BLOCK, "exceeded")
                 if policy.mode == MODE_ENFORCE
@@ -419,6 +511,7 @@ class BudgetEnforcer:
                 limit=limit_value,
                 warn_at=warn_at,
                 mode=policy.mode,
+                cap=limit.cap,
                 outcome=OUTCOME_BUDGET_EXCEEDED if decision == DECISION_BLOCK else None,
             )
         if projected >= warn_at:
@@ -443,6 +536,7 @@ class BudgetEnforcer:
                 limit=limit_value,
                 warn_at=warn_at,
                 mode=policy.mode,
+                cap=limit.cap,
             )
         return EnforcerDecision(
             tenant_id=tenant_id,
@@ -459,6 +553,7 @@ class BudgetEnforcer:
             limit=limit_value,
             warn_at=warn_at,
             mode=policy.mode,
+            cap=limit.cap,
         )
 
 

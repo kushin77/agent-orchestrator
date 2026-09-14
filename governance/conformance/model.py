@@ -34,6 +34,14 @@ CODE_IAC_MANDATE_UNMET = "iac-mandate-unmet"
 CODE_POLICY_INVALID = "policy-invalid"
 CODE_DEPENDENCY_MISSING = "dependency-missing"
 
+# -- filing-path codes (issue #320) -------------------------------------------
+# A filing that cannot derive its declaring labels is REFUSED before `gh` runs,
+# so these codes describe a filing *seam* defect, not a board defect: they are
+# raised before an issue can exist, which is the point (prevention, not repair —
+# repairing the legacy unclassified issues is #174's job).
+CODE_FILING_REFUSED = "filing-refused"
+CODE_FILING_SEAM_BYPASSED = "filing-seam-bypassed"
+
 MANDATE_IAC = "iac"
 
 
@@ -74,11 +82,34 @@ class Policy:
     expectations: Mapping[str, Tuple[str, ...]]
     prefixed: Tuple[str, ...]
     infra_paths: Tuple[str, ...]
+    # The `filing` block: what a NEW issue derives when the filing path does not
+    # declare it. Empty means nothing is derivable, and a filing that declares no
+    # class is then refused rather than filed unclassified (issue #320).
+    filing_default_class: str = ""
+    filing_defaults: Mapping[str, str] = field(default_factory=dict)
     strictable: bool = True
 
     @property
     def allowed_classes(self) -> FrozenSet[str]:
         return frozenset(self.ladder)
+
+    def filing_label_names(self, declared_class: str) -> Tuple[str, ...]:
+        """Every label a filing must carry, in declaration order.
+
+        `class` first, then the policy's `required` companions (`type`,
+        `priority`, `area`), then the expectations the declared class adds
+        (`gdc` at enterprise, `gdc`+`pillar` at elite). Deriving the set here —
+        rather than listing labels in the caller — is what makes "no path can file
+        an unclassified issue" a property of the policy instead of a convention.
+        """
+        names = ["class"]
+        for name in self.required:
+            if name not in names:
+                names.append(name)
+        for name in self.expectations_for(declared_class):
+            if name not in names:
+                names.append(name)
+        return tuple(names)
 
     def rank(self, name: str) -> int:
         """Position on the ladder; ``-1`` when the name is not a rung."""
@@ -100,6 +131,10 @@ class Policy:
             "expectations": {k: list(v) for k, v in self.expectations.items()},
             "prefixed": list(self.prefixed),
             "infra_paths": list(self.infra_paths),
+            "filing": {
+                "default_class": self.filing_default_class,
+                "defaults": dict(self.filing_defaults),
+            },
         }
 
 

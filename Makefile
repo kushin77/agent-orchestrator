@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy knowledge-index knowledge-index-build cross-reference paperclip-gap-analysis paperclip-integration \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -69,7 +69,12 @@ help:
 	@echo "                are declared and map onto the shipped channel"
 
 	@echo "  fleet-runbook  Bootstrap runbook gate (M26 #166): the only human step"
-	@echo "                is the model switch, and the recovery paths stay documented"
+	@echo "                is the model switch, and the recovery paths stay documented;"
+	@echo "                also provokes each capability-drift case (#319)"
+
+	@echo "  capability-drift  Capability drift (#319): report the capabilities each"
+	@echo "                running rung does NOT implement, naming every one (a control"
+	@echo "                that shipped but is not live is a silently absent control)"
 
 	@echo "  session-isolation  Lane isolation (M26 #263): one session identity per"
 	@echo "                issue, its own worktree on issue-<n>, a worktree-scoped"
@@ -89,6 +94,9 @@ help:
 	@echo "                milestoned issue classified; mandates checked on the diff"
 	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
 	@echo "                RCA, every action recorded, every lesson evidenced"
+	@echo "  fleet-state   Unified fleet-state projection (#323): lanes + sessions +"
+	@echo "                claims + journals + directives joined per item; exits"
+	@echo "                non-zero when anything is orphaned, shelved or wedged"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  worktrees     Reclaim stale lane worktrees (dry run; --apply via"
 	@echo "                scripts/prune-worktrees.sh). Keeps dirty, in-use and"
@@ -107,7 +115,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -187,10 +195,19 @@ fleet-contract:
 
 ## fleet-runbook — session-fleet bootstrap runbook gate (M26, issue #166): the
 ## only human step is the model switch, and the recovery paths (claim TTL
-## take-over, mailbox backlog, dispatcher rc=2) stay documented; the check
+## take-over, mailbox backlog, dispatcher rc=2) stay documented; capability
+## drift (#319) adds the restart step and a provoked report per case; the check
 ## mutates its own input, so it cannot pass vacuously
 fleet-runbook:
 	@bash scripts/check-fleet-runbook.sh
+
+## capability-drift — the capabilities each running rung does not implement
+## (#319): the repository declares the set its code provides in
+## fleet/channel.py, each rung declares its own in its beat, and this report
+## names every declared capability a rung is missing — a rung on HEAD that is
+## missing one is NOT repairable by a restart
+capability-drift:
+	@python3 fleet/watchdog.py capabilities
 
 
 ## session-isolation — institutional lane isolation (issue #263): a session
@@ -235,6 +252,16 @@ lease-policy:
 ## mutates its own input, so it cannot pass vacuously
 paperclip-gap-analysis:
 	@bash scripts/check-paperclip-gap-analysis.sh
+
+
+## fleet-state — unified fleet-state projection (issue #323): one read-only
+## command joins lanes, session heartbeats, closure journals, claims and
+## authorisation directives per work item, exits non-zero when anything is
+## orphaned, shelved or wedged, and reports a disagreement between two stores
+## instead of silently resolving it; the gate exercises one fixture item in each
+## state and provokes the failure path, so the projection cannot pass vacuously
+fleet-state:
+	@bash scripts/check-fleet-state.sh
 
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):

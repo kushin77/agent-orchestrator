@@ -456,21 +456,110 @@ def dispatch(order: dict) -> tuple[bool, str]:
 
 WAVES = FLEET_DIR / "waves"
 
+# -- the filing seam (issue #320) --------------------------------------------
+# Every issue the brain files goes through `governance/conformance/filing.py`,
+# which derives the declaring labels from the conformance policy and REFUSES a
+# filing that cannot derive them — so the brain can no longer create an issue the
+# conformance gate rejects afterwards (`governance/lifecycle`'s
+# `FILING_LABELS_MISSING` only *detects* that result; #174 repairs the legacy
+# issues that were filed unclassified, this issue prevents the next one).
+CONFORMANCE_DIR = ROOT / "governance" / "conformance"
+CONFORMANCE_POLICY = CONFORMANCE_DIR / "policy.yaml"
+REPO = "kushin77/agent-orchestrator"
+# Child-spec keys a decomposition may declare explicitly. Anything it leaves out is
+# derived from the policy, which is what keeps the labels out of this module.
+DECLARING_KEYS = ("class", "type", "priority", "area", "gdc", "pillar")
 
-def gh_issue_create(title: str, body: str) -> int:
-    """File a micro-task child issue; returns its number, or raises on failure."""
-    result = subprocess.run(
-        ["gh", "issue", "create", "--repo", "kushin77/agent-orchestrator", "--title", title, "--body", body],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
+
+def _conformance():
+    """Load the conformance policy loader and the filing seam (issue #320).
+
+    `governance/conformance` uses flat sibling imports by repo convention (`filing`
+    imports `model`), and this process already has *another* `model` importable:
+    `governance/dispatch/model.py`, which this module put on `sys.path`. Resolving
+    the package's flat names against that one would make the seam import the wrong
+    model, so the conformance directory goes first, the flat names are taken for the
+    duration of the load, and every name the process already had is restored
+    afterwards — the filing seam must not depend on, or change, the brain's import
+    order. The result is cached, so `FilingRefused` keeps one identity per process
+    (a caller must be able to catch the refusal the seam raised).
+    """
+    global _CONFORMANCE
+    if _CONFORMANCE:
+        return _CONFORMANCE
+
+    directory = str(CONFORMANCE_DIR)
+    flat_names = ("model", "checker", "filing")
+    added = directory not in sys.path
+    stash = {name: sys.modules.pop(name) for name in flat_names if name in sys.modules}
+    if added:
+        sys.path.insert(0, directory)
+    try:
+        import checker  # noqa: PLC0415 - imported after the path and names are clear
+        import filing  # noqa: PLC0415
+
+        loaded = (checker, filing)
+    finally:
+        if added and directory in sys.path:
+            sys.path.remove(directory)
+        for name in flat_names:
+            sys.modules.pop(name, None)
+        sys.modules.update(stash)
+    _CONFORMANCE = loaded
+    return loaded
+
+
+_CONFORMANCE: tuple = ()
+
+
+def _filing_exception() -> type:
+    """`filing.FilingRefused` from the cached seam (see `_conformance`)."""
+    return _conformance()[1].FilingRefused
+
+
+def gh_issue_create(
+    title: str, body: str, declaring: dict | None = None
+) -> int:
+    """File a micro-task child issue; returns its number.
+
+    The declaring labels are *derived* from `governance/conformance/policy.yaml`
+    through the single filing seam (issue #320): the caller may name a class or a
+    companion, but anything it leaves out comes from the policy's `filing` block, and
+    a filing that cannot derive a required label is REFUSED (`FilingRefused`) before
+    `gh` runs — nothing is filed, so nothing has to be repaired later (#174 owns the
+    legacy repair; prevention is this issue's).
+
+    Raises `RuntimeError` when `gh` itself fails, as before.
+    """
+    checker, filing = _conformance()
+    try:
+        policy = checker.load_policy(CONFORMANCE_POLICY)
+    except checker.PolicyUnavailable as exc:
+        raise filing.FilingRefused(
+            "the conformance policy %s cannot be read: %s" % (CONFORMANCE_POLICY, exc)
+        ) from exc
+
+    declared = dict(declaring or {})
+    request = filing.FilingRequest(
+        title=title,
+        body=body,
+        repo=REPO,
+        declared_class=str(declared.pop("class", "") or ""),
+        declaring=declared,
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"gh issue create failed: {result.stderr.strip()[-400:]}")
-    match = re.search(r"/issues/(\d+)", result.stdout)
-    if not match:
-        raise RuntimeError(f"gh issue create returned no issue number: {result.stdout.strip()}")
-    return int(match.group(1))
+    return int(filing.file_issue(request, policy).number)
+
+
+def file_child_issue(title: str, body: str, declaring: dict) -> int:
+    """File one decomposed child through the seam.
+
+    A child spec that declares nothing extra calls the seam with no override at all,
+    so the policy alone decides the labels; a spec that declares a class or a
+    companion states only that and has the rest derived.
+    """
+    if declaring:
+        return gh_issue_create(title, body, declaring=declaring)
+    return gh_issue_create(title, body)
 
 
 def decompose_problem(spec: object) -> str | None:
@@ -522,7 +611,17 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
             f"Lane: {lane}\n\nFiles: {files}\n\nVerify: `{verify}`\n\n"
             f"Micro-task {index} of #{parent} (decomposed by the brain, pmo-sme discipline)."
         )
-        number = gh_issue_create(title, body)
+        # Whatever this child does not declare is derived from the conformance
+        # policy, so a decomposition cannot file an unclassified issue (issue #320).
+        declaring = {
+            key: str(child[key]) for key in DECLARING_KEYS if child.get(key)
+        }
+        try:
+            number = file_child_issue(title, body, declaring)
+        except _filing_exception() as exc:
+            # An explicit refusal, reported to the operator, is the whole point: the
+            # alternative is filing an issue the conformance gate rejects later.
+            return False, exc.loud_message
         plan["children"].append(
             {
                 "index": index,
