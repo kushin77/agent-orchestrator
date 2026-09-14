@@ -229,6 +229,62 @@ The ledger is append-only by construction; a tampered, deleted or reordered
 record — or a truncated tail — is a hard `AuditLogIntegrityError` on reopen /
 `verify`. Schema: [`audit.schema.json`](audit.schema.json).
 
+## The outbound half — servers this platform calls (issue #641)
+
+Everything above is the **inbound** gateway: this platform *serving* its
+declared tools to external agents. Issue #641 (workbook-10) adds the other
+direction — the platform managing the third-party MCP servers its **own**
+agents call. The two halves share the enforcement vocabulary (closed
+allowlist, injected authorization seam, append-only hash-chained audit) and
+share **no state**: an outbound call is audited in its own ledger with its own
+closed event kinds, and an inbound tool id can never resolve to an outbound
+server (conflating them would let a server the platform *calls* masquerade as
+a capability the platform *serves*).
+
+[`outbound.py`](outbound.py) + [`outbound.config.json`](outbound.config.json)
+declare each server by **id**, and a caller names that id — never a raw URL —
+so an endpoint move is a config change and not a prompt rewrite. This is what
+the CTO prompt module's reference resolves to:
+
+| Declared per server | What it means |
+|---|---|
+| `id` | The stable server id callers reference (the seeded entry is `drawio`). |
+| `endpoint` | Declared transport. **Never accepted from a caller**: a supplied endpoint is refused (`endpoint_override`), not honoured — a call cannot be redirected at another host. |
+| `pinnedVersion` | The exact version this platform speaks. A request for any other version is refused (`pin_violation`), and so is a server that *answers* off-pin — there is no floating fallback. |
+| `authzScope` | The permission a session must hold (`mcp:outbound`, distinct from the inbound `tool:call`), checked through the same `PermissionGuard`. |
+| `enabled` | The per-entry flag. Every seeded entry ships **OFF**. |
+
+Every attempt — allowed or refused — appends exactly one record
+to an [`OutboundAuditLog`](outbound.py) (`mcp_outbound_call` /
+`mcp_outbound_denied`), chained with the same helpers as the inbound ledger so
+both are verifiable by one piece of code.
+
+### Flag-gated OFF (two independent decisions)
+
+The registry-level flag is `AO_MCP_OUTBOUND_ENABLED`, declared in this module
+(not in the shared feature-flag registry — an outbound server is gateway/mcp's
+own declaration) and **compiled OFF** (`DEFAULT_OUTBOUND_ENABLED = False`).
+Enabling the deployment and enabling a server are two separate switches, so one
+flag can never widen reach on its own:
+
+```python
+from mcp.outbound import build_registry, DeclaredOfflineProbe
+
+registry = build_registry()          # seeded drawio, registry flag OFF
+assert registry.names() == ["drawio"]
+assert registry.call("drawio", session).status == "disabled"
+```
+
+### Refusal is a value, never a crash
+
+An unreachable server and an off-pin server both return an
+`OutboundOutcome` whose `status` is a member of the closed `OUTBOUND_STATUSES`
+set (`ok` · `disabled` · `unknown_server` · `authz` · `pin_violation` ·
+`unreachable` · `endpoint_override`) with a `reason` naming why. The default
+probe (`DeclaredOfflineProbe`) reports every server unreachable — the honest
+answer with no transport configured, so an unconfigured deployment cannot
+silently look healthy. A deployment injects a real `HealthProbe`.
+
 ## Directory layout
 
 | Path | Purpose |
@@ -248,9 +304,11 @@ record — or a truncated tail — is a hard `AuditLogIntegrityError` on reopen 
 | [`audit.py`](audit.py) | `AuditSink` seam + `HashChainAuditLog` append-only ledger. |
 | [`rategate.py`](rategate.py) | `RateGate` seam + `LimitsRateGate` (consumes gateway/limits). |
 | [`gateway.py`](gateway.py) | `MCPToolGateway`: the enforcement core + JSON-RPC surface. |
+| [`outbound.py`](outbound.py) | **Outbound** registry: servers this platform calls (issue #641) — health, authz, pin, its own audit ledger. |
+| [`outbound.config.json`](outbound.config.json) | The seeded outbound declarations (drawio, flag-gated OFF). |
 | [`cli.py`](cli.py) | Offline CLI (`list-tools`, `demo`). |
 | [`audit.schema.json`](audit.schema.json) | JSON Schema of one audit record. |
-| [`tests/`](tests/) | pytest suite (91 tests incl. every negative). |
+| [`tests/`](tests/) | pytest suite (150 tests incl. every negative). |
 
 ## Usage
 
@@ -343,10 +401,15 @@ catalog vocabularies are not touched by this surface.
 8. **No `NO_DATA` without a reason, and no fake on a live path** (#504,
    AO-GR-19): an absent authority is reported absent, and a `fixture_only`
    source is refused by the catalogue before any read happens.
+9. **Outbound reach is two switches and a pin** (#641): the registry flag *and*
+   the entry flag must both be ON before anything is dialled; a caller may not
+   supply an endpoint; and a version other than the declared pin is refused —
+   as is a server that answers off-pin. A refusal is a returned value with a
+   reason, never a raised exception, and every attempt is audited.
 
-## Verification summary (issues #20, #504)
+## Verification summary (issues #20, #504, #641)
 
-- `python3 -m pytest gateway/mcp/tests -q -p no:cacheprovider` → **91 passed**,
+- `python3 -m pytest gateway/mcp/tests -q -p no:cacheprovider` → **150 passed**.
   covering: tenant-context enforcement + cross-tenant negatives (data + tool +
   explicit-tenant mismatch); unknown-tool rejection; authN failure (bad
   signature / expired / malformed) denied; authZ scope-vs-permission denial via
@@ -363,3 +426,25 @@ catalog vocabularies are not touched by this surface.
   mutation-proved-sensitive refusals).
 - `python3 gateway/mcp/cli.py demo` → **demo: OK (all 19 assertions passed)**.
 - `make verify` → green (see PR evidence).
+
+### Issue #641 — the outbound half
+
+The suite's 29 outbound tests cover: registration + deterministic listing +
+duplicate refusal; the pin mandatory at declaration; health reporting every
+declared server (including unreachable and OFF ones, and one answering
+off-pin); the two independent flags; the seeded config declared OFF with no raw
+URL endpoint; the CTO prompt module's reference resolving to the registered
+server id; the graceful unreachable refusal; the requested-version and
+answered-off-pin refusals; the endpoint-override refusal; authz and
+cross-tenant refusals with their causes; exactly one audit record per call,
+with the closed outbound event vocabulary and chain-tamper detection; and the
+inbound/outbound namespace disjointness.
+
+**Mutation proof** — removing the requested-version pin guard from
+`outbound.py` (`d9ca00af…` → `7a709dd3…`, 247 bytes) fails two tests:
+`test_pin_violation_is_refused_for_a_requested_version`
+(`assert 'ok' == 'pin_violation'`) and
+`test_every_call_appends_exactly_one_audit_record`
+(`assert 'unreachable' == 'pin_violation'`), i.e. **2 failed, 27 passed**.
+Restoring the source returns the byte-identical `d9ca00af…` and the suite to
+**150 passed**.
