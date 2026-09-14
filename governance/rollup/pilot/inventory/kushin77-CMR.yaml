@@ -1,0 +1,32 @@
+# Fleet inventory — kushin77/CMR (pilot, issue #151).
+#
+# The hub/vendor module. Its drift rate is a measured zero (18 checks, 0
+# findings): a zero rate is an assessed rate, not an unassessable one, and the
+# difference is exactly what the tri-state exists to keep.
+schema: ao.rollup/fleet-inventory-v1
+repo: kushin77/CMR
+tenant: kushin77-platform
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: iac-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 300
+    spend_usd: 210.00
+    capacity_hours: 32
+    engaged_hours: 19
+    dispatched: 6
+    closed: 5
+  - id: security-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 320
+    spend_usd: 140.00
+    capacity_hours: 24
+    engaged_hours: 12
+    dispatched: 4
+    closed: 4
+drift:
+  checks: 18
+  findings: 0

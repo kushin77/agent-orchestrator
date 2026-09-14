@@ -1,0 +1,21 @@
+# Org declaration for the missing-inventory provocation (issue #151).
+#
+# The org declares two repos; the fixture's inventory directory holds one. The
+# gate requires the projection to report CANNOT-ASSESS naming the repo whose
+# share of the aggregate is unknown, and never a smaller-but-quiet total.
+schema: ao.rollup/org-v1
+source: declared
+generated_at: 2026-09-13
+
+enterprise:
+  id: fixture-ent
+  name: Roll-up fixture enterprise
+  weekly_spend_ceiling_usd: 600
+
+tenants:
+  - id: alpha
+    name: Alpha tenant
+    weekly_spend_ceiling_usd: 400
+    repos:
+      - fixture/alpha-one
+      - fixture/alpha-present

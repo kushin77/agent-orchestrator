@@ -1,0 +1,54 @@
+# Fleet inventory — kushin77/agent-orchestrator (pilot, issue #151).
+#
+# One repo's fleet facts for one window. Four SMEs are declared, three of them
+# re-declared in sibling repos (security-sme also runs in kushin77/CMR, qa-sme
+# in kushin77/shared-frontend and kushin77/leaderboard, platform-sme in
+# kushin77/leaderboard): their rolled-up identity is `repo#id`, so one repo's
+# spend can never hide inside another's total.
+#
+# `platform-sme` sits exactly ON its ceiling. That is deliberately the pilot's
+# at-ceiling case: it is within budget, produces no over-ceiling finding, and is
+# still surfaced as at-ceiling telemetry.
+schema: ao.rollup/fleet-inventory-v1
+repo: kushin77/agent-orchestrator
+tenant: kushin77-platform
+source: declared
+window:
+  start: 2026-09-07
+  end: 2026-09-13
+smes:
+  - id: security-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 320
+    spend_usd: 268.40
+    capacity_hours: 40
+    engaged_hours: 30
+    dispatched: 9
+    closed: 8
+  - id: qa-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 320
+    spend_usd: 296.20
+    capacity_hours: 40
+    engaged_hours: 34
+    dispatched: 14
+    closed: 12
+  - id: platform-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 300
+    spend_usd: 300.00
+    capacity_hours: 32
+    engaged_hours: 28
+    dispatched: 7
+    closed: 7
+  - id: sync-sme
+    persona_tenant: platform
+    weekly_spend_ceiling_usd: 240
+    spend_usd: 180.75
+    capacity_hours: 24
+    engaged_hours: 15
+    dispatched: 5
+    closed: 4
+drift:
+  checks: 26
+  findings: 1
