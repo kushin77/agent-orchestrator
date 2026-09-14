@@ -78,6 +78,31 @@
 #     * entries are per path — no globs, no wildcard prefixes — because a glob
 #       would absorb a newly declared artifact under that prefix and quietly
 #       restore the opt-in hole.
+#
+#   PROVENANCE (#603) — the rules above cannot bind without it. A lane that
+#   delivers a new check and cannot wire it (`scripts/verify.sh` is a
+#   single-writer file) used to be able to plant a row for its OWN new check,
+#   indistinguishable from a legitimate legacy row. So:
+#     * EVERY row carries the issue that will retire it (`#<n>`) AND the 40-hex
+#       commit at which the row was added. A row whose sha is missing, is not
+#       40-hex, or does not resolve to a real git object is MALFORMED and fails.
+#     * a SCRIPT row (the `uninvoked` deferral) whose wiring issue is CLOSED
+#       while the artifact is still unwired fails, naming both — a deferral to
+#       an open lane is honest, a deferral to a closed one is a permanent
+#       excuse. Issue state is read OFFLINE from the committed board snapshot
+#       `.board/snapshot.json` (never the network); a tracker ABSENT from the
+#       snapshot fails too, because a deferral to an unknown issue cannot be
+#       trusted. The `swept-only` SUITE rows are exempt: they record a permanent
+#       state (run only by the manifest sweep), not a deferred wiring, so a
+#       closed epic that established them does not make them dishonest.
+#     * a row for an artifact that did not exist at the baseline's OWN
+#       last-touched commit fails — "newly delivered" is now computable.
+#       Offline: `git log -1 --format=%H -- scripts/gate-coverage-baseline.txt`
+#       names that commit, and `git cat-file -e <sha>:<path>` proves the
+#       artifact predates it. A row for an artifact that does not is a planted
+#       grandfathered row and is refused, naming the path.
+#     * every ACCEPTED script deferral is REPORTED by name (path, tracker) in
+#       the output below — never silently accepted.
 #   REJECTED ALTERNATIVE: a single mode flag ("allow: manifest-swept suites"),
 #   which is far shorter than 74 explicit lines but admits new artifacts
 #   silently — the one property this gate exists to deny. Second rejected
@@ -88,7 +113,9 @@
 #   0  OK               every artifact is wired or explicitly baselined, and
 #                       every baseline entry is live and unique
 #   1  NOT-OK           an unwired artifact is not baselined, a baseline entry
-#                       is stale / duplicated / malformed, or a scan is refused
+#                       is stale / duplicated / malformed / newly delivered, a
+#                       script deferral names a closed or unknown wiring issue,
+#                       or a scan is refused
 #   2  CANNOT-ASSESS    the question cannot be answered (a gate file is missing,
 #                       the manifest is missing or declares no suites, python3
 #                       or git is unavailable) — never a pass
@@ -107,7 +134,8 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 exec python3 - "$root" <<'PY'
-"""Gate-coverage detector (#526): fail by name when an artifact is ungated."""
+"""Gate-coverage detector (#526, provenance #603): fail by name when an artifact is ungated."""
+import json
 import re
 import subprocess
 import sys
@@ -117,6 +145,7 @@ root = Path(sys.argv[1]).resolve()
 
 MANIFEST = "scripts/pytest-suites.txt"
 BASELINE = "scripts/gate-coverage-baseline.txt"
+SNAPSHOT = ".board/snapshot.json"
 
 # The gate-invocation universe. Explicit by design (see the header comment).
 GATE_FILES = (
@@ -145,6 +174,7 @@ ASSIGN = re.compile(
 )
 
 TRACKER = re.compile(r"^#\d+$")
+SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 def cannot_assess(message):
@@ -154,6 +184,55 @@ def cannot_assess(message):
 
 def read(path):
     return (root / path).read_text(encoding="utf-8", errors="replace")
+
+
+def run_git(args):
+    """Run an offline git command; CANNOT-ASSESS when git cannot even start."""
+    try:
+        return subprocess.run(["git"] + args, cwd=root,
+                              capture_output=True, text=True)
+    except OSError as exc:
+        cannot_assess("git could not run (%s)" % exc)
+
+
+def git_object_exists(spec):
+    """True when `spec` (a sha, or `<sha>:<path>`) names an existing object."""
+    return run_git(["cat-file", "-e", spec]).returncode == 0
+
+
+def baseline_last_commit():
+    """The commit that last touched the baseline — the provenance anchor."""
+    proc = run_git(["log", "-1", "--format=%H", "--", BASELINE])
+    if proc.returncode != 0 or not proc.stdout.strip():
+        cannot_assess("git log cannot name the last commit that touched %s"
+                      % BASELINE)
+    return proc.stdout.strip().splitlines()[0]
+
+
+def tracker_states():
+    """Issue number -> state, read OFFLINE from the committed board snapshot."""
+    snap = root / SNAPSHOT
+    if not snap.is_file():
+        cannot_assess("board snapshot %s is missing -- the closed-wiring-issue "
+                      "rule cannot run offline without it" % SNAPSHOT)
+    try:
+        data = json.loads(snap.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        cannot_assess("board snapshot %s is not valid JSON (%s)"
+                      % (SNAPSHOT, exc))
+    issues = data.get("issues") if isinstance(data, dict) else None
+    if not isinstance(issues, list):
+        cannot_assess("board snapshot %s has no 'issues' list" % SNAPSHOT)
+    states = {}
+    for entry in issues:
+        if not isinstance(entry, dict) or entry.get("number") is None:
+            continue
+        try:
+            number = int(entry["number"])
+        except (TypeError, ValueError):
+            continue
+        states[number] = str(entry.get("state") or "").strip().lower()
+    return states
 
 
 def logical_lines(text):
@@ -308,17 +387,19 @@ def main():
     # --- the baseline --------------------------------------------------------
     entries = []
     malformed = []
+    sha_cache = {}
     if (root / BASELINE).is_file():
         for lineno, raw in enumerate(read(BASELINE).splitlines(), 1):
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 4:
-                malformed.append("%s:%d (expected 4 tab-separated fields, found %d)"
+            if len(parts) != 5:
+                malformed.append("%s:%d (expected 5 tab-separated fields — kind, "
+                                 "path, reason, tracker, sha — found %d)"
                                  % (BASELINE, lineno, len(parts)))
                 continue
-            kind, path, reason, tracker = (part.strip() for part in parts)
+            kind, path, reason, tracker, sha = (part.strip() for part in parts)
             if kind not in REASONS:
                 malformed.append("%s:%d (unknown kind %r)" % (BASELINE, lineno, kind))
                 continue
@@ -328,17 +409,28 @@ def main():
                                     "/".join(sorted(REASONS[kind])), kind))
                 continue
             if not TRACKER.match(tracker):
-                malformed.append("%s:%d (tracker %r is not a #<issue> reference)"
-                                 % (BASELINE, lineno, tracker))
+                malformed.append("%s:%d (%s: tracker %r is not a #<issue> wiring "
+                                 "reference)" % (BASELINE, lineno, path, tracker))
                 continue
-            entries.append((kind, path, reason, tracker))
+            if not SHA.match(sha):
+                malformed.append("%s:%d (%s: sha %r is not a 40-hex commit "
+                                 "reference)" % (BASELINE, lineno, path, sha))
+                continue
+            if sha not in sha_cache:
+                sha_cache[sha] = git_object_exists(sha)
+            if not sha_cache[sha]:
+                malformed.append("%s:%d (%s: sha %r does not resolve to an "
+                                 "object in this repository)"
+                                 % (BASELINE, lineno, path, sha))
+                continue
+            entries.append((kind, path, reason, tracker, sha))
     else:
         print("check-gate-coverage: NOTE — %s is absent; no exception is accepted"
               % BASELINE)
 
-    baselined_suites = {path for kind, path, _, _ in entries if kind == "suite"}
-    baselined_checks = {path for kind, path, _, _ in entries if kind == "script"}
-    entry_keys = [(kind, path) for kind, path, _, _ in entries]
+    baselined_suites = {path for kind, path, _, _, _ in entries if kind == "suite"}
+    baselined_checks = {path for kind, path, _, _, _ in entries if kind == "script"}
+    entry_keys = [(kind, path) for kind, path, _, _, _ in entries]
     duplicates = sorted({key for key in entry_keys if entry_keys.count(key) > 1})
 
     # --- findings ------------------------------------------------------------
@@ -364,6 +456,37 @@ def main():
         elif suite in wired_suites:
             findings.append("baseline suite %s (stale: a gate names it now — remove the entry)" % suite)
 
+    # --- provenance (#603): a deferral must be accountable -------------------
+    if entries:
+        live_scripts = [row for row in entries
+                        if row[0] == "script" and row[1] in unwired_checks]
+        states = tracker_states() if live_scripts else {}
+        base_sha = baseline_last_commit()
+        for kind, path, reason, tracker, sha in entries:
+            if kind == "script" and path in unwired_checks:
+                issue = int(tracker[1:])
+                state = states.get(issue)
+                if state is None:
+                    findings.append(
+                        "baseline script %s (%s: wiring issue #%d is absent from "
+                        "the board snapshot — a deferral to an unknown issue "
+                        "cannot be trusted)" % (path, tracker, issue))
+                elif state != "open":
+                    findings.append(
+                        "baseline script %s (wiring issue #%d is %s while the "
+                        "artifact is still unwired — a deferral to a closed "
+                        "issue is a permanent excuse)" % (path, issue, state.upper()))
+            if kind == "script" and not (root / path).is_file():
+                continue  # stale: no such delivered check script (reported above)
+            if kind == "suite" and path not in suites:
+                continue  # stale: no longer declared (reported above)
+            if not git_object_exists("%s:%s" % (base_sha, path)):
+                findings.append(
+                    "baseline %s %s (newly delivered: %s did not exist at %s, "
+                    "the baseline's last-touched commit — a row for a new "
+                    "artifact is never grandfathered)"
+                    % (kind, path, path, base_sha[:12]))
+
     unlisted_checks = [p for p in unwired_checks if p not in baselined_checks]
     unlisted_suites = [s for s in unwired_suites if s not in baselined_suites]
 
@@ -375,6 +498,10 @@ def main():
           % (len(suites), len(wired_suites), len(unwired_suites),
              len(unwired_suites) - len(unlisted_suites)))
     print("check-gate-coverage: baseline entries=%d" % len(entries))
+    for kind, path, _, tracker, _ in entries:
+        if kind == "script" and path in unwired_checks:
+            print("check-gate-coverage: deferral script %s -> %s (unwired; the "
+                  "named issue retires this row by wiring it)" % (path, tracker))
 
     if malformed:
         findings.extend("baseline line %s" % item for item in malformed)
@@ -386,7 +513,7 @@ def main():
         return 1
 
     print("check-gate-coverage: OK — every unwired artifact is explicitly baselined "
-          "with a live, unique, reasoned entry")
+          "with a live, unique, reasoned, provenanced entry")
     return 0
 
 

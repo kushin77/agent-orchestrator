@@ -54,6 +54,16 @@ children are closed and the product is live flag-gated.
 | control-plane / portal | `control-plane/**`, `portal/**` | flash/LOW | `make verify` |
 | autonomous-ops | phase-8 surface | flash/LOW | `make verify` |
 
+**Single-writer shared build files (RC-8, #559).** `Makefile`,
+`scripts/verify.sh`, `scripts/pytest-suites.txt`, and `docs/README.md` are the
+sole-writer territory of the gate-wiring lane (RC-8, issue #559). Per issue
+#603, `scripts/gate-coverage-baseline.txt` joins that list: it is the
+gate-coverage exception list, its live `script` rows are deferrals to the
+wiring lane that will retire them, and it is the file the detector refuses to
+let any other lane touch productively (a planted row fails the provenance
+checks). A lane that delivers an unwired artifact must defer to RC-8, never
+edit the baseline itself.
+
 **Contract freeze:** when two lanes need a shared field/helper, whichever lane
 lands the schema/types change first owns the contract; the others consume the
 field name, never the files.
