@@ -718,6 +718,8 @@ def handle_order(order: dict) -> tuple[bool, str]:
     kind = str((order.get("task") or {}).get("kind") or order.get("kind") or "").lower()
     if (order.get("task") or {}).get("decompose"):
         return handle_decompose(order)
+    if kind == "steer":
+        return handle_steer(order)
     if kind in NON_WORK_KINDS:
         level, reasons = _health()
         return True, f"order kind '{kind}' — no dispatch; fleet health {level}: {'; '.join(reasons)}"
@@ -743,6 +745,35 @@ def handle_order(order: dict) -> tuple[bool, str]:
         return False, f"dispatch refused for #{issue}: {message}"
     tier, thinking = choose_model(order)
     return True, f"dispatched #{issue} to the sister at {tier}/{thinking} — {message}"
+
+
+def handle_steer(order: dict) -> tuple[bool, str]:
+    """Relay an operator steer order to the sister through the channel (#367).
+
+    The hierarchy stays intact: the operator never addresses the sister, so a
+    mid-run hint travels operator → brain → sister as a `steer` message the
+    channel validates (brain-signed, correlated to an in-flight directive) and
+    the running loop delivers. The brain adds no content of its own — it
+    authenticates and forwards the order, nothing more.
+    """
+    task = order.get("task") or {}
+    target = str(task.get("directive") or "").strip()
+    hint = " ".join(str(order.get("body") or "").split())
+    if not target:
+        return False, "steer order names no directive (task.directive) — nothing was steered"
+    if not channel.DIRECTIVE_ID_RE.fullmatch(target):
+        return False, f"steer order names an unsafe directive id {target!r} — nothing was steered"
+    if not hint:
+        return False, "steer order carries no hint (body) — nothing was steered"
+    result = subprocess.run(
+        ["python3", CHANNEL, "steer", "--directive", target, "--body", hint],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return False, f"steer refused by the channel: {(result.stdout + result.stderr).strip()[-300:]}"
+    return True, f"steer relayed to the sister for run {target}"
 
 
 def safe_handle_order(order: dict) -> tuple[bool, str]:

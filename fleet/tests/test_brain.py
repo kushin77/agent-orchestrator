@@ -297,6 +297,104 @@ def test_non_work_orders_do_not_dispatch(monkeypatch):
     assert "no dispatch" in report
 
 
+# --- mid-run steering (#367): operator → brain → sister, never a shortcut -------
+
+
+class _RelayResult:
+    """A ``subprocess.run`` result the steer relay can read."""
+
+    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = ""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def test_a_steer_order_is_relayed_to_the_channel(monkeypatch):
+    """`task.kind: steer` is forwarded as a brain-signed channel steer, not invented.
+
+    The hierarchy stays intact (issue #367): the operator orders the brain, the
+    brain relays a `steer` through `fleet/channel.py` — the operator never
+    addresses the sister, and the brain adds no content of its own.
+    """
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ARG001
+        calls.append(list(command))
+        return _RelayResult(0, "channel steer: OK — steering hint queued for run d-367", "")
+
+    monkeypatch.setattr(brain.subprocess, "run", fake_run)
+    ok, report = brain.handle_order(
+        order(task={"kind": "steer", "directive": "d-367"}, body="refresh the snapshot and re-run")
+    )
+
+    assert ok is True
+    assert "d-367" in report
+    assert len(calls) == 1, f"the relay must be exactly one channel invocation: {calls}"
+    command = calls[0]
+    assert command[:3] == ["python3", brain.CHANNEL, "steer"], (
+        f"the relay must go through the channel's steer verb: {command!r}"
+    )
+    assert "--directive" in command and "d-367" in command, "the steer must name its run"
+    assert "--body" in command and "refresh the snapshot and re-run" in command, (
+        "the hint must travel verbatim"
+    )
+
+
+def test_a_steer_order_reports_a_channel_refusal_verbatim(monkeypatch):
+    """A steer the channel refuses is a refusal here — never a silent drop."""
+    monkeypatch.setattr(
+        brain.subprocess,
+        "run",
+        lambda *a, **k: _RelayResult(1, "", "channel steer: REFUSED (1 violation(s))"),
+    )
+    ok, report = brain.handle_order(
+        order(task={"kind": "steer", "directive": "d-367"}, body="refresh the snapshot")
+    )
+    assert ok is False
+    assert "steer refused by the channel" in report
+
+
+def test_a_steer_order_without_a_directive_is_refused():
+    ok, report = brain.handle_order(order(task={"kind": "steer"}, body="a hint"))
+    assert ok is False
+    assert "names no directive" in report
+
+
+def test_a_steer_order_with_an_unsafe_directive_id_is_refused():
+    ok, report = brain.handle_order(
+        order(task={"kind": "steer", "directive": "../outside"}, body="a hint")
+    )
+    assert ok is False
+    assert "unsafe directive id" in report
+
+
+def test_a_steer_order_without_a_hint_is_refused():
+    ok, report = brain.handle_order(order(task={"kind": "steer", "directive": "d-367"}, body=""))
+    assert ok is False
+    assert "carries no hint" in report
+
+
+def test_a_steer_order_never_dispatches_work(monkeypatch):
+    """Steering is not a dispatch: no directive is sent to the sister queue."""
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ARG001
+        calls.append(list(command))
+        return _RelayResult(0, "channel steer: OK", "")
+
+    monkeypatch.setattr(brain.subprocess, "run", fake_run)
+
+    def forbidden_dispatch(order_):
+        raise AssertionError(f"a steer must never dispatch: {order_}")
+
+    monkeypatch.setattr(brain, "dispatch", forbidden_dispatch)
+    ok, report = brain.handle_order(
+        order(task={"kind": "steer", "directive": "d-367"}, body="refresh the snapshot")
+    )
+    assert ok is True
+    assert len(calls) == 1 and "steer" in calls[0], "the steer must go through the steer verb"
+
+
 # --- the context stream (the brain window must show something) ----------------
 
 

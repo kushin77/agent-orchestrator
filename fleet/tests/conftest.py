@@ -51,6 +51,8 @@ RUNTIME_PATHS = {
         "BRAIN_DONE",
         "HEARTBEAT",
         "BRAIN_HEARTBEAT",
+        "LOGS",
+        "STEERS",
     ),
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "WORKTREE_ROOT"),
     "brain": ("HEARTBEAT", "WAVES"),
