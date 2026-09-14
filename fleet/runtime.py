@@ -90,3 +90,13 @@ def runner_env(env: dict[str, str] | None = None) -> dict[str, str]:
     base = dict(os.environ if env is None else env)
     base["PATH"] = os.pathsep.join(runner_search_path(base))
     return base
+
+
+# The runaway guard's two runtime locations (issue #723). They are declared
+# HERE, with every other runtime path, so `fleet/runaway.py` re-bases these
+# NAMES onto a caller's root instead of inventing a second layout — the same
+# reason the module exists at all. `attempts/` holds one persisted attempt
+# counter per directive; `dead-letter/` holds the terminal artifact of a
+# directive whose budget was exhausted and which must never be dispatched again.
+ATTEMPTS = FLEET_DIR / "attempts"
+DEAD_LETTER = FLEET_DIR / "dead-letter"
