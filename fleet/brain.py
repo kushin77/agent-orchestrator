@@ -66,6 +66,15 @@ import routing  # noqa: E402
 import runtime  # noqa: E402
 import singleton  # noqa: E402
 
+# The completion-triggered advance (#701) reads the board through the dispatch
+# package: `order.advance_candidates` is the graph-advance recomputation, and
+# `snapshot`/`claims` load the committed board and the live claim ledger. These
+# are flat sibling imports, so they go on the path first (see `_conformance` for
+# how the conformance seam's own flat `model` is kept separate).
+import claims  # noqa: E402
+import order  # noqa: E402
+import snapshot as snapshot_mod  # noqa: E402
+
 FLEET_DIR = runtime.FLEET_DIR
 HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
 # Where this process's stdout is captured. The watchdog owns the spawn and opens
@@ -713,6 +722,58 @@ def advance_waves() -> list[int]:
     return advanced
 
 
+def advance_ready() -> list[int]:
+    """Dispatch the dependency-free ready set a completion just unlocked (#701).
+
+    The completion signal is the board itself: an issue's parent or blocker has
+    closed. The brain fetches the live board (the only way it sees a closure),
+    recomputes the ready set through the dispatch order rules — graph advance,
+    not kanban scavenging (GR-20) — and dispatches each newly-ready issue to the
+    sister in the same cycle, so the pipeline stays full without the brain acting
+    as a serial queue. Each dispatch carries a stable marker, so a later tick
+    never re-dispatches an issue that is already out.
+
+    The board is fetched into memory (`github_records` + `build_snapshot`) rather
+    than via the `snapshot --from-github` CLI, so a completion-triggered advance
+    never rewrites the committed `.board/snapshot.json` as a side effect — that
+    file is refreshed by the board-maintenance path, not by this read-only
+    recomputation.
+    """
+    try:
+        board = snapshot_mod.build_snapshot(snapshot_mod.github_records(REPO), source=REPO)
+    except RuntimeError as exc:
+        print(f"[brain] advance: board fetch failed — {exc}", file=sys.stderr, flush=True)
+        return []
+    live = claims.active_claims(claims.read_ledger())
+    claimed = frozenset(live)
+    dispatched = []
+    for issue in order.advance_candidates(board, claimed=claimed):
+        directive_order = {
+            "type": "directive",
+            # A stable reference per issue: it becomes the directive's identity
+            # (and marker), so a brain that re-runs the advance on a later tick
+            # suppresses the duplicate instead of dispatching it a second time.
+            "id": f"advance-{issue.number}",
+            "task": {"issue": issue.number, "lane": "", "title": issue.title},
+            "body": (
+                f"Completion-triggered advance: #{issue.number} is dependency-free "
+                f"(its parent/blockers are closed). Verify per its acceptance criteria."
+            ),
+        }
+        ok, message = dispatch(directive_order)
+        if message.startswith(DUPLICATE_SUPPRESSED):
+            continue
+        if ok:
+            dispatched.append(issue.number)
+        else:
+            print(
+                f"[brain] advance: dispatch of #{issue.number} refused: {message}",
+                file=sys.stderr,
+                flush=True,
+            )
+    return dispatched
+
+
 def handle_order(order: dict) -> tuple[bool, str]:
     """One order in, one directive or one refusal out. Never a silent drop."""
     kind = str((order.get("task") or {}).get("kind") or order.get("kind") or "").lower()
@@ -987,6 +1048,9 @@ def loop(args: argparse.Namespace) -> int:
             advanced = advance_waves()
             if advanced:
                 print(wave_line(advanced), flush=True)
+            ready = advance_ready()
+            if ready:
+                print(wave_line(ready), flush=True)
             moment = time.monotonic()
             if idle_since is None:
                 idle_since = moment

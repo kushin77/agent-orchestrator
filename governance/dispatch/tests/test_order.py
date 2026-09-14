@@ -159,6 +159,43 @@ def test_active_milestone_follows_the_agents_own_claims(snapshot):
     assert order.active_milestone(snapshot, frozenset()) == "M25"
 
 
+# --- #701: completion-triggered advance (graph advance, not kanban scavenging) -
+
+
+def test_nothing_is_ready_while_the_parent_and_blocker_are_still_open(snapshot):
+    """#605's parent (#601) and #602's blocker (#603) are open, so neither is
+    dependency-free yet — the ready set is empty before any completion."""
+    assert order.advance_candidates(snapshot) == []
+
+
+def test_closing_a_parent_makes_its_child_ready_to_advance(snapshot):
+    """#605 declares `Parent: #601`; closing #601 flips it ready in the same cycle."""
+    ready = order.advance_candidates(with_closed(snapshot, 601))
+    assert [issue.number for issue in ready] == [605]
+
+
+def test_closing_a_blocker_makes_its_dependent_ready_to_advance(snapshot):
+    """#602 declares `Blocked-by: #603`; closing #603 unblocks it in the same cycle."""
+    ready = order.advance_candidates(with_closed(snapshot, 603))
+    assert [issue.number for issue in ready] == [602]
+
+
+def test_an_unrelated_open_issue_does_not_advance(snapshot):
+    """A bare open issue with no chain edge is the milestone frontier, not a
+    completion-triggered advance — kanban scavenging is refused by construction."""
+    ready = {issue.number for issue in order.advance_candidates(snapshot)}
+    assert 601 not in ready and 603 not in ready and 606 not in ready
+
+
+def test_a_claimed_or_epic_issue_never_advances(snapshot):
+    """A ready child that another agent already holds is skipped, and an epic is
+    never a candidate even when its own blockers are gone."""
+    closed_parent = with_closed(snapshot, 601)
+    ready = order.advance_candidates(closed_parent, claimed=frozenset({605}))
+    assert 605 not in [issue.number for issue in ready]
+    assert 600 not in [issue.number for issue in ready]
+
+
 def test_frontier_is_never_a_blocked_issue(snapshot):
     frontier = order.frontier(snapshot, "M25")
     assert frontier is not None

@@ -601,6 +601,9 @@ def test_the_loop_installs_a_clean_stop_for_sigterm_and_sigint(monkeypatch, stub
     installed = []
     monkeypatch.setattr(brain.signal, "signal", lambda signum, handler: installed.append((signum, handler)))
     monkeypatch.setattr(brain, "CHANNEL", str(stub_channel()))
+    # The idle path now runs the completion-triggered advance (#701), which would
+    # fetch the live board — stub it so this signal-install test stays offline.
+    monkeypatch.setattr(brain, "advance_ready", lambda: [])
     assert brain.loop(_Args(watch_timeout=0.02, once=True)) == 0
     assert (signal.SIGTERM, brain.handle_stop) in installed
     assert (signal.SIGINT, brain.handle_stop) in installed
@@ -756,3 +759,66 @@ def test_a_decomposed_child_keeps_its_title_into_the_wave_directive(tmp_path, mo
     plan = json.loads((tmp_path / "waves" / "219.json").read_text(encoding="utf-8"))
     assert plan["children"][0]["title"] == "harden the gate"
     assert sent and sent[0]["task"]["title"] == "harden the gate"
+
+
+# --- #701: completion-triggered advance --------------------------------------
+
+
+def _advance_board():
+    """A board whose child #11 is unlocked by a closed parent #10; #12 is unrelated."""
+    parent = brain.snapshot_mod.Issue(10, "closed parent", state="closed")
+    child = brain.snapshot_mod.Issue(11, "child of the parent", parent=10)
+    unrelated = brain.snapshot_mod.Issue(12, "unrelated open issue")
+    return brain.snapshot_mod.Snapshot(
+        generated_at="2026-09-14T00:00:00Z",
+        source="test",
+        issues={10: parent, 11: child, 12: unrelated},
+    )
+
+
+def _stub_advance_board(monkeypatch, board):
+    """Fetch the live board in memory, offline: no `gh`, no committed-file write."""
+    monkeypatch.setattr(brain.snapshot_mod, "github_records", lambda repo: [])
+    monkeypatch.setattr(brain.snapshot_mod, "build_snapshot", lambda records, source: board)
+    monkeypatch.setattr(brain.claims, "read_ledger", lambda *a, **k: [])
+    monkeypatch.setattr(brain.claims, "active_claims", lambda events: {})
+
+
+def test_a_completion_advances_the_newly_ready_set(monkeypatch):
+    """Closing a parent unblocks its child in the same cycle: `advance_ready`
+    fetches the board, recomputes the ready set, and dispatches exactly the
+    dependency-free issue — never the unrelated open one (kanban scavenging)."""
+    _stub_advance_board(monkeypatch, _advance_board())
+
+    sent: list[dict] = []
+    monkeypatch.setattr(
+        brain,
+        "dispatch",
+        lambda order_: (sent.append(order_), (True, "channel send: OK — queued"))[1],
+    )
+
+    dispatched = brain.advance_ready()
+
+    assert dispatched == [11], f"only the unblocked child should advance, got {dispatched}"
+    assert [order_["task"]["issue"] for order_ in sent] == [11]
+    assert all(order_["task"]["issue"] != 12 for order_ in sent), (
+        "the unrelated open issue must never be dispatched"
+    )
+
+
+def test_a_completion_with_no_ready_set_dispatches_nothing(monkeypatch):
+    """A board where every child is still blocked yields no dispatch, not a crash."""
+    parent = brain.snapshot_mod.Issue(20, "still-open parent")
+    child = brain.snapshot_mod.Issue(21, "child of an open parent", parent=20)
+    board = brain.snapshot_mod.Snapshot(
+        generated_at="2026-09-14T00:00:00Z",
+        source="test",
+        issues={20: parent, 21: child},
+    )
+    _stub_advance_board(monkeypatch, board)
+
+    sent: list[dict] = []
+    monkeypatch.setattr(brain, "dispatch", lambda order_: (sent.append(order_), (True, "ok"))[1])
+
+    assert brain.advance_ready() == []
+    assert sent == []

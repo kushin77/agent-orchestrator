@@ -114,3 +114,38 @@ def eligible(
         REASON_NO_CHAIN_EDGE,
         "no chain edge to the active work (kanban scavenging) and not the milestone frontier",
     )
+
+
+def advance_candidates(
+    snapshot: Snapshot,
+    claimed: frozenset[int] = frozenset(),
+) -> list[Issue]:
+    """The dependency-free ready set a completion can newly unlock (issue #701).
+
+    Graph advance, not kanban scavenging (GR-20): only issues that declare a
+    chain edge — a ``Parent`` or a ``Blocked-by`` — are candidates. An issue is
+    ready when it is open, not an epic, unclaimed, has no open blockers, and its
+    declared parent (if any) is closed.
+
+    A bare open issue with no chain edge is the milestone's own frontier, reached
+    by ``next-in-milestone``, not by a completion-triggered advance: its readiness
+    never *changed* when a blocker closed, so it is excluded here. Closing a
+    parent/blocker is what flips a candidate from blocked to ready, which is
+    exactly the set the brain must re-dispatch in the same cycle.
+    """
+    ready: list[Issue] = []
+    for issue in snapshot.open_issues():
+        if issue.number in claimed or issue.is_epic:
+            continue
+        # Only graph edges resolve into an advance; a bare issue is the frontier.
+        if issue.parent is None and not issue.blocked_by:
+            continue
+        if issue.parent is not None:
+            parent = snapshot.get(issue.parent)
+            if parent is None or not parent.closed:
+                continue
+        if snapshot.blockers_open(issue):
+            continue
+        ready.append(issue)
+    ready.sort(key=lambda issue: issue.number)
+    return ready
