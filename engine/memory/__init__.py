@@ -49,6 +49,7 @@ from .prompt_cache import (Prefix, assemble_prefix, estimate_tokens,
                            validate_static_region)
 from .retrieval import Hit, Retriever, RetrieverResult
 from .store import FileStore, InMemoryStore, MemoryStore
+from .window import WindowPolicy, slide_window
 
 __all__ = [
     # vocabulary
@@ -78,6 +79,8 @@ __all__ = [
     "validate_static_region",
     "assemble_prefix",
     "Prefix",
+    "WindowPolicy",
+    "slide_window",
     # data-subject rights
     "export_memory",
     "forget",
