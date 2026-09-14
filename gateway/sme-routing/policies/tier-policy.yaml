@@ -1,0 +1,65 @@
+# Tier policy -- the FinOps cost controls per model tier: timeout, token cap,
+# fallback and the complexity -> tier map.
+#
+# PROVENANCE (GR-10; ledger in docs/SME-ROUTING.md "PROVENANCE"):
+#   * kushin77/capital-underwriting config/leaderboard/tier-policy.json
+#     verdict PORTED -- tiers, complexity_to_tier and task_overrides kept
+#     verbatim. Its own `source` field records the upstream as
+#     kushin77/vscode-memory integration/ollama-tier-policy.json (#1476).
+#
+# TERMINAL ESCALATION: `auditor.fallback` is null, which is the declared
+# terminal. When a request breaches every tier's caps the router does not
+# raise and does not loop -- it returns the distinct `human_advisor` outcome.
+# The loader enforces that the ladder is acyclic, strictly increasing and
+# terminates at a null fallback.
+#
+# SPELLING: the harvested task_overrides keys use hyphens where the harvested
+# route-policy dispatch_defaults use underscores (doc-update vs doc_update).
+# Both are preserved verbatim here; the loader normalises `_` to `-` and
+# refuses a policy whose keys collide after normalisation, so a declared
+# override cannot be silently skipped by a spelling mismatch.
+version: "1.0.0"
+updated_at: "2026-07-24"
+source: "adapted from kushin77/vscode-memory integration/ollama-tier-policy.json (#1476) via kushin77/capital-underwriting config/leaderboard/tier-policy.json"
+description: >-
+  Model tier assignment policy for the DeepSeek fleet -- maps complexity
+  scores to model tiers with fallback chains.
+tiers:
+  flash:
+    models: [deepseek-v4-flash]
+    timeout_seconds: 30
+    max_tokens: 4096
+    fallback: pro
+    description: >-
+      Fast, cheap model for simple tasks (doc updates, small fixes, label
+      triage).
+  pro:
+    models: [deepseek-v4-pro]
+    timeout_seconds: 120
+    max_tokens: 16384
+    fallback: auditor
+    description: >-
+      Full reasoning model for code changes, architecture, multi-file
+      refactors.
+  auditor:
+    models: [deepseek-v4-pro]
+    timeout_seconds: 300
+    max_tokens: 32768
+    fallback: null
+    description: >-
+      Highest-capability tier for governance verification, release gates,
+      policy enforcement. No fallback -- escalates to human.
+complexity_to_tier:
+  "0-30": flash
+  "31-70": pro
+  "71-100": auditor
+task_overrides:
+  doc-update: flash
+  audit: pro
+  script-fix: pro
+  config-change: pro
+  code-review: auditor
+  architecture: pro
+  multi-file-refactor: pro
+  policy-verification: auditor
+  release-gate-verification: auditor

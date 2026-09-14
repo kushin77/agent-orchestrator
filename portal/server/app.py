@@ -34,9 +34,11 @@ from portal.server.controls import (
 from portal.server.finops import FinOpsReports
 from portal.server.fleet import FleetProjection
 from portal.server.live_feed import MAX_REPLAY_LIMIT, LiveFeed
+from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
+from portal.server.surfaces import PortalSurfacesFeed
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -106,8 +108,10 @@ class ConsoleApplication:
         root_admin_emails: Optional[tuple[str, ...]] = None,
         allowlist_only: bool = False,
         fleet_projection: Optional[FleetProjection] = None,
+        portal_surfaces: Optional[PortalSurfacesFeed] = None,
         finops_reports: Optional[FinOpsReports] = None,
         live_feed: Optional[LiveFeed] = None,
+        ops_health: Optional[OpsHealthReports] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -132,6 +136,12 @@ class ConsoleApplication:
             if fleet_projection is not None
             else FleetProjection(repo_root=self.repo_root)
         )
+        # The portal-surfaces feed (issue #350) — feature-flag-gated OFF.
+        self.surfaces = (
+            portal_surfaces
+            if portal_surfaces is not None
+            else PortalSurfacesFeed(repo_root=self.repo_root)
+        )
         # Tenant scoping + RBAC for that surface (issue #333).
         self.fleet_authz = FleetAuthorizer(state=self.state, repo_root=self.repo_root)
         # The FinOps single-pane surface (issue #341) — feature-flag-gated OFF.
@@ -145,6 +155,12 @@ class ConsoleApplication:
             live_feed
             if live_feed is not None
             else LiveFeed(repo_root=self.repo_root)
+        )
+        # The ops/health/SLO surface (issue #342) — feature-flag-gated OFF.
+        self.ops = (
+            ops_health
+            if ops_health is not None
+            else OpsHealthReports(repo_root=self.repo_root)
         )
 
     # -- request pipeline ---------------------------------------------------
@@ -272,6 +288,17 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.fleet_projection)",
             )
 
+        # The portal-surfaces feed (issue #350) is gated the same way and for
+        # the same reason: an unpromoted surface is invisible, not merely
+        # unauthorised.
+        if parts[0] == "portal" and not self.surfaces.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the portal-surfaces feed is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.portal_surfaces)",
+            )
+
         # The FinOps single-pane surface ships the same way (GR-5), also before
         # authN: an unpromoted surface must be invisible, not merely protected.
         if parts[0] == "finops" and not self.finops.enabled:
@@ -292,15 +319,29 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.telemetry_live_feed)",
             )
 
+        # The ops/health/SLO surface ships the same way (GR-5), also before
+        # authN: an unpromoted surface must be invisible, not merely protected.
+        if parts[0] == "ops" and not self.ops.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the ops/health/SLO surface is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.ops_health)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
             if parts[0] == "fleet":
                 return self._route_fleet(parts, method, query, principal)
+            if parts[0] == "portal":
+                return self._route_portal(parts, method)
             if parts[0] == "finops":
                 return self._route_finops(parts, principal, method, query)
             if parts[0] == "telemetry":
                 return self._route_live_feed(parts, principal, method, query)
+            if parts[0] == "ops":
+                return self._route_ops(parts, principal, method, query)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -371,6 +412,22 @@ class ConsoleApplication:
         except (TypeError, ValueError):
             raise ApiError(400, "invalid_request", "limit must be an integer") from None
         return max(1, min(limit, self.FLEET_EVENTS_MAX_LIMIT))
+
+    # -- portal-surfaces feed (issue #350) -----------------------------------
+    def _route_portal(self, parts: list[str], method: str) -> Response:
+        """The portal-surfaces feed (issue #350).
+
+        One read: the pinned CMR fleet-surface document the serving layer ships
+        (``registry/portal-surfaces.pinned.json``, provenance in its ``pin``
+        block). GET-only; when the feature flag is off the route never reaches
+        here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the portal-surfaces feed is GET only")
+        surface = parts[1:]
+        if surface == ["surfaces"]:
+            return self._ok(self.surfaces.document())
+        raise ApiError(404, "not_found", f"no such portal surface: {'/'.join(surface)}")
 
     # -- finops single-pane (issue #341) ------------------------------------
     def _route_finops(
@@ -491,6 +548,66 @@ class ConsoleApplication:
                 400, "invalid_request", "replay must be an integer"
             ) from None
         return max(0, min(value, MAX_REPLAY_LIMIT))
+
+    # -- ops/health/SLO (issue #342) ----------------------------------------
+    def _route_ops(
+        self,
+        parts: list[str],
+        principal: Principal,
+        method: str,
+        query: dict[str, str],
+    ) -> Response:
+        """The ops/health/SLO surface (issue #342).
+
+        GET-only. Every verdict, percentile and alert is delegated to the
+        observability lane through ``OpsHealthReports`` — this route owns
+        authorization and transport shape only, and never restates an SLO
+        target or a severity. Like every other tenant surface it is scoped: a
+        principal only ever sees the tenants it may read (``agent:read``).
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the ops surface is GET only")
+        surface = parts[1:]
+        if surface == ["overview"]:
+            return self._ok(self.ops.overview(self._ops_readable(principal)))
+        if surface == ["alerts"]:
+            tenant_id = (query.get("tenant") or "").strip()
+            if tenant_id:
+                self._require_ops_tenant(tenant_id)
+                self._require(principal, tenant_id, "agent:read")
+                return self._ok(self.ops.alerts([tenant_id]))
+            return self._ok(self.ops.alerts(self._ops_readable(principal)))
+        if surface == ["dashboard"]:
+            tenant_id = (query.get("tenant") or "").strip()
+            if tenant_id:
+                self._require_ops_tenant(tenant_id)
+                self._require(principal, tenant_id, "agent:read")
+                return self._ok(self.ops.dashboard([tenant_id]))
+            return self._ok(self.ops.dashboard(self._ops_readable(principal)))
+        if surface in (["agents"], ["slos"]):
+            tenant_id = (query.get("tenant") or "").strip()
+            if not tenant_id:
+                raise ApiError(400, "invalid_request", "tenant is required")
+            self._require_ops_tenant(tenant_id)
+            self._require(principal, tenant_id, "agent:read")
+            reader = self.ops.agents if surface == ["agents"] else self.ops.slos
+            return self._ok(reader(tenant_id))
+        raise ApiError(404, "not_found", f"no such ops surface: {'/'.join(surface)}")
+
+    def _ops_readable(self, principal: Principal) -> list[str]:
+        """The ops tenants a principal may read (scope gate + ``agent:read``)."""
+        return [
+            tenant
+            for tenant in self.authorizer.scope_tenants(
+                principal, self.ops.tenant_ids()
+            )
+            if self.authorizer.allow(principal, tenant, "agent:read")
+        ]
+
+    def _require_ops_tenant(self, tenant_id: str) -> None:
+        """Fail closed on a tenant the live span feed does not know."""
+        if not self.ops.known_tenant(tenant_id):
+            raise ApiError(404, "unknown_tenant", f"no such tenant {tenant_id!r}")
 
     # -- session ------------------------------------------------------------
     def _require_session(self, cookies: dict[str, str]) -> tuple[Principal, dict[str, Any]]:
