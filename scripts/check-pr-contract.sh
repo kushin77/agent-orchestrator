@@ -41,16 +41,47 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. A missing body file is
 # CANNOT-ASSESS, never a pass: an empty run is not a green (GR-12).
 #
+# ENFORCEMENT SURFACES (issue #311 — the follow-up that gives this gate teeth)
+#   * PR time — `bash scripts/check-pr-contract.sh --pr <number>` reads the PR
+#     body and the PR's base..head range through `gh` and runs every check above.
+#     `scripts/merge-gate.sh run` wires it in: when `AO_PR_NUMBER` (or
+#     `AO_PR_BODY_FILE` + `AO_PR_RANGE`) is set, the merge gate runs the check
+#     as its `pr-contract` signal; when neither is set (an ordinary working
+#     checkout) the signal is OMITTED with a note, so `make verify`/`make gate`
+#     never false-red for a missing PR body.
+#   * Landed history — `bash scripts/check-pr-contract.sh --landed` audits every
+#     merged (non-merge) commit reachable from the range (default: HEAD) for the
+#     trailing `Refs` trailer. `AI-assistance:` and `Closes #<n>` are PR-BODY
+#     obligations and are enforced at PR time only — the squash-merge commit
+#     body does not reliably carry them (measured on the repo's own standard
+#     commit `8b97ab6`), so a landed audit cannot check them.
+#
+# LANDED BASELINE (grandfathering is a boundary, not a name list)
+#   The enforcement boundary is the commit that landed this gate:
+#   `a7e7312991ae24b1047363ff36627060a810fdd8` (PR #308). Every commit strictly
+#   before it predates the contract and is grandfathered as a class — measured:
+#   all 37 commits that lack the trailer (e.g. `061690c`, the commit the #288
+#   review named) are strictly before the boundary, and 0 commits after it lack
+#   one. A boundary is provably frozen: a new commit is always a descendant,
+#   never an ancestor, so the grandfathering cannot grow silently. The audit
+#   also refuses a boundary commit that itself lacks the trailer
+#   (`enforcement-gate-missing-trailer`). Override with
+#   `--enforcement-gate <sha>` / `AO_PR_ENFORCEMENT_GATE` to prove the audit
+#   fails on a pre-boundary commit (see the non-vacuity proof in the PR).
+#
 # NOT WIRED INTO `make verify` — deliberately, and this is the honest reason:
 # in an ordinary working checkout there is no PR body and the range
 # `origin/master..HEAD` is empty, so wiring it would turn every legitimate
 # `make verify` red for a reason unrelated to the change under test. It is
-# invoked with the PR body at PR time. `--selftest` proves the gate can fail, so
-# it is not a formality while it waits for that hook.
+# invoked with the PR body at PR time, and as its own landed-history command.
+# `--selftest` proves every violation is provoked and refused, so the gate is
+# not a formality while it waits for those hooks.
 #
 # Usage:
 #   bash scripts/check-pr-contract.sh --body-file <path> [--range <git-range>]
-#   bash scripts/check-pr-contract.sh --selftest        # build mutants, prove it fails
+#   bash scripts/check-pr-contract.sh --pr <number>      # PR-time hook (via gh)
+#   bash scripts/check-pr-contract.sh --landed           # landed-history audit
+#   bash scripts/check-pr-contract.sh --selftest         # build mutants, prove it fails
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -61,17 +92,26 @@ range="${AO_PR_RANGE:-origin/master..HEAD}"
 # Both the repo's colon-less form (`Refs owner/repo#n`) and git's own colon form
 # (`Refs: owner/repo#n`) are accepted.
 trailer_pattern="${AO_TRAILER_PATTERN:-Refs:?\\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+}"
+# The landed audit's enforcement boundary: the commit that landed this gate.
+# Everything strictly before it is pre-contract legacy (grandfathered); the
+# boundary itself is checked explicitly, everything after must carry the trailer.
+default_gate="a7e7312991ae24b1047363ff36627060a810fdd8"
+gate="${AO_PR_ENFORCEMENT_GATE:-$default_gate}"
+RANGE_SET=0
 
 usage() {
-  printf 'usage: %s --body-file <path> [--range <git-range>] | --selftest\n' "$0" >&2
+  printf 'usage: %s --body-file <path> [--range <git-range>] | --pr <number> | --landed [--range <git-range>] | --selftest\n' "$0" >&2
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --body-file) body_file="${2:-}"; shift 2 ;;
-    --range)     range="${2:-}"; shift 2 ;;
+    --range)     range="${2:-}"; RANGE_SET=1; shift 2 ;;
     --repo)      repo="${2:-}"; shift 2 ;;
     --selftest)  SELFTEST=1; shift ;;
+    --landed)    LANDED=1; shift ;;
+    --pr)        PR_NUMBER="${2:-}"; shift 2 ;;
+    --enforcement-gate) gate="${2:-}"; shift 2 ;;
     -h|--help)   usage; exit 0 ;;
     *) printf 'check-pr-contract: unknown argument %s\n' "$1" >&2; usage; exit 2 ;;
   esac
@@ -197,12 +237,13 @@ PY
   fi
 }
 
-report() {
+report() { # [label]
+  local label="${1:-check-pr-contract}"
   local f
   for f in "${findings[@]}"; do
     printf '  FAIL  %s\n' "$f" >&2
   done
-  printf 'check-pr-contract: FAIL (%s finding(s))\n' "${#findings[@]}" >&2
+  printf '%s: FAIL (%s finding(s))\n' "$label" "${#findings[@]}" >&2
 }
 
 run_checks() { # <body-file> <range>
@@ -210,11 +251,100 @@ run_checks() { # <body-file> <range>
   check_body "$1"
   check_commits "$2"
   if [ "${#findings[@]}" -gt 0 ]; then
-    report
+    report "check-pr-contract"
     return 1
   fi
   echo "check-pr-contract: OK — trailer block, AI-assistance, Closes and the pre-existing-red claim are all evidenced"
   return 0
+}
+
+# --- landed-history audit: every merged commit carries the ticket trailer -----
+# PR-BODY obligations (Closes, AI-assistance, pre-existing red) live at PR time;
+# the landed audit enforces the one obligation a commit can carry on its own —
+# the trailing `Refs` trailer — over every non-merge commit since the boundary.
+landed_audit() { # <range> <gate>
+  local rang="${1:-HEAD}" g="${2:-$default_gate}"
+  findings=()
+
+  local gate_msg gate_subj gate_finding
+  gate_msg="$(git -C "$repo" log -1 --format=%B "$g" 2>/dev/null)"
+  gate_subj="$(git -C "$repo" log -1 --format=%s "$g" 2>/dev/null)"
+  if [ -z "$gate_msg" ]; then
+    echo "check-pr-contract: CANNOT-ASSESS — enforcement gate $g is not reachable from this repository" >&2
+    return 2
+  fi
+  gate_finding="$(commit_finding "$gate_msg" "$gate_subj")"
+  [ -z "$gate_finding" ] || findings+=("enforcement-gate-missing-trailer:${g:0:12}")
+
+  local shas sha message subject finding bad=0
+  shas="$(git -C "$repo" rev-list --no-merges "$rang" 2>/dev/null)"
+  if [ -z "$shas" ]; then
+    echo "check-pr-contract: CANNOT-ASSESS — no commits in landed range $rang" >&2
+    return 2
+  fi
+  while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
+    if [ "$sha" = "$g" ]; then continue; fi
+    if git -C "$repo" merge-base --is-ancestor "$sha" "$g" 2>/dev/null; then
+      continue  # pre-boundary legacy — grandfathered as a class, never re-checked
+    fi
+    message="$(git -C "$repo" log -1 --format=%B "$sha" 2>/dev/null)"
+    subject="$(git -C "$repo" log -1 --format=%s "$sha" 2>/dev/null)"
+    finding="$(commit_finding "$message" "$subject")"
+    if [ -n "$finding" ]; then
+      findings+=("$finding:${sha:0:12}")
+      bad=$((bad + 1))
+    fi
+  done <<<"$shas"
+  if [ "${#findings[@]}" -gt 0 ]; then
+    report "check-pr-contract: LANDED"
+    return 1
+  fi
+  echo "check-pr-contract: LANDED OK — every merged commit since the enforcement gate carries the ticket trailer"
+  return 0
+}
+
+# --- PR-time hook: the body and the range come from GitHub -------------------
+pr_check() { # <number>
+  local number="$1" tmpdir bodyfile base_name head_oid rang rc
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "check-pr-contract: CANNOT-ASSESS — gh not found (the PR-time check reads the PR body via gh)" >&2
+    return 2
+  fi
+  tmpdir="/tmp/pr-contract-pr.$(date +%s%N).$$"
+  if ! mkdir "$tmpdir" 2>/dev/null; then
+    echo "check-pr-contract: CANNOT-ASSESS — cannot create a temp dir at $tmpdir" >&2
+    return 2
+  fi
+  bodyfile="$tmpdir/body.md"
+  if ! ( cd "$repo" && gh pr view "$number" --json body --jq '.body' ) > "$bodyfile" 2>/dev/null; then
+    rm -rf "$tmpdir"
+    echo "check-pr-contract: CANNOT-ASSESS — cannot read the body of PR #$number via gh" >&2
+    return 2
+  fi
+  # `gh pr view` exposes the base NAME and the head OID (there is no baseRefOid
+  # field), so the range is `origin/<base>..<head-oid>`, falling back to the
+  # local base branch when the remote-tracking ref is not present in the clone.
+  base_name="$( ( cd "$repo" && gh pr view "$number" --json baseRefName --jq '.baseRefName' ) 2>/dev/null )"
+  head_oid="$( ( cd "$repo" && gh pr view "$number" --json headRefOid --jq '.headRefOid' ) 2>/dev/null )"
+  if [ -z "$base_name" ] || [ -z "$head_oid" ]; then
+    rm -rf "$tmpdir"
+    echo "check-pr-contract: CANNOT-ASSESS — cannot resolve the base/head of PR #$number" >&2
+    return 2
+  fi
+  rang="origin/$base_name..$head_oid"
+  if [ -z "$(git -C "$repo" rev-list --no-merges "$rang" 2>/dev/null)" ]; then
+    rang="$base_name..$head_oid"
+  fi
+  if [ -z "$(git -C "$repo" rev-list --no-merges "$rang" 2>/dev/null)" ]; then
+    rm -rf "$tmpdir"
+    echo "check-pr-contract: CANNOT-ASSESS — no non-merge commits in $rang (is the PR head fetched into this clone?)" >&2
+    return 2
+  fi
+  run_checks "$bodyfile" "$rang"
+  rc=$?
+  rm -rf "$tmpdir"
+  return "$rc"
 }
 
 # --- selftest: the gate must be able to fail --------------------------------
@@ -396,6 +526,43 @@ MD
     ok=1
   fi
 
+  # --- landed audit non-vacuity ----------------------------------------------
+  # The enforcement gate is the well-trailed commit `a`; everything after it
+  # must carry the trailer, everything before it (the base commit) is
+  # grandfathered legacy.
+  b_sha="$(git -C "$scratch" rev-list -1 --grep 'ref only in the subject' HEAD 2>/dev/null)"
+  c_sha="$(git -C "$scratch" rev-list -1 --grep 'no ticket reference' HEAD 2>/dev/null)"
+
+  # 9. post-gate commits missing the trailer are refused by name
+  out="$(landed_audit "$base..HEAD" "$a_sha" 2>&1)"
+  if [ $? -ne 0 ] \
+     && printf '%s' "$out" | grep -qF "commit-missing-ticket-trailer:${c_sha:0:12}" \
+     && printf '%s' "$out" | grep -qF "commit-ref-only-in-subject:${b_sha:0:12}"; then
+    printf '  OK    the landed audit refuses post-gate commits missing the trailer, by name\n'
+  else
+    printf '  FAIL  the landed audit did not refuse post-gate bad commits\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 10. a clean post-gate history (gate + grandfathered legacy only) passes
+  out="$(landed_audit "$base..$a_sha" "$a_sha" 2>&1)"
+  if [ $? -eq 0 ] && printf '%s' "$out" | grep -qF "LANDED OK"; then
+    printf '  OK    the landed audit passes a clean post-gate history\n'
+  else
+    printf '  FAIL  the landed audit did not pass a clean post-gate history\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 11. a boundary commit that itself lacks the trailer is a finding (the
+  #     baseline cannot silently include a non-compliant boundary)
+  out="$(landed_audit "$base..HEAD" "$base" 2>&1)"
+  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "enforcement-gate-missing-trailer"; then
+    printf '  OK    a trailer-less enforcement gate is itself refused\n'
+  else
+    printf '  FAIL  a trailer-less enforcement gate went undetected\n%s\n' "$out" >&2
+    ok=1
+  fi
+
   rm -rf "$work"
   if [ "$ok" -ne 0 ]; then
     echo "check-pr-contract: SELFTEST FAIL — the gate cannot detect every violation it defines" >&2
@@ -407,6 +574,20 @@ MD
 
 if [ -n "${SELFTEST:-}" ]; then
   selftest
+  exit $?
+fi
+
+if [ -n "${LANDED:-}" ]; then
+  if [ "$RANGE_SET" -eq 0 ]; then
+    landed_audit "HEAD" "$gate"
+  else
+    landed_audit "$range" "$gate"
+  fi
+  exit $?
+fi
+
+if [ -n "${PR_NUMBER:-}" ]; then
+  pr_check "$PR_NUMBER"
   exit $?
 fi
 
