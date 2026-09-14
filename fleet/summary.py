@@ -28,10 +28,11 @@ import argparse
 import sys
 from pathlib import Path
 
+import runtime
 import telemetry
 
 ROOT = Path(__file__).resolve().parent.parent
-TELEMETRY_LOG = ROOT / ".fleet" / "telemetry.jsonl"
+TELEMETRY_LOG = runtime.FLEET_DIR / "telemetry.jsonl"
 
 #: The per-run fields issue #219 names. The summary is tolerant: a record may
 #: omit any of them and is still counted, with the missing value reported as

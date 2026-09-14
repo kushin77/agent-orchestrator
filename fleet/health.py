@@ -36,14 +36,16 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+import runtime
+
 ROOT = Path(__file__).resolve().parent.parent
 # The two probe targets, mirroring `channel.report_rung`: the sister loop and the
 # brain. Resolved on every call (see `rungs`) so a redirected heartbeat path is
 # honoured.
 SISTER_PROCESS = "fleet/terminal.py"
 BRAIN_PROCESS = "fleet/brain.py"
-SISTER_HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
-BRAIN_HEARTBEAT = ROOT / ".fleet" / "brain.heartbeat.json"
+SISTER_HEARTBEAT = runtime.FLEET_DIR / "sister.heartbeat.json"
+BRAIN_HEARTBEAT = runtime.FLEET_DIR / "brain.heartbeat.json"
 
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 sys.path.insert(0, str(ROOT / "fleet"))

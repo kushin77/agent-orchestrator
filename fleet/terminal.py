@@ -26,6 +26,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import runtime
 import singleton
 import telemetry
 
@@ -595,13 +596,13 @@ def verdict(rc: int, output: str, gate_ok: bool, landed: bool) -> tuple[str, str
     return ("done" if verified else "failed"), hint
 
 
-HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
+HEARTBEAT = runtime.FLEET_DIR / "sister.heartbeat.json"
 WORKTREE_ROOT = Path(os.environ.get("AO_WORKTREE_ROOT", str(Path.home() / "ao-worktrees")))
 # Run registry: who is tracking which directive. Without it a claim's holder is
 # just a string — indistinguishable from an agent that died mid-run, which is how
 # a directive got consumed as "already in-flight" while nothing was running.
-RUNS = ROOT / ".fleet" / "runs"
-REPORTED = ROOT / ".fleet" / "reported"
+RUNS = runtime.FLEET_DIR / "runs"
+REPORTED = runtime.FLEET_DIR / "reported"
 
 #: The bounded worker pool: this many directives run concurrently, env-overridable
 #: so an operator can widen or narrow the fleet without a code change.
@@ -849,8 +850,8 @@ def clear_reported(directive_id: str) -> None:
 #
 # The loop is the only place these can be honoured: it owns the run, the queue
 # cursor and the process. `control.py` sends them; this decides what they mean.
-PAUSED = ROOT / ".fleet" / "paused"
-STOPPING = ROOT / ".fleet" / "stopping"
+PAUSED = runtime.FLEET_DIR / "paused"
+STOPPING = runtime.FLEET_DIR / "stopping"
 # How often a run refreshes its beat. Short enough that a stuck run still looks
 # alive, long enough that the file is not rewritten constantly.
 HEARTBEAT_INTERVAL_SECONDS = 15.0

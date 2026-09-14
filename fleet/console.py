@@ -33,8 +33,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fleet"))
 
 import channel  # noqa: E402
+import runtime  # noqa: E402
 
-FLEET_DIR = ROOT / ".fleet"
+FLEET_DIR = runtime.FLEET_DIR
+SESSION = runtime.SESSION
 REFRESH_SECONDS = 4.0
 REPO = "kushin77/agent-orchestrator"
 # `gh` is asked for closed-issue state — the only fact on this dashboard that
@@ -402,8 +404,8 @@ def header_section(snap: dict) -> str:
     return "\n".join(
         (
             "═" * WIDTH,
-            f"  {snap.get('repo', REPO)} — fleet session · HEAD {snap.get('head', 'unknown')} · {snap.get('now', '')} · {snap.get('uptime', 'up ?')}",
-            "  attach: tmux attach -t fleet      detach: Ctrl-b d      logs: .fleet/<rung>.log",
+            f"  {snap.get('repo', REPO)} — {SESSION} session · HEAD {snap.get('head', 'unknown')} · {snap.get('now', '')} · {snap.get('uptime', 'up ?')}",
+            f"  attach: tmux attach -t {SESSION}      detach: Ctrl-b d      logs: {FLEET_DIR.name}/<rung>.log",
             "═" * WIDTH,
         )
     )
@@ -540,7 +542,7 @@ def status_line(snap: dict) -> str:
     if waves:
         done, total = wave_progress(waves[0], closed)
         wave = f" · wave #{waves[0].get('parent', '?')} {done}/{total} done"
-    return f"fleet: {status} · {len(rungs)} rungs · {n_claims} claims{wave}"
+    return f"{SESSION}: {status} · {len(rungs)} rungs · {n_claims} claims{wave}"
 
 
 def render(snap: dict) -> str:
@@ -549,7 +551,7 @@ def render(snap: dict) -> str:
     summary = status_line(snap)
     if _COLOR:
         status = fleet_status(snap.get("rungs") or {})
-        summary = summary.replace(f"fleet: {status}", f"fleet: {paint(status, state_color(status))}", 1)
+        summary = summary.replace(f"{SESSION}: {status}", f"{SESSION}: {paint(status, state_color(status))}", 1)
     return "\n".join(
         (
             header_section(snap),
