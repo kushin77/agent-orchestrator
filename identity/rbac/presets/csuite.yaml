@@ -1,0 +1,127 @@
+# C-suite role pack - role-based boundaries for the five executive seats
+# (issue #638, workbook-7 Pillar 2).
+#
+# Every role below is *scoped* to what its persona card declares in
+# registry/personas/cards/<id>.yaml (issue #632, consumed read-only): the
+# permissions are the RBAC projection of the card's capabilitySet/constraintSet
+# and the org-chart edge it carries. `identity/rbac/boundaries.py` derives the
+# lane / tool / budget axes from the same cards, so a permission grant here and
+# a boundary refusal there can never disagree about which seat owns what.
+#
+# Tenant types: the pack key `csuite` resolves for the tenant type `csuite`
+# (see presets.resolve_pack), and `seed_org` seeds these five roles. The pack is
+# NOT one of the four BUILTIN_TENANT_TYPES - it is registered on demand so the
+# default packs keep their exact role mixes (tests assert that).
+#
+# Pack schema: identity/rbac/README.md.
+key: csuite
+name: C-Suite Boundaries
+description: Executive seats (CEO/CTO/COO/CFO/CMO) scoped to their declared lanes, tools and budget caps.
+role_admin_permission: roles:manage
+roles:
+  # CEO - the single root of the agent org chart (reports to the board). Owns
+  # strategy, org governance and goal decomposition; orchestrates and takes
+  # architecture-grade decisions; the only seat that may administer roles
+  # (chief executive authority is what the no-lockout invariant protects).
+  - key: ceo
+    name: CEO
+    description: "Executive strategy director: strategic governance, goal decomposition, multi-repo oversight; the org-chart root (reportsTo board)."
+    level: org
+    permissions:
+      - org:read
+      - org:manage
+      - roles:read
+      - roles:manage
+      - team:read
+      - agent:read
+      - agent:run
+      - session:read
+      - session:manage
+      - prompt:read
+      - model:read
+      - budget:read
+      - budget:manage
+      - tool:call
+      - audit:read
+    is_system: true
+
+  # CTO - system architect & dev lead (reportsTo ceo). Owns architecture,
+  # code-architecture and pr-triage; reads/author agents and prompts; never a
+  # role administrator (that stays with the root) and never a budget manager.
+  - key: cto
+    name: CTO
+    description: "System architect and dev lead: multi-repo architecture, AST mapping, PR triage; reports to the CEO."
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+      - agent:run
+      - agent:write
+      - session:read
+      - session:manage
+      - prompt:read
+      - prompt:write
+      - model:read
+      - budget:read
+      - tool:call
+    is_system: true
+
+  # COO - operations & pacing lead (reportsTo ceo). Owns operations, pacing and
+  # state-tracking; observes and paces, so it reads and runs but never mutates
+  # the org's role or budget administration.
+  - key: coo
+    name: COO
+    description: "Operations and pacing lead: workflow pacing, telemetry delta ingestion, ticket state tracking; reports to the CEO."
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+      - agent:run
+      - session:read
+      - session:manage
+      - prompt:read
+      - model:read
+      - budget:read
+      - tool:call
+      - audit:read
+    is_system: true
+
+  # CFO - financial & compute controller (reportsTo ceo). Owns finops,
+  # cost-control and budget-alerts; it is the one seat that reads cost and audit
+  # data, and it keeps budget:manage for its own cap policy - it still cannot
+  # administer roles.
+  - key: cfo
+    name: CFO
+    description: "Financial and compute controller: cloud cost analysis, token-burn auditing, budget alerts; reports to the CEO."
+    level: org
+    permissions:
+      - org:read
+      - agent:read
+      - session:read
+      - prompt:read
+      - model:read
+      - budget:read
+      - budget:manage
+      - audit:read
+      - tool:call
+    is_system: true
+
+  # CMO - marketing & sales automation (reportsTo ceo). Owns marketing,
+  # sales-automation and campaign-tracking; the only seat whose card carries the
+  # outbound mail/crm/sms tools, so it holds tool:call and read access, and
+  # never role or budget administration.
+  - key: cmo
+    name: CMO
+    description: "Marketing and sales automation: webhook management, outbound campaign tracking, social distribution; reports to the CEO."
+    level: org
+    permissions:
+      - org:read
+      - agent:read
+      - session:read
+      - prompt:read
+      - model:read
+      - budget:read
+      - tool:call
+    is_system: true
