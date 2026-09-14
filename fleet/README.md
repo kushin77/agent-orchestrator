@@ -582,3 +582,38 @@ runner that is on neither PATH nor HOME — exactly one escalation, nothing
 dispatched, the queue held, the work left pending. Two mutants of the real loop
 (the preflight neutralised, the hold removed) must each be **detected**, so a
 regression cannot pass by looking right.
+
+## Restarting a rung: which signal, and why it matters (AO-GR-27)
+
+Both loops install handlers for **`SIGTERM` and `SIGINT` only**
+(`fleet/terminal.py:1036`, `fleet/brain.py:262`, `fleet/monitor.py:178`). Those
+are *clean* stops: the signal handler releases the in-flight claim and takes its
+subagent down with it, so the restart suppresses a duplicate rather than
+stranding work.
+
+**`SIGHUP` is NOT handled.** On Linux its default action is to **terminate the
+process immediately**, so `kill -HUP <pid>` bypasses the handler, the claim
+release and the child teardown entirely. It is therefore *worse* than
+`SIGTERM` — it is an abrupt kill wearing the costume of a graceful reload. It
+also does not do what a `HUP` usually means: neither loop re-reads config or
+re-execs on it.
+
+```bash
+# The clean restart (the recommended one):
+kill -TERM "$(pgrep -f 'fleet/terminal.py run')"
+
+# For comparison, a LIVE self-upgrade without any restart at all:
+python3 fleet/channel.py send ...   # a `refresh` control pulls, gates,
+                                    # then re-execs the loop with the new code
+```
+
+`refresh` is the right tool when the goal is "pick up merged code": the loop
+pulls, runs `make verify`, and re-executes itself with the new code. Use
+`SIGTERM` when you specifically want the rung to stop and let the watchdog bring
+it back.
+
+> **A merged fix does not reach a running loop by itself.** The loop runs the
+> code it started with, and the watchdog only replaces it when it is missing,
+> stale, or **drifted from `origin/master`** (AO-GR-25). If a fix is merged and
+> the fleet is still behaving like the old one, compare the running rung's commit
+> against `origin/master` before assuming the fix did not work.

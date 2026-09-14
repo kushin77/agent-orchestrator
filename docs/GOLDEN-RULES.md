@@ -405,6 +405,179 @@ into, not stumbled into (CMR GR-8 / SaaS escape-hatch ADR-0010).
 
 ---
 
+## Part C — fleet autonomy spine
+
+Rules for the autonomous loop itself. Every one of these exists because its
+absence was **measured** on this box, not hypothesised: on 2026-09-14 the fleet
+ran 16 hours of gate-stacking, executed pre-fix code while reporting healthy,
+and shelved 46 commits across 31 lanes. A rule here is advisory until its gate
+ships — and per AO-GR-4 that gap is stated, never implied-enforced.
+
+### AO-GR-21 — Bounded work: no queue item is retried forever
+
+**Origin.** Issue #723 (measured 2026-09-14; the wedge itself was #366).
+
+**Rule.** Every dispatched directive carries an **attempt budget** with
+exponential backoff and a **terminal dead-letter state**. A refusal is a state
+transition, not a reason to try again next tick. A directive that exhausts its
+budget moves to the dead-letter mailbox and is **never re-read**; the brain is
+escalated exactly once.
+
+**Why.** `fleet/terminal.py` left a directive **PENDING** on a refused claim and
+re-read it every cycle with no attempt counter, no backoff and no dead-letter
+(`report_once` deduped the *escalation*, not the *attempt*). Measured: **49
+concurrent `make verify` runs, 43 stacked in two worktrees, ~16 hours**; the
+wedge that caused it (#366) was itself re-dispatched in the same loop. A work
+queue with no dead-letter is an infinite loop with extra steps.
+
+**Verify.**
+- Per-directive attempts are persisted and survive a loop restart; attempts are
+  spaced by backoff; exhaustion dead-letters the directive.
+- `bash scripts/check-runaway-guard.sh` provokes a directive that always fails
+  and **must** observe it dead-lettered, never re-dispatched (AO-GR-4: the
+  check can genuinely fail).
+
+### AO-GR-22 — One gate per worktree, and the gate is admission-controlled
+
+**Origin.** Issue #724 (measured 2026-09-14: 49 concurrent gates).
+
+**Rule.** At most **one** composite gate (`make verify`) runs per worktree at a
+time, bounded by a box-wide concurrency cap. Work that cannot acquire a permit is
+**parked, not started**.
+
+**Why.** `make verify` had no admission control, so a re-dispatch loop could
+start gates without bound. Measured: 49 concurrent gates, zero idle CPU, and
+long gates SIGTERM'd by neighbouring load — which is indistinguishable from a
+test failure and corrupts the evidence chain. A gate that can be started an
+unbounded number of times will be.
+
+**Verify.**
+- A per-worktree lock refuses a second concurrent gate (released on signal and
+  on crash, with stale-lock detection naming the owner).
+- A negative control starts two gates in one worktree and proves the second
+  refuses.
+
+### AO-GR-23 — No work is invisible: commit is pushed before it is gated
+
+**Origin.** Issue #740 (measured 2026-09-14: 46 unpushed commits, 31 worktrees).
+
+**Rule.** A lane **pushes its branch as soon as it commits** — before the gate,
+never after. A committed change that exists only locally, or only in a worktree,
+is not work: it is unsheltered data. The dispatch loop must not be able to end a
+cycle with an unpushed commit.
+
+**Why.** The loop pushed only on full success (runner exit 0 **and** gates
+green), so a runner failure stalled every lane at "committed, never pushed".
+Measured: **31 worktrees holding 46 unpushed commits**, including **5 lanes on
+closed issues whose work `origin/master` did not contain**. An unpushed branch
+is invisible to the board *and* to `governance/reconcile`, which can only
+reclaim or park what reaches a remote — so this work was shelved by accident,
+and for a closed issue nobody ever returns.
+
+**Verify.**
+- After any loop cycle, no worktree has commits ahead of `origin/master` that
+  have no matching remote branch; a stranded lane is reported **by name**.
+- `bash scripts/check-lane-stranded.sh` provokes a local-only commit and must
+  fail it.
+
+### AO-GR-24 — A wave is provably file-disjoint before it is dispatched
+
+**Origin.** Issue #740 (measured 2026-09-14: 27 collisions across 14 lanes).
+
+**Rule.** Before dispatching a wave of parallel lanes, the dispatcher computes
+each lane's file set and **refuses to dispatch two lanes whose sets intersect**.
+Collisions are resolved by serialising the wave or by re-scoping the issue —
+never by fanning out and rebasing later.
+
+**Why.** Fan-out by *issue* without collision-aware planning produced **27
+source-file collisions across 14 lanes**: six children of one epic all edited the
+same seven files (`Makefile`, `control-plane/control/cli.py`, `scripts/verify.sh`,
+`governance/dispatch/cli.py`, `governance/dispatch/focus.py`,
+`scripts/check-epic-focus.sh`, `test_focus.py`). That is AO-GR-2 violated in
+bulk, and it means **raising agent count multiplies conflicts, not throughput** —
+because the policy that would have prevented it was itself one of the colliding
+lanes.
+
+**Verify.**
+- The ready wave is pairwise file-disjoint by construction; a negative control
+  presents two colliding children and the dispatcher **refuses the second**.
+- Max-agents fan-out is **blocked** until this check is green — the raising
+  change and this gate land together or not at all.
+
+### AO-GR-25 — Drift is measured against the remote, and never fails open
+
+**Origin.** Issue #739 (measured 2026-09-14: the loop ran pre-fix code while
+reporting `healthy`).
+
+**Rule.** A running loop's commit is compared against **`origin/master`** — never
+against the local checkout, which may itself be the stale side. An unreadable
+HEAD is **CANNOT-ASSESS**, never healthy. When the running commit differs from the
+remote, the rung is **drifted** and is respawned.
+
+**Why.** `fleet/watchdog.py` compared the loop's heartbeat commit to
+`channel.head_commit()`, which reads the **shared checkout**. With the checkout
+stale (the normal state here) both sides were the *same old commit*, so the loop
+reported `sister: healthy` while executing code from **before a merged fix** — a
+fix that therefore could never reach the running fleet. The comparison was also
+guarded by `head != "unknown"`, so an unreadable HEAD **silently disabled drift
+detection entirely**. A control that cannot fail is a formality (AO-GR-4); a
+control that fails *open* is worse than none.
+
+**Verify.**
+- The watchdog reports DRIFTED when the loop's commit differs from
+  `origin/master`, even when the local checkout equals the running commit (a
+  negative control proves this exact case).
+- `HEAD == unknown` ⇒ CANNOT-ASSESS, never healthy; the watchdog line names both
+  commits.
+
+### AO-GR-26 — A long-lived loop resolves its own dependencies before taking work
+
+**Origin.** Issue #733 (measured 2026-09-14: the fleet could not spawn a single
+subagent).
+
+**Rule.** A loop **preflights its runner and required binaries at startup and on
+every respawn**, before reading its queue. If a dependency is unresolvable it
+prints one actionable line naming what is missing and where it looked, escalates
+**once**, and **holds the queue** — it never fails per item.
+
+**Why.** The runner was resolved from an inherited PATH the loop did not control
+(cron's minimal PATH omitted `~/.local/bin`), so every dispatch died with
+`FileNotFoundError: 'claude'` — **a fleet that could not spawn a single
+subagent** while appearing to run. Because the failure was per-directive, it also
+became an escalate-storm: the same defect, multiplied by queue depth.
+
+**Verify.**
+- The runner is resolved in code from an explicit, documented search path; the
+  launcher passes an explicit environment rather than relying on ambient PATH.
+- A preflight failure yields exactly **one** escalation plus a held queue; a
+  negative control removes the runner and proves the preflight fires once.
+
+### AO-GR-27 — A loop honours the signals it is sent, and documents the rest
+
+**Origin.** Issue #733 (measured 2026-09-14: asked to `HUP` a loop that does not
+handle `SIGHUP`).
+
+**Rule.** Every long-lived loop installs handlers for the signals an operator is
+told to use. A signal the loop does **not** handle must be documented as
+unhandled — and the documented restart signal must be one that performs a
+**clean** stop (release claims, take the in-flight child down). Operators must
+never be advised to send a signal whose default action is an abrupt kill.
+
+**Why.** Both loops handle only `SIGTERM`/`SIGINT` (`fleet/terminal.py:1036`,
+`fleet/brain.py:262`); `SIGHUP` is unhandled, so its default action
+**terminates the process immediately** — bypassing `handle_stop`, the claim
+release, and the child teardown. An operator restarting the fleet "cleanly"
+would silently corrupt the evidence chain, and the recurring
+"can't you just HUP it?" is a documentation defect, not an operator error.
+
+**Verify.**
+- The signal set each loop installs is declared and asserted; a check fails when
+  a restart signal is recommended that the loop does not handle.
+- The runbook names the clean restart signal (`SIGTERM`) and states plainly that
+  `SIGHUP` is unhandled and therefore destructive.
+
+---
+
 ## Enforcement & linkage
 
 Golden rules are the top of the product's policy hierarchy. Below them:
