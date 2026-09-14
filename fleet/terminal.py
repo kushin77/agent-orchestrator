@@ -195,6 +195,7 @@ def run_once(
     agent_id: str,
     worktree: Path | None = None,
     env: dict[str, str] | None = None,
+    slot: dict | None = None,
 ) -> tuple[int, str]:
     """Run one subagent for one directive; return (exit code, captured output).
 
@@ -219,7 +220,8 @@ def run_once(
         )
     except OSError as exc:
         return 127, f"runner could not start in {cwd}: {exc}"
-    IN_FLIGHT["child"] = child
+    if slot is not None:
+        slot["child"] = child
     beater = start_session_beat(env, child.pid)
     try:
         output, _ = child.communicate(timeout=timeout)
@@ -229,7 +231,8 @@ def run_once(
         return 124, f"runner timed out after {timeout}s: {(output or '')[-400:]}"
     finally:
         stop_session_beat(beater)
-        IN_FLIGHT["child"] = None
+        if slot is not None:
+            slot["child"] = None
     return child.returncode, output or ""
 
 
@@ -327,18 +330,33 @@ def release_issue(issue: int, agent_id: str) -> tuple[bool, str]:
     return False, output
 
 
-def release_in_flight(issue: int, agent_id: str, directive_id: str) -> None:
-    """Release the run's claim exactly once, whichever path gets there first.
+def _mark_released(slot: dict) -> bool:
+    """Atomically take ownership of a run's release: True exactly once per slot.
 
     Two writers race for one claim on a graceful stop — ``stop_and_release`` (the
     signal handler) and the run's ``finally`` — and ``release`` is deliberately
-    not idempotent, so the loser logged ``release of #N FAILED`` plus a spurious
-    warn on *every* graceful stop (#281). The ``released`` flag makes this the
-    single owner: the first caller releases, the second is a no-op.
+    not idempotent. The per-slot ``released`` flag, guarded by ``RUNS_LOCK``,
+    makes one caller the single owner: the first releases, the second is a no-op.
     """
-    if IN_FLIGHT.get("released"):
+    with RUNS_LOCK:
+        if slot.get("released"):
+            return False
+        slot["released"] = True
+        return True
+
+
+def release_in_flight(slot: dict) -> None:
+    """Release one run's claim exactly once, whichever path gets there first.
+
+    The loop owns the claim and a worker releases it in its ``finally``, so a
+    dead child can never strand it; ``stop_and_release`` races the same release
+    and ``_mark_released`` picks a single owner (#281).
+    """
+    if not _mark_released(slot):
         return
-    IN_FLIGHT["released"] = True
+    issue = slot.get("issue")
+    agent_id = slot.get("agent_id")
+    directive_id = slot.get("directive")
     released, release_output = release_issue(issue, agent_id)
     if not released:
         print(f"[terminal] release of #{issue} FAILED: {release_output}", file=sys.stderr, flush=True)
@@ -372,52 +390,56 @@ def closeout_issue(issue: int) -> str:
 
 
 def stop_and_release(reason: str) -> None:
-    """A stopped loop must not strand its claim: take the subagent down, free it.
+    """A stopped loop must not strand any claim: take every subagent down, free all.
 
     Observed live: restarting the sister loop mid-run killed it before the
     `finally`, so #167 stayed claimed by an agent that no longer existed — the
     exact wedge the reap tool exists to clean, recreated by an operator restart.
+    With a pool the same must hold for *every* in-flight child: a stop takes all
+    N down and releases each claim exactly once.
     """
-    child = IN_FLIGHT.get("child")
-    if child is not None and child.poll() is None:
-        child.terminate()
-        try:
-            child.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            child.kill()
-    issue, agent_id, directive_id = IN_FLIGHT.get("issue"), IN_FLIGHT.get("agent_id"), IN_FLIGHT.get("directive")
-    if issue is None or not agent_id:
-        return
-    # Single owner: this handler releases the claim, and the run's own `finally`
-    # must not release it a second time (the second was always refused and logged
-    # a false "release FAILED" on every graceful stop — #281).
-    IN_FLIGHT["released"] = True
-    held = subprocess.run(
-        ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
-    if held.returncode != 0:
-        # Nothing was held (the claim was refused, or already released): say so
-        # rather than reporting a release that never happened.
+    for slot in active_run_slots():
+        slot["stopped"] = True
+        child = slot.get("child")
+        if child is not None and child.poll() is None:
+            child.terminate()
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child.kill()
+        # Single owner: whichever of this handler and the run's own `finally`
+        # wins `_mark_released` releases the claim; the other is a no-op (#281).
+        if not _mark_released(slot):
+            continue
+        issue = slot.get("issue")
+        agent_id = slot.get("agent_id")
+        directive_id = slot.get("directive")
+        held = subprocess.run(
+            ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        if held.returncode != 0:
+            # Nothing was held (the claim was refused, or already released): say
+            # so rather than reporting a release that never happened.
+            subprocess.run(
+                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id or "unknown",
+                 "--severity", "warn", "--body", f"operator stopped the loop mid-run on #{issue} ({reason}); "
+                 "no live claim to release"[:2000]],
+                cwd=ROOT,
+            )
+            continue
+        ok, output = release_issue(issue, agent_id)
+        body = (
+            f"operator stopped the loop mid-run on #{issue} ({reason}); claim released"
+            + (" — re-dispatch is safe" if ok else f" — RELEASE FAILED: {output[-200:]}")
+        )
         subprocess.run(
             ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id or "unknown",
-             "--severity", "warn", "--body", f"operator stopped the loop mid-run on #{issue} ({reason}); "
-             "no live claim to release"[:2000]],
+             "--severity", "warn", "--body", body[:2000]],
             cwd=ROOT,
         )
-        return
-    ok, output = release_issue(issue, agent_id)
-    body = (
-        f"operator stopped the loop mid-run on #{issue} ({reason}); claim released"
-        + (" — re-dispatch is safe" if ok else f" — RELEASE FAILED: {output[-200:]}")
-    )
-    subprocess.run(
-        ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id or "unknown",
-         "--severity", "warn", "--body", body[:2000]],
-        cwd=ROOT,
-    )
 
 
 def handle_stop(signum: int, frame: object) -> None:
@@ -575,15 +597,63 @@ def verdict(rc: int, output: str, gate_ok: bool, landed: bool) -> tuple[str, str
 
 HEARTBEAT = ROOT / ".fleet" / "sister.heartbeat.json"
 WORKTREE_ROOT = Path(os.environ.get("AO_WORKTREE_ROOT", str(Path.home() / "ao-worktrees")))
-# What the loop is currently executing, so a stop signal can free the claim.
-IN_FLIGHT: dict[str, object] = {
-    "issue": None, "agent_id": None, "directive": None, "child": None, "released": False,
-}
 # Run registry: who is tracking which directive. Without it a claim's holder is
 # just a string — indistinguishable from an agent that died mid-run, which is how
 # a directive got consumed as "already in-flight" while nothing was running.
 RUNS = ROOT / ".fleet" / "runs"
 REPORTED = ROOT / ".fleet" / "reported"
+
+#: The bounded worker pool: this many directives run concurrently, env-overridable
+#: so an operator can widen or narrow the fleet without a code change.
+DEFAULT_POOL_SIZE = 10
+
+
+def pool_size() -> int:
+    """Up to this many subagents run at once; ``FLEET_SISTER_POOL`` overrides it."""
+    raw = os.environ.get("FLEET_SISTER_POOL", str(DEFAULT_POOL_SIZE))
+    try:
+        size = int(raw)
+    except (TypeError, ValueError):
+        size = DEFAULT_POOL_SIZE
+    return max(1, size)
+
+
+#: Live per-directive run slots, keyed by directive id. The old single ``IN_FLIGHT``
+#: dict could track exactly one run; a pool of N concurrent subagents needs one
+#: slot per child, each carrying its own issue, agent id, child process, release
+#: flag and heartbeat thread. Guarded by ``RUNS_LOCK``: the loop thread, each
+#: worker thread and the signal handler all touch it.
+RUNS_LOCK = threading.Lock()
+IN_FLIGHT: dict[str, dict[str, object]] = {}
+#: Serialises telemetry appends so N workers cannot interleave a JSON line.
+RECORD_LOCK = threading.Lock()
+
+
+def register_run(directive_id: str, issue: int, agent_id: str) -> dict:
+    """Open a per-directive slot; the worker and the stop handler find it here."""
+    slot: dict[str, object] = {
+        "issue": issue,
+        "agent_id": agent_id,
+        "directive": directive_id,
+        "child": None,
+        "released": False,
+        "stopped": False,
+        "beater": None,
+    }
+    with RUNS_LOCK:
+        IN_FLIGHT[directive_id] = slot
+    return slot
+
+
+def unregister_run(directive_id: str) -> None:
+    with RUNS_LOCK:
+        IN_FLIGHT.pop(directive_id, None)
+
+
+def active_run_slots() -> list[dict]:
+    """A snapshot of every in-flight run slot, so N runs are visible at once."""
+    with RUNS_LOCK:
+        return list(IN_FLIGHT.values())
 
 
 def _now() -> str:
@@ -641,14 +711,50 @@ def mark_run(directive_id: str, issue: int, agent_id: str) -> None:
     Written atomically (tmp + rename): readers outside the loop (the JSON gate,
     the brain, an operator) can otherwise catch a torn file mid-write — which is
     exactly how it was caught, by `json-lint` reading a half-written registry.
+
+    The marker is per-directive, so N concurrent runs produce N markers. ``pid``
+    stays the loop's — that is what prune/watchdog read for liveness — while
+    ``child_pid`` and ``ts`` are refreshed by the run's own beater (see
+    ``refresh_run``) so the marker doubles as that child's heartbeat.
     """
     RUNS.mkdir(parents=True, exist_ok=True)
     target = RUNS / f"{directive_id}.json"
     tmp = target.with_suffix(".tmp")
     tmp.write_text(
-        json.dumps({"issue": issue, "agent": agent_id, "pid": os.getpid(), "started_at": _now()}) + "\n",
+        json.dumps(
+            {
+                "issue": issue,
+                "agent": agent_id,
+                "pid": os.getpid(),
+                "child_pid": None,
+                "started_at": _now(),
+                "ts": _now(),
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
+    tmp.replace(target)
+
+
+def refresh_run(directive_id: str, child_pid: int | None = None) -> None:
+    """Refresh one run marker's heartbeat; N live runs read as N live beats.
+
+    The single ``sister.heartbeat.json`` can only name one child, so each run's
+    own marker carries its liveness instead: the beater advances ``ts`` and
+    records the subagent pid while the child works. ``pid`` is left untouched,
+    so the prune/watchdog liveness semantics are unchanged.
+    """
+    target = RUNS / f"{directive_id}.json"
+    try:
+        record = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    record["ts"] = _now()
+    if child_pid is not None:
+        record["child_pid"] = child_pid
+    tmp = target.with_suffix(".tmp")
+    tmp.write_text(json.dumps(record) + "\n", encoding="utf-8")
     tmp.replace(target)
 
 
@@ -668,18 +774,19 @@ def record_run(
     the channel; only the extra record is lost.
     """
     try:
-        telemetry.append_record(
-            telemetry.RUNS_LOG,
-            telemetry.build_record(
-                run_id=directive_id,
-                issue=str(issue),
-                agent=agent_id,
-                status=status,
-                started_at=started_at,
-                finished_at=finished_at,
-                detail=detail,
-            ),
-        )
+        with RECORD_LOCK:
+            telemetry.append_record(
+                telemetry.RUNS_LOG,
+                telemetry.build_record(
+                    run_id=directive_id,
+                    issue=str(issue),
+                    agent=agent_id,
+                    status=status,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    detail=detail,
+                ),
+            )
     except (telemetry.TelemetryError, OSError) as exc:
         print(f"[terminal] telemetry record for {directive_id} rejected: {exc}", file=sys.stderr, flush=True)
 
@@ -811,6 +918,7 @@ def write_heartbeat(
     issue: int | None = None,
     agent: str | None = None,
     child_pid: int | None = None,
+    runs: int | None = None,
 ) -> None:
     """Publish liveness *and* the commit this process is running.
 
@@ -834,6 +942,8 @@ def write_heartbeat(
         entry["agent"] = agent
     if child_pid is not None:
         entry["child_pid"] = child_pid
+    if runs is not None:
+        entry["runs"] = runs
     HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
     tmp = HEARTBEAT.with_suffix(".tmp")
     tmp.write_text(json.dumps(entry) + "\n", encoding="utf-8")
@@ -841,34 +951,32 @@ def write_heartbeat(
 
 
 class RunBeater:
-    """Keeps the beat fresh while a child runs; `stop()` is synchronous.
+    """Keeps one run's marker fresh while its child works; `stop()` is synchronous.
 
-    `stop()` joins the thread rather than merely setting a flag: a beater that
-    outlives its owner writes the *owner's* idea of the world — measured, a test
-    beater left running wrote `commit: abc1234` and a pytest pid into the live
-    heartbeat when monkeypatch restored the real path.
+    Each run in the pool has its own beater, keyed by directive id, so N
+    concurrent children each advance their own marker (`refresh_run`) — the
+    watchdog/monitor sees N live runs, not one shared heartbeat. `stop()` joins
+    the thread rather than merely setting a flag: a beater that outlives its
+    owner wrote the *owner's* idea of the world — measured, a test beater left
+    running wrote `commit: abc1234` and a pytest pid into the live heartbeat when
+    monkeypatch restored the real path.
     """
 
-    def __init__(self, started_at: str, commit: str, issue: int, agent_id: str, interval: float) -> None:
+    def __init__(self, directive_id: str, interval: float, slot: dict | None = None) -> None:
         self._stop = threading.Event()
+        self._slot = slot or {}
+        self._directive_id = directive_id
         self._thread = threading.Thread(
             target=self._beat,
-            args=(started_at, commit, issue, agent_id, interval),
-            name="fleet-heartbeat",
+            args=(interval,),
+            name=f"fleet-runbeat-{directive_id}",
             daemon=True,
         )
 
-    def _beat(self, started_at: str, commit: str, issue: int, agent_id: str, interval: float) -> None:
+    def _beat(self, interval: float) -> None:
         while not self._stop.wait(interval):
-            child = IN_FLIGHT.get("child")
-            write_heartbeat(
-                f"working:#{issue}",
-                started_at=started_at,
-                commit=commit,
-                issue=issue,
-                agent=agent_id,
-                child_pid=getattr(child, "pid", None),
-            )
+            child = self._slot.get("child")
+            refresh_run(self._directive_id, child_pid=getattr(child, "pid", None))
 
     def start(self) -> RunBeater:
         self._thread.start()
@@ -881,14 +989,44 @@ class RunBeater:
 
 
 def start_beating(
-    started_at: str,
-    commit: str,
-    issue: int,
-    agent_id: str,
+    directive_id: str,
     interval: float = HEARTBEAT_INTERVAL_SECONDS,
+    slot: dict | None = None,
 ) -> RunBeater:
-    """Start a run's beater; the caller MUST `stop()` it in a finally block."""
-    return RunBeater(started_at, commit, issue, agent_id, interval).start()
+    """Start a run's per-directive beater; the caller MUST `stop()` it in finally."""
+    return RunBeater(directive_id, interval, slot).start()
+
+
+def _run_child(
+    directive: dict,
+    args: argparse.Namespace,
+    slot: dict,
+    agent_id: str,
+    worktree: Path | None,
+    lane_env: dict[str, str],
+) -> tuple[int, str]:
+    """Run one subagent and release its lane; the loop owns the claim.
+
+    This is the body of one pool worker up to and including the release: it
+    executes the subagent, then in ``finally`` clears the run marker, releases the
+    claim exactly once and unregisters the slot, so a dead child can never strand
+    an issue. The verdict and the report are the loop's own worker's job (the
+    nested ``run_worker`` inside ``loop``), run on the same thread so the run path
+    stays one place.
+    """
+    directive_id = slot["directive"]
+    beater = start_beating(directive_id, HEARTBEAT_INTERVAL_SECONDS, slot)
+    try:
+        return run_once(
+            directive, args.runner, args.timeout, args.dry_run, agent_id, worktree, lane_env, slot
+        )
+    finally:
+        beater.stop()
+        clear_run(directive_id)
+        # Single owner (#281): a graceful stop already released the claim and set
+        # the flag, so this must not release it a second time.
+        release_in_flight(slot)
+        unregister_run(directive_id)
 
 
 def loop(args: argparse.Namespace) -> int:
@@ -900,22 +1038,89 @@ def loop(args: argparse.Namespace) -> int:
     commit = subprocess.run(
         ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
     ).stdout.strip() or "unknown"
+
+    def run_worker(
+        directive: dict,
+        slot: dict,
+        agent_id: str,
+        issue: int,
+        worktree: Path | None,
+        lane_env: dict[str, str],
+        run_started_at: str,
+    ) -> None:
+        """One worker's full life: run the subagent, then derive and report the verdict.
+
+        The claim is already taken and the lane provisioned by the loop; this runs
+        the subagent (via ``_run_child``, which releases the claim in ``finally``),
+        then derives the verdict from evidence the loop runs itself and reports it.
+        One worker = one directive = one lane = one report.
+        """
+        directive_id = slot["directive"]
+        rc, output = _run_child(directive, args, slot, agent_id, worktree, lane_env)
+        if slot.get("stopped"):
+            # A stop/kill took this run down; the stop path already escalated, and
+            # a post-mortem gate run here would only manufacture a false result.
+            return
+        where = f"worktree {worktree}" if worktree else "shared checkout"
+        tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
+        tail = f"[{where}] {tail}"
+        # The verdict comes from evidence the loop runs itself — the issue's own
+        # Verify: command, `make verify`, and the real board state — never from
+        # the runner's prose (#279).
+        gate_ok, gate_detail = gate_evidence(issue, worktree, args.timeout)
+        # "The PR is merged" is not "the item is closed": at this point the branch,
+        # the claim, the directive and the lane are still live. Close them out and
+        # carry the verdict, so a partial close is visible. Only a run whose gates
+        # passed is worth closing out.
+        closeout = closeout_issue(issue) if (rc == 0 and gate_ok) else "SKIPPED (gates did not pass)"
+        landed, landing_detail = landed_evidence(issue)
+        run_status, prose_hint = verdict(rc, output, gate_ok, landed)
+        tail = f"{tail} | {gate_detail} | {landing_detail} | close-out: {closeout} | prose-hint: {prose_hint}"
+        record_run(directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200])
+        clear_reported(directive_id)
+        if run_status == "done":
+            subprocess.run(
+                ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                 "--type", "result", "--body", tail[:2000]],
+                cwd=ROOT,
+            )
+        else:
+            # The runner's exit code picks the severity; the *evidence* decides
+            # whether this is a success at all. Prose no longer picks either.
+            severity = "warn" if rc == 0 else "critical"
+            subprocess.run(
+                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                 "--severity", severity, "--body", tail[:2000]],
+                cwd=ROOT,
+            )
+
     idle_printed = False
     paused_printed = False
+    pool = pool_size()
     while True:
+        active = len(active_run_slots())
         if stopping():
-            # `stop` takes effect between runs — and an idle loop is between runs.
-            # Checking only after a run meant `stop` on an idle fleet did nothing.
+            # `stop` is graceful: it takes effect once every in-flight run has
+            # finished — an idle pool is between runs. Checking only after a run
+            # meant `stop` on an idle fleet did nothing, and returning while
+            # workers still ran would strand their claims.
+            if active:
+                write_heartbeat("stopping", started_at=started_at, commit=commit, runs=active)
+                time.sleep(args.idle_sleep)
+                continue
             set_flag(STOPPING, False)
             write_heartbeat("stopped", started_at=started_at, commit=commit)
             print("[terminal] control:stop — stopping the loop cleanly", flush=True)
             return 0
         if paused():
-            write_heartbeat("paused", started_at=started_at, commit=commit)
+            write_heartbeat("paused", started_at=started_at, commit=commit, runs=active)
         else:
-            write_heartbeat("idle", started_at=started_at, commit=commit)
+            write_heartbeat("working" if active else "idle", started_at=started_at, commit=commit, runs=active)
+        watch_command = ["python3", CHANNEL, "watch", "--timeout-seconds", str(args.watch_timeout), "--interval", "1"]
+        for slot in active_run_slots():
+            watch_command += ["--skip", str(slot["directive"])]
         watch = subprocess.run(
-            ["python3", CHANNEL, "watch", "--timeout-seconds", str(args.watch_timeout), "--interval", "1"],
+            watch_command,
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -964,7 +1169,8 @@ def loop(args: argparse.Namespace) -> int:
                     if control == "poke"
                     else (
                         f"loop state: paused={paused()} stopping={stopping()} "
-                        f"in-flight={IN_FLIGHT.get('issue') or 'none'} runs={len(list(RUNS.glob('*.json'))) if RUNS.exists() else 0}"
+                        f"active-runs={len(active_run_slots())} "
+                        f"runs={len(list(RUNS.glob('*.json'))) if RUNS.exists() else 0}"
                     )
                 )
                 print(f"[terminal] control:{control} — answering", flush=True)
@@ -977,9 +1183,9 @@ def loop(args: argparse.Namespace) -> int:
                     return 0
                 continue
 
-            verdict = apply_control(control, directive, agent_id_for(directive_id))
-            print(f"[terminal] control:{control} — {verdict}", flush=True)
-            if verdict == "unknown":
+            control_outcome = apply_control(control, directive, agent_id_for(directive_id))
+            print(f"[terminal] control:{control} — {control_outcome}", flush=True)
+            if control_outcome == "unknown":
                 # Poison message: this build cannot execute it, and re-reading it
                 # cannot change that. Say so once, then consume it.
                 report_once(
@@ -998,7 +1204,7 @@ def loop(args: argparse.Namespace) -> int:
                 if args.once:
                     return 1
                 continue
-            if verdict == "kill":
+            if control_outcome == "kill":
                 handled(directive_id)
                 subprocess.run(
                     ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
@@ -1006,7 +1212,7 @@ def loop(args: argparse.Namespace) -> int:
                     cwd=ROOT,
                 )
                 return 128 + signal.SIGTERM
-            if verdict == "halt":
+            if control_outcome == "halt":
                 handled(directive_id)
                 subprocess.run(
                     ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
@@ -1014,7 +1220,7 @@ def loop(args: argparse.Namespace) -> int:
                     cwd=ROOT,
                 )
                 return 0
-            if verdict == "refresh":
+            if control_outcome == "refresh":
                 handled(directive_id)
                 print("[terminal] refresh requested — pull + verify + restart", flush=True)
                 pull = subprocess.run(["git", "pull", "--ff-only"], cwd=ROOT, capture_output=True, text=True)
@@ -1036,7 +1242,7 @@ def loop(args: argparse.Namespace) -> int:
                 if args.once:
                     return 1
                 continue
-            if verdict == "restart":
+            if control_outcome == "restart":
                 # Re-exec the same code: no pull, no verify — the fast lever.
                 handled(directive_id)
                 subprocess.run(
@@ -1046,7 +1252,7 @@ def loop(args: argparse.Namespace) -> int:
                 )
                 print("[terminal] restart requested — re-exec", flush=True)
                 os.execv(sys.executable, [sys.executable, *sys.argv])
-            if verdict == "dispatch-override":
+            if control_outcome == "dispatch-override":
                 print("[terminal] control:override — reaping any holder, then dispatching", flush=True)
                 issue_for_override = directive_issue(directive)
                 if issue_for_override is not None:
@@ -1063,7 +1269,7 @@ def loop(args: argparse.Namespace) -> int:
                 # pause / resume / stop: the flag is set; ack and carry on.
                 subprocess.run(
                     ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
-                     "--type", "ack", "--body", f"control:{control} — {verdict}"],
+                     "--type", "ack", "--body", f"control:{control} — {control_outcome}"],
                     cwd=ROOT,
                 )
                 if args.once:
@@ -1101,11 +1307,16 @@ def loop(args: argparse.Namespace) -> int:
                 return 1
             continue
 
+        if active >= pool:
+            # The pool is full: this directive is work but there is no free worker.
+            # Leave it pending (do NOT consume it) and let a freed slot take it next
+            # cycle. The skip list keeps `watch` from re-returning only the already
+            # running directives; this one stays queued for a later slot.
+            print(f"[terminal] pool full ({active}/{pool}) — holding #{issue} pending", flush=True)
+            time.sleep(args.idle_sleep)
+            continue
+
         agent_id = agent_id_for(directive_id)
-        IN_FLIGHT["issue"] = issue
-        IN_FLIGHT["agent_id"] = agent_id
-        IN_FLIGHT["directive"] = directive_id
-        IN_FLIGHT["released"] = False
         held = subprocess.run(
             ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
             cwd=ROOT,
@@ -1174,11 +1385,9 @@ def loop(args: argparse.Namespace) -> int:
                 continue
 
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
-        write_heartbeat("working", started_at=started_at, commit=commit, issue=issue, agent=agent_id)
         mark_run(directive_id, issue, agent_id)
         run_started_at = _now()
         record_run(directive_id, issue, agent_id, "started", run_started_at)
-        beater = start_beating(started_at, commit, issue, agent_id)
         lane = (directive.get("task") or {}).get("lane") or ""
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
@@ -1206,59 +1415,21 @@ def loop(args: argparse.Namespace) -> int:
                 cwd=ROOT,
             )
         worktree, _branch, lane_env = tree if tree else (None, None, {})
-        try:
-            rc, output = run_once(
-                directive, args.runner, args.timeout, args.dry_run, agent_id, worktree, lane_env
-            )
-        finally:
-            beater.stop()
-            IN_FLIGHT["issue"] = None
-            IN_FLIGHT["agent_id"] = None
-            IN_FLIGHT["directive"] = None
-            clear_run(directive_id)
-            # Single owner (#281): a graceful stop already released the claim and
-            # set the flag, so this must not release it a second time.
-            release_in_flight(issue, agent_id, directive_id)
-            IN_FLIGHT["released"] = False
-        where = f"worktree {worktree}" if worktree else "shared checkout"
-        tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
-        tail = f"[{where}] {tail}"
-        # The verdict comes from evidence the loop runs itself — the issue's own
-        # Verify: command, `make verify`, and the real board state — never from
-        # the runner's prose (#279).
-        gate_ok, gate_detail = gate_evidence(issue, worktree, args.timeout)
-        # "The PR is merged" is not "the item is closed": at this point the branch,
-        # the claim, the directive and the lane are still live. Close them out and
-        # carry the verdict, so a partial close is visible. Only a run whose gates
-        # passed is worth closing out.
-        closeout = closeout_issue(issue) if (rc == 0 and gate_ok) else "SKIPPED (gates did not pass)"
-        landed, landing_detail = landed_evidence(issue)
-        run_status, prose_hint = verdict(rc, output, gate_ok, landed)
-        tail = f"{tail} | {gate_detail} | {landing_detail} | close-out: {closeout} | prose-hint: {prose_hint}"
-        record_run(directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200])
-        clear_reported(directive_id)
-        if run_status == "done":
-            subprocess.run(
-                ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
-                 "--type", "result", "--body", tail[:2000]],
-                cwd=ROOT,
-            )
-        else:
-            # The runner's exit code picks the severity; the *evidence* decides
-            # whether this is a success at all. Prose no longer picks either.
-            severity = "warn" if rc == 0 else "critical"
-            subprocess.run(
-                ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
-                 "--severity", severity, "--body", tail[:2000]],
-                cwd=ROOT,
-            )
+        # One worker = one lane = one claim = one run marker = one report. The
+        # claim is taken here (by the loop) and released in the worker's `finally`,
+        # so a dead child can never strand an issue.
+        slot = register_run(directive_id, issue, agent_id)
+        worker = threading.Thread(
+            target=run_worker,
+            args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at),
+            name=f"fleet-run-{directive_id}",
+            daemon=True,
+        )
+        slot["thread"] = worker
+        worker.start()
         if args.once:
-            return 0
-        if stopping():
-            # `stop` is graceful: it takes effect between runs, never mid-run.
-            set_flag(STOPPING, False)
-            write_heartbeat("stopped", started_at=started_at, commit=commit)
-            print("[terminal] control:stop — run finished; stopping the loop cleanly", flush=True)
+            # `--once` stays synchronous: one directive to completion, then out.
+            worker.join()
             return 0
 
 

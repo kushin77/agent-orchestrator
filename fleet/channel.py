@@ -738,11 +738,17 @@ def cmd_watch(args: argparse.Namespace) -> int:
     (which consumes the directive), then runs ``watch`` again. Exit 0 = a
     directive was returned; 1 = IDLE (nothing arrived before the timeout);
     2 = CANNOT-ASSESS (the inbox is unusable).
+
+    ``--skip ID`` (repeatable) removes directives the caller has already
+    dispatched but not yet consumed, so a pool of N concurrent workers can keep
+    draining the inbox past the directives still in flight instead of re-reading
+    the oldest one forever.
     """
     INBOX.mkdir(parents=True, exist_ok=True)
+    skip = set(getattr(args, "skip", None) or [])
     deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
     while True:
-        pending = ordered_by_time(INBOX)
+        pending = [path for path in ordered_by_time(INBOX) if path.stem not in skip]
         if pending:
             try:
                 message = json.loads(pending[0].read_text(encoding="utf-8"))
@@ -792,6 +798,7 @@ def build_parser() -> argparse.ArgumentParser:
     watch = sub.add_parser("watch", help="return the next pending directive, or block for one (sister side)")
     watch.add_argument("--timeout-seconds", type=float, default=600.0)
     watch.add_argument("--interval", type=float, default=1.0)
+    watch.add_argument("--skip", action="append", default=[], help="directive ids to skip (already dispatched)")
     watch.set_defaults(func=cmd_watch)
 
     escalate = sub.add_parser("escalate", help="raise a problem to the brain (sister/subagent side)")
