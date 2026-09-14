@@ -220,6 +220,14 @@ surfaces:
       healthy signal — until both this flag and an endpoint are configured. The
       label set is closed and bounded to
       {service, slo_kind, slo_id, verdict, tenant}.
+  fleet_health_export:
+    default: off
+    promoted: false
+    service: control-plane
+    description: >
+      Fleet-health push exporter (issue #498, ADR-0022): rung state + beat age,
+      reconciliation outcomes (reclaimed/parked/shelved/suspect), watchdog
+      capability verdicts. Closed label set only. Inert when unconfigured.
   chat:
     default: off
     promoted: false

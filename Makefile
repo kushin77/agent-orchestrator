@@ -14,9 +14,9 @@
 
 SHELL := /bin/bash
 
-.PHONY: help verify lint gate merge-gate qa-loop tests \
-        shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx \
+.PHONY: help verify lint gate merge-gate qa-loop tests e2e \
+        shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -40,6 +40,7 @@ help:
 	@echo "                per-suite tests + controls + policy-schema"
 	@echo "  qa-loop       fix -> verify -> re-check until the gate is green"
 	@echo "  tests         Run every declared pytest suite in isolation"
+	@echo "  e2e           Run only the capstone e2e suite (also in verify, #525)"
 	@echo "  paperclip     Run every paperclip boundary/adapter gate in one shot"
 	@echo "  shellcheck    Run shellcheck on scripts/ (skipped if not installed)"
 	@echo "  gitleaks      Run gitleaks with .gitleaks.toml (skipped if absent)"
@@ -145,6 +146,12 @@ qa-loop:
 tests:
 	@bash scripts/run-pytest-suites.sh
 
+## e2e — the capstone end-to-end suite alone (issue #525). The identical command
+## is an entry in `make verify` (scripts/verify.sh), so a red Definition-of-Done
+## proof can no longer reach master; this target is the convenience runner.
+e2e:
+	@env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q e2e/tests
+
 ## shell-syntax — bash -n on every *.sh outside vendor/
 shell-syntax:
 	@bash scripts/check-shell-syntax.sh
@@ -160,6 +167,14 @@ json-lint:
 ## docs-lint — foundation files, markdown links, whitespace, unfinished markers
 docs-lint:
 	@bash scripts/check-docs.sh
+
+## gate-coverage — every delivered artifact must be invoked by a gate (issue
+## #526): a scripts/check-*.sh no gate file names, or a declared pytest suite no
+## gate names as a target, fails by name unless it is a live entry in the
+## reviewed scripts/gate-coverage-baseline.txt (which is checked in both
+## directions, so a stale entry fails too)
+gate-coverage:
+	@bash scripts/check-gate-coverage.sh
 
 ## chronological-dispatch — governance docs must declare dependency-ordered
 ## issue selection (GR-20); a doc-only rule is advisory, so this gate fails it
@@ -440,6 +455,29 @@ codeidx:
 	@bash scripts/check-codeidx-surface.sh
 	@bash scripts/check-codeidx-backend.sh
 	@bash scripts/check-context-pack-consumption.sh
+
+## monitoring-declaration — the monitoring declaration surface (EPIC #494;
+## issue #499 is the wiring lane): the repo's monitoring integration
+## (`module.json`, the flat {id,type} shape ADR-0022 D3 froze, no invented pin
+## key) and its producer/consumer boundary (`docs/OBSERVABILITY.md`) must BOTH
+## be declared; the check stages a deliberately damaged scratch copy of each and
+## requires it to be refused BY NAME, so it cannot pass vacuously
+monitoring-declaration:
+	@bash scripts/check-monitoring-declaration.sh
+
+## capability-registers — the capability-register surfaces (EPIC #462 diagrams,
+## EPIC #473 codeidx): the two register-grammar enforcement gates (#469, #480)
+## and the two board-reconciliation trackers (#468, #479), in one shot. Each
+## keeps its OWN name in scripts/verify.sh's checks=() array — this target is
+## for fast local iteration, not a second gate of record. Unlike the `diagrams`
+## and `codeidx` targets above, these four are offline and deterministic: no
+## network, no `vendor/CMR` submodule and no vendored seed, so they run for real
+## in a fresh worktree rather than reporting CANNOT-ASSESS.
+capability-registers:
+	@bash scripts/check-diagrams-capability-register.sh
+	@bash scripts/track-diagrams-capabilities.sh
+	@bash scripts/check-codeidx-capability-register.sh
+	@bash scripts/track-codeidx-capabilities.sh
 
 ## paperclip-auth — cross-boundary auth for the paperclip seam (issue #412,
 ## ADR-0013/ADR-0012): agent identity is minted/verified from the fleet's own

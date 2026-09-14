@@ -13,12 +13,16 @@
 # failure -- and is named in the summary and in the attestation, so a skip can
 # never hide. Only a definite NOT-OK (or an unexpected code) fails the run.
 #
-# The check set includes the declared `fleet` pytest suite (`pytest-fleet`).
+# The check set includes the declared `fleet` pytest suite (`pytest-fleet`) and
+# the declared capstone `e2e` suite (`e2e`).
 # The gate of record must exercise the tests it claims to cover: a red fleet
 # suite sat on master undetected because this gate ran no pytest at all — only
-# `make gate` / `make tests` did (gate gap, issue #331). The remaining declared
-# suites are still exercised only by `make gate`; `governance/lessons` is red
-# for an unrelated board-hygiene defect (#312).
+# `make gate` / `make tests` did (gate gap, issue #331). The capstone E2E suite
+# had the same gap: it was declared in scripts/pytest-suites.txt, but only `make
+# gate` / `make tests` ran it, so the EPIC-00 Definition-of-Done proof could be
+# skipped outright (issue #525). The remaining declared suites are still
+# exercised only by `make gate`; `governance/lessons` is red for an unrelated
+# board-hygiene defect (#312).
 #
 # Usage: scripts/verify.sh [verify|gate]
 set -u
@@ -42,6 +46,17 @@ checks=(
   'yaml-lint|python3 scripts/check-yaml.py'
   'json-lint|bash scripts/check-json.sh'
   'docs-lint|bash scripts/check-docs.sh'
+  # gate-coverage (issue #526, RCA of EPIC #524): the gate registry was not
+  # self-checking. A new `scripts/check-*.sh` that nobody registers is inert,
+  # and a suite declared in scripts/pytest-suites.txt that no gate names is only
+  # reached by the manifest sweep -- so coverage was opt-in and nothing
+  # complained. This check names BOTH classes of ungated artifact and fails on
+  # any that is not in a live, reasoned baseline entry
+  # (scripts/gate-coverage-baseline.txt); the baseline is checked in both
+  # directions, so a stale entry (its artifact is wired now, or gone) fails too
+  # and the list cannot rot into a fiction. It is registered here deliberately:
+  # this array is explicit, so the detector is itself inert until it is named.
+  'gate-coverage|bash scripts/check-gate-coverage.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'fleet-channel|bash scripts/check-fleet-channel.sh'
@@ -160,6 +175,51 @@ checks=(
   'codeidx-surface|bash scripts/check-codeidx-surface.sh'
   'codeidx-backend|bash scripts/check-codeidx-backend.sh'
   'context-pack-consumption|bash scripts/check-context-pack-consumption.sh'
+  # e2e (issue #525): the capstone end-to-end suite. e2e/README.md calls this
+  # subtree the gate of the whole product build — it proves the EPIC-00
+  # Definition of Done (signup -> org -> personas -> agents -> routed model
+  # calls -> audit + usage billing, across all six providers, with 10 real
+  # negative controls in e2e/negative_controls.py). It was declared in
+  # scripts/pytest-suites.txt but ran only under `make gate` / `make tests`,
+  # which nothing enforces, so the DoD proof could be skipped and a broken DoD
+  # could reach master. It is wired as an ordinary PASS/FAIL check — a real
+  # failure is rc 1, never a SKIP — because the suite is offline, deterministic
+  # and green, so the CANNOT-ASSESS third state does not apply.
+  # PYTHONDONTWRITEBYTECODE + `-p no:cacheprovider` keep the gate clear of the
+  # __pycache__ state that can make a later run read a stale module instead of
+  # the tree under test.
+  'e2e|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q e2e/tests'
+  # EPIC #494 (the monitoring program; issue #499 is the wiring lane): the
+  # declaration gate (#496, ADR-0022) proves BOTH halves of the monitoring
+  # declaration are real -- `module.json` carries exactly one flat
+  # `{ "id": "prometheus", "type": "monitoring" }` integration (the shape
+  # ADR-0022 D3 froze, with no invented pin key) AND `docs/OBSERVABILITY.md`
+  # names the producer/consumer boundary (producer SSOT, Prometheus-plane
+  # owner, capability tie-back, OTLP/HTTP push, the signal-to-ticket rule, the
+  # DIFFERENT human-surface gap and the exposition lane). The check stages a
+  # deliberately damaged scratch copy of each declared file and REQUIRES it to
+  # be refused by name, so it cannot pass vacuously. It is registered here
+  # deliberately: this array is explicit, so a new scripts/check-*.sh is never
+  # auto-discovered and an unwired gate is a formality, not a gate.
+  'monitoring-declaration|bash scripts/check-monitoring-declaration.sh'
+  # EPIC #462 (diagrams) / EPIC #473 (codeidx) -- the capability registers: the
+  # four enforcement checks delivered by #468/#469 and #479/#480, registered here
+  # because this array is explicit and nothing is auto-discovered, so an unwired
+  # check enforces nothing (GR-12). `diagrams-capability-register` (#469) and
+  # `codeidx-capability-register` (#480) enforce each register's own row grammar
+  # (header, cell count, status/owner vocabularies, ref shape) and provoke their
+  # negative controls; `diagrams-capability-tracker` (#468) and
+  # `codeidx-capability-tracker` (#479) reconcile every row's `ref` against the
+  # RECORDED board snapshot, so a row that drifted from the board is surfaced by
+  # name instead of rotting. Unlike their `diagrams-declaration` (#464) and
+  # `codeidx-surface` (#475) siblings above, these four are offline and
+  # deterministic -- no network, no `vendor/CMR` submodule and no vendored seed
+  # -- so they RUN for real (rc 0) in a fresh worktree and are never recorded as
+  # CANNOT-ASSESS.
+  'diagrams-capability-register|bash scripts/check-diagrams-capability-register.sh'
+  'diagrams-capability-tracker|bash scripts/track-diagrams-capabilities.sh'
+  'codeidx-capability-register|bash scripts/check-codeidx-capability-register.sh'
+  'codeidx-capability-tracker|bash scripts/track-codeidx-capabilities.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
@@ -168,7 +228,30 @@ checks=(
   'pytest-fleet|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q fleet/tests'
 )
 
+# --- duplicate-registration guard (issue #499) -------------------------------
+# `checks=()` is an explicit list that every wiring lane appends to, so two
+# lanes can register the SAME name (measured on this board: a re-added
+# `cross-reference` entry). A duplicate is a gate defect, not a harmless no-op:
+# it re-runs a check and hides that two lanes claim the same surface. The
+# duplicates are computed and named BEFORE anything runs, recorded in the
+# attestation as `duplicates` ({} when the list is clean) and fail the run, so a
+# wedged check list can never attest green.
+duplicates_tsv="$verify_dir/.duplicates.tsv"
+: > "$duplicates_tsv"
+for entry in "${checks[@]}"; do
+  printf '%s\n' "${entry%%|*}"
+done | LC_ALL=C sort | uniq -c | awk '$1 > 1 {print $2"\t"$1}' > "$duplicates_tsv"
+
 overall=0
+if [ -s "$duplicates_tsv" ]; then
+  while IFS=$'\t' read -r dup_name dup_count; do
+    printf '  FAIL  check name %s is registered %s times (one writer per wave on this list)\n' \
+      "$dup_name" "$dup_count" >&2
+  done < "$duplicates_tsv"
+  echo "verify: duplicate check name(s) registered -- the check list is wedged" >&2
+  overall=1
+fi
+
 for entry in "${checks[@]}"; do
   name="${entry%%|*}"
   cmd="${entry#*|}"
@@ -197,11 +280,13 @@ export ATTEST_HOST="$(hostname 2>/dev/null || echo unknown)"
 export ATTEST_RESULT="$overall"
 export ATTEST_MODE="$mode"
 export ATTEST_RESULTS_TSV="$results_tsv"
+export ATTEST_DUPLICATES_TSV="$duplicates_tsv"
 python3 - <<'PY'
 import json, os
 
 attest_dir = os.environ["ATTEST_DIR"]
 results_tsv = os.environ["ATTEST_RESULTS_TSV"]
+duplicates_tsv = os.environ["ATTEST_DUPLICATES_TSV"]
 
 checks = []
 with open(results_tsv, encoding="utf-8") as fh:
@@ -214,6 +299,18 @@ with open(results_tsv, encoding="utf-8") as fh:
         checks.append({"name": name, "rc": int(rc), "status": status})
 
 skipped = [c["name"] for c in checks if c["status"] == "SKIP"]
+
+# Duplicate check names: a name registered twice is a gate defect (two lanes
+# wrote the same surface), so it is recorded here verbatim -- {} when clean.
+duplicates: dict[str, int] = {}
+with open(duplicates_tsv, encoding="utf-8") as fh:
+    for line in fh:
+        line = line.rstrip("\n")
+        if not line:
+            continue
+        dup_name, dup_count = line.split("\t", 1)
+        duplicates[dup_name] = int(dup_count)
+
 overall = int(os.environ["ATTEST_RESULT"])
 attestation = {
     "gate": "verify",
@@ -227,6 +324,7 @@ attestation = {
     "check_count": len(checks),
     "skipped": len(skipped),
     "skipped_checks": skipped,
+    "duplicates": duplicates,
     "checks": checks,
 }
 path = os.path.join(attest_dir, "attestation.json")
@@ -256,6 +354,10 @@ done
 skip_note=""
 if [ "$skipped" -gt 0 ]; then
   skip_note=", $skipped skipped: $skipped_names"
+fi
+
+if [ -s "$duplicates_tsv" ]; then
+  echo "verify: duplicate check name(s): $(awk -F'\t' '{printf "%s%s", sep, $1; sep=", "}' "$duplicates_tsv")" >&2
 fi
 
 echo ""
