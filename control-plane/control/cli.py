@@ -8,7 +8,7 @@ fleet can actually do:
 
     fleet/control.py            20 verbs
     fleet/channel.py            17 verbs
-    governance/dispatch/cli.py  11 verbs
+    governance/dispatch/cli.py  12 verbs
     governance/reconcile/cli.py  5 verbs
     governance/lifecycle/cli.py  4 verbs
 
@@ -16,7 +16,8 @@ Two directions are checked, and both matter:
 
   * MISSING  — a surface verb with no registry entry. This is the contract-first
     enforcement: a producer lane that adds a verb to a lever file without landing
-    the matching ``verbs.yaml`` + schema entry first is refused BY NAME.
+    the matching ``verbs.yaml`` + schema entry first is refused BY NAME, and the
+    registry — not the gate — is what gets extended.
   * ABSENT   — a registry entry whose local verb has disappeared. This is rot:
     the registry would describe a lever that no longer exists.
 
@@ -69,8 +70,8 @@ SOURCES: dict[str, set[str]] = {
         "consume", "log", "follow", "kb", "steer",
     },
     "governance/dispatch/cli.py": {
-        "audit", "eligible", "claim", "release", "status", "held", "reap",
-        "snapshot", "focus", "pool", "trigger",
+        "audit", "eligible", "claim", "dispatch", "release", "status", "held",
+        "reap", "snapshot", "focus", "pool", "trigger",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
     "governance/lifecycle/cli.py": {"audit", "status", "close", "collect"},

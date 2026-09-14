@@ -578,6 +578,17 @@ verbs:
     exposed: true
     refusals: [401, 403, 409, 503]
 
+  - id: board.dispatch
+    source: governance/dispatch/cli.py
+    local: dispatch
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: "A2A arbitration (#726): proves issue -> epic -> lane ownership before a directive is routed, and names the evidence checked. Read-class — the act that changes state is board.claim, which runs this same arbitration immediately before it writes, so the write remains the audited one and the refusal cannot be bypassed by calling the mutation directly. Carries 409 in addition to the 401/403/503 scaffold: an arbitration that cannot find the unit unowned fails the same 'already in flight' way a duplicate claim does."
+
   - id: board.release
     source: governance/dispatch/cli.py
     local: release
