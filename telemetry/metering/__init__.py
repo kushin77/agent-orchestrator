@@ -16,6 +16,9 @@ Public surface
 - ``model`` — the canonical ``UsageRecord`` + time-bucket helpers.
 - ``ratecards`` — ``RateCardStore`` over ``rate_cards/*.yaml``; the
   estimator returns ``None`` on an unknown provider/model (never 0).
+- ``cost_details`` — ``CostModel``: the ``usageDetails`` / ``costDetails``
+  breakdown of usage and cost by pricing tier (standard / longContext /
+  local), for the FinOps single-pane report (issue #341).
 - ``intake`` — ``MeteringIntake``: normalizes the merged gateway
   ``ModelCallEvent`` / ``CallRecord`` / ``MeteringRecord`` and the camelCase
   gateway/observability record shapes into ``UsageRecord``s and resolves
@@ -30,6 +33,7 @@ Public surface
 
 from telemetry.metering import (  # noqa: F401
     budget,
+    cost_details,
     intake,
     model,
     ratecards,
@@ -44,4 +48,5 @@ __all__ = [
     "store",
     "report",
     "budget",
+    "cost_details",
 ]
