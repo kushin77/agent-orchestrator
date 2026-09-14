@@ -62,6 +62,7 @@ sys.path.insert(0, str(ROOT / "fleet"))
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
 import channel  # noqa: E402
+import decompose_policy  # noqa: E402
 import routing  # noqa: E402
 import runtime  # noqa: E402
 import singleton  # noqa: E402
@@ -72,6 +73,7 @@ import singleton  # noqa: E402
 # are flat sibling imports, so they go on the path first (see `_conformance` for
 # how the conformance seam's own flat `model` is kept separate).
 import claims  # noqa: E402
+import focus as focus_mod  # noqa: E402
 import order  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 
@@ -571,6 +573,68 @@ def file_child_issue(title: str, body: str, declaring: dict) -> int:
     return gh_issue_create(title, body)
 
 
+# -- the micro-decomposition POLICY (epic #707 lane F4 / issue #719) -----------
+# The brain could already *file* a decomposition; what it could not do was refuse
+# one that was not a decomposition at all. What follows are the board FACTS the
+# policy needs — the rule itself is pure and offline (`fleet/decompose_policy.py`)
+# — and every guard runs BEFORE the first `gh issue create`, so a refused wave
+# files nothing and therefore has nothing to repair afterwards.
+FOCUS_PATH = ROOT / ".board" / "focus.json"
+BOARD_PATH = ROOT / ".board" / "snapshot.json"
+
+
+def resolve_active_epic() -> tuple[int | None, str]:
+    """``(the ACTIVE epic, the reason when there is none)``.
+
+    Children are bound to the epic the fleet is actually driving (lane F1's
+    ``governance/dispatch/focus.py``), never to whichever number the order happens
+    to name: filing a child against a closed epic — or against nothing — is the
+    orphan the single-epic focus exists to prevent. Offline: the committed board
+    snapshot plus the pinned focus, both read from the repo root so the answer does
+    not depend on the brain's working directory.
+    """
+    try:
+        board = snapshot_mod.load(BOARD_PATH)
+    except (OSError, ValueError) as exc:
+        return None, f"the committed board snapshot {BOARD_PATH} is unreadable: {exc}"
+    try:
+        epic = focus_mod.active(board, FOCUS_PATH)
+    except focus_mod.FocusInvalid as exc:
+        return None, f"the board focus is unreadable: {exc}"
+    if epic is None:
+        return None, (
+            f"the board has no active epic (nothing pinned in {FOCUS_PATH} and no workable "
+            "open epic) — children are never filed against nothing"
+        )
+    return epic.number, ""
+
+
+def _pinned_wave_cap() -> int | None:
+    """The focus's own ``wave_cap``, or ``None`` when the focus is absent/broken."""
+    try:
+        focus = focus_mod.load(FOCUS_PATH)
+    except focus_mod.FocusInvalid:
+        return None
+    return focus.wave_cap if focus is not None else None
+
+
+def open_board_index() -> list[tuple[int, str, str, str]]:
+    """The OPEN issues a duplicate is refused against: ``(number, title, lane, verify)``.
+
+    The committed snapshot stores titles and no bodies, so the lane and the
+    ``Verify:`` line are empty here and the title carries the identity; the policy
+    still compares lane + ``Verify:`` whenever a caller has them (the live board
+    does). An unreadable snapshot yields an EMPTY index rather than an exception —
+    the sizing rule and the cap still bind, and the intra-wave duplicate guard
+    still catches a child filed twice in one spec.
+    """
+    try:
+        board = snapshot_mod.load(BOARD_PATH)
+    except (OSError, ValueError):
+        return []
+    return [(issue.number, issue.title, "", "") for issue in board.open_issues()]
+
+
 def decompose_problem(spec: object) -> str | None:
     """Why this decomposition spec cannot be filed, or None when it is well formed.
 
@@ -602,22 +666,58 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
     issues (the pmo-sme discipline), filed with a `Parent: #N` marker so the chain
     gate recognises them, and the ready wave is dispatched immediately — the brain
     prepares the next waves in advance instead of waiting for the parent.
+
+    The wave is bound to the ACTIVE epic and must pass the micro-decomposition
+    policy first (epic #707 lane F4 / issue #719): a child is filed only when it is
+    sized as a micro-child (1 lane, 1 runnable `Verify:`, 1 criterion, a non-empty
+    `Files:` set), it is not already open on the board, and the wave is within the
+    cap. Every guard runs BEFORE the first `gh issue create`, so a refused wave
+    files nothing at all.
     """
     spec = (order.get("task") or {}).get("decompose")
     problem = decompose_problem(spec)
     if problem:
         return False, problem
-    parent = int(spec["parent_issue"])
+
+    epic, reason = resolve_active_epic()
+    if epic is None:
+        return False, f"REFUSED — {reason}; no child was filed and nothing was dispatched"
+    named = int(spec["parent_issue"])
+    if named != epic:
+        return False, (
+            f"REFUSED — this order decomposes #{named}, but the ACTIVE epic is #{epic}: children "
+            "are bound to the epic the fleet is driving (epic #707 single-epic focus), so nothing "
+            f"was filed. Re-issue against #{epic}, or move the focus first."
+        )
+
+    try:
+        cap = decompose_policy.effective_cap(focus_wave_cap=_pinned_wave_cap())
+    except ValueError as exc:
+        return False, f"REFUSED — {exc}; the wave cap is not defaulted silently, so no child was filed"
+    problems = decompose_policy.wave_problems(spec["children"], open_issues=open_board_index(), cap=cap)
+    if problems:
+        return False, (
+            "REFUSED — the wave violates the micro-decomposition policy: "
+            + "; ".join(problems)
+            + " — no child was filed"
+        )
+
+    parent = epic
     WAVES.mkdir(parents=True, exist_ok=True)
     plan = {"parent": parent, "children": [], "dispatched": []}
     for index, child in enumerate(spec["children"]):
         title = str(child.get("title", "")).strip()
-        lane = str(child.get("lane", "fleet"))
-        verify = str(child.get("verify", ""))
-        files = ", ".join(child.get("files", []))
+        # The policy has already proved there is exactly one of each; reading them
+        # back through it (rather than re-parsing the spec here) keeps the one
+        # definition of "the lane/verify/criterion of this child".
+        lane = decompose_policy.lanes(child)[0]
+        verify = decompose_policy.verify_lines(child)[0]
+        criterion = decompose_policy.criteria(child)[0]
+        files = ", ".join(decompose_policy.files(child))
         body = (
             f"Parent: #{parent}\n\n"
             f"Lane: {lane}\n\nFiles: {files}\n\nVerify: `{verify}`\n\n"
+            f"Criterion: {criterion}\n\n"
             f"Micro-task {index} of #{parent} (decomposed by the brain, pmo-sme discipline)."
         )
         # Whatever this child does not declare is derived from the conformance

@@ -227,6 +227,9 @@ def test_decompose_files_children_and_dispatches_only_wave_1(tmp_path, monkeypat
     import brain
 
     monkeypatch.setattr(brain, "WAVES", tmp_path / "waves")
+    # A child is bound to the ACTIVE epic since #719 (the sizing rule too), so the
+    # active-epic resolution is stubbed here rather than reaching to the real board.
+    monkeypatch.setattr(brain, "resolve_active_epic", lambda: (219, ""))
     filed = []
     monkeypatch.setattr(brain, "gh_issue_create", lambda title, body: (filed.append(title), 300 + len(filed))[1])
     dispatched = []
@@ -249,9 +252,30 @@ def test_decompose_files_children_and_dispatches_only_wave_1(tmp_path, monkeypat
     spec = {
         "parent_issue": 219,
         "children": [
-            {"title": "a", "lane": "fleet", "verify": "pytest a", "files": ["a.py"], "depends_on": []},
-            {"title": "b", "lane": "fleet", "verify": "pytest b", "files": ["b.py"], "depends_on": [0]},
-            {"title": "c", "lane": "fleet", "verify": "pytest c", "files": ["c.py"], "depends_on": [0]},
+            {
+                "title": "a",
+                "lane": "fleet",
+                "verify": "pytest a",
+                "criterion": "a is true",
+                "files": ["a.py"],
+                "depends_on": [],
+            },
+            {
+                "title": "b",
+                "lane": "fleet",
+                "verify": "pytest b",
+                "criterion": "b is true",
+                "files": ["b.py"],
+                "depends_on": [0],
+            },
+            {
+                "title": "c",
+                "lane": "fleet",
+                "verify": "pytest c",
+                "criterion": "c is true",
+                "files": ["c.py"],
+                "depends_on": [0],
+            },
         ],
     }
     ok, report = brain.handle_decompose({"task": {"decompose": spec}})
