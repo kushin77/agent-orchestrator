@@ -55,6 +55,11 @@ checks=(
   'board-gate|bash scripts/check-board-gate.sh'
   'cross-repo-boundary|bash scripts/check-cross-repo-boundary.sh'
   'gateway-catalog-parity|bash scripts/check-gateway-catalog-parity.sh'
+  # agent-identity-parity (issue #346): the shared agent-identity schema's
+  # closed vocabularies must equal agent-profile.schema.json + catalog.yaml and
+  # every seed must validate as a projected identity; the check mutates its own
+  # input, so it cannot pass vacuously.
+  'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
   'paperclip-adapter|bash scripts/check-paperclip-integration-adapter.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'

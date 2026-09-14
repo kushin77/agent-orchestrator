@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity paperclip-adapter \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity agent-identity-parity paperclip-adapter \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -97,6 +97,9 @@ help:
 	@echo "  fleet-state   Unified fleet-state projection (#323): lanes + sessions +"
 	@echo "                claims + journals + directives joined per item; exits"
 	@echo "                non-zero when anything is orphaned, shelved or wedged"
+	@echo "  agent-identity-parity  Shared agent-identity schema (#346): the closed"
+	@echo "                vocabularies must equal the AgentProfile schema and the"
+	@echo "                catalog, and every seed must validate as an identity"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  worktrees     Reclaim stale lane worktrees (dry run; --apply via"
 	@echo "                scripts/prune-worktrees.sh). Keeps dirty, in-use and"
@@ -261,7 +264,15 @@ paperclip-gap-analysis:
 ## cannot pass vacuously
 gateway-catalog-parity:
 	@bash scripts/check-gateway-catalog-parity.sh
-
+## agent-identity-parity — one shared, versioned agent-identity schema is the
+## single source of truth for both repos (issue #346): the shared schema's
+## closed vocabularies must EQUAL agent-profile.schema.json + catalog.yaml and
+## the status enum must be the union of both repos, every seed is projected to
+## the identity view and validated (a free-text capability or an
+## out-of-vocabulary status is refused), and the check mutates a scratch copy
+## and requires each mutant to be refused, so it cannot pass vacuously
+agent-identity-parity:
+	@bash scripts/check-agent-identity-parity.sh
 
 ## fleet-state — unified fleet-state projection (issue #323): one read-only
 ## command joins lanes, session heartbeats, closure journals, claims and
