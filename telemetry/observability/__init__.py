@@ -27,7 +27,15 @@ Public surface
 - ``breach`` — ``BreachDetector`` / ``Alert`` (outcome-not-liveness).
 - ``usage`` — per-tenant usage/chargeback aggregation (billing feed).
 - ``dashboard`` — static HTML + JSON data + terminal health report.
+- ``exposition`` — the flag-gated-OFF OTLP/HTTP **push** exporter (#497,
+  ADR-0022) that renders the SLO / budget / metering facts for the fleet
+  monitoring plane; inert when unconfigured, and no HTTP exposition route.
 - ``cli`` — ``python3 -m telemetry.observability.cli <cmd>``.
+
+``exposition`` and ``cli`` are runnable entry modules (``python3 -m
+...``), so — like ``cli`` — ``exposition`` is imported on demand
+(``from telemetry.observability import exposition``) rather than eagerly here:
+importing a module and then running it as ``__main__`` would execute it twice.
 """
 
 from telemetry.observability import (  # noqa: F401
