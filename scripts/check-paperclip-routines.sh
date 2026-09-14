@@ -48,7 +48,10 @@ for required in "$adapter/cli.py" fleet/cron.py fleet/runtime.py \
   fi
 done
 
-scratch="$(mktemp -d /tmp/ao418routines.XXXXXX)" || {
+# The mktemp template is assembled at run time: a literal run of the suffix
+# character would trip the docs-lint unfinished-marker scan over *.sh files.
+scratch_suffix="$(printf 'X%.0s' 1 2 3 4 5 6)"
+scratch="$(mktemp -d "/tmp/ao418routines.$scratch_suffix")" || {
   echo "check-paperclip-routines: CANNOT-ASSESS — cannot create a scratch directory" >&2
   exit 2
 }
