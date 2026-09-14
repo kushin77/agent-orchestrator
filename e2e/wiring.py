@@ -48,6 +48,7 @@ ENDPOINTS = {
     "anthropic": "https://api.anthropic.com/v1/messages",
     "ollama": "http://localhost:11434/api/chat",
     "openai": "https://api.openai.com/v1/chat/completions",
+    "copilot": "https://api.githubcopilot.com/chat/completions",
     "paperclip": "http://localhost:11435/api/chat",
     "hermes": "http://localhost:11436/api/chat",
 }
@@ -59,24 +60,27 @@ PROVIDER_OPENAI = "openai"
 PROVIDER_OLLAMA = "ollama"  # the keyless local terminal hop of every chain
 PROVIDER_PAPERCLIP = "paperclip"  # purebliss team member (local, no live endpoint)
 PROVIDER_HERMES = "hermes"  # purebliss team member (local; falls back to ollama)
+PROVIDER_COPILOT = "copilot"  # purebliss team member (OpenAI-compatible adapter)
 
 TENANT = "acme"
 
-# The five-agent purebliss team (epic #253 frozen contract): agent id -> provider.
+# The six-agent purebliss team (epic #253 + issue #340): agent id -> provider.
 TEAM_AGENT_PROVIDERS = {
     "ollama": PROVIDER_OLLAMA,
     "paperclip": PROVIDER_PAPERCLIP,
     "hermes": PROVIDER_HERMES,
     "deepseek": PROVIDER_DEEPSEEK,
     "claude": PROVIDER_ANTHROPIC,
+    "copilot": PROVIDER_COPILOT,
 }
-# Provider ids exercised by the five-agent team (claude routes to anthropic).
+# Provider ids exercised by the six-agent team (claude routes to anthropic).
 TEAM_PROVIDERS = (
     PROVIDER_OLLAMA,
     PROVIDER_PAPERCLIP,
     PROVIDER_HERMES,
     PROVIDER_DEEPSEEK,
     PROVIDER_ANTHROPIC,
+    PROVIDER_COPILOT,
 )
 
 # --------------------------------------------------------------------------- #
@@ -455,7 +459,8 @@ def register_team_provider_configs(registry: Any) -> None:
 
 def extend_team_routing(wired: Any) -> None:
     """Append the local team providers as terminal fallback hops on every
-    routing chain so the five-agent team is routable offline (issue #257).
+    routing chain so the six-agent team is routable offline (issue #257,
+    issue #340).
 
     Runtime-only: the merged routing policy (``gateway/proxy/config/routing.yaml``)
     predates the purebliss team and this lane never edits a gateway file.
@@ -464,6 +469,10 @@ def extend_team_routing(wired: Any) -> None:
     for tier, chain in list(config.provider_chains.items()):
         if "paperclip" not in chain:
             config.provider_chains[tier] = tuple(chain) + ("paperclip", "hermes")
+        if "copilot" not in config.provider_chains[tier]:
+            config.provider_chains[tier] = tuple(config.provider_chains[tier]) + (
+                "copilot",
+            )
 
 
 def build_team_gateway(

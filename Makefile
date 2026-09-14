@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration paperclip-adapter cross-reference cross-repo-boundary \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity paperclip-adapter \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -252,6 +252,15 @@ lease-policy:
 ## mutates its own input, so it cannot pass vacuously
 paperclip-gap-analysis:
 	@bash scripts/check-paperclip-gap-analysis.sh
+
+
+## gateway-catalog-parity — every registered gateway provider adapter has a
+## gateway-owned module-catalog entry and every catalog module names a registered
+## provider (issue #349); the check reads the provider set from the registry
+## (never a filename glob) and mutates its own input in both directions, so it
+## cannot pass vacuously
+gateway-catalog-parity:
+	@bash scripts/check-gateway-catalog-parity.sh
 
 
 ## fleet-state — unified fleet-state projection (issue #323): one read-only

@@ -1,0 +1,58 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "paperclip",
+  "name": "paperclip",
+  "description": "Paperclip provider module: the vendored planning / status-report workflow module's inference surface, speaking the OpenAI-compatible chat/completions wire shape shared with the deepseek and openai adapters, with cloud-to-local (Ollama) graceful degradation.",
+  "source": {
+    "repo": "kushin77/gov-ai-scout",
+    "default_branch": "master",
+    "path": "backend/src/services/ai-provider.ts"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "paperclip"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.paperclip",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "chat-completions",
+      "default": "on",
+      "flags": ["paperclip.chat"],
+      "desc": "OpenAI-compatible chat/completions chat with Bearer auth and typed output validation."
+    },
+    {
+      "id": "tier-routing",
+      "default": "on",
+      "flags": ["paperclip.tiers"],
+      "desc": "The paperclip-planner model id is a default illustrative identifier for the vendored module, overridable per tenant via the model mapping."
+    },
+    {
+      "id": "graceful-degradation",
+      "default": "on",
+      "flags": ["paperclip.fallback"],
+      "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-14",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/gov-ai-scout backend/src/services/ai-provider.ts; kushin77/llm-triage src/llm_triage/classifier.py",
+    "note": "Gateway-owned module-catalog entry (issue #349) for the registered `paperclip` provider adapter. Pattern only; the OpenAI-compatible provider-gateway shape shared with the deepseek/openai adapters was re-implemented for this repo's Python substrate, no source file was copied."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "hermes",
+  "name": "hermes",
+  "description": "Hermes provider module: the vendored agent-routing / capability-registry / model-tiering module's local agent-service inference endpoint, speaking the Ollama-compatible /api/chat wire shape, with the frozen hermes -> hermes/ollama fallback.",
+  "source": {
+    "repo": "kushin77/hermes-agents",
+    "default_branch": "master",
+    "path": "models/model_tiering.py"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "hermes", "local"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.hermes",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "ollama-compatible-chat",
+      "default": "on",
+      "flags": ["hermes.chat"],
+      "desc": "Ollama-compatible /api/chat chat (stream: false, message.content, prompt_eval_count/eval_count) for the local hermes3 endpoint."
+    },
+    {
+      "id": "keyless",
+      "default": "on",
+      "flags": ["hermes.keyless"],
+      "desc": "The local agent-service endpoint requires no API key (requires_key=false)."
+    },
+    {
+      "id": "frozen-fallback",
+      "default": "on",
+      "flags": ["hermes.fallback"],
+      "desc": "The EPIC #253 frozen map hermes -> hermes/ollama makes the keyless local Ollama hop its terminal fallback."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-14",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/ollama ollama/services/inference/resilient_ollama_client.py; kushin77/hermes-agents models/model_tiering.py + api/capabilities.py",
+    "note": "Gateway-owned module-catalog entry (issue #349) for the registered `hermes` provider adapter. Pattern/READY only; the Ollama-compatible wire shape and the agent -> model/provider routing vocabulary were re-implemented for this repo's Python substrate, no source file was copied."
+  }
+}

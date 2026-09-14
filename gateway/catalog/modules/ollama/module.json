@@ -1,0 +1,57 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "ollama",
+  "name": "ollama",
+  "description": "Local Ollama provider module: the keyless, on-prem /api/chat terminal hop that every cloud provider degrades to, with circuit-breaker resilience and typed output validation.",
+  "source": {
+    "repo": "kushin77/ollama",
+    "default_branch": "master",
+    "path": "ollama/services/inference/resilient_ollama_client.py"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "ollama", "local"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.ollama",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "local-chat",
+      "default": "on",
+      "flags": ["ollama.chat"],
+      "desc": "Ollama /api/chat chat (stream: false) with sampling options and typed output validation."
+    },
+    {
+      "id": "keyless",
+      "default": "on",
+      "flags": ["ollama.keyless"],
+      "desc": "The local endpoint requires no API key (requires_key=false); nothing leaves the host."
+    },
+    {
+      "id": "tier-routing",
+      "default": "on",
+      "flags": ["ollama.tiers"],
+      "desc": "LOW/MED route to llama3.2, HIGH/MAX to qwen2.5, chosen from the issue-#9 tier ladder."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-14",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/ollama ollama/services/inference/resilient_ollama_client.py",
+    "note": "Gateway-owned module-catalog entry (issue #349) for the registered `ollama` provider adapter. Pattern only; the resilient local-LLM client and the /api/chat wire shape were re-implemented for this repo's Python substrate, no source file was copied."
+  }
+}

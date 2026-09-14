@@ -76,6 +76,24 @@ def test_tenant_override_explicit_model() -> None:
     assert registry.resolve_route("acme", "MAX") == ("anthropic", "claude-opus-4-5")
 
 
+def test_copilot_provider_is_registered_and_routable() -> None:
+    """copilot is a first-class provider: config + adapter + tier models.
+
+    The copilot provider id maps onto the existing OpenAI adapter (issue #340);
+    a tenant can route to it like any other provider.
+    """
+    from providers import PROVIDER_CLASSES
+
+    configs = default_provider_configs()
+    assert "copilot" in configs
+    assert PROVIDER_CLASSES["copilot"].name == "copilot"
+    registry = _registry()
+    registry.set_tenant_mapping("acme", {"LOW": "copilot"})
+    assert registry.resolve_route("acme", "LOW") == ("copilot", "gpt-4o-mini")
+    registry.set_tenant_mapping("acme", {"HIGH": "copilot"})
+    assert registry.resolve_route("acme", "HIGH") == ("copilot", "gpt-4o")
+
+
 def test_tenant_override_task_key() -> None:
     registry = _registry()
     registry.set_tenant_mapping("acme", {"summarize": "ollama/llama3.2"})
@@ -356,6 +374,7 @@ def test_metering_and_audit_hooks_fire_per_call(sentiment_schema) -> None:
 def test_provider_configs_are_exposed() -> None:
     registry = _registry()
     names = set(registry.provider_configs())
-    assert names == {"anthropic", "deepseek", "openai", "gemini", "ollama", "paperclip", "hermes"}
+    assert names == {"anthropic", "deepseek", "openai", "copilot", "gemini",
+                     "ollama", "paperclip", "hermes"}
     assert registry.config_for("ollama").requires_key is False
     assert registry.config_for("hermes").requires_key is False

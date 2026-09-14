@@ -32,7 +32,7 @@ modules and writes `golden-path.json` evidence. Stage by stage:
 | `rbac` | `identity/rbac` (issue #12) | owner allowed `agent:read`; a stranger denied at the scope gate |
 | `agents` | `registry/service` + `events` (issue #10) | `worker-1` (coder@1.0.0) and `reviewer-1` active; scoped-claims session binds tenant `acme` |
 | `routed-call` | `gateway/proxy` wiring over personas/profiles/prompts (issues #9/#11/#13/#15/#16/#17/#18/#19) | a governed `classify-route` dispatch served by `deepseek`; policy `log` + DLP `sent` + preflight `allow` + ledger `model.call` + metered billable usage |
-| `conformance` | same gateway stack, all providers | the **same path** under every provider of the five-agent purebliss team — DeepSeek, local Ollama, paperclip, hermes (LOW) and Claude/anthropic (MED), plus OpenAI for degradation cover — yields governed, audited, metered behavior on every provider |
+| `conformance` | same gateway stack, all providers | the **same path** under every provider of the six-agent purebliss team — DeepSeek, local Ollama, paperclip, hermes, copilot (LOW) and Claude/anthropic (MED), plus OpenAI for degradation cover — yields governed, audited, metered behavior on every provider |
 | `durable` | `engine/core` (issue #21) | one durable `TASK_EXECUTION` workflow (file-backed event store) runs the real gateway through the `core.task` handler and succeeds |
 | `audit` | `telemetry/ledger` (issue #31) | every action is on the per-tenant hash-chained ledger; `verify` → `OK` (exit 0) |
 | `billing` | `telemetry/metering` (issue #33) | every call is ingested and rolled up; billable usage + cost per model |
