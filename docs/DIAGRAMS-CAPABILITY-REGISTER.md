@@ -191,7 +191,9 @@ alone.
   because three closed issues on the vendor's board carry **no comment at all** —
   `#52`, `#53` and `#67`, all closed 2026-01-26 — and `#371` closed as
   superseded. A register that reads `state: closed` as `shipped` would be wrong
-  in four places out of the eight-issue register alone.
+  in four places on that board — and one of them, `#371`, sits inside the
+  eight-issue CMR register itself, which is why the register's own rule is that
+  a closed issue needs a signal before its capability is called `shipped`.
 
 ### The decision layer and the gate artifact (C13, C14, C15, C16)
 
