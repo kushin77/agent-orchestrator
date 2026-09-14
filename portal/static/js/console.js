@@ -37,7 +37,17 @@
     { id: "audit", label: "Audit", icon: "≡" },
     { id: "approvals", label: "Approvals", icon: "◷" }
   ];
-  var NAV_GLOBAL = [{ id: "tenants", label: "Tenants", icon: "▦" }];
+  var NAV_GLOBAL = [
+    { id: "tenants", label: "Tenants", icon: "▦" },
+    // The fleet single-pane-of-glass (issue #332) is an enterprise/org-level
+    // view like Tenants: it is not scoped to one tenant, so it takes no
+    // ?tenant= and its crumb is its own label.
+    { id: "fleet", label: "Fleet", icon: "◍" }
+  ];
+
+  function isGlobalView(view) {
+    return NAV_GLOBAL.some(function (item) { return item.id === view; });
+  }
 
   function currentView() {
     var value = new URLSearchParams(window.location.search).get("view");
@@ -90,7 +100,7 @@
 
   function navigate(view) {
     var next = window.location.pathname + "?view=" + view +
-      (view === "tenants" ? "" : "&tenant=" + state.tenant);
+      (isGlobalView(view) ? "" : "&tenant=" + state.tenant);
     window.history.pushState({}, "", next);
     loadView(view);
   }
@@ -98,14 +108,15 @@
   function loadView(view) {
     var frame = document.getElementById("stageFrame");
     var target = "/views/" + view + ".html";
-    if (view !== "tenants") target += "?tenant=" + encodeURIComponent(state.tenant);
+    if (!isGlobalView(view)) target += "?tenant=" + encodeURIComponent(state.tenant);
     frame.src = target;
     showCrumb(view);
   }
 
   function showCrumb(view) {
     var crumb = document.getElementById("crumb");
-    var label = (view === "tenants") ? "Tenants" : state.tenant + " / " + view;
+    var global = NAV_GLOBAL.filter(function (item) { return item.id === view; })[0];
+    var label = global ? global.label : state.tenant + " / " + view;
     crumb.textContent = label;
   }
 

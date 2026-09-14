@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "declared_by": "kushin77/agent-orchestrator#332",
+  "issue": "kushin77/agent-orchestrator#151",
+  "description": "The enterprise/GDC roll-up hierarchy the fleet dashboard keys its org rows to (issue #151): repos roll up under tenants, tenants roll up under the enterprise/GDC org. This file is the portal lane's declaration of that hierarchy for the pilot tenants seeded in portal/server/state.py; the enterprise view is a projection over it, never a second source of truth.",
+  "defaultRepo": "kushin77/agent-orchestrator",
+  "orgs": [
+    {
+      "orgId": "elevatediq",
+      "name": "ElevatedIQ (GDC)",
+      "kind": "enterprise",
+      "tenants": [
+        {
+          "tenantId": "acme",
+          "repos": ["kushin77/agent-orchestrator", "kushin77/CMR"]
+        },
+        {
+          "tenantId": "globex",
+          "repos": ["kushin77/shared-frontend"]
+        },
+        {
+          "tenantId": "purebliss",
+          "repos": ["kushin77/purebliss"]
+        }
+      ]
+    },
+    {
+      "orgId": "initech-holdings",
+      "name": "Initech Holdings",
+      "kind": "enterprise",
+      "tenants": [
+        {
+          "tenantId": "initech",
+          "repos": ["kushin77/initech-portal"]
+        }
+      ]
+    }
+  ]
+}
