@@ -15,7 +15,7 @@
 SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e \
-        shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
+        shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
@@ -167,6 +167,14 @@ json-lint:
 ## docs-lint — foundation files, markdown links, whitespace, unfinished markers
 docs-lint:
 	@bash scripts/check-docs.sh
+
+## gate-coverage — every delivered artifact must be invoked by a gate (issue
+## #526): a scripts/check-*.sh no gate file names, or a declared pytest suite no
+## gate names as a target, fails by name unless it is a live entry in the
+## reviewed scripts/gate-coverage-baseline.txt (which is checked in both
+## directions, so a stale entry fails too)
+gate-coverage:
+	@bash scripts/check-gate-coverage.sh
 
 ## chronological-dispatch — governance docs must declare dependency-ordered
 ## issue selection (GR-20); a doc-only rule is advisory, so this gate fails it

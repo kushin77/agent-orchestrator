@@ -1,0 +1,107 @@
+# scripts/gate-coverage-baseline.txt — accepted gate-coverage exceptions (#526).
+#
+# The ONLY way to shrink this list is to REMOVE an entry, by wiring the artifact
+# into a gate file. `scripts/check-gate-coverage.sh` checks it in both
+# directions:
+#   * an artifact that is unwired and NOT listed here           -> NOT-OK, named;
+#   * an entry whose artifact is wired NOW, is duplicated, no longer exists, or
+#     is malformed                                              -> NOT-OK, named
+#     as STALE (so an entry cannot sit here as a permanent excuse).
+# A newly declared suite or a newly delivered `scripts/check-*.sh` is therefore
+# NEVER grandfathered: it fails immediately, by name.
+#
+# Format — tab-separated, one artifact path per line (never a glob or a wildcard
+# prefix: a glob would absorb a newly declared artifact under that prefix and
+# quietly restore the opt-in hole this gate exists to close):
+#
+#   <kind>	<path>	<reason>	<tracker>
+#
+#   kind     suite | script
+#   reason   swept-only  suite: run only by the scripts/run-pytest-suites.sh
+#                        manifest sweep; no gate file names it as a pytest target
+#            uninvoked   script: delivered, invoked by no gate file
+#   tracker  the issue that must remove this line
+#
+# Measured when this baseline landed, at ffb2688 (the detector prints the same
+# numbers from the tree, it does not read them from here): 78 check scripts
+# (WIRED 70, UNWIRED 8), 71 declared suites (WIRED 5, UNWIRED 66) — 74 entries.
+# It shrank to 72 IN THE MERGE: the capability-registers lane that landed as
+# e08f358 wired `scripts/check-codeidx-capability-register.sh` and
+# `scripts/check-diagrams-capability-register.sh`, and the stale-entry rule
+# failed this gate naming both until they were removed — 79 check scripts, now
+# WIRED 73, UNWIRED 6, and 71 suites, WIRED 5, UNWIRED 66. The list cannot rot:
+# a wired entry is a stale entry and a stale entry is a red gate.
+# The gate-invocation universe, the match-by-path rule and the rejected
+# alternatives are stated in scripts/check-gate-coverage.sh.
+script	scripts/check-chat-eval.sh	uninvoked	#499
+script	scripts/check-chat-finops.sh	uninvoked	#499
+script	scripts/check-chat-guardrails.sh	uninvoked	#499
+script	scripts/check-chat-identity.sh	uninvoked	#499
+script	scripts/check-chat-tools.sh	uninvoked	#499
+script	scripts/check-chat-ux.sh	uninvoked	#499
+suite	guardrails/dlp	swept-only	#524
+suite	guardrails/policy	swept-only	#524
+suite	guardrails/controls	swept-only	#524
+suite	guardrails/honesty	swept-only	#524
+suite	guardrails/isolation	swept-only	#524
+suite	guardrails/sandbox	swept-only	#524
+suite	gateway/finops	swept-only	#524
+suite	gateway/health	swept-only	#524
+suite	gateway/providers	swept-only	#524
+suite	gateway/catalog	swept-only	#524
+suite	gateway/limits	swept-only	#524
+suite	gateway/mcp	swept-only	#524
+suite	gateway/proxy	swept-only	#524
+suite	registry/profiles	swept-only	#524
+suite	registry/prompts	swept-only	#524
+suite	registry/personas	swept-only	#524
+suite	registry/events	swept-only	#524
+suite	registry/service	swept-only	#524
+suite	registry/packs	swept-only	#524
+suite	identity/onboarding	swept-only	#524
+suite	identity/rbac	swept-only	#524
+suite	identity/cpapi	swept-only	#524
+suite	identity/edges	swept-only	#524
+suite	identity/entitlements	swept-only	#524
+suite	identity/sso	swept-only	#524
+suite	engine/loop	swept-only	#524
+suite	engine/multiagent	swept-only	#524
+suite	engine/memory	swept-only	#524
+suite	engine/queue	swept-only	#524
+suite	engine/core	swept-only	#524
+suite	telemetry/ledger	swept-only	#524
+suite	telemetry/audit	swept-only	#524
+suite	telemetry/observability	swept-only	#524
+suite	telemetry/metering	swept-only	#524
+suite	telemetry/budgets	swept-only	#524
+suite	portal	swept-only	#524
+suite	control-plane/instructions	swept-only	#524
+suite	control-plane/sdk/python	swept-only	#524
+suite	governance/merge	swept-only	#524
+suite	governance/dispatch	swept-only	#524
+suite	governance/knowledge	swept-only	#524
+suite	governance/conformance	swept-only	#524
+suite	governance/finops	swept-only	#524
+suite	governance/sync	swept-only	#524
+suite	infra/rollout	swept-only	#524
+suite	governance/lessons	swept-only	#524
+suite	governance/lessons-sync	swept-only	#524
+suite	governance/remediation	swept-only	#524
+suite	governance/board	swept-only	#524
+suite	governance/isolation	swept-only	#524
+suite	governance/lifecycle	swept-only	#524
+suite	governance/reconcile	swept-only	#524
+suite	governance/ticket	swept-only	#524
+suite	governance/pmo	swept-only	#524
+suite	governance/cto-overlay	swept-only	#524
+suite	governance/authority	swept-only	#524
+suite	governance/rollup	swept-only	#524
+suite	control-plane/fleet-template	swept-only	#524
+suite	gateway/sme-routing	swept-only	#524
+suite	integrations/paperclip	swept-only	#524
+suite	integrations/paperclip/adapters/approvals	swept-only	#524
+suite	integrations/paperclip/adapters/routines	swept-only	#524
+suite	integrations/paperclip/adapters/secrets	swept-only	#524
+suite	integrations/paperclip/adapters/skills	swept-only	#524
+suite	registry/parity	swept-only	#524
+suite	scripts	swept-only	#524

@@ -46,6 +46,17 @@ checks=(
   'yaml-lint|python3 scripts/check-yaml.py'
   'json-lint|bash scripts/check-json.sh'
   'docs-lint|bash scripts/check-docs.sh'
+  # gate-coverage (issue #526, RCA of EPIC #524): the gate registry was not
+  # self-checking. A new `scripts/check-*.sh` that nobody registers is inert,
+  # and a suite declared in scripts/pytest-suites.txt that no gate names is only
+  # reached by the manifest sweep -- so coverage was opt-in and nothing
+  # complained. This check names BOTH classes of ungated artifact and fails on
+  # any that is not in a live, reasoned baseline entry
+  # (scripts/gate-coverage-baseline.txt); the baseline is checked in both
+  # directions, so a stale entry (its artifact is wired now, or gone) fails too
+  # and the list cannot rot into a fiction. It is registered here deliberately:
+  # this array is explicit, so the detector is itself inert until it is named.
+  'gate-coverage|bash scripts/check-gate-coverage.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'fleet-channel|bash scripts/check-fleet-channel.sh'
