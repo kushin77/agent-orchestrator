@@ -78,6 +78,7 @@ class WorkflowKind(str, Enum):
     AGENT_LOOP = "agent_loop"
     FAN_OUT_JOIN = "fan_out_join"
     TENANT_PROVISIONING = "tenant_provisioning"
+    ENGINEER_TASK = "engineer_task"  # tenant ticket lifecycle (issue #634)
     SAGA = "saga"
 
 
@@ -115,6 +116,20 @@ class EventKind(str, Enum):
     WORKFLOW_FAILED = "workflow_failed"
     WORKFLOW_ROLLED_BACK = "workflow_rolled_back"
     WORKFLOW_RESUMED = "workflow_resumed"
+    # Tenant ticket lifecycle anchors (issue #634, ``core.tickets``): the
+    # *created* anchor is emitted alongside the workflow's ``workflow_started``
+    # and the *closed* anchor alongside its (successful) ``workflow_completed``,
+    # so a ticket exists only inside the engine's own append path.
+    ENGINEER_TASK_CREATED = "engineer_task_created"
+    ENGINEER_TASK_CLOSED = "engineer_task_closed"
+    # Tenant ticket lifecycle events (issue #634, ``core.tickets``): the four
+    # steps between the anchors.  Their payloads carry the replayable inputs
+    # (the decomposition plan, the dispatch target, the execution envelope and
+    # the injected review verdict), so the ticket projects from the log alone.
+    PLAN_DECOMPOSED = "plan_decomposed"
+    TICKET_DISPATCHED = "ticket_dispatched"
+    TICKET_EXECUTED = "ticket_executed"
+    TICKET_REVIEWED = "ticket_reviewed"
 
 
 # --------------------------------------------------------------------------
