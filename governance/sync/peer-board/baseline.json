@@ -1,0 +1,46 @@
+{
+  "schema": "ao.sync/peer-board-snapshot-v1",
+  "generated": "2026-09-07T00:00:00Z",
+  "source": "pinned",
+  "note": "The previous pass (issue #427). Pinned so the current pass can report what each peer opened and closed since the last pass, deterministically and offline.",
+  "peers": [
+    {
+      "repo": "kushin77/CMR",
+      "issues": [
+        {
+          "number": 862,
+          "title": "Hygiene report: branch protection disabled fleet-wide",
+          "state": "open",
+          "labels": ["compliance"],
+          "body": "The vendored hygiene report shows branch protection disabled across the portfolio. Remediation is per-repo; tracked by the owning boards."
+        },
+        {
+          "number": 864,
+          "title": "SPoG board-sync was built but never wired",
+          "state": "open",
+          "labels": ["governance"],
+          "body": "A fully-built board-sync exists in the hub but no scheduled job invokes it, so the derived board never refreshes."
+        },
+        {
+          "number": 865,
+          "title": "Board sync is one-directional (spoke -> CMR), no path back down",
+          "state": "open",
+          "labels": ["governance"],
+          "body": "Direction from the hub to kushin77/agent-orchestrator has no channel; a spoke cannot be told to act."
+        }
+      ]
+    },
+    {
+      "repo": "kushin77/deepseek",
+      "issues": [
+        {
+          "number": 50,
+          "title": "Pin the model gateway contract",
+          "state": "open",
+          "labels": ["gateway"],
+          "body": "Track the gateway contract version this consumer pins."
+        }
+      ]
+    }
+  ]
+}
