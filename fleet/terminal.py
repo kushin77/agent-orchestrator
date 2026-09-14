@@ -35,6 +35,7 @@ from typing import Callable
 
 import channel
 import routing
+import runaway
 import runtime
 import singleton
 import telemetry
@@ -1451,11 +1452,16 @@ def run_state(directive_id: str) -> str:
     return "live"
 
 
-def report_once(directive_id: str, key: str, message_type: str, body: str) -> bool:
+def report_once(
+    directive_id: str, key: str, message_type: str, body: str, severity: str = "warn"
+) -> bool:
     """Say something about a directive once, not once per watch cycle.
 
     A directive that is left pending is re-read every cycle; without this the
-    loop would repeat the same report forever.
+    loop would repeat the same report forever. ``severity`` is the escalation
+    severity for a non-``result`` message (ignored for ``result``); the runaway
+    guard's terminal notice raises it to ``critical`` (#723), because a retired
+    directive is work that will never be done unless an operator acts.
     """
     REPORTED.mkdir(parents=True, exist_ok=True)
     path = REPORTED / f"{directive_id}.json"
@@ -1471,7 +1477,7 @@ def report_once(directive_id: str, key: str, message_type: str, body: str) -> bo
                    "--type", "result", "--body", body]
     else:
         command = ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
-                   "--severity", "warn", "--body", body]
+                   "--severity", severity, "--body", body]
     subprocess.run(command, cwd=ROOT)
     return True
 
@@ -1481,6 +1487,95 @@ def clear_reported(directive_id: str) -> None:
         (REPORTED / f"{directive_id}.json").unlink()
     except OSError:
         pass
+
+
+# --- the runaway guard (issue #723) ------------------------------------------
+#
+# Five paths in this loop leave a directive PENDING without ever reporting a
+# result: a refused claim, a run that did not finish `done`, our own dead claim
+# (self-heal), a hold by another loop (in-flight) and an untracked foreign claim
+# (orphaned). Re-reading them every cycle for ever was the runaway: no attempt
+# counter, no delay, no terminal state — and `report_once` deduped only the
+# *report*, never the *attempt*.
+#
+# Every one of those paths now goes through `guard_retire`: it counts the
+# attempt against the directive's ONE persisted counter, spaces the next attempt
+# with the backoff `vendor/CMR/ops/retry.sh` declares, and on the K-th failure
+# retires the order to `.fleet/dead-letter/`, where `channel watch` can never
+# return it again.
+#
+# The state directory is derived from RUNS — beside the run markers — and never
+# from `runtime.FLEET_DIR` directly: the fleet suite redirects `terminal.RUNS` to
+# a tmp directory, so driving this loop in a test cannot write guard state into
+# the live fleet's `.fleet/`.
+
+
+def guard_base() -> Path:
+    """The guard's root: beside the run markers, so test isolation carries over."""
+    return RUNS.parent
+
+
+def guard_attempt(directive_id: str, reason: str) -> "runaway.Attempt | None":
+    """Count one failed attempt; None when the guard is misconfigured.
+
+    A typo'd ``AO_RUNAWAY_ATTEMPTS``/``AO_RUNAWAY_BACKOFF`` raises inside the
+    guard. The loop must not die on it — the order would be stranded with no
+    report at all — so the misconfiguration is printed by name and the directive
+    is left pending, which is the loud version of the pre-guard behaviour.
+    """
+    try:
+        return runaway.record_attempt(directive_id, reason, base=guard_base())
+    except runaway.RunawayConfigError as exc:
+        print(f"[terminal] runaway guard misconfigured — {exc}", file=sys.stderr, flush=True)
+        return None
+
+
+def guard_retire(directive_id: str, issue: int, reason: str) -> bool:
+    """Count the attempt, and retire the directive once its budget is exhausted.
+
+    Returns True when the directive is now a dead letter: the caller must stop
+    re-dispatching it and move on. False means "counted, still retryable" — the
+    directive stays in the inbox and ``channel watch`` holds it until its
+    backoff has elapsed, so nothing here sleeps and the loop keeps polling.
+    """
+    record = guard_attempt(directive_id, reason)
+    if record is None:
+        return False
+    if not record.exhausted:
+        report_once(
+            directive_id,
+            key=f"attempt:{record.attempts}",
+            message_type="escalate",
+            body=(
+                f"#{issue} attempt {record.attempts}/{record.cap} failed — {reason}. The next "
+                f"attempt is held until {record.next_attempt_at} (exponential backoff, cap "
+                f"{runaway.BACKOFF_CAP_SECONDS}s); the directive stays pending meanwhile."
+            ),
+        )
+        return False
+    target = runaway.dead_letter(directive_id, reason, base=guard_base())
+    print(
+        f"[terminal] #{issue} DEAD-LETTERED after {record.attempts} attempt(s) — {reason}",
+        file=sys.stderr,
+        flush=True,
+    )
+    stream_run_event(
+        directive_id, f"DEAD-LETTERED after {record.attempts} attempt(s): {reason}"
+    )
+    report_once(
+        directive_id,
+        key=f"dead-letter:{record.attempts}",
+        message_type="escalate",
+        severity="critical",
+        body=(
+            f"#{issue} DEAD-LETTERED after {record.attempts} attempt(s) (cap {record.cap}) — "
+            f"{reason}. The order was moved to {target} and will never be dispatched again. "
+            f"Inspect it with `python3 fleet/runaway.py show --directive {directive_id}`, then "
+            f"re-order it, or re-arm the budget with `python3 fleet/runaway.py rearm --directive "
+            f"{directive_id}` once the cause is fixed."
+        ),
+    )
+    return True
 
 
 # --- controls (the operator's levers, relayed by the brain) -------------------
@@ -1730,6 +1825,13 @@ def loop(args: argparse.Namespace) -> int:
                 cwd=ROOT,
             )
         else:
+            # The run did not land: the directive is still in the inbox (the
+            # failure path escalates, it does not report — and only a report
+            # consumes), so this attempt is counted against the directive's
+            # budget. A crashed run and a refused claim share that one counter
+            # (#723), and the K-th failure retires the order to the dead-letter
+            # store instead of re-dispatching it for ever.
+            guard_retire(directive_id, issue, f"run did not land: {run_status} (rc={rc})")
             # The runner's exit code picks the severity; the *evidence* decides
             # whether this is a success at all. Prose no longer picks either.
             severity = "warn" if rc == 0 else "critical"
@@ -2008,14 +2110,10 @@ def loop(args: argparse.Namespace) -> int:
                 # Someone (another loop) is tracking this run: report it, and leave
                 # the directive PENDING — consuming it would erase the only record
                 # that the work was ordered, and nobody would report its result.
+                # Counted like every other held path (#723): a directive another
+                # loop never finishes must not be re-read by this loop for ever.
                 print(f"[terminal] #{issue} in flight (held by {holder}, run tracked) — left pending", flush=True)
-                report_once(
-                    directive_id,
-                    key=f"in-flight:{holder}",
-                    message_type="result",
-                    body=f"#{issue} in flight (held by {holder}, run tracked) — directive left pending; "
-                    "the tracking loop reports the result",
-                )
+                guard_retire(directive_id, issue, f"in flight (held by {holder}, run tracked)")
                 if args.once:
                     return 0
                 continue
@@ -2023,6 +2121,18 @@ def loop(args: argparse.Namespace) -> int:
                 # Our own orphan: a previous loop of ours was stopped mid-run. The
                 # work was never reported, so self-heal — reap the dead claim, then
                 # dispatch below in this same cycle.
+                #
+                # The re-dispatch is COUNTED as an attempt (#723), never a fresh
+                # start: a directive whose dispatch keeps killing the loop is
+                # exactly the runaway, and it must be retired rather than reaped
+                # and re-spawned for ever. This cycle still re-dispatches (the work
+                # was never reported, so the immediate retry is deliberate); from
+                # the next cycle on, `channel watch` holds the directive until its
+                # backoff elapses, so the retries are spaced rather than spun.
+                if guard_retire(directive_id, issue, "self-heal: our own run no longer exists"):
+                    if args.once:
+                        return 1
+                    continue
                 print(f"[terminal] #{issue} orphaned by our own dead run — reaping and re-dispatching", flush=True)
                 reap = subprocess.run(
                     ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "reap",
@@ -2030,13 +2140,6 @@ def loop(args: argparse.Namespace) -> int:
                     cwd=ROOT,
                     capture_output=True,
                     text=True,
-                )
-                report_once(
-                    directive_id,
-                    key=f"self-heal:{holder}:{reap.returncode}",
-                    message_type="escalate",
-                    body=f"#{issue} claimed by our own run that no longer exists; reaped "
-                    f"(rc={reap.returncode}) and re-dispatching — the previous run was never reported",
                 )
                 if reap.returncode != 0:
                     print(f"[terminal] self-heal reap failed: {reap.stdout}{reap.stderr}", file=sys.stderr, flush=True)
@@ -2046,14 +2149,10 @@ def loop(args: argparse.Namespace) -> int:
                 clear_reported(directive_id)
             else:
                 # A claim nobody is tracking, held by someone else: the brain decides.
+                # Counted (#723) — an orphan nobody reaps is another pending-forever
+                # directive, and the guard is what bounds it.
                 print(f"[terminal] #{issue} held by {holder} with no live run — escalating, left pending", flush=True)
-                report_once(
-                    directive_id,
-                    key=f"orphaned:{holder}",
-                    message_type="escalate",
-                    body=f"#{issue} is held by {holder} but no loop is tracking that run — the claim is "
-                    "orphaned; reap it (dispatch reap) so the directive can be dispatched. Directive left pending.",
-                )
+                guard_retire(directive_id, issue, f"orphaned claim held by {holder}, no live run")
                 if args.once:
                     return 0
                 continue
@@ -2079,17 +2178,14 @@ def loop(args: argparse.Namespace) -> int:
         if claimed:
             stream_run_event(directive_id, f"claim taken for #{issue} by {agent_id}")
         if not claimed:
-            # Escalate ONCE and leave the directive pending: the refusal is usually
-            # a stale snapshot (a freshly filed child), and after a board refresh the
-            # next cycle claims it. Re-escalating every cycle was measured — four
-            # lines a second for one refusal.
+            # The refusal is usually a stale snapshot (a freshly filed child), and
+            # after a board refresh the next cycle claims it — but "the next cycle"
+            # was every cycle, for ever, with no counter to stop it. The attempt is
+            # counted and the next one is spaced by the harvested backoff; once the
+            # budget is exhausted the order is retired to the dead-letter store and
+            # `channel watch` never returns it again (#723).
             print(f"[terminal] claim refused for #{issue}: {claim_output}", file=sys.stderr, flush=True)
-            report_once(
-                directive_id,
-                key=f"claim-refused:{claim_output[-80:]}",
-                message_type="escalate",
-                body=f"claim refused: {claim_output[-400:]}",
-            )
+            guard_retire(directive_id, issue, f"claim refused: {claim_output[-120:]}")
             if args.once:
                 return 1
             continue

@@ -35,3 +35,12 @@ FLEET_DIR = Path(os.environ.get("AO_FLEET_DIR", ROOT / ".fleet")).resolve()
 
 # The fleet's identity: the tmux session name and the dashboard header label.
 SESSION = os.environ.get("AO_FLEET_SESSION", "fleet")
+
+# The runaway guard's two runtime locations (issue #723). They are declared
+# HERE, with every other runtime path, so `fleet/runaway.py` re-bases these
+# NAMES onto a caller's root instead of inventing a second layout — the same
+# reason the module exists at all. `attempts/` holds one persisted attempt
+# counter per directive; `dead-letter/` holds the terminal artifact of a
+# directive whose budget was exhausted and which must never be dispatched again.
+ATTEMPTS = FLEET_DIR / "attempts"
+DEAD_LETTER = FLEET_DIR / "dead-letter"
