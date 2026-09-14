@@ -7,6 +7,13 @@
 # code. A check that cannot fail is a formality and is rejected
 # (no-false-green doctrine). No network and no containers are required.
 #
+# The check set includes the declared `fleet` pytest suite (`pytest-fleet`).
+# The gate of record must exercise the tests it claims to cover: a red fleet
+# suite sat on master undetected because this gate ran no pytest at all — only
+# `make gate` / `make tests` did (gate gap, issue #331). The remaining declared
+# suites are still exercised only by `make gate`; `governance/lessons` is red
+# for an unrelated board-hygiene defect (#312).
+#
 # Usage: scripts/verify.sh [verify|gate]
 set -u
 
@@ -49,6 +56,12 @@ checks=(
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'
   'terraform|bash scripts/check-terraform.sh'
+  # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
+  # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
+  # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
+  # again. pytest exits non-zero on a collection error or on "no tests collected"
+  # (rc 5), so the check has no false-green path.
+  'pytest-fleet|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q fleet/tests'
 )
 
 overall=0

@@ -9,6 +9,7 @@ test can observe, or returns a verdict the loop acts on.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -230,6 +231,20 @@ def test_decompose_files_children_and_dispatches_only_wave_1(tmp_path, monkeypat
     monkeypatch.setattr(brain, "gh_issue_create", lambda title, body: (filed.append(title), 300 + len(filed))[1])
     dispatched = []
     monkeypatch.setattr(brain, "dispatch", lambda order: (dispatched.append(order["task"]["issue"]), (True, "ok"))[1])
+    # A unit test must not touch the network or the live board. `handle_decompose`
+    # consults the dependency gate through `issue_is_closed` (a `gh api` call) and
+    # refreshes the board snapshot (`... snapshot --from-github`) before it
+    # dispatches — both reach GitHub. Left live, this test read the REAL board:
+    # #301/#302/#303 are genuine, now-CLOSED issues, so every child looked ready
+    # and all three dispatched (`[301, 302, 303] != [301]`). Nothing is closed yet,
+    # so only the child with no dependencies may go out.
+    asked = []
+    monkeypatch.setattr(brain, "issue_is_closed", lambda n: (asked.append(n), False)[1])
+    monkeypatch.setattr(
+        brain.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+    )
 
     spec = {
         "parent_issue": 219,
@@ -241,6 +256,7 @@ def test_decompose_files_children_and_dispatches_only_wave_1(tmp_path, monkeypat
     }
     ok, report = brain.handle_decompose({"task": {"decompose": spec}})
     assert ok is True and len(filed) == 3
+    assert set(asked) == {301}, "the dependency gate must be consulted about the wave-1 child"
     assert dispatched == [301], "only the dependency-free wave is dispatched now; b and c wait"
 
 
