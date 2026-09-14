@@ -153,43 +153,75 @@ work-order item for the adoption, not a claim that the seam is free.
    `wake.delta` and no `outcome`. Upstream a wake carries a delta and ends in
    progress-or-blocker. The seam *adds* fields the fleet does not emit today; an
    adapter must synthesize `wake` and `outcome` from the rung's actual activity.
+   **Resolved** by `integrations/paperclip/mapping.py` (`map_heartbeats`
+   synthesizes `wake` from the rung state and `outcome` from liveness).
 2. **Heartbeat state vocabulary.** The fleet `state` is a rung-liveness enum
    (`healthy`, `idle`, `dispatching`, plus console-derived `down` / `no-heartbeat`);
    upstream has no such enum — it distinguishes event wake from scheduled tick. The
-   two are not translations of each other.
+   two are not translations of each other. **Resolved** by
+   `integrations/paperclip/mapping.py` (`_WAKE_CAUSE` maps the rung state onto the
+   upstream `wake.cause` enum; a rung with no beat becomes a named blocker).
 3. **Cadence is implicit.** The fleet has no tick counter and no explicit cadence
    field; `POLL_SECONDS` (=20) and `STALE_HEARTBEAT_SECONDS` (=120) are module
    constants. Upstream has an explicit scheduled tick. `tick` and `cadence_seconds`
-   must be derived, not read.
+   must be derived, not read. **Resolved** by `integrations/paperclip/mapping.py`
+   (`cadence_seconds` = `fleet/monitor.py` `POLL_SECONDS` = 20; `tick` derived and
+   held at 0 offline).
 4. **Ticket status is not first-class.** `governance/dispatch/` records claim
    *events* (`claim` / `release` / `reap`) and lock files — there is no
    `in-progress` / `blocked` / `in-review` / `done` enum and **no `blocked_by`
    field**. Status and blocked-by must be derived from claim state plus the
-   dependency chain; there is no single record to read them from.
+   dependency chain; there is no single record to read them from. **Resolved** by
+   `integrations/paperclip/mapping.py` (`_ticket_status` derives the closed-vocabulary
+   status; `blocked_by` is joined from the board snapshot).
 5. **No goal reference on a claim.** A claim names the issue, agent and lane — not
    the epic it serves. `goal` must be joined from the board, not read from the
-   ledger.
+   ledger. **Resolved** by `integrations/paperclip/mapping.py` (`map_tickets` joins
+   `goal` from the snapshot's milestone/parent).
 6. **Evidence is a convention, not a field.** "Evidence" today is the PR + the
    gate output posted to the issue (GR-12), not a structured field on a record.
-   The `evidence` array is a seam field with no fleet column behind it.
+   The `evidence` array is a seam field with no fleet column behind it. **Resolved
+   (derived)** by `integrations/paperclip/mapping.py` (`evidence` carries the issue
+   reference and, when present, the closure or commit reference). **Deferred** — a
+   natively structured evidence field is adoption work owned by the ticket-contract
+   v2 lane (#401, milestone M27).
 7. **Budget scope differs.** The fleet budget rail is scoped by **tenant and
    vendor** (`telemetry/budgets/budget.py` `VendorBudgetCap`: per-vendor/model,
    `window` = `month`), not by **agent / team / project**. Upstream caps per agent.
-   `scope.level` = `agent` has **no fleet producer today**.
+   `scope.level` = `agent` has **no fleet producer today**. **Deferred** —
+   `integrations/paperclip/mapping.py` (`map_budgets`) maps a tenant budget to
+   scope level `team`; a real per-agent cap has no fleet producer and is adoption
+   work owned by the budget-scope adapter lane (#415, milestone M27).
 8. **No explicit currency.** The fleet encodes USD by convention (`limitUsd`); it
    has no `currency` field. Upstream models currency. `currency` is derived.
+   **Resolved (derived)** by `integrations/paperclip/mapping.py` (`currency` =
+   `USD`).
 9. **Hard stop is a percentage, not a boolean.** The fleet expresses the stop as
    `hard_cap_pct` (default 100); upstream a hard stop is an absolute cap with a
    graceful hand-off. `hard_stop` (boolean) and `cap`/`spent` must be derived from
-   the percentage rail.
+   the percentage rail. **Resolved (derived)** by
+   `integrations/paperclip/mapping.py` (`hard_stop` from the mode/percentage rail).
 10. **No per-task receipt field.** The fleet has an append-only audit stream
     (`.fleet/slog.jsonl`) and a hash-chained ledger (`telemetry/ledger/`) but no
     field that ties a spend to a task as a receipt. `receipt_ref` is a seam field
-    pointing at an audit/ledger entry, not a native receipt.
+    pointing at an audit/ledger entry, not a native receipt. **Resolved (derived)**
+    by `integrations/paperclip/mapping.py` (`receipt_ref` points at the budget
+    config row). **Deferred** — a native per-task receipt is adoption work owned by
+    the budget-scope adapter lane (#415, milestone M27).
 11. **Auth models do not meet natively.** The fleet has no HTTP caller identity;
     upstream has agent keys/JWTs, a session cookie, a board token and the
     `X-Paperclip-Run-Id` run header. Cross-boundary auth is one-time integration
-    work, not a field mapping.
+    work, not a field mapping. **Resolved** by
+    `integrations/paperclip/client.py` (`Authorization: Bearer` on every request
+    and `X-Paperclip-Run-Id` on mutating calls, applied at the transport seam).
+    **Deferred** — standing the process up and wiring real cross-boundary
+    credentials is adoption work owned by the cross-boundary auth lane (#412,
+    milestone M27).
+
+Every mismatch above is now either **resolved** by a file under
+`integrations/paperclip/` (enforced offline by
+`scripts/check-paperclip-integration-adapter.sh` in `make verify`) or **deferred**
+to the named adoption lane with the reason recorded on the row.
 
 ## 6. Related records and docs
 

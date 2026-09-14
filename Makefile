@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration paperclip-adapter cross-reference cross-repo-boundary \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -330,6 +330,14 @@ lessons:
 ## and their JSON Schemas are enforced, with a self-mutating negative control.
 paperclip-integration:
 	@bash scripts/check-paperclip-integration.sh
+
+## paperclip-adapter — the paperclip.ing adapter gate (#428, ADR-0013): the
+## mapper's heartbeat/ticket/budget records must conform to the three seam
+## schemas and the client's request shapes (kept offline through the fixture
+## transport) must hold; a dropped required field or a value outside a closed
+## vocabulary is refused by name, with a self-mutating negative control.
+paperclip-adapter:
+	@bash scripts/check-paperclip-integration-adapter.sh
 
 ## board-gate — governance board enforcement gate (issue #143): re-runs
 ## knowledge-index, conformance, lessons and remediation for real and refuses
