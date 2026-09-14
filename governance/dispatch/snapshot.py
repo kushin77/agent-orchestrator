@@ -30,6 +30,11 @@ from model import Issue, Snapshot
 
 DEFAULT_PATH = Path(".board/snapshot.json")
 
+# A snapshot older than this is refused as stale (issue #170): the board moves
+# faster than an hour-old artifact, and answering confidently from stale data is
+# the failure mode the gate exists to prevent.
+DEFAULT_STALENESS_MINUTES = 15
+
 _PARENT_RE = re.compile(r"^\s*(?:parent|part[-_ ]of)\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
 _BLOCKED_RE = re.compile(r"^\s*blocked[-_ ]by\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
 
@@ -67,6 +72,29 @@ def parse_iso(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def age_minutes(snapshot: Snapshot, now: datetime | None = None) -> float:
+    """Age of the snapshot in minutes (wall-clock now minus ``generated_at``).
+
+    An empty or unparseable ``generated_at`` reads as ``inf``: fail closed, a
+    snapshot whose age cannot be established is never trusted.
+    """
+    try:
+        generated = parse_iso(snapshot.generated_at)
+    except ValueError:
+        return float("inf")
+    moment = now or datetime.now(timezone.utc)
+    return max(0.0, (moment - generated).total_seconds() / 60.0)
+
+
+def is_stale(
+    snapshot: Snapshot,
+    threshold_minutes: int = DEFAULT_STALENESS_MINUTES,
+    now: datetime | None = None,
+) -> bool:
+    """True when the snapshot is strictly older than ``threshold_minutes``."""
+    return age_minutes(snapshot, now) > threshold_minutes
 
 
 def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at: str | None = None) -> Snapshot:

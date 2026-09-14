@@ -36,11 +36,15 @@ python3 governance/dispatch/cli.py release --issue 139 --agent me
 ```
 
 Exit codes follow the repo tri-state convention: `0` OK, `1` refused/NOT-OK,
-`2` CANNOT-ASSESS (for example the snapshot is missing).
+`2` CANNOT-ASSESS (for example the snapshot is missing **or stale** — past
+`--stale-minutes`, default 15 minutes).
 
-* **Claim record** — one JSON object per line in the append-only, tracked
-  `.board/claims.jsonl`: agent, lane, base commit, reason, snapshot hash,
-  timestamp and TTL. The record is the evidence that the claim was order-checked.
+* **Claim record** — one JSON object per event. New events are written **one file
+  per event** into `.board/claims/` (atomic, collision-proof), so two concurrent
+  lanes never touch the same path and a git conflict on the ledger is impossible
+  by construction. The pre-#170 single-file ledger `.board/claims.jsonl` is
+  frozen history, read first so replay stays time-ordered. The record is the
+  evidence that the claim was order-checked.
 * **Single-claim lock** — `.board/locks/<issue>.lock` is created
   `O_CREAT|O_EXCL`, so a second claim on an in-flight issue fails loudly instead
   of two agents duplicating work. A claim whose TTL elapsed may be taken over,
@@ -50,6 +54,26 @@ Exit codes follow the repo tri-state convention: `0` OK, `1` refused/NOT-OK,
   gate audits against. Refresh it with
   `python3 governance/dispatch/cli.py snapshot --from-github` (the only
   network-touching path in this package); the gate itself is offline.
+
+## Snapshot staleness (#170)
+
+The snapshot is refreshed only by an explicit command, so it can go stale while
+the live board moves on — a stale frontier sends an agent at finished work, or
+refuses a legitimate claim as out of order. `status`, `eligible` and `claim`
+print the snapshot's age on every run and **fail closed** past the threshold:
+
+```
+$ python3 governance/dispatch/cli.py eligible --issue 139 --agent me
+eligible: snapshot age 19.0m (threshold 15m)
+eligible: CANNOT-ASSESS — snapshot-stale (19.0m > 15m) — refresh first: python3 governance/dispatch/cli.py snapshot --from-github
+# exit code 2
+```
+
+A stale snapshot yields `CANNOT-ASSESS` (exit 2), never a verdict; a stale
+`claim` is refused with reason `snapshot-stale`. The threshold is
+`--stale-minutes` (default 15). The offline `audit` is deliberately **not**
+staleness-gated: it judges committed history against the committed snapshot, and
+`make verify` runs without the network.
 
 ## Chain markers
 
@@ -92,6 +116,6 @@ fails (GR-12 / AO-GR-19: a check that cannot fail is a formality).
 | `model.py` | Issue / Snapshot / Eligibility / ClaimEvent dataclasses and reason codes |
 | `snapshot.py` | Snapshot build, load, hash, chain-marker parsing, `gh` fetch |
 | `order.py` | Eligibility rules and frontier/milestone resolution |
-| `claims.py` | Ledger, single-claim lock, TTL take-over, audit, self-control |
+| `claims.py` | Ledger (directory + frozen legacy file), single-claim lock, TTL take-over, snapshot-staleness refusal, audit, self-control |
 | `cli.py` | `status` / `eligible` / `claim` / `release` / `snapshot` / `audit` |
 | `tests/` | Eligibility, lock, TTL, audit and anti-formality controls |

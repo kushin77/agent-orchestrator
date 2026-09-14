@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Claim-time issue-order enforcement — command line (issue #157).
+"""Claim-time issue-order enforcement — command line (issue #157, hardened #170).
 
 Exit codes follow the repo's tri-state convention (guardrails/honesty):
 
 * ``0`` — OK
 * ``1`` — NOT-OK (a claim was refused, or the audit found a violation)
-* ``2`` — CANNOT-ASSESS (no snapshot / no ledger to audit against)
+* ``2`` — CANNOT-ASSESS (no snapshot, a stale snapshot, or no ledger to audit
+  against) — the snapshot's age is printed on every ``status``/``eligible``/
+  ``claim`` run, and a snapshot past ``--stale-minutes`` is refused with
+  ``snapshot-stale`` instead of a verdict.
 
 Typical agent flow::
 
@@ -57,7 +60,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         return EXIT_CANNOT_ASSESS
 
     problems = claims.self_control()
-    problems.extend(claims.audit_text(ledger_path.read_text(encoding="utf-8") if ledger_path.exists() else "", snapshot))
+    problems.extend(claims.audit_ledger(ledger_path, snapshot))
 
     if problems:
         print(f"issue-claims: FAIL ({len(problems)} problem(s))", file=sys.stderr)
@@ -74,6 +77,15 @@ def cmd_eligible(args: argparse.Namespace) -> int:
         print(f"eligible: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     snapshot = _load_snapshot(snapshot_path)
+    age = snapshot_mod.age_minutes(snapshot)
+    print(f"eligible: snapshot age {age:.1f}m (threshold {args.stale_minutes}m)", file=sys.stderr)
+    if snapshot_mod.is_stale(snapshot, args.stale_minutes):
+        print(
+            f"eligible: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m) "
+            "— refresh first: python3 governance/dispatch/cli.py snapshot --from-github",
+            file=sys.stderr,
+        )
+        return EXIT_CANNOT_ASSESS
     events = claims.read_ledger(args.ledger)
     live = claims.active_claims(events)
     held_by_self = frozenset(number for number, claim in live.items() if claim.agent == args.agent)
@@ -96,6 +108,8 @@ def cmd_claim(args: argparse.Namespace) -> int:
         print(f"claim: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     snapshot = _load_snapshot(snapshot_path)
+    age = snapshot_mod.age_minutes(snapshot)
+    print(f"claim: snapshot age {age:.1f}m (threshold {args.stale_minutes}m)", file=sys.stderr)
     digest = snapshot_mod.content_sha256(snapshot_path)
     try:
         event = claims.claim(
@@ -109,10 +123,11 @@ def cmd_claim(args: argparse.Namespace) -> int:
             snapshot_sha256=digest,
             ttl_hours=args.ttl_hours,
             directive_id=args.directive,
+            stale_minutes=args.stale_minutes,
         )
     except claims.ClaimRefused as exc:
         print(f"claim REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
-        return EXIT_NOT_OK
+        return EXIT_CANNOT_ASSESS if exc.reason == "snapshot-stale" else EXIT_NOT_OK
     print(json.dumps(event.to_json(), indent=2))
     print(f"claim accepted: #{event.issue} as {event.agent} ({event.reason})")
     return EXIT_OK
@@ -134,11 +149,20 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(f"status: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     snapshot = _load_snapshot(snapshot_path)
+    age = snapshot_mod.age_minutes(snapshot)
+    print(f"snapshot: {snapshot.source} generated {snapshot.generated_at} ({len(snapshot.issues)} issues)")
+    print(f"snapshot age: {age:.1f}m (threshold {args.stale_minutes}m)")
+    if snapshot_mod.is_stale(snapshot, args.stale_minutes):
+        print(
+            f"status: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m) "
+            "— refresh first: python3 governance/dispatch/cli.py snapshot --from-github",
+            file=sys.stderr,
+        )
+        return EXIT_CANNOT_ASSESS
     events = claims.read_ledger(args.ledger)
     live = claims.active_claims(events)
     milestone = order.active_milestone(snapshot, frozenset())
     frontier = order.frontier(snapshot, milestone) if milestone else None
-    print(f"snapshot: {snapshot.source} generated {snapshot.generated_at} ({len(snapshot.issues)} issues)")
     print(f"active milestone: {milestone or '<none>'}")
     print(f"frontier: #{frontier.number} {frontier.title}" if frontier else "frontier: <none>")
     print(f"live claims: {len(live)}")
@@ -195,8 +219,9 @@ def cmd_snapshot(args: argparse.Namespace) -> int:
 def add_paths(parser: argparse.ArgumentParser) -> None:
     """Board artifacts every subcommand reads (after the subcommand, e.g. `audit --ledger x`)."""
     parser.add_argument("--snapshot", default=str(snapshot_mod.DEFAULT_PATH))
-    parser.add_argument("--ledger", default=str(claims.DEFAULT_LEDGER))
+    parser.add_argument("--ledger", default=str(claims.DEFAULT_CLAIMS_DIR))
     parser.add_argument("--locks", default=str(claims.DEFAULT_LOCK_DIR))
+    parser.add_argument("--stale-minutes", type=int, default=snapshot_mod.DEFAULT_STALENESS_MINUTES)
 
 
 def build_parser() -> argparse.ArgumentParser:
