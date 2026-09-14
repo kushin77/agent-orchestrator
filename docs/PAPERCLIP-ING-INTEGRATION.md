@@ -382,3 +382,46 @@ a missing mapping; the seam itself is closed here.
   lane's doc; mentioned in plain text only).
 - [`../GOLDEN-RULES.md`](GOLDEN-RULES.md) — the golden rules cited above (GR-10,
   GR-12) and [AGENTS.md](../AGENTS.md) for the doctrine.
+
+## 7. Contract 4 — the diagrams blueprint signal (read-only `evidence[]`)
+
+Frozen by [ADR-0017](decision-records/ADR-0017-diagrams-authority-on-the-operator-surface.md)
+(issue #463, EPIC #461). Additive: §1–§6 are unchanged, and this section **adds no
+facet** — the closed set in §3.1 stays `lessons` / `raid` / `budget`.
+
+**Fleet-side producer:** the projection adapter `integrations/paperclip/diagrams.py`
+on the canonical transport ([ADR-0016](decision-records/ADR-0016-paperclip-boundary-single-module.md),
+#465), consuming the `kushin77/diagrams` blueprint state this repo declares through
+its SSOT membership (`architecture.yaml` + the `gdc-manifest.yaml`
+`diagrams.blueprint` pin, #464).
+**Fleet-side consumer:** a ticket's structured `evidence[]` (§3.1, ADR-0014 rule 4).
+**Authority:** *none taken* — the blueprint is **read-only input**. The ticket stays
+the single join node (ADR-0014) and the fleet stays authoritative for dispatch,
+claims, budgets and audit (ADR-0012).
+
+**Which question the blueprint owns.** Per CMR `ADR-0018`
+(`vendor/CMR/docs/decision-records/ADR-0018-architecture-ssot-transition.md`), the
+diagrams blueprint is the single source of truth for **"what is live, today?"** —
+and nothing else. *"What did we decide, and why?"* stays with `docs/ARCHITECTURE.md`
++ `docs/decision-records/`; *"who acts?"* stays with the ticket. The projection is
+therefore **read-only and one-way**: diagram → decision → ticket; **never**
+diagram → write. A drift the blueprint detects is a signal to open an ADR or a
+ticket, never a silent absorption.
+
+**The seam shape (ADR-0017).** A diagram signal (a drift Finding, a
+rendered-blueprint reference, a `content_hash`) rides `evidence[]` as an additive
+structured receipt `{kind, ref, result, checks}` — the same v2 receipt §3.1 froze —
+and **not** a new facet, **not** a new `kind`. This leaf **does not touch the
+closed `facets` set**: `lessons` / `raid` / `budget` remain its only members,
+because `evidence` is explicitly *not authority-tracked* ("appended by whichever
+lane ran the proof", §3.1), which is what a read-only projection requires. A drift
+finding is a ticket of `kind: "task"`; the Finding is its `evidence[]`. Adding a
+facet would be a contract change that must move
+`scripts/check-paperclip-integration.sh` (and the schema) with it — so a new facet
+is never added by prose, and this section adds none.
+
+| Seam element | Shape | Producer | Authority |
+|---|---|---|---|
+| diagram signal | `evidence[]` receipt `{kind, ref, result, checks}` | `integrations/paperclip/diagrams.py` (#465) | **none** — appended proof, not authority-tracked |
+| drift finding → work item | a ticket `kind: "task"` | the blueprint's drift→decide loop | the ticket stays the join (ADR-0014) |
+

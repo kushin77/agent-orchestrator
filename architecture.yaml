@@ -1,0 +1,72 @@
+# architecture.yaml — per-repo SSOT declaration seed (issue #464, EPIC #461).
+#
+# The mandatory consumer surface of the `diagrams` GR-18 module
+# (CMR:ONBOARD-0005): the *input* the `diagrams.blueprint` always-current sync
+# reads. It declares WHERE this repo's live topology, resources and Terraform
+# state actually live; the sync rewrites the `generated:` block on drift. Only
+# `schema` and the top-level key names are fixed contract
+# (`vendor/CMR/catalog/schemas/architecture-manifest.schema.json`); every value
+# below is this repo's own real answer, verified against the checkout — not a
+# copy of the vendor's own seed.
+#
+# Honesty notes (each value below is the *measured* answer, never aspirational):
+#   * generator — no live-topology generator exists in this repo (no extractor,
+#     no CDK/CloudFormation app, no topology module). `kind: manual` is the
+#     honest answer and `entrypoint` is therefore omitted. A future lane that
+#     lands a real generator must name it here; the declaration gate
+#     (`scripts/check-diagrams-declaration.sh`) checks that any declared
+#     entrypoint actually exists on disk.
+#   * live_resources.source — `manual` for the same reason: nothing here
+#     extracts a resource inventory, so there is no cloud API surface to name.
+#   * terraform_state — this repo has exactly one state root, `infra/terraform`
+#     (the `modules/*` sub-directories are child modules, not state roots).
+#     No `backend` block is committed, so the *actually configured* backend is
+#     Terraform's default `local`; `infra/terraform/backend.tf.example`
+#     documents the intended GCS backend, but it is a template, not a
+#     configured backend (never applied, never copied into place here).
+#   * generated — left null on purpose: no sync pass has run in this repo.
+
+schema: cmr.architecture-manifest/v1
+repo: kushin77/agent-orchestrator
+
+# Where this repo's own live topology/resource graph is actually produced.
+# There is no generator here today, so the honest, machine-readable answer is
+# `manual` with no entrypoint. `generator.kind` is one of
+# python-module | terraform-plan | cdk-synth | cloudformation | manual.
+generator:
+  kind: manual
+
+# Live resources this repo's own generator actually extracts. None are
+# extracted (no extractor exists), so the honest source is `manual`; the sync
+# has nothing to enumerate for this repo until a generator lands.
+live_resources:
+  source: manual
+  scope:
+    note: >-
+      no cloud-resource extraction pipeline exists in this repo; there is no
+      project id or extractor entrypoint to declare. Recorded as `manual`
+      rather than guessed.
+
+# Every real Terraform state root this repo manages. One root today; `backend`
+# is the actually configured backend (Terraform's default `local`, since no
+# `backend` block is committed) — not the GCS backend the example template
+# merely sketches.
+terraform_state:
+  - root: infra/terraform
+    backend: local
+    note: >-
+      no committed `backend` block; `backend.tf.example` is an unapplied GCS
+      template, so the configured backend is the Terraform default `local`
+    manages:
+      - control-plane service instances (Cloud Run v2, flag-gated OFF)
+      - control-plane deployer service account (the only apply identity)
+      - public web surface (Cloud Run v2 + DNS/TLS, flag-gated OFF)
+
+# Filled in / overwritten by the sync run itself — never hand-edited here.
+# `null` means this repo has not yet had a first `diagrams.blueprint` sync pass
+# (the fully-automated org-wide sync is diagrams' own near-term item, not
+# shipped), so the declaration surface is all this repo carries today.
+generated:
+  last_synced: null
+  synced_by: null
+  content_hash: null

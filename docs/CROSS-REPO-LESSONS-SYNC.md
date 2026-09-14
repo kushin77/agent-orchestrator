@@ -15,6 +15,17 @@ deepseek #84/#79 and our #141 must share one ledger, not two"* — and pointed a
 the **derived view** (read-only); the sync direction is **one-way:
 agent-orchestrator -> deepseek** — never two symmetric stores.
 
+There is a **second** lessons ledger, and this document declares it too — the
+`kushin77/CMR` `docs/LESSONS.md` consolidated index. **Declared (intent, not yet
+confirmed):** `governance/lessons/ledger.jsonl` in `kushin77/agent-orchestrator`
+is the **writer** for agent-orchestrator-scoped records; the `kushin77/CMR`
+`docs/LESSONS.md` index is the org-level **derived view**; the direction of flow
+is **one-way: agent-orchestrator -> CMR**. This is a **declared intent, not a
+confirmed mapping**: measured 2026-09-14, the two ledgers share no record ids and
+no cross-reference, so there is no record-level mapping to assert. The direction
+issue in §7 asks the hub to confirm the direction or declare the mapping — a
+truthful "declared intent, unconfirmed" beats a fabricated crosswalk.
+
 Where the physical constraint of the boundary (§2) means a second on-disk store
 must exist, the roles are fixed and disjoint:
 
@@ -22,6 +33,7 @@ must exist, the roles are fixed and disjoint:
 |---|---|---|
 | `kushin77/agent-orchestrator` `governance/lessons/ledger.jsonl` | **writer** (authoritative) | out only |
 | `kushin77/deepseek` | **derived view** (read-only projection) | in only |
+| `kushin77/CMR` `docs/LESSONS.md` | **derived view** (declared intent, unconfirmed) | in only |
 
 Peer-originated lessons do **not** flow back into the authoritative ledger by
 copy. They enter it the same way every other cross-repo item does — through a
@@ -47,9 +59,10 @@ The contract is machine-checked by `governance/lessons-sync/lessons_sync.py`
 repository's own ledger:
 
 ```text
-governance/lessons-sync/contract.json      # the declared relationship (roles, direction, references)
+governance/lessons-sync/contract.json      # the declared relationships (roles, direction, references)
 governance/lessons-sync/peer-issues.json   # the pinned peer board items that carry the peer loop
 governance/lessons-sync/hints.json         # the dispatch-hint table (§4)
+governance/lessons-sync/cmr-ledger.json    # the FROZEN CMR consolidated index (§1, the second ledger)
 governance/lessons/ledger.jsonl            # the authoritative ledger itself
 ```
 
@@ -97,6 +110,12 @@ The pass checks the contract, and every check can genuinely fail:
 | peer counterpart **by id** | a lesson whose peer-side counterpart is missing (`peer-counterpart-missing`, naming the lesson id) |
 | hint provenance | a hint with no issue ref or no commit — a bare string (`hint-without-provenance`) |
 | no peer close | a reference that would close a peer issue from here (`peer-close-refused`) |
+| the second ledger is declared | an undeclared CMR-hub ledger (`ledger-undeclared`) |
+| the CMR reference resolves | a CMR ledger reference that does not resolve against the frozen baseline (`ledger-ref-unresolved`) |
+| no silent drop (CMR side) | a CMR index record with no disposition — `hub-only` or `mirrors` (`cmr-record-undisclosed`, naming the id) |
+| counterpart by id (CMR side) | a `mirrors` mapping whose local counterpart is missing (`local-counterpart-missing`, naming the id) |
+| intent is not a mapping | a `mirrors` mapping asserted while `confirmed: false` (`mapping-unconfirmed`) |
+| no silent drop (local side) | a local ledger record that is neither a mirror target nor `local-only` (`local-record-undisclosed`, naming the id) |
 
 **No silent close.** A `Closes` / `Fixes` / `Resolves <owner>/<repo>#<n>`
 reference to a foreign repo is refused: same-owner cross-repo `Closes` *does*
@@ -109,7 +128,11 @@ the peer board from here**.
 The pass is offline and deterministic by default: stdlib only, one read per
 pinned input, no network, no `gh`, no wall clock — so two runs over the same
 pinned inputs produce byte-identical reports. Live peer reads happen only behind
-the explicit `--live` flag (which calls `gh api`).
+the explicit `--live` flag (which calls `gh api`). The CMR freeze is re-resolved
+against the live `vendor/CMR/docs/LESSONS.md` only behind `--verify-cmr-source`;
+a missing, unreadable, or empty live source is **CANNOT-ASSESS (`2`), never `0`**
+— and a fresh worktree leaves the submodule unpopulated, which is exactly why the
+default mode reconciles against the frozen baseline instead of the live file.
 
 | rc | Meaning |
 |---|---|
@@ -120,10 +143,12 @@ the explicit `--live` flag (which calls `gh api`).
 CANNOT-ASSESS is **never** `0`. In `--live` mode a peer source that is
 unavailable is CANNOT-ASSESS (`2`), never a clean pass.
 
-## 7. The direction issue
+## 7. The direction issues
 
-The peer half is requested — and only requested — by **one** direction issue on
-`kushin77/deepseek`, which states our authoritative-ledger decision, names what we
+Each peer half is requested — and only requested — by **one** direction issue on
+that peer's board. Two boards are declared in §1, so there are two.
+
+The deepseek half, which states our authoritative-ledger decision, names what we
 need from their side, and cites `kushin77/agent-orchestrator#424` and
 `docs/CROSS-REPO-EXECUTION-BOUNDARY.md`:
 
@@ -131,8 +156,20 @@ need from their side, and cites `kushin77/agent-orchestrator#424` and
   <https://github.com/kushin77/deepseek/issues/118>
 
 It references `kushin77/deepseek#84` and `#79` without closing or modifying
-anything on that board, and carries no `Closes`/`Fixes` reference to any peer
-issue. It is the one sanctioned cross-repo write; everything else here is
+anything on that board, and carries no `Closes` / `Fixes` reference to any peer
+issue.
+
+The CMR-hub half, which records the **declared, unconfirmed** relationship from
+§1 and asks the hub to confirm the writer/derived-view direction or declare the
+record-level mapping, citing `kushin77/agent-orchestrator#424` and the boundary
+doc:
+
+- **`kushin77/CMR#1009`** —
+  <https://github.com/kushin77/CMR/issues/1009>
+
+It closes nothing on that board and carries no peer-closing reference either.
+
+These two are the only sanctioned cross-repo writes; everything else here is
 read-only.
 
 ## 8. Enforcement
@@ -140,7 +177,7 @@ read-only.
 | Surface | Role |
 |---|---|
 | `governance/lessons-sync/lessons_sync.py` | The pass: deterministic, offline, tri-state exit, self-test negative controls |
-| `governance/lessons-sync/{contract,peer-issues,hints}.json` | The pinned inputs |
+| `governance/lessons-sync/{contract,peer-issues,hints,cmr-ledger}.json` | The pinned and frozen inputs |
 | `governance/lessons-sync/tests/test_lessons_sync.py` | Behavioural proof, one negative control per refusal |
 | `scripts/check-cross-repo-lessons.sh` | The gate: runs the pass, propagates the honest tri-state |
 | This document | The contract the gate enforces |
@@ -161,3 +198,5 @@ adds it alongside the other cross-repo gates.
   sibling of that contract.
 - `kushin77/deepseek#84`, `kushin77/deepseek#79`, `kushin77/deepseek#74`,
   `kushin77/deepseek#78`; `kushin77/CMR#865` (board sync is one-directional).
+- `kushin77/CMR#1009` — the direction issue that asks the hub to confirm the second
+  ledger's writer/derived-view direction (filed by this lane, cited in §7).

@@ -1,0 +1,1269 @@
+{
+  "components": {
+    "parameters": {
+      "companyId": {
+        "description": "The upstream company scope. It is the fleet's own Org/Tenant id through the one declared mapping — never a second tenancy.",
+        "in": "path",
+        "name": "companyId",
+        "required": true,
+        "schema": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "x-company-mapping": "ao.paperclip.company/v1"
+      }
+    },
+    "responses": {
+      "400": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "``400`` — the request failed validation."
+      },
+      "401": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "``401`` — the caller identity is missing or invalid."
+      },
+      "403": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "``403`` — the caller is known but not allowed."
+      },
+      "404": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "``404`` — the resource is missing or outside the company scope."
+      },
+      "409": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "``409`` — the resource is owned, locked, or in conflict."
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "``422`` — the request is well-formed but breaks a business rule."
+      },
+      "503": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "``503`` — the upstream database is unreachable."
+      }
+    },
+    "schemas": {
+      "Activity": {
+        "additionalProperties": false,
+        "description": "Introspected from integrations/paperclip/model.py::Activity.to_dict — the exact shape the adapter emits, never a parallel description.",
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "object_ref": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "verb": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "actor",
+          "id",
+          "object_ref",
+          "ts",
+          "verb"
+        ],
+        "title": "Activity",
+        "type": "object",
+        "x-shape-provenance": "integrations/paperclip/model.py::Activity.to_dict"
+      },
+      "Agent": {
+        "additionalProperties": false,
+        "description": "Introspected from integrations/paperclip/model.py::Agent.to_dict — the exact shape the adapter emits, never a parallel description.",
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hired": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reports_to": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "capabilities",
+          "hired",
+          "kind",
+          "name",
+          "reports_to",
+          "role",
+          "tier"
+        ],
+        "title": "Agent",
+        "type": "object",
+        "x-shape-provenance": "integrations/paperclip/model.py::Agent.to_dict"
+      },
+      "Approval": {
+        "additionalProperties": false,
+        "description": "Introspected from integrations/paperclip/model.py::Approval.to_dict — the exact shape the adapter emits, never a parallel description.",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "scope": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "level": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "level"
+            ],
+            "type": "object"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "id",
+          "kind",
+          "scope",
+          "state"
+        ],
+        "title": "Approval",
+        "type": "object",
+        "x-shape-provenance": "integrations/paperclip/model.py::Approval.to_dict"
+      },
+      "Budget": {
+        "additionalProperties": false,
+        "description": "The frozen budget seam between the fleet's FinOps tiers and budget rail (governance/finops/, gateway/finops/, telemetry/budgets/) and the upstream cost surface (issue #370, ADR-0013). A budget has a scope, a period, a cap and spend, a currency, a hard-stop flag, a burn-rate alert threshold and a receipt reference. See docs/PAPERCLIP-ING-INTEGRATION.md.",
+        "properties": {
+          "burn_rate_alert_pct": {
+            "description": "Burn-rate alert threshold, as a percentage of cap, that warns before the hard stop (fleet: warn_at_pct / hard_cap_pct).",
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "cap": {
+            "description": "The spend limit for the period. At the cap the run hard-stops with a graceful hand-off.",
+            "minimum": 0,
+            "type": "number"
+          },
+          "currency": {
+            "description": "ISO-4217 currency of cap and spent (fleet vendor caps are USD).",
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "hard_stop": {
+            "description": "True when the cap is absolute: spend at or above it always stops, whatever the policy.",
+            "type": "boolean"
+          },
+          "period": {
+            "description": "The budget window (fleet: month — the vendor cap window in telemetry/budgets/budget.py).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "receipt_ref": {
+            "description": "Per-task receipt reference backing the spend (fleet: the audit/ledger entry; upstream: the cost receipt).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "additionalProperties": false,
+            "description": "What the cap applies to. Upstream caps per agent (also per team/project).",
+            "properties": {
+              "id": {
+                "description": "The agent / team / project id the cap applies to.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "level": {
+                "description": "The scoping level of the cap.",
+                "enum": [
+                  "agent",
+                  "team",
+                  "project"
+                ]
+              }
+            },
+            "required": [
+              "level",
+              "id"
+            ],
+            "type": "object"
+          },
+          "spent": {
+            "description": "Spend already consumed in the period.",
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "scope",
+          "period",
+          "cap",
+          "spent",
+          "currency",
+          "hard_stop",
+          "burn_rate_alert_pct",
+          "receipt_ref"
+        ],
+        "title": "Paperclip-ing budget contract (fleet FinOps -> upstream costs)",
+        "type": "object"
+      },
+      "Dashboard": {
+        "description": "The adapter's client serves the company's dashboard route, but integrations/paperclip/model.py declares no typed record for it, so no shape is introspectable. This schema is deliberately permissive and records that gap rather than inventing a parallel description.",
+        "title": "Dashboard",
+        "type": "object",
+        "x-shape-provenance": "not introspectable — integrations/paperclip/model.py defines no Dashboard record; described permissively, not invented"
+      },
+      "Error": {
+        "additionalProperties": false,
+        "description": "The mapped boundary error envelope. ``status`` is one of the seven taxonomy statuses; ``code`` is the fleet's own stable machine code (identity/cpapi/errors.py vocabulary). No field ever carries a credential.",
+        "properties": {
+          "code": {
+            "description": "the stable machine wire code for this refusal",
+            "type": "string"
+          },
+          "details": {
+            "description": "optional structured detail; never a credential (GR-6)",
+            "type": "object"
+          },
+          "message": {
+            "description": "a human-readable refusal",
+            "type": "string"
+          },
+          "status": {
+            "description": "the HTTP status (one of 400/401/403/404/409/422/503)",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "code",
+          "message"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "HealthReport": {
+        "additionalProperties": false,
+        "description": "The health verdict and the real per-dependency readings behind it (integrations/paperclip/api/health.py). A non-ok dependency is never reported as ok.",
+        "properties": {
+          "dependencies": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "detail": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "detail",
+                "name",
+                "state"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependencies",
+          "status"
+        ],
+        "title": "HealthReport",
+        "type": "object"
+      },
+      "Heartbeat": {
+        "additionalProperties": false,
+        "description": "The frozen heartbeat seam between the fleet's rung beats (fleet/monitor.py, fleet/brain.py) and the upstream operator surface (issue #370, ADR-0013). A heartbeat is either an event wake (assigned / commented / unblocked / review-requested) or a scheduled tick; it carries the delta so the consumer does not re-read history, and it ends in durable progress or a named blocker with an owner. See docs/PAPERCLIP-ING-INTEGRATION.md.",
+        "properties": {
+          "agent_id": {
+            "description": "Agent identity that emitted the beat (fleet: the rung/agent id; upstream: the agent record id).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "cadence_seconds": {
+            "description": "The scheduled cadence between ticks (fleet: fleet/monitor.py POLL_SECONDS; the staleness ceiling is fleet/channel.py STALE_HEARTBEAT_SECONDS).",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "outcome": {
+            "additionalProperties": false,
+            "description": "What the beat ends in: durable progress, or a named blocker with an owner.",
+            "properties": {
+              "detail": {
+                "description": "Human-readable summary of the progress made or the blocker named.",
+                "type": "string"
+              },
+              "owner": {
+                "description": "The single accountable owner for the next step — the blocker's owner when status is blocked.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "status": {
+                "description": "progress = durable forward motion; blocked = a named blocker with an owner.",
+                "enum": [
+                  "progress",
+                  "blocked"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "owner"
+            ],
+            "type": "object"
+          },
+          "session_id": {
+            "description": "The minted session identity bound to the one issue this agent is working (fleet: AO_SESSION_ID).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "tick": {
+            "description": "Monotonic tick counter for this agent's run; a scheduled tick advances it, an event wake does not reset it.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "ts": {
+            "description": "ISO-8601 UTC timestamp of the beat (fleet beats carry the same field).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "wake": {
+            "additionalProperties": false,
+            "description": "Why this beat fired, and the delta it carries so the consumer needs no history re-read.",
+            "properties": {
+              "cause": {
+                "description": "Event wake (assigned / commented / unblocked / review-requested) or scheduled tick.",
+                "enum": [
+                  "assigned",
+                  "commented",
+                  "unblocked",
+                  "review-requested",
+                  "scheduled"
+                ]
+              },
+              "delta": {
+                "description": "The change since the previous beat (the upstream wake carries this so the agent does not re-read history).",
+                "type": "object"
+              }
+            },
+            "required": [
+              "cause",
+              "delta"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "agent_id",
+          "session_id",
+          "tick",
+          "cadence_seconds",
+          "wake",
+          "outcome",
+          "ts"
+        ],
+        "title": "Paperclip-ing heartbeat contract (fleet producer -> upstream surface)",
+        "type": "object"
+      },
+      "Ticket": {
+        "$defs": {
+          "evidence_receipt": {
+            "additionalProperties": false,
+            "description": "A structured evidence receipt: the receipt that proves delivery and backs the budget charge are the same object (ADR-0014).",
+            "properties": {
+              "checks": {
+                "description": "The number of checks the receipt covers.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "kind": {
+                "description": "Receipt kind (e.g. gate-run).",
+                "minLength": 1,
+                "type": "string"
+              },
+              "ref": {
+                "description": "Receipt id — for a gate run, the attestation git_sha.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "result": {
+                "description": "The receipt's verdict.",
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "CANNOT-ASSESS"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "ref",
+              "result",
+              "checks"
+            ],
+            "type": "object"
+          },
+          "facet_budget": {
+            "additionalProperties": false,
+            "description": "The budget facet: the spend this ticket caused, against a cap, with the per-task receipt. authority facets.budget = telemetry/budgets.",
+            "properties": {
+              "cap": {
+                "description": "The cap the spend is measured against.",
+                "minimum": 0,
+                "type": "number"
+              },
+              "receipt": {
+                "description": "The ledger entry backing the spend — the same receipt id an evidence[] receipt carries (mismatch #10).",
+                "minLength": 1,
+                "type": "string"
+              },
+              "scope": {
+                "additionalProperties": false,
+                "description": "What the spend is scoped to (mirrors budget.schema.json scope).",
+                "properties": {
+                  "id": {
+                    "description": "The agent / team / project id.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "level": {
+                    "description": "The scoping level.",
+                    "enum": [
+                      "agent",
+                      "team",
+                      "project"
+                    ]
+                  }
+                },
+                "required": [
+                  "level",
+                  "id"
+                ],
+                "type": "object"
+              },
+              "spent": {
+                "description": "The spend this ticket caused in the period.",
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "facet_lessons": {
+            "additionalProperties": false,
+            "description": "The lessons facet: the incident a lesson came from, its RCA, its corrective actions and its solution class.",
+            "properties": {
+              "class": {
+                "description": "Solution class (docs/SOLUTION-CLASSES.md).",
+                "enum": [
+                  "template",
+                  "class",
+                  "pattern",
+                  "enterprise",
+                  "faang",
+                  "elite"
+                ]
+              },
+              "corrective_actions": {
+                "description": "Corrective-action references (CA-*).",
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "incident": {
+                "description": "The incident this lesson came from (INC-*).",
+                "minLength": 1,
+                "type": "string"
+              },
+              "rca": {
+                "description": "The root-cause analysis reference (RCA-*).",
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "facet_raid": {
+            "additionalProperties": false,
+            "description": "The RAID facet: the risk a ticket carries and its remediation. authority facets.raid = derived — computed from the ticket's risk signals, not written by a lane.",
+            "properties": {
+              "remediation": {
+                "description": "The ticket id that remediates the risk.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "risk": {
+                "description": "The risk level carried by this ticket.",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The frozen ticket seam between the fleet's claim ledger (governance/dispatch/) and the upstream issue surface, and the SINGLE JOIN NODE for tasks, agents, the lessons register and the PMO (ADR-0014, issues #370/#400). Contract v2 is ADDITIVE: the v1 keys (id, owner, status, blocked_by, goal, evidence) keep their meaning and a v1 document still validates. v2 adds kind (the generic improvement register is a ticket kind), facets (a CLOSED set: lessons, raid, budget) and authority{} (one writer per field — the ticket is a projection, never authority; ADR-0014). See docs/PAPERCLIP-ING-INTEGRATION.md.",
+        "properties": {
+          "authority": {
+            "additionalProperties": false,
+            "description": "One writer per field. Each entry maps a populated field to its SINGLE producing lane; a field with two writers fails and a populated field with no entry fails (ADR-0014). The ticket is a projection, never authority: the named lane is the source, the ticket is rebuildable.",
+            "properties": {
+              "blocked_by": {
+                "const": ".board/snapshot.json"
+              },
+              "facets.budget": {
+                "const": "telemetry/budgets"
+              },
+              "facets.lessons": {
+                "const": "governance/lessons"
+              },
+              "facets.raid": {
+                "const": "derived"
+              },
+              "goal": {
+                "const": ".board/snapshot.json"
+              },
+              "owner": {
+                "const": "governance/isolation"
+              },
+              "status": {
+                "const": "governance/dispatch"
+              }
+            },
+            "type": "object"
+          },
+          "blocked_by": {
+            "description": "Explicit blocked-by relations: the ticket ids this ticket waits on (empty when unblocked).",
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "evidence": {
+            "description": "Evidence references backing the status. v1 accepted a bare string; v2 also admits a structured receipt, so the same receipt that proves delivery also backs the budget charge (seam-doc mismatches #6 and #10). Additive: both forms validate.",
+            "items": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/evidence_receipt"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "facets": {
+            "additionalProperties": false,
+            "description": "Facet groups the ticket joins on. A CLOSED set — an unknown facet fails, so a new facet is a contract change (ADR-0014).",
+            "properties": {
+              "budget": {
+                "$ref": "#/$defs/facet_budget"
+              },
+              "lessons": {
+                "$ref": "#/$defs/facet_lessons"
+              },
+              "raid": {
+                "$ref": "#/$defs/facet_raid"
+              }
+            },
+            "type": "object"
+          },
+          "goal": {
+            "description": "Goal / milestone reference this ticket serves (fleet: the epic, e.g. EPIC-00 = issue #4).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "description": "Ticket identifier (fleet: the issue number as kushin77/agent-orchestrator#N).",
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "description": "Ticket kind. The generic improvement register is a ticket kind, which is how an open SUGGEST-* becomes an addressable node (ADR-0014).",
+            "enum": [
+              "task",
+              "incident",
+              "rca",
+              "corrective-action",
+              "lesson",
+              "suggestion"
+            ]
+          },
+          "owner": {
+            "description": "The single accountable agent that owns this ticket — never a set.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "description": "Ticket lifecycle state. done is a verdict, not a self-report.",
+            "enum": [
+              "in-progress",
+              "blocked",
+              "in-review",
+              "done"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "status",
+          "blocked_by",
+          "goal",
+          "evidence"
+        ],
+        "title": "Paperclip-ing ticket contract v2 (the single join node: task + agent + lessons + PMO)",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "agentKey": {
+        "description": "agent key/JWT",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "boardToken": {
+        "description": "board token",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "The fleet's own state projected over the upstream paperclip HTTP surface (docs/PAPERCLIP-ING-INTEGRATION.md, ADR-0013). The document is emitted from the frozen contracts in docs/contracts/paperclip/, the adapter's own to_dict shapes and the adapter client's own routes; company scope projects the fleet's tenancy; the error taxonomy is mapped.",
+    "title": "Fleet paperclip projection API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/companies/{companyId}/activity": {
+      "get": {
+        "operationId": "activity",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Activity"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The company's Activity collection."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [
+          {
+            "agentKey": []
+          },
+          {
+            "boardToken": []
+          }
+        ],
+        "summary": "The company's append-only activity, projected from the audit ledger.",
+        "tags": [
+          "company"
+        ]
+      }
+    },
+    "/api/companies/{companyId}/agents": {
+      "get": {
+        "operationId": "agents",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Agent"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The company's Agent collection."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [
+          {
+            "agentKey": []
+          },
+          {
+            "boardToken": []
+          }
+        ],
+        "summary": "The agents the fleet registry hires for this company (profiles + persona cards).",
+        "tags": [
+          "company"
+        ]
+      }
+    },
+    "/api/companies/{companyId}/approvals": {
+      "get": {
+        "operationId": "approvals",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Approval"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The company's Approval collection."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [
+          {
+            "agentKey": []
+          },
+          {
+            "boardToken": []
+          }
+        ],
+        "summary": "The company's approvals (budget top-ups and policy exceptions).",
+        "tags": [
+          "company"
+        ]
+      }
+    },
+    "/api/companies/{companyId}/costs": {
+      "get": {
+        "operationId": "costs",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Budget"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The company's Budget collection."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [
+          {
+            "agentKey": []
+          },
+          {
+            "boardToken": []
+          }
+        ],
+        "summary": "The company's budget seam records projected from the fleet budget rail.",
+        "tags": [
+          "company"
+        ]
+      }
+    },
+    "/api/companies/{companyId}/dashboard": {
+      "get": {
+        "operationId": "dashboard",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Dashboard"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The company's Dashboard collection."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [
+          {
+            "agentKey": []
+          },
+          {
+            "boardToken": []
+          }
+        ],
+        "summary": "The company's dashboard rollup.",
+        "tags": [
+          "company"
+        ]
+      }
+    },
+    "/api/companies/{companyId}/issues": {
+      "get": {
+        "operationId": "issues",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The company's Ticket collection."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [
+          {
+            "agentKey": []
+          },
+          {
+            "boardToken": []
+          }
+        ],
+        "summary": "The company's tickets — the ticket contract v2 projected from the claim ledger and board snapshot.",
+        "tags": [
+          "company"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "Reads the claim ledger (readable) and the ticket projection (fresh). Reports 503 when a named dependency is unreachable, never a green lie.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            },
+            "description": "Every named dependency is ok (or merely stale — see status)."
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "Real health of the dependencies the surface names.",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "operationId": "getOpenApi",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The OpenAPI 3.1 document."
+          }
+        },
+        "security": [],
+        "summary": "This OpenAPI document.",
+        "tags": [
+          "platform"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "local dev base (the upstream surface runs its own process)",
+      "url": "http://localhost:3100"
+    }
+  ],
+  "x-client-routes": [
+    {
+      "method": "GET",
+      "operationId": "activity",
+      "path": "/api/companies/{companyId}/activity"
+    },
+    {
+      "method": "GET",
+      "operationId": "agents",
+      "path": "/api/companies/{companyId}/agents"
+    },
+    {
+      "method": "GET",
+      "operationId": "approvals",
+      "path": "/api/companies/{companyId}/approvals"
+    },
+    {
+      "method": "GET",
+      "operationId": "costs",
+      "path": "/api/companies/{companyId}/costs"
+    },
+    {
+      "method": "GET",
+      "operationId": "dashboard",
+      "path": "/api/companies/{companyId}/dashboard"
+    },
+    {
+      "method": "GET",
+      "operationId": "issues",
+      "path": "/api/companies/{companyId}/issues"
+    },
+    {
+      "method": "GET",
+      "operationId": "health",
+      "path": "/api/health"
+    },
+    {
+      "method": "GET",
+      "operationId": "openapi",
+      "path": "/api/openapi.json"
+    }
+  ],
+  "x-company-mapping": {
+    "declared_source": "telemetry/budgets/config/policies.yaml",
+    "declared_source_pointer": "/policies/*/tenantId",
+    "id": "ao.paperclip.company/v1",
+    "refusal": {
+      "cross_company": {
+        "code": "cross_tenant",
+        "status": 403
+      },
+      "unknown_company": {
+        "code": "not_found",
+        "status": 404
+      }
+    },
+    "relation": "identity",
+    "target_authority": "identity/rbac.Org.id (== identity/onboarding.Tenant.id)",
+    "upstream": "companyId"
+  },
+  "x-contract-sources": {
+    "Budget": "docs/contracts/paperclip/budget.schema.json",
+    "Heartbeat": "docs/contracts/paperclip/heartbeat.schema.json",
+    "Ticket": "docs/contracts/paperclip/ticket.schema.json"
+  },
+  "x-error-taxonomy": [
+    {
+      "codes": [
+        "validation_error"
+      ],
+      "description": "``400`` — the request failed validation.",
+      "error_type": "ValidationError",
+      "status": 400
+    },
+    {
+      "codes": [
+        "invalid_token",
+        "session_revoked",
+        "token_expired",
+        "unauthorized"
+      ],
+      "description": "``401`` — the caller identity is missing or invalid.",
+      "error_type": "AuthError",
+      "status": 401
+    },
+    {
+      "codes": [
+        "cross_tenant",
+        "permission_denied"
+      ],
+      "description": "``403`` — the caller is known but not allowed.",
+      "error_type": "ForbiddenError",
+      "status": 403
+    },
+    {
+      "codes": [
+        "not_found"
+      ],
+      "description": "``404`` — the resource is missing or outside the company scope.",
+      "error_type": "NotFoundError",
+      "status": 404
+    },
+    {
+      "codes": [
+        "replayed_run_id"
+      ],
+      "description": "``409`` — the resource is owned, locked, or in conflict.",
+      "error_type": "ConflictError",
+      "status": 409
+    },
+    {
+      "codes": [
+        "refused"
+      ],
+      "description": "``422`` — the request is well-formed but breaks a business rule.",
+      "error_type": "UnprocessableError",
+      "status": 422
+    },
+    {
+      "codes": [
+        "unavailable"
+      ],
+      "description": "``503`` — the upstream database is unreachable.",
+      "error_type": "ServiceUnavailableError",
+      "status": 503
+    }
+  ],
+  "x-shape-provenance": {
+    "Activity": "integrations/paperclip/model.py::Activity.to_dict",
+    "Agent": "integrations/paperclip/model.py::Agent.to_dict",
+    "Approval": "integrations/paperclip/model.py::Approval.to_dict"
+  }
+}
