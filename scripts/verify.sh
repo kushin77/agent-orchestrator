@@ -7,6 +7,12 @@
 # code. A check that cannot fail is a formality and is rejected
 # (no-false-green doctrine). No network and no containers are required.
 #
+# Tri-state, honest (GR-12): each check's exit code is 0 = PASS, 1 = NOT-OK (a
+# real defect -- the run goes red), 2 = CANNOT-ASSESS. A check that says it
+# genuinely could not assess is recorded as SKIP -- never a pass and never a
+# failure -- and is named in the summary and in the attestation, so a skip can
+# never hide. Only a definite NOT-OK (or an unexpected code) fails the run.
+#
 # The check set includes the declared `fleet` pytest suite (`pytest-fleet`).
 # The gate of record must exercise the tests it claims to cover: a red fleet
 # suite sat on master undetected because this gate ran no pytest at all — only
@@ -118,6 +124,16 @@ checks=(
   'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
   'paperclip-budget|bash scripts/check-paperclip-budget.sh'
   'metering-parity|bash scripts/check-metering-parity.sh'
+  # EPIC #461 (the diagrams chain): the diagrams blueprint is the mandatory
+  # GR-18 SSOT consumer surface. paperclip-diagrams (#465) proves the read-only
+  # ADR-0017 evidence[] projection cannot regress; diagrams-declaration (#464)
+  # proves the architecture.yaml / gdc-manifest.yaml seeds conform to the
+  # vendored CMR contract. The latter is tri-state: it is CANNOT-ASSESS (rc 2,
+  # visibly SKIPped) until `git submodule update --init vendor/CMR` has run --
+  # the normal state of a fresh worktree -- while a genuinely wrong declaration
+  # (rc 1) still fails the gate.
+  'paperclip-diagrams|bash scripts/check-paperclip-diagrams.sh'
+  'diagrams-declaration|bash scripts/check-diagrams-declaration.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
@@ -134,7 +150,14 @@ for entry in "${checks[@]}"; do
   bash -c "$cmd" 2>&1 | tee -a "$log"
   rc="${PIPESTATUS[0]}"
   printf '%s\t%s\n' "$name" "$rc" >> "$results_tsv"
-  if [ "$rc" -ne 0 ]; then
+  # Honest tri-state (GR-12 / guardrails/honesty). 0 = PASS; 1 = NOT-OK, a real
+  # defect, and the run fails; 2 = CANNOT-ASSESS -> SKIP. A check that says it
+  # genuinely could not assess (e.g. the pinned vendor/CMR submodule is absent in
+  # a fresh worktree, so the vendored contract is unreadable) must not paint the
+  # whole gate red for every lane AND must not be counted as a pass: it is
+  # recorded as SKIP and named in the summary and the attestation, so a skip can
+  # never hide. Any other rc (unexpected, timeout 124, killed 137) fails.
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
     overall=1
   fi
 done
@@ -161,8 +184,10 @@ with open(results_tsv, encoding="utf-8") as fh:
         if not line:
             continue
         name, rc = line.split("\t", 1)
-        checks.append({"name": name, "rc": int(rc), "status": "PASS" if rc == "0" else "FAIL"})
+        status = "PASS" if rc == "0" else ("SKIP" if rc == "2" else "FAIL")
+        checks.append({"name": name, "rc": int(rc), "status": status})
 
+skipped = [c["name"] for c in checks if c["status"] == "SKIP"]
 overall = int(os.environ["ATTEST_RESULT"])
 attestation = {
     "gate": "verify",
@@ -174,6 +199,8 @@ attestation = {
     "git_sha": os.environ["ATTEST_SHA"],
     "branch": os.environ["ATTEST_BRANCH"],
     "check_count": len(checks),
+    "skipped": len(skipped),
+    "skipped_checks": skipped,
     "checks": checks,
 }
 path = os.path.join(attest_dir, "attestation.json")
@@ -183,26 +210,37 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 
 # --- summary ----------------------------------------------------------------
+# A SKIP is counted and named here so it can never hide (a skip is not a pass).
 passed=0
+failed=0
+skipped=0
+skipped_names=""
 total=0
 for entry in "${checks[@]}"; do
   name="${entry%%|*}"
   total=$((total + 1))
   rc="$(awk -F'\t' -v n="$name" '$1==n {print $2}' "$results_tsv" | head -1)"
-  if [ "${rc:-1}" = "0" ]; then
-    passed=$((passed + 1))
-  fi
+  case "${rc:-1}" in
+    0) passed=$((passed + 1)) ;;
+    2) skipped=$((skipped + 1)); skipped_names="${skipped_names}${skipped_names:+, }${name}" ;;
+    *) failed=$((failed + 1)) ;;
+  esac
 done
+
+skip_note=""
+if [ "$skipped" -gt 0 ]; then
+  skip_note=", $skipped skipped: $skipped_names"
+fi
 
 echo ""
 if [ "$overall" -eq 0 ]; then
-  echo "verify: PASS ($passed of $total checks)"
+  echo "verify: PASS ($passed of $total checks$skip_note)"
   echo "attestation: $verify_dir/attestation.json"
   if [ "$mode" = "gate" ]; then
     echo "GATE: PASS"
   fi
 else
-  echo "verify: FAIL ($((total - passed)) of $total checks failed)" >&2
+  echo "verify: FAIL ($failed of $total checks failed$skip_note)" >&2
   echo "attestation: $verify_dir/attestation.json" >&2
   if [ "$mode" = "gate" ]; then
     echo "GATE: FAIL" >&2
