@@ -147,10 +147,15 @@ variable "portal_image" {
   default     = "us-docker.pkg.dev/example-control-plane/portal:placeholder"
 }
 
-variable "web_image" {
-  description = "Container image for the public web surface. Placeholder until the web build promotes a real artifact."
+# The web-surface build already ships (issue #606, infra/cloudbuild/web-image.yaml),
+# so its image is the real Artifact-Registry reference assembled in main.tf from
+# project_id + this tag. The build's tag gate refuses an empty tag or `latest`;
+# the all-zero default marks "no build promoted yet" and the go-live apply pins
+# the real build's commit sha.
+variable "web_image_tag" {
+  description = "Image tag for the public web surface; the AR path is assembled in main.tf."
   type        = string
-  default     = "us-docker.pkg.dev/example-control-plane/web:placeholder"
+  default     = "0000000000000000000000000000000000000000"
 }
 
 variable "web_domain" {

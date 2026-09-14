@@ -77,10 +77,13 @@ raise a tier — an executor that wants more model must ask, not take.
 
 ## 2. Directive vocabulary
 
-Exactly six verbs exist. There is no seventh, and there is no free-form verb
-field: each verb maps onto an envelope type that `channel.py` already enforces,
-so the vocabulary is expressible in the shipped schema rather than parallel to
-it.
+Exactly six dispatch verbs exist. There is no seventh, and there is no
+free-form verb field: each verb maps onto an envelope type that `channel.py`
+already enforces, so the vocabulary is expressible in the shipped schema
+rather than parallel to it. Issue #367 adds three **live transport
+capabilities** on top of this vocabulary — `log`/`follow`, `kb` and `steer`,
+declared in §7 — without touching the six verbs here: they are additive verbs
+of the channel, not directives.
 
 | Verb | Envelope | Meaning |
 |---|---|---|
@@ -134,6 +137,11 @@ Four rules, and one consequence that is itself the rule:
 4. **Everything else is refused.** Not "discouraged", not "logged" — refused by
    `channel.validate` before the message moves, so an out-of-contract message
    never reaches a mailbox.
+5. **Only the brain may steer a run mid-flight (added by issue #367).** A
+   `steer` is brain-signed and correlated to an in-flight directive; the sister
+   loop delivers it to the live run without killing or re-dispatching it. The
+   operator steers by ordering the brain, which relays the brain-signed steer
+   (`task.kind: steer`) — the chain is never skipped.
 
 Consequences of the model, stated so they are not discovered later:
 
@@ -161,10 +169,43 @@ and its rationale cannot drift apart.
 |---|---|---|
 | `channel.validate` | `fleet/channel.py` | Refuses out-of-contract traffic at the boundary (unknown type, bad tier/thinking, missing role, sister-issued directive, misaddressed directive, uncorrelated report, brain ack). |
 | `nonce` replay refusal | `fleet/channel.py` `send` | A directive cannot be replayed into the mailbox under a previously seen nonce. |
+| A2A extension enforcement | `fleet/channel.py` (`log`, `follow`, `kb`, `steer`) + `fleet/terminal.py` delivery | A steer must be brain-signed, addressed to the sister, correlated to a directive and name a safe mailbox id; the sister loop streams each run's stdout/events to `.fleet/runs/<directive>.log` (which `follow` tails live), answers `kb` from the recorded knowledge catalogue (CANNOT-ASSESS when it is missing), and delivers a queued steer to the live run (stdin + log stream + run marker) — never a re-dispatch. |
 | `scripts/check-fleet-contract.sh` | `make verify` (`fleet-contract`) | This contract still declares the six verbs, the four trust rules and the schema/ADR references; every declared verb maps to a message type the channel actually implements; and the check proves itself non-vacuous by mutating its own input. |
 | `fleet/tests/test_contract.py` | `make tests` (`fleet` suite) | The same declarations, asserted in the per-suite test corpus. |
 
-## 7. Provenance
+## 7. Live transport verbs — the A2A extension (issue #367)
+
+The M26 mailbox carried *discrete* messages only (`directive`/`ack`/`result`/
+`escalate`), so live debugging was poll-and-restart. Issue #367 extends the
+same transport — localhost, file-based, no daemons (GR-21: "live" is
+short-poll/long-poll over the `.fleet/` mailbox, not a socket service) — with
+three additive capabilities. The change widens `channel.MESSAGE_TYPES`
+additively (`steer`); the schema's envelope enum stays v1, because `channel.py`
+is the machine that runs (§0), and no validation rule that existed before
+#367 was weakened.
+
+| Verb | Mechanism | Meaning |
+|---|---|---|
+| `log` | `channel.py log --directive <id> --line <text>` | Append one event to a directive's live log stream (`.fleet/runs/<directive>.log`). |
+| `follow` (`listen`) | `channel.py follow --directive <id>` | Tail that stream live — the `follow`/`listen --directive` view of one run's stdout/events. |
+| `kb` | `channel.py kb --text <query> [--kind …]` | Query the institutional KB (`governance/knowledge/`), answered from the recorded catalogue with source-backed evidence per hit. |
+| `steer` | `channel.py steer --directive <id> --body <hint>` | Queue a mid-run steering hint for an in-flight directive; the sister loop delivers it to the live run. |
+
+**The extension keeps the hierarchy and the mailbox:**
+
+- Only the brain may `steer`, and a steer names an in-flight directive of the
+  sister's. The operator steers by ordering the brain (`task.kind: steer`),
+  which relays a brain-signed steer — the operator never addresses the sister
+  directly.
+- A steer is delivered to the *running* child (its stdin and its live log
+  stream, stamped into the run marker) and then consumed. A steer whose run is
+  not live yet stays queued; one whose run already finished is dropped — a
+  hint for a finished run must never steer the next run of the same directive.
+- `log`/`follow`/`steer` refuse a directive id that is not a safe mailbox name;
+  `kb` answers only from the recorded catalogue and is CANNOT-ASSESS when it is
+  missing — never an invented answer.
+
+## 8. Provenance
 
 The vocabulary and role separation in this contract are harvested, not invented
 (GR-10); every source is recorded in

@@ -18,8 +18,11 @@ Messages are validated against `fleet/schema/message.schema.json` semantics
 before they move. The topology, the directive vocabulary and the trust rules the
 validator enforces are the normative contract in `fleet/CONTRACT.md`, and the
 transport itself is decided by ADR-0011 (docs/decision-records/) — this module is
-the machine that runs that contract. Exit codes are the repo tri-state: 0 OK /
-1 NOT-OK / 2 CANNOT-ASSESS.
+the machine that runs that contract. Issue #367 extends the machine additively
+with three live capabilities over the same mailbox: per-directive live log
+streams (`log` / `follow`), KB access (`kb`, against governance/knowledge/), and
+mid-run steering (`steer`, drained by the sister loop each cycle). Exit codes
+are the repo tri-state: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 """
 
 from __future__ import annotations
@@ -60,12 +63,29 @@ SLOG = FLEET_DIR / "slog.jsonl"
 HEARTBEAT = FLEET_DIR / "sister.heartbeat.json"
 BRAIN_HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
 
+# --- the A2A transport extension (issue #367) --------------------------------
+# Three capabilities the discrete-mailbox transport could not carry: LIVE agent
+# logs, KB access, and mid-run steering. All are additive verbs over the same
+# file mailbox (GR-21: localhost, file-based, no daemons — "live" is
+# short-poll/long-poll over `.fleet/`).
+#
+# ``LOGS`` holds one append-only JSONL stream per directive
+# (`.fleet/runs/<directive>.log`, beside the run marker), written by the loop
+# that owns the run and tailed by the `follow` verb. ``STEERS`` is the brain's
+# outbound steering queue (`.fleet/brain/steer/<directive>.json`): one pending
+# steer per in-flight directive, drained by the sister loop every cycle.
+LOGS = FLEET_DIR / "runs"
+STEERS = FLEET_DIR / "brain" / "steer"
+# A directive id becomes a mailbox filename component, so a steer/log/follow
+# argument must be a safe name — `../` must not be able to walk out.
+DIRECTIVE_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+
 # The FinOps vocabulary is harvested, not invented (issue #164) and is declared
 # once in governance/finops/policy.json: tiers from capital-underwriting
 # config/leaderboard/tier-policy.json, thinking effort from leaderboard
 # lib/fleet-roster.sh role_effort(). scripts/check-finops-chooser.sh fails if
 # these constants, the message schema and the policy stop agreeing.
-MESSAGE_TYPES = ("directive", "ack", "result", "halt", "escalate")
+MESSAGE_TYPES = ("directive", "ack", "result", "halt", "escalate", "steer")
 SEVERITIES = ("info", "warn", "critical")
 CONTROL_ACTIONS = (
     "poke",
@@ -87,8 +107,8 @@ MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
 # Order kinds (schema v1, additive): `work` needs an issue; the others are
 # answered by the brain without dispatching anything to the sister.
-TASK_KINDS = ("work", "status", "report", "ping")
-NON_WORK_KINDS = ("status", "report", "ping")
+TASK_KINDS = ("work", "status", "report", "ping", "steer")
+NON_WORK_KINDS = ("status", "report", "ping", "steer")
 _ROLE_RE = re.compile(r"^(operator|brain|sister|subagent(-[a-z0-9]+)?)$")
 
 EXIT_OK = 0
@@ -515,6 +535,19 @@ def validate(message: dict) -> list[str]:
         problems.append("the brain does not ack or report on its own directives (only back to the operator)")
     if message_type == "halt" and message.get("from") != "brain":
         problems.append("only the brain may issue a halt")
+    if message_type == "steer":
+        # Mid-run steering (issue #367): the brain injects a hint into a live
+        # run, so it stays inside the hierarchy — only the brain steers, and it
+        # steers the sister (the loop that owns the run), never a subagent.
+        if not message.get("correlation_id"):
+            problems.append("steer must carry correlation_id (the in-flight directive it steers)")
+        if message.get("from") != "brain":
+            problems.append("only the brain may steer a run mid-flight")
+        if message.get("to") != "sister":
+            problems.append("steer is addressed to the sister (the loop that owns the run)")
+        target = message.get("correlation_id")
+        if isinstance(target, str) and not DIRECTIVE_ID_RE.fullmatch(target):
+            problems.append("steer names a directive id that is not a safe mailbox name")
     if message_type == "escalate":
         if not message.get("correlation_id"):
             problems.append("escalate must carry correlation_id (the directive that hit trouble)")
@@ -591,6 +624,184 @@ def load_message(source: Path | str) -> dict:
         print(f"channel: CANNOT-ASSESS — {label} is not valid JSON: {exc.msg}", file=sys.stderr)
         raise SystemExit(EXIT_CANNOT_ASSESS)
     return data
+
+
+def log_stream_path(directive_id: str) -> Path:
+    """The per-directive live log stream one run's stdout/events append to."""
+    if not DIRECTIVE_ID_RE.fullmatch(directive_id):
+        raise ValueError(f"directive id {directive_id!r} is not a safe mailbox name")
+    return LOGS / f"{directive_id}.log"
+
+
+def append_directive_log(directive_id: str, line: str, source: str = "sister") -> Path:
+    """Append one event line to a directive's live log stream (issue #367).
+
+    One line per ``os.write`` with O_APPEND: writers (the loop's event stream
+    and the subagent-stdout pump) cannot interleave inside a line. The same
+    artifact `follow` tails, so the transport is the mailbox, not a socket.
+    """
+    path = log_stream_path(directive_id)
+    entry = json.dumps(
+        {"ts": now_iso(), "directive": directive_id, "source": source, "line": str(line)[:1000]}
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    try:
+        os.write(fd, (entry + "\n").encode("utf-8"))
+    finally:
+        os.close(fd)
+    return path
+
+
+def pending_steers() -> list[Path]:
+    """The brain's undelivered steering messages, oldest first."""
+    if not STEERS.exists():
+        return []
+    return sorted(STEERS.glob("*.json"), key=lambda path: path.stat().st_mtime)
+
+
+def consume_steer(path: Path) -> None:
+    """A steer that reached its run leaves the queue; delivery is the log entry."""
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
+def cmd_log(args: argparse.Namespace) -> int:
+    """Append one event to a directive's live log stream (sister/subagent side)."""
+    if not DIRECTIVE_ID_RE.fullmatch(args.directive):
+        print(f"channel log: REFUSED — {args.directive!r} is not a safe directive id", file=sys.stderr)
+        return EXIT_NOT_OK
+    path = append_directive_log(args.directive, args.line, source=args.source or "sister")
+    print(f"channel log: OK — appended to {path}")
+    return EXIT_OK
+
+
+def cmd_follow(args: argparse.Namespace) -> int:
+    """Tail one directive's live log stream — the `follow`/`listen` verb (#367).
+
+    Prints what the stream already holds, then keeps printing new lines as the
+    run writes them. ``--timeout-seconds 0`` follows forever (the operator's
+    live view); ``--max-lines`` bounds it for tests.
+    """
+    if not DIRECTIVE_ID_RE.fullmatch(args.directive):
+        print(f"channel follow: REFUSED — {args.directive!r} is not a safe directive id", file=sys.stderr)
+        return EXIT_NOT_OK
+    path = log_stream_path(args.directive)
+    deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
+    seen = 0
+    offset = 0 if args.from_start else (path.stat().st_size if path.exists() else 0)
+    while True:
+        if path.exists():
+            with open(path, encoding="utf-8") as handle:
+                handle.seek(offset)
+                lines = handle.read().splitlines()
+                offset = handle.tell()
+            for line in lines:
+                if not line.strip():
+                    continue
+                print(f"channel follow [{args.directive}]: {line}", flush=True)
+                seen += 1
+                if args.max_lines and seen >= args.max_lines:
+                    return EXIT_OK
+        if deadline is not None and time.monotonic() >= deadline:
+            print(
+                f"channel follow: IDLE — {seen} line(s) seen for {args.directive} in window",
+                file=sys.stderr,
+            )
+            return EXIT_OK
+        nap = args.interval
+        if deadline is not None:
+            nap = min(nap, max(0.0, deadline - time.monotonic()))
+        time.sleep(nap)
+
+
+def cmd_kb(args: argparse.Namespace) -> int:
+    """Query the institutional KB (governance/knowledge/) — the `kb` verb (#367).
+
+    A running agent can pull the KB/lessons it needs mid-run instead of only the
+    static paths a directive attached. Answers from the recorded catalogue
+    (``governance/knowledge/catalog.json``), the same artifact
+    ``governance/knowledge/cli.py query`` reads, with source-backed evidence
+    per hit.
+    """
+    directory = str(ROOT / "governance" / "knowledge")
+    # The knowledge tooling is flat (namespace module, no package — like this
+    # file), so its transitive imports (`sources`, `secretpolicy`, `crossref`)
+    # land in sys.modules under their bare names too. Stash and restore the
+    # whole family so a query cannot leak a flat module into the caller's
+    # namespace and shadow a real package later.
+    flat_names = ("model", "query", "indexer", "sources", "secretpolicy", "crossref")
+    stash = {name: sys.modules.pop(name) for name in flat_names if name in sys.modules}
+    sys.path.insert(0, directory)
+    try:
+        import indexer as kb_indexer  # noqa: PLC0415 - scoped to this verb
+        import model as kb_model  # noqa: PLC0415
+        import query as kb_query  # noqa: PLC0415
+    finally:
+        if directory in sys.path:
+            sys.path.remove(directory)
+        for name in flat_names:
+            sys.modules.pop(name, None)
+        sys.modules.update(stash)
+    catalog = kb_indexer.load_catalog(ROOT / "governance" / "knowledge" / kb_indexer.CATALOG_FILENAME)
+    if catalog is None:
+        print("channel kb: CANNOT-ASSESS — no knowledge catalogue (run the knowledge-index build)", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    index = kb_model.Index.from_dict(catalog)
+    results = kb_query.query(index, text=args.text, kind=args.kind, owner=args.owner, tag=args.tag, limit=args.limit)
+    if args.json:
+        print(json.dumps(kb_query.summarize(index, results), indent=2, sort_keys=True))
+    else:
+        print(f"channel kb: {len(results)} hit(s) of {len(index.items)} indexed item(s)")
+        for result in results:
+            print(
+                f"  {result.item.id}  [{result.item.kind}]  {result.item.title}  "
+                f"(matched: {', '.join(result.matched_fields)})"
+            )
+    if not results:
+        print(f"channel kb: no matches for {args.text or '-'} (NOT-OK)", file=sys.stderr)
+        return EXIT_NOT_OK
+    return EXIT_OK
+
+
+def cmd_steer(args: argparse.Namespace) -> int:
+    """Brain side: queue a mid-run steering hint for one in-flight directive (#367).
+
+    The sister loop drains the queue every cycle and delivers the hint to the
+    live run (its stdin and its log stream) without killing or re-dispatching
+    anything. One pending steer per directive: a newer hint replaces an
+    undelivered older one, and every steer is audited in the slog.
+    """
+    if args.message is not None:
+        message = load_message(args.message)
+        message.setdefault("from", "brain")
+        message.setdefault("to", "sister")
+        message.setdefault("type", "steer")
+    else:
+        message = {
+            "from": "brain",
+            "to": "sister",
+            "type": "steer",
+            "correlation_id": args.directive,
+            "body": args.body,
+        }
+    problems = validate(message)
+    if problems:
+        print(f"channel steer: REFUSED ({len(problems)} violation(s))", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return EXIT_NOT_OK
+    message["id"] = str(uuid.uuid4())
+    message["ts"] = now_iso()
+    message["nonce"] = str(uuid.uuid4())
+    target = str(message["correlation_id"])
+    STEERS.mkdir(parents=True, exist_ok=True)
+    (STEERS / f"{target}.json").write_text(json.dumps(message, indent=2) + "\n", encoding="utf-8")
+    _slog(message)
+    print(f"channel steer: OK — steering hint queued for run {target}")
+    return EXIT_OK
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
@@ -826,7 +1037,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(
         f"inbox: {count(INBOX)} pending | sent: {count(SENT)} | outbox: {count(OUTBOX)}\n"
         f"brain: {count(BRAIN_INBOX)} order(s) pending | {count(BRAIN_DONE)} dispatched | "
-        f"{count(BRAIN_OUTBOX)} reply(ies)"
+        f"{count(BRAIN_OUTBOX)} reply(ies) | {len(pending_steers())} steer(s) awaiting a live run"
     )
     abandoned = expired_directives(INBOX)
     if abandoned:
@@ -1054,7 +1265,21 @@ def cmd_listen(args: argparse.Namespace) -> int:
     blocks, printing every directive/ack/result/escalate the moment it lands —
     an escalation from the sister pings the brain here. `--max-messages` bounds
     it for tests.
+
+    Issue #367 extends the verb additively: `listen --directive <id>` switches
+    to the per-directive live log view (`follow`), the `follow`/`listen
+    --directive` pair the issue names for tailing one run's stream. The
+    argumentless form keeps its old meaning.
     """
+    if getattr(args, "directive", None):
+        follow_args = argparse.Namespace(
+            directive=args.directive,
+            timeout_seconds=args.timeout_seconds,
+            interval=args.interval,
+            max_lines=getattr(args, "max_lines", 0),
+            from_start=getattr(args, "from_start", False),
+        )
+        return cmd_follow(follow_args)
     deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
     seen = 0
     offset = 0 if getattr(args, "from_start", False) else (SLOG.stat().st_size if SLOG.exists() else 0)
@@ -1217,11 +1442,13 @@ def build_parser() -> argparse.ArgumentParser:
     escalate.add_argument("--body", default=None)
     escalate.set_defaults(func=cmd_escalate)
 
-    listen = sub.add_parser("listen", help="tail the slog stream (brain side, idle-watch)")
+    listen = sub.add_parser("listen", help="tail the slog stream (brain side, idle-watch); --directive tails one run's live log instead (issue #367)")
     listen.add_argument("--timeout-seconds", type=float, default=0.0)
     listen.add_argument("--interval", type=float, default=1.0)
     listen.add_argument("--max-messages", type=int, default=0)
     listen.add_argument("--from-start", action="store_true", help="replay the whole slog instead of tailing from now")
+    listen.add_argument("--directive", default=None, help="tail this directive's live log stream instead of the slog (the follow view, issue #367)")
+    listen.add_argument("--max-lines", type=int, default=0)
     listen.set_defaults(func=cmd_listen)
 
     order = sub.add_parser("order", help="operator side: order the BRAIN (never the sister)")
@@ -1243,6 +1470,35 @@ def build_parser() -> argparse.ArgumentParser:
     consume = sub.add_parser("consume", help="mark a directive handled without a result (process controls)")
     consume.add_argument("--id", required=True)
     consume.set_defaults(func=cmd_consume)
+
+    log = sub.add_parser("log", help="append one event to a directive's live log stream (issue #367)")
+    log.add_argument("--directive", required=True)
+    log.add_argument("--line", required=True)
+    log.add_argument("--source", default=None, help="who wrote the line (sister/subagent/steer/brain)")
+    log.set_defaults(func=cmd_log)
+
+    follow = sub.add_parser("follow", help="tail a directive's live log stream (issue #367)")
+    follow.add_argument("--directive", required=True)
+    follow.add_argument("--timeout-seconds", type=float, default=0.0)
+    follow.add_argument("--interval", type=float, default=0.5)
+    follow.add_argument("--max-lines", type=int, default=0)
+    follow.add_argument("--from-start", action="store_true", help="replay the whole stream instead of tailing from now")
+    follow.set_defaults(func=cmd_follow)
+
+    kb = sub.add_parser("kb", help="query the institutional KB (governance/knowledge/, issue #367)")
+    kb.add_argument("--text", default=None)
+    kb.add_argument("--kind", default=None)
+    kb.add_argument("--owner", default=None)
+    kb.add_argument("--tag", default=None)
+    kb.add_argument("--limit", type=int, default=None)
+    kb.add_argument("--json", action="store_true", help="print the source-backed summary as JSON")
+    kb.set_defaults(func=cmd_kb)
+
+    steer = sub.add_parser("steer", help="queue a mid-run steering hint for an in-flight directive (brain side, issue #367)")
+    steer.add_argument("--directive", default=None, help="the in-flight directive's id (the steer's correlation_id)")
+    steer.add_argument("--body", default=None, help="the steering hint")
+    steer.add_argument("--message", default=None, help="a full JSON steer message (takes precedence over --directive/--body)")
+    steer.set_defaults(func=cmd_steer)
     return parser
 
 

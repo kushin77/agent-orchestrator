@@ -11,9 +11,11 @@ Index of the repo's canonical documentation. Agents start at
 | [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | One-issue-one-lane parallel dispatch contract, phase/wave sequencing 0–8. |
 | [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md) | Sourced fork-map of upstream `paperclip.ing` against the fleet's own primitives (issue #368). |
 | [`ERP-MODULE-GAP-ANALYSIS.md`](ERP-MODULE-GAP-ANALYSIS.md) | Feature-by-feature gap of frappe/erpnext against our pillars — the indexer-fed ERP module plan (issue #612, EPIC #645). |
+| [`GIT-TEMPLATES-GAP-ANALYSIS.md`](GIT-TEMPLATES-GAP-ANALYSIS.md) | Git-ecosystem gap analysis — class/pattern/template/env/governance/clobber/RCA/orphan-checker, each mapped to a remediation lane (issue #608 → EPIC #616). |
 | [`GOVERNANCE.md`](GOVERNANCE.md) | Branch, provenance, session-label, review/merge conventions. |
 | [`PAPERCLIP-ING-INTEGRATION.md`](PAPERCLIP-ING-INTEGRATION.md) | Frozen fleet ↔ upstream Paperclip integration seam — heartbeat/ticket/budget contracts (ADR-0013, issue #370). |
 | [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) | The self-hosted paperclip runtime runbook — declaration-only, flag-gated OFF, pinned upstream release, offline `/api/health` probe (issue #411). |
+| [`ENTERPRISE-WORKBOOK-GAP-ANALYSIS.md`](ENTERPRISE-WORKBOOK-GAP-ANALYSIS.md) | Paperclip enterprise-workbook four-pillar gap analysis — measured master mapping, C-suite org-chart → persona mapping, and the delta epic (EPIC #631, children #632–#644) (issue #614). |
 | [`CROSS-REFERENCE-SPINE.md`](CROSS-REFERENCE-SPINE.md) | Typed relationship edges (`cmr-refs:` markers, closed vocabulary, RCA nodes) — EPIC #138, issue #384. |
 | [`CROSS-REPO-EXECUTION-BOUNDARY.md`](CROSS-REPO-EXECUTION-BOUNDARY.md) | The cross-repo boundary contract — a repo remediates findings for itself only; foreign work is handed over by direction issue (NG4, issue #125). |
 | [`CTO-OVERLAY.md`](CTO-OVERLAY.md) | The per-repo drop-in governance overlay — four real layer gates, BLOCKING/WARNING, preserved no-false-green tally (EPIC #144, issue #147). |
@@ -25,6 +27,9 @@ Index of the repo's canonical documentation. Agents start at
 | [`REGISTRY-PROVENANCE.md`](REGISTRY-PROVENANCE.md) | Harvest provenance for the profile/persona/SME vocabularies, and the frozen canonical-CMR parity baseline with its refresh command (issue #145). |
 | [`MODULE-ADMISSION.md`](MODULE-ADMISSION.md) | The parent-side sub-module admission contract — what a sub-module is, what each side declares, and what a module must not inherit (EPIC #422, issue #423). |
 | [`CROSS-REPO-SYNC-OWNER.md`](CROSS-REPO-SYNC-OWNER.md) | The standing peer-board triage: dispositions with mandatory provenance, dry-run direction issues, no silent adoption or cross-repo close (EPIC #422, issue #427). |
+| [`REMOTE-CONTROL-GAP-ANALYSIS.md`](REMOTE-CONTROL-GAP-ANALYSIS.md) | Inventoried control-surface gap: every control verb is local; paperclip is the control plane and tmux is a back door, not the mechanism (issue #550). |
+| [`CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md`](CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md) | DeepSeek and peer enhancements consumed/linked by the remote-control program (issue #549). |
+| [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit — the Bloomberg-terminal-grade operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, flag-gated OFF (EPIC #551, issue #566). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
 
