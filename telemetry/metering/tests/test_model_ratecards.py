@@ -92,8 +92,9 @@ def test_usage_record_unmetered_serializes_null_cost():
 
 def test_load_all_shipped_cards():
     store = RateCardStore.load_dir()
-    assert store.providers() == ["anthropic", "deepseek", "gemini", "ollama", "openai"]
+    assert store.providers() == ["anthropic", "copilot", "deepseek", "gemini", "ollama", "openai"]
     assert store.lookup("gemini", "gemini-2.5-flash") is not None
+    assert store.lookup("copilot", "gpt-4o-mini") is not None
     assert store.fingerprint()
 
 

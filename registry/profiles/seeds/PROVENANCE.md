@@ -27,6 +27,7 @@ and memory-scope semantics are normalized to `registry/profiles/catalog.yaml`.
 | `deepseek` | `kushin77/leaderboard` `lib/fleet-roster.sh` + `config/deepseek-capabilities.txt` + `kushin77/capital-underwriting` `personas.yaml` (ds-worker-*) | role→tier→model chooser; DeepSeek capability catalog; data-analysis/research; MED tier |
 | `claude` | `kushin77/gmail-agent` `src/agent/claude.ts` + `kushin77/CMR` `onboarding/agent-profiles/profiles/architecture-sme.json` | governed Claude client (tiers/p-retry/tool loop); orchestration posture; MED tier |
 | `finops-steward` | `kushin77/leaderboard` `lib/fleet-roster.sh` (`role_capabilities()` cost_tier / cost_per_mtok) + `kushin77/capital-underwriting` `config/leaderboard/{tier-policy,capability-registry}.json` (complexity->tier->model with fallback chains; per-role tool allowlists) | FinOps metering posture; `fallbackChain`; the first-class `weekly_spend_ceiling` (issue #145) |
+| `copilot` | `kushin77/agent-orchestrator` `gateway/providers/openai.py` + `gateway/providers/copilot.py` | OpenAI-compatible adapter mapped onto the copilot provider id; code-author/code-review posture; MED tier |
 
 Cross-cutting field semantics (all seeds):
 

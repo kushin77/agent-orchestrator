@@ -149,4 +149,8 @@ entries:
   version: 1.0.0
   file: cards/mechanical-sme.yaml
   sha256: 0a425874334b2afe7fb3c8f8170960f242cb6bc6325f7eebb3aa716195815c7c
+  persona: copilot
+  version: 1.0.0
+  file: cards/copilot.yaml
+  sha256: 19d4cff551318e2e570bdb8d34610be5698d732aff88a07a0c1696814cb47c95
   status: published

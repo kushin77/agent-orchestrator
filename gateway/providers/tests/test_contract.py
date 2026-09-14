@@ -74,7 +74,7 @@ def test_every_default_config_has_a_registered_adapter(configs) -> None:
         assert PROVIDER_CLASSES[name].name == name
 
 
-@pytest.mark.parametrize("provider_name", ["anthropic", "deepseek", "openai", "gemini", "ollama", "paperclip", "hermes"])
+@pytest.mark.parametrize("provider_name", ["anthropic", "deepseek", "openai", "copilot", "gemini", "ollama", "paperclip", "hermes"])
 def test_every_provider_constructs_from_default_config(provider_name) -> None:
     adapter = PROVIDER_CLASSES[provider_name](config_for(provider_name), FailingTransport())
     assert adapter.name == provider_name

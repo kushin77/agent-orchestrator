@@ -1,0 +1,40 @@
+# AgentProfile seed: copilot (OpenAI-compatible coding assistant) v1.0.0
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/agent-orchestrator gateway/providers/openai.py (OpenAI-compatible
+#     adapter the platform documents as covering Copilot/GPT deployments)
+#   - kushin77/agent-orchestrator gateway/providers/copilot.py (issue #340
+#     mapping of the copilot provider id onto the OpenAI adapter)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+id: copilot
+version: 1.0.0
+owner: platform/purebliss
+systemPromptRef: copilot/primary@v1
+toolAllowlist:
+  - gh_issue
+  - gh_pr
+  - file_read
+  - file_write
+  - shell_exec
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - stay-in-lane
+  - no-unrelated-edits
+  - verify-before-done
+  - evidence-on-pr
+  - no-direct-push
+  - no-secrets
+  - no-unverified-merge
+  - no-debug-leftovers
+capabilitySet:
+  - code-author
+  - code-review
+  - research
+  - memory-ops
+defaultModelTier: MED
+memoryScope:
+  - session
+  - repository
+guardrailPolicyRef: worker-bundle

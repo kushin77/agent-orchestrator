@@ -61,3 +61,7 @@ published:
     version: 1.0.0
     file: seeds/finops-steward.1.0.0.yaml
     sha256: d55cfc716ea01d59ef9420a71c263eb2cb68ba6dc37ba0e223105880915395e9
+  - profile: copilot
+    version: 1.0.0
+    file: seeds/copilot.1.0.0.yaml
+    sha256: 9bc9a3fd6b48b821632e5cce15b9b17e5edf4caf74265493cc4e896cbeea8bf8

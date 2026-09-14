@@ -40,18 +40,19 @@ EXPECTED_IDS = {
     "sync-sme",
     "gcp-gatekeeper-sme",
     "mechanical-sme",
+    "copilot",
 }
 
 
 def test_seed_card_count_and_auditor_present():
     files = sorted(CARDS_DIR.glob("*.yaml"))
-    assert len(files) == len(EXPECTED_IDS) == 25
+    assert len(files) == len(EXPECTED_IDS) == 26
     assert {f.stem for f in files} == EXPECTED_IDS
 
 
 def test_seed_cards_validate_and_match_filename_stem():
     cards = REAL.discover()
-    assert len(cards) == 25
+    assert len(cards) == 26
     for (tenant, persona_id), card in cards.items():
         assert tenant == "platform"  # every seed is a platform-default persona
         assert persona_id == card["id"]
@@ -69,7 +70,7 @@ def test_seed_posture_mix():
     postures = {}
     for (_tenant, _persona_id), card in cards.items():
         postures[card["posture"]] = postures.get(card["posture"], 0) + 1
-    assert postures == {"executor": 15, "reviewer": 9, "auditor": 1}
+    assert postures == {"auditor": 1, "executor": 16, "reviewer": 9}
     assert any(c["posture"] == "auditor" for c in cards.values())
 
 
