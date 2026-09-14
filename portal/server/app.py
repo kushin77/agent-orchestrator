@@ -36,6 +36,7 @@ from portal.server.fleet import FleetProjection
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
+from portal.server.surfaces import PortalSurfacesFeed
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -105,6 +106,7 @@ class ConsoleApplication:
         root_admin_emails: Optional[tuple[str, ...]] = None,
         allowlist_only: bool = False,
         fleet_projection: Optional[FleetProjection] = None,
+        portal_surfaces: Optional[PortalSurfacesFeed] = None,
         finops_reports: Optional[FinOpsReports] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
@@ -129,6 +131,12 @@ class ConsoleApplication:
             fleet_projection
             if fleet_projection is not None
             else FleetProjection(repo_root=self.repo_root)
+        )
+        # The portal-surfaces feed (issue #350) — feature-flag-gated OFF.
+        self.surfaces = (
+            portal_surfaces
+            if portal_surfaces is not None
+            else PortalSurfacesFeed(repo_root=self.repo_root)
         )
         # Tenant scoping + RBAC for that surface (issue #333).
         self.fleet_authz = FleetAuthorizer(state=self.state, repo_root=self.repo_root)
@@ -264,6 +272,17 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.fleet_projection)",
             )
 
+        # The portal-surfaces feed (issue #350) is gated the same way and for
+        # the same reason: an unpromoted surface is invisible, not merely
+        # unauthorised.
+        if parts[0] == "portal" and not self.surfaces.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the portal-surfaces feed is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.portal_surfaces)",
+            )
+
         # The FinOps single-pane surface ships the same way (GR-5), also before
         # authN: an unpromoted surface must be invisible, not merely protected.
         if parts[0] == "finops" and not self.finops.enabled:
@@ -279,6 +298,8 @@ class ConsoleApplication:
         try:
             if parts[0] == "fleet":
                 return self._route_fleet(parts, method, query, principal)
+            if parts[0] == "portal":
+                return self._route_portal(parts, method)
             if parts[0] == "finops":
                 return self._route_finops(parts, principal, method, query)
             if parts[:2] == ["console", "logout"] and method == "POST":
@@ -351,6 +372,22 @@ class ConsoleApplication:
         except (TypeError, ValueError):
             raise ApiError(400, "invalid_request", "limit must be an integer") from None
         return max(1, min(limit, self.FLEET_EVENTS_MAX_LIMIT))
+
+    # -- portal-surfaces feed (issue #350) -----------------------------------
+    def _route_portal(self, parts: list[str], method: str) -> Response:
+        """The portal-surfaces feed (issue #350).
+
+        One read: the pinned CMR fleet-surface document the serving layer ships
+        (``registry/portal-surfaces.pinned.json``, provenance in its ``pin``
+        block). GET-only; when the feature flag is off the route never reaches
+        here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the portal-surfaces feed is GET only")
+        surface = parts[1:]
+        if surface == ["surfaces"]:
+            return self._ok(self.surfaces.document())
+        raise ApiError(404, "not_found", f"no such portal surface: {'/'.join(surface)}")
 
     # -- finops single-pane (issue #341) ------------------------------------
     def _route_finops(
