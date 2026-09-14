@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -40,6 +40,7 @@ help:
 	@echo "                per-suite tests + controls + policy-schema"
 	@echo "  qa-loop       fix -> verify -> re-check until the gate is green"
 	@echo "  tests         Run every declared pytest suite in isolation"
+	@echo "  paperclip     Run every paperclip boundary/adapter gate in one shot"
 	@echo "  shellcheck    Run shellcheck on scripts/ (skipped if not installed)"
 	@echo "  gitleaks      Run gitleaks with .gitleaks.toml (skipped if absent)"
 	@echo "  pre-commit    Run pre-commit on all files (skipped if absent)"
@@ -403,6 +404,18 @@ paperclip-adapter:
 ## self-mutating negative control, so the guard cannot pass vacuously).
 paperclip-canonical-module:
 	@bash scripts/check-paperclip-canonical-module.sh
+
+## paperclip — convenience target (issue #420, the wiring lane): run every
+## paperclip boundary/adapter gate (scripts/check-paperclip-*.sh) in one shot.
+## Each gate keeps its OWN name in scripts/verify.sh's checks=() array — this
+## target is for fast local iteration, not a second gate of record. It runs in
+## a subshell with `set -e`, so the first gate that fails stops the run.
+paperclip:
+	@set -e; for s in scripts/check-paperclip-*.sh; do \
+		printf '== %s ==\n' "$$s"; \
+		bash "$$s"; \
+	done; \
+	echo "paperclip: OK"
 
 ## paperclip-auth — cross-boundary auth for the paperclip seam (issue #412,
 ## ADR-0013/ADR-0012): agent identity is minted/verified from the fleet's own

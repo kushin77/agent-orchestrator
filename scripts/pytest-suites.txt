@@ -82,5 +82,15 @@ governance/rollup
 control-plane/fleet-template
 gateway/sme-routing
 integrations/paperclip
+# EPIC-410 paperclip parity adapters (issue #420): each family adapter ships
+# its own tests/ dir and they cannot share one pytest invocation (sibling
+# conftest sys.path bootstrap + duplicate test-module basenames), so they are
+# registered here and each runs IN ISOLATION via scripts/run-pytest-suites.sh.
+integrations/paperclip/adapters/approvals
+integrations/paperclip/adapters/heartbeat
+integrations/paperclip/adapters/secrets
+integrations/paperclip/adapters/skills
+integrations/paperclip/api
+integrations/paperclip/auth
 registry/parity
 scripts
