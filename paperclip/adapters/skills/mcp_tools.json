@@ -1,0 +1,17 @@
+{
+  "derived_from": [
+    "gateway/mcp/tools.py",
+    "gateway/mcp/model.py"
+  ],
+  "schema": "paperclip-mcp-projection/v1",
+  "source_function": "gateway.mcp.tools.build_registry",
+  "tools": [
+    "code.definitions",
+    "code.references",
+    "code.search",
+    "kb.freshness",
+    "kb.query",
+    "kb.summary",
+    "platform.whoami"
+  ]
+}
