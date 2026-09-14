@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import json
+import signal
 import subprocess
+import threading
 import time
 
 import terminal
@@ -247,26 +250,28 @@ def test_clear_reported_lets_a_new_cycle_speak(tmp_path, monkeypatch):
 
 def test_a_run_keeps_its_beat_fresh_while_the_child_works(tmp_path, monkeypatch):
     """A long run must not look like a dead loop — the misread cost two restarts."""
-    monkeypatch.setattr(terminal, "HEARTBEAT", tmp_path / "sister.heartbeat.json")
-    monkeypatch.setattr(terminal, "IN_FLIGHT", {"child": None, "issue": 142, "agent_id": "subagent-x", "directive": "d"})
+    monkeypatch.setattr(terminal, "RUNS", tmp_path / "runs")
+    slot = {"child": None}
+    terminal.mark_run("d-1", 142, "subagent-x")
 
-    beater = terminal.start_beating("2026-09-13T00:00:00Z", "abc1234", 142, "subagent-x", interval=0.05)
+    beater = terminal.start_beating("d-1", interval=0.05, slot=slot)
     try:
         time.sleep(0.2)
-        beat = json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))
-        first_ts = beat["ts"]
-        assert beat["state"] == "working:#142" and beat["issue"] == 142 and beat["agent"] == "subagent-x"
+        marker = json.loads((terminal.RUNS / "d-1.json").read_text(encoding="utf-8"))
+        first_ts = marker["ts"]
+        assert marker["issue"] == 142 and marker["agent"] == "subagent-x"
+        assert marker["pid"] == terminal.os.getpid()
 
         time.sleep(0.2)
-        assert json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))["ts"] >= first_ts
+        assert json.loads((terminal.RUNS / "d-1.json").read_text(encoding="utf-8"))["ts"] >= first_ts
     finally:
         beater.stop()
 
-    # `stop()` must be synchronous: a beater that outlived the test wrote the
-    # test's values into the LIVE heartbeat once monkeypatch restored the path.
-    after_stop = json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))["ts"]
+    # `stop()` must be synchronous: a beater that outlived the test would keep
+    # writing the test's values into the live marker once monkeypatch restored it.
+    after_stop = json.loads((terminal.RUNS / "d-1.json").read_text(encoding="utf-8"))["ts"]
     time.sleep(0.25)
-    assert json.loads(terminal.HEARTBEAT.read_text(encoding="utf-8"))["ts"] == after_stop
+    assert json.loads((terminal.RUNS / "d-1.json").read_text(encoding="utf-8"))["ts"] == after_stop
 
 
 def test_the_heartbeat_can_name_the_child_process(tmp_path, monkeypatch):
@@ -293,15 +298,9 @@ def test_stop_and_release_frees_the_in_flight_claim(monkeypatch):
 
     monkeypatch.setattr(terminal, "release_issue", fake_release)
     monkeypatch.setattr(terminal.subprocess, "run", fake_run)
-    terminal.IN_FLIGHT.update(
-        {"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
-    )
-    try:
-        terminal.stop_and_release("signal 15")
-    finally:
-        terminal.IN_FLIGHT.update(
-            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
-        )
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+    terminal.register_run("d-1", 167, "subagent-abc12345")
+    terminal.stop_and_release("signal 15")
     assert ("release", 167, "subagent-abc12345") in calls
     assert any(kind == "escalate" for kind, *_ in calls), "the brain must be told the loop stopped mid-run"
 
@@ -315,15 +314,9 @@ def test_stop_and_release_reports_a_failed_release(monkeypatch):
 
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (False, "REFUSED: not the holder"))
     monkeypatch.setattr(terminal.subprocess, "run", fake_run)
-    terminal.IN_FLIGHT.update(
-        {"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
-    )
-    try:
-        terminal.stop_and_release("signal 15")
-    finally:
-        terminal.IN_FLIGHT.update(
-            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
-        )
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+    terminal.register_run("d-1", 167, "subagent-abc12345")
+    terminal.stop_and_release("signal 15")
     assert any("RELEASE FAILED" in body for body in bodies), f"bodies={bodies}"
 
 
@@ -338,15 +331,9 @@ def test_stop_with_nothing_held_says_so_instead_of_claiming_a_release(monkeypatc
 
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "should not be called"))
     monkeypatch.setattr(terminal.subprocess, "run", fake_run)
-    terminal.IN_FLIGHT.update(
-        {"issue": 167, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
-    )
-    try:
-        terminal.stop_and_release("signal 15")
-    finally:
-        terminal.IN_FLIGHT.update(
-            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
-        )
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+    terminal.register_run("d-1", 167, "subagent-abc12345")
+    terminal.stop_and_release("signal 15")
     assert any("no live claim to release" in body for body in bodies), f"bodies={bodies}"
 
 
@@ -358,9 +345,7 @@ def test_an_idle_stop_releases_nothing(monkeypatch):
         return True, "ok"
 
     monkeypatch.setattr(terminal, "release_issue", fake_release)
-    terminal.IN_FLIGHT.update(
-        {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
-    )
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
     terminal.stop_and_release("signal 15")
     assert calls == []
 
@@ -483,16 +468,10 @@ def test_a_graceful_stop_releases_the_claim_exactly_once(monkeypatch):
 
     monkeypatch.setattr(terminal, "release_issue", fake_release)
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Ok())
-    terminal.IN_FLIGHT.update(
-        {"issue": 281, "agent_id": "subagent-abc12345", "directive": "d-1", "child": None, "released": False}
-    )
-    try:
-        terminal.stop_and_release("signal 15")  # the SIGTERM handler
-        terminal.release_in_flight(281, "subagent-abc12345", "d-1")  # what the run's finally does
-    finally:
-        terminal.IN_FLIGHT.update(
-            {"issue": None, "agent_id": None, "directive": None, "child": None, "released": False}
-        )
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+    slot = terminal.register_run("d-1", 281, "subagent-abc12345")
+    terminal.stop_and_release("signal 15")  # the SIGTERM handler
+    terminal.release_in_flight(slot)  # what the run's finally does
     assert calls == [(281, "subagent-abc12345")], f"the claim must be released once, got {calls}"
 
 
@@ -521,3 +500,244 @@ def test_release_issue_still_reports_not_owner(monkeypatch):
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: NotOwner())
     ok, output = terminal.release_issue(4242, "subagent-x")
     assert ok is False and "not-owner" in output
+
+
+# --- #310: the sister runs a bounded pool of N concurrent subagents -----------
+
+
+class _FakeBeater:
+    """Stands in for the per-run heartbeat thread; `stop` is all a worker needs."""
+
+    def __init__(self) -> None:
+        self.stopped = False
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+class _Completed:
+    """A ``subprocess.run`` result the loop can read."""
+
+    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def _run_worker(directive_id: str, issue: int, args) -> threading.Thread:
+    """Spawn one `_run_child` worker with every expensive seam stubbed."""
+    slot = terminal.register_run(directive_id, issue, f"subagent-{directive_id}")
+    return threading.Thread(
+        target=terminal._run_child,
+        args=(
+            {"id": directive_id, "task": {"issue": issue}},
+            args,
+            slot,
+            f"subagent-{directive_id}",
+            None,
+            {},
+        ),
+        name=f"fleet-run-{directive_id}",
+        daemon=True,
+    )
+
+
+def test_pool_size_reads_the_env_and_defaults_to_ten(monkeypatch):
+    monkeypatch.delenv("FLEET_SISTER_POOL", raising=False)
+    assert terminal.pool_size() == 10
+    monkeypatch.setenv("FLEET_SISTER_POOL", "3")
+    assert terminal.pool_size() == 3
+    monkeypatch.setenv("FLEET_SISTER_POOL", "garbage")
+    assert terminal.pool_size() == 10
+    monkeypatch.setenv("FLEET_SISTER_POOL", "0")
+    assert terminal.pool_size() == 1  # never fewer than one
+
+
+def test_n_workers_run_concurrently(monkeypatch):
+    """The pool must run N children at once, not one after another."""
+    n = 5
+    barrier = threading.Barrier(n)
+    entered: list[str] = []
+    completed: list[str] = []
+
+    def fake_run_once(directive, runner, timeout, dry_run, agent_id, worktree=None, env=None, slot=None):
+        entered.append(directive["id"])
+        barrier.wait(timeout=5)
+        completed.append(directive["id"])
+        return 0, "done"
+
+    monkeypatch.setattr(terminal, "run_once", fake_run_once)
+    monkeypatch.setattr(terminal, "start_beating", lambda *a, **k: _FakeBeater())
+    monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "ok"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
+    monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
+    monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Completed())
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+
+    args = argparse.Namespace(runner="true", timeout=60.0, dry_run=False)
+    threads = [_run_worker(f"d-{i}", 1000 + i, args) for i in range(n)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert sorted(entered) == [f"d-{i}" for i in range(n)]
+    # The barrier only releases once ALL n are inside at once; serialized runs
+    # would time out here and never record a completion.
+    assert sorted(completed) == [f"d-{i}" for i in range(n)]
+    assert terminal.IN_FLIGHT == {}, "every worker must unregister itself"
+
+
+def test_children_claim_and_release_in_isolation(monkeypatch):
+    """Each child owns exactly its own issue/agent; no cross-claim, no double release."""
+    n = 4
+    released: list[tuple[int, str]] = []
+
+    def fake_release(issue, agent):
+        released.append((issue, agent))
+        return True, "ok"
+
+    monkeypatch.setattr(terminal, "run_once", lambda *a, **k: (0, "done"))
+    monkeypatch.setattr(terminal, "start_beating", lambda *a, **k: _FakeBeater())
+    monkeypatch.setattr(terminal, "release_issue", fake_release)
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
+    monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
+    monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Completed())
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+
+    args = argparse.Namespace(runner="true", timeout=60.0, dry_run=False)
+    threads = [_run_worker(f"d-{i}", 2000 + i, args) for i in range(n)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert sorted(released) == sorted((2000 + i, f"subagent-d-{i}") for i in range(n))
+    assert len(released) == n, "each child releases exactly once, its own claim"
+
+
+class _FakeChild:
+    """A stand-in for the subagent process; `stop_and_release` must kill it."""
+
+    def __init__(self) -> None:
+        self._alive = True
+        self.terminated = 0
+        self.killed = 0
+
+    def poll(self):
+        return None if self._alive else 0
+
+    def terminate(self) -> None:
+        self.terminated += 1
+        self._alive = False
+
+    def wait(self, timeout=None):
+        return 0
+
+    def kill(self) -> None:
+        self.killed += 1
+        self._alive = False
+
+
+def test_stop_and_release_kills_all_children(monkeypatch):
+    """A stop must take down EVERY in-flight child and release EVERY claim."""
+    n = 6
+    released: list[tuple[int, str]] = []
+    children: list[_FakeChild] = []
+
+    def fake_release(issue, agent):
+        released.append((issue, agent))
+        return True, "ok"
+
+    monkeypatch.setattr(terminal, "release_issue", fake_release)
+    monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Completed())
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+    for i in range(n):
+        slot = terminal.register_run(f"d-{i}", 3000 + i, f"subagent-d-{i}")
+        child = _FakeChild()
+        children.append(child)
+        slot["child"] = child
+
+    terminal.stop_and_release("signal 15")
+
+    assert all(child.terminated == 1 for child in children), "every in-flight child must be terminated"
+    assert sorted(released) == sorted((3000 + i, f"subagent-d-{i}") for i in range(n))
+
+
+def test_per_child_run_markers_are_keyed_by_directive(tmp_path, monkeypatch):
+    """N concurrent runs each get their own marker; the monitor sees N, not one."""
+    monkeypatch.setattr(terminal, "RUNS", tmp_path / "runs")
+    for i in range(3):
+        terminal.mark_run(f"d-{i}", 4000 + i, f"subagent-d-{i}")
+
+    assert terminal.run_state("d-0") == "live"
+    assert terminal.run_state("d-1") == "live"
+    assert terminal.run_state("d-2") == "live"
+    assert sorted(path.stem for path in terminal.RUNS.glob("*.json")) == ["d-0", "d-1", "d-2"]
+
+    # refresh touches ONE child's marker, never the others
+    terminal.refresh_run("d-1", child_pid=4242)
+    marker = json.loads((terminal.RUNS / "d-1.json").read_text(encoding="utf-8"))
+    assert marker["child_pid"] == 4242 and "ts" in marker
+    other = json.loads((terminal.RUNS / "d-0.json").read_text(encoding="utf-8"))
+    assert other.get("child_pid") is None
+
+    terminal.clear_run("d-0")
+    assert terminal.run_state("d-0") == "none"
+
+
+def test_loop_no_longer_shadows_verdict(monkeypatch):
+    """#310: a work directive reaches the module-level verdict(), never a local."""
+    verdict_calls: list[tuple] = []
+
+    def spy_verdict(rc, output, gate_ok, landed):
+        verdict_calls.append((rc, gate_ok, landed))
+        return ("done" if (rc == 0 and gate_ok and landed) else "failed"), "none"
+
+    monkeypatch.setattr(terminal, "verdict", spy_verdict)
+    monkeypatch.setattr(terminal.singleton, "guard", lambda *a, **k: True)
+    monkeypatch.setattr(terminal, "write_heartbeat", lambda *a, **k: None)
+    monkeypatch.setattr(terminal, "start_beating", lambda *a, **k: _FakeBeater())
+    monkeypatch.setattr(terminal, "claim_issue", lambda *a, **k: (True, "claimed"))
+    monkeypatch.setattr(terminal, "provision_worktree", lambda *a, **k: None)
+    monkeypatch.setattr(terminal, "run_once", lambda *a, **k: (0, "runner finished"))
+    monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "ok"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
+    monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
+    monkeypatch.setattr(terminal, "IN_FLIGHT", {})
+
+    directive = {
+        "id": "d-310",
+        "ts": "2026-09-13T00:00:00Z",
+        "type": "directive",
+        "from": "brain",
+        "to": "sister",
+        "task": {"kind": "work", "issue": 310, "lane": "fleet"},
+    }
+
+    def fake_run(command, **kwargs):
+        if command[:1] == ["git"]:
+            return _Completed(stdout="abc1234\n")
+        if "watch" in command:
+            return _Completed(stdout=json.dumps(directive))
+        if "held" in command:
+            return _Completed(returncode=1, stdout="{}")
+        return _Completed()
+
+    monkeypatch.setattr(terminal.subprocess, "run", fake_run)
+
+    args = argparse.Namespace(
+        runner="true", watch_timeout=0.1, timeout=1.0, idle_sleep=0.0, dry_run=False, once=True
+    )
+    saved = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+    try:
+        rc = terminal.loop(args)
+    finally:
+        for sig, handler in saved.items():
+            signal.signal(sig, handler)
+
+    assert rc == 0
+    assert verdict_calls == [(0, True, True)], f"module verdict() must be reached, got {verdict_calls}"
