@@ -54,6 +54,7 @@ checks=(
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
+  'paperclip-integration|bash scripts/check-paperclip-integration.sh'
   'secrets|bash scripts/check-secrets.sh'
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/docs/contracts/paperclip/budget.schema.json",
+  "title": "Paperclip-ing budget contract (fleet FinOps -> upstream costs)",
+  "description": "The frozen budget seam between the fleet's FinOps tiers and budget rail (governance/finops/, gateway/finops/, telemetry/budgets/) and the upstream cost surface (issue #370, ADR-0013). A budget has a scope, a period, a cap and spend, a currency, a hard-stop flag, a burn-rate alert threshold and a receipt reference. See docs/PAPERCLIP-ING-INTEGRATION.md.",
+  "type": "object",
+  "required": ["scope", "period", "cap", "spent", "currency", "hard_stop", "burn_rate_alert_pct", "receipt_ref"],
+  "additionalProperties": false,
+  "properties": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "id"],
+      "description": "What the cap applies to. Upstream caps per agent (also per team/project).",
+      "properties": {
+        "level": {
+          "enum": ["agent", "team", "project"],
+          "description": "The scoping level of the cap."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The agent / team / project id the cap applies to."
+        }
+      }
+    },
+    "period": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The budget window (fleet: month — the vendor cap window in telemetry/budgets/budget.py)."
+    },
+    "cap": {
+      "type": "number",
+      "minimum": 0,
+      "description": "The spend limit for the period. At the cap the run hard-stops with a graceful hand-off."
+    },
+    "spent": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Spend already consumed in the period."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO-4217 currency of cap and spent (fleet vendor caps are USD)."
+    },
+    "hard_stop": {
+      "type": "boolean",
+      "description": "True when the cap is absolute: spend at or above it always stops, whatever the policy."
+    },
+    "burn_rate_alert_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Burn-rate alert threshold, as a percentage of cap, that warns before the hard stop (fleet: warn_at_pct / hard_cap_pct)."
+    },
+    "receipt_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Per-task receipt reference backing the spend (fleet: the audit/ledger entry; upstream: the cost receipt)."
+    }
+  }
+}
