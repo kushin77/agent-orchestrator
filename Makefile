@@ -14,7 +14,7 @@
 
 SHELL := /bin/bash
 
-.PHONY: help verify lint gate merge-gate qa-loop tests \
+.PHONY: help verify lint gate merge-gate qa-loop tests e2e \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
@@ -40,6 +40,7 @@ help:
 	@echo "                per-suite tests + controls + policy-schema"
 	@echo "  qa-loop       fix -> verify -> re-check until the gate is green"
 	@echo "  tests         Run every declared pytest suite in isolation"
+	@echo "  e2e           Run only the capstone e2e suite (also in verify, #525)"
 	@echo "  paperclip     Run every paperclip boundary/adapter gate in one shot"
 	@echo "  shellcheck    Run shellcheck on scripts/ (skipped if not installed)"
 	@echo "  gitleaks      Run gitleaks with .gitleaks.toml (skipped if absent)"
@@ -144,6 +145,12 @@ qa-loop:
 ## tests — run every declared pytest suite in isolation (per-suite, issue #29)
 tests:
 	@bash scripts/run-pytest-suites.sh
+
+## e2e — the capstone end-to-end suite alone (issue #525). The identical command
+## is an entry in `make verify` (scripts/verify.sh), so a red Definition-of-Done
+## proof can no longer reach master; this target is the convenience runner.
+e2e:
+	@env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q e2e/tests
 
 ## shell-syntax — bash -n on every *.sh outside vendor/
 shell-syntax:
