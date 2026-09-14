@@ -109,3 +109,13 @@ def runner_env(env: dict[str, str] | None = None) -> dict[str, str]:
 # directive whose budget was exhausted and which must never be dispatched again.
 ATTEMPTS = FLEET_DIR / "attempts"
 DEAD_LETTER = FLEET_DIR / "dead-letter"
+
+# The runaway alarm's LATCH (issue #728). `health/` holds the fleet's own
+# health state and `alarm.json` is the latch artifact: raised when the queue-
+# liveness facet (#728) measures a runaway, and kept raised — naming the
+# directives and worktrees responsible — until an operator acknowledges it.
+# Declared HERE for the same reason as ATTEMPTS/DEAD_LETTER: `fleet/health.py`
+# re-bases these NAMES onto the caller's fleet directory rather than inventing a
+# second layout.
+HEALTH = FLEET_DIR / "health"
+ALARM = HEALTH / "alarm.json"

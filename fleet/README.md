@@ -719,16 +719,55 @@ surfaces:
 > (#497/#499) this wave. Until the entry exists the surface reads as `off`
 > (deny by default), which is why no flag edit was required to ship it inert.
 
+## Runaway + queue-liveness alarm (issue #728)
+
+The runaway that motivated the attempt cap (#723) — 49 concurrent `make verify`
+runs on one box — was caught by a human *noticing* it. Detection is a signal,
+and a signal has to be an alarm: an excursion that clears itself before anyone
+looks is indistinguishable from one that never happened. `fleet/health.py`
+therefore reports the work queue's liveness and **latches** a runaway until an
+operator acknowledges it. Contract: [`CONTRACT.md`](CONTRACT.md) §9.
+
+```bash
+python3 fleet/health.py check   # full signal: rungs + queue + the latch (read-only)
+python3 fleet/health.py alarm   # measure the queue, raise + latch; exit 2 when raised
+python3 fleet/health.py ack     # acknowledge — the ONLY way the latch clears
+```
+
+The signal reads inbox depth, the oldest pending directive's age and the
+dead-letter count (via `runaway.inventory`, the same read `channel.py status`
+makes). A condition above any cap raises the alarm and persists the latch at
+`<fleet>/health/alarm.json`; the next measurement — taken with the excursion
+already gone — is *still* raised, and still names the directives and the
+worktrees responsible, from the claim's `directive_id` and the lane records
+under `governance/isolation`. Only `ack` clears it (and a second `ack` is
+refused). The knobs are `AO_RUNAWAY_INBOX_DEPTH` (default 24),
+`AO_RUNAWAY_OLDEST_MINUTES` (default 120) and `AO_RUNAWAY_DEAD_LETTERS`
+(default 5); an unreadable value is refused rather than silently defaulted.
+
+The alarm is emitted by the gate of record, not only by an ad-hoc command:
+`scripts/check-fleet-channel.sh` provokes the condition, proves the latch
+survives the excursion and proves `ack` clears it — and **fails** if the alarm
+clears itself (mutation-proved).
+
+The culprit's *names* deliberately do not travel as monitoring labels: per-session
+identity is refused by name in `fleet/health_signals.py` (ADR-0022 D5), so the
+exported family carries counts while the names stay in the local signal, the
+latch artifact and the log (see "Fleet-health export", above).
+
 ## The gate
 
 ```bash
 bash scripts/check-fleet-channel.sh   # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
 ```
 
-The check validates `fleet/directive.json` against the contract and runs the
+The check validates `fleet/directive.json` against the contract, runs the
 channel's own mutants (unknown message type, bad tier, bad thinking, missing
 role, a sister-issued directive) — each mutant must be refused, so the check
-cannot pass vacuously.
+cannot pass vacuously — and drives the runaway alarm (§9): raised and naming the
+offending directive + worktree, still raised once the excursion is removed,
+cleared by `ack`, with a second `ack` refused. A check that cannot fail is a
+formality, so each half is proved on a path that genuinely fails.
 
 ```bash
 bash scripts/check-fleet-runner-preflight.sh   # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
