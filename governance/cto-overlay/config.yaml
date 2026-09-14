@@ -1,0 +1,129 @@
+# CTO overlay configuration — kushin77/agent-orchestrator
+#
+# Drop-in four-layer governance for this repository. Schema:
+# governance/cto-overlay/schema.yaml. Contract and provenance:
+# docs/CTO-OVERLAY.md. Engine: governance/cto-overlay/overlay.py.
+#
+# Ported from kushin77/leaderboard/.cto/ (see PROVENANCE in docs/CTO-OVERLAY.md).
+# The layer ids, the three tiers, the BLOCKING/WARNING vocabulary and the four
+# non-negotiable signals are the harvested taxonomy, not a new one.
+
+repo:
+  name: "agent-orchestrator"
+  owner: "kushin77"
+
+overlay:
+  version: "1.0.0"
+  source: "kushin77/leaderboard/.cto (port, kushin77/agent-orchestrator#147)"
+  default_tier: "standard"
+
+# Layer 1-4. `blocking: true` is the layer's declaration for the DEFAULT tier
+# (standard); a tier entry below overrides it, and `tiers.standard` must agree
+# with these flags or the engine refuses to run (a config that contradicts
+# itself cannot be assessed).
+layers:
+  executive:
+    enabled: true
+    blocking: true
+    description: "Architecture governance — decision records and dependency policy"
+    checks:
+      - id: adr-check
+      - id: dep-policy
+      - id: security-baseline
+        min_tier: critical
+  engineering:
+    enabled: true
+    blocking: true
+    description: "Code quality — shell syntax and declared test-suite discoverability"
+    checks:
+      - id: syntax
+      - id: coverage
+        min_tier: standard
+      - id: sast
+        min_tier: critical
+  devops:
+    enabled: true
+    blocking: false
+    description: "Deploy safety — container, compose and IaC hygiene (warns at standard)"
+    checks:
+      - id: dockerfile-lint
+      - id: compose-validate
+        min_tier: standard
+      - id: terraform-fmt
+        min_tier: standard
+  support:
+    enabled: true
+    blocking: false
+    description: "Self-healing — telemetry surface, reconcile tooling, runbook (warns at standard)"
+    checks:
+      - id: log-harvest
+      - id: self-heal
+        min_tier: standard
+      - id: incident-response
+        min_tier: critical
+
+# Tiered enforcement, harvested shape: a tier names the effective severity of a
+# layer and overrides its `blocking` flag. Omitted layers keep their flag.
+tiers:
+  experimental:
+    executive: advisory
+    engineering: warning
+    devops: advisory
+    support: advisory
+  standard:
+    executive: blocking
+    engineering: blocking
+    devops: warning
+    support: warning
+  critical:
+    executive: blocking
+    engineering: blocking
+    devops: blocking
+    support: blocking
+
+# Signals that always run, whatever the tier, and must pass. Dropping one from
+# this list fails schema validation (the schema requires all four), so the
+# baseline cannot be silently narrowed.
+non_negotiable:
+  - shell_syntax
+  - secret_scan
+  - protected_files
+  - path_integrity
+
+signals:
+  shell_syntax:
+    exclude_prefixes:
+      - vendor/
+      - .research/
+      - node_modules/
+  secret_scan:
+    max_file_bytes: 1048576
+    file_suffixes:
+      - .md
+      - .sh
+      - .py
+      - .yaml
+      - .yml
+      - .json
+      - .toml
+      - .txt
+      - .tsv
+      - .cursorrules
+    exempt_markers:
+      - example
+      - sample
+      - placeholder
+      - dummy
+      - fake
+      - changeme
+      - replace-me
+      - redacted
+      - not-a-real
+  protected_files:
+    paths:
+      - Makefile
+      - scripts/verify.sh
+      - AGENTS.md
+      - docs/GOLDEN-RULES.md
+  path_integrity:
+    max_path_length: 240
