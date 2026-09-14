@@ -422,6 +422,50 @@ verbs:
     why_not_exposed: "Marks a directive handled without a result -- a rung's own bookkeeping."
     refusals: [401, 403, 503]
 
+  - id: channel.log
+    source: fleet/channel.py
+    local: log
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: "Reads the per-directive live log stream (#367); a view, never a write."
+
+  - id: channel.follow
+    source: fleet/channel.py
+    local: follow
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: "Tails the per-directive live log stream (#367); short-poll, no daemon."
+
+  - id: channel.kb
+    source: fleet/channel.py
+    local: kb
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: "Answers a query from the governance/knowledge index (#367); CANNOT-ASSESS when the catalogue is absent."
+
+  - id: channel.steer
+    source: fleet/channel.py
+    local: steer
+    effect_class: hold
+    capability: fleet:steer
+    audit: channel.steer
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: "Queues a mid-run steering hint for one in-flight directive (#367); delivered without a kill/re-dispatch and audited in the slog."
+
   # -- governance/dispatch/cli.py: the claim ledger --------------------------
   - id: board.status
     source: governance/dispatch/cli.py

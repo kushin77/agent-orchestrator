@@ -32,6 +32,7 @@ from .model import MemoryKind, MemoryScope
 from .prompt_cache import estimate_tokens, footprint, render_memory_block
 from .retrieval import Hit, Retriever, RetrieverResult
 from .store import MemoryStore
+from .window import WindowPolicy, slide_window
 
 #: Default allowed scopes when no profile constraint is supplied.
 _ALL_SCOPES: Tuple[MemoryScope, ...] = (
@@ -49,6 +50,7 @@ class EnrichmentPolicy:
     min_relevance: float = 0.10
     top_k: int = 8
     block_header: str = "Scoped memory (tenant/agent/session):"
+    window: WindowPolicy = field(default_factory=WindowPolicy)
 
 
 @dataclass
@@ -66,6 +68,7 @@ class EnrichmentReport:
     evaluated: int = 0
     below_relevance: int = 0
     budget_dropped: int = 0
+    redundant_dropped: int = 0
     scope_excluded: int = 0
     cache_footprint: Optional[str] = None
     scopes_allowed: Tuple[MemoryScope, ...] = ()
@@ -88,6 +91,7 @@ class EnrichmentReport:
             "evaluated": self.evaluated,
             "below_relevance": self.below_relevance,
             "budget_dropped": self.budget_dropped,
+            "redundant_dropped": self.redundant_dropped,
             "scope_excluded": self.scope_excluded,
             "cache_footprint": self.cache_footprint,
             "scopes_allowed": [s.value for s in self.scopes_allowed],
@@ -114,6 +118,7 @@ class ContextEnricher:
                max_tokens: Optional[int] = None,
                min_relevance: Optional[float] = None,
                top_k: Optional[int] = None,
+               window: Optional[WindowPolicy] = None,
                now: Optional[datetime] = None) -> EnrichmentReport:
         """Build the injection block for ``query`` under the caller session.
 
@@ -149,12 +154,17 @@ class ContextEnricher:
             now=now,
         )
 
-        # Budget gate: keep hits in score order while the rendered block fits.
+        # Window gate: slide over score-ordered hits and drop redundant
+        # content (duplicate/subsumed text) before it costs a token.
+        window_policy = window if window is not None else self.policy.window
         kept: List[Hit] = []
         dropped = 0
+        redundant_dropped = 0
         if result.hits:
+            windowed, redundant_dropped = slide_window(result.hits,
+                                                       window_policy)
             block_header = header if header else ""
-            for hit in result.hits:
+            for hit in windowed:
                 candidate = render_memory_block(kept + [hit],
                                                 header=block_header)
                 if estimate_tokens(candidate) > budget:
@@ -167,6 +177,7 @@ class ContextEnricher:
         reason_codes.append("budget:max=" + str(budget))
         reason_codes.append("budget:used=" + str(estimate_tokens(block_text)))
         reason_codes.append("budget:dropped=" + str(dropped))
+        reason_codes.append("window:redundant=" + str(redundant_dropped))
         reason_codes.append("inject:" + str(len(kept)))
 
         return EnrichmentReport(
@@ -181,6 +192,7 @@ class ContextEnricher:
             evaluated=result.evaluated,
             below_relevance=result.below_relevance,
             budget_dropped=dropped,
+            redundant_dropped=redundant_dropped,
             scope_excluded=result.scope_excluded,
             cache_footprint=footprint(block_text) if block_text else None,
             scopes_allowed=allowed,
