@@ -1,0 +1,245 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:governance:authority-matrix:v1",
+  "title": "AuthorityMatrix",
+  "description": "Authority matrix for repo separation, scoped admin rights, separation of duties and end-to-end closure (issue #150, EPIC-00 #144). A matrix declares the repos under governance, the principals (per-repo fleets plus exactly one enterprise controller) that may act on them, the actors inside each principal (each carrying a chain-of-command role, a persona posture and a model tier), and the work items whose closure is gated on recorded gate + `make verify` evidence. Document validity is NOT the same as closure: `gate_evidence`/`verify_evidence` are optional at the document level because their absence is a runtime closure denial (issue #150: 'a missing or empty evidence field is a denial, never a pass'), never a pass and never a document failure. Structurally malformed input (unparseable YAML, non-mapping root) is CANNOT-ASSESS; a violation of this schema or of a semantic invariant is a real defect (NOT-OK).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "repos", "principals", "work_items"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Matrix format version. The engine understands version 1 only; a version it does not understand is CANNOT-ASSESS (a matrix this engine cannot read is never a pass)."
+    },
+    "repos": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Every repo under governance. A repo names the fleet that administers it; rights are per repo, so an undeclared repo has no authority record at all.",
+      "items": {
+        "$ref": "#/definitions/repo"
+      }
+    },
+    "principals": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The authority holders: one repo-fleet per repo plus exactly one enterprise-controller (semantic invariant 'cross-repo-single', enforced by the engine).",
+      "items": {
+        "$ref": "#/definitions/principal"
+      }
+    },
+    "work_items": {
+      "type": "array",
+      "description": "Work items under closure governance: each names its repo and its separation-of-duties assignment, and optionally carries the recorded evidence that would make it closed.",
+      "items": {
+        "$ref": "#/definitions/workItem"
+      }
+    }
+  },
+  "definitions": {
+    "repoId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9._-]*$",
+      "description": "A repository in <owner>/<name> form, e.g. kushin77/agent-orchestrator."
+    },
+    "action": {
+      "type": "string",
+      "enum": ["files", "issues", "state", "merge", "rollup"],
+      "description": "The closed action vocabulary an admin right grants: 'files' (read/write the repo's files), 'issues' (create/edit/close its issues), 'state' (read/write its fleet state: claims, sessions, board), 'merge' (merge into its protected branch; additionally requires an actor with merge_authority), 'rollup' (cross-repo read/aggregation; inherently cross-repo, so only a cross_repo principal may hold it)."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["commander", "lieutenant-commander", "general", "platoon-leader", "soldier", "auditor", "scribe"],
+      "description": "Chain-of-command role (harvested vocabulary: capital-underwriting docs/wiki/ELITE_*_CHARTER.md). The commander is the only role with merge authority and performs no execution; the lieutenant-commander is the execution arm; soldiers/snipes do bounded mechanical work; the auditor audits adversarially and never executes."
+    },
+    "posture": {
+      "type": "string",
+      "enum": ["executor", "reviewer", "auditor"],
+      "description": "Persona posture (closed platform vocabulary shared with registry/personas/persona-card.schema.json): 'executor' performs primary work, 'reviewer' independently reviews an executor's work, 'auditor' adversarially audits claims/evidence. A posture only ever fills the duty it names, and an auditor is never the executor of what it audits."
+    },
+    "modelTier": {
+      "type": "string",
+      "enum": ["LOW", "MED", "HIGH", "MAX"],
+      "description": "Dispatch tier on the flash/pro ladder (registry/personas defaultModelTier vocabulary, docs/MODEL-PROFILES.md). Used by the tier-floor rule: the auditor of a work item must not be dispatched below its executor."
+    },
+    "repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fleet", "gate", "admin_rights"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/repoId"
+        },
+        "fleet": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Id of the repo-fleet principal that administers this repo. The fleet's scope must be exactly this repo (semantic invariant 'fleet-scope-single')."
+        },
+        "gate": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The repo's own make-verify command, recorded verbatim so closure evidence can be checked against the gate the repo actually publishes."
+        },
+        "admin_rights": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/action"
+          },
+          "description": "The rights this repo delegates to its fleet. The fleet's own admin_rights must be a subset (a fleet cannot self-grant more than the repo delegates)."
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "posture", "model_tier"],
+      "description": "One identity inside a principal. Actors are the principals separation of duties reasons about: executor != reviewer != auditor for one work item, as three distinct actors.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "role": {
+          "$ref": "#/definitions/role"
+        },
+        "posture": {
+          "$ref": "#/definitions/posture"
+        },
+        "model_tier": {
+          "$ref": "#/definitions/modelTier"
+        },
+        "merge_authority": {
+          "type": "boolean",
+          "description": "True only for a commander actor (semantic invariant 'merge-authority-commander'). Absent means false."
+        }
+      }
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "scope", "cross_repo", "admin_rights", "actors"],
+      "description": "An authority holder. Exactly one principal in the matrix has cross_repo: true and it must be the enterprise-controller (semantic invariant 'cross-repo-single'): every other principal is confined to the repos in its scope.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["repo-fleet", "enterprise-controller"],
+          "description": "'repo-fleet' is a repo's own engineering team with scoped admin rights; 'enterprise-controller' is the single cross-repo actor that rolls up across repos."
+        },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/repoId"
+          },
+          "description": "The repos this principal may act on. A repo absent from every scope is actionable by nobody but the enterprise controller."
+        },
+        "cross_repo": {
+          "type": "boolean",
+          "description": "True for the enterprise controller only. A second cross_repo principal is a validation failure (NOT-OK), because it re-opens exactly the cross-repo hole the matrix exists to close."
+        },
+        "admin_rights": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/action"
+          }
+        },
+        "actors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/actor"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A recorded gate result. The schema checks SHAPE only (each field, when present, has the right type): completeness and truthfulness are decided at closure time, not here, because issue #150 requires a missing or empty evidence field to be an explicit closure DENIAL rather than a document failure. An evidence record with an absent or whitespace-only output, a non-zero exit code, a commit that is not the item's head, a repo that is not the item's repo, or a recorder with no authority on that repo is a closure DENIAL.",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "description": "Repo the evidence was recorded in. Must equal the work item's repo (closure DENY otherwise)."
+        },
+        "command": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string",
+          "description": "The command's literal output. Recorded output is the only thing that makes evidence real — a claim of a result is not evidence."
+        },
+        "exit_code": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "git_sha": {
+          "type": "string",
+          "description": "The commit under test; evidence always names a commit (parity with governance/merge: a green check that cannot name a commit cannot close work)."
+        },
+        "recorded_by": {
+          "type": "string",
+          "description": "Actor id of the recorder. It must resolve to an actor whose principal is scoped to this repo."
+        }
+      }
+    },
+    "sodAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Separation-of-duties assignment for one work item: three distinct actor ids, each filling the duty its posture names. The keys are optional here because an unassigned duty is a separation DENIAL ('sod-duty-unassigned'), not a document failure.",
+      "properties": {
+        "executor": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "reviewer": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "auditor": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        }
+      }
+    },
+    "workItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "repo"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9._-]*#[1-9][0-9]*$",
+          "description": "Work-item id in <owner>/<repo>#<n> form."
+        },
+        "repo": {
+          "$ref": "#/definitions/repoId"
+        },
+        "head_sha": {
+          "type": "string",
+          "description": "The commit under test. When declared, both evidence records must name it (closure evidence names a COMMIT)."
+        },
+        "sod": {
+          "$ref": "#/definitions/sodAssignment"
+        },
+        "gate_evidence": {
+          "$ref": "#/definitions/evidence",
+          "description": "The fleet's own gate result for this item. Absent means 'not recorded', which is a closure denial."
+        },
+        "verify_evidence": {
+          "$ref": "#/definitions/evidence",
+          "description": "The repo-level `make verify` result for this item. Absent means 'not recorded', which is a closure denial."
+        }
+      }
+    }
+  }
+}
