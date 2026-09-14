@@ -183,4 +183,24 @@ surfaces:
       change signal). Delegates to the existing family surfaces; adds no second
       projection. Offline (reads local artifacts/stores only; no network
       egress).
+  telemetry_exposition:
+    default: off
+    promoted: false
+    service: telemetry
+    tf_flag: enable_telemetry
+    description: >
+      Telemetry exposition (issue #497, ADR-0022): the flag-gated-OFF OTLP/HTTP
+      **push** exporter that renders the telemetry pillar's own facts — the
+      per-tenant SLO verdicts from slo_templates/* (imported verbatim from
+      telemetry/observability/slos.py), the BudgetStateExporter budget/quota/
+      audit state and the metering usage aggregate — and pushes them to the
+      endpoint the fleet monitoring plane names. Not a scrape endpoint: ADR-0022
+      fixes push as the transport because this control plane is a Cloud Run v2
+      service (ephemeral, scales to zero, no pod, no ServiceMonitor), so this
+      surface ships no HTTP route, no /metrics and no bound port. The endpoint,
+      credentials and interval come from the environment only (GR-6) and default
+      to nothing, so the exporter is inert — no render, no push, no fabricated
+      healthy signal — until both this flag and an endpoint are configured. The
+      label set is closed and bounded to
+      {service, slo_kind, slo_id, verdict, tenant}.
 
