@@ -22,10 +22,15 @@
 #            uninvoked   script: delivered, invoked by no gate file
 #   tracker  the issue that must remove this line
 #
-# Measured at ffb2688 when this baseline landed (the detector prints the same
-# numbers from the tree, it does not read them from here): 78 tracked
-# scripts/check-*.sh|py — WIRED 70, UNWIRED 8; 71 suites declared in
-# scripts/pytest-suites.txt — WIRED 5, UNWIRED 66. 74 exceptions in total.
+# Measured when this baseline landed, at ffb2688 (the detector prints the same
+# numbers from the tree, it does not read them from here): 78 check scripts
+# (WIRED 70, UNWIRED 8), 71 declared suites (WIRED 5, UNWIRED 66) — 74 entries.
+# It shrank to 72 IN THE MERGE: the capability-registers lane that landed as
+# e08f358 wired `scripts/check-codeidx-capability-register.sh` and
+# `scripts/check-diagrams-capability-register.sh`, and the stale-entry rule
+# failed this gate naming both until they were removed — 79 check scripts, now
+# WIRED 73, UNWIRED 6, and 71 suites, WIRED 5, UNWIRED 66. The list cannot rot:
+# a wired entry is a stale entry and a stale entry is a red gate.
 # The gate-invocation universe, the match-by-path rule and the rejected
 # alternatives are stated in scripts/check-gate-coverage.sh.
 script	scripts/check-chat-eval.sh	uninvoked	#499
@@ -34,8 +39,6 @@ script	scripts/check-chat-guardrails.sh	uninvoked	#499
 script	scripts/check-chat-identity.sh	uninvoked	#499
 script	scripts/check-chat-tools.sh	uninvoked	#499
 script	scripts/check-chat-ux.sh	uninvoked	#499
-script	scripts/check-codeidx-capability-register.sh	uninvoked	#524
-script	scripts/check-diagrams-capability-register.sh	uninvoked	#524
 suite	guardrails/dlp	swept-only	#524
 suite	guardrails/policy	swept-only	#524
 suite	guardrails/controls	swept-only	#524

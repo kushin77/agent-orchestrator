@@ -202,6 +202,24 @@ checks=(
   # deliberately: this array is explicit, so a new scripts/check-*.sh is never
   # auto-discovered and an unwired gate is a formality, not a gate.
   'monitoring-declaration|bash scripts/check-monitoring-declaration.sh'
+  # EPIC #462 (diagrams) / EPIC #473 (codeidx) -- the capability registers: the
+  # four enforcement checks delivered by #468/#469 and #479/#480, registered here
+  # because this array is explicit and nothing is auto-discovered, so an unwired
+  # check enforces nothing (GR-12). `diagrams-capability-register` (#469) and
+  # `codeidx-capability-register` (#480) enforce each register's own row grammar
+  # (header, cell count, status/owner vocabularies, ref shape) and provoke their
+  # negative controls; `diagrams-capability-tracker` (#468) and
+  # `codeidx-capability-tracker` (#479) reconcile every row's `ref` against the
+  # RECORDED board snapshot, so a row that drifted from the board is surfaced by
+  # name instead of rotting. Unlike their `diagrams-declaration` (#464) and
+  # `codeidx-surface` (#475) siblings above, these four are offline and
+  # deterministic -- no network, no `vendor/CMR` submodule and no vendored seed
+  # -- so they RUN for real (rc 0) in a fresh worktree and are never recorded as
+  # CANNOT-ASSESS.
+  'diagrams-capability-register|bash scripts/check-diagrams-capability-register.sh'
+  'diagrams-capability-tracker|bash scripts/track-diagrams-capabilities.sh'
+  'codeidx-capability-register|bash scripts/check-codeidx-capability-register.sh'
+  'codeidx-capability-tracker|bash scripts/track-codeidx-capabilities.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
