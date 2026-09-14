@@ -110,3 +110,47 @@ def document_file(tree: Path) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+@pytest.fixture()
+def unresolved_document(tree: Path) -> Path:
+    """A registry document whose mandatory module claims a seed that is not there.
+
+    Composing from this document makes a *claim* cite a path that resolves
+    nowhere under either declared citation base — the "runnable but not truthful"
+    case the policy refuses by naming the line (issue #592).
+    """
+    from governance.modules import registry
+
+    document = registry.build(tree, tree / HUB)
+    for entry in document["modules"]:
+        if entry["state"] == "registered-mandatory":
+            row = entry["assets"][0]
+            row["seed"] = "templates/module/not-here.json"
+            row["seed_present"] = True
+            break
+    else:  # pragma: no cover - the registry always carries a mandatory module
+        raise AssertionError("no registered-mandatory module to doctor")
+    path = tree / "unresolved-registry.json"
+    path.write_text(
+        json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return path
+
+
+def run_cli(tree: Path, *args: str) -> "subprocess.CompletedProcess":
+    """The scratch tree's own CLI, in a fresh interpreter (the lane's tree is never touched)."""
+    import subprocess
+
+    return subprocess.run(
+        [
+            sys.executable,
+            str(tree / "integrations/paperclip/reporting/cli.py"),
+            *args,
+            "--repo",
+            str(tree),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
