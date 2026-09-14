@@ -32,8 +32,8 @@
       "enum": ["brain", "monitor", "sister"]
     },
     "rungState": {
-      "description": "fleet/watchdog.decide's own closed vocabulary, plus the honest no-data member. A stale beat may never be published as healthy.",
-      "enum": ["healthy", "missing", "stale", "drifted", "no-data"]
+      "description": "fleet/watchdog.decide's own closed vocabulary, plus the honest no-data member. A stale beat may never be published as healthy; an unjudgeable drift comparison is `cannot-assess` (#739, AO-GR-25), which is likewise never healthy.",
+      "enum": ["healthy", "missing", "stale", "drifted", "cannot-assess", "no-data"]
     },
     "beatAgeBucket": {
       "description": "The beat-age bucket, split at channel.STALE_HEARTBEAT_SECONDS. An unreadable beat is OMITTED rather than bucketed, because rung_state already publishes the watchdog's measured verdict for that rung.",

@@ -27,7 +27,11 @@ def _fleet(
     """Point health at a fake fleet: both rungs up, with fresh matching heartbeats."""
     monkeypatch.setattr(health, "loop_running", lambda: sister_running)
     monkeypatch.setattr(health, "brain_running", lambda: brain_running)
-    monkeypatch.setattr(health.channel, "head_commit", lambda: "head1111")
+    # The drift baseline is the REMOTE (#739, AO-GR-25) — the local checkout is
+    # deliberately left pinned to an unrelated commit to prove health does not
+    # consult it.
+    monkeypatch.setattr(health.channel, "head_commit", lambda: "localstale")
+    monkeypatch.setattr(health.channel, "remote_head_commit", lambda: "head1111")
     sister_path = tmp_path / "sister.heartbeat.json"
     brain_path = tmp_path / "brain.heartbeat.json"
     sister_path.write_text(json.dumps(sister_beat if sister_beat is not None else _beat()), encoding="utf-8")
@@ -82,6 +86,29 @@ def test_evaluate_is_degraded_when_a_heartbeat_is_stale(tmp_path, monkeypatch):
     level, reasons = health.evaluate(30.0, tmp_path / "claims.jsonl")
     assert level == health.DEGRADED
     assert any("sister" in r and "stale" in r for r in reasons)
+
+
+def test_evaluate_is_degraded_when_a_rung_is_stale_to_the_remote(tmp_path, monkeypatch):
+    """#739: health must measure drift against origin/master, not the checkout.
+
+    The local checkout equals the rung's commit (the measured trap); the remote is
+    ahead. Health must NOT read healthy.
+    """
+    _fleet(tmp_path, monkeypatch, brain_beat=_beat(commit="592b132"))
+    monkeypatch.setattr(health.channel, "head_commit", lambda: "592b132")
+    monkeypatch.setattr(health.channel, "remote_head_commit", lambda: "47a068b")
+    level, reasons = health.evaluate(30.0, tmp_path / "claims.jsonl")
+    assert level == health.DEGRADED
+    assert any("47a068b" in r and "brain" in r for r in reasons)
+
+
+def test_evaluate_is_degraded_when_the_baseline_is_unreadable(tmp_path, monkeypatch):
+    """Fail-closed: health must not report healthy on a comparison it cannot make."""
+    _fleet(tmp_path, monkeypatch)
+    monkeypatch.setattr(health.channel, "remote_head_commit", lambda: "unknown")
+    level, reasons = health.evaluate(30.0, tmp_path / "claims.jsonl")
+    assert level == health.DEGRADED
+    assert any("CANNOT ASSESS DRIFT" in r for r in reasons)
 
 
 def test_evaluate_is_healthy_when_idle_and_no_slog_exists(tmp_path, monkeypatch):
