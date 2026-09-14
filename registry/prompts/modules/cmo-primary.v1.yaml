@@ -1,0 +1,22 @@
+taskType: cmo-primary
+version: v1
+description: Marketing and sales automation prompt for webhook cache-key deduplication, registered-template injection and multi-platform campaign distribution.
+modelTierHint: med
+modelFamilyHint: flash/MED
+status: published
+parameters:
+  temperature: 0.3
+enforcement:
+  policyId: workbook-webhook-caching
+  action: workbook.webhook
+  attribute: webhook.cacheable
+  rule: Webhook caching with cache-key deduplication and NEPQ template injection.
+provenance:
+  - "kushin77/agent-orchestrator issue #614 Tab 3 (Master AI Prompt Templates: CMO - Marketing & Sales Automation; DSV4PMax / DSV4FNone Tier 2-3; Pillar 'Skill Studio & Tasks')"
+  - "kushin77/agent-orchestrator issue #631 (EPIC: Paperclip enterprise-workbook four-pillar delta; work item workbook-8)"
+  - "kushin77/agent-orchestrator issue #636 (the five workbook mechanical rules as policy ids; guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml)"
+  - "kushin77/agent-orchestrator issue #632 (C-suite PersonaCard cmo.yaml; systemPromptRef cmo/primary@v1 and the workbook tier ladder)"
+bodyRefs:
+  system: ../bodies/cmo-primary.v1.system.md
+  user: ../bodies/cmo-primary.v1.user.md
+outputSchema: ../output-schemas/cmo-primary.schema.json

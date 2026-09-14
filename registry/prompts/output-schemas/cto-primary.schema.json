@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/cto-primary.schema.json",
+  "title": "CtoPrimaryOutput",
+  "description": "Output contract for the cto-primary prompt module (workbook-8, source workbook issue #614 Tab 3). `diagrams` records the draw.io MCP declaration enforced by policy workbook-drawio-mcp-diagramming; `impactedModules` records the cross-repository AST map result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision",
+    "diagrams",
+    "impactedModules",
+    "prTriage",
+    "blockedBy",
+    "summary"
+  ],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "The architectural decision, stated as a decision rather than an option."
+    },
+    "diagrams": {
+      "type": "array",
+      "description": "Diagram declarations rendered through the draw.io MCP server.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "format",
+          "mcpTool"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "drawio"
+            ]
+          },
+          "mcpTool": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "The draw.io MCP tool invoked to render the topology."
+          }
+        }
+      }
+    },
+    "impactedModules": {
+      "type": "array",
+      "description": "Modules located through the cross-repository AST index map.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prTriage": {
+      "type": "array",
+      "description": "Open pull requests routed to the lane that owns them.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pr",
+          "lane",
+          "action"
+        ],
+        "properties": {
+          "pr": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "lane": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "request_changes",
+              "hold"
+            ]
+          }
+        }
+      }
+    },
+    "blockedBy": {
+      "type": "array",
+      "description": "Escalated blocking dependencies; each names the ticket that unblocks it.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ticket",
+          "reason"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One-paragraph architecture summary."
+    }
+  }
+}

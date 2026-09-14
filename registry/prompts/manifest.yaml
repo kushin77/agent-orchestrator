@@ -1,5 +1,17 @@
 schema: prompt-manifest/v1
 taskTypes:
+  ceo-primary:
+    pinned: v1
+    published:
+    - digest: sha256:3dc0baa38b53cd34b138ccb54cfc8323be99f600933cc94bc5edee07379d833d
+      publishedAt: '2026-09-14T23:33:09+00:00'
+      version: v1
+  cfo-primary:
+    pinned: v1
+    published:
+    - digest: sha256:98d2a569ad615d2788166a29f9abe126c70b347dc898728776a1f010e15b9101
+      publishedAt: '2026-09-14T23:33:10+00:00'
+      version: v1
   classify-route:
     pinned: v2
     published:
@@ -9,6 +21,12 @@ taskTypes:
     - digest: sha256:161b4b06f943ff1a011e3ccfbb124e9fe995231783612d2c639ab2d865706b56
       publishedAt: '2026-09-08T18:04:47+00:00'
       version: v2
+  cmo-primary:
+    pinned: v1
+    published:
+    - digest: sha256:fbf8db354325f99bd8895e8052ca3578d2697d9a7d08b0adcde1ee3c31999a18
+      publishedAt: '2026-09-14T23:33:10+00:00'
+      version: v1
   code-author:
     pinned: v1
     published:
@@ -20,6 +38,18 @@ taskTypes:
     published:
     - digest: sha256:8bdd1267964b8c52262de66cf099aba42d41ded020781ffe0050eb038dbc937b
       publishedAt: '2026-09-08T18:04:47+00:00'
+      version: v1
+  coo-primary:
+    pinned: v1
+    published:
+    - digest: sha256:1f95cd0bc7d1cfb6e02b42daa0265db5822869f6c881c47e31de920e6612f04d
+      publishedAt: '2026-09-14T23:33:10+00:00'
+      version: v1
+  cto-primary:
+    pinned: v1
+    published:
+    - digest: sha256:5d4e83bf9c8e15d5c0ed8408521615fd43689b7da9fe7c146eb024352519b41c
+      publishedAt: '2026-09-14T23:33:10+00:00'
       version: v1
   summarize:
     pinned: v1

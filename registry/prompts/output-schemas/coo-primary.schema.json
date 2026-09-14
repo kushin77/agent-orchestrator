@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/coo-primary.schema.json",
+  "title": "CooPrimaryOutput",
+  "description": "Output contract for the coo-primary prompt module (workbook-8, source workbook issue #614 Tab 3). `stateUpdates` records the cached external state machine synced by policy workbook-external-state-caching; `pacingDeltas` records the mechanical Prometheus delta comparison.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stateUpdates",
+    "pacingDeltas",
+    "stalledItems",
+    "summary"
+  ],
+  "properties": {
+    "stateUpdates": {
+      "type": "array",
+      "description": "Ticket state transitions applied to the cached external state; each cites the cause.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ticket",
+          "from",
+          "to",
+          "cause"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "cause": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "pacingDeltas": {
+      "type": "array",
+      "description": "The measured before/after delta per pacing metric and its threshold comparison.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "before",
+          "after",
+          "threshold",
+          "within"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "before": {
+            "type": "number"
+          },
+          "after": {
+            "type": "number"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "within": {
+            "type": "boolean",
+            "description": "Whether the delta stays within its threshold."
+          }
+        }
+      }
+    },
+    "stalledItems": {
+      "type": "array",
+      "description": "Unfinished work reported on this pass. Never idle: an item is reported, not parked.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ticket",
+          "ageMinutes"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string"
+          },
+          "ageMinutes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One-paragraph pacing summary."
+    }
+  }
+}

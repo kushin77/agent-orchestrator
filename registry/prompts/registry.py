@@ -20,12 +20,16 @@ Design (see README.md for the full contract):
   unregistered taskTypes** (governance: no unversioned ad-hoc prompts).
 - ``render_prompt`` substitutes template variables into the frozen bodies and
   rejects any leftover ``{{...}}`` placeholders.
+- ``publish`` runs the **regression-eval gate** (``evals.py``) before it writes
+  the manifest: a module whose eval cases fail, or which has no cases, cannot
+  be frozen.
 
 Usage (from the repo root):
 
     python3 registry/prompts/registry.py status
     python3 registry/prompts/registry.py resolve classify-route
     python3 registry/prompts/registry.py render classify-route --var input="..."
+    python3 registry/prompts/registry.py evals ceo-primary v1
     python3 registry/prompts/registry.py governance seed/call-plan.yaml
 """
 
@@ -45,6 +49,16 @@ try:
     import yaml  # type: ignore
 except ImportError as exc:  # pragma: no cover
     sys.exit(f"registry: missing dependency ({exc}); need jsonschema + PyYAML")
+
+# The regression-eval gate is co-located in this package (evals.py imports this
+# module's sibling and nothing else). Guarded so the registry still loads if a
+# consumer vendors the module without the harness; the gate then fails *closed*
+# rather than silently skipping the evals (a gate that cannot fail is a
+# formality).
+try:
+    import evals  # type: ignore
+except ImportError:  # pragma: no cover
+    evals = None  # type: ignore[assignment]
 
 PKG_DIR = Path(__file__).resolve().parent
 MODULES_DIR = PKG_DIR / "modules"
@@ -208,8 +222,24 @@ class PromptRegistry:
         return module
 
     # ---------------------------------------------------------------- publish
-    def publish(self, task_type: str, version: str) -> str:
+    def publish(
+        self,
+        task_type: str,
+        version: str,
+        *,
+        skip_evals: bool = False,
+    ) -> str:
         """Freeze and pin a prompt version, making it resolvable at runtime.
+
+        The module must first pass its **regression evals** (``evals.py``): a
+        prompt version whose cases fail, or which carries no cases at all, is
+        refused before anything is written to the manifest. The eval gate runs
+        before the immutability check so a failing candidate can never be
+        frozen, and is re-runnable (the manifest is untouched on refusal).
+
+        ``skip_evals`` exists for the schema/immutability tests that register
+        synthetic modules; it is **not** a supported route for a real module and
+        is never used by the CLI.
 
         Raises VersionAlreadyPublishedError if (taskType, version) is already
         published - a published version is immutable.
@@ -229,6 +259,8 @@ class PromptRegistry:
             raise VersionAlreadyPublishedError(
                 f"{task_type}@{version} is already published and immutable"
             )
+        if not skip_evals:
+            self._check_evals(task_type, version)
         digest = self._digest(module)
         ts = self._manifest["taskTypes"].setdefault(
             task_type, {"pinned": None, "published": []}
@@ -239,6 +271,31 @@ class PromptRegistry:
         ts["pinned"] = version
         self._save_manifest()
         return digest
+
+    def _check_evals(
+        self, task_type: str, version: str, path: Optional[Path] = None
+    ) -> None:
+        """Refuse to publish a module whose regression evals do not pass.
+
+        The eval cases are read from **this registry's own root** (so a scratch
+        tree's cases are what gate its publishes, never the tracked checkout's)
+        unless an explicit path is supplied.
+
+        Fails **closed**: if the eval harness cannot be loaded, publication is
+        refused rather than allowed with the gate silently absent.
+        """
+        if evals is None:  # pragma: no cover - guarded import
+            raise PromptModuleError(
+                "regression-eval gate unavailable: evals harness could not be "
+                "imported, refusing to publish without it"
+            )
+        if path is None:
+            path = self.root / "evals" / "eval-cases.yaml"
+        prompt_id = f"{task_type}@{version}"
+        try:
+            evals.require_ok(prompt_id, path=path)
+        except evals.EvalGateError as exc:
+            raise PromptModuleError(f"cannot publish {prompt_id}: {exc}") from exc
 
     def pin(self, task_type: str, version: str) -> None:
         """Point runtime resolution at an already-published version (rollback)."""
@@ -413,6 +470,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_publish.add_argument("taskType")
     p_publish.add_argument("version")
 
+    p_evals = sub.add_parser(
+        "evals", help="run the regression-eval gate for a module version"
+    )
+    p_evals.add_argument("taskType")
+    p_evals.add_argument("version")
+    p_evals.add_argument("--data", default=None, help="eval cases YAML path")
+
     p_pin = sub.add_parser("pin", help="re-pin runtime resolution to a published version")
     p_pin.add_argument("taskType")
     p_pin.add_argument("version")
@@ -454,6 +518,23 @@ def _dispatch(registry: PromptRegistry, args: argparse.Namespace) -> int:
     if args.command == "publish":
         digest = registry.publish(args.taskType, args.version)
         print(f"published {args.taskType}@{args.version} (digest {digest})")
+        return 0
+    if args.command == "evals":
+        if evals is None:  # pragma: no cover - guarded import
+            print("prompt-registry: eval harness unavailable", file=sys.stderr)
+            return 1
+        path = Path(args.data) if args.data else None
+        try:
+            report = evals.require_ok(
+                f"{args.taskType}@{args.version}", path=path
+            )
+        except evals.EvalGateError as exc:
+            print(f"evals: FAIL {exc}", file=sys.stderr)
+            return 1
+        print(
+            f"evals: PASS {report.prompt_id} "
+            f"({report.passed} of {report.total} case(s))"
+        )
         return 0
     if args.command == "pin":
         registry.pin(args.taskType, args.version)
