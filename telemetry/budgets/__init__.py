@@ -31,12 +31,16 @@ Public surface
   (kill switch -> quota -> budget) that the gateway/engine lanes wire in.
 - ``exporter`` — ``BudgetStateExporter``: machine-readable budget/quota/SLO
   state export for dashboards and alerting.
+- ``alerts`` — ``SpendAlertEvaluator``: the warning/alert thresholds behind
+  the spend alerts (soft vs hard cap, honest NO_DATA when the feed has never
+  metered the tenant) consumed by the FinOps single-pane (issue #341).
 - ``chargeback`` — ``ChargebackReporter``: per-tenant chargeback lines for
   tenant billing from the metering feed.
 - ``cli`` — ``python3 -m telemetry.budgets.cli <cmd>``.
 """
 
 from telemetry.budgets import (  # noqa: F401
+    alerts,
     audit,
     budget,
     chargeback,

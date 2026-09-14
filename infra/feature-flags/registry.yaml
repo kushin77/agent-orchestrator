@@ -117,3 +117,15 @@ surfaces:
       GET /api/portal/surfaces. Offline: the pinned document is on disk, so the
       route needs no network egress. Unblocks the shell's Settings→Modules page,
       which had nothing to render while kushin77/CMR#708 was open.
+  finops_reports:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      FinOps single-pane reports (issue #341): live per-tenant and per-agent
+      cost/budget/usage from telemetry/metering + telemetry/budgets, with
+      pricing-tier cost_details, soft vs hard cap semantics, spend alerts on
+      warning/alert thresholds and an honest NO_DATA path. Served read-only at
+      GET /api/finops/overview, GET /api/finops/report?tenant=<id> and
+      GET /api/finops/alerts. Offline (no network egress).

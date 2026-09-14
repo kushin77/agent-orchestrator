@@ -1,0 +1,96 @@
+{
+  "_comment": [
+    "Real board-125 children, captured from the live board on 2026-09-13 via",
+    "`gh api repos/kushin77/agent-orchestrator/issues/<n>` for n in 125..137.",
+    "number/title/state are verbatim. Each child's body is its real `## Repo`",
+    "declaration block as it appears on the live board, which is the pattern this",
+    "fixture exists to pin; the live bodies additionally carry a legacy",
+    "`Parent: #125` line and a `## Finding summary` section, which are covered by",
+    "that check's own tests and are deliberately not repeated here so this",
+    "fixture's count isolates the `foreign-repo-declaration` check. Issue #125",
+    "(the epic) carries its real `## Scope` section, so the fixture also proves",
+    "the epic itself is never flagged.",
+    "States are as on the live board: #130 is CLOSED (resolved history, not a",
+    "finding); the other twelve children are open; #125 is open."
+  ],
+  "items": [
+    {
+      "number": 125,
+      "title": "EPIC: CMR vendor compliance remediation backlog (all violators)",
+      "state": "open",
+      "body": "## Scope\nClose the bi-directional vendor compliance gaps across the CMR fleet: governance drift, onboarding gate failures, missing guardrails, missing Dependabot, missing branch protection, and module dependency pin drift.\n"
+    },
+    {
+      "number": 126,
+      "title": "CMR vendor compliance gap: saas-rbac",
+      "state": "open",
+      "body": "## Repo\nsaas-rbac\n"
+    },
+    {
+      "number": 127,
+      "title": "CMR vendor compliance gap: github-workflow",
+      "state": "open",
+      "body": "## Repo\ngithub-workflow\n"
+    },
+    {
+      "number": 128,
+      "title": "CMR vendor compliance gap: shared-temporal",
+      "state": "open",
+      "body": "## Repo\nshared-temporal\n"
+    },
+    {
+      "number": 129,
+      "title": "CMR vendor compliance gap: Shared_Integrations",
+      "state": "open",
+      "body": "## Repo\nShared_Integrations\n"
+    },
+    {
+      "number": 130,
+      "title": "CMR vendor compliance gap: shared-frontend",
+      "state": "closed",
+      "body": "## Repo\nshared-frontend\n"
+    },
+    {
+      "number": 131,
+      "title": "CMR vendor compliance gap: shared-governance",
+      "state": "open",
+      "body": "## Repo\nshared-governance\n"
+    },
+    {
+      "number": 132,
+      "title": "CMR vendor compliance gap: shared-services",
+      "state": "open",
+      "body": "## Repo\nshared-services\n"
+    },
+    {
+      "number": 133,
+      "title": "CMR vendor compliance gap: googleworkspace",
+      "state": "open",
+      "body": "## Repo\ngoogleworkspace\n"
+    },
+    {
+      "number": 134,
+      "title": "CMR vendor compliance gap: SharedFeatures",
+      "state": "open",
+      "body": "## Repo\nSharedFeatures\n"
+    },
+    {
+      "number": 135,
+      "title": "CMR vendor compliance gap: ERP-CRM",
+      "state": "open",
+      "body": "## Repo\nERP-CRM\n"
+    },
+    {
+      "number": 136,
+      "title": "CMR vendor compliance gap: code-indexing",
+      "state": "open",
+      "body": "## Repo\ncode-indexing\n"
+    },
+    {
+      "number": 137,
+      "title": "CMR vendor compliance gap: diagrams",
+      "state": "open",
+      "body": "## Repo\ndiagrams\n"
+    }
+  ]
+}

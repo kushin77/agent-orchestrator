@@ -31,6 +31,7 @@ from portal.server.controls import (
     PolicyStateStore,
     build_control_policy_map,
 )
+from portal.server.finops import FinOpsReports
 from portal.server.fleet import FleetProjection
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
@@ -105,6 +106,7 @@ class ConsoleApplication:
         allowlist_only: bool = False,
         fleet_projection: Optional[FleetProjection] = None,
         portal_surfaces: Optional[PortalSurfacesFeed] = None,
+        finops_reports: Optional[FinOpsReports] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -134,6 +136,12 @@ class ConsoleApplication:
             portal_surfaces
             if portal_surfaces is not None
             else PortalSurfacesFeed(repo_root=self.repo_root)
+        )
+        # The FinOps single-pane surface (issue #341) — feature-flag-gated OFF.
+        self.finops = (
+            finops_reports
+            if finops_reports is not None
+            else FinOpsReports(repo_root=self.repo_root)
         )
 
     # -- request pipeline ---------------------------------------------------
@@ -272,6 +280,16 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.portal_surfaces)",
             )
 
+        # The FinOps single-pane surface ships the same way (GR-5), also before
+        # authN: an unpromoted surface must be invisible, not merely protected.
+        if parts[0] == "finops" and not self.finops.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the FinOps reports surface is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.finops_reports)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -279,6 +297,8 @@ class ConsoleApplication:
                 return self._route_fleet(parts, method, query)
             if parts[0] == "portal":
                 return self._route_portal(parts, method)
+            if parts[0] == "finops":
+                return self._route_finops(parts, principal, method, query)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -347,6 +367,58 @@ class ConsoleApplication:
         if surface == ["surfaces"]:
             return self._ok(self.surfaces.document())
         raise ApiError(404, "not_found", f"no such portal surface: {'/'.join(surface)}")
+
+    # -- finops single-pane (issue #341) ------------------------------------
+    def _route_finops(
+        self,
+        parts: list[str],
+        principal: Principal,
+        method: str,
+        query: dict[str, str],
+    ) -> Response:
+        """The FinOps single-pane reports (issue #341).
+
+        GET-only. Every figure is delegated to the metering/budgets lanes
+        through ``FinOpsReports`` — this route owns authorization and transport
+        shape only, and never restates a cost, a threshold or a verdict. Like
+        every other tenant surface it is scoped: a principal only ever sees the
+        tenants it may read (``budget:read``).
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the finops surface is GET only")
+        surface = parts[1:]
+        if surface == ["overview"]:
+            return self._ok(self.finops.overview(self._finops_readable(principal)))
+        if surface == ["report"]:
+            tenant_id = (query.get("tenant") or "").strip()
+            if not tenant_id:
+                raise ApiError(400, "invalid_request", "tenant is required")
+            self._require_finops_tenant(tenant_id)
+            self._require(principal, tenant_id, "budget:read")
+            return self._ok(self.finops.report(tenant_id))
+        if surface == ["alerts"]:
+            tenant_id = (query.get("tenant") or "").strip()
+            if tenant_id:
+                self._require_finops_tenant(tenant_id)
+                self._require(principal, tenant_id, "budget:read")
+                return self._ok(self.finops.alerts_report([tenant_id]))
+            return self._ok(self.finops.alerts_report(self._finops_readable(principal)))
+        raise ApiError(404, "not_found", f"no such finops surface: {'/'.join(surface)}")
+
+    def _finops_readable(self, principal: Principal) -> list[str]:
+        """The FinOps tenants a principal may read (scope gate + ``budget:read``)."""
+        return [
+            tenant
+            for tenant in self.authorizer.scope_tenants(
+                principal, self.finops.tenant_ids()
+            )
+            if self.authorizer.allow(principal, tenant, "budget:read")
+        ]
+
+    def _require_finops_tenant(self, tenant_id: str) -> None:
+        """Fail closed on a tenant the live stores do not know (no probing)."""
+        if not self.finops.known_tenant(tenant_id):
+            raise ApiError(404, "unknown_tenant", f"no such tenant {tenant_id!r}")
 
     # -- session ------------------------------------------------------------
     def _require_session(self, cookies: dict[str, str]) -> tuple[Principal, dict[str, Any]]:
