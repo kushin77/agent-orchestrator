@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/code-author.schema.json",
+  "title": "CodeAuthorOutput",
+  "description": "Output contract for the code-author prompt module. The model must return exactly this JSON shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "files",
+    "diffSummary",
+    "testsAdded"
+  ],
+  "properties": {
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "purpose"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Repository-relative path of a file the change touches."
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Why this file is part of the change."
+          }
+        }
+      },
+      "description": "One entry per file the change touches."
+    },
+    "diffSummary": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "What changed and why."
+    },
+    "testsAdded": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "description": "Tests covering the new behavior; empty means uncovered."
+    }
+  }
+}

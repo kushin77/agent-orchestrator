@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/test-run.schema.json",
+  "title": "TestRunOutput",
+  "description": "Output contract for the test-run prompt module. The model must return exactly this JSON shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "checks",
+    "evidence"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "description": "Overall verification verdict: pass only when every reported check passed."
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "result"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "The command or gate that was run."
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "skip"
+            ],
+            "description": "Observed result for this check."
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "The decisive observed output for this check."
+          }
+        }
+      },
+      "description": "One entry per command or gate that was run."
+    },
+    "evidence": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "The exact command line(s) plus the decisive observed output."
+    }
+  }
+}
