@@ -128,7 +128,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -192,6 +192,12 @@ chronological-dispatch:
 ## audit always runs its own mutants, so it cannot pass vacuously
 issue-claims:
 	@bash scripts/check-issue-claims.sh
+
+## epic-focus — the active-epic resolver (epic #707, lane F1/#716): the fleet
+## focuses on exactly ONE epic; the check refuses a missing resolver and drives
+## the resolver + focus-schema self-control mutants, so it cannot pass vacuously
+epic-focus:
+	@bash scripts/check-epic-focus.sh
 
 ## issue-template — the fleet issue-brief contract (issue #165): every required
 ## field present and the FinOps vocabularies canonical; a dropped field fails

@@ -31,6 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import claims  # noqa: E402
+import focus as focus_mod  # noqa: E402
 import order  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 
@@ -171,6 +172,53 @@ def cmd_status(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_focus(args: argparse.Namespace) -> int:
+    """Print the active epic, its open children and the pooled set (epic #707, F1).
+
+    With ``--self-control`` it first runs the resolver/schema mutants: a resolver
+    that cannot fail is a formality, so the gate drives this mode.
+    """
+    if args.self_control:
+        problems = focus_mod.self_control()
+        if problems:
+            print(f"focus: FAIL ({len(problems)} self-control problem(s))", file=sys.stderr)
+            for problem in problems:
+                print(f"  - {problem}", file=sys.stderr)
+            return EXIT_NOT_OK
+        print("focus: OK (self-control mutants all rejected)")
+
+    snapshot_path = Path(args.snapshot)
+    if not snapshot_path.exists():
+        print(f"focus: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    snapshot = _load_snapshot(snapshot_path)
+    try:
+        focus = focus_mod.load(args.focus)
+    except focus_mod.FocusInvalid as exc:
+        print(f"focus: NOT-OK — {exc}", file=sys.stderr)
+        return EXIT_NOT_OK
+    epic = focus_mod.active(snapshot, args.focus)
+    if epic is None:
+        print("active_epic: <none> — the board has no workable epic")
+    else:
+        print(f"active_epic: #{epic.number} {epic.title}")
+    epic_number = epic.number if epic is not None else None
+    children = focus_mod.open_children(snapshot, epic_number)
+    listed = " ".join(f"#{issue.number}" for issue in children)
+    print(f"open children ({len(children)}): {listed or '<none>'}")
+    pool = focus_mod.pooled(snapshot, epic_number)
+    head = " ".join(f"#{issue.number}" for issue in pool[:20])
+    if len(pool) > 20:
+        head += " ..."
+    print(f"pooled ({len(pool)}): {head or '<none>'}")
+    if focus is not None:
+        print(
+            f"wave_cap: {focus.wave_cap}  max_agents: {focus.max_agents}  "
+            f"activated_at: {focus.activated_at}"
+        )
+    return EXIT_OK
+
+
 def cmd_reap(args: argparse.Namespace) -> int:
     """Recover claims wedged by dead agents so their issues can be dispatched again."""
     reaped = claims.reap(
@@ -262,6 +310,14 @@ def build_parser() -> argparse.ArgumentParser:
     add_paths(held)
     held.add_argument("--issue", type=int, required=True)
     held.set_defaults(func=cmd_held)
+
+    focus_cmd = sub.add_parser("focus", help="show the active epic, its children and the pooled set")
+    add_paths(focus_cmd)
+    focus_cmd.add_argument("--focus", default=str(focus_mod.DEFAULT_PATH))
+    focus_cmd.add_argument(
+        "--self-control", action="store_true", help="also prove the resolver and schema can fail"
+    )
+    focus_cmd.set_defaults(func=cmd_focus)
 
     reap = sub.add_parser("reap", help="release claims wedged by dead agents past a threshold")
     add_paths(reap)
