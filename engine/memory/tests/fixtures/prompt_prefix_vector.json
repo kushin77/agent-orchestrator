@@ -1,0 +1,73 @@
+{
+  "note": "Pre-change byte-vector captured from origin/master BEFORE editing engine/memory/prompt_cache.py (issue #477). The absent-pack path must reproduce these bytes exactly: any drift would invalidate every existing provider cache entry.",
+  "captured_from_sha": "b4c9fb58d99f8593f34724c25da6371f1944ef54",
+  "capture_command": "python3 /tmp/ao477.genvec.py",
+  "logical_set_render_sha256": "3c537c628d97338d66ad78df5d201d9f6f34a011391da948d55f7798924c4231",
+  "cases": [
+    {
+      "name": "plain",
+      "system_text": "You are a careful release-engineering agent.",
+      "memory_block": "- [tenant:semantic] deploy: ships weekly",
+      "user_delta": "What is the cadence?",
+      "min_static_tokens": 0,
+      "static_text": "You are a careful release-engineering agent.\n\n- [tenant:semantic] deploy: ships weekly",
+      "static_sha256": "22f1d1f550ab745d7aa92176962dfd30eec514f0b4f5a6ee362a8ca049d4b347",
+      "delta_text": "What is the cadence?",
+      "delta_sha256": "397b7e5a201d49ad42f40fbc3b59085ff931c7fd8e07b0bf20bb6911875179b8",
+      "render": "You are a careful release-engineering agent.\n\n- [tenant:semantic] deploy: ships weekly\nWhat is the cadence?",
+      "render_sha256": "f9fb3fd8742eab5368b9c273a3369cd1bc3202a502ee7e9ff797fb6941d22f62"
+    },
+    {
+      "name": "padded",
+      "system_text": "SYS",
+      "memory_block": "- [tenant:semantic] deploy: ships weekly",
+      "user_delta": "USER",
+      "min_static_tokens": 40,
+      "static_text": "SYS\n\n- [tenant:semantic] deploy: ships weekly\nMemory is scoped knowledge from this tenant's agent org.\nRetrieved memories are ordered and deduplicated deterministically.",
+      "static_sha256": "c6dd1aa31ed3523d2d9ae93c699e67ffcc20973ffdafb7bf5ac2b0f994d8ba72",
+      "delta_text": "USER",
+      "delta_sha256": "92b7b421992ef490f3b75898ec0e511f1a5c02422819d89719b20362b023ee4f",
+      "render": "SYS\n\n- [tenant:semantic] deploy: ships weekly\nMemory is scoped knowledge from this tenant's agent org.\nRetrieved memories are ordered and deduplicated deterministically.\nUSER",
+      "render_sha256": "876918a991eabbdf3bb7b6e195f58f5f79417c3a0af7d2cfec4fa99a045f53cd"
+    },
+    {
+      "name": "empty_memory",
+      "system_text": "You are a helpful ops agent.",
+      "memory_block": "",
+      "user_delta": "hello",
+      "min_static_tokens": 0,
+      "static_text": "You are a helpful ops agent.",
+      "static_sha256": "b7a98791d81b809df5b826caafed07217c0b63cdcb3477a99a20c7e68078055a",
+      "delta_text": "hello",
+      "delta_sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      "render": "You are a helpful ops agent.\nhello",
+      "render_sha256": "5fb6da9e7d6f0bf3392bf25f64b1f75d6400934f8675675e6fa6940a1315297a"
+    },
+    {
+      "name": "multi_entry",
+      "system_text": "You are a careful release-engineering agent.",
+      "memory_block": "- [session:memory] todo: ship release today\n- [agent:memory] style: typed returns preferred\n- [tenant:memory] deploy: deploy pipeline ships weekly",
+      "user_delta": "When do we ship?",
+      "min_static_tokens": 0,
+      "static_text": "You are a careful release-engineering agent.\n\n- [session:memory] todo: ship release today\n- [agent:memory] style: typed returns preferred\n- [tenant:memory] deploy: deploy pipeline ships weekly",
+      "static_sha256": "66cf550bca537f787fc3fb9e618a2b92062ce6ef701b6fcb41d0b8ba4746a484",
+      "delta_text": "When do we ship?",
+      "delta_sha256": "89aaa03d0783cfe33df7d5fee56ccdf5e960f28a68e1ccd8dbd353bfc1b18d25",
+      "render": "You are a careful release-engineering agent.\n\n- [session:memory] todo: ship release today\n- [agent:memory] style: typed returns preferred\n- [tenant:memory] deploy: deploy pipeline ships weekly\nWhen do we ship?",
+      "render_sha256": "a063c30b59976de53864ec3dd289280ad025439e8ba3f59cc108d403b18848fa"
+    },
+    {
+      "name": "unicode",
+      "system_text": "Agente de operaciones.",
+      "memory_block": "- [tenant:semantic] café: résumé é prêt",
+      "user_delta": "¿Cuándo?",
+      "min_static_tokens": 0,
+      "static_text": "Agente de operaciones.\n\n- [tenant:semantic] café: résumé é prêt",
+      "static_sha256": "dc9ddd917ef8514a89308910dd7d6d82a3041877459b95afbc597e98c441b851",
+      "delta_text": "¿Cuándo?",
+      "delta_sha256": "7e79e9dc6061bee04881418cc7b67e67151f425118525106eb1880860e35d9a5",
+      "render": "Agente de operaciones.\n\n- [tenant:semantic] café: résumé é prêt\n¿Cuándo?",
+      "render_sha256": "64bfb9a137a21a7ec016aca1555006835231262bd05c249c7ff207f6d581bf2b"
+    }
+  ]
+}
