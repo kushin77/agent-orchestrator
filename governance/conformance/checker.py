@@ -103,12 +103,29 @@ def load_policy(path: Path) -> Policy:
     iac = mandates.get("iac") if isinstance(mandates, Mapping) else None
     infra_paths = tuple(str(p) for p in ((iac or {}).get("infra_paths") or INFRA_PREFIXES))
 
+    filing = raw.get("filing") or {}
+    if not isinstance(filing, Mapping):
+        raise PolicyUnavailable("policy %s declares `filing` as a non-mapping" % path)
+    filing_default_class = str(filing.get("default_class") or "")
+    if filing_default_class and filing_default_class not in ladder:
+        # The filing path derives a *class* from this value; one that names no rung
+        # would make every filing already-unconformant (issue #320).
+        raise PolicyUnavailable(
+            "filing.default_class %r is not a rung of the ladder" % filing_default_class
+        )
+    filing_defaults = {
+        str(name): str(value)
+        for name, value in (filing.get("defaults") or {}).items()
+    }
+
     return Policy(
         ladder=ladder,
         required=tuple(str(name) for name in raw.get("required", ()) or ()),
         expectations=expectations,
         prefixed=tuple(str(name) for name in raw.get("prefixed", ()) or ()),
         infra_paths=infra_paths,
+        filing_default_class=filing_default_class,
+        filing_defaults=filing_defaults,
     )
 
 

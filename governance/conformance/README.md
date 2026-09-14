@@ -50,12 +50,50 @@ python3 governance/conformance/cli.py check --milestone "M24 - ..." --strict
 # The current diff against the mandates
 python3 governance/conformance/cli.py change-set --base origin/master
 
+# The filing path derives declaring labels and refuses when it cannot
+python3 governance/conformance/cli.py filing-check
+
+# The supported hand-run filing path: the labels are derived for you
+python3 governance/conformance/cli.py file --title "..." --body "..." --dry-run
+
 # The declared policy
 python3 governance/conformance/cli.py policy
 ```
 
-`make conformance` runs the check; `make verify` runs it as the 12th check via
-`scripts/check-conformance.sh`.
+`make conformance` runs the board check *and* the filing self-control;
+`make verify` runs it as the 12th check via `scripts/check-conformance.sh`.
+
+## The filing path — prevention, not repair (issue #320)
+
+A gate that only refuses an unclassified issue *after* it exists leaves the board
+wrong until someone notices. The filing path is therefore part of the standard:
+
+* Every code path that files an issue derives its declaring labels from
+  [`policy.yaml`](policy.yaml) — the `class` from the filing's own declaration or
+  `filing.default_class`, the companions (`type`, `priority`, `area`) and the
+  declared class's expectations from `filing.defaults` — and passes them to
+  `gh issue create` ([`filing.py`](filing.py)).
+* A filing that **cannot** derive one of those labels is REFUSED
+  (`FilingRefused`) *before* the command is built: nothing is filed, so nothing has
+  to be repaired afterwards. The refusal names itself and points at the issue that
+  owns prevention (#320) and the one that owns the legacy repair (#174).
+* `fleet/brain.py` files micro-task issues only through that seam and reports the
+  refusal to the operator instead of filing an issue the gate rejects later.
+* `cli.py file` is the supported hand-run path, for the same reason.
+
+`filing-check` is the self-control the gate runs (GR-12: a control whose refusal
+path cannot be reached is a formality). It provokes, for real:
+
+| Expectation | What is provoked |
+|---|---|
+| labels derived from the policy | a filing that declares nothing still carries every declaring label |
+| labels passed to `gh issue create` | every derived label appears as a `--label` pair |
+| refuses a filing with no derivable class | `filing.default_class` removed from the policy |
+| refuses a class outside the ladder | a filing declaring `platinum` |
+| refuses an underivable companion | the #297 shape (a class, no `priority:`) |
+| refusal files nothing | the runner is never reached |
+| refusal is explicit | the message names `#320` (prevention) and `#174` (repair) |
+| the fleet's filing path delegates | `fleet/brain.py` builds no `gh issue create` of its own |
 
 ## Calibration (measured 2026-09-13)
 
@@ -84,18 +122,23 @@ Path arguments are repository-relative, which is what git reports.
 
 | File | Role |
 |---|---|
-| [`policy.yaml`](policy.yaml) | the ladder, required metadata, per-class expectations, mandates |
+| [`policy.yaml`](policy.yaml) | the ladder, required metadata, per-class expectations, mandates, filing defaults |
 | [`model.py`](model.py) | ladder, findings, report |
 | [`checker.py`](checker.py) | board and change-set checking |
-| [`cli.py`](cli.py) | check / change-set / policy / report |
+| [`filing.py`](filing.py) | the issue-filing seam: derive the declaring labels, or refuse (#320) |
+| [`cli.py`](cli.py) | check / change-set / filing-check / file / policy / report |
 
 To change the standard, edit [`policy.yaml`](policy.yaml) — it is the single
-declaration of what conformance means. No code change is needed to add a rung or an
-expectation, and a policy naming a rung that does not exist is rejected as malformed.
+declaration of what conformance means. No code change is needed to add a rung, an
+expectation, or a filing default, and a policy naming a rung that does not exist —
+including a `filing.default_class` that is not a rung — is rejected as malformed.
 
 ## Related
 
 - Implements issue #140 (milestone M24), parent #138, blocked-by #139.
+- The filing path (issue #320) derives declaring labels for every filed issue;
+  [#174](https://github.com/kushin77/agent-orchestrator/issues/174) owns repairing
+  the legacy issues that were filed before it.
 - The class ladder and the IaC mandate are declared in
   [`../../GOLDEN-RULES.md`](../../GOLDEN-RULES.md) and
   [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md).
