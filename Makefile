@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -416,6 +416,17 @@ paperclip:
 		bash "$$s"; \
 	done; \
 	echo "paperclip: OK"
+
+## diagrams — the diagrams blueprint consumer surface (EPIC #461, GR-18): the
+## read-only ADR-0017 evidence[] projection gate (#465) and the SSOT
+## declaration-conformance gate (#464), in one shot. Each keeps its OWN name in
+## scripts/verify.sh's checks=() array — this target is for fast local
+## iteration, not a second gate of record. (The declaration gate is
+## CANNOT-ASSESS until vendor/CMR is initialised: git submodule update --init
+## vendor/CMR.)
+diagrams:
+	@bash scripts/check-paperclip-diagrams.sh
+	@bash scripts/check-diagrams-declaration.sh
 
 ## paperclip-auth — cross-boundary auth for the paperclip seam (issue #412,
 ## ADR-0013/ADR-0012): agent identity is minted/verified from the fleet's own
