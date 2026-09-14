@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/docs/contracts/paperclip/heartbeat.schema.json",
+  "title": "Paperclip-ing heartbeat contract (fleet producer -> upstream surface)",
+  "description": "The frozen heartbeat seam between the fleet's rung beats (fleet/monitor.py, fleet/brain.py) and the upstream operator surface (issue #370, ADR-0013). A heartbeat is either an event wake (assigned / commented / unblocked / review-requested) or a scheduled tick; it carries the delta so the consumer does not re-read history, and it ends in durable progress or a named blocker with an owner. See docs/PAPERCLIP-ING-INTEGRATION.md.",
+  "type": "object",
+  "required": ["agent_id", "session_id", "tick", "cadence_seconds", "wake", "outcome", "ts"],
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Agent identity that emitted the beat (fleet: the rung/agent id; upstream: the agent record id)."
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The minted session identity bound to the one issue this agent is working (fleet: AO_SESSION_ID)."
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic tick counter for this agent's run; a scheduled tick advances it, an event wake does not reset it."
+    },
+    "cadence_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The scheduled cadence between ticks (fleet: fleet/monitor.py POLL_SECONDS; the staleness ceiling is fleet/channel.py STALE_HEARTBEAT_SECONDS)."
+    },
+    "wake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cause", "delta"],
+      "description": "Why this beat fired, and the delta it carries so the consumer needs no history re-read.",
+      "properties": {
+        "cause": {
+          "enum": ["assigned", "commented", "unblocked", "review-requested", "scheduled"],
+          "description": "Event wake (assigned / commented / unblocked / review-requested) or scheduled tick."
+        },
+        "delta": {
+          "type": "object",
+          "description": "The change since the previous beat (the upstream wake carries this so the agent does not re-read history)."
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "owner"],
+      "description": "What the beat ends in: durable progress, or a named blocker with an owner.",
+      "properties": {
+        "status": {
+          "enum": ["progress", "blocked"],
+          "description": "progress = durable forward motion; blocked = a named blocker with an owner."
+        },
+        "detail": {
+          "type": "string",
+          "description": "Human-readable summary of the progress made or the blocker named."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The single accountable owner for the next step — the blocker's owner when status is blocked."
+        }
+      }
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of the beat (fleet beats carry the same field)."
+    }
+  }
+}
