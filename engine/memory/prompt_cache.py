@@ -24,6 +24,15 @@ static-first / delta-last block discipline lifted from
 3. ``assemble_prefix`` - place the memory context after the stable system
    block and before the user delta, so the cacheable prefix stays intact and
    only the delta varies per request.
+4. ``ContextPack`` - the *consumption seam* for a pre-fetched
+   ``codeidx.context-pack/v1`` block. Alongside adapting the harvested
+   pattern (above), this module is now a **consumer** of the published vendor
+   contract: ``assemble_prefix`` places a pre-fetched pack as, or ahead of,
+   the locally-derived memory block, so two independently-derived static
+   regions collapse onto **one** shared, cacheable prefix per tenant/repo.
+   The pack is consumed as opaque bytes and never re-derived - the ADR-0018
+   no-re-derivation rule: a shape that exists in a published contract is
+   *consumed, never mirrored*.
 """
 
 from __future__ import annotations
@@ -234,24 +243,137 @@ def _pad_static(text: str, min_tokens: int) -> str:
     return "\n".join(parts)
 
 
+# --------------------------------------------------------------------------- #
+# pre-fetched context-pack consumption (the codeidx contract seam)
+# --------------------------------------------------------------------------- #
+
+#: The published contract this module consumes. ``codeidx.context-pack/v1``
+#: is the *vendor's* schema id - quoted from `kushin77/code-indexing`'s
+#: context-pack story (#106) - not a shape invented here. The machine-readable
+#: envelope is defined by the vendor's consumption contract, which is still
+#: OPEN; until it lands this module ships the seam below plus a recorded
+#: fixture and marks the consumption row ``UNVERIFIED`` in
+#: :data:`CONSUMED_CONTRACTS` rather than guessing a schema.
+CONTEXT_PACK_SCHEMA = "codeidx.context-pack/v1"
+
+#: Consumed-contract register (ADR-0018 decision 3 - a shape that exists in a
+#: published contract is *consumed, never mirrored*). Each row names the
+#: producer, the published contract, and whether this consumer's use of it has
+#: been verified against a landed contract. ``UNVERIFIED`` is an honest state:
+#: the seam and its fixture exist, but the vendor has not published the
+#: contract, so nothing here claims a shape.
+CONSUMED_CONTRACTS = (
+    {
+        "id": CONTEXT_PACK_SCHEMA,
+        "producer": "kushin77/code-indexing",
+        "contract": "kushin77/code-indexing#128",
+        "state": "UNVERIFIED",
+        "note": (
+            "Seam + fixture shipped; the vendor consumption contract is still "
+            "open, so this consumer models no field of the pack - it consumes "
+            "the bytes verbatim and checks only the declared schema id."
+        ),
+    },
+)
+
+#: Schema ids this consumer knows. A pack declaring anything else is refused
+#: by name rather than silently consumed under a shape it does not match.
+_KNOWN_CONTEXT_PACK_SCHEMAS = frozenset({CONTEXT_PACK_SCHEMA})
+
+
+class ContextPackError(PrefixError):
+    """A pre-fetched context pack cannot be consumed as a static block."""
+
+
+@dataclass(frozen=True)
+class ContextPack:
+    """A pre-fetched ``codeidx.context-pack/v1`` block, at the seam.
+
+    This is the **seam**, not a mirror of the vendor's contract (ADR-0018).
+    Exactly two things are interpreted:
+
+    * ``schema`` - the *declared* contract id, checked against
+      :data:`_KNOWN_CONTEXT_PACK_SCHEMAS` so a pack built for an unknown
+      version is refused rather than consumed under a shape it may not match;
+    * the payload's validity *as text* - it must decode as UTF-8 and be
+      non-empty.
+
+    Nothing else about the pack is parsed, modelled or re-derived: the bytes
+    are the consumer's input and are placed into the static region verbatim,
+    so every consumer embedding the same pack shares the same provider prefix.
+    """
+
+    schema: str
+    payload: bytes
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.schema, str) or not self.schema:
+            raise ContextPackError(
+                "context pack must declare a schema id; got {!r}".format(
+                    self.schema))
+        if self.schema not in _KNOWN_CONTEXT_PACK_SCHEMAS:
+            raise ContextPackError(
+                "unknown context-pack schema {!r}; this consumer knows: {}"
+                .format(self.schema,
+                        ", ".join(sorted(_KNOWN_CONTEXT_PACK_SCHEMAS))))
+        if not isinstance(self.payload, (bytes, bytearray, memoryview)):
+            raise ContextPackError(
+                "malformed context pack: payload must be bytes, got {}".format(
+                    type(self.payload).__name__))
+        try:
+            bytes(self.payload).decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ContextPackError(
+                "malformed context pack: payload is not UTF-8 text ({})"
+                .format(exc)) from None
+        if not bytes(self.payload).decode("utf-8").strip():
+            raise ContextPackError(
+                "empty context pack: schema {!r} declares no bytes; an empty "
+                "pack is a producer fault, not an absent one - pass "
+                "context_pack=None to mean absent".format(self.schema))
+
+    @property
+    def text(self) -> str:
+        """The pack bytes decoded verbatim (never normalised, never parsed)."""
+        return bytes(self.payload).decode("utf-8")
+
+
 def assemble_prefix(system_text: str, memory_block: str,
                     user_delta: str, *, min_static_tokens: int = 0,
-                    strict: bool = True) -> Prefix:
-    """Assemble ``system + memory context`` (static) before ``user delta``.
+                    strict: bool = True,
+                    context_pack: ContextPack | None = None) -> Prefix:
+    """Assemble ``system [+ pack] + memory context`` (static) before ``user
+    delta``.
 
     The memory block is deterministic (``render_memory_block``), so for a
     given logical memory set the static prefix is byte-identical across
     requests - the provider's prefix cache keeps hitting. With ``strict`` the
     combined static region is scanned for dynamic tokens and rejected loudly.
 
-    Raises ``PrefixError`` on a discipline violation.
+    ``context_pack`` is an optional **pre-fetched**
+    ``codeidx.context-pack/v1`` block (see :class:`ContextPack`). When supplied
+    it is placed immediately after the stable system block and **ahead of**
+    the locally-derived memory block, so the two independently-derived static
+    regions collapse onto ONE shared, cacheable prefix: the pack carries the
+    same bytes for every consumer of a given tenant/repo, which is what lets
+    them share a single provider cache entry. The pack bytes are consumed
+    verbatim and are scanned by the same anti-pattern list as the rest of the
+    static region.
+
+    With ``context_pack=None`` (the default) the assembly is **byte-identical**
+    to the pre-consumer behaviour - asserted against the recorded vector in
+    ``tests/fixtures/prompt_prefix_vector.json`` - because a silent change to
+    the injected prefix would invalidate every existing cache entry.
+
+    Raises ``PrefixError`` (and its ``ContextPackError`` subclass) on a
+    discipline violation.
     """
 
-    blocks = [
-        ("system", system_text or ""),
-        ("context", memory_block or ""),
-        ("user", user_delta or ""),
-    ]
+    blocks = [("system", system_text or "")]
+    if context_pack is not None:
+        blocks.append(("context", context_pack.text))
+    blocks.append(("context", memory_block or ""))
+    blocks.append(("user", user_delta or ""))
     validate_block_order(blocks)
     static_blocks, dynamic_blocks = split_static_dynamic(blocks)
     static_text = "\n\n".join(t for _r, t in static_blocks if t).strip()
