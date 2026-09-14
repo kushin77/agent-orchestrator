@@ -158,6 +158,12 @@ GATE_FILES = (
 
 CHECK_GLOB = re.compile(r"^scripts/check-.*\.(sh|py)$")
 
+# The self-wiring marker (#698): scripts/verify.sh sources this helper, which
+# auto-discovers every `scripts/check-*.sh`. When a gate file carries the marker,
+# a delivered check script is wired by construction (unless it is denylisted).
+DISCOVERY_MARKER = "scripts/discover-checks.sh"
+DENYLIST = "scripts/check-denylist.txt"
+
 # Closed reason vocabulary. A baseline line may not invent a reason.
 REASONS = {"suite": {"swept-only"}, "script": {"uninvoked"}}
 
@@ -322,6 +328,20 @@ def discover_check_scripts():
     return [path for path in paths if path not in ignored]
 
 
+def read_denylist():
+    """Check names/basenames disabled by name (scripts/check-denylist.txt, #698)."""
+    path = root / DENYLIST
+    if not path.is_file():
+        return set()
+    names = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        names.add(line)
+    return names
+
+
 def self_check():
     """Negative controls: the rule must not read coverage out of prose.
 
@@ -358,6 +378,21 @@ def main():
         path for path in checks
         if any(path in text for text in gate_text.values())
     }
+    # #698 self-wiring: when a gate file carries the discovery marker,
+    # scripts/verify.sh auto-discovers every `scripts/check-*.sh`, so a delivered
+    # check script is wired by construction. A denylisted one (disabled by name
+    # in scripts/check-denylist.txt) is NOT auto-wired: it must be invoked by
+    # some other gate file, or it is refused as an unwired artifact below.
+    if any(DISCOVERY_MARKER in text for text in gate_text.values()):
+        denylist = read_denylist()
+        for path in checks:
+            if not path.endswith(".sh"):
+                continue
+            base = path.rsplit("/", 1)[-1]
+            name = base[len("check-"):-len(".sh")]
+            if name in denylist or base in denylist:
+                continue
+            wired_checks.add(path)
     unwired_checks = [path for path in checks if path not in wired_checks]
 
     # --- class 2: declared pytest suites -------------------------------------

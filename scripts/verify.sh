@@ -328,6 +328,34 @@ checks=(
   'pytest-cockpit|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/cockpit/tests'
 )
 
+# --- check auto-discovery (#698) ---------------------------------------------
+# A NEW `scripts/check-*.sh` is wired the moment it lands, with no hand-edit to
+# the array above — this ends the #559 sole-writer serialization on this list.
+# The explicit array stays the source of truth for the entries whose check NAME
+# or command differs from the filename convention (renamed checks, `*.py`
+# checks, tracker scripts, pytest suites). Every other `scripts/check-*.sh` is
+# discovered here — its name derived from its filename (`check-X.sh` -> `X`) —
+# and appended. `scripts/check-denylist.txt` disables a check BY NAME (never
+# silently: the discovery layer reports each denylisted name on stderr). A
+# discovered check whose script is already referenced in the explicit array is
+# not re-added, so the array's names, commands and order are preserved exactly.
+source "$root/scripts/discover-checks.sh"
+
+already_wired=""
+for entry in "${checks[@]}"; do
+  already_wired="${already_wired}${entry#*|}|"
+done
+
+mapfile -t discovered < <(discover_check_scripts)
+for entry in "${discovered[@]}"; do
+  script_path="${entry#*|}"      # "bash scripts/check-X.sh"
+  base="${script_path##*/}"      # "check-X.sh"
+  if printf '%s' "$already_wired" | grep -qF "scripts/$base"; then
+    continue
+  fi
+  checks+=("$entry")
+done
+
 # --- duplicate-registration guard (issue #499) -------------------------------
 # `checks=()` is an explicit list that every wiring lane appends to, so two
 # lanes can register the SAME name (measured on this board: a re-added
