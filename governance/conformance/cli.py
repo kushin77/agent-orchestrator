@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """Conformance CLI — CMR class / pattern / template enforcement (issue #140).
 
-Checks the board (is in-scope work classified, and does the declared class hold?)
-and a change set (does the work honour the cross-cutting mandates?).
+Checks the board (is in-scope work classified, and does the declared class hold?),
+a change set (does the work honour the cross-cutting mandates?), and the filing
+path itself (can an unclassified issue still be filed? — issue #320).
 
 Honest tri-state exit codes (repo convention, GR-12 / no-false-green):
 
 * ``0`` — OK
-* ``1`` — NOT-OK (a conformance error, or deviations under ``--strict``)
+* ``1`` — NOT-OK (a conformance error, deviations under ``--strict``, or a filing
+  that could not derive its declaring labels)
 * ``2`` — CANNOT-ASSESS (no policy, no snapshot, not a git work tree)
 
 Subcommands::
 
     check        classify the board and report findings (the gate of record)
     change-set   check the current diff against the mandates
+    filing-check the filing path derives declaring labels, and refuses when it cannot
+    file         the supported hand-run filing path (derives the labels for you)
     policy       print the declared policy
     report       write .verify/conformance-report.json without failing
 
@@ -22,6 +26,8 @@ Examples::
     python3 governance/conformance/cli.py check
     python3 governance/conformance/cli.py check --milestone "M24 - ..." --strict
     python3 governance/conformance/cli.py change-set --base origin/master
+    python3 governance/conformance/cli.py filing-check
+    python3 governance/conformance/cli.py file --title "..." --body "..." --dry-run
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -49,6 +56,15 @@ from checker import (  # noqa: E402
     load_snapshot,
     missing_suite_registration,
     write_report,
+)
+from filing import (  # noqa: E402
+    CLASS_FIELD,
+    DEFAULT_REPO,
+    FilingRefused,
+    FilingRequest,
+    audit_filing_seam,
+    file_issue,
+    plan_filing,
 )
 from model import errors, warnings  # noqa: E402
 
@@ -207,6 +223,210 @@ def cmd_report(args: argparse.Namespace) -> int:
     return cmd_check(namespace)
 
 
+def _parse_declares(pairs) -> list:
+    """``--declare name=value`` arguments, as (name, value)."""
+    parsed = []
+    for pair in pairs or ():
+        name, _, value = str(pair).partition("=")
+        if not name.strip() or not value.strip():
+            raise SystemExit(
+                "conformance: cannot parse --declare %r (expected name=value)" % pair
+            )
+        parsed.append((name.strip(), value.strip()))
+    return parsed
+
+
+def _policy_or_cannot_assess(root: Path):
+    """The declared policy, or ``None`` with CANNOT-ASSESS already reported."""
+    try:
+        return load_policy(root / POLICY_RELPATH)
+    except PolicyUnavailable as exc:
+        print("conformance: CANNOT-ASSESS — %s" % exc, file=sys.stderr)
+        return None
+
+
+def cmd_file(args: argparse.Namespace) -> int:
+    """The supported hand-run filing path (issue #320).
+
+    A hand-run ``gh issue create`` is the other way an unclassified issue reaches
+    the board. This subcommand *is* that path with the declaring labels derived from
+    the policy: it refuses an underivable filing instead of filing it.
+    """
+    policy = _policy_or_cannot_assess(args.root)
+    if policy is None:
+        return EXIT_CANNOT_ASSESS
+
+    declaring = dict(_parse_declares(args.declare))
+    request = FilingRequest(
+        title=args.title,
+        body=args.body,
+        repo=args.repo,
+        declared_class=args.declared_class or "",
+        declaring=declaring,
+        labels=tuple(args.label or ()),
+        dry_run=bool(args.dry_run),
+    )
+    try:
+        result = file_issue(request, policy)
+    except FilingRefused as exc:
+        print("conformance: %s" % exc.loud_message, file=sys.stderr)
+        return EXIT_NOT_OK
+
+    if result.dry_run:
+        print("filing: DRY-RUN — nothing was filed")
+        print("  labels:  %s" % ", ".join(result.labels))
+        print("  command: %s" % result.plan.command)
+        return EXIT_OK
+
+    print("filing: filed #%s with %s" % (result.number, ", ".join(result.labels)))
+    return EXIT_OK
+
+
+def cmd_filing_check(args: argparse.Namespace) -> int:
+    """Prove the filing path derives declaring labels, and REFUSES when it cannot.
+
+    The gate's self-control for issue #320 (GR-12): a control whose refusal path
+    cannot be reached is a formality, so every expectation below is provoked for
+    real — the underivable filings must raise, the refusal must name itself, and the
+    runner must never be reached (a refusal that files nothing is the whole point).
+    """
+    policy = _policy_or_cannot_assess(args.root)
+    if policy is None:
+        return EXIT_CANNOT_ASSESS
+
+    results: list = []
+
+    def expect(name: str, ok: bool, detail: str = "") -> None:
+        results.append(ok)
+        print("filing-check: %s — %s" % ("PASS" if ok else "FAIL", name))
+        if detail:
+            print("    %s" % detail)
+
+    # 1. A filing that declares nothing still carries every declaring label the
+    #    policy demands, derived from the policy's `filing` block.
+    plan = None
+    try:
+        plan = plan_filing(FilingRequest(title="t", body="b"), policy)
+        expected = policy.filing_label_names(plan.declared_class)
+        carried = [name for name in expected if plan.label(name)]
+        expect(
+            "derives declaring labels from the policy",
+            bool(expected) and len(carried) == len(expected),
+            "class=%s | labels=%s" % (plan.declared_class, ", ".join(plan.labels)),
+        )
+    except FilingRefused as exc:
+        expect("derives declaring labels from the policy", False, exc.loud_message)
+
+    # 2. The derived labels are PASSED to `gh issue create`, not merely computed.
+    if plan is None:
+        expect("passes the derived labels to `gh issue create`", False, "no plan to check")
+    else:
+        argv = list(plan.argv)
+        pairs = [
+            argv[index + 1]
+            for index, token in enumerate(argv[:-1])
+            if token == "--label"
+        ]
+        passed = [label for label in plan.labels if label in pairs]
+        expect(
+            "passes the derived labels to `gh issue create`",
+            argv[:3] == ["gh", "issue", "create"]
+            and len(passed) == len(plan.labels)
+            and any(label.startswith(CLASS_FIELD + ":") for label in passed),
+            "argv[0:3]=%s | --label pairs=%d of %d" % (argv[:3], len(passed), len(plan.labels)),
+        )
+
+    # 3. REFUSAL: a policy that declares no default class + a filing that declares
+    #    none is refused, not filed unclassified.
+    underivable = FilingRequest(title="t", body="b")
+    classless_policy = replace(policy, filing_default_class="")
+    refusal = None
+    try:
+        plan_filing(underivable, classless_policy)
+        expect("refuses a filing with no derivable class", False, "it planned a filing anyway")
+    except FilingRefused as exc:
+        refusal = exc
+        expect(
+            "refuses a filing with no derivable class",
+            CLASS_FIELD in exc.missing,
+            "missing=%s" % ", ".join(exc.missing),
+        )
+
+    # 4. REFUSAL: a class that is not a rung of the ladder.
+    try:
+        plan_filing(
+            FilingRequest(title="t", body="b", declared_class="platinum"), policy
+        )
+        expect("refuses a class outside the ladder", False, "it planned a filing anyway")
+    except FilingRefused as exc:
+        expect(
+            "refuses a class outside the ladder",
+            "platinum" in exc.reason,
+            exc.reason,
+        )
+
+    # 5. REFUSAL: a required companion the filing and the policy both omit — the
+    #    failure that filed #297 (`class:enterprise`, no `priority:`).
+    thin_policy = replace(
+        policy, filing_defaults={"type": "feature", "area": "governance", "gdc": "enterprise"}
+    )
+    try:
+        plan_filing(FilingRequest(title="t", body="b"), thin_policy)
+        expect("refuses an underivable companion label", False, "it planned a filing anyway")
+    except FilingRefused as exc:
+        expect(
+            "refuses an underivable companion label",
+            exc.missing == ("priority",),
+            "missing=%s" % ", ".join(exc.missing),
+        )
+
+    # 6. The refusal files NOTHING: no subprocess is ever reached.
+    calls: list = []
+
+    def recorder(*call_args, **call_kwargs):  # pragma: no cover - must not run
+        calls.append((call_args, call_kwargs))
+        raise AssertionError("a refused filing must not invoke `gh`")
+
+    try:
+        file_issue(underivable, classless_policy, runner=recorder)
+        expect("refusal files nothing (runner never reached)", False, "file_issue returned")
+    except FilingRefused:
+        expect(
+            "refusal files nothing (runner never reached)",
+            not calls,
+            "runner invocations=%d" % len(calls),
+        )
+
+    # 7. The refusal is LOUD and names where prevention lives, so an operator sees
+    #    a refused filing rather than discovering an unclassified issue later.
+    text = refusal.loud_message if refusal is not None else ""
+    expect(
+        "refusal is explicit and points at #174/#320",
+        "FILING REFUSED" in text and "#320" in text and "#174" in text,
+        text,
+    )
+
+    # 8. The fleet's filing path DELEGATES to this seam (no `gh issue create` argv
+    #    of its own — the shape that filed unclassified issues before this issue).
+    problems = audit_filing_seam(args.root)
+    expect(
+        "fleet/brain.py filing path delegates to the seam",
+        not problems,
+        "; ".join(problem.message for problem in problems) or "no bypass found",
+    )
+
+    unmet = [index for index, ok in enumerate(results, start=1) if not ok]
+    if unmet:
+        print(
+            "filing-check: FAIL (%d of %d expectation(s) unmet: %s)"
+            % (len(unmet), len(results), ", ".join(str(i) for i in unmet)),
+            file=sys.stderr,
+        )
+        return EXIT_NOT_OK
+    print("filing-check: OK (%d of %d expectations held)" % (len(results), len(results)))
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="governance/conformance/cli.py",
@@ -231,6 +451,41 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_policy = sub.add_parser("policy", help="print the declared policy")
     p_policy.set_defaults(func=cmd_policy)
+
+    p_filing_check = sub.add_parser(
+        "filing-check",
+        help="the filing path derives declaring labels and refuses when it cannot",
+    )
+    p_filing_check.set_defaults(func=cmd_filing_check)
+
+    p_file = sub.add_parser(
+        "file", help="the supported hand-run filing path (declaring labels derived)"
+    )
+    p_file.add_argument("--title", required=True)
+    p_file.add_argument("--body", required=True)
+    p_file.add_argument("--repo", default=DEFAULT_REPO)
+    p_file.add_argument(
+        "--class",
+        dest="declared_class",
+        default="",
+        help="the rung to declare; omit to take the policy's filing.default_class",
+    )
+    p_file.add_argument(
+        "--declare",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="declare a companion label explicitly (type/priority/area/gdc/...)",
+    )
+    p_file.add_argument(
+        "--label", action="append", default=[], help="an extra non-declaring label"
+    )
+    p_file.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the command and the derived labels without filing anything",
+    )
+    p_file.set_defaults(func=cmd_file)
 
     p_report = sub.add_parser("report", help="write the report only")
     p_report.add_argument("--milestone", default=None)

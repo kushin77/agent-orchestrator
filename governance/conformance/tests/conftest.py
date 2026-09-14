@@ -50,6 +50,13 @@ prefixed:
   - area
   - pillar
   - gdc
+filing:
+  default_class: enterprise
+  defaults:
+    type: feature
+    priority: P2
+    area: board
+    gdc: enterprise
 """
 
 
