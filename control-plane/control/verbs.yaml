@@ -1,0 +1,602 @@
+# control-plane/control/verbs.yaml
+#
+# THE ONE DECLARATION OF EVERY CONTROL VERB (issue #553, EPIC #551).
+#
+# ADR-0025 D2 fixed the shape: the API's resource segment is `fleet` and the
+# ACTION segment is owned here. So a verb id is `<family>.<action>`, and the
+# closed set below is the only place a control action may be named. A verb that
+# exists locally and is unsafe to expose remotely is declared with
+# `exposed: false` and a reason -- it is never silently dropped, because a
+# dropped verb is a verb someone later re-invents.
+#
+# This file is validated by `control-plane/control/cli.py validate` and gated by
+# `scripts/check-control-verbs.sh`. The gate also cross-references the four CLI
+# files below, so the registry cannot drift from the levers it describes:
+#   * fleet/control.py        -- the human-override terminal (18 verbs)
+#   * fleet/channel.py        -- the steering transport (13 verbs)
+#   * governance/dispatch/cli.py, governance/reconcile/cli.py,
+#     governance/lifecycle/cli.py -- the ledger/reconciliation/lifecycle verbs
+#
+# Nothing here decides WHO may call a verb; that is identity/rbac. This file
+# declares WHAT a verb is, what it costs to call it, and what it records.
+
+schema: cmr.control-verbs/v1
+
+# ---------------------------------------------------------------------------
+# The closed effect classes. A verb's blast radius -- not its transport.
+# ---------------------------------------------------------------------------
+# read         changes nothing; safe to repeat; never audited as a control act
+# hold         suspends, resumes or (re)starts a unit; reversible by an opposite
+#              verb in this same vocabulary
+# stop         ends a running unit; reversible only by an explicit start/restart
+# irreversible persists in an append-only rail or an external system, and no
+#              other verb in this vocabulary can undo it
+effect_classes:
+  read: "changes nothing; safe to repeat"
+  hold: "suspends, resumes or (re)starts a unit; reversible by an opposite verb"
+  stop: "ends a running unit; reversible only by an explicit start/restart"
+  irreversible: "persists externally or in an append-only rail; no verb undoes it"
+
+# ---------------------------------------------------------------------------
+# The closed refusal-code set.
+# ---------------------------------------------------------------------------
+# ADR-0025 D1/D2 plus the API lane's (RC-3/#554) refusal matrix. A verb may
+# declare only codes from this set; anything else is a schema error, so a new
+# failure mode cannot be introduced by a leaf file.
+refusals:
+  401: "no authenticated caller"
+  403: "the caller lacks the required capability"
+  405: "wrong HTTP method for this verb"
+  409: "a duplicate command is already in flight"
+  422: "verb is not in this closed vocabulary"
+  503: "the local lever is unreachable"
+
+# ---------------------------------------------------------------------------
+# The verbs.
+# ---------------------------------------------------------------------------
+# capability   the identity/rbac capability the caller must hold (ADR-0025 D2);
+#              the scope gate is applied first, per call.
+# audit        the action name recorded on the EXISTING rails
+#              (telemetry/ledger/ + .fleet/slog.jsonl) -- required (non-null)
+#              for every non-read verb and forbidden for reads (ADR-0025 D3).
+# idempotent   true when a replay must return the ORIGINAL receipt rather than
+#              act twice (RC-4/#555 enforces this).
+# exposed      whether this verb may be reached over the control API (RC-3).
+#              false requires `why_not_exposed`.
+verbs:
+  # -- fleet/control.py: the human-override terminal ------------------------
+  - id: fleet.status
+    source: fleet/control.py
+    local: status
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: fleet.health
+    source: fleet/control.py
+    local: health
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: fleet.verbs
+    source: control-plane/control/verbs.yaml
+    local: verbs
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: >-
+      Serves this registry over the control API so a client renders the closed
+      vocabulary rather than hard-coding one. Declared here because RC-5's CLI
+      exposes it.
+
+  - id: fleet.debug
+    source: fleet/control.py
+    local: debug
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: "Tail of a rung log. Read-only, but the log content is not sanitised, so it requires an operator capability rather than a public one."
+
+  - id: fleet.watch
+    source: fleet/control.py
+    local: watch
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: "Live follow. Long-lived: the API lane pairs this with the existing SSE stream (portal/server/live_feed.py) rather than a separate socket."
+
+  - id: fleet.cron
+    source: fleet/control.py
+    local: cron
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: fleet.live
+    source: fleet/control.py
+    local: live
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: >-
+      `live`/`attach` renders the tmux layout and attaches the operator's tty.
+      A remote caller has no tty and no local multiplexer, so exposing it would
+      be a lie about what happened. The remote equivalent is `fleet.watch` (or
+      the SSE stream). RC-9 demotes tmux to a local debug convenience.
+    refusals: [401, 403, 503]
+
+  - id: fleet.attach
+    source: fleet/control.py
+    local: attach
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: >-
+      Alias of fleet.live: also attaches the tmux session, so the same refusal
+      applies -- a remote caller has no tty and no local multiplexer. Stated in
+      full rather than "see above", so a reader of the registry does not have to
+      follow an alias to learn why a verb is withheld.
+    refusals: [401, 403, 503]
+
+  - id: fleet.start
+    source: fleet/control.py
+    local: start
+    effect_class: hold
+    capability: fleet:operate
+    audit: fleet.start
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: fleet.pause
+    source: fleet/control.py
+    local: pause
+    effect_class: hold
+    capability: fleet:operate
+    audit: fleet.pause
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: fleet.resume
+    source: fleet/control.py
+    local: resume
+    effect_class: hold
+    capability: fleet:operate
+    audit: fleet.resume
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: fleet.restart
+    source: fleet/control.py
+    local: restart
+    effect_class: stop
+    capability: fleet:operate
+    audit: fleet.restart
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: fleet.stop
+    source: fleet/control.py
+    local: stop
+    effect_class: stop
+    capability: fleet:operate
+    audit: fleet.stop
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: fleet.kill
+    source: fleet/control.py
+    local: kill
+    effect_class: stop
+    capability: fleet:operate
+    audit: fleet.kill
+    idempotent: true
+    exposed: true
+    immediate: true
+    refusals: [401, 403, 409, 503]
+    note: >-
+      Immediate termination (no graceful drain). Distinct from fleet.stop by
+      `immediate: true`. RC-9 must name the substrate primitive that replaces
+      SIGKILL -- os.kill is refused as the control mechanism.
+
+  - id: fleet.halt
+    source: fleet/control.py
+    local: halt
+    effect_class: stop
+    capability: fleet:operate
+    audit: fleet.halt
+    idempotent: true
+    exposed: true
+    immediate: true
+    refusals: [401, 403, 409, 503]
+    note: "Fleet-wide halt of the directive loop. Broader blast radius than stop; same class."
+
+  - id: fleet.refresh
+    source: fleet/control.py
+    local: refresh
+    effect_class: hold
+    capability: fleet:operate
+    audit: fleet.refresh
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: fleet.update
+    source: fleet/control.py
+    local: update
+    effect_class: hold
+    capability: fleet:operate
+    audit: fleet.update
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: fleet.poke
+    source: fleet/control.py
+    local: poke
+    effect_class: hold
+    capability: fleet:operate
+    audit: fleet.poke
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: fleet.override
+    source: fleet/control.py
+    local: override
+    effect_class: irreversible
+    capability: fleet:override
+    audit: fleet.override
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 422, 503]
+    note: >-
+      Raises an operator override as a TICKET (ADR-0014's single join node).
+      Irreversible because the ticket persists in an append-only board and no
+      verb here un-files it. This is the verb that makes the authority split
+      concrete: it files, it does not act silently.
+
+  # -- fleet/channel.py: the steering transport ------------------------------
+  - id: channel.verify
+    source: fleet/channel.py
+    local: verify
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: "Internal contract validation; a remote caller has no message to validate."
+    refusals: [401, 403, 503]
+
+  - id: channel.status
+    source: fleet/channel.py
+    local: status
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: channel.send
+    source: fleet/channel.py
+    local: send
+    effect_class: hold
+    capability: fleet:steer
+    audit: channel.send
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: channel.order
+    source: fleet/channel.py
+    local: order
+    effect_class: hold
+    capability: fleet:steer
+    audit: channel.order
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: "Operator side: orders the BRAIN, never the sister. The operator-sender refusal in cmd_order is not widened by this declaration."
+
+  - id: channel.escalate
+    source: fleet/channel.py
+    local: escalate
+    effect_class: hold
+    capability: fleet:steer
+    audit: channel.escalate
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: channel.report
+    source: fleet/channel.py
+    local: report
+    effect_class: hold
+    capability: fleet:steer
+    audit: channel.report
+    idempotent: false
+    exposed: false
+    why_not_exposed: "Executor-side completion trigger; the executor is a rung, not a remote operator."
+    refusals: [401, 403, 503]
+
+  - id: channel.wait
+    source: fleet/channel.py
+    local: wait
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: "Blocking primitive for the brain loop, not an operator action; a remote client observes via the SSE stream instead."
+    refusals: [401, 403, 503]
+
+  - id: channel.watch
+    source: fleet/channel.py
+    local: watch
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: "Sister-side next-directive poll; not an operator action."
+    refusals: [401, 403, 503]
+
+  - id: channel.listen
+    source: fleet/channel.py
+    local: listen
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: channel.brain-inbox
+    source: fleet/channel.py
+    local: brain-inbox
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: "Brain-side blocking read of the operator mailbox."
+    refusals: [401, 403, 503]
+
+  - id: channel.brain-outbox
+    source: fleet/channel.py
+    local: brain-outbox
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: channel.head-commit
+    source: fleet/channel.py
+    local: head-commit
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: "Diagnostic for a starting loop; nothing for a remote caller to decide with."
+    refusals: [401, 403, 503]
+
+  - id: channel.consume
+    source: fleet/channel.py
+    local: consume
+    effect_class: hold
+    capability: fleet:steer
+    audit: channel.consume
+    idempotent: true
+    exposed: false
+    why_not_exposed: "Marks a directive handled without a result -- a rung's own bookkeeping."
+    refusals: [401, 403, 503]
+
+  # -- governance/dispatch/cli.py: the claim ledger --------------------------
+  - id: board.status
+    source: governance/dispatch/cli.py
+    local: status
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: board.held
+    source: governance/dispatch/cli.py
+    local: held
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: board.eligible
+    source: governance/dispatch/cli.py
+    local: eligible
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: board.audit
+    source: governance/dispatch/cli.py
+    local: audit
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: board.claim
+    source: governance/dispatch/cli.py
+    local: claim
+    effect_class: hold
+    capability: board:claim
+    audit: board.claim
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: board.release
+    source: governance/dispatch/cli.py
+    local: release
+    effect_class: hold
+    capability: board:claim
+    audit: board.release
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: board.reap
+    source: governance/dispatch/cli.py
+    local: reap
+    effect_class: stop
+    capability: board:admin
+    audit: board.reap
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: "Releases claims wedged by dead agents. A stop-class act on someone else's claim, so it needs a distinct capability."
+
+  - id: board.snapshot
+    source: governance/dispatch/cli.py
+    local: snapshot
+    effect_class: hold
+    capability: board:admin
+    audit: board.snapshot
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  # -- governance/reconcile/cli.py: session reconciliation -------------------
+  - id: recover.status
+    source: governance/reconcile/cli.py
+    local: status
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: recover.sweep
+    source: governance/reconcile/cli.py
+    local: sweep
+    effect_class: stop
+    capability: fleet:recover
+    audit: recover.sweep
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+
+  - id: recover.stamp
+    source: governance/reconcile/cli.py
+    local: stamp
+    effect_class: hold
+    capability: fleet:recover
+    audit: recover.stamp
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: recover.clear
+    source: governance/reconcile/cli.py
+    local: clear
+    effect_class: hold
+    capability: fleet:recover
+    audit: recover.clear
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: recover.watch
+    source: governance/reconcile/cli.py
+    local: watch
+    effect_class: read
+    capability: fleet:read
+    audit: null
+    idempotent: true
+    exposed: false
+    why_not_exposed: "A daemon, not a verb a caller issues; cron owns its schedule."
+    refusals: [401, 403, 503]
+
+  # -- governance/lifecycle/cli.py: end-to-end closure -----------------------
+  - id: closure.status
+    source: governance/lifecycle/cli.py
+    local: status
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: closure.audit
+    source: governance/lifecycle/cli.py
+    local: audit
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: closure.collect
+    source: governance/lifecycle/cli.py
+    local: collect
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+
+  - id: closure.close
+    source: governance/lifecycle/cli.py
+    local: close
+    effect_class: irreversible
+    capability: board:close
+    audit: closure.close
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: >-
+      Drives a work item to hygiene and closes it. Irreversible in this
+      vocabulary: it writes a terminal closure record and mutates an external
+      board; no verb here reopens it.
