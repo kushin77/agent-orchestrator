@@ -28,19 +28,28 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from governance.policy import lease  # noqa: E402
+
 #: Where session heartbeats live, relative to the repository root.
 SESSIONS_DIR = ".fleet/sessions"
 
-#: A session that has not beaten for this long is orphaned.
-DEFAULT_TTL_MINUTES = 15
+#: A session that has not beaten for this long is orphaned. Declared once in
+#: governance/policy/lease.py, where it is constrained to exceed the rung
+#: heartbeat (or a live lane would be judged dead between beats).
+DEFAULT_TTL_MINUTES = lease.SESSION_TTL_MINUTES
 
 #: How often a running session refreshes its beat.
-DEFAULT_BEAT_SECONDS = 60
+DEFAULT_BEAT_SECONDS = lease.SESSION_HEARTBEAT_SECONDS
 
 LIVE = "live"
 SUSPECT = "suspect"

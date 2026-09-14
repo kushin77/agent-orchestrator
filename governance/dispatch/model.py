@@ -14,8 +14,16 @@ snapshot (`.board/snapshot.json`) and claims are an append-only ledger
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from governance.policy import lease  # noqa: E402
 
 # Reasons that justify a claim. Anything else is kanban scavenging.
 REASON_CHILD_OF_CLAIM = "child-of-claim"
@@ -144,7 +152,8 @@ class ClaimEvent:
     base_commit: str = ""
     snapshot_sha256: str = ""
     reason: str = ""
-    ttl_hours: int = 24
+    # The claim lease is declared once in governance/policy/lease.py.
+    ttl_hours: int = lease.CLAIM_TTL_HOURS
     directive_id: str = ""
     directive_from: str = ""
     reaped_agent: str = ""
@@ -194,7 +203,7 @@ def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
     at = _require(obj, "at", str, where)
     if not agent.strip():
         raise ValueError(f"{where}: field 'agent' must not be empty")
-    ttl = obj.get("ttl_hours", 24)
+    ttl = obj.get("ttl_hours", lease.CLAIM_TTL_HOURS)
     if isinstance(ttl, bool) or not isinstance(ttl, int) or ttl <= 0:
         raise ValueError(f"{where}: field 'ttl_hours' must be a positive integer")
     return ClaimEvent(

@@ -34,7 +34,12 @@ from pathlib import Path
 # (`AO_FLEET_DIR`). Reading the one source keeps a second fleet's claims from
 # being refused as "invalid-directive" (#363). The ledger/lock/snapshot stay at
 # `.board/` and shared across fleets.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "fleet"))
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "fleet"))
+
+from governance.policy import lease  # noqa: E402
 import runtime  # noqa: E402
 
 import order
@@ -58,7 +63,11 @@ from snapshot import DEFAULT_STALENESS_MINUTES, age_minutes, is_stale, now_iso, 
 DEFAULT_LEDGER = Path(".board/claims.jsonl")
 DEFAULT_CLAIMS_DIR = Path(".board/claims")
 DEFAULT_LOCK_DIR = Path(".board/locks")
-DEFAULT_TTL_HOURS = 24
+#: The claim lease and the reap threshold are declared once in
+#: governance/policy/lease.py: the claim TTL must exceed the session TTL, and the
+#: reap threshold must not release a claim whose lane is still beating.
+DEFAULT_TTL_HOURS = lease.CLAIM_TTL_HOURS
+DEFAULT_REAP_MINUTES = lease.CLAIM_REAP_MINUTES
 SENT_DIR = runtime.FLEET_DIR / "sent"
 
 

@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile knowledge-index knowledge-index-build \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -107,7 +107,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -219,6 +219,24 @@ reconcile:
 	@bash scripts/check-reconcile.sh
 
 
+## lease-policy — one declared policy for every fleet lease and TTL (issue #322):
+## the rung heartbeat, session heartbeat, session/reconcile TTL, claim TTL and
+## reap threshold, snapshot staleness and directive lifetime are declared once in
+## governance/policy/lease.py with their ordering invariants written as
+## machine-checkable relations; every consumer reads the policy, a module that
+## restates a value fails the gate, and every invariant must be refutable by a
+## named mutation (a session TTL below the rung heartbeat is refused)
+lease-policy:
+	@bash scripts/check-lease-policy.sh
+
+## paperclip-gap-analysis — sourced paperclip.ing gap analysis (issue #368): the
+## GR-10 provenance, the four-way namesake disambiguation, the six capability
+## families and the cannibalize-vs-build table must all be present, and the check
+## mutates its own input, so it cannot pass vacuously
+paperclip-gap-analysis:
+	@bash scripts/check-paperclip-gap-analysis.sh
+
+
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):
 ## every item's provenance complete, secret policy clean, mandatory kinds covered
 knowledge-index:
@@ -271,6 +289,12 @@ remediation-dispatch:
 ## fail the gate; the historical backlog is reported with its remediation
 lessons:
 	@bash scripts/check-lessons.sh
+
+## paperclip-integration — integration seam gate (#370, M26): the mode decision
+## (ADR-0013), its index row, the seam doc's heartbeat/ticket/budget contracts
+## and their JSON Schemas are enforced, with a self-mutating negative control.
+paperclip-integration:
+	@bash scripts/check-paperclip-integration.sh
 
 ## board-gate — governance board enforcement gate (issue #143): re-runs
 ## knowledge-index, conformance, lessons and remediation for real and refuses

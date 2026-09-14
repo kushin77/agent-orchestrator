@@ -16,7 +16,7 @@ import socketserver
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
-from portal.server.app import ConsoleApplication, Response
+from portal.server.app import ConsoleApplication, Response, StreamResponse
 
 
 def _parse_cookies(cookie_header: Optional[str]) -> dict[str, str]:
@@ -59,7 +59,7 @@ class ConsoleRequestHandler(http.server.BaseHTTPRequestHandler):
             for key, values in parse_qs(parsed.query).items()
         }
         body = self._read_body() if method == "POST" else {}
-        response: Response = app.handle(
+        response: Response | StreamResponse = app.handle(
             method,
             parsed.path,
             query=query,
@@ -68,7 +68,10 @@ class ConsoleRequestHandler(http.server.BaseHTTPRequestHandler):
         )
         self._write(response)
 
-    def _write(self, response: Response) -> None:
+    def _write(self, response: Response | StreamResponse) -> None:
+        if isinstance(response, StreamResponse):
+            self._write_stream(response)
+            return
         body = response.as_bytes()
         content_type = response.content_type or "application/json; charset=utf-8"
         self.send_response(response.status)
@@ -80,6 +83,30 @@ class ConsoleRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         if body:
             self.wfile.write(body)
+
+    def _write_stream(self, response: StreamResponse) -> None:
+        """Write a server-sent-events response frame by frame.
+
+        No ``Content-Length`` is sent (the stream has no end until the client
+        disconnects), so the HTTP/1.0 connection close delimits the body and a
+        browser ``EventSource`` receives each frame as it is flushed. A client
+        that goes away mid-stream ends the handler quietly — that is a normal
+        disconnect, not a server error.
+        """
+        self.send_response(response.status)
+        for name, value in response.headers:
+            self.send_header(name, value)
+        self.send_header("Content-Type", response.content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+        try:
+            for frame in response.frames:
+                payload = frame.encode("utf-8") if isinstance(frame, str) else bytes(frame)
+                self.wfile.write(payload)
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return
 
     # -- verbs --------------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802
