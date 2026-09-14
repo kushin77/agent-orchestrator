@@ -190,9 +190,13 @@ def test_unverified_tenant_context_is_refused_fail_closed(chat_gateway):
         chat_gateway.call_tool("ticket.get", {"number": 504})["error"]["code"]
         == TENANT_CONTEXT_REQUIRED
     )
+    # The value is deliberately too short to look like a credential: the
+    # repo's own scan (scripts/check-secrets.sh, RE_GEN) flags a secret word
+    # followed by a quoted 8+ character value, and this line is a test, not a
+    # leak. Keep it short rather than teaching the gate to ignore a real shape.
     assert (
         chat_gateway.call_tool(
-            "ticket.get", {"number": 504}, session_token="not-a-session"
+            "ticket.get", {"number": 504}, session_token="invalid"
         )["error"]["code"]
         == AUTHN_FAILED
     )
