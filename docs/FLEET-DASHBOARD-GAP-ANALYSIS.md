@@ -91,3 +91,76 @@ instrument (zero network, zero dependencies, instant attach via
 multi-tenant** surface. They share one projection so the two can never drift on
 what "the fleet is doing" means; they differ only in who can look and what they
 can query.
+
+## Repointed — the single pane of glass is sourced from paperclip.ing, not built
+
+EPIC [#359](https://github.com/kushin77/agent-orchestrator/issues/359) supersedes
+the **build** conclusion of this document. The six capabilities named above are
+still the requirement; what changes is **where they come from**.
+
+### What this supersedes
+
+The roadmap below — a from-scratch web single pane of glass split into a
+projection server ([#331](https://github.com/kushin77/agent-orchestrator/issues/331)),
+a bespoke browser dashboard
+([#332](https://github.com/kushin77/agent-orchestrator/issues/332)), and
+hand-written tenant scoping
+([#333](https://github.com/kushin77/agent-orchestrator/issues/333)) — is the
+plan this repoint replaces. That greenfield build is no longer the direction.
+
+### What is no longer built
+
+The bespoke web single-pane-of-glass UI as a **greenfield build**. The fleet
+frame component, the filter bar, the historical timeline, and the multi-tenant
+org roll-up are no longer written from scratch here. In their place the
+agent-management surface is a fork/embed of **paperclip.ing** (MIT,
+`github.com/paperclipai/paperclip`, self-hosted via
+`npx paperclipai onboard --yes`), which already provides the org chart, goal
+alignment, heartbeats, per-agent budgets with hard caps, tickets with full
+tool-call tracing and an immutable audit log, and governance (approve hires /
+pause / resume / override / terminate).
+
+### What is still true and not affected
+
+- **`fleet/console.py` is not removed.** It remains the local terminal
+  operator's instrument, exactly as argued in "The terminal TUI is not being
+  removed" above; the repoint changes the *remote* surface, not the local one.
+- **The gap analysis still holds.** The six capabilities a TUI structurally
+  cannot provide — multi-tenant org roll-up, historical timelines, filters and
+  search, live streaming to a browser, access control / tenant scoping, and a
+  shareable / embeddable view — are unchanged as requirements. They are now
+  *sourced* from the paperclip.ing fork/embed rather than built here.
+- **The projection is still `snapshot()`.** `fleet/console.py`'s `snapshot()`
+  stays the single source of truth for what "the fleet is doing"; any paperclip
+  surface that shows fleet state must consume it rather than re-derive it.
+
+### Board items in scope for the repoint
+
+- EPIC [#338](https://github.com/kushin77/agent-orchestrator/issues/338)
+  ("Unified agent single pane of glass") and its children
+  [#339](https://github.com/kushin77/agent-orchestrator/issues/339)–[#351](https://github.com/kushin77/agent-orchestrator/issues/351).
+- [#331](https://github.com/kushin77/agent-orchestrator/issues/331) — projection
+  server + streaming API.
+- [#332](https://github.com/kushin77/agent-orchestrator/issues/332) — browser
+  dashboard, filters, timelines, org roll-up.
+- [#333](https://github.com/kushin77/agent-orchestrator/issues/333) — access
+  control + tenant scoping.
+
+### What this change does not do
+
+This is a **recorded direction, not a takeover**. It does not close, relabel,
+re-milestone, or reassign #338, its children #339–#351, or #331 / #332 / #333.
+Ownership of each issue stays with its author, and each issue is re-scoped by its
+owner in light of the repoint rather than executed as originally written. A
+repoint records where the work is sourced from; it does not seize the work.
+
+### Where the artifacts live
+
+- `docs/PAPERCLIP-ING-GAP-ANALYSIS.md` — the paperclip.ing gap analysis
+  (issue #368).
+- ADR-0013 (`docs/decision-records/`) and `docs/PAPERCLIP-ING-INTEGRATION.md` —
+  the integration seam (issue #370).
+
+These paths are named here as plain text rather than links because they land on
+`master` under issues #368 and #370, ahead of this document in the merge order;
+links are added once the targets exist in the tree.
