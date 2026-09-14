@@ -72,6 +72,11 @@ checks=(
   'fleet-template|bash scripts/check-fleet-template.sh'
   'sme-routing|bash scripts/check-sme-routing.sh'
   'registry-parity|bash scripts/check-registry-parity.sh'
+  # EPIC #422 (cross-repo integration gaps) — each tri-state, each proving its
+  # own negative control.
+  'module-admission|bash scripts/check-module-admission.sh'
+  'routing-seam|bash scripts/check-routing-seam.sh'
+  'cross-repo-sync|bash scripts/check-cross-repo-sync.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
