@@ -19,9 +19,9 @@
 #
 #   * the canonical module `integrations/paperclip/` must exist and carry its
 #     `mapping.py` and `client.py`;
-#   * a repo-root `paperclip/` tree is refused unless it is the *declared*
-#     separately-owned sibling module (its `__init__.py` names EPIC #410 — the
-#     parity-adapters EPIC). A bare / undeclared paperclip tree is a duplicate;
+#   * a repo-root `paperclip/` tree is refused *unconditionally* — issue #457
+#     consolidated the former declared EPIC #410 tree under
+#     `integrations/paperclip/adapters/`, so the sibling escape hatch is gone;
 #   * any `paperclip/` directory elsewhere in the tree is refused when it is a
 #     module (carries `__init__.py`); schema/catalog companions that are not
 #     modules are named and passed;
@@ -30,17 +30,23 @@
 #   * a `paperclip/{auth,api,adapters,reporting}` path is refused, naming the
 #     canonical path the brief should have used instead of just "fail".
 #
-# The declared EPIC #410 sibling is reported as a KNOWN line, not silently
-# ignored: it is the pre-existing second paperclip tree, tracked by #448, and
-# the forward rule is still to extend `integrations/paperclip/`.
+# Before #457 the guard reported a `paperclip/` tree carrying the EPIC #410
+# marker as a KNOWN sibling (a pass). That tree is now the *duplicate* and is
+# refused by name, so this check is strictly stronger than the one it replaces:
+# there is exactly one home, `integrations/paperclip/` (issue #457, ADR-0016).
 #
 # It also runs a self-mutating negative control: it builds a clean throwaway
-# root containing only the canonical module, asserts the checker is GREEN, drops
-# a decoy `paperclip/auth/x.py` into that root, asserts the enumerated input
-# CHANGED (sha256), requires the checker to refuse the decoy BY NAME, removes the
-# decoy, and asserts the enumeration hashes identically and the checker is GREEN
-# again. If the mutant passes, this gate prints FAIL and exits non-zero — a check
-# that cannot fail is a formality.
+# root containing only the canonical module, asserts the checker is GREEN, then
+# provokes it twice — (A) a decoy `paperclip/auth/x.py` (a briefed-but-wrong
+# glob) and (B) the former *declared sibling* shape, a `paperclip/` module whose
+# `__init__.py` names EPIC #410 — asserting for each that the enumerated input
+# CHANGED (sha256) and that the checker refuses it BY NAME. It removes the
+# provocations, asserts the enumeration hashes identically and the checker is
+# GREEN again. If a mutant passes, this gate prints FAIL and exits non-zero — a
+# check that cannot fail is a formality. The main verdict is propagated after the
+# control runs, so a passing control can never mask a failing main check (until
+# issue #457 the script ended `exit 0` unconditionally: a duplicate module
+# printed FAIL and still exited 0).
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. CANNOT-ASSESS never
 # exits 0, and a missing canonical module is never a PASS.
@@ -62,7 +68,7 @@ while [ "$#" -gt 0 ]; do
     --root) scan_root="${2:-}"; shift 2 ;;
     --enumerate) mode="enumerate"; controls=0; shift ;;
     --no-controls) controls=0; shift ;;
-    -h|--help) sed -n '2,52p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,58p' "$0"; exit 0 ;;
     *) printf 'check-paperclip-canonical-module: unknown argument: %s\n' "$1" >&2; exit 2 ;;
   esac
 done
@@ -90,7 +96,6 @@ from pathlib import Path
 CANONICAL = "integrations/paperclip"
 CANONICAL_FILES = ("mapping.py", "client.py")
 BRIEFED_CONCERNS = ("auth", "api", "adapters", "reporting")
-DECLARED_SIBLING_MARKER = "EPIC #410"
 SKIP_DIRS = {".git", "vendor", ".research", "node_modules", ".venv", "__pycache__"}
 
 root = Path(sys.argv[1]).resolve()
@@ -99,18 +104,6 @@ mode = sys.argv[2]
 
 def rel(path):
     return str(path.relative_to(root)).replace(os.sep, "/")
-
-
-def is_declared_sibling(path):
-    if path.name != "paperclip" or not path.is_dir():
-        return False
-    init = path / "__init__.py"
-    if not init.is_file():
-        return False
-    try:
-        return DECLARED_SIBLING_MARKER in init.read_text(encoding="utf-8")
-    except OSError:
-        return False
 
 
 def paperclip_dirs():
@@ -134,7 +127,6 @@ if not integrations.is_dir():
     raise SystemExit(2)
 
 offenses = []
-known = []
 scanned = []
 
 
@@ -175,12 +167,12 @@ for name in sorted(os.listdir(root)):
         continue
     path_rel = rel(path)
     note_scan(path_rel)
-    if name == "paperclip" and is_declared_sibling(path):
-        known.append(path_rel)
-    elif name == "paperclip":
+    if name == "paperclip":
         add_offense(
             path_rel,
-            "a second top-level paperclip module beside %s" % CANONICAL,
+            "a second top-level paperclip module beside %s — the former EPIC "
+            "#410 tree was consolidated under %s/adapters/ by issue #457"
+            % (CANONICAL, CANONICAL),
         )
     else:
         add_offense(
@@ -204,38 +196,35 @@ for path in paperclip_dirs():
     if path_rel == CANONICAL or path_rel.startswith(CANONICAL + "/"):
         continue
     note_scan(path_rel)
-    if is_declared_sibling(path):
-        if path_rel not in known:
-            known.append(path_rel)
-        continue
     if not (path / "__init__.py").is_file():
         # a data / companion directory (seam schemas, catalog rows), not a module
         continue
-    add_offense(path_rel, "a second paperclip module")
+    add_offense(
+        path_rel,
+        "a second paperclip module — there is one home, %s/" % CANONICAL,
+    )
 
 # --- (4) the briefed-but-wrong globs, refused by name ------------------------
 # Only paperclip directories that are NOT the canonical module (or beneath it)
-# are scanned: the canonical module legitimately grows
-# `integrations/paperclip/<concern>/` subpackages, so it must never be refused
-# for owning one. The declared EPIC #410 sibling is exempt only for `adapters/`
-# (its own family home); a boundary-adapter concern dropped inside it — `auth/`,
-# `api/`, `reporting/` — is still refused by name.
+# are scanned: the canonical module legitimately owns
+# `integrations/paperclip/adapters/<family>/` and `integrations/paperclip/<concern>.py`,
+# so it must never be refused for owning one. A `paperclip/{auth,api,adapters,
+# reporting}` path anywhere else is a stale-brief artifact and is refused by
+# name — there is no longer any declared sibling to exempt.
 for path in paperclip_dirs():
     path_rel = rel(path)
     if path_rel == CANONICAL or path_rel.startswith(CANONICAL + "/"):
         continue
-    declared = is_declared_sibling(path)
     for concern in BRIEFED_CONCERNS:
         candidate = path / concern
         if not candidate.exists():
             continue
         note_scan(rel(candidate))
-        if concern == "adapters" and declared:
-            continue
         add_offense(
             rel(candidate),
             "a briefed-but-wrong paperclip/<concern> path; extend %s instead "
-            "(%s/<concern>.py or %s/<concern>/)" % (CANONICAL, CANONICAL, CANONICAL),
+            "(%s/adapters/<family>/ or %s/<concern>.py)"
+            % (CANONICAL, CANONICAL, CANONICAL),
         )
 
 scanned = sorted(set(scanned))
@@ -254,12 +243,10 @@ print(
     "  OK    canonical module present: %s/ (%s)"
     % (CANONICAL, ", ".join(CANONICAL_FILES))
 )
-for path in known:
-    print(
-        "  KNOWN %s — declared separately-owned sibling module "
-        "(EPIC #410 parity adapters); forward rule: extend %s/" % (path, CANONICAL)
-    )
-print("  OK    no second top-level paperclip module (%d candidate(s) checked)" % len(scanned))
+print(
+    "  OK    no second paperclip module — %s/ is the sole home "
+    "(%d candidate(s) checked)" % (CANONICAL, len(scanned))
+)
 raise SystemExit(0)
 PY
 }
@@ -283,7 +270,11 @@ case "$rc_main" in
     echo "    paperclip/auth/**, paperclip/api/**, paperclip/reporting/**," >&2
     echo "    paperclip/adapters/<name>/**" >&2
     echo "  fix            : extend integrations/paperclip/ — as" >&2
-    echo "                   integrations/paperclip/<concern>.py or integrations/paperclip/<concern>/." >&2
+    echo "                   integrations/paperclip/<concern>.py," >&2
+    echo "                   integrations/paperclip/<concern>/ or" >&2
+    echo "                   integrations/paperclip/adapters/<family>/." >&2
+    echo "  note           : the former EPIC #410 paperclip/ tree is now a" >&2
+    echo "                   duplicate; issue #457 moved it under integrations/paperclip/adapters/." >&2
     ;;
   *)
     echo "check-paperclip-canonical-module: CANNOT-ASSESS — inspector returned $rc_main" >&2
@@ -297,11 +288,12 @@ fi
 
 # --- self-mutating negative control ------------------------------------------
 # Build a clean throwaway root holding ONLY the canonical module: the checker
-# must be GREEN. Drop the decoy module paperclip/auth/x.py into that root: the
-# enumerated input must change (sha256) AND the checker must refuse it by name.
-# Remove the decoy: the enumeration must hash identically and the checker must
-# be GREEN again.
-scratch="/tmp/ao448.$$.$(date +%s)"
+# must be GREEN. Provoke it twice: (A) a decoy module paperclip/auth/x.py and
+# (B) the former *declared sibling* shape (a paperclip/ module naming EPIC #410).
+# For each, the enumerated input must change (sha256) AND the checker must
+# refuse it by name. Remove the provocations: the enumeration must hash
+# identically and the checker must be GREEN again.
+scratch="/tmp/ao457.$$.$(date +%s)"
 if ! mkdir "$scratch" 2>/dev/null; then
   echo "check-paperclip-canonical-module: CANNOT-ASSESS — cannot create a scratch directory" >&2
   exit 2
@@ -349,11 +341,34 @@ fi
 mut_out="$(inspect "$mut" check 2>&1)"
 mut_rc=$?
 if [ "$mut_rc" -eq 1 ] && printf '%s\n' "$mut_out" | grep -qF "paperclip/auth"; then
-  echo "  OK    negative control: the decoy paperclip/auth/x.py is refused by name"
+  echo "  OK    negative control A: the decoy paperclip/auth/x.py is refused by name"
   echo "        enumerated input changed: $before_sha -> $after_sha"
 else
   echo "check-paperclip-canonical-module: FAIL — the decoy paperclip/auth/x.py was not refused by name" >&2
   printf '%s\n' "$mut_out" >&2
+  exit 1
+fi
+
+# mutation B: the former *declared sibling* shape — a paperclip/ module whose
+# __init__.py names EPIC #410. Before #457 this was reported as KNOWN (a pass);
+# it must now be refused by name, proving the check is strictly stronger.
+rm -rf "$mut/paperclip"
+mkdir -p "$mut/paperclip/adapters"
+printf '"""Paperclip-ing parity adapters (EPIC #410)."""\n' > "$mut/paperclip/__init__.py"
+printf '"""adapters package."""\n' > "$mut/paperclip/adapters/__init__.py"
+b_sha="$(enum_sha "$mut")"
+if [ "$b_sha" = "$before_sha" ]; then
+  echo "check-paperclip-canonical-module: CANNOT-ASSESS — mutation B did not change the enumerated input" >&2
+  exit 2
+fi
+b_out="$(inspect "$mut" check 2>&1)"
+b_rc=$?
+if [ "$b_rc" -eq 1 ] && printf '%s\n' "$b_out" | grep -qF "paperclip"; then
+  echo "  OK    negative control B: the former EPIC #410 declared sibling is refused by name"
+  echo "        enumerated input changed: $before_sha -> $b_sha"
+else
+  echo "check-paperclip-canonical-module: FAIL — the former declared sibling (paperclip/ naming EPIC #410) was not refused by name" >&2
+  printf '%s\n' "$b_out" >&2
   exit 1
 fi
 
@@ -375,7 +390,16 @@ if [ "$restore_rc" -ne 0 ]; then
 fi
 echo "  OK    control root restored byte-identical (enumeration sha256 $before_sha)"
 
+# Propagate the MAIN verdict. The self-mutating control runs on its own scratch
+# root and is independent of the main check, so a passing control must never mask
+# a failing main check (that was a false green until issue #457: the script ended
+# `exit 0` unconditionally, so a duplicate module printed FAIL and still exited 0).
+if [ "$rc_main" -ne 0 ]; then
+  exit "$rc_main"
+fi
+
 echo "check-paperclip-canonical-module: OK — integrations/paperclip/ is the sole"
-echo "  canonical module for the paperclip boundary adapter; no undeclared second"
-echo "  top-level paperclip module; the decoy briefed glob is refused by name."
+echo "  canonical module for the paperclip boundary adapter; no second paperclip"
+echo "  module — the former EPIC #410 sibling and the decoy briefed glob are both"
+echo "  refused by name."
 exit 0

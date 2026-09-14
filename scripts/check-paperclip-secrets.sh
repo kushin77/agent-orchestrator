@@ -44,18 +44,18 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-if [ ! -d "$root/paperclip/adapters/secrets" ]; then
-  echo "check-paperclip-secrets: FAIL — paperclip/adapters/secrets/ is missing" >&2
+if [ ! -d "$root/integrations/paperclip/adapters/secrets" ]; then
+  echo "check-paperclip-secrets: FAIL — integrations/paperclip/adapters/secrets/ is missing" >&2
   exit 1
 fi
 
-schema="paperclip/adapters/secrets/schema/secret.schema.json"
+schema="integrations/paperclip/adapters/secrets/schema/secret.schema.json"
 if [ ! -f "$schema" ]; then
   echo "check-paperclip-secrets: CANNOT-ASSESS — no view schema at $schema" >&2
   exit 2
 fi
 
-catalog="paperclip/adapters/secrets/catalog/secrets.json"
+catalog="integrations/paperclip/adapters/secrets/catalog/secrets.json"
 if [ ! -f "$catalog" ]; then
   echo "check-paperclip-secrets: CANNOT-ASSESS — no declaration catalog at $catalog" >&2
   exit 2
@@ -73,8 +73,8 @@ root = Path(sys.argv[1]).resolve()
 view_path = Path(sys.argv[2]) if len(sys.argv) > 2 else None
 sys.path.insert(0, str(root))
 
-from paperclip.adapters.secrets import vault  # noqa: E402
-from paperclip.adapters.secrets.model import SecretError  # noqa: E402
+from integrations.paperclip.adapters.secrets import vault  # noqa: E402
+from integrations.paperclip.adapters.secrets.model import SecretError  # noqa: E402
 
 try:
     if view_path is not None:
@@ -144,7 +144,7 @@ scratch = Path(sys.argv[2])
 fake = sys.argv[3]
 sys.path.insert(0, str(root))
 
-from paperclip.adapters.secrets import vault  # noqa: E402
+from integrations.paperclip.adapters.secrets import vault  # noqa: E402
 
 
 def dump(obj, name):
@@ -235,7 +235,7 @@ from pathlib import Path
 root = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(root))
 
-from paperclip.adapters.secrets import vault  # noqa: E402
+from integrations.paperclip.adapters.secrets import vault  # noqa: E402
 
 refs = vault.refs_from(vault.load_catalog(root))
 print(refs[0].scope if refs else "")
@@ -250,7 +250,7 @@ if [ -z "$target_scope" ] || [ -z "$target_path" ]; then
   exit 2
 fi
 
-out_d="$(python3 -m paperclip.adapters.secrets.cli read --path "$target_path" --principal unbound-session 2>&1)"
+out_d="$(python3 -m integrations.paperclip.adapters.secrets.cli read --path "$target_path" --principal unbound-session 2>&1)"
 rc_d=$?
 if [ "$rc_d" -eq 1 ] && printf '%s\n' "$out_d" | grep -qF "lacks scope '$target_scope'"; then
   echo "  OK    negative control D: an unscoped read is refused, naming the scope"
@@ -260,7 +260,7 @@ else
   exit 1
 fi
 
-out_e="$(python3 -m paperclip.adapters.secrets.cli read --path "$target_path" \
+out_e="$(python3 -m integrations.paperclip.adapters.secrets.cli read --path "$target_path" \
   --principal gate-session --scope "$target_scope" 2>&1)"
 rc_e=$?
 if [ "$rc_e" -eq 0 ] && printf '%s\n' "$out_e" | grep -qF "$target_path" \
@@ -282,7 +282,7 @@ from pathlib import Path
 root = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(root))
 
-from paperclip.adapters.secrets import vault  # noqa: E402
+from integrations.paperclip.adapters.secrets import vault  # noqa: E402
 
 payload = json.dumps(vault.build_view(root), indent=2, sort_keys=True).encode("utf-8")
 print(hashlib.sha256(payload).hexdigest())
