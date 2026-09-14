@@ -16,8 +16,10 @@ three rules the contract's ``authority{}`` map implies:
   fails.
 
 :func:`verify` is the rebuild proof: it re-derives the projection, compares it to
-the store, deletes the store, rebuilds again and compares hashes. An unresolvable
-reference is always a failure naming the file and line — never a skip.
+the store, deletes the store, rebuilds again and compares hashes. A store that
+differs stops the run *before* the delete, so the finding is reproducible rather
+than green on the next run. An unresolvable authority-tracked reference is always
+a failure naming the file and line — never a skip.
 """
 
 from __future__ import annotations
@@ -46,11 +48,11 @@ from model import (
     canonical,
     digest,
     first_difference,
+    is_populated,
     load_contract,
     sorted_tickets,
 )
 from sources import (
-    LessonIndex,
     board_contributions,
     read_attestations,
     read_board,
@@ -250,7 +252,10 @@ def build(
         entries = by_ticket[ticket_id]
         by_field: dict[str, list[Contribution]] = {}
         for entry in entries:
-            if entry.field is None:
+            # Only a *populated* value is a write: a producer that emits an empty
+            # form has written nothing, so it is neither a writer nor evidence
+            # that a ledger backs the ticket.
+            if entry.field is None or not is_populated(entry.value):
                 continue
             by_field.setdefault(entry.field, []).append(entry)
 

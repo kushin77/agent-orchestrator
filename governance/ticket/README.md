@@ -61,7 +61,9 @@ writer.
 ## The rules the projection refuses on
 
 * **One writer per field.** A populated authority-tracked field written by two
-  producers fails, naming the ticket, the field and both producers.
+  producers fails, naming the ticket, the field and both producers. An *empty*
+  value is not a write, so a producer that emits an empty form is not a writer
+  and is not evidence that a ledger backs the ticket.
 * **The declared writer.** A populated authority-tracked field written by any
   producer other than its `authority` value fails, naming both.
 * **A known field only.** A populated field the frozen contract does not carry

@@ -101,6 +101,23 @@ def test_a_field_outside_the_frozen_contract_fails(root):
     assert finding.subject == f"{TICKET_10}.facets.approvals"
 
 
+def test_an_empty_value_is_not_a_writer(root):
+    _small_root(root)
+    extra = [Contribution(TICKET_10, "goal", "rogue/lane", "", "negative-control")]
+    projection = build(root, extra=extra)
+    assert projection.ok
+    assert projection.tickets[TICKET_10]["goal"] == "#4"
+    assert projection.tickets[TICKET_10]["authority"]["goal"] == ".board/snapshot.json"
+
+
+def test_a_ticket_whose_only_contribution_is_empty_is_unbacked(root):
+    _small_root(root)
+    extra = [Contribution("#999999", "goal", "rogue/lane", "", "negative-control")]
+    projection = build(root, extra=extra)
+    finding = next(item for item in projection.violations if item.code == CODE_TICKET_UNBACKED)
+    assert finding.subject == "#999999"
+
+
 def test_a_ticket_no_ledger_backs_fails_and_names_it(root):
     _small_root(root)
     extra = [Contribution("#999999", None, "rogue/lane", None, "negative-control")]

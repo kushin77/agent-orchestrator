@@ -52,6 +52,7 @@ from model import (
     Violation,
     issue_id,
     issue_number,
+    short_ref,
 )
 
 PRODUCER_SNAPSHOT = ".board/snapshot.json"
@@ -516,7 +517,7 @@ def read_budgets(
             violations.append(
                 Violation(
                     CODE_UNRESOLVED_REFERENCE,
-                    f"{record.get('ticket')!r}",
+                    short_ref(str(record.get("ticket") or "")),
                     "budget charge names an issue the board snapshot does not carry",
                     where,
                 )
