@@ -239,7 +239,7 @@ auth mismatches as adoption work:
 | 8 | No explicit currency | **OPEN** — the ticket facet does not add a currency column; the budget rail still encodes USD by convention |
 | 9 | Hard stop is a percentage, not a boolean | **OPEN** — upstream's absolute cap/stop is not modelled by the ticket facet |
 | 10 | No per-task receipt field | **CLOSED** — `facets.budget.receipt` and the structured `evidence[]` receipt carry the same receipt id, tying spend to the task |
-| 11 | Auth models do not meet natively | **OPEN** — cross-boundary auth is one-time adoption work, not a field mapping |
+| 11 | Auth models do not meet natively | **RESOLVED (seam)** — the cross-boundary auth seam landed (#412, §5.2): agent key/JWT mint+verify from the registry records, the board-token adapter over the fleet session path, and the `X-Paperclip-Run-Id` ↔ `correlation_id` run bridge |
 
 1. **Heartbeat granularity.** The fleet beat is a flat process-liveness record
    (`pid`, `state`, `started_at`, `commit`, `ts`) — it has **no** `wake.cause`, no
@@ -304,12 +304,15 @@ auth mismatches as adoption work:
 11. **Auth models do not meet natively.** The fleet has no HTTP caller identity;
     upstream has agent keys/JWTs, a session cookie, a board token and the
     `X-Paperclip-Run-Id` run header. Cross-boundary auth is one-time integration
-    work, not a field mapping. **Resolved** by
+    work, not a field mapping. **Resolved (transport)** by
     `integrations/paperclip/client.py` (`Authorization: Bearer` on every request
     and `X-Paperclip-Run-Id` on mutating calls, applied at the transport seam).
-    **Deferred** — standing the process up and wiring real cross-boundary
-    credentials is adoption work owned by the cross-boundary auth lane (#412,
-    milestone M27).
+    **Resolved (seam)** by `integrations/paperclip/auth/` — the cross-boundary
+    auth seam mints and verifies an agent key/JWT from the fleet's own registry
+    records (no second identity store), maps a human operator onto the board
+    session path (no third login), and bridges the upstream run id to the
+    fleet's `correlation_id` (#412, §5.2). Standing the process up with real
+    credentials is deployment work, not a missing mapping.
 
 ### 5.1 Resolution record — #428 (commit `9cd5794`)
 
@@ -344,6 +347,25 @@ Every mismatch above is now either **resolved** by a file under
 `integrations/paperclip/` (enforced offline by
 `scripts/check-paperclip-integration-adapter.sh` in `make verify`) or **deferred**
 to the named adoption lane with the reason recorded on the row.
+
+### 5.2 Resolution record — #412 (the cross-boundary auth seam)
+
+Mismatch 11 has two halves, and they land in two places. The **transport** half
+(attach `Authorization: Bearer` and `X-Paperclip-Run-Id`) is answered by
+`integrations/paperclip/client.py` (#428). The **identity** half — the two auth
+models actually meeting — is answered by **#412** in
+[`../integrations/paperclip/auth/`](../integrations/paperclip/auth/README.md),
+enforced offline by `scripts/check-paperclip-auth.sh` in `make verify`:
+
+| Half of mismatch 11 | Where it is answered |
+|---|---|
+| Agent identity minted/verified from the fleet's own records (company scope in the claim, no parallel identity store) | `auth/registry.py` reads `registry/profiles/seeds/*.yaml` through `integrations/paperclip/mapping.py`; an unregistered agent cannot be minted for and a retired one cannot verify (ADR-0012) |
+| Human identity mapped onto the board session path (no third login) | `auth/board.py` mints the board token from a `governance/isolation` `SessionIdentity` record and re-checks the session on verify (`session_revoked`) |
+| Run correlation bridged (`X-Paperclip-Run-Id` ↔ `correlation_id`) | `auth/runbridge.py` joins the two, single-use; the fleet value is the authoritative one (`fleet/schema/message.schema.json` requires `correlation_id`) |
+| Negative controls first-class and proven | `auth/guard.py` + `auth/cli.py controls`; each refusal (401 expired / 401 unknown / 401 missing Authorization / 403 cross-company / 403 permission_denied never 404 / 409 replayed run id) is provoked and refused by name |
+
+The standing-up of the process with real credentials is **deployment** work, not
+a missing mapping; the seam itself is closed here.
 
 ## 6. Related records and docs
 
