@@ -1,0 +1,58 @@
+# Route policy -- how task complexity and risk signals map to an agent chain
+# and a model tier.
+#
+# PROVENANCE (GR-10; ledger in docs/SME-ROUTING.md "PROVENANCE"):
+#   * kushin77/capital-underwriting config/leaderboard/route-policy.json
+#     verdict PORTED -- thresholds, routes and dispatch_defaults kept verbatim
+#     (including the strict route's `path_mode: deep`: the route NAME is what
+#     distinguishes strict; its execution mode is the deep path with the
+#     governance chain and the auditor tier).
+#   * kushin77/vscode-memory integration/route-policy.json (#1476) is the
+#     upstream of that file and is recorded as the lineage, not re-ported.
+#
+# Fallback contract: `dispatch_defaults.unknown_task_type` is the fail-safe
+# and MUST stay "deep". The loader enforces it, so the default cannot drift
+# silently (a task the router does not recognise escalates rather than
+# slipping through on the cheap path).
+version: "1.0.0"
+updated_at: "2026-07-24"
+source: "ported from kushin77/capital-underwriting config/leaderboard/route-policy.json"
+description: >-
+  Routing rules for agent dispatch -- maps task complexity signals to model
+  tiers and agent chains.
+thresholds:
+  fast_path_max_tokens: 120
+  deep_path_min_tokens: 300
+  risk_high_keywords: [destroy, delete, production, secret, credential, deploy,
+                       migration]
+  complexity_keywords: [architecture, refactor, multi-file, workflow,
+                        orchestration, governance]
+routes:
+  fast:
+    path_mode: fast
+    description: Simple, low-risk tasks -- single agent, cheapest model.
+    agents: [executor]
+    model_tier: flash
+    worker_types: [text-fleet, shell-fleet]
+  deep:
+    path_mode: deep
+    description: Moderate complexity -- plan -> execute -> verify chain.
+    agents: [planner, executor, verifier]
+    model_tier: pro
+    worker_types: [code-fleet, scout-fleet, scribe-fleet]
+  strict:
+    path_mode: deep
+    description: >-
+      High-risk or governance tasks -- full plan -> execute -> verify -> critic
+      chain with auditor review.
+    agents: [planner, executor, verifier, critic]
+    model_tier: auditor
+    worker_types: [auditor-fleet]
+dispatch_defaults:
+  unknown_task_type: deep
+  legacy_task: deep
+  doc_update: fast
+  audit: deep
+  script_fix: deep
+  config_change: deep
+  code_review: strict
