@@ -1,0 +1,63 @@
+{
+  "definitions": {
+    "name": "charge",
+    "count": 1,
+    "hits": [
+      {
+        "name": "charge",
+        "repo": "acme/payments",
+        "kind": "function",
+        "fidelity": "semantic",
+        "definition": {"path": "src/payments/core.py", "line": 12},
+        "hitKind": "definition"
+      }
+    ]
+  },
+  "references": {
+    "name": "charge",
+    "count": 1,
+    "hits": [
+      {
+        "name": "charge",
+        "repo": "acme/payments",
+        "fidelity": "semantic",
+        "reference": {
+          "path": "src/payments/api.py",
+          "line": 40,
+          "context": "charge(account)"
+        }
+      }
+    ]
+  },
+  "search": {
+    "q": "post",
+    "count": 1,
+    "hits": [
+      {
+        "name": "post_entry",
+        "repo": "acme/ledger",
+        "kind": "function",
+        "fidelity": "semantic",
+        "definition": {"path": "src/ledger/entries.py", "line": 3},
+        "hitKind": "search"
+      }
+    ]
+  },
+  "query": {
+    "query": {
+      "tenantId": "acme",
+      "repos": {
+        "acme/payments": {
+          "modules": ["payments.api", "payments.core"],
+          "symbols": ["charge", "refund"]
+        }
+      }
+    }
+  },
+  "freshness": {
+    "repo": "acme/payments",
+    "status": "ok",
+    "commit": "realc0de",
+    "indexedAt": "2026-09-14T00:00:00Z"
+  }
+}

@@ -233,7 +233,7 @@ Patterns adapted from the fleet sources indexed in
 |---|---|---|
 | `capital-underwriting` `apps/server/src/mcp/capitalMcpServer.ts` | Tenant-scoped MCP server: every tool requires a tenant context, refuses unscoped, no cross-tenant fallback | `context.session` requirement + tenant binding + cross-tenant negatives |
 | `shared-services` `services/mcp-hub/server/mcp-server.ts` | JWT bearer authN + rate limit on every MCP call (401/403/429 posture) | `authn.verify_token`, `RateGate` on every call, error-code posture |
-| `code-indexing` `codeidx/mcp_server.py` | Compiler-accurate indexing tool catalog (definitions/references/search), canonical sorted-key envelopes | Declared indexing tools + canonical output |
+| `code-indexing` `codeidx/mcp_server.py` | Compiler-accurate indexing tool catalog (definitions/references/search), canonical sorted-key envelopes | Declared indexing tools + canonical output; the relationship is **now a live option** — `CodeidxBackend` consumes this published catalog through the `CodeidxClient` seam (flag-gated OFF, `KbRegistry.opt_in`), and the declared graph is kept as the offline fixture (#476, ADR-0018) |
 | `CMR` `catalog/indexer/mcp_server.py` | Minimal stdio JSON-RPC surface (initialize/ping/tools/list/tools/call), unknown tool `-32601` | The `handle_message` JSON-RPC surface |
 | `saas-rbac` `services/frontend-api/src/proxy.ts` | Explicit allowlist (never denylist); allowlisted entries are a publication decision | `ToolRegistry` fail-closed + session `allowedTools` |
 
