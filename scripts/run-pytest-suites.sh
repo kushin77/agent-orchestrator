@@ -60,14 +60,14 @@ record() { # <suite> <status> <rc> <detail>
   printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$records_file"
 }
 
-for mod in "${suites[@]}"; do
-  tdir="$mod/tests"
-  if [ ! -d "$tdir" ]; then
-    echo "  FAIL  $mod  (declared suite missing: $tdir)" >&2
-    fail=$((fail + 1))
-    record "$mod" "FAIL" "1" "missing $tdir"
-    continue
-  fi
+# run_one_suite — run one suite in isolation and record its outcome (issue #29).
+# `label` is "" for a declared suite and "auto" for an auto-registered one; it
+# only prefixes the log line, never the record key, so a suite's record is
+# stable however it was reached.
+run_one_suite() { # <mod> <label>
+  local mod="$1" label="$2" prefix=""
+  [ -n "$label" ] && prefix="[$label] "
+  local tdir="$mod/tests" out rc summary
   out="$(timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 \
     python3 -m pytest -p no:cacheprovider -q "$tdir" 2>&1)"
   rc=$?
@@ -75,44 +75,72 @@ for mod in "${suites[@]}"; do
     passed=$((passed + 1))
     summary="$(printf '%s\n' "$out" | grep -oE '[0-9]+ passed.*' | tail -1)"
     [ -n "$summary" ] || summary="all tests passed"
-    echo "  PASS  $mod  ($summary)"
+    echo "  PASS  ${prefix}$mod  ($summary)"
     record "$mod" "OK" "0" "$summary"
   elif [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
     # timed out / killed: no verdict was reached — never a pass (issue #28).
     unknown=$((unknown + 1))
-    echo "  CANNOT-ASSESS  $mod  (exceeded ${suite_timeout}s timeout — no verdict)" >&2
+    echo "  CANNOT-ASSESS  ${prefix}$mod  (exceeded ${suite_timeout}s timeout — no verdict)" >&2
     record "$mod" "CANNOT-ASSESS" "$rc" "timeout after ${suite_timeout}s"
   else
     fail=$((fail + 1))
     summary="$(printf '%s\n' "$out" | tail -2 | tr '\n' ' ' | cut -c1-180)"
-    echo "  FAIL  $mod  (pytest exit $rc: $summary)" >&2
+    echo "  FAIL  ${prefix}$mod  (pytest exit $rc: $summary)" >&2
     record "$mod" "FAIL" "$rc" "$summary"
   fi
+}
+
+for mod in "${suites[@]}"; do
+  if [ ! -d "$mod/tests" ]; then
+    echo "  FAIL  $mod  (declared suite missing: $mod/tests)" >&2
+    fail=$((fail + 1))
+    record "$mod" "FAIL" "1" "missing $mod/tests"
+    continue
+  fi
+  run_one_suite "$mod" ""
 done
 
-# --- warn on unregistered suites (tracked tests dirs not in the manifest) ---
+# --- auto-register undeclared suites (#698) ----------------------------------
+# A NEW `<module>/tests/` suite is picked up WITHOUT editing the manifest: the
+# scan below finds every committed `*/tests/` directory (via a tracked
+# conftest.py or test_*.py) and runs any the manifest does not already declare,
+# in isolation, exactly like a declared suite. The manifest stays authoritative
+# for ordering and for suites whose tests/ layout is non-standard; the scan is
+# additive and labels an auto-registered suite `[auto]` so it is never mistaken
+# for a declared one. This ends the hand-edit that used to be required to run a
+# new suite (the #559 sole-writer serialization applied to the suite manifest
+# too).
+auto_suites=()
 if command -v git >/dev/null 2>&1; then
+  declared_set=""
+  for mod in "${suites[@]}"; do declared_set="${declared_set}|$mod|"; done
   while IFS= read -r cf; do
     tdir="$(dirname "$cf")"          # .../tests
     mod="$(dirname "$tdir")"         # .../<module>
     mod="${mod#./}"
-    # only consider suites whose tests dir is committed and under a pillar root
-    case "$mod" in
-      guardrails/*|gateway/*|registry/*|identity/*|engine/*|telemetry/*)
-        if ! grep -qx "$mod" "$manifest"; then
-          echo "  WARN  $mod  (tests exist but are NOT declared in $manifest — register them)" >&2
-        fi ;;
-    esac
-  done < <(git ls-files '*/tests/conftest.py' 2>/dev/null | LC_ALL=C sort)
+    if printf '%s' "$declared_set" | grep -qF "|$mod|"; then
+      continue
+    fi
+    already=0
+    for m in "${auto_suites[@]}"; do
+      if [ "$m" = "$mod" ]; then already=1; break; fi
+    done
+    [ "$already" -eq 1 ] && continue
+    auto_suites+=("$mod")
+  done < <(git ls-files '*/tests/conftest.py' '*/tests/test_*.py' 2>/dev/null | LC_ALL=C sort)
+
+  for mod in "${auto_suites[@]}"; do
+    run_one_suite "$mod" "auto"
+  done
 fi
 
 # --- summary ---------------------------------------------------------------
-echo "run-pytest-suites: $passed passed, $fail failed, $unknown no-verdict (${#suites[@]} declared suite(s), sha ${sha:0:12})"
+echo "run-pytest-suites: $passed passed, $fail failed, $unknown no-verdict (${#suites[@]} declared + ${#auto_suites[@]} auto-registered suite(s), sha ${sha:0:12})"
 
-python3 - "$results_json" "$sha" "$passed" "$fail" "$unknown" "${#suites[@]}" "$records_file" <<'PY'
+python3 - "$results_json" "$sha" "$passed" "$fail" "$unknown" "${#suites[@]}" "${#auto_suites[@]}" "$records_file" <<'PY'
 import json, os, sys
 
-path, sha, passed, failed, unknown, declared, records_file = sys.argv[1:8]
+path, sha, passed, failed, unknown, declared, auto_registered, records_file = sys.argv[1:9]
 rows = []
 with open(records_file, encoding="utf-8") as fh:
     for line in fh:
@@ -125,6 +153,7 @@ doc = {
     "gate": "pytest-suites",
     "sha": sha,
     "declared": int(declared),
+    "auto_registered": int(auto_registered),
     "passed": int(passed),
     "failed": int(failed),
     "no_verdict": int(unknown),

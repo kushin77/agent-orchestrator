@@ -1,0 +1,22 @@
+# scripts/check-denylist.txt — explicit check denylist for scripts/verify.sh (#698).
+#
+# One entry per line; blank lines and `#` comments are ignored. An entry
+# disables a discovered check BY NAME — either the derived check name
+# (`gate-coverage`) or the script basename (`check-gate-coverage.sh`).
+#
+# Disabling is never silent: the discovery layer reports every denylisted check
+# on stderr, and scripts/check-gate-coverage.sh reports a denylisted script as
+# `disabled by name`, never as a failure.
+#
+# The four entries below preserve the existing verify/gate split: these checks
+# are gate/merge-gate signals (run by scripts/gate.sh and
+# scripts/merge-gate.sh), NOT part of `make verify`'s composite. Without this
+# list, the discovery layer would auto-wire them into `make verify` and change
+# the gate-of-record's check set — a behavior change, not a bug fix. Everything
+# else is auto-discovered: a NEW `scripts/check-*.sh` is wired into `make
+# verify` the moment it lands, with no hand-edit.
+drift
+negative-controls
+policy-schema
+pr-contract
+
