@@ -135,15 +135,13 @@ checks=(
   'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
   'paperclip-budget|bash scripts/check-paperclip-budget.sh'
   'metering-parity|bash scripts/check-metering-parity.sh'
-  # EPIC #461 (the diagrams chain): the diagrams blueprint is the mandatory
-  # GR-18 SSOT consumer surface. paperclip-diagrams (#465) proves the read-only
-  # ADR-0017 evidence[] projection cannot regress; diagrams-declaration (#464)
-  # proves the architecture.yaml / gdc-manifest.yaml seeds conform to the
-  # vendored CMR contract. The latter is tri-state: it is CANNOT-ASSESS (rc 2,
-  # visibly SKIPped) until `git submodule update --init vendor/CMR` has run --
-  # the normal state of a fresh worktree -- while a genuinely wrong declaration
-  # (rc 1) still fails the gate.
-  'paperclip-diagrams|bash scripts/check-paperclip-diagrams.sh'
+  # EPIC #461 (the diagrams chain): diagrams-declaration (#464) proves the
+  # architecture.yaml / gdc-manifest.yaml seeds conform to the vendored CMR
+  # contract. (Its sibling, the #465 ADR-0017 projection gate
+  # `paperclip-diagrams`, is already wired above with its #420 siblings.) This
+  # check is tri-state: it is CANNOT-ASSESS (rc 2, visibly SKIPped) until
+  # `git submodule update --init vendor/CMR` has run -- the normal state of a
+  # fresh worktree -- while a genuinely wrong declaration (rc 1) still fails.
   'diagrams-declaration|bash scripts/check-diagrams-declaration.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
