@@ -93,6 +93,7 @@ checks=(
   'cross-repo-sync|bash scripts/check-cross-repo-sync.sh'
   'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
   'paperclip-budget|bash scripts/check-paperclip-budget.sh'
+  'metering-parity|bash scripts/check-metering-parity.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
