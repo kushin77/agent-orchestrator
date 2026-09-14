@@ -20,6 +20,9 @@
 #     later lane could have downgraded it back to "optional extension" and
 #     nothing would have failed. Its markers are pinned by name and the
 #     declaration is mutation-proved like the trust model;
+#   * the runaway + queue-liveness alarm (#728) is still declared — the latch,
+#     the `ack` that is its only clear, and every threshold `fleet/health.py`
+#     actually reads, so the knobs cannot drift out of the contract;
 #   * and the check mutates its own input (a contract with the trust model
 #     stripped, and a contract with the primary-control-plane declaration
 #     stripped) and requires each mutation to be DETECTED — a declaration check
@@ -75,6 +78,12 @@ declare -a required_markers=(
   "DSv4FNone"
   "fleet/schema/message.schema.json"
   "ADR-0011"
+  # The runaway + queue-liveness alarm (issue #728): the contract is silent
+  # about it, or it is no longer an alarm.
+  "fleet/health.py"
+  "LATCHES"
+  "ack"
+  "runaway"
 )
 
 # The trust model, verbatim. These four rules are the contract's teeth: only the
@@ -203,6 +212,42 @@ if grep -qF -- "ADR-0011" "$channel_py"; then
   echo "  OK    $channel_py references the transport decision (ADR-0011)"
 else
   echo "  FAIL  $channel_py does not reference the transport decision (ADR-0011)" >&2
+  fail=$((fail + 1))
+fi
+
+# The alarm's knobs must be declared in the contract, so documentation cannot
+# drift from the code that reads them (issue #728). The names are taken from
+# `fleet/health.py` itself, never re-typed here: a knob added to the module and
+# left undocumented fails, and a knob documented but no longer read fails too.
+if python3 - <<'PY'
+import pathlib
+import re
+import sys
+
+health = pathlib.Path("fleet/health.py").read_text(encoding="utf-8")
+contract_text = pathlib.Path("fleet/CONTRACT.md").read_text(encoding="utf-8")
+declared = re.findall(r'^ENV_MAX_[A-Z_]+ = "([^"]+)"', health, re.MULTILINE)
+if not declared:
+    print("  FAIL  fleet/health.py declares no ENV_MAX_* threshold to document", file=sys.stderr)
+    raise SystemExit(1)
+
+# A WHOLE-TOKEN match, not a substring: renaming the knob in the contract to
+# `..._XX` leaves the old text as a substring, so a `in` test would report the
+# renamed knob as documented and the drift control would be vacuous.
+def documented(name: str) -> bool:
+    return re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])", contract_text) is not None
+
+
+undocumented = [name for name in declared if not documented(name)]
+if undocumented:
+    for name in undocumented:
+        print(f"  FAIL  {name} is read by fleet/health.py but not declared in fleet/CONTRACT.md", file=sys.stderr)
+    raise SystemExit(1)
+print(f"  OK    all {len(declared)} runaway-alarm threshold(s) are declared in the contract")
+PY
+then
+  :
+else
   fail=$((fail + 1))
 fi
 
