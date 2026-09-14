@@ -146,6 +146,16 @@ else
   note_fail "an undeclared SKILL.md was not refused by name (rc=$rc_a)"
   printf '%s\n' "$out_a" >&2
 fi
+# ... and the LOAD path refuses the same undeclared skill by name, so it is the
+# load that is gated rather than only the tree scan.
+out_a2="$(cli "$ra" load --skill rogue-skill --profile paperclip 2>&1)"
+rc_a2=$?
+if [ "$rc_a2" -eq 1 ] && printf '%s\n' "$out_a2" | grep -q "rogue-skill"; then
+  echo "  OK    the load path refuses it too: $(printf '%s\n' "$out_a2" | grep -o "skill 'rogue-skill' is not in the declared registry" | head -1)"
+else
+  note_fail "an undeclared skill LOAD was not refused by name (rc=$rc_a2)"
+  printf '%s\n' "$out_a2" >&2
+fi
 
 # --- provocation B: a callable-but-unprojected MCP tool is a FAIL ------------
 echo "== provocation B: a callable tool absent from the projection is a FAIL =="
