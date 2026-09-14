@@ -1,0 +1,29 @@
+# Org declaration for the over-ceiling provocation (issue #151).
+#
+# Not a pilot input: this fixture exists so the gate can PROVE the over-ceiling
+# finding is reachable at all three scopes. `fixture/alpha-one` spends past its
+# SME ceiling, tenant `alpha`'s total exceeds its own ceiling, and the
+# enterprise total exceeds the enterprise ceiling — one deliberate violation per
+# scope, each of which the gate requires to be reported.
+schema: ao.rollup/org-v1
+source: declared
+generated_at: 2026-09-13
+
+enterprise:
+  id: fixture-ent
+  name: Roll-up fixture enterprise
+  weekly_spend_ceiling_usd: 250
+
+tenants:
+  - id: alpha
+    name: Alpha tenant
+    weekly_spend_ceiling_usd: 200
+    repos:
+      - fixture/alpha-one
+      - fixture/alpha-two
+
+  - id: beta
+    name: Beta tenant
+    weekly_spend_ceiling_usd: 200
+    repos:
+      - fixture/beta-one
