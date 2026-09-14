@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cmr-indexer": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["catalog/indexer/mcp_server.py"],
+      "env": {}
+    }
+  }
+}
