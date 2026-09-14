@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
 
 from integrations.paperclip import mapping
+from integrations.paperclip.reporting import policy as claim_policy
 from integrations.paperclip.reporting.model import (
     CannotAssess,
     Refusal,
@@ -113,6 +114,9 @@ def check(repo_root: Path, hub_root: Path) -> Tuple[Refusal, ...]:
     card = load_card(repo_root)
     persona = str(card.get("id") or "paperclip")
     findings: List[Refusal] = []
+    # The source-resolution rule is the declared policy's, the same one the
+    # composer's claims are held to (issue #592).
+    policy = claim_policy.load()
 
     declared = _as_strings(card.get("capabilitySet"))
     if CAPABILITY_ID not in declared:
@@ -157,7 +161,9 @@ def check(repo_root: Path, hub_root: Path) -> Tuple[Refusal, ...]:
         )
 
     for source in SOURCES:
-        if not resolves(source.path, repo_root=repo_root, hub_root=hub_root, ids=()):
+        if not resolves(
+            source.path, repo_root=repo_root, hub_root=hub_root, ids=(), policy=policy
+        ):
             findings.append(
                 Refusal(
                     "BRIEF-SOURCE-MISSING",

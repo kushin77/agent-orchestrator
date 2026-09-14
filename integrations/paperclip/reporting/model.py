@@ -15,8 +15,13 @@ A brief line is not prose — it is a :class:`Claim` that carries the registry r
 or the cited path it came from. :func:`claim_findings` refuses, **naming the
 line**, any claim that cites nothing or cites something that resolves to
 nothing. That is the difference between a brief that is *runnable* and one that
-is *truthful* (``kushin77/deepseek#117``).
-"""
+is *truthful* (``kushin77/deepseek#117``).#:
+#: Since issue #592 the resolution rule itself is **declared**, not written here:
+#: ``claim-policy.json`` states which prefix names a registry row, which bases a
+#: path may resolve against, which artifact the line is named in and which code a
+#: non-resolving line produces. :func:`resolves` and :func:`claim_findings` take
+#: that policy and read it — a rule restated here and a rule declared there would
+#: eventually disagree, and the brief would be the one that lied."""
 
 from __future__ import annotations
 
@@ -34,6 +39,8 @@ from governance.modules.model import (  # the authority's vocabulary, reused not
     Refusal,
     sorted_refusals,
 )
+
+from integrations.paperclip.reporting.policy import ClaimPolicy
 
 #: Canonical schema tag of the composed brief document.
 SCHEMA = "ao.module-brief/v1"
@@ -59,6 +66,8 @@ BRIEF_CODES: Tuple[str, ...] = (
     "BRIEF-MODULE-NO-PIN",
     "BRIEF-MODULE-NO-REV",
     "BRIEF-ASSET-NO-SEED",
+    # -- the emitted machine document vs the frozen schema (issue #592) -----
+    "BRIEF-SCHEMA-INVALID",
     # -- pending must never be rendered as shipped (acceptance 4) -----------
     "BRIEF-PENDING-RENDERED-SHIPPED",
     "BRIEF-PENDING-NO-BLOCKER",
@@ -67,7 +76,9 @@ BRIEF_CODES: Tuple[str, ...] = (
 )
 
 #: Citation prefix for a registry row: ``registry:<module-id>`` resolves against
-#: the registry document this brief was composed from.
+#: the registry document this brief was composed from. The **declared** form of
+#: this prefix is the policy's ``resolution.registry_prefix`` (issue #592); this
+#: constant is only its name, so a reader has one word for the concept.
 REGISTRY_PREFIX = "registry:"
 
 #: Citation placed on a claim whose referenced subject is *counted*, not named
@@ -174,20 +185,31 @@ def _cell(value: Any) -> str:
 # --------------------------------------------------------------------------- #
 # citation resolution
 # --------------------------------------------------------------------------- #
-def resolves(citation: str, *, repo_root: Path, hub_root: Path, ids: Iterable[str]) -> bool:
+def resolves(
+    citation: str,
+    *,
+    repo_root: Path,
+    hub_root: Path,
+    ids: Iterable[str],
+    policy: ClaimPolicy,
+) -> bool:
     """Whether a citation resolves: a registry row, or a path that exists.
 
-    A citation is one of three honest things:
+    A citation is one of the honest things the declared policy names
+    (``claim-policy.json``, read through
+    :class:`~integrations.paperclip.reporting.policy.ClaimPolicy`):
 
-    * ``registry:<id>`` — a row of the registry document this brief was
-      composed from (membership included: ``not-a-module`` rows are rows);
-    * a repository-relative path under the repository root;
-    * a hub-relative path under ``vendor/CMR`` (the read-only pinned catalog).
+    * the policy's registry prefix followed by an id — a row of the registry
+      document this brief was composed from (membership included:
+      ``not-a-module`` rows are rows);
+    * a path that exists under one of the policy's declared bases — the
+      repository root, and the pinned read-only hub root.
     """
-    if citation.startswith(REGISTRY_PREFIX):
-        return citation[len(REGISTRY_PREFIX) :] in set(ids)
-    for base in (Path(repo_root), Path(hub_root)):
-        if (base / citation).exists():
+    prefix = policy.registry_prefix
+    if citation.startswith(prefix):
+        return citation[len(prefix) :] in set(ids)
+    for base in policy.bases:
+        if (policy.resolves_path(base, Path(repo_root), Path(hub_root)) / citation).exists():
             return True
     return False
 
@@ -198,21 +220,26 @@ def claim_findings(
     repo_root: Path,
     hub_root: Path,
     ids: Iterable[str],
-    artifact: str = ARTIFACT,
+    policy: ClaimPolicy,
+    artifact: Optional[str] = None,
 ) -> Tuple[Refusal, ...]:
     """Every claim that cites nothing — or cites something that is not there.
 
     The finding names the **line**, because "which statement is unsupported" is
-    the only question a reader of a brief can act on.
+    the only question a reader of a brief can act on. Both the code it is refused
+    under and the artifact the line is named in come from the declared policy,
+    never from a literal here (issue #592).
     """
+    code = policy.unresolved_code
+    where_in = artifact or policy.artifact
     known = set(ids)
     findings: List[Refusal] = []
     for claim in claims:
-        where = "{}:{:d}".format(artifact, claim.line)
+        where = "{}:{:d}".format(where_in, claim.line)
         if not claim.citations:
             findings.append(
                 Refusal(
-                    "BRIEF-CLAIM-UNRESOLVED",
+                    code,
                     claim.subject,
                     "line {:d} ({}.{} = {!r}) cites no registry row and no cited path — "
                     "a statement that resolves to nothing is a finding, not prose".format(
@@ -226,13 +253,17 @@ def claim_findings(
             citation
             for citation in claim.citations
             if not resolves(
-                citation, repo_root=repo_root, hub_root=hub_root, ids=known
+                citation,
+                repo_root=repo_root,
+                hub_root=hub_root,
+                ids=known,
+                policy=policy,
             )
         ]
         if unresolved:
             findings.append(
                 Refusal(
-                    "BRIEF-CLAIM-UNRESOLVED",
+                    code,
                     claim.subject,
                     "line {:d} ({}.{}) cites {!r}, which is neither a registry row nor "
                     "a path that exists".format(
@@ -263,6 +294,7 @@ __all__ = [
     "CATALOG_MODULE_NOT_MANDATORY",
     "Claim",
     "ClaimBook",
+    "ClaimPolicy",
     "NOT_A_MODULE",
     "REGISTERED_MANDATORY",
     "REGISTRY_DOCUMENT",

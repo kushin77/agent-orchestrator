@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from integrations.paperclip.reporting import composer
+from integrations.paperclip.reporting import policy as claim_policy
 from integrations.paperclip.reporting.model import (
     ARTIFACT,
     ClaimBook,
@@ -12,6 +13,11 @@ from integrations.paperclip.reporting.model import (
 )
 
 HUB = "vendor/CMR"
+
+
+def _policy():
+    """The declared claim-resolution policy the composer and these tests read."""
+    return claim_policy.load()
 
 
 def test_the_shipped_composition_has_no_unresolved_claim(composition):
@@ -41,6 +47,7 @@ def test_a_claim_with_no_citation_is_refused_by_name_and_line(repo_root: Path):
         repo_root=repo_root,
         hub_root=repo_root / HUB,
         ids=("code-indexing",),
+        policy=_policy(),
     )
     assert len(findings) == 1
     rendered = findings[0].render()
@@ -63,6 +70,7 @@ def test_a_claim_citing_a_path_that_is_not_there_is_refused_by_name(repo_root: P
         repo_root=repo_root,
         hub_root=repo_root / HUB,
         ids=("shared-frontend",),
+        policy=_policy(),
     )
     assert len(findings) == 1
     assert "templates/module/not-here.json" in findings[0].render()
@@ -82,6 +90,7 @@ def test_a_claim_citing_a_registry_row_that_does_not_exist_is_refused(repo_root:
         repo_root=repo_root,
         hub_root=repo_root / HUB,
         ids=("code-indexing",),
+        policy=_policy(),
     )
     assert len(findings) == 1
     assert "registry:ghost" in findings[0].render()

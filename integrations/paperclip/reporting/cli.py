@@ -6,6 +6,7 @@
     python3 integrations/paperclip/reporting/cli.py check              # artifact vs a fresh composition
     python3 integrations/paperclip/reporting/cli.py capability         # the persona's declaration vs the tools it needs
     python3 integrations/paperclip/reporting/cli.py claims             # every claim resolves?
+    python3 integrations/paperclip/reporting/cli.py audit              # the append-only trail of composed runs
 
 Exit codes are the repository's tri-state convention: **0** OK, **1** NOT-OK (a
 refusal), **2** CANNOT-ASSESS — the hub catalog is absent, or the registry could
@@ -14,6 +15,12 @@ not be built. CANNOT-ASSESS is never reported as a pass.
 ``--registry FILE`` composes from a registry document already on disk instead of
 building one: that is how a caller (or the gate) proves the composer refuses a
 document that reports a pending module as shipped, without touching the tree.
+
+Every command that composes a brief appends **exactly one** record to the audit
+trail (``--audit``, default ``<repo>/.verify/module-brief-audit.jsonl``, which is
+gitignored runtime state): the run's resolved / unresolved claim counts and the
+finding lines it produced. ``compose`` keeps stdout byte-for-byte the brief, so
+the trail never contaminates the artifact it records.
 """
 
 from __future__ import annotations
@@ -76,6 +83,18 @@ def _load_registry_document(path: Path):
         raise CannotAssess("registry document unreadable: {} ({})".format(path, exc))
 
 
+def _trail(args):
+    """Where this run's single audit record goes (issue #592).
+
+    Always constructed — every command that composes a brief records the run —
+    and always the same path for a given caller, so a run is never silently
+    unrecorded.
+    """
+    from integrations.paperclip.reporting import audit
+
+    return audit.Trail(audit.trail_path(Path(args.repo), getattr(args, "audit", None)))
+
+
 def _cmd_compose(args) -> int:
     from integrations.paperclip.reporting import composer
     from governance.modules.model import CannotAssess
@@ -86,7 +105,9 @@ def _cmd_compose(args) -> int:
             if args.registry
             else _build_registry(Path(args.repo), args.hub, args.targets)
         )
-        composition = composer.compose(document, Path(args.repo), args.hub_rel)
+        composition = composer.compose(
+            document, Path(args.repo), args.hub_rel, audit_trail=_trail(args)
+        )
     except CannotAssess as exc:
         print("module-brief: CANNOT-ASSESS — {}".format(exc), file=sys.stderr)
         return EXIT_CANNOT_ASSESS
@@ -105,10 +126,11 @@ def _cmd_compose(args) -> int:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(composition.text, encoding="utf-8")
         print(
-            "module-brief: wrote {} ({} bytes, {} claims)".format(
+            "module-brief: wrote {} ({} bytes, {} claims); one audit record appended to {}".format(
                 args.out,
                 len(composition.text.encode("utf-8")),
                 len(composition.claims),
+                _trail(args).path,
             )
         )
         return EXIT_OK
@@ -154,7 +176,9 @@ def _cmd_claims(args) -> int:
             if args.registry
             else _build_registry(Path(args.repo), args.hub, args.targets)
         )
-        composition = composer.compose(document, Path(args.repo), args.hub_rel)
+        composition = composer.compose(
+            document, Path(args.repo), args.hub_rel, audit_trail=_trail(args)
+        )
     except CannotAssess as exc:
         print("module-brief: CANNOT-ASSESS — {}".format(exc), file=sys.stderr)
         return EXIT_CANNOT_ASSESS
@@ -174,6 +198,35 @@ def _cmd_claims(args) -> int:
     return EXIT_OK
 
 
+def _cmd_audit(args) -> int:
+    """Report the append-only trail of composed brief runs (issue #592)."""
+    from integrations.paperclip.reporting import audit
+
+    trail = _trail(args)
+    records = trail.records()
+    if not records:
+        print(
+            "module-brief: CANNOT-ASSESS — no audit trail at {} (no brief has been "
+            "composed against this tree yet)".format(trail.path),
+            file=sys.stderr,
+        )
+        return EXIT_CANNOT_ASSESS
+    last = records[-1]
+    print(
+        "  OK    {} record(s) in {}; the last run resolved {} of {} claim(s) "
+        "({} unresolved)".format(
+            len(records),
+            trail.path,
+            last["resolved"],
+            last["claims"],
+            last["unresolved"],
+        )
+    )
+    for line in last["findings"]:
+        print("        {}".format(line))
+    return EXIT_OK
+
+
 def _cmd_check(args) -> int:
     from integrations.paperclip.reporting import capability, composer, model
     from governance.modules.model import CannotAssess
@@ -187,7 +240,9 @@ def _cmd_check(args) -> int:
             if args.registry
             else _build_registry(repo, args.hub, args.targets)
         )
-        composition = composer.compose(document, repo, args.hub_rel)
+        composition = composer.compose(
+            document, repo, args.hub_rel, audit_trail=_trail(args)
+        )
     except CannotAssess as exc:
         print("module-brief: CANNOT-ASSESS — {}".format(exc), file=sys.stderr)
         return EXIT_CANNOT_ASSESS
@@ -241,8 +296,6 @@ def _cmd_check(args) -> int:
         )
     )
     return EXIT_OK
-
-
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="integrations/paperclip/reporting/cli.py",
@@ -259,6 +312,11 @@ def _parser() -> argparse.ArgumentParser:
             "--registry",
             default=None,
             help="compose from a registry document on disk instead of building one",
+        )
+        target.add_argument(
+            "--audit",
+            default=None,
+            help="audit trail to append this run's one record to (default: <repo>/.verify/module-brief-audit.jsonl)",
         )
 
     compose = sub.add_parser("compose", help="emit the brief")
@@ -278,6 +336,17 @@ def _parser() -> argparse.ArgumentParser:
     cap.add_argument("--repo", default=None, help="repository root (default: this checkout)")
     cap.add_argument("--hub-rel", default=DEFAULT_HUB_REL, help="hub root, repository-relative")
     cap.set_defaults(handler=_cmd_capability)
+
+    trail = sub.add_parser(
+        "audit", help="the append-only trail of composed brief runs (resolved / unresolved counts)"
+    )
+    trail.add_argument("--repo", default=None, help="repository root (default: this checkout)")
+    trail.add_argument(
+        "--audit",
+        default=None,
+        help="audit trail to read (default: <repo>/.verify/module-brief-audit.jsonl)",
+    )
+    trail.set_defaults(handler=_cmd_audit)
     return parser
 
 

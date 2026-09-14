@@ -21,13 +21,31 @@ Three properties the issue pins, and how they are held:
 Refusals do not make the brief lie: the text is still produced (honestly
 reporting what it found), but it is not *frozen* — the CLI refuses to write the
 artifact while a finding stands.
+
+Three artifacts landed with issue #592 (parent #590) are read on every
+composition, never restated:
+
+* ``claim-policy.json`` — the **declared claim-resolution policy**: which
+  prefix names a registry row, which bases a citation path may resolve against,
+  which code a non-resolving line is refused under, and that a target-set module
+  with no vendor ``module.json`` renders ``target-pending`` while *pending is
+  never rendered as shipped*;
+* ``brief.schema.json`` — the **frozen schema** of the machine document this
+  module emits; :func:`compose` validates what it emits against it on every run
+  and refuses ``BRIEF-SCHEMA-INVALID`` naming the JSON path otherwise;
+* ``audit.py`` — the **append-only trail** every composed run appends one
+  record to (the resolved / unresolved counts and the finding lines).
+
+One rule, one home: none of the three rules above is written out below, and the
+gate proves each artifact is really read by doctoring it and requiring the
+refusal to change.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from governance.modules.model import (
     CATALOG_MODULE_NOT_MANDATORY,
@@ -40,7 +58,7 @@ from governance.modules.model import (
     sorted_refusals,
 )
 
-from integrations.paperclip.reporting import capability
+from integrations.paperclip.reporting import audit, brief_schema, capability, policy as claim_policy
 from integrations.paperclip.reporting.model import (
     ARTIFACT,
     REGISTRY_DOCUMENT,
@@ -72,12 +90,19 @@ REV_UNAVAILABLE = "unavailable at this revision (the hub is not a git checkout)"
 
 @dataclass(frozen=True)
 class Composition:
-    """The rendered brief, the claims it makes, and every refusal it found."""
+    """The rendered brief, the claims it makes, and every refusal it found.
+
+    ``document`` is the same composition as a **machine document** — the shape
+    ``brief.schema.json`` freezes, validated against it before this value is
+    returned. The rendered text and the document come from one pass, so they
+    cannot describe different compositions.
+    """
 
     text: str
     claims: Tuple[Claim, ...]
     findings: Tuple[Refusal, ...]
     ids: Tuple[str, ...]
+    document: Dict[str, Any] = field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------- #
@@ -92,8 +117,13 @@ def _table(book: ClaimBook, header: Sequence[str]) -> None:
     _row(book, ["---"] * len(header))
 
 
-def _registry_row(module_id: str) -> str:
-    return REGISTRY_PREFIX + module_id
+def _registry_row(module_id: str, prefix: str = REGISTRY_PREFIX) -> str:
+    """A citation of the registry row for a module id.
+
+    The prefix is the policy's, not a literal: a citation form the policy does
+    not resolve would make every claim in the brief a finding.
+    """
+    return prefix + module_id
 
 
 def _reference_citation(reference: Dict[str, Any], hub_root_rel: str) -> str:
@@ -114,29 +144,29 @@ def _reference_citation(reference: Dict[str, Any], hub_root_rel: str) -> str:
     return "{}/{}".format(hub_root_rel, path)
 
 
-def _asset_rows(book: ClaimBook, entry: Dict[str, Any]) -> None:
+def _asset_rows(book: ClaimBook, entry: Dict[str, Any], prefix: str) -> None:
     """One row per consumer asset, naming the seed it comes from."""
     module_id = str(entry["id"])
     assets = entry.get("assets") or []
     if not assets:
         book.row(
-            ["(none)", "—", "—", _registry_row(module_id)],
+            ["(none)", "—", "—", _registry_row(module_id, prefix)],
             subject=module_id,
             fact="asset_inventory",
             value="none",
-            citations=[_registry_row(module_id)],
+            citations=[_registry_row(module_id, prefix)],
         )
         return
     for asset in assets:
         seed = asset.get("seed")
         present = bool(asset.get("seed_present"))
         if present and seed:
-            citations = [str(seed), _registry_row(module_id)]
+            citations = [str(seed), _registry_row(module_id, prefix)]
             value = "`{}`".format(seed)
         else:
             # The seed is missing: the only thing this line can honestly cite is
             # the registry row that reports it missing.
-            citations = [_registry_row(module_id)]
+            citations = [_registry_row(module_id, prefix)]
             value = "NO SEED"
         book.row(
             [
@@ -152,26 +182,40 @@ def _asset_rows(book: ClaimBook, entry: Dict[str, Any]) -> None:
         )
 
 
+def _drift_findings(entry: Dict[str, Any], findings: Sequence[Refusal]) -> List[Refusal]:
+    """The findings that belong to this module — one rule, used twice."""
+    return [finding for finding in findings if finding.subject == str(entry["id"])]
+
+
 def _drift(entry: Dict[str, Any], findings: Sequence[Refusal]) -> str:
-    mine = [f for f in findings if f.subject == str(entry["id"])]
+    mine = _drift_findings(entry, findings)
     if not mine:
         return "none"
     return "; ".join("{}: {}".format(f.code, f.detail) for f in mine)
 
 
-def _module_findings(entry: Dict[str, Any], revision_known: bool = True) -> List[Refusal]:
-    """What a module entry must not be, checked before it is rendered."""
+def _module_findings(
+    entry: Dict[str, Any], policy: claim_policy.ClaimPolicy, revision_known: bool = True
+) -> List[Refusal]:
+    """What a module entry must not be, checked before it is rendered.
+
+    The pending rule is the policy's: which state counts as pending, that it may
+    only be rendered with ``shipped: false``, that it must name its blocker, and
+    which refusals say so. A rule restated here would be a second policy.
+    """
     module_id = str(entry["id"])
     state = state_of(entry)
     findings: List[Refusal] = []
-    if state == TARGET_PENDING:
-        if entry.get("shipped") is not False:
+    if state == policy.pending_state:
+        if entry.get("shipped") is not policy.pending_shipped_must_be:
             findings.append(
                 Refusal(
-                    "BRIEF-PENDING-RENDERED-SHIPPED",
+                    policy.pending_shipped_code,
                     module_id,
-                    "the registry says target-pending, but this entry reports shipped={!r} — "
-                    "pending is never rendered as shipped".format(entry.get("shipped")),
+                    "the registry says {}, but this entry reports shipped={!r} — "
+                    "pending is never rendered as shipped".format(
+                        policy.pending_renders, entry.get("shipped")
+                    ),
                     "{} (state={}, shipped={!r})".format(
                         entry.get("reference", {}).get("path") or REGISTRY_DOCUMENT,
                         state,
@@ -179,10 +223,10 @@ def _module_findings(entry: Dict[str, Any], revision_known: bool = True) -> List
                     ),
                 )
             )
-        if not entry.get("blocking"):
+        if policy.pending_blocker_required and not entry.get("blocking"):
             findings.append(
                 Refusal(
-                    "BRIEF-PENDING-NO-BLOCKER",
+                    policy.pending_blocker_code,
                     module_id,
                     "a pending module must name the blocking hub issue(s) that keep it "
                     "pending — an unnamed blocker is indistinguishable from a wish",
@@ -244,8 +288,22 @@ def compose(
     document: Dict[str, Any],
     repo_root: Path,
     hub_root_rel: str = DEFAULT_HUB,
+    *,
+    policy: Optional[claim_policy.ClaimPolicy] = None,
+    audit_trail: Optional[audit.Trail] = None,
 ) -> Composition:
-    """Compose the brief from a registry document. Deterministic over one revision."""
+    """Compose the brief from a registry document. Deterministic over one revision.
+
+    ``policy`` is the declared claim-resolution policy; it is read from this
+    package's ``claim-policy.json`` unless a caller hands in its own (which is how
+    the suite proves the composer reads it rather than restating it).
+
+    ``audit_trail`` is where this run's single audit record is appended **after**
+    the findings are known — the trail records a run, it never influences one.
+    """
+    policy = policy or claim_policy.load()
+    prefix = policy.registry_prefix
+    schema = brief_schema.load()
     repo_root = Path(repo_root)
     hub_root = repo_root / hub_root_rel
 
@@ -286,7 +344,11 @@ def compose(
             )
 
     for entry in sorted(modules, key=lambda item: str(item["id"])):
-        findings.extend(_module_findings(entry, revision_known=bool(hub_revision_known)))
+        findings.extend(
+            _module_findings(
+                entry, policy, revision_known=bool(hub_revision_known)
+            )
+        )
     module_findings = sorted_refusals(iter(findings))
 
     book = ClaimBook()
@@ -432,6 +494,7 @@ def compose(
                 module_findings,
                 hub_root_rel,
                 refusals,
+                prefix,
                 revision_known=hub_revision_known,
             )
     book.blank()
@@ -464,7 +527,7 @@ def compose(
                 subject=module_id,
                 fact="membership",
                 value=NOT_A_MODULE,
-                citations=[_registry_row(module_id)],
+                citations=[_registry_row(module_id, prefix)],
             )
     book.blank()
 
@@ -511,14 +574,117 @@ def compose(
             repo_root=repo_root,
             hub_root=hub_root,
             ids=registry_ids,
+            policy=policy,
         )
     )
-    return Composition(
+
+    # The machine document, and the composer's duty to validate what it emits:
+    # a document that stops being the frozen shape is a finding, not a silence.
+    document_of_run = _document(
+        registry=document,
+        modules=modules,
+        refused=refused,
+        recomputed=recomputed,
+        claims=claims,
+        findings=sorted_refusals(iter(findings)),
+        hub_revision=str(hub_revision),
+        hub_revision_source=str(hub_revision_source),
+        prefix=prefix,
+    )
+    findings.extend(brief_schema.validate(document_of_run, schema))
+
+    composition = Composition(
         text=book.render(),
         claims=claims,
         findings=sorted_refusals(iter(findings)),
         ids=tuple(registry_ids),
+        document=document_of_run,
     )
+    if audit_trail is not None:
+        # One record per composed brief run — appended here, never anywhere else,
+        # so the trail cannot record something that did not happen.
+        audit_trail.record(composition, policy)
+    return composition
+
+
+def _document(
+    *,
+    registry: Dict[str, Any],
+    modules: Sequence[Dict[str, Any]],
+    refused: Sequence[Dict[str, Any]],
+    recomputed: Mapping[str, int],
+    claims: Sequence[Claim],
+    findings: Sequence[Refusal],
+    hub_revision: str,
+    hub_revision_source: str,
+    prefix: str,
+) -> Dict[str, Any]:
+    """The composition as the machine document ``brief.schema.json`` freezes.
+
+    The same data the rendered text is built from, so the two cannot describe
+    different compositions. Absent values are the empty string with an explicit
+    presence flag rather than ``null``: the frozen schema is restricted to the
+    validation subset the repository's own validator implements, which has no
+    nullable type, and an explicit flag is the honest form anyway — "the registry
+    reports no pin at this revision" is a fact, not a missing value.
+    """
+    records: List[Dict[str, Any]] = []
+    for entry in sorted(modules, key=lambda item: str(item["id"])):
+        module_id = str(entry["id"])
+        health = entry.get("health") or {}
+        mandatory = entry.get("mandatory")
+        records.append(
+            {
+                "id": module_id,
+                "state": state_of(entry),
+                "owning_repo": str(entry.get("owning_repo") or ""),
+                "mandatory": mandatory if isinstance(mandatory, bool) else None,
+                "shipped": entry.get("shipped") is True,
+                "pin": str(entry.get("pin") or ""),
+                "pin_present": bool(entry.get("pin")),
+                "rev": str(entry.get("rev") or ""),
+                "rev_present": bool(entry.get("rev")),
+                "consumer_assets": [str(a) for a in entry.get("consumer_assets") or []],
+                "assets": [
+                    {
+                        "asset": str(asset.get("asset") or ""),
+                        "seed": str(asset.get("seed") or ""),
+                        "seed_present": bool(asset.get("seed_present")),
+                    }
+                    for asset in entry.get("assets") or []
+                ],
+                "health": {
+                    "kind": str(health.get("kind") or ""),
+                    "status": str(health.get("status") or "unknown"),
+                    "reason": str(health.get("reason") or ""),
+                },
+                "board_ref": str(entry.get("board_ref") or ""),
+                "blocking": [str(item) for item in entry.get("blocking") or []],
+                "drift": [
+                    finding.as_dict() for finding in _drift_findings(entry, findings)
+                ],
+            }
+        )
+    return {
+        "schema": SCHEMA,
+        "hub": {
+            "revision": hub_revision,
+            "revision_source": hub_revision_source,
+        },
+        "states": list(STATES),
+        "summary": {state: int(recomputed.get(state, 0)) for state in STATES},
+        "modules": records,
+        "refused": [
+            {
+                "id": str(entry["id"]),
+                "kind": str(entry.get("reference", {}).get("kind") or ""),
+                "detail": str(entry.get("detail") or entry.get("note") or ""),
+            }
+            for entry in sorted(refused, key=lambda item: str(item["id"]))
+        ],
+        "claims": [claim.as_dict() for claim in claims],
+        "findings": [finding.as_dict() for finding in findings],
+    }
 
 
 def _module(
@@ -527,6 +693,7 @@ def _module(
     findings: Sequence[Refusal],
     hub_root_rel: str,
     refusals: Sequence[Refusal],
+    prefix: str,
     revision_known: bool = True,
 ) -> None:
     """One module: the fields acceptance 2 freezes, each with its citation."""
@@ -534,7 +701,7 @@ def _module(
     state = str(entry["state"])
     reference = entry.get("reference") or {}
     reference_path = _reference_citation(reference, hub_root_rel)
-    row_citations = [_registry_row(module_id)]
+    row_citations = [_registry_row(module_id, prefix)]
     if reference_path:
         row_citations.append(reference_path)
 
@@ -543,7 +710,7 @@ def _module(
         subject=module_id,
         fact="state",
         value=state,
-        citations=[_registry_row(module_id)],
+        citations=[_registry_row(module_id, prefix)],
     )
     book.blank()
 
@@ -621,7 +788,7 @@ def _module(
         subject=module_id,
         fact="health",
         value=str(health.get("status") or "unknown"),
-        citations=[HEALTH_MODULE, _registry_row(module_id)],
+        citations=[HEALTH_MODULE, _registry_row(module_id, prefix)],
     )
     board_ref = entry.get("board_ref")
     book.row(
@@ -646,7 +813,7 @@ def _module(
             subject=module_id,
             fact="blocking",
             value=",".join(str(item) for item in blocking),
-            citations=[TARGETS, _registry_row(module_id)],
+            citations=[TARGETS, _registry_row(module_id, prefix)],
         )
         if entry.get("onboarding"):
             book.row(
@@ -658,7 +825,7 @@ def _module(
                 subject=module_id,
                 fact="onboarding",
                 value=str(entry.get("onboarding")),
-                citations=[TARGETS, _registry_row(module_id)],
+                citations=[TARGETS, _registry_row(module_id, prefix)],
             )
     book.row(
         [
@@ -674,7 +841,7 @@ def _module(
     book.blank()
 
     _table(book, ["Consumer asset", "Seed it comes from", "Seed present", "Source"])
-    _asset_rows(book, entry)
+    _asset_rows(book, entry, prefix)
     book.blank()
 
 
