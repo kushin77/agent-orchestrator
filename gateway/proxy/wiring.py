@@ -224,7 +224,11 @@ class ProviderRegistryBackend:
 
         registry = self.registry
         # Pin this candidate's provider as the tenant route for the registry
-        # tier, then perform one resilient, stamped, audited provider call.
+        # tier, then perform ONE resilient, stamped, audited provider call.
+        # The provider's own fallback chain is disabled: the proxy dispatch
+        # loop owns the ordered candidate chain (routing.yaml) and walks it
+        # itself, so a per-provider ollama fallback here would shadow the
+        # intermediate candidates.
         registry.set_tenant_mapping(
             invocation.tenant_id, {candidate.registry_tier: candidate.provider}
         )
@@ -239,6 +243,7 @@ class ProviderRegistryBackend:
                 tenant_id=invocation.tenant_id,
                 agent_id=invocation.agent_id,
                 logical_key=candidate.registry_tier,
+                allow_fallback=False,
             )
         except OutputValidationError as exc:
             raise BackendOutputInvalidError(str(exc)) from exc

@@ -327,8 +327,18 @@ class ProviderRegistry:
         temperature: float | None = None,
         max_tokens: int | None = None,
         timeout_ms: int | None = None,
+        allow_fallback: bool = True,
     ) -> ChatResult:
-        """Route and perform one resilient, stamped, audited model call."""
+        """Route and perform one resilient, stamped, audited model call.
+
+        ``allow_fallback`` controls the graceful-degradation walk of the
+        routed provider's own ``fallback`` chain (cloud -> local by default).
+        Callers that already own an ordered candidate chain (the gateway
+        proxy dispatch loop) pass ``allow_fallback=False`` so this method
+        performs EXACTLY ONE candidate's call and the caller's chain decides
+        the next hop — otherwise the provider's ``ollama`` fallback shadows
+        the caller's intermediate candidates.
+        """
         route = self.resolve_route(tenant_id, logical_key)
         route_model = model or route.model
         config = self.config_for(route.provider)
@@ -347,7 +357,7 @@ class ProviderRegistry:
         try:
             return client.chat(coerced, schema, primary_options, context)
         except (ProviderUnavailableError, RetryExhaustedError, CircuitOpenError) as primary_error:
-            if not config.fallback:
+            if not config.fallback or not allow_fallback:
                 raise
             # Graceful degradation: walk the provider's fallback chain. Each
             # fallback resolves ITS OWN model for the logical key (a fallback

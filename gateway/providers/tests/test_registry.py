@@ -254,6 +254,31 @@ def test_graceful_degradation_to_ollama(sentiment_schema) -> None:
     assert result.content == CONTENT_OBJ
 
 
+def test_allow_fallback_false_skips_the_provider_fallback_chain(sentiment_schema) -> None:
+    """``allow_fallback=False`` performs exactly one provider's call: a caller
+    that owns its own candidate chain (the gateway proxy) gets the primary's
+    failure back instead of a silent degrade to Ollama (issue #334)."""
+
+    def transport_factory(name, cfg):
+        if name == "deepseek":
+            return FailingTransport()
+        return RecordingTransport([ok_response("ollama", "llama3.2", VALID_CONTENT)])
+
+    registry = _registry(
+        credentials_factory=lambda tenant, provider: Credentials(api_key=FAKE_KEY),
+        transport_factory=transport_factory,
+    )
+    with pytest.raises(RetryExhaustedError):
+        registry.chat(
+            make_messages(),
+            sentiment_schema,
+            tenant_id="acme",
+            agent_id="agent-1",
+            logical_key="MED",
+            allow_fallback=False,
+        )
+
+
 def test_hermes_degrades_to_ollama(sentiment_schema) -> None:
     """Hermes unavailable -> degrade to its local Ollama fallback (frozen map)."""
 
