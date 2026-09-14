@@ -119,6 +119,7 @@ from cpapi import errors as cpapi_errors  # noqa: E402
 from rbac.guard import guard  # noqa: E402
 from rbac.model import ScopeNode  # noqa: E402
 
+from portal.server.control_audit import ControlAudit  # noqa: E402
 from portal.server.fleet import surface_enabled  # noqa: E402
 from portal.server.fleet_authz import PLATFORM_ORG  # noqa: E402
 
@@ -607,7 +608,9 @@ class RemoteControl:
         # RC-4 (#555) replaces exactly this line: its audited ledger implements
         # the same three calls (begin / finish / end) and appends the record.
         self.commands: CommandLedger = (
-            commands if commands is not None else InFlightCommands()
+            commands
+            if commands is not None
+            else ControlAudit(repo_root=self.repo_root)
         )
         self._vocabulary: Optional[Vocabulary] = None
 

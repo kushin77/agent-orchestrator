@@ -134,6 +134,18 @@ checks=(
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'
   'terraform|bash scripts/check-terraform.sh'
+  # scratch-safety (issue #488): one agent scratch log reached 14.8 GB and filled
+  # this box's /tmp -- a 16 GB tmpfs, i.e. RAM -- stopping every parallel lane at
+  # once; the knock-on was worse than the disk, because `cp` wrote a 0-byte
+  # "backup" and restoring from it truncated a source file to empty. The check
+  # proves each of its refusals with a provoked control -- SCRATCH-SELF-APPEND
+  # (the incident's own driver), SCRATCH-FILE-OVERSIZE, SCRATCH-SPACE-NEAR-FULL,
+  # SCRATCH-TMP-WORKTREE and SCRATCH-EMPTY-COPY -- and lints the repo's tracked
+  # *.sh, so it cannot pass vacuously. The live machine verdict it prints is
+  # ADVISORY by design: a gate that reddens because a NEIGHBOUR filled the tmpfs
+  # reddens an unrelated diff, and the machine-level guard (its own timer) owns
+  # that verdict; `--scan` is the verb that refuses by name on demand.
+  'scratch-safety|bash scripts/check-scratch-safety.sh'
   # EPIC #144 (per-repo agent fleet) governance surfaces — each is tri-state
   # (0 OK / 1 NOT-OK / 2 CANNOT-ASSESS) and proves its own negative control.
   'cto-overlay|bash scripts/check-cto-overlay.sh'

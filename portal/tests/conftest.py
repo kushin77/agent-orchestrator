@@ -202,3 +202,26 @@ def login_as(app, email: str, tenant_id: str, *, role: str = "user") -> ApiClien
     api = ApiClient(app)
     api.authenticate(email, tenant_id, role=role)
     return api
+
+
+@pytest.fixture(autouse=True)
+def isolate_control_rails(tmp_path, monkeypatch):
+    """No portal test may write the repository's own control rail.
+
+    RC-4 (#555) wired the audited ledger (``portal/server/control_audit.py``) in
+    as the control surface's default collaborator. Before that the default was
+    an in-memory guard, so a test that applied a mutating verb wrote nothing;
+    now such a command appends to a real rail, and without this fixture every
+    run that exercises one writes
+    ``<repo>/.portal/control/ledger/<tenant>.jsonl`` — dirtying the working tree
+    and leaking one test's records into the next.
+
+    The rails are pointed at this test's own ``tmp_path`` for the whole suite. A
+    test that wants a specific rail still overrides these (see
+    ``test_control_audit.py``'s ``rails`` fixture); this removes only the
+    possibility of silently using the repository's own.
+    """
+    from portal.server.control_audit import LEDGER_DIR_ENV, SLOG_ENV
+
+    monkeypatch.setenv(LEDGER_DIR_ENV, str(tmp_path / "control-ledger"))
+    monkeypatch.setenv(SLOG_ENV, str(tmp_path / "fleet" / "slog.jsonl"))
