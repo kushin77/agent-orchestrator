@@ -265,7 +265,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     reap = sub.add_parser("reap", help="release claims wedged by dead agents past a threshold")
     add_paths(reap)
-    reap.add_argument("--older-than-minutes", type=int, default=45)
+    reap.add_argument("--older-than-minutes", type=int, default=claims.DEFAULT_REAP_MINUTES)
     reap.add_argument("--issue", type=int, default=None)
     reap.add_argument("--reaper", default="brain")
     reap.set_defaults(func=cmd_reap)

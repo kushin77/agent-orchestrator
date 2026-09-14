@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile knowledge-index knowledge-index-build \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy knowledge-index knowledge-index-build \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -107,7 +107,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -217,6 +217,17 @@ github-lifecycle:
 ## exists nowhere else are shelved with their worktree, branch and claim intact
 reconcile:
 	@bash scripts/check-reconcile.sh
+
+
+## lease-policy — one declared policy for every fleet lease and TTL (issue #322):
+## the rung heartbeat, session heartbeat, session/reconcile TTL, claim TTL and
+## reap threshold, snapshot staleness and directive lifetime are declared once in
+## governance/policy/lease.py with their ordering invariants written as
+## machine-checkable relations; every consumer reads the policy, a module that
+## restates a value fails the gate, and every invariant must be refutable by a
+## named mutation (a session TTL below the rung heartbeat is refused)
+lease-policy:
+	@bash scripts/check-lease-policy.sh
 
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):

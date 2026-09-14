@@ -39,6 +39,11 @@ from pathlib import Path
 import runtime
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from governance.policy import lease  # noqa: E402
+
 FLEET_DIR = runtime.FLEET_DIR
 SCHEMA_PATH = ROOT / "fleet" / "schema" / "message.schema.json"
 INBOX = FLEET_DIR / "inbox"
@@ -89,8 +94,13 @@ EXIT_NOT_OK = 1
 EXIT_CANNOT_ASSESS = 2
 
 # A beat older than this means the loop died rather than that it is busy: the
-# loop beats every poll cycle (default 30s) and before each directive.
-STALE_HEARTBEAT_SECONDS = 120
+# loop beats every poll cycle (default 30s) and before each directive. The value
+# is declared once in governance/policy/lease.py with its ordering invariants.
+STALE_HEARTBEAT_SECONDS = lease.RUNG_HEARTBEAT_SECONDS
+
+# A directive the sister never drains is abandoned after this long; `status`
+# reports the abandoned ones rather than counting them as queued.
+DIRECTIVE_LIFETIME_SECONDS = lease.DIRECTIVE_LIFETIME_SECONDS
 
 
 def now_iso() -> str:
@@ -419,6 +429,35 @@ def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -
     return age <= STALE_HEARTBEAT_SECONDS
 
 
+def expired_directives(directory: Path, moment: float | None = None) -> list[Path]:
+    """Pending directives older than the declared directive lifetime.
+
+    A directive the sister never consumes is abandoned after
+    `DIRECTIVE_LIFETIME_SECONDS` (governance/policy/lease.py). Past that age it is
+    stale mail, not queued work, and `status` says so.
+    """
+    reference = time.time() if moment is None else moment
+    stale: list[Path] = []
+    if not directory.exists():
+        return stale
+    for path in sorted(directory.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        stamp = payload.get("ts")
+        if not isinstance(stamp, str):
+            continue
+        try:
+            seen = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        age = (datetime.fromtimestamp(reference, tz=timezone.utc) - seen).total_seconds()
+        if age > DIRECTIVE_LIFETIME_SECONDS:
+            stale.append(path)
+    return stale
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     def count(directory: Path) -> int:
         return len(list(directory.glob("*.json"))) if directory.exists() else 0
@@ -428,6 +467,12 @@ def cmd_status(args: argparse.Namespace) -> int:
         f"brain: {count(BRAIN_INBOX)} order(s) pending | {count(BRAIN_DONE)} dispatched | "
         f"{count(BRAIN_OUTBOX)} reply(ies)"
     )
+    abandoned = expired_directives(INBOX)
+    if abandoned:
+        print(
+            f"inbox: {len(abandoned)} directive(s) older than the declared directive lifetime "
+            f"({int(DIRECTIVE_LIFETIME_SECONDS)}s) — abandoned, not queued"
+        )
     brain_ok = report_rung("brain", BRAIN_HEARTBEAT, "fleet/brain.py", "bash fleet/brain.sh")
     sister_ok = report_rung("sister", HEARTBEAT, "fleet/terminal.py", "bash fleet/terminal.sh")
     return EXIT_OK if (brain_ok and sister_ok) else EXIT_NOT_OK
