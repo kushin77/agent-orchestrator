@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -337,6 +337,14 @@ paperclip-integration:
 ## exceptions and escalates repeated violations (see governance/board/CHARTER.md)
 board-gate:
 	@python3 governance/board/cli.py check
+
+## cross-repo-boundary — cross-repo execution boundary (issue #388): the main
+## board snapshot carries no body, so this gate reads the committed
+## boundary-specific export and refuses a foreign-repo backlog item filed here
+## (NG4); the 11 legacy children are quarantined by name while their tracker is
+## open, and a snapshot whose records lack a body is CANNOT-ASSESS, never OK
+cross-repo-boundary:
+	@bash scripts/check-cross-repo-boundary.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:

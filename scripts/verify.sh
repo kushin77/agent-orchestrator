@@ -53,6 +53,7 @@ checks=(
   'conformance|bash scripts/check-conformance.sh'
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'
+  'cross-repo-boundary|bash scripts/check-cross-repo-boundary.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
