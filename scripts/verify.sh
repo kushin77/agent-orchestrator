@@ -155,6 +155,11 @@ checks=(
   # no-vendoring finding, deterministic rebuilds. It returns CANNOT-ASSESS (rc 2)
   # when `vendor/CMR` is not initialised, never a pass.
   'module-registry|bash scripts/check-module-registry.sh'
+  # #447 (the M28 tail): the paperclip reporting agent's module brief — the
+  # artifact composes only from #445's registry, every claim resolves to a
+  # registry row or a cited hub path, Pending is never rendered as shipped, and
+  # the capability the persona declares is one its allowlist actually grants.
+  'module-brief|bash scripts/check-module-brief.sh'
   # EPIC #461 (the diagrams chain): diagrams-declaration (#464) proves the
   # architecture.yaml / gdc-manifest.yaml seeds conform to the vendored CMR
   # contract. (Its sibling, the #465 ADR-0017 projection gate

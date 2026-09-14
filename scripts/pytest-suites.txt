@@ -94,6 +94,7 @@ integrations/paperclip/adapters/secrets
 integrations/paperclip/adapters/skills
 integrations/paperclip/api
 integrations/paperclip/auth
+integrations/paperclip/reporting
 registry/parity
 scripts
 # EPIC #500 (M30 — the enterprise chat surface; issue #502 is the wiring lane):
