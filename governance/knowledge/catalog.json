@@ -1,10 +1,10 @@
 {
   "counts": {
-    "adr": 11,
+    "adr": 14,
     "architecture": 6,
     "golden-rules": 2,
     "governance": 10,
-    "issue-metadata": 113,
+    "issue-metadata": 136,
     "pattern-template": 26,
     "policy": 6
   },
@@ -31,7 +31,7 @@
       "status": "present"
     },
     {
-      "count": 11,
+      "count": 14,
       "kind": "adr",
       "reason": "",
       "required": true,
@@ -52,7 +52,7 @@
       "status": "present"
     },
     {
-      "count": 113,
+      "count": 136,
       "kind": "issue-metadata",
       "reason": "",
       "required": true,
@@ -87,8 +87,8 @@
       "severity": "warning"
     }
   ],
-  "generated_at": "2026-09-13T18:12:31Z",
-  "item_count": 174,
+  "generated_at": "2026-09-14T02:59:21Z",
+  "item_count": 200,
   "items": [
     {
       "id": "docs/decision-records/ADR-0001-adr-process-template-adoption.md",
@@ -719,15 +719,204 @@
       "title": "Adr 0010 Canonical Copy Ownership"
     },
     {
+      "id": "docs/decision-records/ADR-0011-session-fleet-transport.md",
+      "keywords": [
+        "contract",
+        "transport",
+        "brain",
+        "engine",
+        "fleet",
+        "loop",
+        "state",
+        "wait",
+        "completion",
+        "directive",
+        "layer",
+        "mailbox",
+        "repo's",
+        "session",
+        "sessions",
+        "trust",
+        "enforced",
+        "fleet/{inbox,sent,outbox,done",
+        "machine",
+        "message",
+        "rather",
+        "status",
+        "steering",
+        "target",
+        "trigger",
+        "written",
+        "accepted",
+        "adopting",
+        "adr-0011",
+        "agent-to-agent",
+        "already",
+        "carries",
+        "channel",
+        "console",
+        "credential",
+        "daemon",
+        "decision",
+        "deepseek",
+        "described",
+        "envelope"
+      ],
+      "kind": "adr",
+      "path": "docs/decision-records/ADR-0011-session-fleet-transport.md",
+      "provenance": {
+        "bytes": 5464,
+        "lines": 101,
+        "origin_path": "docs/decision-records/ADR-0011-session-fleet-transport.md",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "architecture",
+        "retrieval": "working-tree",
+        "sha256": "d1775cccc4b96a149400240bc6f63edadc2be04b9ab39b5ee7a368ab38ee2e93",
+        "timestamp": "2026-09-13T15:19:50-04:00",
+        "upstream": "",
+        "version": "429736b024e4480615ccc1f4232ccc8d1dc696c7"
+      },
+      "tags": [
+        "working-tree"
+      ],
+      "title": "Adr 0011 Session Fleet Transport"
+    },
+    {
+      "id": "docs/decision-records/ADR-0012-hermes-paperclip-boundary.md",
+      "keywords": [
+        "fleet",
+        "decision",
+        "dispatch",
+        "routing",
+        "record",
+        "contract",
+        "reporting",
+        "service",
+        "already",
+        "hermes",
+        "capability",
+        "owner",
+        "agent",
+        "declared",
+        "escalation",
+        "hermes-agents",
+        "registry",
+        "runtime",
+        "pattern",
+        "rather",
+        "gr-10",
+        "layer",
+        "migration",
+        "module",
+        "never",
+        "repo",
+        "roadmap",
+        "work",
+        "boundary",
+        "changes",
+        "gateway",
+        "provenance",
+        "source",
+        "surface",
+        "vendored",
+        "adapter",
+        "behaviour",
+        "context",
+        "here",
+        "owns"
+      ],
+      "kind": "adr",
+      "path": "docs/decision-records/ADR-0012-hermes-paperclip-boundary.md",
+      "provenance": {
+        "bytes": 18545,
+        "lines": 284,
+        "origin_path": "docs/decision-records/ADR-0012-hermes-paperclip-boundary.md",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "architecture",
+        "retrieval": "working-tree",
+        "sha256": "e3e91a44dc6bc6e02e153ce1ac6f52886dec3cfe023aae94ad678741d4a256dc",
+        "timestamp": "2026-09-13T19:29:39-04:00",
+        "upstream": "",
+        "version": "b76e8fcae3f18c2f58acd21c098ff654d5c7833e"
+      },
+      "tags": [
+        "working-tree"
+      ],
+      "title": "Adr 0012 Hermes Paperclip Boundary"
+    },
+    {
+      "id": "docs/decision-records/ADR-0013-paperclip-ing-integration.md",
+      "keywords": [
+        "seam",
+        "upstream",
+        "boundary",
+        "cost",
+        "fleet",
+        "process",
+        "fork",
+        "operator",
+        "surface",
+        "embed",
+        "runtime",
+        "three",
+        "decision",
+        "adr-0012",
+        "auth",
+        "authoritative",
+        "contracts",
+        "adoption",
+        "integration",
+        "mode",
+        "paperclipai",
+        "adapter",
+        "already",
+        "every",
+        "here",
+        "keeps",
+        "models",
+        "ours",
+        "real",
+        "rebase",
+        "record",
+        "adopt",
+        "audit",
+        "bounded",
+        "budget",
+        "changes",
+        "contract",
+        "control",
+        "couple",
+        "cross-boundary"
+      ],
+      "kind": "adr",
+      "path": "docs/decision-records/ADR-0013-paperclip-ing-integration.md",
+      "provenance": {
+        "bytes": 9165,
+        "lines": 150,
+        "origin_path": "docs/decision-records/ADR-0013-paperclip-ing-integration.md",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "architecture",
+        "retrieval": "working-tree",
+        "sha256": "4c66ecb2e86bb9b98bf7b3dd4c95995c6339c4a9beb8a870572562399306a285",
+        "timestamp": "2026-09-13T22:29:32-04:00",
+        "upstream": "",
+        "version": "b4bd5fa10f47e569eefa3524667672ef922b7411"
+      },
+      "tags": [
+        "working-tree"
+      ],
+      "title": "Adr 0013 Paperclip Ing Integration"
+    },
+    {
       "id": "docs/decision-records/README.md",
       "keywords": [
         "reserved",
-        "decision",
         "issue",
+        "decision",
+        "accepted",
         "contract",
         "issues",
         "phase",
-        "accepted",
         "status",
         "architecture",
         "adrs",
@@ -739,6 +928,7 @@
         "proposed",
         "superseded",
         "write",
+        "adopt",
         "agent",
         "becomes",
         "canonical",
@@ -754,27 +944,26 @@
         "later",
         "never",
         "observability",
+        "ownership",
         "owning",
         "path",
         "pillar",
         "pillar-contract",
-        "pillars",
-        "plane",
-        "process"
+        "pillars"
       ],
       "kind": "adr",
       "path": "docs/decision-records/README.md",
       "provenance": {
-        "bytes": 4989,
-        "lines": 86,
+        "bytes": 5478,
+        "lines": 89,
         "origin_path": "docs/decision-records/README.md",
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "architecture",
         "retrieval": "working-tree",
-        "sha256": "e5801d3b725ebf0ecce8ee078e5c0c75fbb919619c35fe058216a7b1e05d7ab3",
-        "timestamp": "2026-09-08T18:59:55-04:00",
+        "sha256": "41c4c34eac1a336011087624e86edb19d87ccc786cc36e0a20b7a9d05b02d29a",
+        "timestamp": "2026-09-13T22:29:32-04:00",
         "upstream": "",
-        "version": "6409f62a5ec5e869149fc4d18fcc71c18c6c1cbf"
+        "version": "b4bd5fa10f47e569eefa3524667672ef922b7411"
       },
       "tags": [
         "working-tree"
@@ -850,57 +1039,57 @@
         "ready",
         "pattern",
         "source",
-        "reference",
-        "agent",
         "model",
+        "reference",
         "repo",
+        "agent",
+        "issue",
+        "tier",
         "leaderboard",
-        "canonical",
         "verdict",
-        "audit",
-        "canonical-copy",
-        "per-tenant",
-        "copy",
-        "eiq-ai",
-        "git-rca-workspace",
+        "never",
         "harvest",
-        "index",
-        "multi-tenant",
-        "path(s",
-        "policy",
+        "vocabulary",
+        "repo's",
         "upstream",
-        "control-plane",
-        "dprs",
-        "registry",
-        "saas",
-        "shared-frontend",
-        "trio",
-        "capital-underwriting",
-        "engine",
-        "platform",
-        "rbac",
-        "control",
-        "duplicate",
-        "extraction",
+        "code",
+        "asset",
+        "audit",
         "fleet",
-        "persona",
-        "policy-as-code",
+        "canonical",
+        "finops",
+        "harvested",
+        "ollama",
+        "registry",
+        "role",
+        "copied",
+        "local",
+        "canonical-copy",
+        "catalog",
+        "copy",
+        "gate",
+        "path(s",
+        "per-tenant",
+        "policy",
         "product",
-        "recover"
+        "contract",
+        "control-plane",
+        "eiq-ai",
+        "four"
       ],
       "kind": "architecture",
       "path": "docs/CANNIBALIZATION.md",
       "provenance": {
-        "bytes": 32564,
-        "lines": 298,
+        "bytes": 60538,
+        "lines": 599,
         "origin_path": "docs/CANNIBALIZATION.md",
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "architecture",
         "retrieval": "working-tree",
-        "sha256": "0a298f8f40757ca254ebad2c375ce6d71de1e84314313758d4214a462bdafa2f",
-        "timestamp": "2026-09-08T13:37:48-04:00",
+        "sha256": "80adf6fcac6fe72be05f7c6c0168f31f0409276a7a4a507979db72d607d07c7b",
+        "timestamp": "2026-09-13T22:27:34-04:00",
         "upstream": "",
-        "version": "b0c8d5d9ba0c4d134e0ef200aea46b7a529c9b30"
+        "version": "ec5da7b824876130eec1c22b527bd8b7b6c9de4c"
       },
       "tags": [
         "working-tree"
@@ -1290,58 +1479,58 @@
       "keywords": [
         "issue",
         "never",
+        "lane",
+        "work",
+        "branch",
+        "claim",
+        "verify",
+        "every",
+        "evidence",
         "phase",
         "repo",
-        "verify",
-        "lane",
         "agent",
+        "whose",
         "board",
-        "claim",
-        "work",
-        "default",
-        "evidence",
-        "fleet",
-        "github",
-        "issues",
         "master",
+        "commit",
+        "default",
+        "fleet",
+        "gate",
+        "github",
+        "identity",
+        "issues",
         "merge",
-        "branch",
+        "session",
+        "worktree",
         "code",
         "doctrine",
-        "gate",
+        "execution",
+        "model",
+        "open",
         "canonical",
-        "commit",
+        "chain",
+        "closes",
+        "config",
         "control",
         "cross-cutting",
+        "directive",
         "docs/execution-plan.md",
-        "execution",
         "golden",
-        "infra",
-        "model",
-        "plane",
-        "portal",
-        "repo's",
-        "verification",
-        "agent-orchestrator",
-        "agents",
-        "apply",
-        "architecture",
-        "bash",
-        "chain"
+        "green"
       ],
       "kind": "governance",
       "path": "AGENTS.md",
       "provenance": {
-        "bytes": 9999,
-        "lines": 175,
+        "bytes": 13882,
+        "lines": 225,
         "origin_path": "AGENTS.md",
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "platform-governance",
         "retrieval": "working-tree",
-        "sha256": "26b5d665d02848ea8faf78bb3d914fc96b848e098151aef82209f66d1a6ec91b",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "b9056e042c5292a1135a0b4913406ed9e45ac174b31aeb75a5f6a20a5570abe1",
+        "timestamp": "2026-09-13T19:22:12-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "0ff8adf59e32f39292d8188c45249a55ddb53a0e"
       },
       "tags": [
         "working-tree"
@@ -1481,18 +1670,24 @@
         "verify",
         "branch",
         "command",
-        "work",
-        "agents",
-        "canonical",
-        "every",
+        "lane",
         "evidence",
         "first",
+        "criteria",
+        "every",
         "gr-12",
+        "output",
+        "work",
+        "agent",
+        "agents",
+        "canonical",
         "issues",
         "lands",
-        "lane",
         "merge",
+        "never",
+        "read",
         "secrets",
+        "start",
         "agent-orchestrator",
         "ai-assistance",
         "architecture",
@@ -1504,33 +1699,27 @@
         "console",
         "control",
         "copilot",
+        "declares",
+        "dispatcher",
         "docs/execution-plan.md",
-        "gate",
-        "governance",
-        "gr-6",
-        "green",
-        "here",
-        "issue's",
-        "issue-<n>-<slug",
-        "land",
-        "master",
-        "never",
-        "output",
-        "plane"
+        "epic",
+        "exact",
+        "executes",
+        "fleet"
       ],
       "kind": "governance",
       "path": "CONTRIBUTING.md",
       "provenance": {
-        "bytes": 3203,
-        "lines": 73,
+        "bytes": 4541,
+        "lines": 99,
         "origin_path": "CONTRIBUTING.md",
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "platform-governance",
         "retrieval": "working-tree",
-        "sha256": "035226686b0c7d6e50b46e7f9d7cc57af284c530212408310bb6d122f961550a",
-        "timestamp": "2026-09-08T13:42:06-04:00",
+        "sha256": "5a7073f944428447c7e06ed7b7b9ac3d93050f6ce3f1ca82ee625287217fb615",
+        "timestamp": "2026-09-13T15:22:28-04:00",
         "upstream": "",
-        "version": "3a86710797c7843f5ac4ccc8f5fdcf6ab045a450"
+        "version": "bdbd0528ac21ce12c54b65b1c5e4324e18c0585b"
       },
       "tags": [
         "working-tree"
@@ -1793,59 +1982,59 @@
       "id": "docs/GOVERNANCE.md",
       "keywords": [
         "issue",
-        "board",
-        "every",
-        "work",
+        "lane",
         "branch",
         "claim",
-        "gate",
-        "chain",
-        "change",
-        "agent",
-        "ai-assistance",
+        "every",
+        "work",
+        "board",
         "commit",
-        "dispatch",
-        "lands",
-        "verify",
-        "agents",
-        "ai-originated",
-        "cannot",
-        "closes",
-        "code",
-        "declared",
         "evidence",
-        "execution",
-        "github",
-        "governance",
-        "issues",
-        "kanban",
-        "labels",
-        "lane",
-        "merge",
         "never",
-        "next",
-        "path",
-        "planned",
-        "record",
-        "repo",
-        "required",
-        "secrets",
-        "surface",
-        "accepted"
+        "worktree",
+        "change",
+        "gate",
+        "session",
+        "verify",
+        "agent",
+        "cannot",
+        "chain",
+        "closure",
+        "directive",
+        "lands",
+        "merge",
+        "open",
+        "pass",
+        "ai-assistance",
+        "close",
+        "closed",
+        "closes",
+        "config",
+        "declared",
+        "dispatch",
+        "green",
+        "labels",
+        "master",
+        "order",
+        "runs",
+        "signature",
+        "verified",
+        "agents",
+        "ai-originated"
       ],
       "kind": "governance",
       "path": "docs/GOVERNANCE.md",
       "provenance": {
-        "bytes": 6372,
-        "lines": 131,
+        "bytes": 11444,
+        "lines": 211,
         "origin_path": "docs/GOVERNANCE.md",
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "8239e435c474f03f030a24404fd575d56b224ff398f5e1bdc076b40e9cdb5078",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "aecba27dc3327d53f15edd49bfd3a12a36eb5ad6a83bfe2ca2560e234ed2e636",
+        "timestamp": "2026-09-13T19:22:12-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "0ff8adf59e32f39292d8188c45249a55ddb53a0e"
       },
       "tags": [
         "working-tree"
@@ -1859,6 +2048,8 @@
         "architecture",
         "canonical",
         "index",
+        "upstream",
+        "adr-0013",
         "agent-orchestrator",
         "agents",
         "agents.md`](../agents.md",
@@ -1866,49 +2057,47 @@
         "assets",
         "branch",
         "cannibalization.md",
+        "closed",
+        "cmr-refs",
         "contract",
+        "contracts",
         "contributing.md`](../contributing.md",
         "contributor",
         "control-plane",
         "conventions",
+        "cross-reference-spine.md`](cross-reference-spine.md",
         "decision",
         "dispatch",
         "doctrine",
         "documentation",
+        "edges",
+        "epic",
         "epic-00",
         "execution-plan.md`](execution-plan.md",
         "five-pillar",
+        "fleet",
+        "fleet's",
+        "fork-map",
+        "frozen",
         "governance.md`](governance.md",
         "harvested/cannibalized",
+        "heartbeat/ticket/budget",
         "human",
-        "issues",
-        "later",
-        "one-issue-one-lane",
-        "parallel",
-        "phase/wave",
-        "planned",
-        "precedence-ordered",
-        "process",
-        "provenance",
-        "purpose",
-        "records",
-        "release",
-        "releasing.md`](../releasing.md",
-        "repo's"
+        "integration"
       ],
       "kind": "governance",
       "path": "docs/README.md",
       "provenance": {
-        "bytes": 859,
-        "lines": 19,
+        "bytes": 1373,
+        "lines": 22,
         "origin_path": "docs/README.md",
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "46b46905d5cec52f8c15c3da8fed051a731d0e66ba256ff225c0829798b38f7d",
-        "timestamp": "2026-09-08T13:42:06-04:00",
+        "sha256": "2d1ce7ecb1c0607ab345d6401673aa935041decc2a0e3b01565fa3864577cc83",
+        "timestamp": "2026-09-13T22:29:32-04:00",
         "upstream": "",
-        "version": "3a86710797c7843f5ac4ccc8f5fdcf6ab045a450"
+        "version": "b4bd5fa10f47e569eefa3524667672ef922b7411"
       },
       "tags": [
         "working-tree"
@@ -1935,10 +2124,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED"
@@ -1971,10 +2160,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2012,10 +2201,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2051,10 +2240,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2087,10 +2276,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2122,10 +2311,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2156,10 +2345,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2192,10 +2381,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2229,10 +2418,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2264,10 +2453,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2300,10 +2489,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2337,10 +2526,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2376,10 +2565,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2415,10 +2604,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2451,10 +2640,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2486,10 +2675,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2520,10 +2709,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2556,10 +2745,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2593,10 +2782,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2628,10 +2817,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2664,10 +2853,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2701,10 +2890,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2741,10 +2930,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2776,10 +2965,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2807,10 +2996,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2839,10 +3028,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2873,10 +3062,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -2905,10 +3094,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED"
@@ -2935,10 +3124,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -2962,10 +3151,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -2989,10 +3178,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3016,10 +3205,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3043,10 +3232,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3078,10 +3267,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -3110,10 +3299,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3137,10 +3326,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3164,10 +3353,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3191,10 +3380,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3218,10 +3407,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3245,10 +3434,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3272,10 +3461,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3299,10 +3488,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN"
@@ -3339,10 +3528,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -3385,10 +3574,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -3426,10 +3615,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -3449,6 +3638,7 @@
         "blocked_by:139",
         "class",
         "class:enterprise",
+        "closed",
         "conformance",
         "enforce",
         "enterprise",
@@ -3456,7 +3646,6 @@
         "index",
         "knowledge",
         "normalization",
-        "open",
         "parent:138",
         "pattern",
         "policy",
@@ -3474,13 +3663,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M24 - Enterprise Knowledge Index & Policy Normalization",
         "area:standards",
         "class:enterprise",
@@ -3500,6 +3689,7 @@
         "area:lessons",
         "capture",
         "class:enterprise",
+        "closed",
         "corrective",
         "enforce",
         "enterprise",
@@ -3510,7 +3700,6 @@
         "knowledge",
         "lessons",
         "normalization",
-        "open",
         "parent:138",
         "policy",
         "priority:p1",
@@ -3525,13 +3714,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M24 - Enterprise Knowledge Index & Policy Normalization",
         "area:incident-response",
         "area:lessons",
@@ -3551,6 +3740,7 @@
         "automatically",
         "blocked_by:140",
         "class:enterprise",
+        "closed",
         "drift",
         "enterprise",
         "gdc:enterprise",
@@ -3560,7 +3750,6 @@
         "knowledge",
         "non-compliance",
         "normalization",
-        "open",
         "parent:138",
         "priority:p1",
         "remediation",
@@ -3576,13 +3765,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M24 - Enterprise Knowledge Index & Policy Normalization",
         "area:remediation",
         "class:enterprise",
@@ -3602,6 +3791,7 @@
         "blocked_by:142",
         "board",
         "class:elite",
+        "closed",
         "cmr/gdc",
         "compliance",
         "enforcement",
@@ -3612,7 +3802,6 @@
         "governance",
         "index",
         "normalization",
-        "open",
         "parent:138",
         "policy",
         "priority:p0",
@@ -3627,13 +3816,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M24 - Enterprise Knowledge Index & Policy Normalization",
         "area:board",
         "class:elite",
@@ -3675,10 +3864,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -3722,10 +3911,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -3765,10 +3954,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -3809,10 +3998,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -3857,10 +4046,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -3905,10 +4094,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -3945,10 +4134,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -3991,10 +4180,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -4037,10 +4226,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -4083,10 +4272,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4126,10 +4315,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4178,10 +4367,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4222,10 +4411,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4267,10 +4456,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "OPEN",
@@ -4294,11 +4483,11 @@
         "subagents",
         "area:session-fleet",
         "class:elite",
+        "closed",
         "contract",
         "define",
         "gdc:enterprise",
         "model",
-        "open",
         "operating",
         "parent:160",
         "pillar:autonomous-ops",
@@ -4316,13 +4505,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
         "area:session-fleet",
         "class:elite",
@@ -4342,12 +4531,12 @@
         "fleet",
         "area:session-fleet",
         "class:enterprise",
+        "closed",
         "gdc:enterprise",
         "implement",
         "mailbox",
         "message",
         "model",
-        "open",
         "operating",
         "parent:160",
         "pillar:autonomous-ops",
@@ -4367,13 +4556,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
         "area:session-fleet",
         "class:enterprise",
@@ -4392,6 +4581,7 @@
         "fleet",
         "area:session-fleet",
         "class:enterprise",
+        "closed",
         "directives",
         "dispatcher",
         "dumb-terminal",
@@ -4399,7 +4589,6 @@
         "fleet-brain",
         "implement",
         "model",
-        "open",
         "operating",
         "parent:160",
         "pillar:autonomous-ops",
@@ -4417,13 +4606,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
         "area:session-fleet",
         "class:enterprise",
@@ -4445,9 +4634,9 @@
         "area:session-fleet",
         "chooser",
         "class:enterprise",
+        "closed",
         "directives",
         "finops",
-        "open",
         "operating",
         "parent:160",
         "pillar:autonomous-ops",
@@ -4466,13 +4655,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
         "area:fleet",
         "area:session-fleet",
@@ -4493,11 +4682,11 @@
         "area:session-fleet",
         "brain-directed",
         "class:enterprise",
+        "closed",
         "enhance",
         "github",
         "issue",
         "model",
-        "open",
         "operating",
         "parent:160",
         "pillar:autonomous-ops",
@@ -4517,13 +4706,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
         "area:board",
         "area:session-fleet",
@@ -4546,7 +4735,7 @@
         "beyond",
         "bootstrap",
         "class:elite",
-        "open",
+        "closed",
         "operating",
         "parent:160",
         "pillar:autonomous-ops",
@@ -4567,13 +4756,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
         "area:session-fleet",
         "class:elite",
@@ -4591,13 +4780,13 @@
         "fleet",
         "area:session-fleet",
         "class:elite",
+        "closed",
         "command",
         "controls",
         "gdc:enterprise",
         "merge",
         "model",
         "negative",
-        "open",
         "operating",
         "parent:160",
         "pillar:autonomous-ops",
@@ -4618,13 +4807,13 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
-        "OPEN",
+        "CLOSED",
         "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
         "area:session-fleet",
         "class:elite",
@@ -4661,10 +4850,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4675,6 +4864,256 @@
         "type:feature"
       ],
       "title": "#17 13 FinOps model chooser (L0/L1/L2 cheapest-capable + escalate)"
+    },
+    {
+      "id": "issue-170",
+      "keywords": [
+        "claim",
+        "area:board",
+        "check",
+        "class:enterprise",
+        "conflict-free",
+        "gate",
+        "harden",
+        "open",
+        "pillar:governance",
+        "priority:p1",
+        "snapshot",
+        "staleness",
+        "storage",
+        "type:governance"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-170",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "area:board",
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:governance"
+      ],
+      "title": "#170 Harden the claim gate: snapshot staleness check + conflict-free claim storage"
+    },
+    {
+      "id": "issue-171",
+      "keywords": [
+        "brain",
+        "fleet",
+        "area:session-fleet",
+        "blocked_by:162",
+        "blocks",
+        "channel",
+        "class:enterprise",
+        "closed",
+        "completion",
+        "gdc:enterprise",
+        "model",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "priority:p1",
+        "push-task",
+        "reports",
+        "session",
+        "steering",
+        "subagents",
+        "task",
+        "trigger",
+        "type:feature",
+        "wait"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-171",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature",
+        "parent:160",
+        "blocked_by:162"
+      ],
+      "title": "#171 Steering channel: push-task wait + completion trigger (the brain blocks until the task reports done)"
+    },
+    {
+      "id": "issue-174",
+      "keywords": [
+        "area:standards",
+        "assign",
+        "class",
+        "class:enterprise",
+        "conformance",
+        "declared-vs-actual",
+        "issues",
+        "labels",
+        "mismatches",
+        "open",
+        "pillar:governance",
+        "priority:p2",
+        "type:governance"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-174",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "area:standards",
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:governance"
+      ],
+      "title": "#174 Assign class labels to the six issues with declared-vs-actual conformance mismatches"
+    },
+    {
+      "id": "issue-175",
+      "keywords": [
+        "brain",
+        "fleet",
+        "area:session-fleet",
+        "blocked_by:171",
+        "class:enterprise",
+        "close",
+        "closed",
+        "consume-on-report",
+        "gdc:enterprise",
+        "listener",
+        "loop",
+        "model",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "priority:p0",
+        "session",
+        "sister-side",
+        "steering",
+        "subagents",
+        "type:feature",
+        "watch"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-175",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:feature",
+        "parent:160",
+        "blocked_by:171"
+      ],
+      "title": "#175 Close the steering loop: sister-side listener (watch) + consume-on-report"
+    },
+    {
+      "id": "issue-178",
+      "keywords": [
+        "brain",
+        "fleet",
+        "area:board",
+        "area:session-fleet",
+        "blocked_by:171",
+        "chain",
+        "channel",
+        "claim",
+        "class:elite",
+        "closed",
+        "directive",
+        "directives",
+        "dispatch",
+        "edges",
+        "gdc:enterprise",
+        "integration",
+        "model",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "priority:p0",
+        "session",
+        "subagents",
+        "type:feature"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-178",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:board",
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:feature",
+        "parent:160",
+        "blocked_by:171"
+      ],
+      "title": "#178 Brain directives are chain edges: claim --directive integration (channel x dispatch)"
     },
     {
       "id": "issue-18",
@@ -4700,10 +5139,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4714,6 +5153,226 @@
         "type:feature"
       ],
       "title": "#18 14 Model-health monitoring + auto-degradation + local fallback"
+    },
+    {
+      "id": "issue-180",
+      "keywords": [
+        "brain",
+        "fleet",
+        "area:session-fleet",
+        "class:elite",
+        "enterprise-scale",
+        "first",
+        "gdc:enterprise",
+        "hardening",
+        "lessons",
+        "live",
+        "model",
+        "open",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "priority:p1",
+        "register",
+        "session",
+        "steering",
+        "subagents",
+        "type:governance"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-180",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance",
+        "parent:160"
+      ],
+      "title": "#180 Lessons from first live steering + enterprise-scale hardening register"
+    },
+    {
+      "id": "issue-181",
+      "keywords": [
+        "brain",
+        "fleet",
+        "area:knowledge-index",
+        "area:session-fleet",
+        "bidirectional",
+        "blocked_by:180",
+        "capability",
+        "class:elite",
+        "code-indexing",
+        "deepseek",
+        "feedback",
+        "gdc:enterprise",
+        "loop",
+        "model",
+        "modules",
+        "open",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "priority:p0",
+        "session",
+        "subagents",
+        "sync",
+        "type:governance",
+        "waves"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-181",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:knowledge-index",
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:governance",
+        "parent:160",
+        "blocked_by:180"
+      ],
+      "title": "#181 Sync waves with the deepseek and code-indexing modules: bidirectional capability feedback loop"
+    },
+    {
+      "id": "issue-184",
+      "keywords": [
+        "brain",
+        "fleet",
+        "area:session-fleet",
+        "blocked_by:175",
+        "class:enterprise",
+        "closed",
+        "escalation",
+        "gdc:enterprise",
+        "idle-watch",
+        "live",
+        "model",
+        "never",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "ping",
+        "priority:p1",
+        "problems",
+        "session",
+        "sister-side",
+        "sleep",
+        "subagents",
+        "terminal",
+        "type:feature"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-184",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature",
+        "parent:160",
+        "blocked_by:175"
+      ],
+      "title": "#184 Escalation + live log: sister-side problems ping the brain terminal (never sleep, idle-watch)"
+    },
+    {
+      "id": "issue-186",
+      "keywords": [
+        "brain",
+        "fleet",
+        "session",
+        "area:session-fleet",
+        "blocked_by:175",
+        "class:enterprise",
+        "closed",
+        "command",
+        "dumb-terminal",
+        "gdc:enterprise",
+        "launchers",
+        "loop",
+        "model",
+        "never-idle",
+        "opens",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "priority:p0",
+        "sessions",
+        "subagents",
+        "type:feature"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-186",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:feature",
+        "parent:160",
+        "blocked_by:175"
+      ],
+      "title": "#186 Session launchers: one command opens the brain + dumb-terminal sessions (never-idle loop)"
     },
     {
       "id": "issue-19",
@@ -4742,10 +5401,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4756,6 +5415,59 @@
         "type:feature"
       ],
       "title": "#19 15 Semantic cache + token budget + rate limit + output throttle"
+    },
+    {
+      "id": "issue-190",
+      "keywords": [
+        "fleet",
+        "brain",
+        "area:session-fleet",
+        "blocked_by:186",
+        "class:enterprise",
+        "closed",
+        "control",
+        "directive",
+        "gdc:enterprise",
+        "model",
+        "operating",
+        "parent:160",
+        "pillar:autonomous-ops",
+        "plane",
+        "poke/halt/refresh/update/debug/watch",
+        "priority:p1",
+        "roles",
+        "self-refresh",
+        "session",
+        "subagents",
+        "type:feature"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-190",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED",
+        "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature",
+        "parent:160",
+        "blocked_by:186"
+      ],
+      "title": "#190 Fleet control plane + self-refresh: poke/halt/refresh/update/debug/watch + roles directive"
     },
     {
       "id": "issue-2",
@@ -4775,10 +5487,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED"
@@ -4809,10 +5521,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4850,10 +5562,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4864,6 +5576,76 @@
         "type:feature"
       ],
       "title": "#21 17 Durable state-machine orchestration engine (Temporal, namespaces, saga)"
+    },
+    {
+      "id": "issue-218",
+      "keywords": [
+        "block",
+        "finops",
+        "fleet",
+        "honour",
+        "open",
+        "real",
+        "runner",
+        "select",
+        "terminal",
+        "tier/thinking",
+        "type:feature"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-218",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "type:feature"
+      ],
+      "title": "#218 fleet terminal: honour the FinOps block \u2014 tier/thinking must select the real runner"
+    },
+    {
+      "id": "issue-219",
+      "keywords": [
+        "fleet",
+        "aligned",
+        "duration",
+        "metering",
+        "model",
+        "open",
+        "per-run",
+        "telemetry",
+        "terminal",
+        "tier",
+        "type:feature"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-219",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "type:feature"
+      ],
+      "title": "#219 fleet terminal: per-run telemetry (duration, tier, model, rc, PR) aligned with fleet metering"
     },
     {
       "id": "issue-22",
@@ -4890,10 +5672,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4904,6 +5686,44 @@
         "type:feature"
       ],
       "title": "#22 18 Task lifecycle state machine + job queue (claim/ack/fail/reap)"
+    },
+    {
+      "id": "issue-220",
+      "keywords": [
+        "acceptance",
+        "context",
+        "dispatch",
+        "fleet",
+        "issue",
+        "lane",
+        "lessons",
+        "open",
+        "order",
+        "pack",
+        "prior",
+        "string",
+        "terminal",
+        "type:feature"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-220",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "type:feature"
+      ],
+      "title": "#220 fleet terminal: dispatch a context pack (issue, lane, acceptance, prior lessons) not just an order string"
     },
     {
       "id": "issue-23",
@@ -4931,10 +5751,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4945,6 +5765,159 @@
         "type:feature"
       ],
       "title": "#23 19 Deterministic agent-loop runtime (bounded actor loop + escalation)"
+    },
+    {
+      "id": "issue-232",
+      "keywords": [
+        "append",
+        "fleet/telemetry.py",
+        "helper",
+        "jsonl",
+        "open",
+        "parent:219",
+        "per-run",
+        "record",
+        "schema"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-232",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "parent:219"
+      ],
+      "title": "#232 fleet/telemetry.py: per-run record schema + JSONL append helper"
+    },
+    {
+      "id": "issue-233",
+      "keywords": [
+        "fleet/terminal.py",
+        "open",
+        "parent:219",
+        "path",
+        "per-run",
+        "telemetry",
+        "wire"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-233",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "parent:219"
+      ],
+      "title": "#233 Wire per-run telemetry into fleet/terminal.py run path"
+    },
+    {
+      "id": "issue-234",
+      "keywords": [
+        "fleet/telemetry.jsonl",
+        "gitignore",
+        "open",
+        "parent:219",
+        "summary",
+        "telemetry",
+        "verb"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-234",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN",
+        "parent:219"
+      ],
+      "title": "#234 Telemetry summary verb + gitignore for .fleet/telemetry.jsonl"
+    },
+    {
+      "id": "issue-237",
+      "keywords": [
+        "brain/sister",
+        "closed",
+        "cron-owned",
+        "fleet",
+        "respawn",
+        "watchdog"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-237",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED"
+      ],
+      "title": "#237 cron-owned fleet watchdog (respawn brain/sister)"
+    },
+    {
+      "id": "issue-239",
+      "keywords": [
+        "concept/intent",
+        "containers",
+        "execution",
+        "layer",
+        "mechanical",
+        "open"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-239",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN"
+      ],
+      "title": "#239 Mechanical execution layer \u2014 concept/intent (no containers yet)"
     },
     {
       "id": "issue-24",
@@ -4970,10 +5943,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -4984,6 +5957,161 @@
         "type:feature"
       ],
       "title": "#24 20 Multi-agent orchestration (hierarchical lanes + consensus/voting)"
+    },
+    {
+      "id": "issue-240",
+      "keywords": [
+        "cannibalization",
+        "cannibalize",
+        "hardening",
+        "index",
+        "leaderboard",
+        "open",
+        "patterns",
+        "worker-fleet"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-240",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN"
+      ],
+      "title": "#240 Cannibalize leaderboard worker-fleet hardening patterns (cannibalization index #8)"
+    },
+    {
+      "id": "issue-241",
+      "keywords": [
+        "generated-cron",
+        "later",
+        "leaderboard",
+        "open",
+        "pattern",
+        "reconciler"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-241",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN"
+      ],
+      "title": "#241 Generated-cron reconciler (leaderboard pattern, later)"
+    },
+    {
+      "id": "issue-242",
+      "keywords": [
+        "closed",
+        "cron",
+        "demonstrate",
+        "fleet",
+        "install",
+        "verb",
+        "watchdog",
+        "wire"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-242",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "CLOSED"
+      ],
+      "title": "#242 Wire cron verb + install and demonstrate the fleet watchdog"
+    },
+    {
+      "id": "issue-244",
+      "keywords": [
+        "close",
+        "fleet",
+        "green",
+        "issue",
+        "merge",
+        "open",
+        "prompt",
+        "subagent"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-244",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN"
+      ],
+      "title": "#244 fleet: subagent prompt must merge its own green PR and close the issue"
+    },
+    {
+      "id": "issue-245",
+      "keywords": [
+        "auto-start",
+        "durable",
+        "fleet",
+        "monitor",
+        "open",
+        "progress",
+        "rung",
+        "third",
+        "track",
+        "watchdog"
+      ],
+      "kind": "issue-metadata",
+      "path": ".board/snapshot.json#issue-245",
+      "provenance": {
+        "bytes": 0,
+        "lines": 0,
+        "origin_path": ".board/snapshot.json",
+        "origin_repo": "kushin77/agent-orchestrator",
+        "owner": "governance-pmo",
+        "retrieval": "working-tree",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
+        "upstream": "",
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
+      },
+      "tags": [
+        "OPEN"
+      ],
+      "title": "#245 Track the fleet progress monitor as a third watchdog rung (durable, auto-start)"
     },
     {
       "id": "issue-25",
@@ -5009,10 +6137,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5049,10 +6177,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5089,10 +6217,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5130,10 +6258,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5169,10 +6297,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5199,10 +6327,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED"
@@ -5234,10 +6362,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5276,10 +6404,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5315,10 +6443,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5356,10 +6484,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5397,10 +6525,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5436,10 +6564,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5473,10 +6601,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5514,10 +6642,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5551,10 +6679,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5591,10 +6719,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5632,10 +6760,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5672,10 +6800,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5710,10 +6838,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5749,10 +6877,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5788,10 +6916,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5829,10 +6957,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5868,10 +6996,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5908,10 +7036,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5948,10 +7076,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -5988,10 +7116,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6029,10 +7157,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6069,10 +7197,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6112,10 +7240,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6151,10 +7279,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6191,10 +7319,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6230,10 +7358,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6270,10 +7398,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -6306,10 +7434,10 @@
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "governance-pmo",
         "retrieval": "working-tree",
-        "sha256": "4c327cf01d5549e85c405280a015aa2d4f19643051f991ba16cdfbe3a585b19c",
-        "timestamp": "2026-09-13T13:50:05-04:00",
+        "sha256": "c6e96d5981d010282cff0cf88116f5e66faf2974c00389c7fcbad67106730c66",
+        "timestamp": "2026-09-13T17:32:21-04:00",
         "upstream": "",
-        "version": "ca636113d926e1086f2a6a0c1f274a2c02c8985b"
+        "version": "320d0bc2b6b032ecf6ab02d48cdbc642697e5d9b"
       },
       "tags": [
         "CLOSED",
@@ -7421,16 +8549,16 @@
       "kind": "pattern-template",
       "path": "registry/packs/agent-pack.schema.json",
       "provenance": {
-        "bytes": 9069,
-        "lines": 208,
+        "bytes": 9085,
+        "lines": 209,
         "origin_path": "registry/packs/agent-pack.schema.json",
         "origin_repo": "kushin77/agent-orchestrator",
         "owner": "platform",
         "retrieval": "working-tree",
-        "sha256": "e253f151f6089581a362e1c7e84d4ef37df648aa5600925682202ca607136f92",
-        "timestamp": "2026-09-08T18:43:35-04:00",
+        "sha256": "dfb48b9b4c41863197aa19a0c21f520c15e1b310a0150c59a3d71c08b922cc98",
+        "timestamp": "2026-09-13T18:01:46-04:00",
         "upstream": "",
-        "version": "a52fe5ef57a29136a581e74f610a2cbb00306bae"
+        "version": "59bbff113069aa5660c69cc51644254e33b91b5a"
       },
       "tags": [
         "working-tree"
@@ -8318,6 +9446,452 @@
         "working-tree"
       ],
       "title": "Policy.Schema"
+    }
+  ],
+  "relationships": [
+    {
+      "from_id": "issue-140",
+      "to_id": "issue-139",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-142",
+      "to_id": "issue-140",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-143",
+      "to_id": "issue-142",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-171",
+      "to_id": "issue-162",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-175",
+      "to_id": "issue-171",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-178",
+      "to_id": "issue-171",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-181",
+      "to_id": "issue-180",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-184",
+      "to_id": "issue-175",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-186",
+      "to_id": "issue-175",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-190",
+      "to_id": "issue-186",
+      "type": "blocked-by",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "RCA-0001",
+      "to_id": "INC-0001",
+      "type": "caused-by",
+      "via": "RCA-0001"
+    },
+    {
+      "from_id": "RCA-0002",
+      "to_id": "INC-0002",
+      "type": "caused-by",
+      "via": "RCA-0002"
+    },
+    {
+      "from_id": "RCA-0003",
+      "to_id": "INC-0003",
+      "type": "caused-by",
+      "via": "RCA-0003"
+    },
+    {
+      "from_id": "RCA-0004",
+      "to_id": "INC-0004",
+      "type": "caused-by",
+      "via": "RCA-0004"
+    },
+    {
+      "from_id": "RCA-0005",
+      "to_id": "INC-0005",
+      "type": "caused-by",
+      "via": "RCA-0005"
+    },
+    {
+      "from_id": "CA-0001",
+      "to_id": "RCA-0001",
+      "type": "mitigates",
+      "via": "CA-0001"
+    },
+    {
+      "from_id": "CA-0002",
+      "to_id": "RCA-0001",
+      "type": "mitigates",
+      "via": "CA-0002"
+    },
+    {
+      "from_id": "CA-0003",
+      "to_id": "RCA-0002",
+      "type": "mitigates",
+      "via": "CA-0003"
+    },
+    {
+      "from_id": "CA-0004",
+      "to_id": "RCA-0002",
+      "type": "mitigates",
+      "via": "CA-0004"
+    },
+    {
+      "from_id": "CA-0005",
+      "to_id": "RCA-0003",
+      "type": "mitigates",
+      "via": "CA-0005"
+    },
+    {
+      "from_id": "CA-0006",
+      "to_id": "RCA-0004",
+      "type": "mitigates",
+      "via": "CA-0006"
+    },
+    {
+      "from_id": "CA-0007",
+      "to_id": "RCA-0005",
+      "type": "mitigates",
+      "via": "CA-0007"
+    },
+    {
+      "from_id": "LESSON-0001",
+      "to_id": "INC-0001",
+      "type": "mitigates",
+      "via": "LESSON-0001"
+    },
+    {
+      "from_id": "LESSON-0002",
+      "to_id": "INC-0002",
+      "type": "mitigates",
+      "via": "LESSON-0002"
+    },
+    {
+      "from_id": "LESSON-0003",
+      "to_id": "INC-0003",
+      "type": "mitigates",
+      "via": "LESSON-0003"
+    },
+    {
+      "from_id": "LESSON-0004",
+      "to_id": "INC-0004",
+      "type": "mitigates",
+      "via": "LESSON-0004"
+    },
+    {
+      "from_id": "SUGGEST-0001",
+      "to_id": "INC-0001",
+      "type": "mitigates",
+      "via": "SUGGEST-0001"
+    },
+    {
+      "from_id": "SUGGEST-0002",
+      "to_id": "INC-0005",
+      "type": "mitigates",
+      "via": "SUGGEST-0002"
+    },
+    {
+      "from_id": "SUGGEST-0003",
+      "to_id": "INC-0003",
+      "type": "mitigates",
+      "via": "SUGGEST-0003"
+    },
+    {
+      "from_id": "INC-0001",
+      "to_id": "pr-153",
+      "type": "origin",
+      "via": "INC-0001"
+    },
+    {
+      "from_id": "INC-0002",
+      "to_id": "issue-148",
+      "type": "origin",
+      "via": "INC-0002"
+    },
+    {
+      "from_id": "INC-0003",
+      "to_id": "pr-155",
+      "type": "origin",
+      "via": "INC-0003"
+    },
+    {
+      "from_id": "INC-0004",
+      "to_id": "issue-157",
+      "type": "origin",
+      "via": "INC-0004"
+    },
+    {
+      "from_id": "INC-0005",
+      "to_id": "issue-157",
+      "type": "origin",
+      "via": "INC-0005"
+    },
+    {
+      "from_id": "RCA-0001",
+      "to_id": "pr-153",
+      "type": "origin",
+      "via": "RCA-0001"
+    },
+    {
+      "from_id": "RCA-0002",
+      "to_id": "issue-148",
+      "type": "origin",
+      "via": "RCA-0002"
+    },
+    {
+      "from_id": "RCA-0003",
+      "to_id": "pr-155",
+      "type": "origin",
+      "via": "RCA-0003"
+    },
+    {
+      "from_id": "RCA-0004",
+      "to_id": "issue-157",
+      "type": "origin",
+      "via": "RCA-0004"
+    },
+    {
+      "from_id": "RCA-0005",
+      "to_id": "issue-157",
+      "type": "origin",
+      "via": "RCA-0005"
+    },
+    {
+      "from_id": "issue-138",
+      "to_id": "issue-139",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-138",
+      "to_id": "issue-140",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-138",
+      "to_id": "issue-141",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-138",
+      "to_id": "issue-142",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-138",
+      "to_id": "issue-143",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-144",
+      "to_id": "issue-157",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-161",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-162",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-163",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-164",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-165",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-166",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-167",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-171",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-175",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-178",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-180",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-181",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-184",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-186",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-160",
+      "to_id": "issue-190",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-219",
+      "to_id": "issue-232",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-219",
+      "to_id": "issue-233",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "issue-219",
+      "to_id": "issue-234",
+      "type": "parent-of",
+      "via": ".board/snapshot.json"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "#138",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "ADR-0012",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "ADR-0013",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "GR-11",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "INC-0001",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "LESSON-0001",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "RCA-0001",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "docs/CROSS-REFERENCE-SPINE.md",
+      "to_id": "docs/ARCHITECTURE.md",
+      "type": "refs",
+      "via": "docs/CROSS-REFERENCE-SPINE.md"
+    },
+    {
+      "from_id": "governance/knowledge/README.md",
+      "to_id": "ADR-0012",
+      "type": "refs",
+      "via": "governance/knowledge/README.md"
+    },
+    {
+      "from_id": "governance/knowledge/README.md",
+      "to_id": "GR-11",
+      "type": "refs",
+      "via": "governance/knowledge/README.md"
+    },
+    {
+      "from_id": "governance/knowledge/README.md",
+      "to_id": "RCA-0001",
+      "type": "refs",
+      "via": "governance/knowledge/README.md"
     }
   ],
   "repo": "kushin77/agent-orchestrator",

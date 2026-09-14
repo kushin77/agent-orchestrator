@@ -48,6 +48,8 @@ from model import (
 from secretpolicy import scan_file
 from sources import SOURCE_SPECS, SourceSpec
 
+import crossref
+
 CATALOG_FILENAME = "catalog.json"
 REPORT_RELPATH = Path(".verify") / "knowledge-index-report.json"
 
@@ -443,6 +445,7 @@ def build_index(
         generated_at=generated_at or now_iso(),
         repo=owner,
         items=items,
+        relationships=crossref.build_relationships(root),
         coverage=coverage,
         findings=findings,
     )
