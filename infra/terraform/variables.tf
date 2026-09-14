@@ -79,6 +79,12 @@ variable "enable_paperclip" {
   default     = false
 }
 
+variable "enable_chat" {
+  description = "Serve the conversational surface (issue #503, ADR-0023: POST /v1/chat/completions, POST /api/chat, GET /v1/models). Its own flag, so chat can be promoted or killed without promoting the gateway or the portal. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
 # --- Deployer service account (the ONLY apply route) ------------------------
 
 variable "deployer_enabled" {

@@ -1,0 +1,31 @@
+# gateway/chat/config/chat-routes.yaml — the conversational surface's routing
+# declarations (issue #503), COMPOSED with the proxy's own policy.
+#
+# The proxy owns the routing policy (`gateway/proxy/config/routing.yaml`) and
+# its `Router`; that document has no entry for a chat task type, and this lane
+# does not own it. So the surface declares its two task types here and
+# `gateway/chat/resolver.py:chat_routing_config()` merges them into the
+# policy the proxy's own loader validated — refusing to load at all if the
+# proxy's document ever declares the same task type, because a composition that
+# can silently override the authority is a second authority (ADR-0023 §2).
+#
+# Vocabulary is consumed, never invented:
+#   * `capability: research`      — a registry/profiles/catalog.yaml capability
+#                                   ("Investigate, root-cause analysis,
+#                                   evidence gathering"), and the capability the
+#                                   dispatch agent profile must hold.
+#   * `taskClass: research`       — a gateway/finops/tiers.yaml task class
+#                                   (capability research, defaultTier L0,
+#                                   maxTier L2), which is what the FinOps
+#                                   chooser resolves the tier from.
+# A conversational turn answers a question from retrieved evidence, so the
+# existing `research` class is the honest rung: inventing a `chat` task class
+# would have meant editing the FinOps tier table, i.e. a second price ladder.
+schemaVersion: 1
+routes:
+  chat-answer:
+    capability: research
+    taskClass: research
+  chat-refuse:
+    capability: research
+    taskClass: research

@@ -230,16 +230,28 @@ checks=(
   # `codeidx-surface` gates above they RUN for real (rc 0) in a fresh worktree
   # and are never recorded as CANNOT-ASSESS. Each also provokes its own negative
   # controls, so a green result cannot come from a gate that exercises nothing.
-  # NB: the seventh gate named by issue #502, `check-chat-surface.sh`, is NOT
-  # registered because it does not exist yet — it is owned by #503 (the
-  # serving-surface lane, still open). Naming that gap is honest; a stub for it
-  # would be an invented check, which is worse than a named gap.
+  # NB: the seventh gate named by issue #502, `check-chat-surface.sh`, was NOT
+  # registered when this lane was written because it did not exist yet — it is
+  # owned by #503, which has since landed (PR #564). It is registered directly
+  # below by issue #568, which wired it and repaired the red gate of record its
+  # landing caused. Naming that gap was honest; a stub would have been an
+  # invented check, which is worse than a named gap.
   'chat-tools|bash scripts/check-chat-tools.sh'            # #504 grounding lane
   'chat-identity|bash scripts/check-chat-identity.sh'      # #505 identity lane
   'chat-finops|bash scripts/check-chat-finops.sh'          # #506 FinOps lane
   'chat-guardrails|bash scripts/check-chat-guardrails.sh'  # #507 guardrails lane
   'chat-ux|bash scripts/check-chat-ux.sh'                  # #508 UX lane
   'chat-eval|bash scripts/check-chat-eval.sh'              # #509 eval lane
+  # EPIC #500 (the enterprise chat surface), issue #568: the seventh chat gate.
+  # #503 (PR #564) shipped `scripts/check-chat-surface.sh` -- the OpenAI-/
+  # Ollama-compatible contract and its flag gate -- but nothing invoked it, so
+  # the `gate-coverage` detector (#526) failed it BY NAME and the gate of record
+  # went red on master: an artifact no gate runs is a formality (GR-12). Its six
+  # siblings (`chat-eval`, `chat-finops`, `chat-guardrails`, `chat-identity`,
+  # `chat-tools`, `chat-ux`) are wired by the #502 lane; this one landed after
+  # that lane's PR was opened, which is why it needed its own fix. Offline and
+  # deterministic -- no network, no `vendor/CMR` seed -- so it RUNS for real.
+  'chat-surface|bash scripts/check-chat-surface.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
