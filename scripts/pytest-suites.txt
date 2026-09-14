@@ -49,6 +49,7 @@ engine/memory
 engine/queue
 engine/core
 telemetry/ledger
+telemetry/audit
 telemetry/observability
 telemetry/metering
 telemetry/budgets

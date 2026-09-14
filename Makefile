@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
 brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -392,6 +392,16 @@ board-gate:
 ## open, and a snapshot whose records lack a body is CANNOT-ASSESS, never OK
 cross-repo-boundary:
 	@bash scripts/check-cross-repo-boundary.sh
+
+## audit-read-model — the read-only, filterable audit read model (issue #347):
+## the tamper-evident trail served as a deterministic read model with
+## verify-chain semantics; an intact chain is OK, a modified / reordered /
+## removed / truncated record is NOT-OK named by position, an unparseable chain
+## is CANNOT-ASSESS (never a pass), an unknown filter field is refused, and the
+## module exposes no write path (proved by parsing its source). Every tamper is
+## provoked on a temp copy with a self-mutating negative control.
+audit-read-model:
+	@bash scripts/check-audit-read-model.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:
