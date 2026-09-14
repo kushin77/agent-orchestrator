@@ -1,0 +1,197 @@
+# JSON-Schema (draft-07) bundle for the shared-frontend mandatory onboarding
+# (issue #703). Three documents are bound here, one per `$ref`:
+#   * `instance.yaml`   -> #/$defs/instance
+#   * `vocabulary.yaml` -> #/$defs/vocabulary
+#   * `template.yaml`   -> #/$defs/template
+#
+# `render.py` owns the checks (stdlib + PyYAML only — no schema engine is
+# required at gate time); this bundle is the REVIEWABLE contract they implement,
+# and `tests/test_render.py` cross-checks the three documents with the real
+# `jsonschema` library when it is installed, so the claim that this is a real
+# JSON Schema is measured rather than asserted (the same discipline as
+# control-plane/fleet-template/schema.yaml, issue #146).
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "urn:ao:shared-frontend-onboarding:schema:v1"
+title: "shared-frontend mandatory onboarding contract (v1)"
+description: >-
+  The closed contract for the onboarding lane: one instance names the
+  org/tenant/domain and repo; one vocabulary declares which org/tenant/domain
+  values exist; one template renders the two mandatory consumer assets.
+type: object
+additionalProperties: false
+required: [instance, vocabulary, template]
+properties:
+  instance:
+    $ref: "#/$defs/instance"
+  vocabulary:
+    $ref: "#/$defs/vocabulary"
+  template:
+    $ref: "#/$defs/template"
+
+$defs:
+  slug:
+    type: string
+    pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+  repo_slug:
+    type: string
+    pattern: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+  hostname:
+    type: string
+    pattern: "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  nonempty:
+    type: string
+    minLength: 1
+
+  provenance:
+    type: object
+    additionalProperties: false
+    required: [source_repo, source_path, rev, tag, license, tokens_sha256]
+    properties:
+      source_repo:
+        $ref: "#/$defs/repo_slug"
+      source_path:
+        $ref: "#/$defs/nonempty"
+      rev:
+        type: string
+        pattern: "^[0-9a-f]{7,40}$"
+      tag:
+        type: string
+        pattern: "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+      license:
+        $ref: "#/$defs/nonempty"
+      tokens_sha256:
+        $ref: "#/$defs/sha256"
+
+  parameter:
+    type: object
+    additionalProperties: false
+    required: [name, type, required, description]
+    properties:
+      name:
+        $ref: "#/$defs/slug"
+      type:
+        enum: [string, number, boolean, object, array]
+      required:
+        type: boolean
+      description:
+        $ref: "#/$defs/nonempty"
+
+  asset:
+    type: object
+    additionalProperties: false
+    required: [path, kind, description]
+    properties:
+      path:
+        type: string
+        pattern: "^(tokens\\.json|gdc-manifest\\.yaml)$"
+      kind:
+        enum: [verbatim, interpolate]
+      seed:
+        $ref: "#/$defs/nonempty"
+      document:
+        type: string
+        minLength: 1
+      description:
+        $ref: "#/$defs/nonempty"
+
+  instance:
+    type: object
+    additionalProperties: false
+    required: [schema, kind, org, tenant, domain, repo]
+    properties:
+      schema:
+        const: "ao.shared-frontend-onboarding/instance/v1"
+      kind:
+        const: SharedFrontendOnboardingInstance
+      org:
+        $ref: "#/$defs/slug"
+      tenant:
+        $ref: "#/$defs/slug"
+      domain:
+        $ref: "#/$defs/hostname"
+      repo:
+        $ref: "#/$defs/repo_slug"
+
+  tenant_row:
+    type: object
+    additionalProperties: false
+    required: [id, org, domains]
+    properties:
+      id:
+        $ref: "#/$defs/slug"
+      org:
+        $ref: "#/$defs/slug"
+      domains:
+        type: array
+        items:
+          $ref: "#/$defs/hostname"
+      domains_source:
+        $ref: "#/$defs/nonempty"
+
+  org_row:
+    type: object
+    additionalProperties: false
+    required: [id]
+    properties:
+      id:
+        $ref: "#/$defs/slug"
+      name:
+        $ref: "#/$defs/nonempty"
+      source:
+        $ref: "#/$defs/nonempty"
+
+  vocabulary:
+    type: object
+    additionalProperties: false
+    required: [schema, source, orgs, tenants]
+    properties:
+      schema:
+        const: "ao.shared-frontend-onboarding/vocabulary/v1"
+      source:
+        enum: [declared, measured]
+      orgs:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/org_row"
+      tenants:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/tenant_row"
+
+  template:
+    type: object
+    additionalProperties: false
+    required: [apiVersion, kind, metadata, parameters, provenance, assets]
+    properties:
+      apiVersion:
+        const: "ao.shared-frontend-onboarding/v1"
+      kind:
+        const: SharedFrontendOnboarding
+      metadata:
+        type: object
+        additionalProperties: false
+        required: [name, version, description]
+        properties:
+          name:
+            $ref: "#/$defs/nonempty"
+          version:
+            $ref: "#/$defs/nonempty"
+          description:
+            $ref: "#/$defs/nonempty"
+      parameters:
+        type: array
+        minItems: 4
+        items:
+          $ref: "#/$defs/parameter"
+      provenance:
+        $ref: "#/$defs/provenance"
+      assets:
+        type: array
+        minItems: 2
+        items:
+          $ref: "#/$defs/asset"

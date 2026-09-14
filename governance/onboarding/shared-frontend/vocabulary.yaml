@@ -1,0 +1,43 @@
+# Consumer-onboarding vocabulary (issue #703) — the DECLARED org / tenant /
+# domain set a shared-frontend onboarding instance may name.
+#
+# Why a vocabulary at all: the onboarding is a reviewed RENDER, not a copy-paste,
+# and a render is only safe if the identifiers it may consume are closed. An org,
+# tenant or domain that is not declared here is REFUSED BY NAME (never guessed),
+# so a typo cannot silently mint a new tenant.
+#
+# Where the values come from (GR-10 — harvested, not invented):
+#   * `orgs` and `tenants` come from the enterprise/GDC roll-up declaration
+#     `governance/rollup/pilot/org.yaml` (issue #151): one enterprise org
+#     (`elevatediq`) over the tenants that own the fleet's repos —
+#     `kushin77-platform` owns `kushin77/agent-orchestrator`, `kushin77/CMR` and
+#     `kushin77/shared-frontend`; `kushin77-ops` owns `kushin77/leaderboard`.
+#   * `domains` is the host the tenant's web surface serves. The one measured
+#     value in this repo is `ai.purebliss.app` — the default of
+#     `infra/terraform/modules/web-surface/variables.tf` `variable "domain"`
+#     (`infra/cloudbuild/web-image.yaml` names the same host as the public web
+#     image's target). `identity/onboarding/model.py` carries the same field as
+#     `Tenant.domain` and `identity/sso/domains.py` resolves a Host header
+#     against it.
+#
+# `source: declared` on the tenant rows is deliberate and load-bearing: the
+# tenant -> domain BINDING is a declaration (this repo has no measured host
+# registry yet), so it is labelled as one rather than presented as a
+# measurement. A tenant with no evidenced host gets an EMPTY `domains` list —
+# naming a host for it is then refused, which is the honest state, not a hole.
+schema: ao.shared-frontend-onboarding/vocabulary/v1
+source: declared
+orgs:
+  - id: elevatediq
+    name: ElevatedIQ GDC
+    source: governance/rollup/pilot/org.yaml (enterprise.id)
+tenants:
+  - id: kushin77-platform
+    org: elevatediq
+    domains:
+      - ai.purebliss.app
+    domains_source: infra/terraform/modules/web-surface/variables.tf (variable "domain" default)
+  - id: kushin77-ops
+    org: elevatediq
+    domains: []
+    domains_source: none measured — no web surface is declared for this tenant yet

@@ -1,0 +1,125 @@
+# Parameterized shared-frontend onboarding template (issue #703).
+#
+# NOT hand-edited per repo. This file is the PARAMETERIZED source: `render.py`
+# renders it into the two mandatory consumer assets a governed repo carries for
+# the `shared-frontend` module — the `--os-` design-token twin (`tokens.json`)
+# and the spoke declaration that pins it (`gdc-manifest.yaml`) — from one
+# instance file that names the tenant/org/domain and the repo slug.
+#
+# The discipline mirrors control-plane/fleet-template/ (issue #146) and the
+# hub's `templates/module/` (`{{REPO}}`): TWO substitution forms, both
+# implemented in render.py and both closed (an unknown placeholder is refused
+# by name, never left in the output):
+#   * `${path.to.value}` — a placeholder resolved against the instance params
+#     (`org`, `tenant`, `domain`, `repo`) or the template's own `provenance`
+#     block (`provenance.rev`, `provenance.tag`, ...). Rendering is a pure
+#     function of (this file's bytes, the instance bytes, the seeds): no
+#     network, no clock, no environment.
+#   * `kind:` per asset — the render rule. `verbatim` means the asset is the
+#     pinned seed's bytes, unchanged (the `--os-` twin is tenant-INVARIANT by
+#     the upstream twin rule — see seeds/PROVENANCE.md — so its "render" is a
+#     byte-identity assertion, not a substitution). `interpolate` means the
+#     `document` below is written out with its placeholders resolved.
+#
+# Byte-stability is the contract: for a fixed (org, tenant, domain, repo) tuple
+# the render is byte-identical every time, and the committed root assets must
+# equal it. `tests/test_render.py` proves both; the gate
+# (scripts/check-shared-frontend-onboarding.sh) enforces the second.
+apiVersion: ao.shared-frontend-onboarding/v1
+kind: SharedFrontendOnboarding
+metadata:
+  name: shared-frontend-mandatory-onboarding
+  version: 1.0.0
+  description: >-
+    Renders the shared-frontend mandatory consumer assets (tokens.json +
+    gdc-manifest.yaml) for one tenant/org/domain and repo, from a single
+    instance file.
+
+parameters:
+  - name: org
+    type: string
+    required: true
+    description: "Enterprise/GDC org id; must be declared in vocabulary.yaml (orgs[].id)."
+  - name: tenant
+    type: string
+    required: true
+    description: "Tenant id under that org; must own `domain` (vocabulary.yaml tenants[])."
+  - name: domain
+    type: string
+    required: true
+    description: "Host the tenant owns — identity/onboarding `Tenant.domain`."
+  - name: repo
+    type: string
+    required: true
+    description: "`owner/name` slug of the consuming repo; declared as the manifest's `repo`."
+
+# The pin ledger for the vendored `--os-` twin. render.py holds the SAME facts
+# as an immutable constant and refuses when this block diverges from it (parity
+# in the sense of identity/edges: the declarative file and the code spec are
+# kept in lockstep, and a divergence is named, not averaged).
+provenance:
+  source_repo: kushin77/shared-frontend
+  source_path: shared/design-tokens/tokens.json
+  rev: ace748f4
+  tag: v0.2.0
+  license: MIT
+  tokens_sha256: 679ffaf89f6476832d663f3879aa4f90ebdce64021d0f20e0b11ffe0703fe188
+
+assets:
+  - path: tokens.json
+    kind: verbatim
+    seed: seeds/tokens.json
+    description: >-
+      The shared `--os-` design-token twin, vendored byte-verbatim from the
+      pinned rev. Tenant-invariant by the upstream twin rule, so the render is a
+      byte-identity assertion against the pinned digest.
+
+  - path: gdc-manifest.yaml
+    kind: interpolate
+    description: >-
+      The spoke-side declaration: the three mandatory module pins stay intact and
+      the tenant/org/domain bind into the `x-onboarding` extension block.
+    document: |
+      # Spoke-side declaration (EPIC-09 / CMR-901), born from templates/module/ in
+      # kushin77/CMR. The mandatory indexer-KB pin (GR-18), the diagrams.blueprint
+      # pin (GR-18, CMR:ONBOARD-0005, second mandatory module) and the
+      # shared-frontend.tokens pin (GR-18, CMR:ONBOARD-0003, third mandatory module)
+      # are pre-declared — none must be removed. Declare the module's own
+      # features/integrations alongside them.
+      #
+      # Reproduced in lockstep with the vendored template
+      # (vendor/CMR/templates/module/gdc-manifest.yaml); the declaration gate
+      # (scripts/check-diagrams-declaration.sh) fails by name if a mandatory pin or
+      # its version/update policy drifts from that template.
+      #
+      # RENDERED, NOT HAND-EDITED (issue #703): this file is the render of
+      # governance/onboarding/shared-frontend/template.yaml for the instance
+      # governance/onboarding/shared-frontend/instance.yaml. Its
+      # shared-frontend.tokens twin is vendored byte-verbatim from
+      # ${provenance.source_repo}@${provenance.source_path} (rev
+      # ${provenance.rev}, tag ${provenance.tag}); the onboarding gate
+      # (scripts/check-shared-frontend-onboarding.sh) refuses a dropped pin, a
+      # pin whose version/update policy moved, a token set that drifted from the
+      # pinned rev, and this file disagreeing with the render of the instance.
+      repo: ${repo}
+      schema: cmr.gdc-manifest/v1
+      x-onboarding:
+        org: ${org}
+        tenant: ${tenant}
+        domain: ${domain}
+      features:
+        - id: code-indexing.mcp
+          default: "on"
+          flags: ["codeidx.surface.mcp"]
+      integrations: []
+      modules:
+        - module: code-indexing.mcp
+          version: "~0.1"
+          updates: pr
+        - module: diagrams.blueprint
+          version: "~0.1"
+          updates: pr
+        - module: shared-frontend.tokens
+          version: "~0.1"
+          updates: pr
+      updates: pr
