@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -396,6 +396,13 @@ paperclip-integration:
 ## vocabulary is refused by name, with a self-mutating negative control.
 paperclip-adapter:
 	@bash scripts/check-paperclip-integration-adapter.sh
+
+## paperclip-canonical-module — the canonical-home guard for the paperclip
+## boundary adapter (issue #448): integrations/paperclip/ is the single canonical
+## module and a second top-level paperclip module is refused by name (with a
+## self-mutating negative control, so the guard cannot pass vacuously).
+paperclip-canonical-module:
+	@bash scripts/check-paperclip-canonical-module.sh
 
 ## board-gate — governance board enforcement gate (issue #143): re-runs
 ## knowledge-index, conformance, lessons and remediation for real and refuses

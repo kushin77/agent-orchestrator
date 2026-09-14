@@ -25,6 +25,7 @@ from typing import Any, Iterator, Optional
 from portal.server import catalog as catalog_mod
 from portal.server.auditlog import AuditLedger
 from portal.server.authz import Authorizer, Principal
+from portal.server.bridge import LiveBridge
 from portal.server.controls import (
     ControlCatalog,
     PolicyEnforcer,
@@ -112,6 +113,7 @@ class ConsoleApplication:
         finops_reports: Optional[FinOpsReports] = None,
         live_feed: Optional[LiveFeed] = None,
         ops_health: Optional[OpsHealthReports] = None,
+        bridge: Optional[LiveBridge] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -161,6 +163,12 @@ class ConsoleApplication:
             ops_health
             if ops_health is not None
             else OpsHealthReports(repo_root=self.repo_root)
+        )
+        # The versioned live-data bridge (issue #339) — feature-flag-gated OFF.
+        self.bridge = (
+            bridge
+            if bridge is not None
+            else LiveBridge(repo_root=self.repo_root, live_feed=self.live)
         )
 
     # -- request pipeline ---------------------------------------------------
@@ -329,6 +337,17 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.ops_health)",
             )
 
+        # The versioned live-data bridge (issue #339) ships the same way (GR-5),
+        # also before authN: while the flag is off the whole /api/v1 surface is
+        # invisible rather than merely unauthorised.
+        if parts[0] == "v1" and not self.bridge.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the live-data bridge is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.live_bridge)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -342,6 +361,8 @@ class ConsoleApplication:
                 return self._route_live_feed(parts, principal, method, query)
             if parts[0] == "ops":
                 return self._route_ops(parts, principal, method, query)
+            if parts[:2] == ["v1", "bridge"]:
+                return self._route_bridge(parts[2:], principal, method, query)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -608,6 +629,56 @@ class ConsoleApplication:
         """Fail closed on a tenant the live span feed does not know."""
         if not self.ops.known_tenant(tenant_id):
             raise ApiError(404, "unknown_tenant", f"no such tenant {tenant_id!r}")
+
+    # -- versioned live-data bridge (issue #339) ----------------------------
+    #: The default number of telemetry records a bridge read hydrates with.
+    BRIDGE_TELEMETRY_DEFAULT_LIMIT = 50
+
+    def _route_bridge(
+        self,
+        parts: list[str],
+        principal: Principal,
+        method: str,
+        query: dict[str, str],
+    ) -> Response | StreamResponse:
+        """The versioned bridge over the platform's four state families (#339).
+
+        GET-only. The contract lives in ``portal/server/bridge.py``; this route
+        owns transport shape and authorization only. Every read is delegated to
+        the family's owning lane, so no figure, verdict or route is restated
+        here. Platform-config families (registry/gateway/guardrails) are
+        readable by any authenticated principal, exactly like the portal-surfaces
+        feed; the telemetry family is scoped through the live feed's own rule,
+        and a principal with no visible tenant is refused rather than shown an
+        empty feed.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the live-data bridge is GET only")
+        if not parts:
+            return self._ok(self.bridge.manifest())
+        if parts == ["stream"]:
+            return StreamResponse(frames=self.bridge.stream())
+        family = parts[0]
+        if family not in self.bridge.families():
+            raise ApiError(404, "not_found", f"no such bridge family: {family}")
+        if family == "telemetry":
+            visible = self._live_feed_tenants(principal)
+            return self._ok(
+                self.bridge.telemetry(
+                    tenants=visible, limit=self._bridge_telemetry_limit(query)
+                )
+            )
+        return self._ok(self.bridge.family(family))
+
+    def _bridge_telemetry_limit(self, query: dict[str, str]) -> int:
+        raw = (query.get("limit") or "").strip()
+        if not raw:
+            return self.BRIDGE_TELEMETRY_DEFAULT_LIMIT
+        try:
+            limit = int(raw)
+        except (TypeError, ValueError):
+            raise ApiError(400, "invalid_request", "limit must be an integer") from None
+        return max(1, limit)
 
     # -- session ------------------------------------------------------------
     def _require_session(self, cookies: dict[str, str]) -> tuple[Principal, dict[str, Any]]:

@@ -1,0 +1,39 @@
+{
+  "repo": "kushin77/deepseek",
+  "captured_at": "2026-09-14",
+  "source": "gh api repos/kushin77/deepseek/issues/{84,79,74,78,53}",
+  "note": "Pinned, read-only snapshot of the peer board items that carry the peer-side lessons loop. Offline default; refresh with the --live flag or by re-pinning. The peer lesson ledger itself has not materialised yet (issue 84 is open), so peer_lessons is empty by measurement, not by omission.",
+  "issues": [
+    {
+      "number": 84,
+      "state": "open",
+      "role": "lessons-ledger-carrier",
+      "title": "[fleet] Auto-file lessons as GitHub issues and keep the mandated board in sync"
+    },
+    {
+      "number": 79,
+      "state": "open",
+      "role": "dispatch-hints",
+      "title": "[fleet] Close the lessons loop: record EPIC-13 lessons in the CMR ledger and feed them back via dispatch hints"
+    },
+    {
+      "number": 74,
+      "state": "open",
+      "role": "pmo-board",
+      "title": "[fleet] pmo-sme board organization: milestones, status columns, and start-to-finish sequencing"
+    },
+    {
+      "number": 78,
+      "state": "open",
+      "role": "board-as-code",
+      "title": "[iac] Declare the mandated Projects v2 board as code (board-sync, no console clicks)"
+    },
+    {
+      "number": 53,
+      "state": "open",
+      "role": "dispatch-integration",
+      "title": "[fleet] Dispatch integration: context pack and issue-hint consumption"
+    }
+  ],
+  "peer_lessons": []
+}

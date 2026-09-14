@@ -1,0 +1,35 @@
+{
+  "decision": "one authoritative ledger",
+  "decision_detail": "governance/lessons/ledger.jsonl (kushin77/agent-orchestrator) is the single writer; kushin77/deepseek's view is derived and read-only; sync is one-way writer -> derived; peer lessons enter only through a reviewed direction/harvest item carrying provenance, so two symmetric stores can never exist.",
+  "authoritative": {
+    "repo": "kushin77/agent-orchestrator",
+    "role": "writer",
+    "ledger": "governance/lessons/ledger.jsonl"
+  },
+  "derived": {
+    "repo": "kushin77/deepseek",
+    "role": "derived-view",
+    "ledger_ref": {
+      "repo": "kushin77/deepseek",
+      "issue": 84,
+      "state": "requested",
+      "path": "governance/lessons/ledger.jsonl"
+    }
+  },
+  "sync": {
+    "direction": "one-way:writer->derived",
+    "symmetric": false
+  },
+  "hint_transport": {
+    "carrier": "brain-directive",
+    "local_equivalent": "the brain directive recorded in .fleet/sent plus the governance/dispatch claim chain",
+    "peer_equivalent": "kushin77/deepseek#79",
+    "provenance": "every hint carries the lesson id, an issue reference, and a commit sha"
+  },
+  "history": [
+    "kushin77/agent-orchestrator#181 gap 6 (closed without a standing mechanism)",
+    "kushin77/deepseek#84 and #79 (the peer lessons loop)",
+    "kushin77/deepseek#74 and #78 (peer board as code)",
+    "kushin77/CMR#865 (board sync is one-directional)"
+  ]
+}

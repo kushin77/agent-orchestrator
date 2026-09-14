@@ -68,6 +68,7 @@ checks=(
   # input, so it cannot pass vacuously.
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
   'paperclip-adapter|bash scripts/check-paperclip-integration-adapter.sh'
+  'paperclip-canonical-module|bash scripts/check-paperclip-canonical-module.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
@@ -95,6 +96,8 @@ checks=(
   'module-admission|bash scripts/check-module-admission.sh'
   'routing-seam|bash scripts/check-routing-seam.sh'
   'cross-repo-sync|bash scripts/check-cross-repo-sync.sh'
+  'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
+  'paperclip-budget|bash scripts/check-paperclip-budget.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master

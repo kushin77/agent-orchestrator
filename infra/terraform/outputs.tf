@@ -24,3 +24,8 @@ output "web_surface_domain" {
   description = "Public hostname served by the web surface; null until enable_web."
   value       = module.web_surface.domain
 }
+
+output "paperclip_runtime_uri" {
+  description = "URI of the self-hosted paperclip runtime; null until enable_paperclip"
+  value       = module.paperclip_runtime.service_uri
+}
