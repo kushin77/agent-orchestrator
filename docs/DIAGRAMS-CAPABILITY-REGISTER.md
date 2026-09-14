@@ -356,3 +356,42 @@ that is why C1 and C7 are `both`.
   issue was dispatched under.
 - [ADR-0017](decision-records/ADR-0017-diagrams-authority-on-the-operator-surface.md)
   — where a diagram signal lives on a ticket.
+
+## Reconciliation against the vendor board (generated table - do not hand-edit)
+
+Every row above is reconciled against a **recorded read of the vendor board**
+(`scripts/fixtures/diagrams-vendor-board.snapshot.json`, recorded 2026-09-14) by
+`bash scripts/track-diagrams-capabilities.sh`, which exits `1` and names the class when a
+row's declared `status` disagrees with that read. The table below is **generated** from that
+tracker's output rather than written by hand; regenerate it with
+`bash scripts/track-diagrams-capabilities.sh --emit-reconciliation-table`. The tracker compares
+this table against a fresh generation and names `register-section-stale` if the two differ, so
+this register cannot age silently. A `finding` verdict is neither a pass nor a failure: it is a
+closed vendor issue whose closure is **not** evidence that the capability exists (`#374`),
+surfaced by name instead of hidden or called shipped.
+
+| row | vendor issue | register status | vendor state | verdict |
+|---|---|---|---|---|
+| C1 | [kushin77/diagrams#368](https://github.com/kushin77/diagrams/issues/368) | in-flight | open | consistent |
+| C2 | [kushin77/diagrams#100](https://github.com/kushin77/diagrams/issues/100) | shipped | closed | consistent |
+| C3 | [kushin77/diagrams#176](https://github.com/kushin77/diagrams/issues/176) | shipped | closed | consistent |
+| C4 | [kushin77/diagrams#100](https://github.com/kushin77/diagrams/issues/100) | shipped | closed | consistent |
+| C5 | [kushin77/diagrams#148](https://github.com/kushin77/diagrams/issues/148) | shipped | closed | consistent |
+| C6 | [kushin77/diagrams#225](https://github.com/kushin77/diagrams/issues/225) | shipped | closed | consistent |
+| C7 | [kushin77/diagrams#128](https://github.com/kushin77/diagrams/issues/128) | shipped | closed | consistent |
+| C8 | [kushin77/diagrams#312](https://github.com/kushin77/diagrams/issues/312) | shipped | closed | consistent |
+| C9 | [kushin77/diagrams#310](https://github.com/kushin77/diagrams/issues/310) | shipped | closed | consistent |
+| C10 | [kushin77/diagrams#515](https://github.com/kushin77/diagrams/issues/515) | gap | open | consistent |
+| C11 | [kushin77/diagrams#515](https://github.com/kushin77/diagrams/issues/515) | gap | open | consistent |
+| C12 | [kushin77/diagrams#516](https://github.com/kushin77/diagrams/issues/516) | gap | open | consistent |
+| C13 | [kushin77/diagrams#514](https://github.com/kushin77/diagrams/issues/514) | gap | open | consistent |
+| C14 | [kushin77/diagrams#514](https://github.com/kushin77/diagrams/issues/514) | gap | open | consistent |
+| C15 | [kushin77/diagrams#513](https://github.com/kushin77/diagrams/issues/513) | gap | open | consistent |
+| C16 | [kushin77/diagrams#513](https://github.com/kushin77/diagrams/issues/513) | gap | open | consistent |
+| C17 | [kushin77/diagrams#369](https://github.com/kushin77/diagrams/issues/369) | shipped | closed | consistent |
+| C18 | [kushin77/diagrams#375](https://github.com/kushin77/diagrams/issues/375) | shipped | closed | consistent |
+| C19 | [kushin77/diagrams#372](https://github.com/kushin77/diagrams/issues/372) | shipped | closed | consistent |
+| C20 | [kushin77/diagrams#374](https://github.com/kushin77/diagrams/issues/374) | shipped | closed | consistent |
+| C21 | [kushin77/diagrams#374](https://github.com/kushin77/diagrams/issues/374) | UNVERIFIED | closed | finding closed-without-signal |
+| C22 | [kushin77/diagrams#373](https://github.com/kushin77/diagrams/issues/373) | in-flight | open | consistent |
+| C23 | [kushin77/diagrams#147](https://github.com/kushin77/diagrams/issues/147) | shipped | closed | consistent |
