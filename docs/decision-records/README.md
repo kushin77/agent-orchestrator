@@ -77,6 +77,18 @@ writes the real ADR.
 | [ADR-0016](ADR-0016-paperclip-boundary-single-module.md) | One home for the paperclip boundary adapter — consolidate the parity adapters under `integrations/paperclip/` | accepted | issue #457 (M27) |
 | [ADR-0017](ADR-0017-diagrams-authority-on-the-operator-surface.md) | The diagrams blueprint on the operator surface — a read-only `evidence[]` signal, never a new facet | accepted | issue #463 (EPIC #461, M27) |
 | [ADR-0018](ADR-0018-codeidx-consumption-and-index-authority.md) | The two-index authority split + the no-re-derivation rule | accepted | issue #474 (EPIC #472) |
+| [ADR-0022](ADR-0022-telemetry-exposition-authority-split.md) | The telemetry-exposition authority split + the no-second-dashboard rule | accepted | issue #495 (EPIC #494) |
+
+> **Numbering gap `ADR-0019`–`ADR-0021`.** Those numbers are **CMR-hub** records
+> cited from this repo with an explicit `CMR (fleet)` prefix
+> (`governance/merge/README.md`: `ADR-0020` solo-dev merge posture, `ADR-0021`
+> SME-reviewer-per-PR; `ADR-0019` the shared-governance dual-role record cited by
+> #445). They are not this repo's to take. `ADR-0022` was allocated to the
+> monitoring decision (#495) on the board — sibling lane #501 records *"`ADR-0022`
+> is claimed by the monitoring decision `#495`"* and takes `ADR-0023` — so this
+> repo's next free number is that one, and the gap is deliberate, not a
+> reservation to fill. See the numbering note in
+> [ADR-0022](ADR-0022-telemetry-exposition-authority-split.md).
 
 The reserved set covers every pillar contract named in EPIC-00 (issue #4) and
 [`ARCHITECTURE.md`](../ARCHITECTURE.md): agent-registry, model-gateway,
