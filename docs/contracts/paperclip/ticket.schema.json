@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/kushin77/agent-orchestrator/docs/contracts/paperclip/ticket.schema.json",
-  "title": "Paperclip-ing ticket contract (fleet claim -> upstream issue)",
-  "description": "The frozen ticket seam between the fleet's claim ledger (governance/dispatch/) and the upstream issue surface (issue #370, ADR-0013). A ticket has one accountable owner, a status in in-progress / blocked / in-review / done, explicit blocked-by relations, a goal reference and evidence. See docs/PAPERCLIP-ING-INTEGRATION.md.",
+  "title": "Paperclip-ing ticket contract v2 (the single join node: task + agent + lessons + PMO)",
+  "description": "The frozen ticket seam between the fleet's claim ledger (governance/dispatch/) and the upstream issue surface, and the SINGLE JOIN NODE for tasks, agents, the lessons register and the PMO (ADR-0014, issues #370/#400). Contract v2 is ADDITIVE: the v1 keys (id, owner, status, blocked_by, goal, evidence) keep their meaning and a v1 document still validates. v2 adds kind (the generic improvement register is a ticket kind), facets (a CLOSED set: lessons, raid, budget) and authority{} (one writer per field — the ticket is a projection, never authority; ADR-0014). See docs/PAPERCLIP-ING-INTEGRATION.md.",
   "type": "object",
   "required": ["id", "owner", "status", "blocked_by", "goal", "evidence"],
   "additionalProperties": false,
@@ -33,8 +33,102 @@
     },
     "evidence": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
-      "description": "Evidence references backing the status — the Verify: command and its real output, at minimum (GR-12)."
+      "description": "Evidence references backing the status. v1 accepted a bare string; v2 also admits a structured receipt, so the same receipt that proves delivery also backs the budget charge (seam-doc mismatches #6 and #10). Additive: both forms validate.",
+      "items": {
+        "anyOf": [
+          { "type": "string", "minLength": 1 },
+          { "$ref": "#/$defs/evidence_receipt" }
+        ]
+      }
+    },
+    "kind": {
+      "description": "Ticket kind. The generic improvement register is a ticket kind, which is how an open SUGGEST-* becomes an addressable node (ADR-0014).",
+      "enum": ["task", "incident", "rca", "corrective-action", "lesson", "suggestion"]
+    },
+    "facets": {
+      "type": "object",
+      "description": "Facet groups the ticket joins on. A CLOSED set — an unknown facet fails, so a new facet is a contract change (ADR-0014).",
+      "additionalProperties": false,
+      "properties": {
+        "lessons": { "$ref": "#/$defs/facet_lessons" },
+        "raid": { "$ref": "#/$defs/facet_raid" },
+        "budget": { "$ref": "#/$defs/facet_budget" }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "description": "One writer per field. Each entry maps a populated field to its SINGLE producing lane; a field with two writers fails and a populated field with no entry fails (ADR-0014). The ticket is a projection, never authority: the named lane is the source, the ticket is rebuildable.",
+      "additionalProperties": false,
+      "properties": {
+        "owner": { "const": "governance/isolation" },
+        "status": { "const": "governance/dispatch" },
+        "goal": { "const": ".board/snapshot.json" },
+        "blocked_by": { "const": ".board/snapshot.json" },
+        "facets.lessons": { "const": "governance/lessons" },
+        "facets.raid": { "const": "derived" },
+        "facets.budget": { "const": "telemetry/budgets" }
+      }
+    }
+  },
+  "$defs": {
+    "evidence_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "result", "checks"],
+      "description": "A structured evidence receipt: the receipt that proves delivery and backs the budget charge are the same object (ADR-0014).",
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "description": "Receipt kind (e.g. gate-run)." },
+        "ref": { "type": "string", "minLength": 1, "description": "Receipt id — for a gate run, the attestation git_sha." },
+        "result": { "enum": ["PASS", "FAIL", "CANNOT-ASSESS"], "description": "The receipt's verdict." },
+        "checks": { "type": "integer", "minimum": 0, "description": "The number of checks the receipt covers." }
+      }
+    },
+    "facet_lessons": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The lessons facet: the incident a lesson came from, its RCA, its corrective actions and its solution class.",
+      "properties": {
+        "incident": { "type": "string", "minLength": 1, "description": "The incident this lesson came from (INC-*)." },
+        "rca": { "type": "string", "minLength": 1, "description": "The root-cause analysis reference (RCA-*)." },
+        "corrective_actions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Corrective-action references (CA-*)."
+        },
+        "class": {
+          "enum": ["template", "class", "pattern", "enterprise", "faang", "elite"],
+          "description": "Solution class (docs/SOLUTION-CLASSES.md)."
+        }
+      }
+    },
+    "facet_raid": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The RAID facet: the risk a ticket carries and its remediation. authority facets.raid = derived — computed from the ticket's risk signals, not written by a lane.",
+      "properties": {
+        "risk": { "enum": ["low", "medium", "high", "critical"], "description": "The risk level carried by this ticket." },
+        "remediation": { "type": "string", "minLength": 1, "description": "The ticket id that remediates the risk." }
+      }
+    },
+    "facet_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The budget facet: the spend this ticket caused, against a cap, with the per-task receipt. authority facets.budget = telemetry/budgets.",
+      "properties": {
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "id"],
+          "description": "What the spend is scoped to (mirrors budget.schema.json scope).",
+          "properties": {
+            "level": { "enum": ["agent", "team", "project"], "description": "The scoping level." },
+            "id": { "type": "string", "minLength": 1, "description": "The agent / team / project id." }
+          }
+        },
+        "spent": { "type": "number", "minimum": 0, "description": "The spend this ticket caused in the period." },
+        "cap": { "type": "number", "minimum": 0, "description": "The cap the spend is measured against." },
+        "receipt": { "type": "string", "minLength": 1, "description": "The ledger entry backing the spend — the same receipt id an evidence[] receipt carries (mismatch #10)." }
+      }
     }
   }
 }
