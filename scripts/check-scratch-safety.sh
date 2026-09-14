@@ -143,13 +143,38 @@ file_size() { stat -c %s -- "$1" 2>/dev/null || true; }
 # compare equal; a single-quoted '$L' is a literal and does not interpolate, so
 # it is left alone (it is stripped here too, which can only over-report a line
 # that names the same token twice).
+#
+# A heredoc body is DATA, not a shell line. This file quotes the incident driver
+# verbatim in its own self-test, and a matcher that cannot tell data from code
+# fires on its own fixture and reddens the gate of record. Skipping a data body
+# is the fix that keeps this file fully scanned for real code (issue #488).
 self_append_lines() {
-  awk '
+  awk -v q="'" '
+    # A heredoc opener (`<<EOS`, `<<-EOS`, `<<EOS`) starts a data body; the body
+    # runs until a line equal to the delimiter. Quotes are stripped from a copy
+    # used only for this detection, so the predicate below is unchanged.
+    function heredoc_open(line,   m) {
+      if (!match(line, /<<-?[A-Za-z_][A-Za-z0-9_]*/)) return ""
+      m = substr(line, RSTART, RLENGTH)
+      sub(/^<<-?/, "", m)
+      return m
+    }
     {
       raw = $0
       s = $0
       gsub(/{/, "", s); gsub(/}/, "", s); gsub(/"/, "", s)
       sub(/^[ \t]+/, "", s)
+
+      hs = s
+      gsub(q, "", hs)
+
+      if (heredoc != "") {
+        if (hs == heredoc) heredoc = ""
+        next
+      }
+      h = heredoc_open(hs)
+      if (h != "") { heredoc = h; next }
+
       if (s ~ /^#/) next
       i = index(s, ">>")
       if (i == 0) next
@@ -433,6 +458,21 @@ EOS
   out="$(env SG_ROOT="$tmp" "$self" --lint "$tmp" 2>&1)"
   expect quiet "a correct driver is not refused" "FAIL  SCRATCH-SELF-APPEND" "$out" || rc=1
   rm -f "$tmp/clean.sh"
+
+  # 1c. ...and a driver that appears only as DATA -- quoted inside a heredoc -- is
+  # not refused. A heredoc body is not a shell line, and a matcher that cannot
+  # tell data from code fires on its own fixture: this guard did exactly that to
+  # itself, failing its own lint and the gate of record (issue #488).
+  cat > "$tmp/quoted.sh" <<'EOS'
+cat > /tmp/inner.sh <<'EOS2'
+L=/tmp/z.log
+tail -6 "$L" >> "$L"
+EOS2
+EOS
+  out="$(env SG_ROOT="$tmp" "$self" --lint "$tmp" 2>&1)"
+  expect quiet "a driver quoted as DATA in a heredoc is not refused" \
+    "FAIL  SCRATCH-SELF-APPEND" "$out" || rc=1
+  rm -f "$tmp/quoted.sh"
 
   # 2. SCRATCH-FILE-OVERSIZE -- sparse, so the control costs no space.
   truncate -s 2M "$tmp/bigfile" 2>/dev/null || dd if=/dev/zero of="$tmp/bigfile" bs=1M count=2 status=none
