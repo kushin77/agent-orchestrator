@@ -55,6 +55,11 @@ checks=(
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'
   'cross-repo-boundary|bash scripts/check-cross-repo-boundary.sh'
+  # audit-read-model (issue #347): the tamper-evident trail served as a
+  # read-only, deterministic, filterable read model; verify-chain is OK on an
+  # intact chain and refuses a modified / reordered / removed record, and the
+  # check mutates a temp copy of the chain, so it cannot pass vacuously.
+  'audit-read-model|bash scripts/check-audit-read-model.sh'
   'gateway-catalog-parity|bash scripts/check-gateway-catalog-parity.sh'
   'guardrail-controls|bash scripts/check-guardrail-controls.sh'
   # agent-identity-parity (issue #346): the shared agent-identity schema's
