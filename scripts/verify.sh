@@ -258,6 +258,12 @@ checks=(
   # again. pytest exits non-zero on a collection error or on "no tests collected"
   # (rc 5), so the check has no false-green path.
   'pytest-fleet|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q fleet/tests'
+  # EPIC #500 (issue #513): the conversation transcript store. Wired here for
+  # the same reason `pytest-fleet` is: a suite nothing names is decorous but
+  # inert, and `check-gate-coverage` refuses a newly *declared* suite that no
+  # gate names -- declaring it without wiring it would fail the gate of record.
+  # Offline, deterministic, stdlib only: no network, no model, no vendor seed.
+  'pytest-conversation|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/conversation/tests'
 )
 
 # --- duplicate-registration guard (issue #499) -------------------------------
