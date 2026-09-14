@@ -121,6 +121,34 @@ entries:
   sha256: ec3258e215ecf9ac6a624a1e85eaf65163d8ee224c2045d68d02d384fce580cf
   status: published
 - tenant: platform
+  persona: platform-sme
+  version: 1.0.0
+  file: cards/platform-sme.yaml
+  sha256: 80a8bf026104db2a714847e127570c2b6bdf58c3d7329156b30e6c99e2eb1720
+  status: published
+- tenant: platform
+  persona: pmo-sme
+  version: 1.0.0
+  file: cards/pmo-sme.yaml
+  sha256: 9aa89dfadde4232b0969a978a6668e19ab43ce784828b77b269eaf3badde2002
+  status: published
+- tenant: platform
+  persona: sync-sme
+  version: 1.0.0
+  file: cards/sync-sme.yaml
+  sha256: ad0d791469647ac7507e9b89ba4c89c52d734a2a02d5ba81005c8945a898e9df
+  status: published
+- tenant: platform
+  persona: gcp-gatekeeper-sme
+  version: 1.0.0
+  file: cards/gcp-gatekeeper-sme.yaml
+  sha256: 40929bdfa02e6ad3dad41d5f1d5a67eef181a1844ac6b1fa945fb6d0e687065c
+  status: published
+- tenant: platform
+  persona: mechanical-sme
+  version: 1.0.0
+  file: cards/mechanical-sme.yaml
+  sha256: 0a425874334b2afe7fb3c8f8170960f242cb6bc6325f7eebb3aa716195815c7c
   persona: copilot
   version: 1.0.0
   file: cards/copilot.yaml

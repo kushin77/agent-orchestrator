@@ -69,8 +69,7 @@
       "description": "Operational class, enforcing separation of duties: 'executor' performs primary work (write/run/ship); 'reviewer' independently reviews an executor's PR/verdict; 'auditor' adversarially audits claims/evidence. An auditor persona is never the executing persona of the task it audits (registry/personas/mapping.py guard_dispatch rejects it)."
     },
     "defaultModelTier": {
-      "type": "string",
-      "enum": ["LOW", "MED", "HIGH", "MAX"],
+      "$ref": "#/definitions/modelTier",
       "description": "Default dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro). Closed platform vocabulary (issue #9 catalog tiers). Security/architecture personas carry HIGH/MAX floors; reviewers with verification duty default LOW/MED."
     },
     "guardrailPolicyRef": {
@@ -197,6 +196,115 @@
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 },
       "description": "Human-readable non-negotiables this persona operates under (the SME card 'Guardrails' section; optional — machine enforcement rides on guardrailPolicyRef + constraintSet)."
+    },
+    "role": {
+      "$ref": "#/definitions/roleId",
+      "description": "Canonical CMR agent role this persona fills (CMR onboarding/agent-profiles/role.schema.json). Optional: a platform persona (coder, orchestrator, ...) need not map to a CMR role, but an SME persona derived from a CMR role MUST name it, and the id must exist in the canonical CMR role vocabulary (the registry/parity gate enforces the mirror, issue #145)."
+    },
+    "model": {
+      "$ref": "#/definitions/workerModel",
+      "description": "Concrete worker model for the default tier (flash or pro). Separates the MODEL axis from the tier axis (leaderboard fleet-roster ROLE/TIER/MODEL/TRANSPORT/EFFORT separation). Optional."
+    },
+    "transport": {
+      "$ref": "#/definitions/transport",
+      "description": "How the model is carried: a provider API (deepseek/api) or the running CLI session (session). Separates the TRANSPORT axis (leaderboard lib/fleet-roster.sh role_transport). Optional."
+    },
+    "effort": {
+      "$ref": "#/definitions/effort",
+      "description": "Reasoning effort for this persona's dispatches (low/medium/high; leaderboard lib/fleet-roster.sh role_effort). Separates the EFFORT axis. Optional."
+    },
+    "capabilityTier": {
+      "$ref": "#/definitions/capabilityTier",
+      "description": "Capability tier (deep/balanced/fast; leaderboard fleet-roster three-tier routing), distinct from the semantic model tier. Optional."
+    },
+    "fallbackChain": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/roleId" },
+      "description": "Ordered fallback chain of canonical role ids to dispatch when this persona cannot serve the task (capital-underwriting config/leaderboard/capability-registry.json 'fallback' pattern). Every id must be a canonical CMR role. Optional."
+    },
+    "canonicalLanes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/canonicalLane" },
+      "description": "Canonical CMR lane ids this persona owns (CMR role schema ownedLanes). Optional cross-walk to the CMR lane taxonomy; distinct from the free-form ownedLanes field above."
+    },
+    "weekly_spend_ceiling": {
+      "$ref": "#/definitions/weeklySpendCeiling",
+      "description": "First-class per-persona FinOps ceiling: the maximum the platform may spend on this persona in a rolling week, in USD. Optional; when absent the persona is governed by the platform default budget guardrail. When present it must be a non-negative number (a negative ceiling is refused by the schema and by registry/personas/registry.py)."
+    }
+  },
+  "definitions": {
+    "roleId": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "architecture-sme",
+        "iac-sme",
+        "security-sme",
+        "sync-sme",
+        "platform-sme",
+        "qa-sme",
+        "frontend-sme",
+        "pmo-sme",
+        "general",
+        "vendor",
+        "spoke-consumer"
+      ],
+      "description": "Canonical CMR agent-role vocabulary (CMR onboarding/agent-profiles/role.schema.json properties.role.enum), backfilled per issue #145. The registry/parity gate fails if this set drifts from the canonical CMR role set in either direction."
+    },
+    "modelTier": {
+      "type": "string",
+      "enum": ["LOW", "MED", "HIGH", "MAX"],
+      "description": "Dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro). Closed platform vocabulary (issue #9 catalog tiers)."
+    },
+    "workerModel": {
+      "type": "string",
+      "enum": ["flash", "pro"],
+      "description": "Concrete worker model (CMR role schema model.model): flash = the volume tier, pro = the reasoning tier."
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["deepseek", "session", "api"],
+      "description": "Transport that carries the model (leaderboard lib/fleet-roster.sh role_transport): deepseek = the DeepSeek API path; api = the Anthropic API path; session = the running CLI session."
+    },
+    "effort": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Reasoning effort (leaderboard lib/fleet-roster.sh role_effort)."
+    },
+    "capabilityTier": {
+      "type": "string",
+      "enum": ["deep", "balanced", "fast"],
+      "description": "Capability tier (leaderboard fleet-roster three-tier routing: deep/balanced/fast)."
+    },
+    "canonicalLane": {
+      "type": "string",
+      "enum": [
+        "arch",
+        "gov-iac",
+        "security",
+        "sync-engine",
+        "harvest",
+        "module-contract",
+        "catalog",
+        "registry",
+        "gates",
+        "observability",
+        "pilot-frontend",
+        "guardrails",
+        "standards",
+        "dx",
+        "meta",
+        "hygiene",
+        "pmo"
+      ],
+      "description": "Canonical CMR lane vocabulary (CMR role schema properties.ownedLanes.items.enum), backfilled per issue #145. The registry/parity gate fails on drift."
+    },
+    "weeklySpendCeiling": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Non-negative weekly spend ceiling in USD. Draft-07 treats booleans as a distinct type, so true/false fail here; registry/personas/registry.py additionally refuses a negative or non-numeric value fail-closed."
     }
   }
 }

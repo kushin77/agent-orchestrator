@@ -33,6 +33,7 @@ from portal.server.controls import (
 )
 from portal.server.finops import FinOpsReports
 from portal.server.fleet import FleetProjection
+from portal.server.live_feed import MAX_REPLAY_LIMIT, LiveFeed
 from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
@@ -109,6 +110,7 @@ class ConsoleApplication:
         fleet_projection: Optional[FleetProjection] = None,
         portal_surfaces: Optional[PortalSurfacesFeed] = None,
         finops_reports: Optional[FinOpsReports] = None,
+        live_feed: Optional[LiveFeed] = None,
         ops_health: Optional[OpsHealthReports] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
@@ -147,6 +149,12 @@ class ConsoleApplication:
             finops_reports
             if finops_reports is not None
             else FinOpsReports(repo_root=self.repo_root)
+        )
+        # The live telemetry event feed (issue #345) — feature-flag-gated OFF.
+        self.live = (
+            live_feed
+            if live_feed is not None
+            else LiveFeed(repo_root=self.repo_root)
         )
         # The ops/health/SLO surface (issue #342) — feature-flag-gated OFF.
         self.ops = (
@@ -301,6 +309,16 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.finops_reports)",
             )
 
+        # The live telemetry event feed ships the same way (GR-5), also before
+        # authN: an unpromoted surface must be invisible, not merely protected.
+        if parts[0] == "telemetry" and not self.live.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the live telemetry feed is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.telemetry_live_feed)",
+            )
+
         # The ops/health/SLO surface ships the same way (GR-5), also before
         # authN: an unpromoted surface must be invisible, not merely protected.
         if parts[0] == "ops" and not self.ops.enabled:
@@ -320,6 +338,8 @@ class ConsoleApplication:
                 return self._route_portal(parts, method)
             if parts[0] == "finops":
                 return self._route_finops(parts, principal, method, query)
+            if parts[0] == "telemetry":
+                return self._route_live_feed(parts, principal, method, query)
             if parts[0] == "ops":
                 return self._route_ops(parts, principal, method, query)
             if parts[:2] == ["console", "logout"] and method == "POST":
@@ -460,6 +480,74 @@ class ConsoleApplication:
         """Fail closed on a tenant the live stores do not know (no probing)."""
         if not self.finops.known_tenant(tenant_id):
             raise ApiError(404, "unknown_tenant", f"no such tenant {tenant_id!r}")
+
+    # -- live telemetry feed (issue #345) -----------------------------------
+    def _route_live_feed(
+        self,
+        parts: list[str],
+        principal: Principal,
+        method: str,
+        query: dict[str, str],
+    ) -> Response | StreamResponse:
+        """The live telemetry event feed (issue #345).
+
+        GET-only. Every frame is delegated to ``LiveFeed`` over the live
+        telemetry stores — this route owns authorization and transport shape
+        only, and never restates a provider, a cost or a verdict. The
+        connection is scoped: a principal only ever receives frames for the
+        tenants where its role grants ``event:read``, and the header's counts
+        are computed over that same subset so no other tenant's volume leaks.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the live feed is GET only")
+        visible = self._live_feed_tenants(principal)
+        limit = self._live_replay_limit(query)
+        surface = parts[1:]
+        if surface == ["stream"]:
+            return StreamResponse(frames=self.live.stream(tenants=visible, replay=limit))
+        if surface == ["recent"]:
+            return self._ok(self.live.recent(tenants=visible, limit=limit))
+        raise ApiError(
+            404, "not_found", f"no such telemetry surface: {'/'.join(surface)}"
+        )
+
+    def _live_feed_tenants(self, principal: Principal) -> Optional[list[str]]:
+        """The tenants a principal may watch (``None`` = every tenant).
+
+        A super-admin sees the whole platform; anyone else sees exactly the
+        tenants whose scope they hold and where their role grants
+        ``event:read``. An empty set is a refusal — never an empty feed, which
+        would read as "the platform saw no traffic".
+        """
+        if principal.super_admin:
+            return None
+        tenants = [
+            tenant
+            for tenant in self.authorizer.scope_tenants(
+                principal, self.state.tenant_ids()
+            )
+            if self.authorizer.allow(principal, tenant, "event:read")
+        ]
+        if not tenants:
+            raise ApiError(
+                403,
+                "permission_denied",
+                f"{principal.email!r} may not read telemetry events in any tenant",
+            )
+        return tenants
+
+    def _live_replay_limit(self, query: dict[str, str]) -> int:
+        """The replay window a client asked for (bounded by the lane's max)."""
+        raw = (query.get("replay") or "").strip()
+        if not raw:
+            return self.live.replay_limit
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            raise ApiError(
+                400, "invalid_request", "replay must be an integer"
+            ) from None
+        return max(0, min(value, MAX_REPLAY_LIMIT))
 
     # -- ops/health/SLO (issue #342) ----------------------------------------
     def _route_ops(

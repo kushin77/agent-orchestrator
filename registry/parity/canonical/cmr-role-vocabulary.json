@@ -1,0 +1,57 @@
+{
+  "_provenance": {
+    "vendor_repo": "kushin77/CMR",
+    "source_path": "onboarding/agent-profiles/role.schema.json",
+    "vendor_commit": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224",
+    "sha256": "64966d36dbf62f95a4a526ac78862587e3659eb4b23956a73e05c730f23c4528",
+    "payload_sha256": "d30c33ec4930bff5460a176c4dcd40c4476864a9bfde1636d5a884b5ac638069",
+    "extracted": "2026-09-14",
+    "note": "Canonical CMR agent-role vocabulary, frozen from the source schema so the default parity gate is deterministic and offline. The four axes are the canonical role/tier/worker-model/lane ids the registry must mirror exactly.",
+    "frozen_because": "vendor/CMR is a git submodule that is UNPOPULATED in a fresh git worktree, so the parity gate cannot read the canonical source there and would return CANNOT-ASSESS (rc 2) on every clone. Freezing the vocabulary in-repo lets the default mode run in make verify anywhere; --verify-source re-checks the freeze against the live submodule when it is present.",
+    "refresh_command": "python3 registry/parity/parity.py --refresh-baseline   # run where vendor/CMR is populated",
+    "verify_command": "bash scripts/check-registry-parity.sh --verify-source"
+  },
+  "roles": [
+    "architecture-sme",
+    "frontend-sme",
+    "general",
+    "iac-sme",
+    "owner",
+    "platform-sme",
+    "pmo-sme",
+    "qa-sme",
+    "security-sme",
+    "spoke-consumer",
+    "sync-sme",
+    "vendor"
+  ],
+  "tiers": [
+    "HIGH",
+    "LOW",
+    "MAX",
+    "MED"
+  ],
+  "models": [
+    "flash",
+    "pro"
+  ],
+  "lanes": [
+    "arch",
+    "catalog",
+    "dx",
+    "gates",
+    "gov-iac",
+    "guardrails",
+    "harvest",
+    "hygiene",
+    "meta",
+    "module-contract",
+    "observability",
+    "pilot-frontend",
+    "pmo",
+    "registry",
+    "security",
+    "standards",
+    "sync-engine"
+  ]
+}

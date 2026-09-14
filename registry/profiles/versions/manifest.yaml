@@ -57,6 +57,10 @@ published:
     version: 1.0.0
     file: seeds/claude.1.0.0.yaml
     sha256: c0e98f063f63903ad185188e53fcfa2ba51772ceb5b36469a82302afead834ae
+  - profile: finops-steward
+    version: 1.0.0
+    file: seeds/finops-steward.1.0.0.yaml
+    sha256: d55cfc716ea01d59ef9420a71c263eb2cb68ba6dc37ba0e223105880915395e9
   - profile: copilot
     version: 1.0.0
     file: seeds/copilot.1.0.0.yaml
