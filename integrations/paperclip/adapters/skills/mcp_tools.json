@@ -6,12 +6,20 @@
   "schema": "paperclip-mcp-projection/v1",
   "source_function": "gateway.mcp.tools.build_registry",
   "tools": [
+    "agent.list",
+    "agent.status",
+    "budget.status",
     "code.definitions",
     "code.references",
     "code.search",
+    "fleet.snapshot",
     "kb.freshness",
     "kb.query",
     "kb.summary",
-    "platform.whoami"
+    "ledger.tail",
+    "ledger.verify",
+    "platform.whoami",
+    "ticket.get",
+    "ticket.search"
   ]
 }

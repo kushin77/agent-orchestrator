@@ -83,6 +83,83 @@ with the JSON-RPC `-32601` method-not-found error — allowlist, not denylist
 `allowedTools` claim (its own closed subset of the tool ids above) is the
 per-call allowlist.
 
+## The read-only enterprise family (issue #504, EPIC #500)
+
+Issue #504 adds the ten read-only tools a **grounded chat turn** reaches its
+enterprise facts through. Two of the ten — `kb.query` / `kb.freshness` — are
+the issue #20 declarations and are left exactly as they are; the other **eight**
+are declared here and composed *beside* the seven base tools
+(`ToolRegistry.extend`, never a rewrite):
+
+| Tool | Reads (the authority) | Arguments |
+|---|---|---|
+| `ticket.get` | `.board/snapshot.json` — the ticket join node (ADR-0014) | `number` (req) |
+| `ticket.search` | the same board snapshot | `text?`, `state?`, `label?`, `limit?` |
+| `budget.status` | `telemetry/budgets/config/policies.yaml` (**declared** policy) | — |
+| `ledger.tail` | `telemetry/ledger`, through the ledger's own store | `limit?` |
+| `ledger.verify` | the same store — carries its tri-state verdict verbatim | — |
+| `agent.list` | the `ao.bridge/v1` `registry` family | `limit?` |
+| `agent.status` | the same versioned family | `agent_id` (req) |
+| `fleet.snapshot` | the `ao.bridge/v1` manifest + per-family revisions | — |
+
+Every reader **consumes** the authority and returns it verbatim, stamped with
+that authority's own revision (`mcp/sources.py`); nothing is re-derived
+(ADR-0012) and no argument can select a tenant — the tenant a tenant-scoped
+read runs under comes from the **verified session**, and a caller that supplies
+`tenant` / `tenant_id` / `tenantId` is refused by name rather than silently
+ignored (`mcp/enterprise.py`).
+
+**Read vs propose (ADR-0023).** No tool in this family writes; `WRITE_TOOLS` is
+empty on purpose. An action a turn wants is an **approval proposal**
+(`grounding.ApprovalProposal`) for the identity lane to route.
+
+### Grounding: the static-first prefix and the citations envelope
+
+`mcp/grounding.py` turns a turn's needs into a cited, provider-cache-compatible
+prefix, consuming the engine's own discipline
+(`engine/memory/prompt_cache.py`, issue #25) rather than restating it:
+
+* **static first, delta last** — the platform spec and the grounded blocks are
+  the cacheable prefix, the user's turn is the delta;
+* the block is a **pure function of the logical fragment set** (sorted by source
+  id, deduplicated, no run identity), so the same input is the same bytes and
+  the same `cache_footprint`; declared-volatile payload fields (`ts`,
+  `closed_at`, `generated_at`, …) are dropped from the cacheable region, and a
+  source that injects run identity is **refused loudly**, never silently
+  stripped;
+* it **reports the token budget it used** (`limit` / `staticTokens` /
+  `deltaTokens` / `totalTokens` / `withinBudget`) and names any fragment it had
+  to drop to fit;
+* every fragment carries a **citation** — `family:locator@revision`, of kind
+  `ticket`, `bridge_family` or `tool_call` (with the tool-call id when the turn
+  had one) — and the envelope refuses both a citation naming a source the turn
+  never read and a model response citing something it was not given.
+
+### Honesty: `NO_DATA` and the index verdict
+
+An absent or empty authority is **never** an empty success. `ReadResult`
+refuses to be constructed in the `NO_DATA` state without a reason naming what
+was missing, every tool answer carries `status` + `reason` + `count` +
+`fragments`, and a turn with no facts reports `NO_DATA` and says why
+(AO-GR-19).
+
+**Which index this grounds on — measured, not assumed.** ADR-0018 splits the
+authorities: code facts belong to `kushin77/code-indexing`, institutional facts
+to this repo's `governance/knowledge` index. Measured on this checkout:
+
+| Surface | Reachable? | Behaviour |
+|---|---|---|
+| `governance/knowledge/catalog.json` (the real in-repo institutional index) | **yes** | `knowledge` family reads it, with per-item provenance |
+| `kushin77/code-indexing` (the real compiler-accurate symbol index) | **no** — not readable from this checkout | `codeidx` family returns `NO_DATA` **naming it**, never a local mirror |
+| `gateway/mcp/kb.py` (the **declared fake** in-memory graph) | yes, offline | labelled `fixture_only`; **refused on a production path** by `SourceCatalog` |
+| `mcp/fixtures.py` (this lane's fixture tree + bridge stand-in) | test/gate only | labelled `fixture_only`, same refusal |
+
+So the declared-fake index is **not** a production grounding source: the
+refusal is one control in `SourceCatalog`, exercised by both the test suite and
+the gate of record. `kb.query` / `kb.freshness` therefore remain offline /
+fixture / demo surfaces (ADR-0018 §2) until a real index backend is consumed —
+at which point the fixture backs no live answer.
+
 ## The enforcement contract
 
 ### Wire shape
@@ -162,14 +239,18 @@ record — or a truncated tail — is a hard `AuditLogIntegrityError` on reopen 
 | [`authn.py`](authn.py) | HS256 JWT-shaped session verify/mint (registry/service claim vocab). |
 | [`authz.py`](authz.py) | `PermissionGuard` seam + `RbacScopeGuard` (consumes identity/rbac). |
 | [`registry.py`](registry.py) | `ToolRegistry`: declared capabilities, fail-closed lookup. |
-| [`tools.py`](tools.py) | The declared tool catalog (indexing + platform tools). |
-| [`kb.py`](kb.py) | Per-tenant fake code/KB index (`KbRegistry`, `TenantKb`). |
+| [`tools.py`](tools.py) | The declared tool catalog (base seven + the enterprise family). |
+| [`enterprise.py`](enterprise.py) | The read-only enterprise family (issue #504): schemas, argument guard, handlers. |
+| [`sources.py`](sources.py) | The read-only authority readers + the `SourceCatalog` gate (issue #504). |
+| [`grounding.py`](grounding.py) | The grounding assembler + the citations envelope (issue #504). |
+| [`fixtures.py`](fixtures.py) | **Fixture-only** authorities for offline tests/gates (labelled; refused on a live path). |
+| [`kb.py`](kb.py) | Per-tenant fake code/KB index (`KbRegistry`, `TenantKb`) — offline fixture only. |
 | [`audit.py`](audit.py) | `AuditSink` seam + `HashChainAuditLog` append-only ledger. |
 | [`rategate.py`](rategate.py) | `RateGate` seam + `LimitsRateGate` (consumes gateway/limits). |
 | [`gateway.py`](gateway.py) | `MCPToolGateway`: the enforcement core + JSON-RPC surface. |
 | [`cli.py`](cli.py) | Offline CLI (`list-tools`, `demo`). |
 | [`audit.schema.json`](audit.schema.json) | JSON Schema of one audit record. |
-| [`tests/`](tests/) | pytest suite (45 tests incl. every negative). |
+| [`tests/`](tests/) | pytest suite (91 tests incl. every negative). |
 
 ## Usage
 
@@ -218,8 +299,9 @@ gate also append `identity/` (as the rbac tests do):
 
 ```bash
 # from the repo root
-python3 -m pytest gateway/mcp/tests -q -p no:cacheprovider   # 45 passed
-python3 -m pytest gateway/limits/tests gateway/mcp/tests -q  # 132 passed (coexist)
+python3 -m pytest gateway/mcp/tests -q -p no:cacheprovider   # 91 passed
+python3 -m pytest gateway/limits/tests gateway/mcp/tests -q  # coexist
+bash scripts/check-chat-tools.sh                             # the #504 gate
 make verify                                                  # repo gate stays green
 ```
 
@@ -255,16 +337,29 @@ catalog vocabularies are not touched by this surface.
    an append-only hash-chained ledger.
 6. A denial is an unconditional stop; there is no code path that turns a block
    into a silent success.
+7. **Read, never write** (#504, ADR-0023): the enterprise family is read-only,
+   an action is an approval proposal, and a caller-supplied tenant selector is
+   refused rather than ignored.
+8. **No `NO_DATA` without a reason, and no fake on a live path** (#504,
+   AO-GR-19): an absent authority is reported absent, and a `fixture_only`
+   source is refused by the catalogue before any read happens.
 
-## Verification summary (issue #20)
+## Verification summary (issues #20, #504)
 
-- `python3 -m pytest gateway/mcp/tests -q -p no:cacheprovider` → **45 passed**,
+- `python3 -m pytest gateway/mcp/tests -q -p no:cacheprovider` → **91 passed**,
   covering: tenant-context enforcement + cross-tenant negatives (data + tool +
   explicit-tenant mismatch); unknown-tool rejection; authN failure (bad
   signature / expired / malformed) denied; authZ scope-vs-permission denial via
   the real rbac guard; rate-limit-exceeded denied (real gateway/limits adapter)
   with per-scope isolation; audit records per call (who/what/tenant/result) +
   ledger tamper/truncation detection; indexing tools callable against the fake
-  per-tenant KB.
+  per-tenant KB; **the #504 family** — declared schemas, the tenant-selector
+  refusal (tool *and* need), a cross-tenant session refused and audited, the
+  read-only family leaving the tree byte-identical, no second on-disk store,
+  `NO_DATA` with a reason, byte-stable grounding + reported budget and cache
+  footprint, a fabricated source id refused, the declared-fake index refused on
+  a production path, and the approval proposal as the only action shape.
+- `bash scripts/check-chat-tools.sh` → **OK** (19 controls, incl. two
+  mutation-proved-sensitive refusals).
 - `python3 gateway/mcp/cli.py demo` → **demo: OK (all 19 assertions passed)**.
 - `make verify` → green (see PR evidence).
