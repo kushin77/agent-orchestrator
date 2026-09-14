@@ -20,7 +20,7 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 from portal.server import catalog as catalog_mod
 from portal.server.auditlog import AuditLedger
@@ -31,6 +31,7 @@ from portal.server.controls import (
     PolicyStateStore,
     build_control_policy_map,
 )
+from portal.server.fleet import FleetProjection
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
 
@@ -73,6 +74,22 @@ class Response:
         return self.payload if isinstance(self.payload, bytes) else b""
 
 
+@dataclass
+class StreamResponse:
+    """A server-sent-events response: an iterator of formatted frames.
+
+    Deliberately not a :class:`Response`: it carries no ``Content-Length`` and
+    is written incrementally by the transport (``httpd``) rather than buffered
+    into one body. The fleet push channel (``/api/fleet/stream``) is its only
+    producer.
+    """
+
+    status: int = 200
+    headers: list[tuple[str, str]] = field(default_factory=list)
+    content_type: str = "text/event-stream; charset=utf-8"
+    frames: Iterator[str] = field(default_factory=lambda: iter(()))
+
+
 class ConsoleApplication:
     """The offline console backend (route table + request pipeline)."""
 
@@ -85,6 +102,7 @@ class ConsoleApplication:
         sso: Optional[ConsoleSso] = None,
         root_admin_emails: Optional[tuple[str, ...]] = None,
         allowlist_only: bool = False,
+        fleet_projection: Optional[FleetProjection] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -101,6 +119,12 @@ class ConsoleApplication:
         self.control_policy_map = build_control_policy_map(self.catalog)
         self.policy_store = PolicyStateStore(self.catalog, self.state.tenant_ids())
         self.enforcer = PolicyEnforcer(self.policy_store, self.catalog)
+        # The fleet projection surface (issue #331) — feature-flag-gated OFF.
+        self.fleet = (
+            fleet_projection
+            if fleet_projection is not None
+            else FleetProjection(repo_root=self.repo_root)
+        )
 
     # -- request pipeline ---------------------------------------------------
     def handle(
@@ -111,7 +135,7 @@ class ConsoleApplication:
         body: Optional[dict[str, Any]] = None,
         cookies: Optional[dict[str, str]] = None,
         now_iso: str = "",
-    ) -> Response:
+    ) -> Response | StreamResponse:
         path = (path or "/").split("?", 1)[0]
         query = query or {}
         cookies = cookies or {}
@@ -206,7 +230,7 @@ class ConsoleApplication:
         body: dict[str, Any],
         cookies: dict[str, str],
         now_iso: str,
-    ) -> Response:
+    ) -> Response | StreamResponse:
         parts = [part for part in route.split("/") if part]
         if not parts:
             raise ApiError(404, "not_found", "empty api route")
@@ -216,9 +240,22 @@ class ConsoleApplication:
         if parts == ["healthz"] and method == "GET":
             return self._ok({"status": "ok", "service": "portal-console"})
 
+        # The fleet projection surface ships feature-flag-gated OFF (GR-5), and
+        # the gate is checked BEFORE authN so an unpromoted surface is invisible
+        # rather than distinguishable by an authentication probe.
+        if parts[0] == "fleet" and not self.fleet.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the fleet projection surface is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.fleet_projection)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
+            if parts[0] == "fleet":
+                return self._route_fleet(parts, method, query)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -234,6 +271,43 @@ class ConsoleApplication:
             raise
         except KeyError as exc:
             raise ApiError(404, "not_found", f"unknown entity: {exc}") from exc
+
+    # -- fleet projection (issue #331) --------------------------------------
+    #: The default ``slog.jsonl`` tail size when ``?limit=`` is absent, matching
+    #: the dashboard's own default so the two surfaces agree.
+    FLEET_EVENTS_DEFAULT_LIMIT = 8
+    #: The largest history window a client may request in one call.
+    FLEET_EVENTS_MAX_LIMIT = 500
+
+    def _route_fleet(
+        self, parts: list[str], method: str, query: dict[str, str]
+    ) -> Response | StreamResponse:
+        """The read-only web single-pane-of-glass (issue #331).
+
+        Every read is delegated to ``fleet/console.py`` through the projection,
+        so the browser receives exactly the dashboard's projection. The surface
+        is GET-only and, when the feature flag is off, never reaches here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the fleet surface is GET only")
+        surface = parts[1:]
+        if surface == ["snapshot"]:
+            return self._ok(self.fleet.snapshot())
+        if surface == ["events"]:
+            return self._ok(self.fleet.events(self._fleet_events_limit(query)))
+        if surface == ["stream"]:
+            return StreamResponse(frames=self.fleet.stream())
+        raise ApiError(404, "not_found", f"no such fleet surface: {'/'.join(surface)}")
+
+    def _fleet_events_limit(self, query: dict[str, str]) -> int:
+        raw = (query.get("limit") or "").strip()
+        if not raw:
+            return self.FLEET_EVENTS_DEFAULT_LIMIT
+        try:
+            limit = int(raw)
+        except (TypeError, ValueError):
+            raise ApiError(400, "invalid_request", "limit must be an integer") from None
+        return max(1, min(limit, self.FLEET_EVENTS_MAX_LIMIT))
 
     # -- session ------------------------------------------------------------
     def _require_session(self, cookies: dict[str, str]) -> tuple[Principal, dict[str, Any]]:
