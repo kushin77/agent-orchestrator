@@ -1,0 +1,164 @@
+# Per-surface target solution-class policy (issue #351).
+#
+# The issue-class gate (`policy.yaml`, issue #140) holds a piece of *work* to a
+# rung of the CMR quality ladder (`kushin77/CMR docs/SOLUTION-CLASSES.md`,
+# referenced by AO ADR-0010). This file is the surface counterpart: every
+# product surface declares the rung it is held to, and the gate fails while the
+# surface sits below that declaration.
+#
+#     template -> class -> pattern -> enterprise -> faang -> elite
+#
+# The ladder vocabulary is closed and identical to `governance/conformance/
+# model.py` (the suites assert this, so the two gates cannot drift apart).
+#
+# Calibration (measured 2026-09-14 against this tree, issue #351): each
+# surface's `declared_class` is the highest rung whose machine evidence the tree
+# actually shows. A surface is never declared above its evidence — raising one
+# fails the gate, which is the whole point. A class requirement that cannot be
+# machine-checked carries `kind: manual` and is REPORTED on every run, never
+# silently treated as met (honesty over false-green).
+
+schema: cmr.surface-class/policy-v1
+
+ladder:
+  - template
+  - class
+  - pattern
+  - enterprise
+  - faang
+  - elite
+
+# What a rung can require. `machine` evidence is measured against the tree by
+# `surfaces.py`; `manual` evidence cannot be machine-checked and is reported.
+evidence:
+  contract:
+    kind: machine
+    description: >-
+      the surface declares its contract in a README.md under its path
+  tests:
+    kind: machine
+    description: >-
+      the surface ships a test suite: a conftest.py or a test_*.py under its path
+  controls:
+    kind: machine
+    description: >-
+      the surface ships a real control/policy artifact: a file whose name
+      carries a control / controls / policy / policies / guard / limit / quota /
+      killswitch / ratelimit / backpressure / parity token
+  audit:
+    kind: machine
+    description: >-
+      the surface ships an audit trail outside its tests: an audit / auditlog /
+      audit_event / event_log / attestation / ledger / journal module or schema
+  schema:
+    kind: machine
+    description: >-
+      the surface declares a shared schema: a *.schema.json under its path
+      (outside its tests)
+  gate:
+    kind: machine
+    description: >-
+      the surface has a dedicated gate in scripts/: a scripts/check-* whose file
+      name carries the surface name
+  live_sync:
+    kind: machine
+    description: >-
+      the surface serves or consumes live state: a live / feed / sync module
+      under its path (outside its tests)
+  rollback:
+    kind: manual
+    description: >-
+      a documented rollout + rollback procedure for the surface (CMR
+      "enterprise": rollout and rollback). Not machine-checkable here, so it is
+      reported on every run rather than assumed.
+
+# Requirements per rung. Cumulative by construction: each rung repeats every
+# lower rung's requirement and adds its own (a policy that breaks the superset
+# chain is rejected as invalid).
+requirements:
+  template: []
+  class:
+    - tests
+  pattern:
+    - tests
+    - contract
+  enterprise:
+    - tests
+    - contract
+    - controls
+    - audit
+    - schema
+    - rollback
+  faang:
+    - tests
+    - contract
+    - controls
+    - audit
+    - schema
+    - rollback
+    - gate
+  elite:
+    - tests
+    - contract
+    - controls
+    - audit
+    - schema
+    - rollback
+    - gate
+    - live_sync
+
+# Top-level directories that are product surfaces. Each that exists must have at
+# least one declared surface at or under it, or be waived here by name with a
+# reason. No surface root goes unclassified by omission.
+surface_roots:
+  - portal
+  - gateway
+  - telemetry
+  - registry
+waived_roots: []
+
+# The declared surfaces. `declared_class` is measured, never aspirational.
+surfaces:
+  - surface: shell
+    path: portal/static
+    declared_class: template
+    notes: >-
+      The console *client* shell this repo hosts: the framed shell view, the
+      console JS, the views and the design tokens it renders. Held at
+      `template` because it is a static asset bundle with no README and no test
+      suite of its own — its assets are exercised by portal/tests, which is
+      outside this path. The full OS shell is kushin77/shared-frontend's
+      `shell/` and is out of this repo's scope.
+  - surface: portal
+    path: portal
+    declared_class: pattern
+    notes: >-
+      The admin/tenant control-plane console (server + static + catalog +
+      tests). Contract, tests, real controls, an audit chain and a live feed are
+      present; it declares no shared schema of its own (its controls are
+      validated by the guardrails control schema), and that missing owned schema
+      is what holds it at `pattern`.
+  - surface: gateway
+    path: gateway
+    declared_class: faang
+    notes: >-
+      Model gateways: contract, per-package suites, real controls (health
+      policy, limits, budgets), an MCP audit trail + schema, and the
+      check-gateway-catalog-parity.sh gate. No live-sync module, so it stops
+      short of `elite`.
+  - surface: telemetry
+    path: telemetry
+    declared_class: enterprise
+    notes: >-
+      Observability / FinOps: contract, four suites, real controls (budget
+      policies + kill-switch), an audit trail and the ledger's
+      audit_event.schema.json. It has no dedicated scripts/check-*telemetry*
+      gate, which is what stops it at `enterprise`.
+  - surface: registry
+    path: registry
+    declared_class: faang
+    notes: >-
+      Agent registry: contract, six suites, owned schemas, an append-only event
+      log + pack attestation (audit), the drift control (parity/parity.py) and
+      the check-registry-parity.sh gate. No live-sync module, so it stops short
+      of `elite`.

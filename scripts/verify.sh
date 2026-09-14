@@ -51,6 +51,7 @@ checks=(
   'knowledge-index|bash scripts/check-knowledge-index.sh'
   'cross-reference|bash scripts/check-cross-reference.sh'
   'conformance|bash scripts/check-conformance.sh'
+  'surface-class|bash scripts/check-surface-class.sh'
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'
   'cross-repo-boundary|bash scripts/check-cross-repo-boundary.sh'
