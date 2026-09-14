@@ -60,6 +60,7 @@ governance/merge
 governance/dispatch
 fleet
 governance/knowledge
+governance/modules
 governance/conformance
 governance/finops
 # Final registration (issue #46, E2E lane): the top-level negative-control +

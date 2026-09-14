@@ -150,6 +150,11 @@ checks=(
   'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
   'paperclip-budget|bash scripts/check-paperclip-budget.sh'
   'metering-parity|bash scripts/check-metering-parity.sh'
+  # #445 (the M28 tail): the ecosystem module registry — mandatory status read
+  # from the hub catalog, three honest states, membership refused by name, a
+  # no-vendoring finding, deterministic rebuilds. It returns CANNOT-ASSESS (rc 2)
+  # when `vendor/CMR` is not initialised, never a pass.
+  'module-registry|bash scripts/check-module-registry.sh'
   # EPIC #461 (the diagrams chain): diagrams-declaration (#464) proves the
   # architecture.yaml / gdc-manifest.yaml seeds conform to the vendored CMR
   # contract. (Its sibling, the #465 ADR-0017 projection gate
