@@ -31,12 +31,26 @@ def run_cli(*args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
 
 
 def _budget_on_registry(tmp_path: Path) -> Path:
-    """Registry registering all three shipped controls but enabling only
+    """Registry registering every shipped control but enabling only
     model-call-budget (startup requires every referenced control to be
-    registered, so the others must be present even while OFF)."""
+    registered, so the others must be present even while OFF).
+
+    The id list mirrors ``guardrails/policy/controls.yaml``: the three
+    issue-#26 platform controls plus the five workbook mechanical-rule
+    controls of issue #636.
+    """
     path = tmp_path / "controls-budget-on.yaml"
     controls = []
-    for cid in ("model-call-budget", "tool-use-guard", "data-egress-guard"):
+    for cid in (
+        "model-call-budget",
+        "tool-use-guard",
+        "data-egress-guard",
+        "workbook-vector-memory-frontload",
+        "workbook-drawio-mcp-diagramming",
+        "workbook-external-state-caching",
+        "workbook-zero-token-arithmetic",
+        "workbook-webhook-caching",
+    ):
         enabled = "true" if cid == "model-call-budget" else "false"
         rationale = "\n    on_since_rationale: test registry" if cid == "model-call-budget" else ""
         controls.append(
@@ -56,7 +70,9 @@ def test_validate_shipped_examples_exits_zero():
     proc = run_cli("validate")
     assert proc.returncode == 0, proc.stderr
     assert "valid: yes" in proc.stdout
-    assert "policies: 3" in proc.stdout
+    # 3 issue-#26 platform examples + 5 issue-#636 workbook mechanical rules
+    assert "policies: 8" in proc.stdout
+    assert "controls.yaml (8 registered)" in proc.stdout
 
 
 def test_validate_invalid_bundle_exits_one(tmp_path):

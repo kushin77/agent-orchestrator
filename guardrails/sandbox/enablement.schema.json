@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-orchestrator.internal/schemas/sandbox-enablement.schema.json",
+  "title": "agent-orchestrator sandbox runtime enablement flag",
+  "description": "Contract for the single feature flag that governs whether a sandbox runtime (offline / docker / firecracker) may execute. Shares the enum vocabulary of runtime names with the sandbox Runtime protocol; ships enabled:false and may only be turned ON by an explicit activation (issue #636, AO-GR-6 flag-gated-OFF doctrine).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "runtime", "enabled"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "runtime": {
+      "type": "string",
+      "enum": ["offline", "docker", "firecracker"],
+      "description": "The runtime this flag governs. 'offline' is the injectable fake used by tests/CI; 'docker' and 'firecracker' are declared, seam-only runtimes."
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Always false on load. A sandbox is enabled only by an explicit activation at runtime, never by its declared document."
+    },
+    "activations": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many times the flag has been turned ON in this process. 0 is the shipped state; the count exists so a gate can prove a flag was never auto-enabled."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why the sandbox is being (or was) enabled. Required by the operator path when a declared runtime is switched ON."
+    },
+    "operator": {
+      "type": "string",
+      "description": "Identity of the operator that enabled the sandbox (audit context, never a secret)."
+    }
+  },
+  "definitions": {
+    "declared_runtime": {
+      "description": "A runtime that ships as a declared seam: enabling the flag still refuses to fabricate an execution.",
+      "type": "string",
+      "enum": ["docker", "firecracker"]
+    }
+  }
+}

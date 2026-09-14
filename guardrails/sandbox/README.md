@@ -60,6 +60,8 @@ fail-closed behaviour.
 | `catalog.py` | `ProfileCatalog` / `CategoryMap` loaders, fail-closed resolution |
 | `runtime.py` | `Runtime` protocol: `name` / `enabled` / `run(request, profile)` |
 | `offline.py` | `OfflineRuntime`: deterministic in-process enforcement model |
+| `enablement.py` | `SandboxEnablement`: the ONE feature flag that enables a runtime; ships OFF, reversible, negative-controlled (issue #636) |
+| `enablement.schema.json` | Declared contract for the runtime-enablement flag |
 | `docker.py` | Docker runtime - **DECLARED, flag-gated OFF** + pure `docker_run_flags` |
 | `firecracker.py` | Firecracker microVM executor - **DECLARED, flag-gated OFF** (schema + seam) |
 | `executor.py` | `SandboxExecutor`: per-category defaults, fail-closed dispatch, optional audit |
@@ -126,6 +128,27 @@ deterministic `microvm_limits(profile)` derivation, and an OFF-by-default
 `FirecrackerMicroVmRuntime` whose `run`/`start` refuse. A deployment that turns
 the flag on wires the real Firecracker lifecycle (the elevatedIQ
 `internal/firecracker` reference pattern) at that seam.
+
+### 3.5 Runtime enablement (the one flag that turns a runtime on)
+
+`SandboxEnablement` ([`enablement.py`](enablement.py), contract in
+[`runtime-enablement.md`](runtime-enablement.md) and
+[`enablement.schema.json`](enablement.schema.json)) is the **single** feature
+flag governing whether a runtime may execute (issue #636):
+
+* it ships **OFF** and there is no constructor path to an ON sandbox;
+* `enable()` builds the runtime *disabled first* and only then flips the flag,
+  so a runtime that cannot exist never leaves a half-enabled state;
+* `disable()` restores the shipped posture and the runtime refuses again;
+* `activations()` counts ON transitions, and `assert_not_auto_on()` is the
+  negative control a gate runs to prove the OFF-by-default guarantee still
+  bites (no environment variable can flip the flag).
+
+Enabling a **declared** runtime (`docker`/`firecracker`) does **not** fabricate
+an execution: the enabled runtime still refuses with
+`RuntimeExecutionError`. The enable/disable round-trip is therefore proven on
+the **injectable `OfflineRuntime`** — no docker daemon, no Firecracker, no
+network.
 
 ## 4. Wiring into the MCP tool gateway (issue #20)
 
