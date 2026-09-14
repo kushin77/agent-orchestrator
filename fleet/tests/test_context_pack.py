@@ -92,6 +92,16 @@ def test_pack_carries_the_title_body_lane_verify_clause_and_relevant_lessons(tmp
     assert "LESSON-0002" not in prompt, "an irrelevant lesson was padded into the pack"
 
 
+def test_the_verify_clause_is_read_through_markdown_and_backticks():
+    """The bodies these issues use write ``**Verify:** `cmd` plus prose``."""
+    clause = terminal.pack_verify_clause(
+        "**Acceptance.** something\n\n**Verify:** `python3 -m pytest fleet/tests -q` plus a live dispatch."
+    )
+    assert clause == "python3 -m pytest fleet/tests -q", clause
+    assert terminal.pack_verify_clause("`Verify:` `pytest fleet/tests -q`") == "pytest fleet/tests -q"
+    assert terminal.pack_verify_clause("no verify line here") is None
+
+
 def test_build_command_carries_the_pack_in_the_final_prompt_argument(tmp_path):
     pack = terminal.issue_context(
         220,

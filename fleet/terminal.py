@@ -597,25 +597,52 @@ def _keywords(text: str) -> set[str]:
 _VERIFY_CLAUSE_RE = re.compile(r"^[\s>*_`-]*Verify:\s*(.*)$", re.IGNORECASE | re.MULTILINE)
 
 
+def _first_backtick_span(text: str) -> str | None:
+    """The first non-empty ``` `...` ``` span in `text`, or None.
+
+    The label's own closing backtick (`` `Verify:` ``) forms a blank pair, so a
+    blank pair is skipped rather than returned — which is what lets both
+    `` `Verify:` `cmd` `` and ``**Verify:** `cmd` plus prose`` yield ``cmd``.
+    """
+    index = text.find("`")
+    while index != -1:
+        end = text.find("`", index + 1)
+        if end == -1:
+            return None
+        candidate = text[index + 1:end].strip()
+        if candidate:
+            return candidate
+        index = text.find("`", end + 1)
+    return None
+
+
 def pack_verify_clause(body: str) -> str | None:
     """The issue's own ``Verify:`` clause as TEXT, for the context pack.
 
     Deliberately more tolerant than :func:`extract_verify_command`, which decides
     whether a declared value is *runnable* and whose result the loop executes under
     a shell. Here the clause is only ever *told* to the subagent, so a body that
-    writes ``**Verify:** ...`` (the issue bodies do) still has its clause carried
-    instead of silently dropped.
+    writes ``**Verify:** ...`` or backticks the command and then adds prose still
+    has its clause carried instead of silently dropped.
     """
     match = _VERIFY_CLAUSE_RE.search(body or "")
     if not match:
         return None
-    candidate = re.sub(r"^[`\s*_]+|[`\s*_]+$", "", match.group(1))
-    if not candidate:
+    raw = match.group(1)
+    if not raw.strip():
         for line in (body or "")[match.end():].splitlines():
-            candidate = re.sub(r"^[`\s*_]+|[`\s*_]+$", "", line)
-            if candidate:
+            if line.strip():
+                raw = line
                 break
-    return candidate or None
+    text = raw.strip()
+    if not text:
+        return None
+    span = _first_backtick_span(text)
+    if span:
+        return span
+    text = re.sub(r"^[\s*_`]+", "", text)
+    text = re.sub(r"[\s*_`]+$", "", text)
+    return text or None
 
 
 def snapshot_issue(issue: int, path: Path | str | None = None) -> dict | None:
