@@ -233,6 +233,18 @@
     "weekly_spend_ceiling": {
       "$ref": "#/definitions/weeklySpendCeiling",
       "description": "First-class per-persona FinOps ceiling: the maximum the platform may spend on this persona in a rolling week, in USD. Optional; when absent the persona is governed by the platform default budget guardrail. When present it must be a non-negative number (a negative ceiling is refused by the schema and by registry/personas/registry.py)."
+    },
+    "reportsTo": {
+      "$ref": "#/definitions/reportsTo",
+      "description": "Org-chart reporting line (issue #632): the platform persona id this persona reports to, or the reserved principal 'board' for the org chart's single root. Optional and backwards-compatible — a persona without a reporting line is simply not part of the declared org chart. The id must be a resolvable platform persona (or 'board'), and the edge must appear in registry/personas/org-chart.yaml: registry.validate_org_chart() refuses an unresolvable edge."
+    },
+    "monthlyBudgetCapUsd": {
+      "$ref": "#/definitions/monthlyBudgetCapUsd",
+      "description": "First-class per-persona MONTHLY FinOps cap in USD (issue #632 C-suite workbook row). Optional and backwards-compatible. Distinct from the rolling-week weekly_spend_ceiling: this is the monthly ceiling the org chart declares per role (e.g. CEO $300.00, CFO $50.00). When present it must be a non-negative number; registry/personas/registry.py refuses a negative or non-numeric value fail-closed."
+    },
+    "heartbeatSchedule": {
+      "$ref": "#/definitions/heartbeatSchedule",
+      "description": "How often this persona's heartbeat is refreshed (issue #632 org chart). Optional and backwards-compatible. The closed vocabulary covers fixed cron cadences (hourly / every-30m / every-15m / daily) plus trigger-driven beats (event / webhook) — a heartbeat outside the platform cadences would be undispatchable, so the enum is closed. registry/personas/registry.py additionally refuses an unparseable value fail-closed."
     }
   },
   "definitions": {
@@ -306,6 +318,41 @@
       "type": "number",
       "minimum": 0,
       "description": "Non-negative weekly spend ceiling in USD. Draft-07 treats booleans as a distinct type, so true/false fail here; registry/personas/registry.py additionally refuses a negative or non-numeric value fail-closed."
+    },
+    "reportsTo": {
+      "type": "string",
+      "enum": [
+        "board",
+        "ceo",
+        "cto",
+        "coo",
+        "cfo",
+        "cmo",
+        "orchestrator",
+        "pmo-sme",
+        "architecture-sme",
+        "iac-sme",
+        "security-sme",
+        "sync-sme",
+        "platform-sme",
+        "qa-sme",
+        "frontend-sme",
+        "gcp-gatekeeper-sme",
+        "mechanical-sme",
+        "debugging-sme",
+        "docs-sme"
+      ],
+      "description": "Org-chart reporting target (issue #632): a platform persona id from the C-suite org chart, plus the reserved principal 'board' (the principal OUTSIDE the agent org — the CEO's reporting line). Closed like every other platform vocabulary so a card can never name a reporting target that no persona can resolve; registry.validate_org_chart() additionally refuses an edge whose target is not a resolvable platform persona."
+    },
+    "monthlyBudgetCapUsd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Non-negative MONTHLY budget cap in USD (issue #632 C-suite workbook row). Draft-07 treats booleans as a distinct type, so true/false fail here; registry/personas/registry.py additionally refuses a negative or non-numeric value fail-closed. Distinct from weekly_spend_ceiling (rolling week)."
+    },
+    "heartbeatSchedule": {
+      "type": "string",
+      "enum": ["hourly", "every-30m", "every-15m", "daily", "event", "webhook"],
+      "description": "Closed heartbeat vocabulary (issue #632 org chart): hourly / every-30m / every-15m / daily are the fixed cron cadences; event / webhook are trigger-driven beats. A closed enum keeps every declared schedule dispatchable."
     }
   }
 }
