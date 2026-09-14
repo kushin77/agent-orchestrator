@@ -1,0 +1,26 @@
+{
+  "schema": "ao.sync/sync-ownership-v1",
+  "note": "Who owns cross-repo sync (issue #427): the repo that owns this pass, the tokens that mean 'this repo is named', the peer boards the pass reviews, and the lanes this repo owns (a peer issue carrying one of these labels maps onto our work).",
+  "owner_repo": "kushin77/agent-orchestrator",
+  "name_tokens": [
+    "agent-orchestrator",
+    "kushin77/agent-orchestrator",
+    "ao.sync"
+  ],
+  "peers": [
+    "kushin77/CMR",
+    "kushin77/deepseek"
+  ],
+  "lanes": {
+    "control-plane": "control-plane/",
+    "engine": "engine/",
+    "fleet": "fleet/",
+    "gateway": "gateway/",
+    "governance": "governance/",
+    "guardrails": "guardrails/",
+    "identity": "identity/",
+    "portal": "portal/",
+    "registry": "registry/",
+    "telemetry": "telemetry/"
+  }
+}
