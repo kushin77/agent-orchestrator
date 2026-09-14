@@ -88,6 +88,7 @@ integrations/paperclip
 # registered here and each runs IN ISOLATION via scripts/run-pytest-suites.sh.
 integrations/paperclip/adapters/approvals
 integrations/paperclip/adapters/heartbeat
+integrations/paperclip/adapters/routines
 integrations/paperclip/adapters/secrets
 integrations/paperclip/adapters/skills
 integrations/paperclip/api
