@@ -1,0 +1,23 @@
+{
+  "why": "The alert fixture (issue #566). Severity values are the closed RC-2 enum the steering verb channel.escalate declares (info | warn | critical) — a fixture that invents a fourth is refused at load. An acknowledgement resolves to the DECLARED steering command SEND with the alert id in the message, delivered through the control API so the audit record lands on RC-4's rails.",
+  "alerts": [
+    {
+      "id": "a-1",
+      "severity": "critical",
+      "text": "rung monitor lost its beat",
+      "source": "fleet_projection"
+    },
+    {
+      "id": "a-2",
+      "severity": "warn",
+      "text": "claim #566 has no heartbeat",
+      "source": "board/held"
+    },
+    {
+      "id": "a-3",
+      "severity": "info",
+      "text": "dispatch c-1 completed",
+      "source": "telemetry_live_feed"
+    }
+  ]
+}
