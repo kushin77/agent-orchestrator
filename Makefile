@@ -17,7 +17,7 @@ SHELL := /bin/bash
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
-brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt surface-class \
+        brain-profile conformance lessons ticket secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
 
@@ -313,6 +313,16 @@ knowledge-index-build:
 ## vacuously
 cross-reference:
 	@bash scripts/check-cross-reference.sh
+
+## ticket — ticket projection (M26 #401): the paperclip ticket is the single
+## join node (ADR-0014) — the board snapshot, the claim ledger, the lessons
+## register, the budget rail and the gate attestation are projected into one
+## deterministic, rebuildable ticket graph; one writer per field is enforced
+## against contract v2's frozen authority{} map, an unresolvable reference fails
+## naming the file and line, and the check provokes each refusal for real, so it
+## cannot pass vacuously
+ticket:
+	@bash scripts/check-ticket-projection.sh
 
 ## conformance — CMR class/pattern/template enforcement (issue #140): every
 ## milestoned issue must be classified, and the class it declares must hold
