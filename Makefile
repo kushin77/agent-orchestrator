@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -478,6 +478,25 @@ capability-registers:
 	@bash scripts/track-diagrams-capabilities.sh
 	@bash scripts/check-codeidx-capability-register.sh
 	@bash scripts/track-codeidx-capabilities.sh
+
+## chat — the conversational surface (EPIC #500, M30): the six chat gates
+## delivered by the sibling lanes — #504 (grounding, the read-only enterprise
+## tool family), #505 (identity), #506 (FinOps), #507 (guardrails), #508 (UX)
+## and #509 (eval) — in one shot. Each keeps its OWN name in scripts/verify.sh's
+## checks=() array; this target is for fast local iteration, not a second gate
+## of record. All six are offline and deterministic (no network, no `vendor/CMR`
+## submodule), so they run for real in a fresh worktree rather than reporting
+## CANNOT-ASSESS. The seventh gate named by issue #502,
+## scripts/check-chat-surface.sh, is deliberately NOT listed here: it does not
+## exist yet (it is owned by #503, the still-open serving-surface lane). A stub
+## would be an invented check, which is worse than a named gap.
+chat:
+	@bash scripts/check-chat-tools.sh
+	@bash scripts/check-chat-identity.sh
+	@bash scripts/check-chat-finops.sh
+	@bash scripts/check-chat-guardrails.sh
+	@bash scripts/check-chat-ux.sh
+	@bash scripts/check-chat-eval.sh
 
 ## paperclip-auth — cross-boundary auth for the paperclip seam (issue #412,
 ## ADR-0013/ADR-0012): agent identity is minted/verified from the fleet's own

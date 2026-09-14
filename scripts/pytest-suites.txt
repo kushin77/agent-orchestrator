@@ -95,3 +95,14 @@ integrations/paperclip/api
 integrations/paperclip/auth
 registry/parity
 scripts
+# EPIC #500 (M30 — the enterprise chat surface; issue #502 is the wiring lane):
+# the four chat suites the sibling lanes ship. Each was committed with a tests/
+# dir but never declared, so check-drift.sh warned about all four; they are
+# registered here so the warning is resolved rather than tolerated. Each ships
+# its own tests/ dir and cannot share one pytest invocation with a sibling
+# (sibling conftest sys.path bootstrap + duplicate test-module basenames), so
+# each runs IN ISOLATION via scripts/run-pytest-suites.sh.
+guardrails/chat
+identity/chat
+registry/chat
+telemetry/chat
