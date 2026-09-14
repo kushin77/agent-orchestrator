@@ -68,6 +68,7 @@ e2e
 governance/sync
 infra/rollout
 governance/lessons
+governance/lessons-sync
 governance/remediation
 governance/board
 governance/isolation
@@ -79,5 +80,6 @@ governance/authority
 governance/rollup
 control-plane/fleet-template
 gateway/sme-routing
+integrations/paperclip
 registry/parity
 scripts
