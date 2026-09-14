@@ -23,6 +23,15 @@ Public surface
   the injected ``RateGate`` seam.
 - ``KbRegistry`` / ``TenantKb`` (kb) - per-tenant fake code/KB index so the
   declared indexing tools are fully exercisable offline.
+- ``SourceCatalog`` (sources) - the read-only authority readers behind the
+  enterprise family; every read is stamped with the authority's own revision,
+  and a ``fixture_only`` source is refused on a production path (issue #504).
+- ``GroundingAssembler`` / ``CitationsEnvelope`` (grounding) - the static-first
+  cited prefix a grounded chat turn is built from, consuming the
+  ``engine/memory/prompt_cache`` discipline (issue #504).
+- ``enterprise_handlers`` / ``enterprise_schemas`` (enterprise) - the ten
+  read-only enterprise tools (eight new + ``kb.query`` / ``kb.freshness``)
+  composed beside the seven base declarations (issue #504).
 
 The package is importable as ``mcp`` when ``gateway/`` is on ``sys.path``
 (the tests arrange this in ``tests/conftest.py``, prepending ``gateway/`` so
@@ -58,7 +67,28 @@ from .errors import (
     ToolNotAllowedError,
     UnknownToolError,
 )
+from .enterprise import (
+    CHAT_FAMILY_NAMES,
+    ENTERPRISE_TOOL_NAMES,
+    REUSED_READ_TOOLS,
+    WRITE_TOOLS,
+    enterprise_descriptions,
+    enterprise_handlers,
+    enterprise_schemas,
+)
 from .gateway import MCPToolGateway
+from .grounding import (
+    ApprovalProposal,
+    Citation,
+    CitationsEnvelope,
+    GroundedTurn,
+    GroundingAssembler,
+    GroundingError,
+    GroundingRequest,
+    Need,
+    TokenBudget,
+    propose_approval,
+)
 from .kb import (
     IndexBackend,
     KbRegistry,
@@ -87,59 +117,102 @@ from .protocol import (
 )
 from .rategate import LimitsRateGate, RateDecision, RateGate, UnlimitedRateGate, scope_for
 from .registry import ToolRegistry
+from .sources import (
+    MODE_FIXTURE,
+    MODE_PRODUCTION,
+    STATUS_NO_DATA,
+    STATUS_OK,
+    TENANT_ARGUMENT_KEYS,
+    TENANT_SCOPED_FAMILIES,
+    AuthoritySource,
+    Fragment,
+    KbFixtureSource,
+    ReadResult,
+    SourceCatalog,
+    default_repo_root,
+)
 from .tools import build_registry, declared_tools
 
 __all__ = [
     "AUTHN_FAILED",
     "AUTHZ_DENIED",
+    "ApprovalProposal",
     "AuditLogError",
     "AuditLogIntegrityError",
     "AuditSink",
     "AuthnError",
+    "AuthoritySource",
     "AuthzDecision",
     "AuthzDenied",
+    "CHAT_FAMILY_NAMES",
+    "Citation",
+    "CitationsEnvelope",
     "CrossTenantSessionDenied",
     "DEFAULT_ROLE",
     "DEFAULT_TTL_SECONDS",
+    "ENTERPRISE_TOOL_NAMES",
+    "Fragment",
     "GatewayError",
+    "GroundedTurn",
+    "GroundingAssembler",
+    "GroundingError",
+    "GroundingRequest",
     "HashChainAuditLog",
     "ISSUER",
     "IndexBackend",
     "InvalidArgumentsError",
     "InvalidCredentialError",
+    "KbFixtureSource",
     "KbRegistry",
     "LimitsRateGate",
     "MCPToolGateway",
     "MCP_ALLOWLIST_KEYS",
+    "MODE_FIXTURE",
+    "MODE_PRODUCTION",
     "MemoryKbBackend",
+    "Need",
     "PermissionGuard",
     "PROTOCOL_VERSION",
     "RATE_LIMITED",
+    "REUSED_READ_TOOLS",
     "RateDecision",
     "RateGate",
     "RateLimitedError",
     "RbacScopeGuard",
+    "ReadResult",
     "RepoIndex",
     "SERVER_NAME",
     "SERVER_VERSION",
+    "STATUS_NO_DATA",
+    "STATUS_OK",
+    "TENANT_ARGUMENT_KEYS",
+    "TENANT_SCOPED_FAMILIES",
     "SessionExpiredError",
     "SessionIdentity",
+    "SourceCatalog",
     "Symbol",
     "TENANT_CONTEXT_REQUIRED",
     "TOOL_CALL_PERMISSION",
     "TOOL_NOT_ALLOWED",
     "TenantContextRequired",
     "TenantKb",
+    "TokenBudget",
     "ToolDefinition",
     "ToolNotAllowedError",
     "ToolRegistry",
     "UnknownToolError",
     "UnlimitedRateGate",
+    "WRITE_TOOLS",
     "build_registry",
     "canonical",
     "declared_tools",
+    "default_repo_root",
+    "enterprise_descriptions",
+    "enterprise_handlers",
+    "enterprise_schemas",
     "mint_session",
     "now_utc",
+    "propose_approval",
     "scope_for",
     "session_to_token",
     "tool_result",

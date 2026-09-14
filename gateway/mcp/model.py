@@ -23,6 +23,12 @@ TOOL_CALL_PERMISSION = "tool:call"
 # ``allowedTools`` does not contain the requested id is denied (fail closed).
 # This is the external-MCP allowlist, distinct from (and complementary to) the
 # agent-internal tool vocabulary in registry/profiles/catalog.yaml.
+#
+# Issue #504 appended the read-only **enterprise** family (ticket/budget/ledger/
+# agent/fleet reads over authorities this platform already owns). The seven base
+# ids above it are unchanged: the family is composed beside them, and the
+# paperclip skills projection (a derived view of this vocabulary) is regenerated
+# rather than hand-edited.
 MCP_ALLOWLIST_KEYS = (
     "code.definitions",
     "code.references",
@@ -31,6 +37,14 @@ MCP_ALLOWLIST_KEYS = (
     "kb.freshness",
     "kb.summary",
     "platform.whoami",
+    "agent.list",
+    "agent.status",
+    "budget.status",
+    "fleet.snapshot",
+    "ledger.tail",
+    "ledger.verify",
+    "ticket.get",
+    "ticket.search",
 )
 
 

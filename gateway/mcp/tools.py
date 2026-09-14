@@ -1,6 +1,6 @@
 """Declared tool catalog of the MCP surface.
 
-Every tool is a declared capability with a JSON schema. Two families:
+Every tool is a declared capability with a JSON schema. Three families:
 
 - **Indexing tools** (tenant code/KB access) - re-use the compiler-accurate
   shapes from the code-indexing MCP catalog (``codeidx`` definitions /
@@ -9,20 +9,30 @@ Every tool is a declared capability with a JSON schema. Two families:
   caller's tenant, so results can never cross a tenant boundary.
 - **Platform tools** - a ``platform.whoami`` informational tool that proves
   every call carries a resolved tenant context.
+- **Enterprise read-only tools** (issue #504, ``mcp.enterprise``) - the ten
+  grounded-chat reads over existing authorities: tickets, budget policy,
+  ledger, agents and the ``ao.bridge/v1`` families. They are declared and
+  composed *beside* the seven above, which this module never rewrites.
 
 Handler contract: ``handler(args, session, backend) -> dict`` where ``backend``
-is the caller-tenant index backend (``None`` for platform tools that do not
-touch tenant data). Handlers return data; the gateway wraps exceptions into an
-``isError`` text result (failures are data, not protocol errors - codeidx).
+is the caller-tenant index backend (``None`` for tools that do not touch it).
+Handlers return data; the gateway wraps exceptions into an ``isError`` text
+result (failures are data, not protocol errors - codeidx).
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
+from .enterprise import (
+    enterprise_descriptions,
+    enterprise_handlers,
+    enterprise_schemas,
+)
 from .kb import IndexBackend
 from .model import SessionIdentity, ToolDefinition
 from .registry import ToolRegistry
+from .sources import SourceCatalog
 
 Handler = Callable[[Dict[str, Any], SessionIdentity, Optional[IndexBackend]], Dict[str, Any]]
 
@@ -77,8 +87,8 @@ def _platform_whoami(args: Dict[str, Any], session: SessionIdentity,
     }
 
 
-def declared_tools() -> Dict[str, Handler]:
-    """The declared tool catalog (name -> handler)."""
+def _base_declarations() -> Dict[str, Handler]:
+    """The seven base declarations (issue #20) - unchanged by issue #504."""
     return {
         "code.definitions": _code_definitions,
         "code.references": _code_references,
@@ -90,10 +100,22 @@ def declared_tools() -> Dict[str, Handler]:
     }
 
 
-def build_registry() -> ToolRegistry:
-    """Build a :class:`ToolRegistry` with every declared tool + schema."""
+def declared_tools(sources: Optional[SourceCatalog] = None) -> Dict[str, Handler]:
+    """The declared tool catalog (name -> handler): base + enterprise family.
+
+    Issue #504 adds the read-only **enterprise** family (``mcp.enterprise``)
+    beside the seven base tools. The base declarations are untouched; the
+    family is composed onto them by :func:`build_registry`, which is the single
+    source of truth this function reads back.
+    """
+    registry = build_registry(sources)
+    return {name: registry.require(name).handler for name in registry.names()}
+
+
+def _base_registry() -> ToolRegistry:
+    """Build a :class:`ToolRegistry` with the seven base tools + schemas."""
     registry = ToolRegistry()
-    handlers = declared_tools()
+    handlers = _base_declarations()
 
     schemas = {
         "code.definitions": _required_schema(
@@ -156,4 +178,35 @@ def build_registry() -> ToolRegistry:
                 handler=handler,
             )
         )
+    return registry
+
+
+def _enterprise_registry(sources: Optional[SourceCatalog] = None) -> ToolRegistry:
+    """The read-only enterprise family of issue #504, as its own registry."""
+    registry = ToolRegistry()
+    schemas = enterprise_schemas()
+    descriptions = enterprise_descriptions()
+    for name, handler in enterprise_handlers(sources).items():
+        registry.register(
+            ToolDefinition(
+                name=name,
+                description=descriptions[name],
+                input_schema=schemas[name],
+                handler=handler,
+            )
+        )
+    return registry
+
+
+def build_registry(sources: Optional[SourceCatalog] = None) -> ToolRegistry:
+    """Build the full declared catalogue: the base seven + the enterprise family.
+
+    ``sources`` selects the read-only catalogue the enterprise family reads
+    through. It defaults to the real production catalogue over this checkout, so
+    the declared surface is exactly what a deployment serves; a test or a gate
+    injects a hermetic catalogue over a fixture tree instead.
+    """
+    registry = ToolRegistry()
+    registry.extend(_base_registry())
+    registry.extend(_enterprise_registry(sources))
     return registry

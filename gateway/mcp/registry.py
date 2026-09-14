@@ -40,6 +40,18 @@ class ToolRegistry:
     def __contains__(self, name: str) -> bool:
         return name in self._tools
 
+    def extend(self, other: "ToolRegistry") -> "ToolRegistry":
+        """Compose another registry's declarations into this one.
+
+        Used to place a *family* of tools beside the base catalogue (issue
+        #504) without rewriting it: every declaration of ``other`` is registered
+        here, and the duplicate guard still refuses a name declared twice - so
+        a family can never silently shadow a tool it does not own.
+        """
+        for name in other.names():
+            self.register(other.require(name))
+        return self
+
     def names(self) -> List[str]:
         return sorted(self._tools)
 
