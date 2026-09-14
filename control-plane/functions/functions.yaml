@@ -1,0 +1,794 @@
+# control-plane/functions/functions.yaml
+#
+# THE ONE DECLARATION OF EVERY COCKPIT FUNCTION (issue #565, RC-10 of EPIC #551).
+#
+# ADR-0026 D9 fixed the requirement: adding a domain -- FinOps, SLO, audit,
+# tickets, paperclip -- must be a DECLARATION in a closed function registry,
+# not a fork of the client. This file is that declaration. The cockpit (#566,
+# RC-11) renders what is declared here and types what is declared here; it
+# carries no catalogue of its own.
+#
+# WHAT A FUNCTION IS. A cockpit function is one thing an operator sees or
+# types: a panel (a read projection), a view (a live stream) or a command (an
+# RC-2 control verb reached over RC-3's route family). Each is declared once,
+# with its mnemonic, its human title, the endpoint(s) it binds to, its
+# parameters, the identity/rbac scope a caller needs, its effect class, the
+# stream it subscribes to when it is live, and the roles it is designed for.
+#
+# WHAT THIS FILE DOES NOT DECIDE. Nothing here grants, denies or widens a
+# permission. `roles` is a RECOMMENDATION -- additive filtering only, per
+# ADR-0026 D8/D9: "a role can never make visible something the API would not
+# already serve that caller", and "the cockpit adds no second permission
+# vocabulary and no role table of its own". Permission stays with
+# identity/rbac, rechecked per call by RC-3 (portal/server/control_api.py
+# `_require_capability`, the two gates: scope, then permission).
+#
+# Validated by `control-plane/functions/cli.py validate` and gated by
+# `scripts/check-control-functions.sh`.
+#
+# THE CLOSED SETS ARE CONSUMED, NOT RESTATED. The effect classes and every
+# command's capability and audit action belong to RC-2's vocabulary; the
+# surfaces and their routes belong to the feature-flag registry; the
+# permissions belong to identity/rbac. This file cites them and the gate
+# refuses a citation the owner does not declare -- a second copy of any of
+# them would be a second authority.
+
+schema: cmr.control-functions/v1
+
+# ---------------------------------------------------------------------------
+# The declared authorities this registry reads (never a copy of them).
+# ---------------------------------------------------------------------------
+consumes:
+  vocabulary: control-plane/control/verbs.yaml
+  surfaces: infra/feature-flags/registry.yaml
+  permissions: identity/rbac/model.py
+
+# ---------------------------------------------------------------------------
+# The closed role set. A role is a lens, never a grant.
+# ---------------------------------------------------------------------------
+# ADR-0026 D8: CTO / VP-Eng / Manager / Analyst are named workspaces over ONE
+# function set, scoped by identity/rbac plus entitlements. A role narrows what
+# is shown; it never authorises a call. There is deliberately no `permission`,
+# `allow` or `grant` field anywhere in this file -- adding one would be the
+# second permission vocabulary ADR-0025 D2.3 forbids.
+roles:
+  CTO: "Owns the fleet: the whole function set, including the irreversible levers."
+  VP-Eng: "Runs the fleet: the full lifecycle, the board, recover and closure."
+  Manager: "Runs the work: the board, the channel, the closure trail, and the read planes."
+  Analyst: "Reads everything and commands nothing: panels, views and read verbs."
+
+kinds:
+  panel: "A read projection of one surface (snapshot / report / catalogue)."
+  view: "A live subscription to a surface's own push channel."
+  command: "One RC-2 control verb, reached over RC-3's /api/control route family."
+
+parameter_types:
+  string: "A text value."
+  integer: "A whole number."
+  boolean: "true or false."
+  string-list: "An ordered list of text values."
+
+# ---------------------------------------------------------------------------
+# Not a cockpit function, on the record.
+# ---------------------------------------------------------------------------
+# The same rule RC-2 applies to a withheld verb applies here to a surface: a
+# surface is never silently dropped, because a dropped surface is one a later
+# lane re-invents as a bespoke panel. The gate fails on any declared surface
+# that is neither declared above nor named here.
+undeclared:
+  - kind: surface
+    ref: remote_control
+    reason: >-
+      The transport the commands already travel over, not a thing an operator
+      looks at. Every command function below binds to a route inside this
+      family; declaring it again as a panel would be a second copy of RC-3's
+      route family.
+  - kind: surface
+    ref: chat
+    reason: >-
+      The conversational surface is ADR-0023's own lane and its own client
+      posture. RC-2 declares no chat verb, so there is no control effect class
+      to reuse for a chat turn -- and declaring one here would invent the
+      second vocabulary this registry exists to avoid.
+  - kind: surface
+    ref: fleet_health_export
+    reason: >-
+      A push exporter: its own declaration names no HTTP route for a client to
+      read, so there is nothing for a panel to bind to. A function without an
+      endpoint is not a function.
+  - kind: surface
+    ref: telemetry_exposition
+    reason: >-
+      A push exporter by decision: its declaration states it "ships no HTTP
+      route, no /metrics and no bound port" (ADR-0022 fixes push as the
+      transport). No client-reachable endpoint exists to declare.
+
+functions:
+  # =========================================================================
+  # fleet -- the lifecycle the operator commands.
+  # =========================================================================
+  - id: FST
+    title: Fleet status
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/status, verb: fleet.status}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FHL
+    title: Fleet health
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/health, verb: fleet.health}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FVB
+    title: Fleet verbs
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/verbs, verb: fleet.verbs}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FDG
+    title: Fleet debug tail
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/debug, verb: fleet.debug}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FWT
+    title: Fleet watch
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/watch, verb: fleet.watch}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FCR
+    title: Fleet cron schedule
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/cron, verb: fleet.cron}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FGO
+    title: Start a unit
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/start, verb: fleet.start}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: hold
+    audit: fleet.start
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: FPS
+    title: Pause a unit
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/pause, verb: fleet.pause}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: hold
+    audit: fleet.pause
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: FRS
+    title: Resume a unit
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/resume, verb: fleet.resume}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: hold
+    audit: fleet.resume
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: FRB
+    title: Restart a unit
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/restart, verb: fleet.restart}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: stop
+    audit: fleet.restart
+    stream: null
+    roles: [CTO, VP-Eng]
+
+  - id: FSP
+    title: Stop a unit
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/stop, verb: fleet.stop}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: stop
+    audit: fleet.stop
+    stream: null
+    roles: [CTO, VP-Eng]
+
+  - id: FKL
+    title: Kill a unit (no drain)
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/kill, verb: fleet.kill}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: stop
+    audit: fleet.kill
+    stream: null
+    roles: [CTO, VP-Eng]
+
+  - id: FHT
+    title: Halt the fleet
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/halt, verb: fleet.halt}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: stop
+    audit: fleet.halt
+    stream: null
+    roles: [CTO, VP-Eng]
+
+  - id: FRF
+    title: Refresh fleet state
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/refresh, verb: fleet.refresh}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: hold
+    audit: fleet.refresh
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: FUP
+    title: Update fleet state
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/update, verb: fleet.update}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: hold
+    audit: fleet.update
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: FPK
+    title: Poke a rung
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/poke, verb: fleet.poke}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:operate, tenant_scope: platform}
+    effect_class: hold
+    audit: fleet.poke
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: FOV
+    title: Operator override
+    kind: command
+    endpoints:
+      - {route: /api/control/fleet/override, verb: fleet.override}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:override, tenant_scope: platform}
+    effect_class: irreversible
+    audit: fleet.override
+    stream: null
+    roles: [CTO]
+
+  # =========================================================================
+  # channel -- the steering transport.
+  # =========================================================================
+  - id: CST
+    title: Channel status
+    kind: command
+    endpoints:
+      - {route: /api/control/channel/status, verb: channel.status}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: CSN
+    title: Send a steering message
+    kind: command
+    endpoints:
+      - {route: /api/control/channel/send, verb: channel.send}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:steer, tenant_scope: platform}
+    effect_class: hold
+    audit: channel.send
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: COR
+    title: Give an order
+    kind: command
+    endpoints:
+      - {route: /api/control/channel/order, verb: channel.order}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:steer, tenant_scope: platform}
+    effect_class: hold
+    audit: channel.order
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: CES
+    title: Escalate to the operator
+    kind: command
+    endpoints:
+      - {route: /api/control/channel/escalate, verb: channel.escalate}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:steer, tenant_scope: platform}
+    effect_class: hold
+    audit: channel.escalate
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: CLN
+    title: Channel listen
+    kind: command
+    endpoints:
+      - {route: /api/control/channel/listen, verb: channel.listen}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: CBX
+    title: Brain outbox
+    kind: command
+    endpoints:
+      - {route: /api/control/channel/brain-outbox, verb: channel.brain-outbox}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  # =========================================================================
+  # board -- the claim ledger.
+  # =========================================================================
+  - id: BST
+    title: Board status
+    kind: command
+    endpoints:
+      - {route: /api/control/board/status, verb: board.status}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: BHD
+    title: Held claims
+    kind: command
+    endpoints:
+      - {route: /api/control/board/held, verb: board.held}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: BEL
+    title: Eligible issues
+    kind: command
+    endpoints:
+      - {route: /api/control/board/eligible, verb: board.eligible}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: BAU
+    title: Claim-ledger audit
+    kind: command
+    endpoints:
+      - {route: /api/control/board/audit, verb: board.audit}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: BCL
+    title: Claim an issue
+    kind: command
+    endpoints:
+      - {route: /api/control/board/claim, verb: board.claim}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:claim, tenant_scope: platform}
+    effect_class: hold
+    audit: board.claim
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: BRL
+    title: Release a claim
+    kind: command
+    endpoints:
+      - {route: /api/control/board/release, verb: board.release}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:claim, tenant_scope: platform}
+    effect_class: hold
+    audit: board.release
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: BRP
+    title: Reap stale claims
+    kind: command
+    endpoints:
+      - {route: /api/control/board/reap, verb: board.reap}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:admin, tenant_scope: platform}
+    effect_class: stop
+    audit: board.reap
+    stream: null
+    roles: [CTO, VP-Eng]
+
+  - id: BSN
+    title: Board snapshot
+    kind: command
+    endpoints:
+      - {route: /api/control/board/snapshot, verb: board.snapshot}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:admin, tenant_scope: platform}
+    effect_class: hold
+    audit: board.snapshot
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  # =========================================================================
+  # recover -- orphan reconciliation.
+  # =========================================================================
+  - id: RST
+    title: Reconcile status
+    kind: command
+    endpoints:
+      - {route: /api/control/recover/status, verb: recover.status}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: RSW
+    title: Sweep orphans
+    kind: command
+    endpoints:
+      - {route: /api/control/recover/sweep, verb: recover.sweep}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:recover, tenant_scope: platform}
+    effect_class: stop
+    audit: recover.sweep
+    stream: null
+    roles: [CTO, VP-Eng]
+
+  - id: RSM
+    title: Stamp a session beat
+    kind: command
+    endpoints:
+      - {route: /api/control/recover/stamp, verb: recover.stamp}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:recover, tenant_scope: platform}
+    effect_class: hold
+    audit: recover.stamp
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: RCL
+    title: Clear a session beat
+    kind: command
+    endpoints:
+      - {route: /api/control/recover/clear, verb: recover.clear}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: fleet:recover, tenant_scope: platform}
+    effect_class: hold
+    audit: recover.clear
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  # =========================================================================
+  # closure -- end-to-end closure.
+  # =========================================================================
+  - id: XST
+    title: Closure status
+    kind: command
+    endpoints:
+      - {route: /api/control/closure/status, verb: closure.status}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: XAU
+    title: Closure audit
+    kind: command
+    endpoints:
+      - {route: /api/control/closure/audit, verb: closure.audit}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: XCO
+    title: Collect a closure trail
+    kind: command
+    endpoints:
+      - {route: /api/control/closure/collect, verb: closure.collect}
+    parameters:
+      - {name: commandId, type: string, required: false, default: ""}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:read, tenant_scope: platform}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: XCL
+    title: Close a work item
+    kind: command
+    endpoints:
+      - {route: /api/control/closure/close, verb: closure.close}
+    parameters:
+      - {name: commandId, type: string, required: true}
+      - {name: args, type: string-list, required: false, default: []}
+    scope: {capability: board:close, tenant_scope: platform}
+    effect_class: irreversible
+    audit: closure.close
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  # =========================================================================
+  # the read planes -- panels and views.
+  # =========================================================================
+  - id: FLT
+    title: Fleet projection
+    kind: panel
+    endpoints:
+      - {route: /api/fleet/snapshot, surface: fleet_projection}
+      - {route: /api/fleet/events, surface: fleet_projection}
+    parameters:
+      - {name: limit, type: integer, required: false, default: 8}
+    scope: {capability: fleet:read, tenant_scope: tenant}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FLV
+    title: Fleet live stream
+    kind: view
+    endpoints:
+      - {route: /api/fleet/stream, surface: fleet_projection}
+    parameters: []
+    scope: {capability: fleet:read, tenant_scope: tenant}
+    effect_class: read
+    audit: null
+    stream: fleet_projection
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: TLF
+    title: Live telemetry feed
+    kind: view
+    endpoints:
+      - {route: /api/telemetry/recent, surface: telemetry_live_feed}
+    parameters: []
+    scope: {capability: event:read, tenant_scope: tenant}
+    effect_class: read
+    audit: null
+    stream: telemetry_live_feed
+    roles: [VP-Eng, Manager, Analyst]
+
+  - id: FNS
+    title: FinOps reports
+    kind: panel
+    endpoints:
+      - {route: /api/finops/overview, surface: finops_reports}
+      - {route: /api/finops/report, surface: finops_reports}
+      - {route: /api/finops/alerts, surface: finops_reports}
+    parameters:
+      - {name: tenant, type: string, required: false, default: ""}
+    scope: {capability: budget:read, tenant_scope: tenant}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: OPS
+    title: Ops health and SLOs
+    kind: panel
+    endpoints:
+      - {route: /api/ops/overview, surface: ops_health}
+      - {route: /api/ops/agents, surface: ops_health}
+      - {route: /api/ops/slos, surface: ops_health}
+      - {route: /api/ops/alerts, surface: ops_health}
+      - {route: /api/ops/dashboard, surface: ops_health}
+    parameters:
+      - {name: tenant, type: string, required: false, default: ""}
+    scope: {capability: agent:read, tenant_scope: tenant}
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: CFG
+    title: Platform modules
+    kind: panel
+    endpoints:
+      - {route: /api/portal/surfaces, surface: portal_surfaces}
+    parameters: []
+    scope:
+      capability: null
+      why_no_capability: >-
+        The portal-surfaces feed is served to any authenticated principal
+        (`portal/server/app.py` `_route_portal`); the route requires the console
+        session and no capability, so declaring one here would be a permission
+        the server does not check.
+      tenant_scope: platform
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: BRG
+    title: Live data bridge
+    kind: panel
+    endpoints:
+      - {route: /api/v1/bridge, surface: live_bridge}
+      - {route: /api/v1/bridge/<family>, surface: live_bridge}
+    parameters: []
+    scope:
+      capability: null
+      why_no_capability: >-
+        The bridge's platform-config families are readable by any authenticated
+        principal (`portal/server/app.py` `_route_bridge`); a capability would
+        be invented, not cited.
+      tenant_scope: platform
+    effect_class: read
+    audit: null
+    stream: null
+    roles: [CTO, VP-Eng]
+
+  - id: BRV
+    title: Bridge change signal
+    kind: view
+    endpoints:
+      - {route: /api/v1/bridge/stream, surface: live_bridge}
+    parameters: []
+    scope:
+      capability: null
+      why_no_capability: >-
+        The same authenticated-only contract as BRG: the change signal is the
+        bridge's own push channel, served to any authenticated principal.
+      tenant_scope: platform
+    effect_class: read
+    audit: null
+    stream: live_bridge
+    roles: [VP-Eng, Manager, Analyst]

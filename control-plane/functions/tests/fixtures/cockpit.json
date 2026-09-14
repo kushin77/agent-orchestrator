@@ -1,0 +1,92 @@
+{
+  "calls": {
+    "BCL": {
+      "commandId": "cmd_fixture_bcl"
+    },
+    "BRL": {
+      "commandId": "cmd_fixture_brl"
+    },
+    "BRP": {
+      "commandId": "cmd_fixture_brp"
+    },
+    "BSN": {
+      "commandId": "cmd_fixture_bsn"
+    },
+    "CES": {
+      "commandId": "cmd_fixture_ces"
+    },
+    "COR": {
+      "commandId": "cmd_fixture_cor"
+    },
+    "CSN": {
+      "args": [
+        "--to",
+        "sister",
+        "--message",
+        "fixture"
+      ],
+      "commandId": "cmd_fixture_csn"
+    },
+    "FDG": {
+      "args": [
+        "dashboard"
+      ]
+    },
+    "FGO": {
+      "commandId": "cmd_fixture_fgo"
+    },
+    "FHT": {
+      "commandId": "cmd_fixture_fht"
+    },
+    "FKL": {
+      "commandId": "cmd_fixture_fkl"
+    },
+    "FLT": {
+      "limit": 5
+    },
+    "FNS": {
+      "tenant": "acme-industries"
+    },
+    "FOV": {
+      "commandId": "cmd_fixture_fov"
+    },
+    "FPK": {
+      "commandId": "cmd_fixture_fpk"
+    },
+    "FPS": {
+      "commandId": "cmd_fixture_fps"
+    },
+    "FRB": {
+      "commandId": "cmd_fixture_frb"
+    },
+    "FRF": {
+      "commandId": "cmd_fixture_frf"
+    },
+    "FRS": {
+      "commandId": "cmd_fixture_frs"
+    },
+    "FSP": {
+      "commandId": "cmd_fixture_fsp"
+    },
+    "FUP": {
+      "commandId": "cmd_fixture_fup"
+    },
+    "OPS": {
+      "tenant": "acme-industries"
+    },
+    "RCL": {
+      "commandId": "cmd_fixture_rcl"
+    },
+    "RSM": {
+      "commandId": "cmd_fixture_rsm"
+    },
+    "RSW": {
+      "commandId": "cmd_fixture_rsw"
+    },
+    "XCL": {
+      "commandId": "cmd_fixture_xcl"
+    }
+  },
+  "note": "The cockpit's own calls, as fixtures: no live plane is touched by the render test. A mutating command carries the caller-stable commandId RC-3's exactly-once path keys on; a read omits it and takes the default.",
+  "schema": "cmr.control-functions-fixtures/v1"
+}
