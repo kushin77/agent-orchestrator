@@ -15,7 +15,13 @@
 #   4. tests         — scripts/run-pytest-suites.sh    (every suite, isolated)
 #   5. negative-ctls — scripts/check-negative-controls.sh (guard honesty)
 #   6. policy-schema — scripts/check-policy-schema.sh
-#   7. On green, write .verify/merge-attestation.json naming THIS commit.
+#   7. pr-contract   — scripts/check-pr-contract.sh     (Refs trailer +
+#      Closes/AI-assistance/pre-existing-red). Runs ONLY when a PR body exists:
+#      set AO_PR_NUMBER (read the body + range via gh) or AO_PR_BODY_FILE +
+#      AO_PR_RANGE. With neither set the signal is OMITTED (with a note), never
+#      skipped-to-green — an ordinary working checkout has no PR body, and
+#      wiring that into every local run would false-red it (issue #311).
+#   8. On green, write .verify/merge-attestation.json naming THIS commit.
 #
 #   Exit 0 = MERGE-GATE PASS (all signals OK, attestation written).
 #   Exit 1 = NOT-OK (a signal failed, or the tree is dirty).
@@ -94,6 +100,18 @@ run_contract() {
   step negative-controls bash scripts/check-negative-controls.sh
   step policy-schema bash scripts/check-policy-schema.sh
 
+  # pr-contract is the PR-time/merge-boundary signal (issue #311). A PR body
+  # only exists at that boundary; in an ordinary working checkout there is
+  # none, so the signal is OMITTED — never skipped-to-green and never a
+  # false-red — unless the caller supplies the PR context.
+  if [ -n "${AO_PR_NUMBER:-}" ]; then
+    step pr-contract bash scripts/check-pr-contract.sh --pr "$AO_PR_NUMBER"
+  elif [ -n "${AO_PR_BODY_FILE:-}" ]; then
+    step pr-contract bash scripts/check-pr-contract.sh --body-file "$AO_PR_BODY_FILE" --range "${AO_PR_RANGE:-origin/master..HEAD}"
+  else
+    echo "== merge-gate: pr-contract omitted — no PR body at this boundary (set AO_PR_NUMBER or AO_PR_BODY_FILE to enforce) =="
+  fi
+
   # aggregate: any NOT-OK fails; any CANNOT-ASSESS keeps from PASS; all OK passes
   local result="OK"
   local s
@@ -148,7 +166,7 @@ wiring_check() {
   for f in scripts/gate.sh scripts/verify.sh scripts/run-pytest-suites.sh \
            scripts/check-drift.sh scripts/check-policy-schema.sh \
            scripts/check-negative-controls.sh scripts/qa-loop.sh \
-           scripts/merge-gate.sh; do
+           scripts/merge-gate.sh scripts/check-pr-contract.sh; do
     if [ -f "$f" ]; then
       :
     else
