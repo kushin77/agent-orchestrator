@@ -733,6 +733,8 @@ def test_a_decomposed_child_keeps_its_title_into_the_wave_directive(tmp_path, mo
     """`title` was never stored, so every wave directive shipped `task.title == ""`
     and the title-based FinOps high-floor detection had nothing to read."""
     monkeypatch.setattr(brain, "WAVES", tmp_path / "waves")
+    # Since #719 the child must be a sized micro-child bound to the ACTIVE epic.
+    monkeypatch.setattr(brain, "resolve_active_epic", lambda: (219, ""))
     monkeypatch.setattr(brain, "gh_issue_create", lambda title, body: 4242)
     sent: list[dict] = []
     monkeypatch.setattr(brain, "dispatch", lambda order_: (sent.append(order_), (True, "channel send: OK"))[1])
@@ -749,7 +751,15 @@ def test_a_decomposed_child_keeps_its_title_into_the_wave_directive(tmp_path, mo
             task={
                 "decompose": {
                     "parent_issue": 219,
-                    "children": [{"title": "harden the gate", "verify": "pytest -q", "lane": "fleet"}],
+                    "children": [
+                        {
+                            "title": "harden the gate",
+                            "verify": "pytest -q",
+                            "lane": "fleet",
+                            "criterion": "the gate fails on a broken input",
+                            "files": ["scripts/check-gate.sh"],
+                        }
+                    ],
                 }
             }
         )
