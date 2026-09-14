@@ -3,7 +3,8 @@
 # Every resource is gated by `enabled`, which defaults to false (IaC mandate
 # / flag-gated OFF). With the flag closed this module is inert — it creates
 # no service, no DNS records, no domain mapping, no certificate, nothing.
-# Promotion = a reviewed go-live flips `enabled` and supplies a real `image`.
+# Promotion = a reviewed go-live flips `enabled`; the root module passes the
+# real Artifact Registry image assembled from project_id + web_image_tag.
 
 variable "enabled" {
   description = "Master flag-gate for the web surface. When false (default), nothing is created."
@@ -30,7 +31,7 @@ variable "region" {
 }
 
 variable "image" {
-  description = "Container image for the web surface. Placeholder until the web build promotes a real artifact."
+  description = "Container image for the web surface: the real Artifact Registry reference the web build (#606) promotes — us-central1-docker.pkg.dev/<project>/ao-images/portal:<immutable-tag> — assembled by the root module."
   type        = string
 }
 
