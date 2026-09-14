@@ -157,3 +157,20 @@ surfaces:
       GET /api/ops/agents?tenant=<id>, GET /api/ops/slos?tenant=<id>,
       GET /api/ops/alerts and GET /api/ops/dashboard. Offline (no network
       egress).
+  live_bridge:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Versioned live-data bridge (issue #339): the platform's four state
+      families — registry (the live AgentProfile seeds), gateway (the proxy
+      routing contract + provider catalog), telemetry (the live telemetry tail
+      plus the delegated /api/finops and /api/ops surfaces) and guardrails (the
+      policy controls catalog) — under one versioned, authenticated read
+      contract `ao.bridge/v1` at GET /api/v1/bridge (manifest),
+      GET /api/v1/bridge/<family> (read) and GET /api/v1/bridge/stream (SSE
+      change signal). Delegates to the existing family surfaces; adds no second
+      projection. Offline (reads local artifacts/stores only; no network
+      egress).
+
