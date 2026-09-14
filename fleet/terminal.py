@@ -25,6 +25,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 import runtime
 import singleton
@@ -82,6 +83,7 @@ def build_prompt(
     agent_id: str = "subagent",
     worktree: Path | None = None,
     env: dict[str, str] | None = None,
+    context: dict | None = None,
 ) -> str:
     """The subagent prompt: one issue, one worktree, one session identity.
 
@@ -93,6 +95,13 @@ def build_prompt(
     The session identity travels with the order too. An agent that does not know
     which branch it is on cannot keep its commits traceable to the ticket, so the
     id, the branch and the required trailer are stated rather than assumed.
+
+    The prompt also carries a CONTEXT PACK (#220) — the issue's title, body and
+    acceptance criteria, its lane and its own ``Verify:`` clause, plus the lessons
+    a previous lane already paid for — so the subagent does not have to rediscover
+    the work it was ordered to do. `context` is supplied by the loop, which also
+    records it with the run; when absent it is built from the committed board
+    snapshot (offline).
     """
     task = directive.get("task") or {}
     issue = task.get("issue")
@@ -116,11 +125,16 @@ def build_prompt(
         if session
         else ""
     )
+    pack = context if isinstance(context, dict) else (
+        issue_context(issue, lane) if isinstance(issue, int) else None
+    )
+    context_block = render_context_pack(pack) if pack else ""
     return (
         "You are an epic-focused subagent in the kushin77/agent-orchestrator fleet, "
         "steered by the brain through the sister session. "
         f"{where}{who}\n"
         f"BRAIN DIRECTIVE {directive_id} — model {model.get('tier', 'flash')}/{model.get('thinking', 'none')}:\n{body}\n\n"
+        f"{context_block}"
         "Do exactly this, nothing else:\n"
         f"1. Issue #{issue} is ALREADY CLAIMED for you as `{agent_id}` (lane {lane or 'n/a'}) — do NOT "
         "run claim and do NOT run release; the loop manages the claim around your run.\n"
@@ -147,9 +161,10 @@ def build_command(
     agent_id: str,
     worktree: Path | None = None,
     env: dict[str, str] | None = None,
+    context: dict | None = None,
 ) -> list[str]:
     """Runner must accept the prompt as its final argument (e.g. `claude -p`)."""
-    return shlex.split(runner) + [build_prompt(directive, agent_id, worktree, env)]
+    return shlex.split(runner) + [build_prompt(directive, agent_id, worktree, env, context)]
 
 
 def start_session_beat(env: dict | None, pid: int) -> object | None:
@@ -197,6 +212,7 @@ def run_once(
     worktree: Path | None = None,
     env: dict[str, str] | None = None,
     slot: dict | None = None,
+    context: dict | None = None,
 ) -> tuple[int, str]:
     """Run one subagent for one directive; return (exit code, captured output).
 
@@ -204,8 +220,14 @@ def run_once(
     stop handler: a stopped loop must take its subagent down with it instead of
     orphaning it. The session environment is injected here, so the subagent and
     everything it spawns commit under its own identity.
+
+    The run's context pack (#220) is `context`, or the pack the loop parked on the
+    slot. Resolving it from the slot keeps this call's shape unchanged for callers
+    that predate the pack, while still putting what the subagent was told into the
+    prompt it receives.
     """
-    command = build_command(directive, runner, agent_id, worktree, env)
+    pack = context if context is not None else (slot or {}).get("context")
+    command = build_command(directive, runner, agent_id, worktree, env, pack)
     cwd = str(worktree) if worktree is not None else str(ROOT)
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
@@ -537,6 +559,255 @@ def issue_verify_command(issue: int) -> str | None:
     return extract_verify_command(gh_issue_field(issue, ".body") or "")
 
 
+# --- context pack (#220): what the subagent is TOLD, not just ordered ---------
+#
+# A directive used to carry the operator's prose and nothing else, so the subagent
+# rediscovered the issue it was ordered to do — its acceptance criteria, its lane,
+# and, most expensively, the lessons a previous lane already paid for. The pack is
+# assembled here, from artifacts that are committed (the board snapshot and the
+# lessons ledger), so a dispatch can describe the work without the network.
+
+#: The committed board state — the offline source of an issue's identity.
+BOARD_SNAPSHOT = ROOT / ".board" / "snapshot.json"
+#: The lessons ledger — the single record of what a previous lane already learned.
+LESSONS_LEDGER = ROOT / "governance" / "lessons" / "ledger.jsonl"
+#: How many relevant lessons one dispatch carries; more than a handful is noise.
+CONTEXT_LESSON_LIMIT = 5
+
+#: Words too common to signal relevance between a lesson and an issue title.
+_STOPWORDS = frozenset(
+    "a an and are as at be but by can did do does for from had has have if in into is it its "
+    "more most not of on or other our over own same than that the their them then there these "
+    "they this to too under until up use used using via was we were what when where which while "
+    "who will with would you your".split()
+)
+
+
+def _keywords(text: str) -> set[str]:
+    """The content words of `text`: lower-cased, stopword-free, three characters or more."""
+    return {
+        word
+        for word in re.findall(r"[a-z0-9][a-z0-9_-]{2,}", (text or "").lower())
+        if word not in _STOPWORDS
+    }
+
+
+#: ``Verify:`` on its own line, tolerating the markdown emphasis the issue bodies
+#: actually use (``**Verify:**``) and a quoting backtick around the label.
+_VERIFY_CLAUSE_RE = re.compile(r"^[\s>*_`-]*Verify:\s*(.*)$", re.IGNORECASE | re.MULTILINE)
+
+
+def pack_verify_clause(body: str) -> str | None:
+    """The issue's own ``Verify:`` clause as TEXT, for the context pack.
+
+    Deliberately more tolerant than :func:`extract_verify_command`, which decides
+    whether a declared value is *runnable* and whose result the loop executes under
+    a shell. Here the clause is only ever *told* to the subagent, so a body that
+    writes ``**Verify:** ...`` (the issue bodies do) still has its clause carried
+    instead of silently dropped.
+    """
+    match = _VERIFY_CLAUSE_RE.search(body or "")
+    if not match:
+        return None
+    candidate = re.sub(r"^[`\s*_]+|[`\s*_]+$", "", match.group(1))
+    if not candidate:
+        for line in (body or "")[match.end():].splitlines():
+            candidate = re.sub(r"^[`\s*_]+|[`\s*_]+$", "", line)
+            if candidate:
+                break
+    return candidate or None
+
+
+def snapshot_issue(issue: int, path: Path | str | None = None) -> dict | None:
+    """One issue's entry from the committed board snapshot; None when unusable.
+
+    Reads the snapshot rather than GitHub, so the dispatch path stays
+    offline-safe. An unreadable, torn or malformed snapshot is *cannot assess*: it
+    returns None, and the caller turns that into a named warning instead of a
+    crash or a silently empty pack (#220).
+    """
+    target = Path(path) if path is not None else BOARD_SNAPSHOT
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    entries = data.get("issues") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        return None
+    for entry in entries:
+        if isinstance(entry, dict) and entry.get("number") == issue:
+            return entry
+    return None
+
+
+def read_ledger(path: Path | str | None = None) -> list[dict]:
+    """Every parseable record in the lessons ledger; a torn line is skipped."""
+    target = Path(path) if path is not None else LESSONS_LEDGER
+    try:
+        raw = target.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    records: list[dict] = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            records.append(record)
+    return records
+
+
+def _lesson_text(record: dict) -> str:
+    """The human-readable part of any ledger record kind (lesson, incident, action)."""
+    return " ".join(
+        str(record.get(field, "") or "") for field in ("title", "summary", "action", "class")
+    ).strip()
+
+
+def relevant_lessons(
+    issue: int,
+    terms_text: str,
+    records: list[dict] | None = None,
+    limit: int = CONTEXT_LESSON_LIMIT,
+) -> list[dict]:
+    """Up to `limit` ledger records relevant to this issue, most relevant first.
+
+    Relevance is deliberately mechanical and honest: a record that names this issue
+    in its origin wins outright; otherwise it must share vocabulary with the issue's
+    title and lane. A record that shares nothing is not context — it is padding — so
+    it is dropped rather than filling the pack to a quota.
+    """
+    if limit <= 0:
+        return []
+    pool = read_ledger() if records is None else records
+    terms = _keywords(terms_text)
+    scored: list[tuple[int, str, dict]] = []
+    for record in pool:
+        if not isinstance(record, dict):
+            continue
+        origin = record.get("origin")
+        ref = str(origin.get("ref", "")) if isinstance(origin, dict) else ""
+        score = 100 if f"#{issue}" in ref else 0
+        score += 10 * len(terms & _keywords(_lesson_text(record)))
+        if score > 0:
+            scored.append((score, str(record.get("id", "")), record))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return [record for _, _, record in scored[:limit]]
+
+
+def issue_context(
+    issue: int,
+    lane: str = "",
+    snapshot_path: Path | str | None = None,
+    ledger_path: Path | str | None = None,
+    lesson_limit: int = CONTEXT_LESSON_LIMIT,
+    body_reader: Callable[[int], str | None] | None = None,
+) -> dict:
+    """The context pack one dispatch carries: identity, acceptance, prior lessons.
+
+    The title and body come from the board snapshot (offline) and the issue's own
+    ``Verify:`` clause is extracted from that body. The snapshot records no body
+    today — it carries title/state/edges — so when the snapshot has none the pack
+    may fall back to `body_reader` (the loop passes the live board read it already
+    performs for its gates). When neither yields a body the pack carries a NAMED
+    WARNING: a missing body is reported, never silently rendered as empty (#220).
+    """
+    target = Path(snapshot_path) if snapshot_path is not None else BOARD_SNAPSHOT
+    ledger = Path(ledger_path) if ledger_path is not None else LESSONS_LEDGER
+    entry = snapshot_issue(issue, target)
+    warnings: list[str] = []
+    if entry is None:
+        warnings.append(
+            f"issue #{issue} is not in the board snapshot ({target}) — its title, body and "
+            "acceptance criteria are NOT in this pack; refresh the board snapshot and re-dispatch"
+        )
+    title = str(entry.get("title", "") or "").strip() if entry else ""
+    if entry is not None and not title:
+        warnings.append(f"issue #{issue} title is missing from the board snapshot ({target})")
+    body = str(entry.get("body", "") or "").strip() if entry else ""
+    if body:
+        body_source = "board-snapshot"
+    elif body_reader is not None:
+        body = (body_reader(issue) or "").strip()
+        body_source = "live-board" if body else "unavailable"
+    else:
+        body_source = "unavailable"
+    if not body:
+        warnings.append(
+            f"issue #{issue} body is missing — absent from the board snapshot ({target}) and no "
+            "live read was available, so the acceptance criteria are NOT in this pack"
+        )
+    verify = pack_verify_clause(body) if body else None
+    lessons = relevant_lessons(issue, f"{title} {lane}", read_ledger(ledger), lesson_limit)
+    return {
+        "issue": issue,
+        "lane": lane,
+        "title": title,
+        "body": body,
+        "verify": verify,
+        "lessons": [
+            {
+                "id": str(record.get("id", "")),
+                "kind": str(record.get("kind", "")),
+                "class": str(record.get("class", "")),
+                "text": _lesson_text(record) or str(record.get("id", "")),
+            }
+            for record in lessons
+        ],
+        "warnings": warnings,
+        "sources": {
+            "snapshot": str(target),
+            "ledger": str(ledger),
+            "title": "board-snapshot" if title else "unavailable",
+            "body": body_source,
+            "verify": "issue-body" if verify else "unavailable",
+            "lessons": "ledger" if lessons else "ledger (none matched)",
+        },
+    }
+
+
+def render_context_pack(pack: dict) -> str:
+    """The pack as the text the subagent reads — a warning is never omitted."""
+    lines = [f"CONTEXT PACK — issue #{pack.get('issue')} (assembled offline by the sister):"]
+    lines.append(f"Title: {pack.get('title') or '(unavailable)'}")
+    lines.append(f"Lane: {pack.get('lane') or 'unassigned'}")
+    if pack.get("body"):
+        lines.append(f"Issue body (acceptance criteria):\n{pack['body']}")
+    if pack.get("verify"):
+        lines.append(f"This issue's own Verify: `{pack['verify']}` — run it before claiming done.")
+    lessons = pack.get("lessons") or []
+    if lessons:
+        lines.append(f"Prior lessons already paid for ({len(lessons)}), most relevant first:")
+        for lesson in lessons:
+            label = ", ".join(part for part in (lesson.get("kind"), lesson.get("class")) if part)
+            lines.append(f"  - {lesson.get('id')} ({label or 'lesson'}): {lesson.get('text')}")
+    else:
+        lines.append("Prior lessons: none matched this issue's title and lane.")
+    for warning in pack.get("warnings") or []:
+        lines.append(f"WARNING: {warning}")
+    return "\n".join(lines) + "\n\n"
+
+
+def context_summary(pack: dict) -> str:
+    """A one-line digest of the pack for the run record (the full pack rides the marker)."""
+    return (
+        f"context-pack issue=#{pack.get('issue')} "
+        f"title={'yes' if pack.get('title') else 'missing'} "
+        f"body={'yes' if pack.get('body') else 'missing'} "
+        f"verify={'yes' if pack.get('verify') else 'no'} "
+        f"lessons={len(pack.get('lessons') or [])} "
+        f"warnings={len(pack.get('warnings') or [])}"
+    )
+
+
+def live_issue_body(issue: int) -> str | None:
+    """The issue's body from the live board — the pack's fallback, never its default."""
+    return gh_issue_field(issue, ".body")
+
+
 def run_gate(command: str, cwd: str, timeout: float) -> tuple[bool, str]:
     """Run one gate the loop owns; its exit code — not the prose — is the signal."""
     try:
@@ -706,7 +977,7 @@ def agent_id_for(directive_id: str) -> str:
     return f"subagent-{directive_id[:8]}"
 
 
-def mark_run(directive_id: str, issue: int, agent_id: str) -> None:
+def mark_run(directive_id: str, issue: int, agent_id: str, context: dict | None = None) -> None:
     """Record that this loop is tracking a run for a directive.
 
     Written atomically (tmp + rename): readers outside the loop (the JSON gate,
@@ -717,24 +988,26 @@ def mark_run(directive_id: str, issue: int, agent_id: str) -> None:
     stays the loop's — that is what prune/watchdog read for liveness — while
     ``child_pid`` and ``ts`` are refreshed by the run's own beater (see
     ``refresh_run``) so the marker doubles as that child's heartbeat.
+
+    The run's CONTEXT PACK rides here too (#220): a reviewer can read
+    `.fleet/runs/<directive>.json` and see exactly what the subagent was told —
+    the issue's title and acceptance text, its lane, its ``Verify:`` clause and
+    the prior lessons, warnings included.
     """
     RUNS.mkdir(parents=True, exist_ok=True)
     target = RUNS / f"{directive_id}.json"
     tmp = target.with_suffix(".tmp")
-    tmp.write_text(
-        json.dumps(
-            {
-                "issue": issue,
-                "agent": agent_id,
-                "pid": os.getpid(),
-                "child_pid": None,
-                "started_at": _now(),
-                "ts": _now(),
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    payload = {
+        "issue": issue,
+        "agent": agent_id,
+        "pid": os.getpid(),
+        "child_pid": None,
+        "started_at": _now(),
+        "ts": _now(),
+    }
+    if context is not None:
+        payload["context_pack"] = context
+    tmp.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     tmp.replace(target)
 
 
@@ -1386,10 +1659,15 @@ def loop(args: argparse.Namespace) -> int:
                 continue
 
         print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
-        mark_run(directive_id, issue, agent_id)
-        run_started_at = _now()
-        record_run(directive_id, issue, agent_id, "started", run_started_at)
         lane = (directive.get("task") or {}).get("lane") or ""
+        # What the subagent is TOLD, not just ordered (#220): the issue's identity,
+        # acceptance text and Verify: clause from the board snapshot (offline), the
+        # lane, and the lessons a previous lane already paid for. The live board is
+        # the body fallback only — the snapshot is the primary, offline source.
+        context = issue_context(issue, lane, body_reader=live_issue_body)
+        mark_run(directive_id, issue, agent_id, context=context)
+        run_started_at = _now()
+        record_run(directive_id, issue, agent_id, "started", run_started_at, detail=context_summary(context))
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
             # Escalate ONCE and leave the directive pending: the refusal is usually
@@ -1420,6 +1698,7 @@ def loop(args: argparse.Namespace) -> int:
         # claim is taken here (by the loop) and released in the worker's `finally`,
         # so a dead child can never strand an issue.
         slot = register_run(directive_id, issue, agent_id)
+        slot["context"] = context
         worker = threading.Thread(
             target=run_worker,
             args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at),
