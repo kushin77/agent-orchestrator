@@ -87,6 +87,16 @@ services:
     phase: 7
     tf_flag: enable_web
     description: Public web surface (portal + shared-frontend) served at ai.purebliss.app.
+  paperclip:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_paperclip
+    description: >
+      Self-hosted upstream paperclip runtime beside the control plane (issue
+      #411, ADR-0013): a process boundary, not a control-plane service. Pinned
+      OCI image (infra/paperclip/release.yaml), health-probed at GET /api/health,
+      nothing vendored. Inert until a reviewed go-live promotes this flag.
 
 # Endpoint-level surfaces: a single endpoint family inside a service that is
 # promoted independently of the service flag around it (the service flag alone

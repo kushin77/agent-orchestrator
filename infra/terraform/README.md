@@ -9,13 +9,14 @@ Every resource is gated by an `enable_*` variable that defaults to `false`
 | File | Purpose |
 |------|---------|
 | `versions.tf` / `providers.tf` | Terraform + Google provider pins (offline-validatable). |
-| `variables.tf` | Root inputs, including the eight `enable_*` service flags + `deployer_enabled`, all default `false`. |
-| `main.tf` | Composes `modules/control-plane-service` once per service and `modules/deployer-sa`. |
-| `outputs.tf` | Gated outputs (`service_uris`, `deployer_service_account`) — null while flags are OFF. |
+| `variables.tf` | Root inputs, including the nine `enable_*` service flags + `deployer_enabled`, all default `false`. |
+| `main.tf` | Composes `modules/control-plane-service` once per service, `modules/deployer-sa`, and the `../paperclip/terraform` runtime module. |
+| `outputs.tf` | Gated outputs (`service_uris`, `deployer_service_account`, `web_surface_uri`, `paperclip_runtime_uri`) — null while flags are OFF. |
 | `backend.tf.example` | GCS remote-state template; copy to `backend.tf` at go-live. |
 | `modules/control-plane-service/` | One Cloud Run v2 service, count-gated on `enabled`, internal ingress by default. |
 | `modules/web-surface/` | The public web surface (ai.purebliss.app): Cloud Run v2 with public ingress, DNS + Google-managed TLS — count-gated on `enabled`. |
 | `modules/deployer-sa/` | The flag-gated deployer service account — the only apply identity. |
+| `../paperclip/terraform/` | The self-hosted paperclip runtime (issue #411, ADR-0013): one count-gated Cloud Run v2 service running the pinned image, health-probed at `GET /api/health`. |
 
 The promotion state of every service is recorded in
 [`../feature-flags/registry.yaml`](../feature-flags/registry.yaml); the gate

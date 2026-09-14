@@ -1,0 +1,58 @@
+# Build config for the self-hosted paperclip runtime (issue #411, ADR-0013).
+#
+# Declarative only — this file is scaffolding until a reviewed go-live imports
+# deploy-trigger.yaml with `disabled: false` and flips `enable_paperclip`. The
+# runner materializes the pinned upstream image (infra/paperclip/release.yaml)
+# as a Cloud Run service declared by ../terraform/, then probes GET /api/health
+# and fails the build if the process is absent or unhealthy.
+#
+# The build is inert by construction: the first step refuses unless the
+# `_ENABLE_PAPERCLIP` substitution is exactly "true", and the importable trigger
+# ships it as "false" (flag-gated OFF, GR-5).
+
+substitutions:
+  _ENABLE_PAPERCLIP: 'false'
+  _PAPERCLIP_IMAGE: 'ghcr.io/paperclipai/paperclip:v2026.831.1'
+  _PAPERCLIP_SERVICE: 'paperclip'
+  _PAPERCLIP_REGION: 'us-central1'
+  _PAPERCLIP_BASE_URL: 'https://paperclip-internal.invalid'
+
+steps:
+  # Flag gate: never deploy while the flag is closed. Names the flag on refusal.
+  - id: flag-gate
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        if [ "${_ENABLE_PAPERCLIP}" != "true" ]; then
+          echo "paperclip runtime ships flag-gated OFF; enable_paperclip is not promoted" >&2
+          exit 1
+        fi
+        echo "enable_paperclip promoted — proceeding"
+
+  # Materialize the pinned upstream image as the declared runtime.
+  - id: deploy
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        gcloud run deploy "${_PAPERCLIP_SERVICE}" \
+          --image="${_PAPERCLIP_IMAGE}" \
+          --region="${_PAPERCLIP_REGION}" \
+          --no-allow-unauthenticated \
+          --port=3100
+
+  # Health probe: a real GET /api/health; the build fails when the process is
+  # absent or unhealthy (never a hope).
+  - id: health
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        python3 infra/paperclip/health/healthcheck.py \
+          --base "${_PAPERCLIP_BASE_URL}" \
+          --path /api/health \
+          --timeout 10
