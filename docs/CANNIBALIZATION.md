@@ -610,6 +610,14 @@ where the mature shape was bash- or GitHub-bound; the verdict says which.
 | `capital-underwriting/docs/wiki/ELITE_{GENERAL,PLATOON_LEADER,AUDITOR,SCRIBE}_CHARTER.md` | chain-of-command, per-role authority, separation of duties | PATTERN | `governance/authority/model.py` (#150) |
 | `leaderboard/docs/LEADERBOARD_PROTOCOL.md` | worktree-per-session isolation (collision → isolation) | PATTERN | `governance/authority/isolation.py` (#150) |
 | `leaderboard/scripts/data/fleet-metrics-per-model.sh` | per-model invocation/success/failure/cost metric shapes | PATTERN | `governance/rollup/model.py` (#151) |
+| `leaderboard/docker/worker-fleet/personas.yaml` + `config/platoons.yaml` | fleet composition + lens→fleet→parallelism routing | PATTERN | `control-plane/fleet-template/template.yaml` (#146) |
+| `leaderboard/lib/fleet-roster.sh` | ROLE/TIER/MODEL/TRANSPORT/EFFORT roster as single source of truth | PATTERN | `control-plane/fleet-template/schema.yaml` (#146) |
+| `capital-underwriting/infra/docker/worker-fleet/personas.yaml` | 30-persona fleet + definition-vs-run-state split | PATTERN | run-state model, `control-plane/fleet-template/` (#146) |
+| `capital-underwriting/docs/operations/{SME_SQUAD_DESIGN,TWO_PLATOON_SPLIT_DESIGN}.md` | 7-domain SME routing + platoon lane split | PATTERN | `gateway/sme-routing/policies/` (#149) |
+| `capital-underwriting/config/leaderboard/capability-registry.json` | agent roles (planner/executor/verifier/critic) + worker fleets with access levels + dispatch chains | READY | `gateway/sme-routing/policies/capability-registry.yaml` (#149) |
+| `capital-underwriting/config/leaderboard/route-policy.json` | complexity/risk → chain + tier (fast/deep/strict), keyword thresholds | READY | `gateway/sme-routing/policies/route-policy.yaml` (#149) |
+| `capital-underwriting/config/leaderboard/tier-policy.json` | model tiers (flash/pro/auditor) + timeouts, token caps, fallbacks, complexity→tier | READY | `gateway/sme-routing/policies/tier-policy.yaml` (#149) |
+| `capital-underwriting/config/agent-module-authority.json` | domain→module authority matrix | REFERENCE | derived domain→module edges (#149) |
 | `vendor/CMR/catalog/schemas/gdc-manifest.schema.json` | GDC framing, `owner/name` identity | REFERENCE | `governance/rollup/schema.yaml` (#151) |
 | `vendor/CMR/catalog/topology/topology.json` | drift-flagged edges | REFERENCE | `governance/rollup/model.py` (#151) |
 | `vendor/CMR/onboarding/agent-profiles/role.schema.json` | the closed SME `role` enum used by the pilot tenants | REFERENCE | `governance/rollup/pilot/` (#151) |
@@ -623,6 +631,12 @@ this repo** (`governance/rollup/`), not harvested — recorded here so a later
 reader does not hunt for a source that is absent. (Provenance is GR-10: repo,
 path, verdict; see also the PROVENANCE tables in `docs/CTO-OVERLAY.md`,
 `docs/AUTHORITY-MODEL.md` and `docs/ENTERPRISE-ROLLUP.md`.)
+
+**A second declared-but-absent source.** `capital-underwriting/infra/docker/worker-fleet/fleet-roster.conf`
+is cited by issue #146 and **does not exist** in the local checkout (that
+directory holds `personas.yaml`, `fleet.cron`, `docker-compose.worker-fleet.yml`,
+`entrypoint.sh`, …). It is recorded as `NOT FOUND` in the #146 PROVENANCE table
+rather than silently substituted.
 
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*

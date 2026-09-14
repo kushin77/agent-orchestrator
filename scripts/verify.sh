@@ -53,6 +53,7 @@ checks=(
   'conformance|bash scripts/check-conformance.sh'
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'
+  'cross-repo-boundary|bash scripts/check-cross-repo-boundary.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
@@ -66,6 +67,8 @@ checks=(
   'cto-overlay|bash scripts/check-cto-overlay.sh'
   'authority|bash scripts/check-authority.sh'
   'rollup|bash scripts/check-rollup.sh'
+  'fleet-template|bash scripts/check-fleet-template.sh'
+  'sme-routing|bash scripts/check-sme-routing.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master

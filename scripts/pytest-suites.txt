@@ -73,4 +73,6 @@ governance/reconcile
 governance/cto-overlay
 governance/authority
 governance/rollup
+control-plane/fleet-template
+gateway/sme-routing
 scripts
