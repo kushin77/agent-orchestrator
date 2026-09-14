@@ -255,6 +255,17 @@ If "DPRS" is the intended *platform reference-architecture name*, treat
   the in-use canonical copy is `leaderboard/scripts/qa/qa-gatekeeper.sh`
   (adapted; testing-suite is the upstream lineage).
 
+### 3.4 Code-index surfaces — authority & the no-re-derivation rule (pointer)
+
+The relationship between three index-shaped surfaces — this repo's institutional
+catalogue (`governance/knowledge/`), the declared in-memory symbol graph in
+`gateway/mcp/kb.py`, and the real `kushin77/code-indexing` index — is **decided in
+[`decision-records/ADR-0018`](decision-records/ADR-0018-codeidx-consumption-and-index-authority.md)**:
+which surface owns institutional vs code facts, the gateway's posture, and the
+frozen rule that a shape in a published contract is *consumed, never mirrored*.
+The harvest entries above record **provenance only**; under that rule a
+`harvested_from` line is a citation, never a licence to re-implement.
+
 ---
 
 ## 4. Recovery pointers — stub / partial-extraction repos → eiq-ai upstream
