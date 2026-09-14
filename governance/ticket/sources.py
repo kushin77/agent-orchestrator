@@ -40,6 +40,8 @@ from model import (
     BUDGET_LEDGER_RELPATH,
     CLAIMS_DIR_RELPATH,
     CLAIMS_FILE_RELPATH,
+    CODE_EVIDENCE_UNATTACHED,
+    CODE_EVIDENCE_UNREADABLE,
     CODE_LEDGER_DUPLICATE,
     CODE_LESSON_JOIN_AMBIGUOUS,
     CODE_UNRESOLVED_REFERENCE,
@@ -542,11 +544,15 @@ def read_budgets(
 
 def read_attestations(
     root: Path | str, board: dict[int, dict[str, Any]]
-) -> tuple[list[Contribution], list[Violation]]:
+) -> tuple[list[Contribution], list[ProjectionWarning]]:
     """``evidence`` receipts from the gate attestation of the lane's own branch.
 
     ``evidence`` is not authority-tracked (ADR-0014): it is appended by whichever
     lane ran the proof, so this producer is named for the artifact, not a lane.
+    It is therefore *optional* — an unreadable attestation, or one naming an
+    issue the committed snapshot does not carry (a stale snapshot is normal: the
+    board is refreshed mid-``make verify``), is reported as a warning naming the
+    file rather than failing the whole projection.
     """
     root = Path(root)
     path = root / ATTESTATION_RELPATH
@@ -555,10 +561,10 @@ def read_attestations(
     payload = _read_json_object(path)
     if not isinstance(payload, dict):
         return [], [
-            Violation(
-                CODE_UNRESOLVED_REFERENCE,
+            ProjectionWarning(
+                CODE_EVIDENCE_UNREADABLE,
                 ATTESTATION_RELPATH,
-                "gate attestation is not a JSON object",
+                "gate attestation is not a JSON object; no receipt is attached",
             )
         ]
     match = RE_BRANCH_ISSUE.match(str(payload.get("branch") or ""))
@@ -567,10 +573,11 @@ def read_attestations(
     number = int(match.group(1))
     if number not in board:
         return [], [
-            Violation(
-                CODE_UNRESOLVED_REFERENCE,
+            ProjectionWarning(
+                CODE_EVIDENCE_UNATTACHED,
                 f"#{number}",
-                "gate attestation names a branch for an issue the board snapshot does not carry",
+                "gate attestation names a branch for an issue the board snapshot does "
+                "not carry; no receipt is attached",
                 ATTESTATION_RELPATH,
             )
         ]

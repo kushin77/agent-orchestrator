@@ -63,6 +63,8 @@ CODE_NON_DETERMINISTIC = "projection-non-deterministic"
 
 CODE_LESSON_JOIN_AMBIGUOUS = "lesson-join-ambiguous"
 CODE_LEDGER_DUPLICATE = "ledger-duplicate-id"
+CODE_EVIDENCE_UNATTACHED = "evidence-unattached"
+CODE_EVIDENCE_UNREADABLE = "evidence-unreadable"
 
 #: A populated value is one that carries something. An empty list/object/string
 #: is *not* a writer's contribution, so it needs no ``authority`` entry; a

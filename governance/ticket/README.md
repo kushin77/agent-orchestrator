@@ -66,10 +66,12 @@ writer.
   producer other than its `authority` value fails, naming both.
 * **A known field only.** A populated field the frozen contract does not carry
   (for example an undeclared facet) fails — the facet set is closed.
-* **No silent skips.** An unresolvable reference fails naming the file and line:
-  a lesson whose *issue* origin is absent from the board, a claim for an unknown
-  issue, a budget charge for an unknown issue, or an attestation naming a branch
-  for an issue the board lacks.
+* **No silent skips.** An unresolvable *authority-tracked* reference fails naming
+  the file and line: a lesson whose *issue* origin is absent from the board, a
+  claim for an unknown issue, a budget charge for an unknown issue. A duplicate
+  ledger id is reported, never silently resolved, and an unreadable or
+  un-attachable gate attestation is reported as a note — evidence is appended,
+  not authority, and a stale committed snapshot is normal.
 * **No unbacked node.** A ticket no ledger supplies a field for fails, naming it.
 * **One receipt.** A `facets.budget.receipt` that no `evidence[]` receipt on the
   same ticket carries fails — the contract's mismatch #10, closed.
@@ -84,7 +86,9 @@ rebuilds from the ledgers, and compares hashes. A rebuild that differs is a
 failure, because a hub that cannot be rebuilt is a second source of truth.
 
 Run `project` before `verify` when you have edited a ledger: `verify` compares the
-store to the rebuild, so a stale store is (correctly) reported as stale.
+store to the rebuild, so a stale store is (correctly) reported as stale — and the
+store is left in place, so the finding stays reproducible until `project`
+regenerates it.
 
 ## The negative-control seam
 

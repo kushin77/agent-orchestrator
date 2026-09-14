@@ -231,10 +231,13 @@ def build(
 
     contributions.extend(read_derived(board, lesson_index))
 
-    for reader in (read_budgets, read_attestations):
-        gathered, found = reader(root, board)
-        contributions.extend(gathered)
-        violations.extend(found)
+    gathered, found = read_budgets(root, board)
+    contributions.extend(gathered)
+    violations.extend(found)
+
+    gathered, noted = read_attestations(root, board)
+    contributions.extend(gathered)
+    warnings.extend(noted)
 
     contributions.extend(extra)
 
@@ -355,8 +358,10 @@ def verify(root: Path | str = ".", *, store: Path | str | None = None) -> Verify
     """Re-derive the projection, prove the store can be rebuilt, and compare.
 
     Steps, in order: build → compare against the stored projection → delete the
-    store → rebuild from the ledgers → compare hashes. A mismatch, a
-    non-deterministic rebuild or any authority finding is a failure.
+    store → rebuild from the ledgers → compare hashes. A store that differs from
+    the rebuild stops the run and is left in place, so the finding stays
+    reproducible. A mismatch, a non-deterministic rebuild or any authority finding
+    is a failure.
     """
     root = Path(root)
     store_path = Path(store) if store is not None else root / STORE_RELPATH
@@ -396,6 +401,19 @@ def verify(root: Path | str = ".", *, store: Path | str | None = None) -> Verify
                     f"the stored projection differs from the rebuild at {where}",
                 )
             )
+
+    # A mismatch stops here and leaves the store in place: deleting it would let
+    # the very next run compare against nothing and pass, which is the
+    # false-green this projection exists to refuse.
+    if violations:
+        return VerifyResult(
+            ok=False,
+            violations=violations,
+            warnings=warnings,
+            sha256=first.sha256,
+            ticket_count=len(first.tickets),
+            store=str(store_path),
+        )
 
     # Rebuildability: the store is not a source of truth, so it must be
     # deletable and reproducible from the ledgers alone.

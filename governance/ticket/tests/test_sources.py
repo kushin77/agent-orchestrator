@@ -220,8 +220,8 @@ def test_an_attestation_for_the_lane_branch_becomes_an_evidence_receipt(root):
         root,
         {"branch": "issue-401-ticket", "git_sha": "deadbeef", "result": 0, "check_count": 40},
     )
-    contributions, violations = read_attestations(root, read_board(root))
-    assert violations == []
+    contributions, warnings = read_attestations(root, read_board(root))
+    assert warnings == []
     receipt = _fields(contributions)[("kushin77/agent-orchestrator#401", "evidence")]
     assert receipt.value == {
         "kind": "gate-run",
@@ -234,9 +234,34 @@ def test_an_attestation_for_the_lane_branch_becomes_an_evidence_receipt(root):
 def test_an_attestation_on_a_detached_branch_contributes_nothing(root):
     write_board(root, [issue(401)])
     write_attestation(root, {"branch": "HEAD", "git_sha": "x", "result": 0, "check_count": 1})
-    contributions, violations = read_attestations(root, read_board(root))
+    contributions, warnings = read_attestations(root, read_board(root))
     assert contributions == []
-    assert violations == []
+    assert warnings == []
+
+
+def test_an_attestation_for_an_issue_the_board_lacks_is_reported_not_fatal(root):
+    # A stale committed snapshot is normal (the board is refreshed mid-verify),
+    # and evidence is appended rather than authority, so this reports.
+    write_board(root, [issue(10)])
+    write_attestation(
+        root,
+        {"branch": "issue-401-ticket", "git_sha": "x", "result": 0, "check_count": 1},
+    )
+    contributions, warnings = read_attestations(root, read_board(root))
+    assert contributions == []
+    assert [item.code for item in warnings] == ["evidence-unattached"]
+    assert warnings[0].subject == "#401"
+    assert warnings[0].where == ".verify/attestation.json"
+
+
+def test_a_malformed_attestation_is_reported_not_fatal(root, tmp_path):
+    write_board(root, [issue(10)])
+    path = root / ".verify" / "attestation.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("not json\n", encoding="utf-8")
+    contributions, warnings = read_attestations(root, read_board(root))
+    assert contributions == []
+    assert [item.code for item in warnings] == ["evidence-unreadable"]
 
 
 def test_contributions_are_plain_records():

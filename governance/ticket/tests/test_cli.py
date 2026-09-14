@@ -70,6 +70,24 @@ def test_verify_refuses_a_stamped_store(root, capsys):
     assert "generated_at" in err
 
 
+def test_a_mismatch_is_repeatable_and_leaves_the_store_in_place(root, capsys):
+    _prepared(root)
+    assert main(["project", "--root", str(root)]) == 0
+    store = root / STORE_RELPATH
+    payload = json.loads(store.read_text(encoding="utf-8"))
+    payload["generated_at"] = "tampered"
+    store.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    # A second run must still refuse: deleting the store on a mismatch would make
+    # the next run compare against nothing and pass (a false green).
+    assert main(["verify", "--root", str(root)]) == 1
+    capsys.readouterr()
+    assert store.is_file()
+    assert main(["verify", "--root", str(root)]) == 1
+    err = capsys.readouterr().err
+    assert "store-mismatch" in err
+
+
 def test_a_missing_board_is_cannot_assess(root, capsys):
     (root / ".board" / "snapshot.json").unlink(missing_ok=True)
     assert main(["project", "--root", str(root)]) == 2
