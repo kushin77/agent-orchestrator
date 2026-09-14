@@ -134,6 +134,18 @@ checks=(
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'
   'terraform|bash scripts/check-terraform.sh'
+  # scratch-safety (issue #488): one agent scratch log reached 14.8 GB and filled
+  # this box's /tmp -- a 16 GB tmpfs, i.e. RAM -- stopping every parallel lane at
+  # once; the knock-on was worse than the disk, because `cp` wrote a 0-byte
+  # "backup" and restoring from it truncated a source file to empty. The check
+  # proves each of its refusals with a provoked control -- SCRATCH-SELF-APPEND
+  # (the incident's own driver), SCRATCH-FILE-OVERSIZE, SCRATCH-SPACE-NEAR-FULL,
+  # SCRATCH-TMP-WORKTREE and SCRATCH-EMPTY-COPY -- and lints the repo's tracked
+  # *.sh, so it cannot pass vacuously. The live machine verdict it prints is
+  # ADVISORY by design: a gate that reddens because a NEIGHBOUR filled the tmpfs
+  # reddens an unrelated diff, and the machine-level guard (its own timer) owns
+  # that verdict; `--scan` is the verb that refuses by name on demand.
+  'scratch-safety|bash scripts/check-scratch-safety.sh'
   # EPIC #144 (per-repo agent fleet) governance surfaces — each is tri-state
   # (0 OK / 1 NOT-OK / 2 CANNOT-ASSESS) and proves its own negative control.
   'cto-overlay|bash scripts/check-cto-overlay.sh'
@@ -150,6 +162,16 @@ checks=(
   'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
   'paperclip-budget|bash scripts/check-paperclip-budget.sh'
   'metering-parity|bash scripts/check-metering-parity.sh'
+  # #445 (the M28 tail): the ecosystem module registry — mandatory status read
+  # from the hub catalog, three honest states, membership refused by name, a
+  # no-vendoring finding, deterministic rebuilds. It returns CANNOT-ASSESS (rc 2)
+  # when `vendor/CMR` is not initialised, never a pass.
+  'module-registry|bash scripts/check-module-registry.sh'
+  # #447 (the M28 tail): the paperclip reporting agent's module brief — the
+  # artifact composes only from #445's registry, every claim resolves to a
+  # registry row or a cited hub path, Pending is never rendered as shipped, and
+  # the capability the persona declares is one its allowlist actually grants.
+  'module-brief|bash scripts/check-module-brief.sh'
   # EPIC #461 (the diagrams chain): diagrams-declaration (#464) proves the
   # architecture.yaml / gdc-manifest.yaml seeds conform to the vendored CMR
   # contract. (Its sibling, the #465 ADR-0017 projection gate
@@ -258,6 +280,35 @@ checks=(
   # again. pytest exits non-zero on a collection error or on "no tests collected"
   # (rc 5), so the check has no false-green path.
   'pytest-fleet|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q fleet/tests'
+  # EPIC #500 (issue #513): the conversation transcript store. Wired here for
+  # the same reason `pytest-fleet` is: a suite nothing names is decorous but
+  # inert, and `check-gate-coverage` refuses a newly *declared* suite that no
+  # gate names -- declaring it without wiring it would fail the gate of record.
+  # Offline, deterministic, stdlib only: no network, no model, no vendor seed.
+  'pytest-conversation|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/conversation/tests'
+  # EPIC #500 (issue #579): the chat SERVING surface's own suite. It shipped
+  # with #503 and nothing ever named or declared it, so 50 passing tests ran in
+  # no gate at all -- check-drift.sh saw it only at WARN. Wired here for the same
+  # reason as pytest-fleet: a suite nothing names is decorous but inert.
+  'pytest-chat|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/chat/tests'
+  # EPIC #551 (the remote control command center): the three control-plane
+  # gates delivered by RC-2 (#553), RC-4 (#555) and RC-10 (#565). Each is
+  # offline and deterministic and provokes its own negative controls; they
+  # are registered here deliberately because this array is explicit and an
+  # unwired check is inert (GR-12). Wiring them retires their baseline rows
+  # (tracker #559).
+  'control-verbs|bash scripts/check-control-verbs.sh'
+  'control-audit|bash scripts/check-control-audit.sh'
+  'control-functions|bash scripts/check-control-functions.sh'
+  # EPIC #551 (the remote control command center): the four control-plane
+  # pytest suites (RC-2 #553, RC-5 #556, RC-10 #565, RC-11 #566). Each is
+  # offline and deterministic. They are named here deliberately: a suite that
+  # is declared in scripts/pytest-suites.txt but named by no gate is refused
+  # by check-gate-coverage, which never grandfathers a newly declared one.
+  'pytest-control|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/control/tests'
+  'pytest-control-cli|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/cli/tests'
+  'pytest-control-functions|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/functions/tests'
+  'pytest-cockpit|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/cockpit/tests'
 )
 
 # --- duplicate-registration guard (issue #499) -------------------------------

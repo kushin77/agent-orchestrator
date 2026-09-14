@@ -200,6 +200,190 @@ def test_a_failed_gh_call_is_an_error_not_a_silent_success(policy):
         raise AssertionError("a failed `gh issue create` was reported as success")
 
 
+# -- a declaration is never silently dropped (issue #517) ----------------------
+#
+# Before #517 a `--declare`d companion outside the class's label set was accepted
+# on the command line and discarded: `file --declare pillar=x --declare phase=8`
+# planned `class:enterprise, type:…, priority:…, area:…, gdc:…` and no `pillar:`/
+# `phase:` at all, with no warning and exit 0. The seam's doctrine is *refuse
+# rather than drop*, so the tests below provoke BOTH halves of the fix: a
+# recognised companion is passed through, an unrecognised one is refused by name.
+
+
+def test_a_recognised_companion_is_passed_through_not_dropped(policy):
+    """POSITIVE CONTROL (#517): `pillar`/`phase` are declaring labels the policy
+    recognises (`prefixed`) but does not require at `enterprise`, so the old
+    derivation discarded them."""
+    plan = plan_filing(
+        request(
+            declared_class="enterprise",
+            declaring={"pillar": "autonomous-ops", "phase": "8-autonomous-ops"},
+        ),
+        policy,
+    )
+
+    assert plan.label("pillar") == "pillar:autonomous-ops"
+    assert plan.label("phase") == "phase:8-autonomous-ops"
+    # passed to `gh`, not merely computed — and in policy order, after the derived set
+    assert plan.labels[-2:] == ("pillar:autonomous-ops", "phase:8-autonomous-ops")
+    argv = list(plan.argv)
+    passed = [argv[i + 1] for i, token in enumerate(argv[:-1]) if token == "--label"]
+    assert passed == list(plan.labels)
+
+
+def test_the_issue_517_reproduction_now_carries_the_declared_labels(policy):
+    """REGRESSION: the exact filing from the issue — every declared label survives."""
+    plan = plan_filing(
+        request(
+            declared_class="enterprise",
+            declaring={
+                "type": "governance",
+                "priority": "P1",
+                "area": "fleet",
+                "pillar": "autonomous-ops",
+                "phase": "8-autonomous-ops",
+            },
+        ),
+        policy,
+    )
+
+    assert plan.labels == (
+        "class:enterprise",
+        "type:governance",
+        "priority:P1",
+        "area:fleet",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "phase:8-autonomous-ops",
+    )
+
+
+def test_the_issue_517_reproduction_through_the_cli(policy):
+    """The layer the defect was observed at: the CLI must PRINT the labels it would
+    file. A `--dry-run` that hides a declaration is the same silent drop."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "governance" / "conformance" / "cli.py"),
+            "file",
+            "--dry-run",
+            "--title",
+            "T",
+            "--body",
+            "b",
+            "--class",
+            "enterprise",
+            "--declare",
+            "type=governance",
+            "--declare",
+            "priority=P1",
+            "--declare",
+            "area=fleet",
+            "--declare",
+            "pillar=autonomous-ops",
+            "--declare",
+            "phase=8-autonomous-ops",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "pillar:autonomous-ops" in result.stdout
+    assert "phase:8-autonomous-ops" in result.stdout
+    assert "--label pillar:autonomous-ops" in result.stdout
+
+
+def test_an_unrecognised_declaration_is_refused_by_name(policy):
+    """NEGATIVE CONTROL (#517): the policy does not know `priorty`, so refusing beats
+    filing an issue that silently lacks the `priority:` its filer declared."""
+    try:
+        plan_filing(request(declaring={"priorty": "P1"}), policy)
+    except FilingRefused as exc:
+        assert exc.missing == ("priorty",)
+        assert "`priorty:`" in exc.reason
+        assert "--label" in exc.reason  # the explicit path for a label outside the policy
+    else:  # pragma: no cover - the failure this test exists to catch
+        raise AssertionError("an unrecognised declaration was dropped instead of refused")
+
+
+def test_the_unrecognised_declaration_refusal_files_nothing(policy):
+    runner = FakeRun()
+
+    try:
+        file_issue(request(declaring={"priorty": "P1"}), policy, runner=runner)
+    except FilingRefused:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("a filing with an unrecognised declaration was not refused")
+
+    assert runner.calls == []
+
+
+def test_the_cli_refuses_an_unrecognised_declaration_with_a_non_zero_exit():
+    """The refusal is observable at the boundary an operator uses: exit 1, by name."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "governance" / "conformance" / "cli.py"),
+            "file",
+            "--dry-run",
+            "--title",
+            "T",
+            "--body",
+            "b",
+            "--declare",
+            "priorty=P1",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1, (result.returncode, result.stdout, result.stderr)
+    assert "`priorty:`" in result.stderr
+    assert "FILING REFUSED" in result.stderr
+
+
+def test_two_different_classes_on_one_filing_are_refused(policy):
+    """Honouring either one would drop the other silently."""
+    try:
+        plan_filing(
+            request(declared_class="elite", declaring={"class": "enterprise"}), policy
+        )
+    except FilingRefused as exc:
+        assert CLASS_FIELD in exc.missing
+        assert "elite" in exc.reason and "enterprise" in exc.reason
+    else:  # pragma: no cover
+        raise AssertionError("one of two conflicting classes was dropped silently")
+
+
+def test_a_declaration_with_no_value_is_refused(policy):
+    """An empty declaration carries nothing, so falling back to the policy default
+    would report a declaration that was never honoured."""
+    try:
+        plan_filing(request(declaring={"area": "   "}), policy)
+    except FilingRefused as exc:
+        assert exc.missing == ("area",)
+        assert "`area:`" in exc.reason
+    else:  # pragma: no cover
+        raise AssertionError("a valueless declaration was dropped silently")
+
+
+def test_a_dry_run_and_a_real_filing_plan_the_same_labels(policy):
+    """A dry run that advertises labels the filing would not pass is the same lie."""
+    runner = FakeRun()
+    declaring = {"pillar": "autonomous-ops"}
+
+    dry = file_issue(request(declaring=declaring, dry_run=True), policy, runner=runner)
+    real = file_issue(request(declaring=declaring), policy, runner=runner)
+
+    assert runner.calls == [list(real.plan.argv)]  # only the real filing called `gh`
+    assert dry.labels == real.labels
+    assert dry.plan.argv == real.plan.argv
+
+
 # -- the seam audit: the fleet's filing path must delegate --------------------
 
 

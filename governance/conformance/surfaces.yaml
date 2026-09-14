@@ -115,6 +115,12 @@ surface_roots:
   - gateway
   - telemetry
   - registry
+  # Widened by issue #590. These two roots were previously out of scope, so the
+  # surfaces this program ships under them were held to NO class at all: the
+  # class gate never looked at them and reported OK while they sat at `pattern`.
+  # A root is covered by any declared surface path at or below it.
+  - governance
+  - integrations
 waived_roots: []
 
 # The declared surfaces. `declared_class` is measured, never aspirational.
@@ -162,3 +168,33 @@ surfaces:
       log + pack attestation (audit), the drift control (parity/parity.py) and
       the check-registry-parity.sh gate. No live-sync module, so it stops short
       of `elite`.
+  - surface: module-registry
+    path: governance/modules
+    declared_class: faang
+    notes: >-
+      The ecosystem module registry (issue #445, hardened to its declared class
+      by #591): one honest view of every module, assembled by reference from the
+      hub catalog. Contract, a suite, an owned schema for the row shape
+      (module-registry.schema.json), the declared acceptance policy
+      (controls.yaml + policy.py, read by registry.py) and an append-only audit
+      trail of every refusal and judged state. Its dedicated gate is
+      scripts/check-module-registry.sh, which is what carries it past
+      `enterprise` to `faang`; it has no live/sync module (its live pin probe is
+      a CLI verb against a file, not a running sync surface), so `elite` — which
+      requires `live_sync` — is not claimed. Declared at the rung its evidence
+      measures, never above it.
+  - surface: module-brief
+    path: integrations/paperclip/reporting
+    declared_class: faang
+    notes: >-
+      The paperclip reporting agent's module brief (issue #447, hardened to its
+      declared class by #592): the per-module statement of what every repo must
+      carry, at which pin, and whether it is current. Contract, a suite, an
+      owned schema for the artifact (brief.schema.json), the declared
+      claim-resolution policy (claim-policy.json + policy.py, read by
+      composer.py so no literal rule remains on a refusal path) and an
+      append-only audit trail of claim resolution. Its dedicated gate is
+      scripts/check-module-brief.sh, which carries it past `enterprise` to
+      `faang`; no live-sync module, so not `elite`. Live under
+      integrations/paperclip/ deliberately — the canonical module (#448), never a
+      second top-level module.

@@ -30,6 +30,7 @@ upstream had no grounded source it is documented, never fabricated.
 | Governance accents (cyan/drift/compliant/schematic) | OS chrome `shell/src/styles.css` + Gov-AI-Scout `portal/app/globals.css` (dark cyan) | `shell/src/styles.css`, `portal/app/globals.css` | shell `8a197da`, `c8fc5c3` |
 | Blueprint canvas (dark surfaces) | OS chrome `shell/src/styles.css` | `--color-bg-page #0f1220`, `--color-surface #1a1f36`, `--color-surface-subtle #232a47`, `--color-border #2c3454` | `8a197da` |
 | Dark text tones | OS chrome `shell/src/styles.css` (fg ramp `#e7f3f7`/`#9db8c9`/`#5d7c8e`) | `shell/src/styles.css` | `8a197da` |
+| Conversational components (EPIC #500, issue #515) | **no new source — values reused** | every `--os-chat-*` colour/geometry value is copied from a group above: `primary-soft`, `accent`, `accent-soft`, `surface-hover`, `border`, `border-subtle`, `bg-subtle`, `fg-subtle`, `muted`, `warning`, `error`, `info`, `radius-md`, `radius-full`, `space-2`, `shadow-focus` — together with each one's dark twin | — |
 
 ## Documented local choices (flagged, not hidden)
 
@@ -40,6 +41,18 @@ upstream had no grounded source it is documented, never fabricated.
 - **No dark palette exists in elevatediq** — dark surfaces use the OS chrome
   blueprint canvas; dark semantic overrides are consolidated in the
   `tokens.json` `modes.dark.css` block and the `tokens.css` dark selector.
+- **Four non-colour state distinctions for the chat surface** (issue #515):
+  `--os-chat-budget-warning-border-style: solid`,
+  `--os-chat-budget-hardstop-border-style: dashed`,
+  `--os-chat-budget-warning-border-width: 1px`,
+  `--os-chat-budget-hardstop-border-width: 2px`. These exist so the budget
+  **warning** and **hard-stop** states are distinguishable *without relying on
+  colour alone* (WCAG 2.2 SC 1.4.1, use of colour) — the hard-stop must remain
+  legible to a reader who cannot separate amber from red, and to a screen reader
+  via the accompanying state label. No harvested upstream token supplies a
+  border-style or border-width distinction, so these four are **flagged local
+  choices** rather than grounded reuses: every *colour* in the group is still a
+  reuse, and no palette value is invented.
 
 ## How the console consumes the twins
 

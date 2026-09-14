@@ -1,0 +1,16 @@
+# Image build context exclusions — the portal image needs portal/ + the repo
+# modules it imports (identity/, telemetry/, fleet/, infra/feature-flags/),
+# not the dev/git/runtime surface.
+
+.git
+.fleet
+.fleet-session
+.board
+.verify
+.telemetry
+vendor
+docs
+e2e
+**/__pycache__
+**/*.pyc
+*.log

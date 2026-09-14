@@ -43,10 +43,15 @@ TERMINAL_STAGE = STAGES[-1]
 class Invariant:
     """One closure requirement: a stable name, what it demands, how to clear it.
 
-    ``subject_kind`` keeps applicable them correctly. ``item`` invariants are owed
-    by a work item in a given state; ``baseline`` invariants are owed by the
-    legacy quarantine itself. Without the distinction, adding the quarantine rule
-    to the vocabulary would charge every item with a rule about the baseline.
+    ``subject_kind`` keeps applicability correct. ``item`` invariants are owed by
+    a work item in a given state; ``baseline`` invariants are owed by the legacy
+    quarantine itself; ``epic`` invariants are owed by a parent (an epic) whose
+    declared children must all be terminal before the epic may close. The third
+    kind exists because the subject of an epic rule is *the epic's child set* — a
+    parent-child relationship the item's own artifacts do not carry — so charging
+    it as an ``item`` invariant would make every leaf item owe a rule about
+    children it has none of, and charging it as ``baseline`` would misname live
+    work as legacy.
     """
 
     code: str
@@ -98,6 +103,12 @@ INVARIANTS: Tuple[Invariant, ...] = (
         code="ISSUE_NOT_CLOSED",
         requires="the issue itself is closed, so the item is off the board",
         remediation="close the issue with its evidence comment (`gh issue close <n> --comment ...`)",
+    ),
+    Invariant(
+        code="CHILD_NOT_CLOSED",
+        requires="an epic that is closed must not still have a declared child open - every child whose body names this epic as parent must itself be closed",
+        remediation="close every declared child (an issue whose body's first line is `Parent: #<n>` naming this epic) before closing the epic",
+        subject_kind="epic",
     ),
     Invariant(
         code="FILING_LABELS_MISSING",

@@ -55,10 +55,25 @@ def repo(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def lane(repo: Path, tmp_path: Path):
+def mounts(tmp_path: Path) -> Path:
+    """A mount table this suite declares instead of inheriting the runner's.
+
+    The tmpfs refusal (issue #516) must be provable on any machine, and a lane
+    fixture must not go red merely because the host's scratch directory happens
+    to be RAM-backed. Injecting the table makes the filesystem an input rather
+    than a property of whoever runs the tests; the refusal itself is provoked
+    with a table that *does* declare a tmpfs.
+    """
+    table = tmp_path / "mounts"
+    table.write_text("/dev/root / ext4 rw,relatime 0 0\n", encoding="utf-8")
+    return table
+
+
+@pytest.fixture
+def lane(repo: Path, tmp_path: Path, mounts: Path):
     """A provisioned lane for issue #263: worktree, branch, lane-local signature."""
     identity = mint(263, "copilot-brain", "governance-isolation", worktree_root=tmp_path / "lanes")
-    provision(identity, repo, base="HEAD")
+    provision(identity, repo, base="HEAD", mounts=mounts)
     write_record(identity, repo)
     return identity
 

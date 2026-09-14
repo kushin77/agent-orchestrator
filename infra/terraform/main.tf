@@ -16,6 +16,13 @@ locals {
     identity   = { enabled = var.enable_identity, image = var.identity_image }
     portal     = { enabled = var.enable_portal, image = var.portal_image }
   }
+
+  # The web build (issue #606) publishes to Artifact Registry as
+  # $_AR_REPO/$_IMAGE:$_TAG — the real reference for the web-surface module:
+  # us-central1-docker.pkg.dev/<project_id>/ao-images/portal:<web_image_tag>.
+  # The tag is explicit and immutable (never `latest`); the all-zero default
+  # marks "no build promoted yet" and go-live pins the real COMMIT_SHA.
+  web_image = "us-central1-docker.pkg.dev/${var.project_id}/ao-images/portal:${var.web_image_tag}"
 }
 
 module "control_plane_service" {
@@ -45,7 +52,7 @@ module "web_surface" {
 
   enabled    = var.enable_web
   name       = "${var.env}-web"
-  image      = var.web_image
+  image      = local.web_image
   project_id = var.project_id
   region     = var.region
   domain     = var.web_domain

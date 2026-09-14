@@ -159,6 +159,19 @@ cases = {
     # GitHub's canonical casing (OPEN/CLOSED/MERGED) must read as its lowercase
     # equivalent; the second end-to-end run found close-out misreading exactly this.
     "GITHUB_CASING": record([item(state="CLOSED", pr=dict(item()["pr"], state="MERGED"))]),
+    # An epic closed while a declared child is still open.
+    "CHILD_NOT_CLOSED": record([item(children=[
+        {"number": 300, "state": "open", "body": "Parent: #269"},
+    ])]),
+    # Every child terminal: the invariant must be able to PASS, not only fail.
+    "CHILD_ALL_CLOSED": record([item(children=[
+        {"number": 300, "state": "closed", "body": "Parent: #269"},
+    ])]),
+    # A child that names a different parent is not this epic's declared child:
+    # the marker is read, not guessed.
+    "CHILD_WRONG_PARENT": record([item(children=[
+        {"number": 300, "state": "open", "body": "Parent: #123"},
+    ])]),
 }
 
 for name, payload in cases.items():
@@ -229,6 +242,7 @@ declare -a provoked=(
   CLOSING_EVIDENCE_MISSING
   ISSUE_NOT_CLOSED
   FILING_LABELS_MISSING
+  CHILD_NOT_CLOSED
 )
 for code in "${provoked[@]}"; do
   expect_code "$code" "$work/$code.json"
@@ -236,6 +250,13 @@ done
 
 # Evidence must name the verified head commit (a squash merge creates a new one).
 expect_code "VERIFY_EVIDENCE_MISSING" "$work/VERIFY_WRONG_COMMIT.json"
+
+# An epic closed with a declared child still open is refused by name.
+expect_code "CHILD_NOT_CLOSED" "$work/CHILD_NOT_CLOSED.json"
+# ... and passes when every declared child is terminal, and when a supplied child
+# names a different parent (the marker is read, not guessed).
+expect_pass "an epic whose children are all terminal is accepted" "$work/CHILD_ALL_CLOSED.json"
+expect_pass "a child naming a different parent is not this epic's child" "$work/CHILD_WRONG_PARENT.json"
 
 # --- 4. the quarantine excuses legacy, and only while it is tracked ----------
 expect_pass "a quarantined legacy item is excused while its tracker is open" \
@@ -254,10 +275,10 @@ import pathlib
 
 root = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(root))
-from governance.lifecycle.model import ITEM_INVARIANTS  # noqa: E402
+from governance.lifecycle.model import INVARIANTS  # noqa: E402
 
 provoked = set(sys.argv[2:])
-declared = {inv.code for inv in ITEM_INVARIANTS}
+declared = {inv.code for inv in INVARIANTS if inv.subject_kind != "baseline"}
 missing = sorted(declared - provoked)
 extra = sorted(provoked - declared)
 if missing:
@@ -266,7 +287,7 @@ if extra:
     print(f"  FAIL  provoked code(s) outside the vocabulary: {', '.join(extra)}", file=sys.stderr)
 if missing or extra:
     raise SystemExit(1)
-print(f"  OK    all {len(declared)} item invariants are provoked by this gate")
+print(f"  OK    all {len(declared)} item and epic invariants are provoked by this gate")
 PY
 then
   :
@@ -289,7 +310,7 @@ codes = [inv.code for inv in INVARIANTS]
 if len(set(codes)) != len(codes):
     problems.append("duplicate invariant codes")
 for inv in INVARIANTS:
-    if inv.subject_kind not in {"item", "baseline"}:
+    if inv.subject_kind not in {"item", "baseline", "epic"}:
         problems.append(f"{inv.code}: unknown subject_kind {inv.subject_kind!r}")
     if len(inv.requires) < 20 or len(inv.remediation) < 20:
         problems.append(f"{inv.code}: requires/remediation is too thin to be actionable")

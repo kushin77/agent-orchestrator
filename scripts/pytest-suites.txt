@@ -56,10 +56,15 @@ telemetry/budgets
 portal
 control-plane/instructions
 control-plane/sdk/python
+control-plane/control
+control-plane/cli
+control-plane/functions
+control-plane/cockpit
 governance/merge
 governance/dispatch
 fleet
 governance/knowledge
+governance/modules
 governance/conformance
 governance/finops
 # Final registration (issue #46, E2E lane): the top-level negative-control +
@@ -93,6 +98,7 @@ integrations/paperclip/adapters/secrets
 integrations/paperclip/adapters/skills
 integrations/paperclip/api
 integrations/paperclip/auth
+integrations/paperclip/reporting
 registry/parity
 scripts
 # EPIC #500 (M30 — the enterprise chat surface; issue #502 is the wiring lane):
@@ -106,3 +112,11 @@ guardrails/chat
 identity/chat
 registry/chat
 telemetry/chat
+# EPIC #500 (issue #513): the conversation transcript store. Declared AND named
+# by a gate (scripts/verify.sh) -- a declared-but-unnamed suite is refused by
+# check-gate-coverage, which never grandfathers a newly declared one.
+engine/conversation
+# EPIC #500 (issue #579): the chat serving surface (#503). Declared AND named
+# by scripts/verify.sh -- declaring it alone would fail check-gate-coverage,
+# which never grandfathers a newly declared suite.
+gateway/chat

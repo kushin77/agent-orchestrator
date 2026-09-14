@@ -72,7 +72,50 @@ python3 governance/isolation/cli.py landed --range origin/master
 `problems`) and human status on stderr. Exit codes follow the repository's
 tri-state convention: `0` OK, `1` NOT-OK, `2` CANNOT-ASSESS.
 
-## 4. What the audit checks, and why each one can fail
+## 4. Provisioning refusals — before anything is created
+
+`open` refuses **before** `git worktree add` runs, so a refused lane leaves no
+worktree, no branch and no lane record behind. Every refusal names itself: its
+code is the first token of the message, so a finding can be grepped for and
+matched to this table.
+
+| Refusal code | Raised when |
+|---|---|
+| `lane-worktree-is-the-shared-checkout` | The worktree path *is* the shared checkout. |
+| `lane-worktree-inside-the-shared-checkout` | The worktree path sits inside the shared checkout, so it would not be isolated. |
+| `lane-worktree-on-tmpfs` | The worktree root is on a RAM-backed filesystem (`tmpfs`, `ramfs`). |
+| `lane-path-exists-but-is-not-a-worktree` | The path exists but is not a linked git worktree. |
+| `lane-base-ref-unresolved` | The base ref does not resolve, so the lane would branch from nothing. |
+| `git-worktree-add-failed` | `git worktree add` itself failed. |
+| `unsafe-lane-name` | The lane name is not a plain worktree directory name. |
+
+### 4.1 The tmpfs refusal (issue #516)
+
+`/tmp` is a **tmpfs** on this fleet's machines: a worktree there costs RAM and
+inodes instead of disk, and it is **lost on reboot** — so a lane parked on it
+evaporates without anything ever looking like an error. `governance/isolation`
+therefore refuses a lane rooted on a RAM-backed filesystem, by name, before it
+creates anything:
+
+```bash
+python3 governance/isolation/cli.py open --issue 999 --agent probe --root /tmp
+# open: NOT-OK — lane-worktree-on-tmpfs: lane worktree root /tmp/ao-999-<session> ...
+```
+
+The filesystem is read from the mount table (`/proc/self/mounts`) for the
+deepest *existing* ancestor of the worktree path — that is, the filesystem the
+worktree would be created on. `provision(..., mounts=...)` injects a table
+instead, which is how the suite proves the refusal offline rather than
+inheriting whichever machine runs the tests.
+
+`allow_tmpfs=True` (CLI: `--allow-tmpfs-root`) accepts a RAM-backed root for
+**throwaway scratch that cannot outlive the run** — a gate's own scratch
+repository, for instance. A lane meant to persist must never use it.
+
+Reclaiming the worktrees this refusal is meant to stop creating is a separate,
+already-tracked tool: `bash scripts/prune-worktrees.sh` (issue #207).
+
+## 5. What the audit checks, and why each one can fail
 
 | Violation | Raised when |
 |---|---|
@@ -94,7 +137,6 @@ generated history.
 
 **The history rule is positional, and merges are exempt.** The reference must be
 a line of the message's trailing trailer block — the last paragraph(s) whose
-every line is a `Token: value` line, a continuation, or the reference line
 itself. A reference in the subject line or buried in prose is a mention, and a
 message with no trailer paragraph at all is exactly what the rule exists to
 refuse; measured on `6d89618` and `576edce`, whose only reference is their
@@ -120,7 +162,7 @@ wholesale to the shared gate's own landed audit — its findings, its
 grandfathering boundary and its exit code are reported verbatim rather than
 re-interpreted.
 
-## 5. Enforcement
+## 6. Enforcement
 
 `scripts/check-session-isolation.sh` runs the same round trip in `make verify`:
 it provisions real lanes in a scratch repository, commits under each session's
@@ -140,7 +182,7 @@ The fleet execution loop ([`fleet/terminal.py`](../../fleet/terminal.py))
 provisions every subagent through this module, so a dispatched agent starts in
 its own lane with its own identity instead of in the shared checkout.
 
-## 6. Tests
+## 7. Tests
 
 `governance/isolation/tests` (declared in [`scripts/pytest-suites.txt`](../../scripts/pytest-suites.txt),
 run per suite by `make tests`) pins the mint, the per-worktree signature, the

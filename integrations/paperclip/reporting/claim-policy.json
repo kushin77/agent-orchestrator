@@ -1,0 +1,47 @@
+{
+  "$comment": [
+    "The module-brief claim-resolution policy (issue #592, parent #590).",
+    "This is a DECLARED control artifact, not documentation: every value below is",
+    "read by integrations/paperclip/reporting/policy.py and used by composer.py and",
+    "model.py. A rule stated here and ignored by the code would be a decoration, so",
+    "the composer holds no second copy of any rule below. Editing this file changes",
+    "the composer's behaviour, which is what makes it a control."
+  ],
+  "schema": "ao.module-brief-claim-policy/v1",
+  "surface": "integrations/paperclip/reporting",
+  "read_by": [
+    "integrations/paperclip/reporting/policy.py",
+    "integrations/paperclip/reporting/model.py",
+    "integrations/paperclip/reporting/composer.py"
+  ],
+  "resolution": {
+    "$comment": "What makes a brief line resolvable. A brief line is a claim, never prose.",
+    "registry_prefix": "registry:",
+    "bases": [
+      "repository-root",
+      "hub-root"
+    ],
+    "unresolved": {
+      "code": "BRIEF-CLAIM-UNRESOLVED",
+      "produces": "a finding that names the line, never prose",
+      "subject": "the claim's own subject (the module id, or the section it belongs to)",
+      "artifact": "docs/MODULE-BRIEF.md",
+      "detail": "the refusal is emitted for every claim that cites nothing, or cites something that resolves neither to a registry row nor to a path under either declared base"
+    },
+    "$note": "a citation resolves when it is the registry prefix plus a row of the registry document this brief was composed from, or when it is a path that exists under one of the declared bases"
+  },
+  "pending": {
+    "$comment": "The rule that keeps a declared target honest: pending is never rendered as shipped.",
+    "state": "target-pending",
+    "when": "a declared target that has no vendor module.json in the pinned hub catalog at this revision",
+    "renders": "target-pending",
+    "shipped_must_be": false,
+    "never_rendered_as_shipped": true,
+    "blocker_required": true,
+    "blocker_detail": "a pending module must name the blocking hub issue(s) that keep it pending — an unnamed blocker is indistinguishable from a wish",
+    "refusals": {
+      "rendered_shipped": "BRIEF-PENDING-RENDERED-SHIPPED",
+      "no_blocker": "BRIEF-PENDING-NO-BLOCKER"
+    }
+  }
+}

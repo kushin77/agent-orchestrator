@@ -1,0 +1,86 @@
+/*
+ * Chat surface — accessibility & responsive layer (EPIC #500, issue #514)
+ * =====================================================================
+ * Loaded by portal/static/views/chat.html AFTER tokens.css + console.css, so
+ * every value below resolves from the declaration twin in
+ * portal/static/design-tokens/ (never an ad-hoc colour). This file owns the
+ * a11y SEMANTICS of the layout; the token VALUES belong to #515.
+ *
+ * Three properties live here, each asserted by portal/tests/test_chat_a11y.py:
+ *   1. a visible focus indicator for every interactive control;
+ *   2. `prefers-reduced-motion: reduce` removes non-essential motion;
+ *   3. a mobile breakpoint that keeps the composer reachable, meets the
+ *      minimum tap-target size, and never scrolls horizontally.
+ */
+
+/* 1. Visible focus ----------------------------------------------------- */
+.btn:focus-visible,
+.tree a:focus-visible,
+#tierPicker:focus-visible,
+#input:focus-visible,
+#conversationList li:focus-visible {
+  outline: 2px solid var(--os-color-accent);
+  outline-offset: 2px;
+  box-shadow: var(--os-chat-composer-focus-ring);
+}
+
+/* 2. Reduced motion ---------------------------------------------------- */
+/* The flag is set by a11y.js from matchMedia so tests can assert it, and the
+   media query itself is the authoritative switch for real users. */
+@media (prefers-reduced-motion: reduce) {
+  #messages,
+  #liveRegion,
+  #turnState,
+  .btn,
+  #input {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+html[data-reduced-motion="true"] #messages,
+html[data-reduced-motion="true"] #liveRegion,
+html[data-reduced-motion="true"] #turnState,
+html[data-reduced-motion="true"] .btn,
+html[data-reduced-motion="true"] #input {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* 3. The mobile breakpoint --------------------------------------------- */
+@media (max-width: 640px) {
+  /* the two-column layout collapses: history above, transcript below, neither
+     side scrolling horizontally */
+  .grid.two {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+  }
+
+  /* the composer must stay reachable with the on-screen keyboard open */
+  #composer {
+    position: sticky;
+    bottom: 0;
+    background: var(--os-color-surface);
+    padding-bottom: max(var(--os-space-2), env(safe-area-inset-bottom));
+  }
+
+  /* minimum tap targets for touch (WCAG 2.2 SC 2.5.8 Target Size Minimum) */
+  #send,
+  #stop,
+  #retry,
+  #newConversation,
+  #tierPicker {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  #app,
+  #messages,
+  #turnFooter,
+  #conversationList {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+}

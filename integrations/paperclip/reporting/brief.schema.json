@@ -1,0 +1,250 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ao.module-brief/v1",
+  "title": "The composed module brief as a machine document",
+  "description": [
+    "The frozen shape of the brief the composer emits (issue #592, parent #590).",
+    "The composer VALIDATES what it emits against this file on every run, so a brief",
+    "that stops carrying a field — or grows a fourth state, or drops the citation",
+    "list that makes its lines claims instead of prose — is refused by name.",
+    "",
+    "Deliberately restricted to the JSON Schema subset the repository's own",
+    "validator (integrations/paperclip/mapping.py) implements: type, enum, minLength,",
+    "pattern, format, minimum, maximum, required, properties, additionalProperties,",
+    "items. Keywords outside that subset are silently ignored by the validator, so a",
+    "`$ref` or a `oneOf` here would validate NOTHING; the suite asserts this file uses",
+    "only supported keywords. Nested shapes are therefore written out in full rather",
+    "than referenced."
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "hub",
+    "states",
+    "summary",
+    "modules",
+    "refused",
+    "claims",
+    "findings"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": ["ao.module-brief/v1"]
+    },
+    "hub": {
+      "description": "The pinned hub the brief was composed against.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "revision_source"],
+      "properties": {
+        "revision": {
+          "description": "empty when the hub is not a git checkout at this tree",
+          "type": "string"
+        },
+        "revision_source": {
+          "type": "string"
+        }
+      }
+    },
+    "states": {
+      "description": "The authority's three states. A fourth is not expressible here.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "registered-mandatory",
+          "target-pending",
+          "catalog-module-not-mandatory"
+        ]
+      }
+    },
+    "summary": {
+      "description": "Counts recomputed from the entries, never taken from the registry's own summary.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registered-mandatory",
+        "target-pending",
+        "catalog-module-not-mandatory"
+      ],
+      "properties": {
+        "registered-mandatory": {"type": "integer", "minimum": 0},
+        "target-pending": {"type": "integer", "minimum": 0},
+        "catalog-module-not-mandatory": {"type": "integer", "minimum": 0}
+      }
+    },
+    "modules": {
+      "description": "One record per module the registry names, sorted by id.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "state",
+          "owning_repo",
+          "mandatory",
+          "shipped",
+          "pin",
+          "pin_present",
+          "rev",
+          "rev_present",
+          "consumer_assets",
+          "assets",
+          "health",
+          "board_ref",
+          "blocking",
+          "drift"
+        ],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "state": {
+            "type": "string",
+            "enum": [
+              "registered-mandatory",
+              "target-pending",
+              "catalog-module-not-mandatory"
+            ]
+          },
+          "owning_repo": {"type": "string"},
+          "mandatory": {
+            "description": "true / false, or null when the registry states no flag (a declared target)",
+            "enum": [true, false, null]
+          },
+          "shipped": {"type": "boolean"},
+          "pin": {
+            "description": "empty when the registry reports no pin at this revision",
+            "type": "string"
+          },
+          "pin_present": {"type": "boolean"},
+          "rev": {
+            "description": "empty when the registry reports no revision for this entry",
+            "type": "string"
+          },
+          "rev_present": {"type": "boolean"},
+          "consumer_assets": {
+            "description": "the consumer assets the owning repo must carry",
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "assets": {
+            "description": "one record per consumer asset, naming the seed it comes from",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["asset", "seed", "seed_present"],
+              "properties": {
+                "asset": {"type": "string", "minLength": 1},
+                "seed": {
+                  "description": "empty when the asset resolves to no seed",
+                  "type": "string"
+                },
+                "seed_present": {"type": "boolean"}
+              }
+            }
+          },
+          "health": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "status", "reason"],
+            "properties": {
+              "kind": {"type": "string"},
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "not-run",
+                  "unreachable",
+                  "no-tag",
+                  "absent",
+                  "unknown"
+                ]
+              },
+              "reason": {"type": "string"}
+            }
+          },
+          "board_ref": {
+            "description": "cited, never asserted open or closed",
+            "type": "string"
+          },
+          "blocking": {
+            "description": "the hub issue(s) that keep a pending target pending",
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "drift": {
+            "description": "the findings this module carries in this composition",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code", "subject", "detail", "source"],
+              "properties": {
+                "code": {"type": "string", "minLength": 1},
+                "subject": {"type": "string"},
+                "detail": {"type": "string"},
+                "source": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "refused": {
+      "description": "Names the hub catalog does not carry: membership refused, never a fourth state.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "detail"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "kind": {"type": "string"},
+          "detail": {"type": "string"}
+        }
+      }
+    },
+    "claims": {
+      "description": "Every statement the brief makes, with the evidence it resolves to.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["subject", "fact", "value", "citations", "line"],
+        "properties": {
+          "subject": {"type": "string"},
+          "fact": {"type": "string"},
+          "value": {"type": "string"},
+          "citations": {
+            "description": "a claim with no citation is a finding, never prose",
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "line": {
+            "description": "the 1-based line of the rendered brief this claim is",
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "findings": {
+      "description": "Every refusal the composition found, each naming its subject.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "subject", "detail", "source"],
+        "properties": {
+          "code": {"type": "string", "minLength": 1},
+          "subject": {"type": "string"},
+          "detail": {"type": "string"},
+          "source": {"type": "string"}
+        }
+      }
+    }
+  }
+}

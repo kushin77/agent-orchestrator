@@ -86,6 +86,30 @@ def test_a_closed_item_is_not_charged_with_being_open():
     assert audit_item(clean_item()) == []
 
 
+def test_a_closed_epic_is_held_to_its_declared_child_set():
+    """The invariant can fail AND pass (GR-12): an epic closed while a declared
+    child is open is a finding by name, and the same fixture with every child
+    terminal is clean."""
+    open_child = clean_item(children=[{"number": 300, "state": "open", "body": "Parent: #269"}])
+    findings = audit_item(open_child)
+    assert "CHILD_NOT_CLOSED" in codes(findings)
+    assert "#300" in str(findings[0])
+    terminal = clean_item(children=[{"number": 300, "state": "closed", "body": "Parent: #269"}])
+    assert audit_item(terminal) == []
+
+
+def test_a_child_naming_a_different_parent_is_not_this_epics_child():
+    """The marker is read, not guessed: a child that declares another parent
+    neither provokes the finding nor excuses an open child of this epic."""
+    item = clean_item(children=[{"number": 300, "state": "open", "body": "Parent: #123"}])
+    assert audit_item(item) == []
+
+
+def test_a_child_without_a_parent_marker_is_not_a_declared_child():
+    item = clean_item(children=[{"number": 300, "state": "open", "body": "no marker here"}])
+    assert audit_item(item) == []
+
+
 def test_github_casing_of_state_and_pr_is_read_correctly():
     """A hygienic item whose state came back from GitHub in canonical casing."""
     item = clean_item(state="CLOSED", pr={**clean_item()["pr"], "state": "MERGED"})
@@ -229,6 +253,7 @@ def test_every_code_the_auditor_emits_is_in_the_closed_vocabulary():
         clean_item(issue=7, closing_evidence=False),
         clean_item(issue=8, state="open", labels=[], milestone="M26"),
         clean_item(issue=9, state="open", closing_evidence=False),
+        clean_item(issue=10, children=[{"number": 300, "state": "open", "body": "Parent: #10"}]),
     ]
     stale = Quarantine(code="FILING_LABELS_MISSING", subject="#8", tracked_by="#174")
     findings = audit(record(*provocations, tracking={"#174": "closed"}), [stale])

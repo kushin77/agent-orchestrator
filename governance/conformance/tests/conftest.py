@@ -50,6 +50,8 @@ prefixed:
   - area
   - pillar
   - gdc
+  - phase
+  - source
 filing:
   default_class: enterprise
   defaults:

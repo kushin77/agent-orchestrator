@@ -18,8 +18,9 @@ SHELL := /bin/bash
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
-        tf-validate shellcheck gitleaks pre-commit worktrees \
-        remediation remediation-scan remediation-dispatch
+        tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety \
+        remediation remediation-scan remediation-dispatch \
+        control-verbs control-audit control-functions cockpit
 
 .DEFAULT_GOAL := help
 
@@ -113,6 +114,11 @@ help:
 	@echo "  terraform     infra/terraform fmt + offline validate (SKIP if absent)"
 	@echo "  tf-fmt        terraform fmt -check only"
 	@echo "  tf-validate   offline terraform validate only"
+	@echo "  scratch-safety  Scratch-space guard (#488): refuses a self-appending"
+	@echo "                log (the 14.8 GB tmpfs incident), an oversize scratch"
+	@echo "                file, a near-full scratch filesystem, a worktree on the"
+	@echo "                tmpfs and a copy that wrote 0 bytes; the live machine"
+	@echo "                verdict it prints is advisory (docs/SCRATCH-SPACE-DISCIPLINE.md)"
 
 ## verify — gate of record (orchestrated by scripts/verify.sh, with attestation)
 verify:
@@ -524,6 +530,26 @@ board-gate:
 cross-repo-boundary:
 	@bash scripts/check-cross-repo-boundary.sh
 
+## control-verbs — the control-verb vocabulary is closed and cross-referenced (RC-2 #553)
+control-verbs:
+	@bash scripts/check-control-verbs.sh
+
+## control-audit — exactly-once control with the audit record + refusal path (RC-4 #555)
+control-audit:
+	@bash scripts/check-control-audit.sh
+
+## control-functions — every cockpit function declared once (RC-10 #565)
+control-functions:
+	@bash scripts/check-control-functions.sh
+
+## cockpit — the terminal cockpit (RC-11 #566): one frame, then exit. A client
+## of the RC-3 API and the authenticated SSE streams that renders only what the
+## declared function registry names; ships flag-gated OFF (surfaces.cockpit),
+## so while the flag is off this target exits non-zero with the named FLAG_OFF
+## condition -- an unpromoted surface is absent, never silently healthy.
+cockpit:
+	@python3 control-plane/cockpit/cockpit/__main__.py --once
+
 ## audit-read-model — the read-only, filterable audit read model (issue #347):
 ## the tamper-evident trail served as a deterministic read model with
 ## verify-chain semantics; an intact chain is OK, a modified / reordered /
@@ -559,6 +585,19 @@ tf-fmt:
 ## (visible SKIP if terraform is absent or no local provider cache exists)
 tf-validate:
 	@bash scripts/check-terraform.sh validate
+
+## scratch-safety — scratch-space guard (issue #488). A single 14.8 GB agent
+## scratch log filled this box's /tmp, a 16 GB tmpfs (RAM), and stopped every
+## parallel lane at once; the knock-on was worse than the disk, because `cp`
+## wrote a 0-byte "backup" and restoring from it truncated a source file to
+## empty. This check refuses each defect BY NAME (SCRATCH-SELF-APPEND,
+## SCRATCH-FILE-OVERSIZE, SCRATCH-SPACE-NEAR-FULL, SCRATCH-TMP-WORKTREE,
+## SCRATCH-EMPTY-COPY), proves every refusal with its own provoked control, and
+## lints the repo's tracked *.sh — so it cannot pass vacuously. The live machine
+## verdict it prints is ADVISORY: the machine-level guard
+## (~/laptop-manage/bin/scratch-guard, on a timer) owns that verdict.
+scratch-safety:
+	@bash scripts/check-scratch-safety.sh
 
 ## shellcheck — optional lint (not part of verify; skipped if not installed)
 shellcheck:

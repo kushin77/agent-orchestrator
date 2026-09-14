@@ -367,6 +367,60 @@ enforced offline by `scripts/check-paperclip-auth.sh` in `make verify`:
 The standing-up of the process with real credentials is **deployment** work, not
 a missing mapping; the seam itself is closed here.
 
+### 5.3 The control-verb mismatches (RC-6, #557)
+
+The mismatches above are in the seam's **contract fields** (heartbeat, ticket,
+budget, auth). A second class is the **control vocabulary**: this fleet declares
+its own operator verbs, upstream serves control routes on **its** server, and the
+two are the same *kind* of thing with only the reach differing (ADR-0025 §3.3) —
+which is exactly the shape that makes a reader assume an equivalence that does not
+hold.
+
+**RC-6 (#557) measured the whole correspondence** in
+[`../integrations/paperclip/control_mapping.py`](../integrations/paperclip/control_mapping.py)
+(commit `7d0534d`, PR #576; exercised offline by the `integrations/paperclip`
+suite declared in `scripts/pytest-suites.txt`). It walks the **49** verbs declared
+in `control-plane/control/verbs.yaml` (RC-2, #553) against the upstream control
+routes inventoried from upstream's own route files, and records a row per verb:
+**8 `MAPPED`, 8 `MISMATCH`, 33 `UNMAPPED`**.
+
+The table below is the nine rows RC-6 **recorded as mismatches** — eight are
+`MISMATCH` rows in the verb table; the ninth (`M-CTL-1`) is upstream-only, which
+is why it names no fleet verb. The `#` column carries RC-6's own immutable row ids
+(the ids its suite asserts by name), so a row here and the row in the module cannot
+drift apart; the divergence column states the **kind** RC-6 recorded and the reason
+it recorded. Nothing here adds a claim RC-6 did not measure — the module holds the
+full statement per row.
+
+| # | Mismatch | Fleet verb | Upstream route | Divergence (RC-6) |
+|---|---|---|---|---|
+| `M-CTL-1` | upstream `terminate` has **no fleet counterpart** | — | `POST /agents/:id/terminate` | `no-fleet-counterpart` — upstream terminate ends an agent irreversibly (it cancels that agent's runs and wakeups and invalidates its descendants); **no** verb in our vocabulary ends an agent. `fleet.stop`/`kill`/`halt` take down the local loop, and our only irreversible verb (`fleet.override`) files a ticket |
+| `M-CTL-2` | our fleet-wide `pause` has no **per-agent** upstream counterpart | `fleet.pause` | `POST /agents/:id/pause` | `scope` — ours is fleet-wide (the loop stops pulling new orders and the run in flight finishes); upstream's is per-agent and also cancels that agent's active heartbeats |
+| `M-CTL-3` | the symmetric half of M-CTL-2, on `resume` | `fleet.resume` | `POST /agents/:id/resume` | `scope` — ours lets the loop pull orders again; upstream's resumes one agent |
+| `M-CTL-4` | graceful `stop` vs the **irreversible** terminate | `fleet.stop` | `POST /agents/:id/terminate` | `effect` — ours is graceful and reversible (`fleet.start`/`restart` brings the loop back); upstream's terminate is irreversible |
+| `M-CTL-5` | the broadest local stop vs the irreversible per-agent terminate | `fleet.halt` | `POST /agents/:id/terminate` | `scope+effect` — the scope (whole directive loop vs one agent) and the effect (reversible vs irreversible) both diverge |
+| `M-CTL-6` | the whole loop vs **one run's** cancel | `fleet.kill` | `POST /heartbeat-runs/:runId/cancel` | `scope` — upstream cancels one named heartbeat run; ours takes the loop down, and its handler releases the in-flight run's claim — a superset of one run |
+| `M-CTL-7` | nudge a worker: a control message vs `wakeup` | `fleet.poke` | `POST /agents/:id/wakeup` | `scope` — correspondence by concept, not by name: ours writes a control message the loop acks on its next poll; upstream's wakes one agent so a heartbeat runs |
+| `M-CTL-8` | batch sweep vs a single run's cancel | `recover.sweep` | `POST /heartbeat-runs/:runId/cancel` | `scope` — ours reclaims every orphaned session whose beat passed the TTL in one pass; upstream cancels one named run per call |
+| `M-CTL-9` | closure vs a mutable issue write | `closure.close` | `PATCH /issues/:id` | `effect` — ours closes a work item against the closure invariants and is irreversible in the append-only rail; upstream's is a mutable field write on the same issue, and the same endpoint can reopen it |
+
+**The `UNMAPPED` half** is 33 of the 49 verbs. RC-6 records each of them as its
+own row carrying its own `why` — an unmapped verb is an explicit row, never
+silence. Restating 33 rows here would mirror the module rather than add a fact to
+it, so they appear as **one aggregate row** that names the coverage:
+
+| # | Coverage | Where the per-verb rows live |
+|---|---|---|
+| `UNMAPPED` | 33 verbs — `fleet.*` (7: `cron`, `live`, `attach`, `start`, `restart`, `refresh`, `update`), `channel.*` (11), `board.*` (8), `recover.*` (4), `closure.*` (3) | `integrations/paperclip/control_mapping.py` — one row per verb, each naming the nearest upstream route when one is close enough to be worth refuting |
+
+**What this is not.** A row names a route; naming one is **not** a licence to call
+it. RC-6's module implements no method that mutates upstream — its only transport
+call is `GET /api/openapi.json`, the peer's own declaration of its surface, checked
+offline through the seam's `FixtureTransport` — so the mapping adds no caller and
+no capability. Import direction obeys ADR-0016, and the upstream route inventory is
+cited **by path** (`server/src/routes/agents.ts`, `server/src/routes/dashboard.ts`,
+and the seam's own `integrations/paperclip/client.py`), never vendored (GR-10, NG4).
+
 ## 6. Related records and docs
 
 - [ADR-0013](decision-records/ADR-0013-paperclip-ing-integration.md) — the mode

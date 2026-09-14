@@ -18,6 +18,15 @@ Two properties make the guarantee mechanical rather than aspirational:
 * derivation happens before the command is assembled, so a refusal files nothing
   at all: it cannot leave a half-classified issue behind.
 
+**Nothing is silently dropped (issue #517).** A declaration the caller made is
+either honoured or refused by name, at every point on the path. A companion the
+policy recognises (`Policy.declaring_fields` — `pillar`, `phase`, `gdc`, `source`,
+…) is passed through even when the declared class does not require it; a name the
+policy does not recognise is refused, because dropping it lands the issue without
+metadata its filer believes it declared — the same defect class as a silently
+dropped chain marker. `--dry-run` plans through the same
+:func:`plan_filing`, so it shows exactly the label set a real filing would carry.
+
 Importing this module pulls in the conformance checker (and with it this package's
 flat `model`), so a caller that already has *another* package's flat `model` on
 `sys.path` must load the seam without disturbing it — `fleet/brain.py` puts
@@ -74,9 +83,10 @@ class FilingRefused(Exception):
         """The operator-facing refusal: what could not be derived, and where it is
         prevented."""
         return (
-            "FILING REFUSED — %s. Nothing was filed: the conformance gate would have "
-            "rejected the issue as unclassified (issue #320 owns prevention; #174 "
-            "owns repairing the legacy issues that were filed this way)." % self.reason
+            "FILING REFUSED — %s. Nothing was filed: a filing that cannot state every "
+            "declaring label must not reach the board, and the conformance gate rejects "
+            "an issue that lands without them (issue #320 owns prevention; #174 owns "
+            "repairing the legacy issues that were filed this way)." % self.reason
         )
 
 
@@ -156,6 +166,15 @@ def derive_declaring_labels(request: FilingRequest, policy: "Policy") -> Tuple[s
     label the policy says the work must declare and neither source can supply is a
     refusal — that is the difference between preventing an unclassified issue and
     discovering it on the board later.
+
+    A declaration the *caller* made is never dropped (issue #517). A name the policy
+    recognises as a declaring label (`Policy.declaring_fields`: `class`, the
+    `required` companions, every rung's expectations, and the `prefixed`
+    vocabulary — `pillar`, `phase`, `gdc`, `source`) is **passed through** even when
+    the declared class does not require it; a name it does not recognise is
+    **REFUSED by name**, because ignoring it would land the issue without metadata
+    its filer believes it declared. `--label` is the explicit path for a label the
+    policy does not declare, so refusing loses no expressiveness.
     """
     declared = declared_class_for(request, policy)
     if not declared:
@@ -171,9 +190,45 @@ def derive_declaring_labels(request: FilingRequest, policy: "Policy") -> Tuple[s
             missing=(CLASS_FIELD,),
         )
 
+    stated_class = str(request.declaring.get(CLASS_FIELD, "") or "").strip()
+    if stated_class and stated_class != declared:
+        raise FilingRefused(
+            "the filing declares class '%s' and also a `class:` label of '%s'; one "
+            "filing states one class, and honouring one silently would drop the other"
+            % (declared, stated_class),
+            missing=(CLASS_FIELD,),
+        )
+
+    stated = {
+        str(name): str(value or "").strip()
+        for name, value in request.declaring.items()
+        if name != CLASS_FIELD
+    }
+    unknown = [name for name in stated if not policy.declares(name)]
+    if unknown:
+        raise FilingRefused(
+            "does not recognise %s as a declaring label — this policy declares %s. "
+            "Pass a label the policy does not declare with `--label` instead; it will "
+            "not be dropped here"
+            % (
+                " or ".join("`%s:`" % name for name in unknown),
+                ", ".join(policy.declaring_fields),
+            ),
+            missing=tuple(unknown),
+        )
+    blank = [name for name, value in stated.items() if not value]
+    if blank:
+        raise FilingRefused(
+            "declares %s with no value — a declaration that carries nothing must not "
+            "be silently dropped either"
+            % " and ".join("`%s:`" % name for name in blank),
+            missing=tuple(blank),
+        )
+
+    required_names = policy.filing_label_names(declared)
     values: Dict[str, str] = {CLASS_FIELD: declared}
     missing: List[str] = []
-    for name in policy.filing_label_names(declared):
+    for name in required_names:
         if name == CLASS_FIELD:
             continue
         value = str(request.declaring.get(name, "") or "").strip()
@@ -192,9 +247,19 @@ def derive_declaring_labels(request: FilingRequest, policy: "Policy") -> Tuple[s
             missing=tuple(missing),
         )
 
+    # A recognised declaration the class does not require is PASSED THROUGH, in
+    # policy order, after the derived ones (#517).
+    passed_through = [
+        name
+        for name in policy.declaring_fields
+        if name not in required_names and name in stated
+    ]
+
     return tuple(
         "%s%s%s" % (name, LABEL_SEPARATOR, values[name])
-        for name in policy.filing_label_names(declared)
+        for name in required_names
+    ) + tuple(
+        "%s%s%s" % (name, LABEL_SEPARATOR, stated[name]) for name in passed_through
     )
 
 

@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cmr.cockpit-functions/v1",
+  "title": "Cockpit function registry (issue #565, RC-10 of #551)",
+  "description": "The one declaration of every cockpit function: the panels the cockpit renders, the views it offers and the commands the operator types. A function outside this file does not exist.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "kinds", "parameter_types", "roles", "consumes", "renders", "functions"],
+  "properties": {
+    "schema": { "const": "cmr.cockpit-functions/v1" },
+    "kinds": {
+      "type": "object",
+      "description": "Closed map of function kind -> meaning. The kind set is exactly these three keys.",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "required": ["panel", "view", "command"]
+    },
+    "parameter_types": {
+      "type": "object",
+      "description": "Closed map of parameter type -> meaning. A parameter with no type is a defect.",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "required": ["string", "integer", "number", "boolean", "enum"]
+    },
+    "roles": {
+      "type": "object",
+      "description": "Closed map of role -> what it is designed for. Role suitability is ADDITIVE FILTERING ONLY (ADR-0026 decision 9); it never grants permission.",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "required": ["CTO", "VP-Eng", "Manager", "Analyst"]
+    },
+    "consumes": {
+      "type": "object",
+      "description": "The authorities this registry consumes, each verified by the gate against the live article.",
+      "additionalProperties": false,
+      "required": ["verbs", "transport", "scopes", "flags", "cockpit", "streams"],
+      "properties": {
+        "verbs": { "type": "string" },
+        "transport": { "type": "string" },
+        "scopes": { "type": "string" },
+        "flags": { "type": "string" },
+        "cockpit": { "type": "string" },
+        "streams": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "minProperties": 1
+        }
+      }
+    },
+    "renders": {
+      "type": "object",
+      "description": "The panels the existing cockpit renders (a section title) -> the function that owns it. Both directions are checked.",
+      "additionalProperties": { "type": "string" },
+      "minProperties": 1
+    },
+    "functions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "title", "kind", "endpoints", "parameters",
+          "scope", "effect_class", "audit", "flags", "roles"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]{1,11}$",
+            "description": "The operator-typed mnemonic: upper case, Bloomberg-function style."
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["panel", "view", "command"] },
+          "endpoints": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$" },
+            "description": "The control-API endpoints it binds (`<family>/<action>`), each of which must resolve in RC-3's declared route set."
+          },
+          "stream": {
+            "type": "string",
+            "description": "The live surface it subscribes to, when it is live."
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "type", "required", "default"],
+              "properties": {
+                "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+                "type": { "enum": ["string", "integer", "number", "boolean", "enum"] },
+                "required": { "type": "boolean" },
+                "default": {
+                  "type": ["string", "integer", "number", "boolean", "null"],
+                  "description": "The default the cockpit presents. null means \"the lever's own default applies\"."
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string" },
+                  "description": "Required when type is `enum`: the closed value list."
+                }
+              }
+            }
+          },
+          "scope": {
+            "type": "object",
+            "description": "The scope requirement: the identity/rbac capability and the tenant scope. Permission lives here and nowhere else.",
+            "additionalProperties": false,
+            "required": ["capability", "level", "tenant"],
+            "properties": {
+              "capability": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$",
+                "description": "Must be a capability RC-2's vocabulary declares."
+              },
+              "level": {
+                "type": "string",
+                "description": "Must be a scope level identity/rbac declares."
+              },
+              "tenant": {
+                "type": "string",
+                "description": "The tenant scope the control path authorises at."
+              }
+            }
+          },
+          "effect_class": {
+            "enum": ["read", "hold", "stop", "irreversible"],
+            "description": "RC-2's closed vocabulary, reused rather than re-invented."
+          },
+          "audit": {
+            "type": ["string", "null"],
+            "description": "MUST be null for a read function and non-null for any other (RC-2's two-way rule)."
+          },
+          "flags": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "pattern": "^surfaces\\.[a-z][a-z0-9_]*$" },
+            "description": "Every feature flag the function's visibility depends on, read from infra/feature-flags/registry.yaml."
+          },
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "enum": ["CTO", "VP-Eng", "Manager", "Analyst"] },
+            "description": "Designed for. Additive filtering only -- never permission."
+          },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

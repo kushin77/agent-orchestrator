@@ -1,0 +1,9 @@
+taskType: test-run
+version: v1
+description: Run a verification task and report the checks executed with their observed evidence for the control-plane verification worker.
+modelTierHint: low
+status: published
+bodyRefs:
+  system: ../bodies/test-run.v1.system.md
+  user: ../bodies/test-run.v1.user.md
+outputSchema: ../output-schemas/test-run.schema.json

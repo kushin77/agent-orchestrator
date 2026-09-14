@@ -1,0 +1,103 @@
+{
+  "why": "The drill fixture (issue #566). The levels map is DATA, not code: each level names the declared RC-10 function it consumes, and the renderer refuses an undeclared function BY NAME — the registry-conformance gate mutates this map to provoke exactly that. The nested record tree is the aggregate → raw-record path the headless driver walks one keystroke at a time.",
+  "levels": {
+    "org": "BOARD",
+    "lane": "BOARD",
+    "issue": "CLOSURE",
+    "agent": "RECOVER",
+    "call": "EVENTS",
+    "tool-call": "EVENTS"
+  },
+  "root": {
+    "kind": "org",
+    "title": "platform",
+    "children": [
+      {
+        "kind": "lane",
+        "title": "control-plane",
+        "children": [
+          {
+            "kind": "issue",
+            "title": "#566 the terminal cockpit",
+            "children": [
+              {
+                "kind": "agent",
+                "title": "ao-rc11",
+                "children": [
+                  {
+                    "kind": "call",
+                    "title": "c-1 plan the lane",
+                    "children": [
+                      {
+                        "kind": "tool-call",
+                        "title": "read functions.yaml",
+                        "detail": [
+                          "tool: read_file",
+                          "path: control-plane/functions/functions.yaml",
+                          "bytes: 12044",
+                          "verdict: ok"
+                        ]
+                      },
+                      {
+                        "kind": "tool-call",
+                        "title": "read ADR-0026",
+                        "detail": [
+                          "tool: read_file",
+                          "path: docs/decision-records/ADR-0026-control-substrate.md",
+                          "bytes: 24013",
+                          "verdict: ok"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "call",
+                    "title": "c-2 run the verify gate",
+                    "children": [
+                      {
+                        "kind": "tool-call",
+                        "title": "bash scripts/verify.sh verify",
+                        "detail": [
+                          "tool: run_in_terminal",
+                          "command: env -C <worktree> bash scripts/verify.sh verify",
+                          "rc: 0",
+                          "verdict: PASS"
+                        ]
+                      },
+                      {
+                        "kind": "tool-call",
+                        "title": "read the attestation",
+                        "detail": [
+                          "tool: read_file",
+                          "path: .verify/attestation.json",
+                          "git_sha: <recorded-at-run-time>",
+                          "verdict: quoted"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "issue",
+            "title": "#565 the function registry",
+            "children": []
+          }
+        ]
+      },
+      {
+        "kind": "lane",
+        "title": "portal",
+        "children": [
+          {
+            "kind": "issue",
+            "title": "#554 the control API",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

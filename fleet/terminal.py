@@ -6,6 +6,12 @@ inbox, runs a code-native subagent per directive via the agent CLI, reports
 the result, and escalates any failure to the brain. An empty inbox is just
 another poll cycle — there is no IDLE exit.
 
+The directive's FinOps block is NOT decorative (#218): `model.tier` selects the
+model the runner is invoked with, the tier/model/thinking are exported to the
+child environment so a BYOK-wired wrapper can honour them, and a block this build
+cannot turn into a runner REFUSES the dispatch instead of silently falling back
+to the default runner.
+
 Usage:
     python3 fleet/terminal.py run [--runner "claude -p"] [--watch-timeout 30]
                                  [--timeout 1800] [--dry-run] [--once]
@@ -27,6 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+import routing
 import runtime
 import singleton
 import telemetry
@@ -43,6 +50,174 @@ sys.path.insert(0, str(ROOT))
 from governance.reconcile.heartbeat import DEFAULT_BEAT_SECONDS, Beater as SessionBeater  # noqa: E402
 
 SESSION_BEAT_SECONDS = DEFAULT_BEAT_SECONDS
+
+# --- the FinOps block selects the runner (issue #218) ------------------------
+#
+# The brain's `model.tier`/`model.thinking` used to be printed into the prompt and
+# otherwise ignored: every subagent ran `claude -p`, so the `pro/low` floor raised
+# for a security lane bought nothing and the FinOps block was decorative. It now
+# selects the runner invocation, and a block this build cannot execute REFUSES the
+# dispatch rather than falling back to the default runner.
+#
+# The vocabulary is harvested, not invented (GR-10):
+#   * the tiers and the model ids are `governance/finops/policy.json`'s
+#     (`vocabulary.tiers`, `tier_models`) — the FinOps chooser's own manifest;
+#   * the `--model <tier-model>` argv shape and the `ANTHROPIC_MODEL` variable are
+#     kushin77/deepseek's Claude-CLI-on-DeepSeek BYOK contract (#88, #91:
+#     `claude --model <tier-model>` with the BYOK environment applied), whose #54
+#     asks for exactly the refusal below: "a profile the module does not know is
+#     refused explicitly rather than silently mapped to a default".
+# The tier vocabulary itself is NOT copied here — it is read from the routing
+# policy (`fleet/routing.py`, ADR-0012), the fleet's single source of dispatch
+# vocabulary — so a tier the policy adds and this map forgets REFUSES by name
+# instead of being dispatched at whatever the map happens to hold.
+#
+# BYOK credentials are deliberately absent: `ANTHROPIC_AUTH_TOKEN` and
+# `ANTHROPIC_BASE_URL` come from the operator's environment or a secret manager
+# and are never written here (GR-6). This module exports only the tier, the model
+# and the thinking effort — which is what a BYOK-wired wrapper needs to honour it.
+TIER_RUNNERS: dict[str, dict[str, str]] = {
+    "flash": {"model": "deepseek-v4-flash", "flag": "--model"},
+    "pro": {"model": "deepseek-v4-pro", "flag": "--model"},
+    "auditor": {"model": "deepseek-v4-pro", "flag": "--model"},
+}
+
+#: The base runner command when the operator passes none. The tier does not
+#: replace it — it selects the model that command is invoked with.
+DEFAULT_RUNNER = "claude -p"
+
+#: The exit code a refused dispatch reports (EX_CONFIG: the order cannot be
+#: executed as declared). Distinct from 127 (could not start) and 124 (timeout).
+RC_REFUSED = 78
+
+
+class FinOpsRefusal:
+    """A refusal with a stable code and its reason — never a silent fallback.
+
+    The posture of ``routing.RoutingRefusal`` and the channel's own refusals: a
+    declaration this build cannot honour is reported by name, because the
+    alternative — dispatching at the default runner while the record says `pro` —
+    is the decorative-FinOps defect #218 exists to remove.
+    """
+
+    def __init__(self, code: str, reason: str) -> None:
+        self.code = code
+        self.reason = reason
+
+    def __str__(self) -> str:
+        return f"{self.code}: {self.reason}"
+
+
+def finops_policy():
+    """The routing policy (ADR-0012): the tier/thinking vocabulary of record.
+
+    Loaded on use rather than at import: the policy reads the registry persona
+    cards, so a malformed policy must refuse a *dispatch*, not the terminal's
+    import (and the module stays safe to import in a context with no I/O).
+    """
+    return routing.policy()
+
+
+def resolve_dispatch(
+    directive: dict, base_runner: str | None = None
+) -> tuple[dict | None, FinOpsRefusal | None]:
+    """Resolve the directive's FinOps block into the real runner invocation.
+
+    Returns ``(dispatch, None)`` or ``(None, refusal)``, where the dispatch is::
+
+        {tier, thinking, model, risk, runner, env}
+
+    ``runner`` is the base command plus the tier's model flag; ``env`` carries the
+    FinOps variables exported to the child. Nothing is guessed: an ABSENT block
+    takes the policy's declared default (start cheap — the doctrine's default, not
+    a fallback for a declared tier), while a declared value this build cannot
+    route is refused by name. The high floor is honoured too: a security/secrets/
+    auth/IaC lane whose block sits below the policy's floor is refused rather than
+    silently raised, so the operator sees what was ordered.
+    """
+    try:
+        policy = finops_policy()
+    except routing.RoutingRefusal as exc:
+        return None, FinOpsRefusal(
+            "policy-unreadable", f"the routing policy cannot be loaded: {exc}"
+        )
+    tiers = policy.tier_vocabulary
+    thinkings = policy.thinking_vocabulary
+    block = directive.get("model")
+    block = block if isinstance(block, dict) else {}
+    tier = block.get("tier") or policy.default_block[0]
+    thinking = block.get("thinking") or policy.default_block[1]
+    if tier not in tiers:
+        return None, FinOpsRefusal(
+            "tier-unknown",
+            f"model.tier {tier!r} is not one of the FinOps tiers ({', '.join(tiers)})",
+        )
+    if thinking not in thinkings:
+        return None, FinOpsRefusal(
+            "thinking-unknown",
+            f"model.thinking {thinking!r} is not one of ({', '.join(thinkings)})",
+        )
+    entry = TIER_RUNNERS.get(str(tier))
+    if entry is None:
+        return None, FinOpsRefusal(
+            "tier-unmapped",
+            f"FinOps tier {tier!r} has no runner mapped (mapped: {', '.join(sorted(TIER_RUNNERS))}) — "
+            "refusing rather than dispatching at the default runner",
+        )
+    task = directive.get("task")
+    task = task if isinstance(task, dict) else {}
+    lane = str(task.get("lane") or "")
+    title = str(task.get("title") or "")
+    risk = policy.risk_for(lane, title)
+    if risk == routing.HIGH:
+        floored = policy.floor(str(tier), str(thinking))
+        if floored != (str(tier), str(thinking)):
+            return None, FinOpsRefusal(
+                "floor-violated",
+                f"'{lane} {title}' bears risk but the block declares {tier}/{thinking}; the "
+                f"policy's high floor is {floored[0]}/{floored[1]} — a floor, never a ceiling. Refused "
+                "rather than silently raised: the brain applies this floor before it sends (fleet/brain.py)",
+            )
+    model = str(entry["model"])
+    runner = shlex.join(
+        [*shlex.split(base_runner or DEFAULT_RUNNER), str(entry["flag"]), model]
+    )
+    env = {
+        "AO_TIER": str(tier),
+        "AO_THINKING": str(thinking),
+        "AO_MODEL": model,
+        "AO_RISK": risk,
+        "AO_RUNNER": runner,
+        # deepseek #88's own BYOK variable, so a wrapper honours the tier's model
+        # with no fleet-specific glue.
+        "ANTHROPIC_MODEL": model,
+    }
+    return (
+        {
+            "tier": str(tier),
+            "thinking": str(thinking),
+            "model": model,
+            "risk": risk,
+            "runner": runner,
+            "env": env,
+        },
+        None,
+    )
+
+
+def finops_line(dispatch: dict | None) -> str:
+    """What the FinOps block selected, as one line — logged on every dispatch.
+
+    #218's own ``Verify:`` asks for a dispatch log line that NAMES the
+    tier-selected runner, so the FinOps claim is measurable rather than asserted.
+    """
+    if not isinstance(dispatch, dict):
+        return "FinOps unknown (no block resolved)"
+    return (
+        f"FinOps tier={dispatch.get('tier')}/{dispatch.get('thinking')} "
+        f"model={dispatch.get('model')} runner={dispatch.get('runner')} "
+        f"risk={dispatch.get('risk')}"
+    )
 
 
 def extract_json(text: str) -> dict:
@@ -225,10 +400,25 @@ def run_once(
     slot. Resolving it from the slot keeps this call's shape unchanged for callers
     that predate the pack, while still putting what the subagent was told into the
     prompt it receives.
+
+    The FinOps block selects the runner here (#218): `runner` is the base command
+    and the directive's `model.tier` appends the model it is invoked with, so the
+    argument this function is handed can no longer be the whole story of what the
+    child runs. The resolved dispatch is taken from the slot when the loop has
+    already made the decision (so the recorded tier and the dispatched tier cannot
+    disagree), and resolved here otherwise. A block this build cannot route returns
+    `RC_REFUSED` with the reason and spawns nothing.
     """
     pack = context if context is not None else (slot or {}).get("context")
-    command = build_command(directive, runner, agent_id, worktree, env, pack)
+    dispatch = (slot or {}).get("dispatch")
+    if not isinstance(dispatch, dict):
+        dispatch, refusal = resolve_dispatch(directive, runner)
+        if refusal is not None:
+            print(f"[terminal] dispatch REFUSED — {refusal}", file=sys.stderr, flush=True)
+            return RC_REFUSED, f"dispatch refused: {refusal}"
+    command = build_command(directive, str(dispatch["runner"]), agent_id, worktree, env, pack)
     cwd = str(worktree) if worktree is not None else str(ROOT)
+    print(f"[terminal] {finops_line(dispatch)}", flush=True)
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
         return 0, f"DRY-RUN (not executed) in {cwd}"
@@ -239,7 +429,9 @@ def run_once(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            env={**os.environ, **(env or {})},
+            # The FinOps block is exported LAST: it is the authority the operator
+            # asked for, the lane environment carries identity.
+            env={**os.environ, **(env or {}), **dict(dispatch.get("env") or {})},
         )
     except OSError as exc:
         return 127, f"runner could not start in {cwd}: {exc}"
@@ -1067,27 +1259,37 @@ def record_run(
     started_at: str,
     finished_at: str | None = None,
     detail: str = "",
+    dispatch: dict | None = None,
 ) -> None:
     """Append one per-run telemetry record; a bad append must not kill the loop.
 
     Telemetry is an observability signal, not the run itself — if the log write
     fails (disk full, bad permissions), the run outcome still gets reported over
     the channel; only the extra record is lost.
+
+    The FinOps block the run actually dispatched at rides here too (#218) so the
+    claim is measurable rather than asserted: `tier`, `thinking` and `runner` are
+    the very field names `fleet/summary.py` (#219/#234) already aggregates, and
+    `model` names the model the tier selected. `telemetry.build_record` fixes the
+    schema's REQUIRED fields; these are additive, so an older reader is unaffected.
     """
     try:
         with RECORD_LOCK:
-            telemetry.append_record(
-                telemetry.RUNS_LOG,
-                telemetry.build_record(
-                    run_id=directive_id,
-                    issue=str(issue),
-                    agent=agent_id,
-                    status=status,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    detail=detail,
-                ),
+            record = telemetry.build_record(
+                run_id=directive_id,
+                issue=str(issue),
+                agent=agent_id,
+                status=status,
+                started_at=started_at,
+                finished_at=finished_at,
+                detail=detail,
             )
+            if isinstance(dispatch, dict):
+                record["tier"] = dispatch.get("tier")
+                record["thinking"] = dispatch.get("thinking")
+                record["model"] = dispatch.get("model")
+                record["runner"] = dispatch.get("runner")
+            telemetry.append_record(telemetry.RUNS_LOG, record)
     except (telemetry.TelemetryError, OSError) as exc:
         print(f"[terminal] telemetry record for {directive_id} rejected: {exc}", file=sys.stderr, flush=True)
 
@@ -1348,6 +1550,7 @@ def loop(args: argparse.Namespace) -> int:
         worktree: Path | None,
         lane_env: dict[str, str],
         run_started_at: str,
+        dispatch: dict | None = None,
     ) -> None:
         """One worker's full life: run the subagent, then derive and report the verdict.
 
@@ -1364,7 +1567,9 @@ def loop(args: argparse.Namespace) -> int:
             return
         where = f"worktree {worktree}" if worktree else "shared checkout"
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
-        tail = f"[{where}] {tail}"
+        # The FinOps block leads the report: the brain's record of the run names
+        # the tier the runner actually executed at, not the tier it asked for.
+        tail = f"[{where}] {finops_line(dispatch)} | {tail}"
         # The verdict comes from evidence the loop runs itself — the issue's own
         # Verify: command, `make verify`, and the real board state — never from
         # the runner's prose (#279).
@@ -1377,7 +1582,10 @@ def loop(args: argparse.Namespace) -> int:
         landed, landing_detail = landed_evidence(issue)
         run_status, prose_hint = verdict(rc, output, gate_ok, landed)
         tail = f"{tail} | {gate_detail} | {landing_detail} | close-out: {closeout} | prose-hint: {prose_hint}"
-        record_run(directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200])
+        record_run(
+            directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200],
+            dispatch=dispatch,
+        )
         clear_reported(directive_id)
         if run_status == "done":
             subprocess.run(
@@ -1617,6 +1825,25 @@ def loop(args: argparse.Namespace) -> int:
             time.sleep(args.idle_sleep)
             continue
 
+        # The FinOps block decides the runner BEFORE any claim is taken (#218): a
+        # declaration this build cannot turn into a runner must cost nothing and
+        # must never reach the default runner. The directive is left PENDING — the
+        # order is real work, and consuming it would erase the only record that it
+        # was ordered (the same posture as a refused claim).
+        dispatch, finops_refusal = resolve_dispatch(directive, args.runner)
+        if finops_refusal is not None:
+            print(f"[terminal] #{issue} dispatch REFUSED — {finops_refusal}", file=sys.stderr, flush=True)
+            report_once(
+                directive_id,
+                key=f"finops-refusal:{finops_refusal.code}",
+                message_type="escalate",
+                body=f"#{issue} refused: {finops_refusal}. The directive is left pending — re-order with a "
+                f"tier/thinking this build can execute ({', '.join(sorted(TIER_RUNNERS))}).",
+            )
+            if args.once:
+                return 1
+            continue
+
         agent_id = agent_id_for(directive_id)
         held = subprocess.run(
             ["python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "held", "--issue", str(issue)],
@@ -1685,7 +1912,10 @@ def loop(args: argparse.Namespace) -> int:
                     return 0
                 continue
 
-        print(f"[terminal] executing directive {directive_id} (issue {issue})", flush=True)
+        print(
+            f"[terminal] executing directive {directive_id} (issue {issue}) — {finops_line(dispatch)}",
+            flush=True,
+        )
         lane = (directive.get("task") or {}).get("lane") or ""
         # What the subagent is TOLD, not just ordered (#220): the issue's identity,
         # acceptance text and Verify: clause from the board snapshot (offline), the
@@ -1694,7 +1924,10 @@ def loop(args: argparse.Namespace) -> int:
         context = issue_context(issue, lane, body_reader=live_issue_body)
         mark_run(directive_id, issue, agent_id, context=context)
         run_started_at = _now()
-        record_run(directive_id, issue, agent_id, "started", run_started_at, detail=context_summary(context))
+        record_run(
+            directive_id, issue, agent_id, "started", run_started_at,
+            detail=context_summary(context), dispatch=dispatch,
+        )
         claimed, claim_output = claim_issue(issue, agent_id, lane, directive_id)
         if not claimed:
             # Escalate ONCE and leave the directive pending: the refusal is usually
@@ -1726,9 +1959,13 @@ def loop(args: argparse.Namespace) -> int:
         # so a dead child can never strand an issue.
         slot = register_run(directive_id, issue, agent_id)
         slot["context"] = context
+        # The resolved block travels with the slot: `_run_child`/`run_once` then
+        # dispatch at exactly the tier this loop recorded, and neither has to
+        # re-decide (or could disagree).
+        slot["dispatch"] = dispatch
         worker = threading.Thread(
             target=run_worker,
-            args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at),
+            args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at, dispatch),
             name=f"fleet-run-{directive_id}",
             daemon=True,
         )
@@ -1744,7 +1981,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-terminal", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="run the never-idle loop")
-    run.add_argument("--runner", default="claude -p")
+    run.add_argument(
+        "--runner",
+        default=DEFAULT_RUNNER,
+        help="the base runner command; the directive's FinOps tier selects the model it is "
+        "invoked with (--model <tier model>) and is exported to the child environment (#218)",
+    )
     run.add_argument("--watch-timeout", type=float, default=30.0)
     run.add_argument("--timeout", type=float, default=1800.0)
     run.add_argument("--idle-sleep", type=float, default=2.0)

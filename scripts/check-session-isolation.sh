@@ -147,9 +147,12 @@ git -C "$scratch" commit -q -m seed >/dev/null 2>&1
 # The scratch identity must not be picked up from the machine running the gate.
 export GIT_CONFIG_GLOBAL=/dev/null
 
+# The gate's own lanes are throwaway scratch inside a directory the EXIT trap
+# removes, so they use the RAM-backed root /tmp provides. The refusal itself
+# (issue #516) is provoked separately, WITHOUT the flag — see section 3b.
 open_lane() { # open_lane <issue> <agent> <lane> — prints the lane JSON
   python3 "$cli" open --issue "$1" --agent "$2" --lane "$3" \
-    --main "$scratch" --root "$lanes" --base HEAD 2>/dev/null
+    --main "$scratch" --root "$lanes" --base HEAD --allow-tmpfs-root 2>/dev/null
 }
 
 jfield() { # jfield <field> — the identity field from the lane JSON on stdin
@@ -204,6 +207,55 @@ commit_in() { # commit_in <worktree> <file> <trailer-or-empty>
     git -C "$1" commit -q -m "work on $2" >/dev/null 2>&1
   fi
 }
+
+# --- 3b. the tmpfs refusal (issue #516) -------------------------------------
+# A lane rooted on a RAM-backed filesystem costs RAM and inodes instead of disk
+# and is lost on reboot, so it must be refused BY NAME — and before
+# `git worktree add`, which is why the probe root must not exist afterwards.
+tmpfs_root=""
+for candidate in /tmp /dev/shm /run; do
+  if [ -d "$candidate" ] && [ "$(stat -f -c %T "$candidate" 2>/dev/null)" = "tmpfs" ]; then
+    tmpfs_root="$candidate"
+    break
+  fi
+done
+if [ -z "$tmpfs_root" ]; then
+  echo "  FAIL  no RAM-backed mount available to provoke the tmpfs refusal" >&2
+  fail=$((fail + 1))
+else
+  probe_root="$tmpfs_root/ao-isolation-probe.$$"
+  rm -rf "$probe_root"
+  output="$(python3 "$cli" open --issue 999 --agent probe --lane tmpfs-probe \
+    --main "$scratch" --root "$probe_root" --base HEAD 2>&1)"
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "  FAIL  a lane rooted on $tmpfs_root was provisioned anyway" >&2
+    fail=$((fail + 1))
+  elif [ "$rc" -ne 1 ]; then
+    echo "  FAIL  the tmpfs refusal exited $rc, not NOT-OK (1)" >&2
+    fail=$((fail + 1))
+  elif ! printf '%s' "$output" | grep -qF "lane-worktree-on-tmpfs"; then
+    echo "  FAIL  the tmpfs refusal did not name lane-worktree-on-tmpfs" >&2
+    printf '%s\n' "$output" | sed 's/^/        /' >&2
+    fail=$((fail + 1))
+  elif [ -e "$probe_root" ]; then
+    echo "  FAIL  $probe_root was created anyway (the guard ran after the write)" >&2
+    fail=$((fail + 1))
+  else
+    echo "  OK    a lane rooted on $tmpfs_root ($(stat -f -c %T "$tmpfs_root")) is refused by name, before git worktree add"
+  fi
+  # Vacuity control: the refusal is about the filesystem, not about this probe —
+  # the same root is accepted the moment a caller says the scratch is throwaway.
+  if python3 "$cli" open --issue 999 --agent probe --lane tmpfs-probe --allow-tmpfs-root \
+      --main "$scratch" --root "$probe_root" --base HEAD >/dev/null 2>&1; then
+    echo "  OK    vacuity control: the same root is accepted with --allow-tmpfs-root"
+    git -C "$scratch" worktree remove --force "$probe_root" >/dev/null 2>&1
+    rm -rf "$probe_root"
+  else
+    echo "  FAIL  vacuity control: the root is refused even with --allow-tmpfs-root" >&2
+    fail=$((fail + 1))
+  fi
+fi
 
 # Lane A — a correctly provisioned lane, with a traceable commit.
 read -r a_sid a_wt < <(lane_session 263 gate-agent foundation) || {

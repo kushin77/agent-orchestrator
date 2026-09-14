@@ -1,0 +1,166 @@
+# The module registry's declared acceptance policy (issue #591).
+#
+# The registry says *no* in more than one place: a duplicated module id, a
+# mandatory consumer asset that resolves to no seed, drift between the hub's
+# mandatory registry and its module flags, a declared target that landed without
+# being registered mandatory, a module's source carried in-tree rather than
+# referenced, and membership claimed for a name the hub catalog does not carry.
+#
+# Until this file existed those judgments lived in code and in prose, so nobody
+# could see — or review — *which* conditions are fatal. This artifact is that
+# declaration, and it is read on every build (`policy.py`):
+#
+#   * `registry.build` stamps every refusal it emits with the `disposition` and
+#     the condition id declared here, and a refusal code this file does not
+#     declare is CANNOT-ASSESS — never a silent pass;
+#   * the vocabulary is closed in **both** directions: this file must declare
+#     every code the registry can emit (`governance/modules/model.py`
+#     `REFUSAL_CODES`) and may declare no code it cannot;
+#   * a refusal is **always** fatal — a condition that would file a refusal code
+#     under `recorded` is refused at load time, because a gate that can be turned
+#     off by editing a YAML file is a gate that cannot fail (AO-GR-4 / GR-12);
+#   * membership is conferred by the hub catalog alone: a policy that would let a
+#     claim confer membership is refused as a policy that weakens the guard,
+#     which is the `kushin77/CMR#952` drift guard itself.
+#
+# Two dispositions, and only two:
+#
+#   fatal     — the registry cannot be clean while this holds; `verify` exits 1.
+#   recorded  — a judgment, not a defect: the state a name resolves to and a
+#               membership refused by name. Every judgment is written to the
+#               append-only audit trail (`audit.py`) on every build, so the
+#               registry's compliance signal is durable rather than printed once
+#               by a script and lost.
+#
+# `enforced_by` names *how* a condition is enforced: `code` means the condition
+# is the set of refusal codes below; `reader` means the reader enforces it while
+# loading this file (a policy that violates it is refused before any registry is
+# built, so the condition is fatal by construction rather than by inspection).
+
+schema: ao.module-registry/controls-v1
+subject: governance/modules
+
+authority:
+  membership: hub-catalog
+  claim_effect: none
+  citation: kushin77/CMR#952
+  statement: >-
+    Membership is conferred by the hub catalog alone. A sub-module admission
+    register entry, a watch question, or any other claim is a claim: it is
+    reported, and it never confers membership.
+
+dispositions:
+  - fatal
+  - recorded
+
+conditions:
+  - id: membership-not-inferred-from-a-claim
+    disposition: fatal
+    enforced_by: reader
+    statement: >-
+      A policy that would let a claim confer membership is refused while it is
+      read — the registry must never derive membership from a claim, however the
+      policy is edited.
+
+  - id: closed-refusal-vocabulary
+    disposition: fatal
+    enforced_by: reader
+    statement: >-
+      The registry emits only refusal codes this file declares, and this file
+      declares every code the registry can emit. An undeclared code is a
+      judgment nobody declared, so it is CANNOT-ASSESS rather than a pass.
+
+  - id: refusals-are-fatal
+    disposition: fatal
+    enforced_by: reader
+    statement: >-
+      No condition may file a refusal code under `recorded`: a refusal that does
+      not fail the gate is a formality. `recorded` belongs to the judgments.
+
+  - id: hub-mandatory-drift
+    disposition: fatal
+    enforced_by: code
+    statement: >-
+      The hub's mandatory registry (`catalog/mandatory.tsv`) and its module
+      flags (`catalog/modules/*/module.json`) must agree in both directions; a
+      module registered mandatory without a row, or a row without the flag, is
+      drift in the authority the registry reproduces.
+    codes:
+      - MODULE-UNREGISTERED-MANDATORY
+      - MODULE-UNREGISTERED-FLAG
+
+  - id: module-identity
+    disposition: fatal
+    enforced_by: code
+    statement: >-
+      A module id resolves to exactly one manifest, the manifest parses, its
+      mandatory flag is well-formed, and its name matches the id.
+    codes:
+      - MODULE-DUPLICATE-ID
+      - MODULE-MANIFEST-INVALID
+      - MODULE-MANDATORY-FLAG-INVALID
+      - MODULE-NONMANDATORY-DECLARES-ASSETS
+      - MODULE-NAME-DRIFT
+
+  - id: consumer-asset-integrity
+    disposition: fatal
+    enforced_by: code
+    statement: >-
+      Every consumer asset a registered mandatory module declares is a safe
+      relative path that resolves to a seed the hub actually ships.
+    codes:
+      - MODULE-ASSET-NO-SEED
+      - MODULE-ASSET-NO-LIST
+      - MODULE-ASSET-UNSAFE
+      - MODULE-ASSET-DRIFT
+
+  - id: declared-target-set
+    disposition: fatal
+    enforced_by: code
+    statement: >-
+      A declared target names the blocking hub issue(s) that keep it pending,
+      and a target that reached the hub catalog is registered mandatory rather
+      than reported as shipped by the declaration alone.
+    codes:
+      - TARGET-WITHOUT-ID
+      - TARGET-WITHOUT-BLOCKING
+      - MODULE-TARGET-LANDED-NOT-MANDATORY
+
+  - id: no-vendoring
+    disposition: fatal
+    enforced_by: code
+    statement: >-
+      Module source is referenced, never carried: no in-tree copy of a hub
+      manifest, no module distribution package in this tree, no registry
+      reference pointing outside the hub, and no additional vendored submodule.
+    codes:
+      - VENDOR-SOURCE-IN-TREE
+      - VENDOR-IN-TREE-PACKAGE
+      - VENDOR-PATH-OUTSIDE-HUB
+      - VENDOR-EXTRA-SUBMODULE
+
+judgments:
+  - subject: registered-mandatory
+    disposition: recorded
+    statement: >-
+      The name is carried by the hub catalog with `mandatory: true`, its
+      registry row and its module flag in lockstep. Recorded, and shipped.
+
+  - subject: target-pending
+    disposition: recorded
+    statement: >-
+      The name is declared as a target and has not landed: `shipped: false`,
+      with the blocking hub issue named. Recorded, never reported as shipped.
+
+  - subject: catalog-module-not-mandatory
+    disposition: recorded
+    statement: >-
+      The hub catalog carries the module, but not in the mandatory set.
+      Recorded, and not required in this repository.
+
+  - subject: not-a-module
+    disposition: recorded
+    statement: >-
+      Membership refused by name: the hub catalog does not carry the name, so it
+      is not a module in some other state — it is not a module. The refusal is
+      recorded, and it is the CMR#952 drift guard (`membership_refusal`).

@@ -61,6 +61,7 @@ capabilities:
   audit:                  { summary: "Independently verify another agent's output with the decisive check.",        source: "kushin77/capital-underwriting auditor / continuous-audit; AGENTS.md GR-13" }
   finops-meter:           { summary: "Meter token/cost and enforce budgets (FinOps).",                              source: "kushin77/capital-underwriting finops persona; observability pillar" }
   memory-ops:             { summary: "Read/write scoped memory (repository/session/user).",                         source: "kushin77/vscode-memory scripts/memory_system_v2.py" }
+  module-brief:           { summary: "Compose each mandatory module's distributable brief from the module registry, the committed board snapshot and the hub catalog (reporting half of the fleet, ADR-0012).", source: "agent-orchestrator issue #447; consumes governance/modules (issue #445) + vendor/CMR/catalog" }
 
 # Constraints: boundary rules. effect is deny (forbidden action) or require
 # (mandatory behavior); the guardrails pillar enforces them at runtime.
