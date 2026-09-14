@@ -69,7 +69,12 @@ help:
 	@echo "                are declared and map onto the shipped channel"
 
 	@echo "  fleet-runbook  Bootstrap runbook gate (M26 #166): the only human step"
-	@echo "                is the model switch, and the recovery paths stay documented"
+	@echo "                is the model switch, and the recovery paths stay documented;"
+	@echo "                also provokes each capability-drift case (#319)"
+
+	@echo "  capability-drift  Capability drift (#319): report the capabilities each"
+	@echo "                running rung does NOT implement, naming every one (a control"
+	@echo "                that shipped but is not live is a silently absent control)"
 
 	@echo "  session-isolation  Lane isolation (M26 #263): one session identity per"
 	@echo "                issue, its own worktree on issue-<n>, a worktree-scoped"
@@ -190,10 +195,19 @@ fleet-contract:
 
 ## fleet-runbook — session-fleet bootstrap runbook gate (M26, issue #166): the
 ## only human step is the model switch, and the recovery paths (claim TTL
-## take-over, mailbox backlog, dispatcher rc=2) stay documented; the check
+## take-over, mailbox backlog, dispatcher rc=2) stay documented; capability
+## drift (#319) adds the restart step and a provoked report per case; the check
 ## mutates its own input, so it cannot pass vacuously
 fleet-runbook:
 	@bash scripts/check-fleet-runbook.sh
+
+## capability-drift — the capabilities each running rung does not implement
+## (#319): the repository declares the set its code provides in
+## fleet/channel.py, each rung declares its own in its beat, and this report
+## names every declared capability a rung is missing — a rung on HEAD that is
+## missing one is NOT repairable by a restart
+capability-drift:
+	@python3 fleet/watchdog.py capabilities
 
 
 ## session-isolation — institutional lane isolation (issue #263): a session
