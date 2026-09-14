@@ -1,0 +1,19 @@
+{
+  "note": "Offline canned responses for FixtureTransport (issue #428). Used by the unit tests and by scripts/check-paperclip-integration-adapter.sh, which is why the gate never touches the network.",
+  "responses": [
+    { "method": "GET", "path": "/api/health", "status": 200, "body": { "status": "ok", "version": "1.0.0" } },
+    { "method": "GET", "path": "/api/openapi.json", "status": 200, "body": { "openapi": "3.0.0", "info": { "title": "paperclipai" } } },
+    { "method": "GET", "path": "/api/companies/acme/agents", "status": 200, "body": { "agents": [ { "id": "orchestrator" } ] } },
+    { "method": "GET", "path": "/api/companies/acme/issues", "status": 200, "body": { "issues": [] } },
+    { "method": "GET", "path": "/api/companies/acme/costs", "status": 200, "body": { "costs": [] } },
+    { "method": "GET", "path": "/api/companies/acme/approvals", "status": 200, "body": { "approvals": [] } },
+    { "method": "GET", "path": "/api/companies/acme/activity", "status": 200, "body": { "activity": [] } },
+    { "method": "GET", "path": "/api/companies/acme/dashboard", "status": 200, "body": { "dashboard": {} } },
+    { "method": "POST", "path": "/api/companies/acme/issues", "status": 201, "body": { "id": "kushin77/agent-orchestrator#428", "status": "in-progress" } },
+    { "method": "PATCH", "path": "/api/issues/428", "status": 200, "body": { "id": "kushin77/agent-orchestrator#428", "status": "done" } },
+    { "method": "POST", "path": "/api/companies/acme/approvals", "status": 201, "body": { "id": "approval-1", "state": "pending" } },
+    { "method": "GET", "path": "/api/companies/acme/missing", "status": 404, "body": { "error": "not found" } },
+    { "method": "POST", "path": "/api/companies/acme/locked", "status": 409, "body": { "error": "owned" } },
+    { "method": "GET", "path": "/api/companies/acme/unavailable", "status": 503, "body": { "error": "db unreachable" } }
+  ]
+}
