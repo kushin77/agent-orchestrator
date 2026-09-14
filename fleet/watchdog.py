@@ -24,6 +24,15 @@ Respawn is a *measurement*, not a claim (issue #276). "`spawn()` returned" is no
 appear and survive a short settle window, so a no-op spawn or a rung that dies at
 startup (a singleton refusal, a crash) reports `RESPAWN FAILED` and the pass exits
 non-zero instead of fabricating a success.
+
+The pass measures a second thing (issue #319): whether the running rung implements
+the capabilities `fleet/channel.py` declares for it. A rung on an old commit
+reports `CAPABILITY STALE` naming each missing capability — "the loop is old" and
+"the loop is old, so lanes are not being beat and orphans will never be flagged"
+are different facts, and only the second tells an operator what is absent. A rung
+that is *current* and still missing a declared capability is reported and never
+respawned: no restart adds a capability the build does not have. `python3
+fleet/watchdog.py capabilities` prints that report on its own.
 """
 
 from __future__ import annotations
@@ -237,17 +246,26 @@ def respawn(
 
 
 def rung_action(name: str, pattern: str, script: str, beat_path: Path, force: bool, head: str) -> str:
-    """One rung, one decision: what did the watchdog do about it."""
+    """One rung, one decision: what did the watchdog do about it — and what is it missing?
+
+    Issue #319: the commit comparison (`decide`) is joined by the capability
+    comparison, so a rung running a build that predates a merged control reports
+    WHICH control is absent instead of only "drifted". A rung that is *current*
+    and still missing a declared capability is reported too — and NOT respawned,
+    because restarting a build that never had the capability cannot fix it.
+    """
     pid = loop_pid(pattern)
-    state, reason = decide(pid, read_beat(beat_path), head)
+    beat = read_beat(beat_path)
+    state, reason = decide(pid, beat, head)
     if force:
         state, reason = "forced", "operator asked to respawn"
+    capability = channel.capability_line(channel.capability_finding(name, beat, head))
     if state == "healthy":
-        return f"{name}: healthy"
+        return f"{name}: healthy | {capability}"
     if state == "drifted" and name == "sister" and run_in_flight():
-        return f"{name}: drifted ({reason}) but a run is in flight — left alone"
+        return f"{name}: drifted ({reason}) but a run is in flight — left alone | {capability}"
     ok = respawn(pattern, script, name)
-    return f"{name}: {state} ({reason}) — {'respawned' if ok else 'RESPAWN FAILED'}"
+    return f"{name}: {state} ({reason}) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
 
 
 def monitor_missing() -> bool:
@@ -269,13 +287,18 @@ def start_monitor(*, window: float | None = None, settle: float | None = None) -
 
 
 def watchdog_once(force: bool = False) -> int:
-    """One pass over both loops plus the monitor; 0 (ok/respawned) or 1 (failure)."""
+    """One pass over both loops plus the monitor; 0 (ok/respawned) or 1 (failure).
+
+    A pass fails on `RESPAWN FAILED` and on `CAPABILITY STALE`: a rung that does
+    not implement a capability the repository declares is a silently absent
+    control, and it is the one finding no respawn can repair (issue #319).
+    """
     head = channel.head_commit()
     failed = False
     for name, pattern, script, beat_path in RUNGS:
         line = rung_action(name, pattern, script, beat_path, force, head)
         print(f"[watchdog] {line}", flush=True)
-        if "FAILED" in line:
+        if "FAILED" in line or "CAPABILITY STALE" in line:
             failed = True
     # Third rung: the monitor is a resident poller with no run-in-flight concern
     # and no code-drift concept, so a missing process is always restarted and a
@@ -290,12 +313,77 @@ def watchdog_once(force: bool = False) -> int:
     return 1 if failed else 0
 
 
+def beat_path(rung: str) -> Path:
+    """The beat this rung publishes (read through `channel`, so a test redirect applies)."""
+    return channel.BRAIN_HEARTBEAT if rung == "brain" else channel.HEARTBEAT
+
+
+def cmd_capabilities(args: argparse.Namespace) -> int:
+    """Report the declared capabilities each rung does NOT implement (issue #319).
+
+    Reads the rung's own beat — it never writes one — so the report measures the
+    live fleet instead of declaring a capability set on its behalf. `--beat`
+    reads a synthetic beat and `--head` pins the comparison commit, which is how
+    the runbook gate provokes each of the three cases and requires it to be
+    reported (a check that cannot fail is a formality, GR-12).
+    """
+    rungs = args.rung or [name for name, _pattern, _script, _beat in RUNGS]
+    if args.beat and len(rungs) != 1:
+        print("watchdog capabilities: --beat needs exactly one --rung", file=sys.stderr)
+        return 2
+    head = args.head or channel.head_commit()
+    findings = []
+    for rung in rungs:
+        path = Path(args.beat) if args.beat else beat_path(rung)
+        findings.append(channel.capability_finding(rung, read_beat(path), head))
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "rung": finding.rung,
+                        "case": finding.case,
+                        "kind": finding.kind,
+                        "missing": list(finding.missing),
+                        "undeclared": list(finding.undeclared),
+                        "detail": finding.detail,
+                        "remediation": finding.remediation,
+                    }
+                    for finding in findings
+                ],
+                indent=2,
+            )
+        )
+    else:
+        for finding in findings:
+            print(channel.capability_line(finding))
+    if any(finding.missing or finding.kind == channel.KIND_DOWN for finding in findings):
+        return 1
+    if any(finding.kind == channel.KIND_UNKNOWN for finding in findings):
+        return 2
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-watchdog", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="one watchdog pass (the cron entry point)")
     run.add_argument("--force", action="store_true", help="respawn the loop rungs even when healthy")
     run.set_defaults(func=lambda args: watchdog_once(args.force))
+    caps = sub.add_parser(
+        "capabilities",
+        help="report the declared capabilities each rung does not implement",
+    )
+    caps.add_argument(
+        "--rung",
+        choices=channel.CAPABILITY_RUNGS,
+        action="append",
+        help="a rung (repeatable; default: every supervised rung)",
+    )
+    caps.add_argument("--beat", help="read this beat instead of the live one (needs exactly one --rung)")
+    caps.add_argument("--head", help="compare against this commit instead of HEAD (the gate pins a sha)")
+    caps.add_argument("--json", action="store_true", help="machine-readable output")
+    caps.set_defaults(func=cmd_capabilities)
     return parser
 
 
