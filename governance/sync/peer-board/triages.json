@@ -1,0 +1,47 @@
+{
+  "schema": "ao.sync/peer-triage-v1",
+  "note": "The authored dispositions (issue #427). Every item the pass surfaces must carry one of track-here / direction / no-action: an item with no disposition is a finding, never silence. Anything adopted from a peer carries provenance (repo + issue + sha). Direction issues are reported, never filed by the pass.",
+  "items": {
+    "kushin77/CMR#864": {
+      "disposition": "direction",
+      "reason": "The board-sync and its trigger live in the hub; only the hub can wire them. Hand off as a direction issue on kushin77/CMR's board.",
+      "direction": {
+        "target_repo": "kushin77/CMR",
+        "title": "Wire and schedule the SPoG board-sync",
+        "labels": ["cmr:direction"],
+        "ref": "CMR:SYNC-0001",
+        "status": "held(guard)",
+        "body": "Direction recorded by kushin77/agent-orchestrator issue #427; the hub owns the wiring and the schedule."
+      },
+      "provenance": {
+        "repo": "kushin77/CMR",
+        "issue": 864,
+        "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+      }
+    },
+    "kushin77/CMR#865": {
+      "disposition": "track-here",
+      "reason": "The one-directional board sync is the gap this repo's #427 pass closes on its own half: a scheduled peer-board triage that reports direction back down.",
+      "local_issue": 427,
+      "provenance": {
+        "repo": "kushin77/CMR",
+        "issue": 865,
+        "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+      }
+    },
+    "kushin77/CMR#867": {
+      "disposition": "track-here",
+      "reason": "The missing unattended trigger is owned here: cron runs the pass this repo already owns, so the peer item is consumed by #427's schedule rather than by the hub.",
+      "local_issue": 427,
+      "provenance": {
+        "repo": "kushin77/CMR",
+        "issue": 867,
+        "sha": "b2c3d4e5f60718293a4b5c6d7e8f9012345678a1"
+      }
+    },
+    "kushin77/deepseek#53": {
+      "disposition": "no-action",
+      "reason": "Informational: the peer follows an already-landed seam and expects no local change, so there is no half for this repo to track."
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "kushin77/agent-orchestrator#370",
+  "owner": "session-ae3700000000000000",
+  "status": "done",
+  "blocked_by": [],
+  "goal": "#4",
+  "evidence": [
+    "bash scripts/check-paperclip-integration.sh -> OK",
+    "make verify -> PASS"
+  ]
+}

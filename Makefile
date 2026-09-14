@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity agent-identity-parity paperclip-adapter \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -273,6 +273,16 @@ gateway-catalog-parity:
 ## and requires each mutant to be refused, so it cannot pass vacuously
 agent-identity-parity:
 	@bash scripts/check-agent-identity-parity.sh
+
+## guardrail-controls — server-side guardrail control semantics (issue #343):
+## every control defaults OFF, an unknown control is refused, a toggle writes
+## exactly one append-only audit record and flips observable state a second
+## reader sees, the Portkey-style 246 PASSED / 446 BLOCKED vocabulary is closed,
+## and a control that ships ON is refused (self-mutating negative control), so
+## it cannot pass vacuously
+guardrail-controls:
+	@bash scripts/check-guardrail-controls.sh
+
 
 ## fleet-state — unified fleet-state projection (issue #323): one read-only
 ## command joins lanes, session heartbeats, closure journals, claims and

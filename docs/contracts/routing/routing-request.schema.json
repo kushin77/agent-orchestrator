@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/docs/contracts/routing/routing-request.schema.json",
+  "title": "Routing seam request contract (caller -> routing authority)",
+  "description": "The frozen INPUT half of the routing seam (issue #426, ADR-0015). The caller asks the routing authority for a decision about one unit of work; the authority is gateway/sme-routing (the RoutingPolicy port implementation), which owns every decision and policy field on the other side of this seam. Every field here is written by exactly one side: the caller. Field names align with the live authority where one exists (task_type is the router's task 'type'; complexity is the router's 0..100 'complexity'; tier is the tier the caller requests or floors at). See docs/contracts/routing/README.md and docs/decision-records/ADR-0015-routing-seam-single-authority.md.",
+  "type": "object",
+  "required": ["task_type", "complexity", "capability", "tier"],
+  "additionalProperties": false,
+  "properties": {
+    "task_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The kind of work, used to select a route. The live authority reads this as the router task 'type' and resolves it against the declared route-policy dispatch_defaults / tier-policy task_overrides (doc_update, audit, script_fix, config_change, code_review, ...). An undeclared type takes the declared fail-safe route; it is never silently cheap."
+    },
+    "complexity": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "The caller's 0..100 difficulty estimate for the work. The authority compares it against the declared complexity_to_tier bands; the caller never picks the tier from it (the band map is a policy field the authority owns)."
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The capability the work requires (the registry capability id, e.g. code-author, test-author, research, docs-authoring). Capability resolution selects the worker; it is an input to the decision, not a field the caller may resolve to a tier itself."
+    },
+    "tier": {
+      "enum": ["flash", "pro", "auditor"],
+      "description": "The tier the caller requests or floors at. The request is a floor, never a ceiling: the authority may raise it (escalation, security/IaC floor) but never silently lower it below the declared floor. The effective tier is the authority's output field 'tier' in routing-decision.schema.json."
+    }
+  }
+}
