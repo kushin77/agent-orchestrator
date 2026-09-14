@@ -75,6 +75,19 @@ checks=(
   # refuse every negative control by name (incl. 403-not-404); the check runs
   # the boundary suite and provokes each refusal, so it cannot pass vacuously.
   'paperclip-auth|bash scripts/check-paperclip-auth.sh'
+  # EPIC-410 paperclip parity adapters (issue #420, the wiring lane): the six
+  # adapter gates below are registered here deliberately — a check that only
+  # runs when someone remembers to run it is a formality, not a gate. Each
+  # carries its own self-mutating negative control (a scratch-copy mutant the
+  # gate must refuse BY NAME, so it cannot pass vacuously) and each subject
+  # adapter's pytest suite is declared in scripts/pytest-suites.txt so `make
+  # gate` runs it in isolation.
+  'paperclip-approvals|bash scripts/check-paperclip-approvals.sh'
+  'paperclip-deploy|bash scripts/check-paperclip-deploy.sh'
+  'paperclip-heartbeat|bash scripts/check-paperclip-heartbeat.sh'
+  'paperclip-openapi|bash scripts/check-paperclip-openapi.sh'
+  'paperclip-secrets|bash scripts/check-paperclip-secrets.sh'
+  'paperclip-skills|bash scripts/check-paperclip-skills.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
