@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T21:24:51Z",
+  "generated_at": "2026-09-14T20:02:35Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1965,6 +1965,133 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 445,
+      "title": "Ecosystem module registry + state federation \u2014 one view of every module (mandatory status, pin, health, consumer assets)",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:board",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 422,
+      "blocked_by": [
+        423
+      ],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T17:09:22Z"
+    },
+    {
+      "number": 447,
+      "title": "Reporting agent: the paperclip persona composes each mandatory module's distributable brief",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:agent-profiles",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 422,
+      "blocked_by": [
+        445
+      ],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T17:12:47Z"
+    },
+    {
+      "number": 502,
+      "title": "Wire the conversational-surface gates into the gate of record",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501
+      ],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T16:25:03Z"
+    },
+    {
+      "number": 524,
+      "title": "EPIC: the gate of record exercises 4 of 71 declared suites \u2014 the e2e capstone Definition-of-Done proof is not in make verify",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T15:58:10Z"
+    },
+    {
+      "number": 555,
+      "title": "RC-4: Exactly-once control, with the audit record and the refusal path",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        554
+      ],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T17:52:33Z"
+    },
+    {
+      "number": 559,
+      "title": "RC-8: Gate wiring + docs index \u2014 sole writer of the shared build files",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:command-center",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        553,
+        554,
+        555,
+        556,
+        557
+      ],
+      "cross_refs": [],
       "closed_at": ""
     }
   ]
