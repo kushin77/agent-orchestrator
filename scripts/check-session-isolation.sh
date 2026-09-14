@@ -14,7 +14,15 @@
 #     trailer, wrong session signature, non-lane branch, signature leaked into
 #     the shared config, worktree-scoped identity unavailable) and must be
 #     detected by name. A check whose pass and fail paths collapse is a
-#     formality.
+#     formality;
+#   * the trailer rule is POSITIONAL, not a substring test — a commit whose only
+#     reference is in the subject line, and one whose reference sits in a prose
+#     paragraph, are each provoked for real and must be refused by name (issue
+#     #287, measured on the real commits `6d89618` and `576edce`);
+#   * the predicate is SINGLE-SOURCED — the audit delegates it to the
+#     PR-contract gate (issue #288) instead of carrying a second copy, and the
+#     finding it quotes for a commit is the finding that gate itself prints for
+#     that commit. Two implementations of one rule disagree silently.
 #
 # It also pins that the execution loop provisions through this module, so the
 # isolation is applied to dispatched agents rather than only available to them.
@@ -30,6 +38,8 @@ cd "$root" || exit 2
 cli="governance/isolation/cli.py"
 terminal="fleet/terminal.py"
 suites="scripts/pytest-suites.txt"
+#: The one implementation of the trailing-trailer predicate (issue #288).
+predicate="scripts/check-pr-contract.sh"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "check-session-isolation: CANNOT-ASSESS — python3 not found" >&2
@@ -100,6 +110,19 @@ else
   fail=$((fail + 1))
 fi
 
+# --- 2b. one rule, one implementation ---------------------------------------
+# The audit must ASK the PR-contract gate's predicate, not carry a second copy
+# of it: two implementations of one rule disagree silently, and the weaker one
+# is the one that lets a commit through. The equivalence control for the same
+# commit follows the position controls in section 3.
+trailer_module="governance/isolation/trailer.py"
+if [ ! -f "$trailer_module" ] || ! grep -qF -- "$predicate" "$trailer_module"; then
+  echo "  FAIL  $trailer_module does not delegate the trailer predicate to $predicate" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    the trailer predicate is delegated to $predicate (one implementation, not two)"
+fi
+
 # --- 3. the mechanism, exercised for real in a scratch repository -----------
 work="/tmp/session-isolation.$$.$(date +%s)"
 if ! mkdir -p "$work/repo" 2>/dev/null; then
@@ -155,7 +178,7 @@ expect_ok() { # expect_ok <label> <session>
   fi
 }
 
-expect_fail() { # expect_fail <label> <session> <expected-violation-code>
+expect_fail() { # expect_fail <label> <session> <expected-code> [<also-named-finding>]
   local output rc
   output="$(python3 "$cli" audit --main "$scratch" --session "$2" 2>&1)"
   rc=$?
@@ -166,8 +189,12 @@ expect_fail() { # expect_fail <label> <session> <expected-violation-code>
     echo "  FAIL  $1 (audit failed without naming $3)" >&2
     printf '%s\n' "$output" | sed 's/^/        /' >&2
     fail=$((fail + 1))
+  elif [ -n "${4:-}" ] && ! printf '%s' "$output" | grep -qF -- "$4"; then
+    echo "  FAIL  $1 (audit named $3 but never quoted the predicate's own finding $4)" >&2
+    printf '%s\n' "$output" | sed 's/^/        /' >&2
+    fail=$((fail + 1))
   else
-    echo "  OK    $1 (audit refused: $3)"
+    echo "  OK    $1 (audit refused: $3${4:+, and named $4})"
   fi
 }
 
@@ -282,6 +309,40 @@ expect_fail "a worktree signing as another session is refused" "$c_sid" "identit
 read -r d_sid d_wt < <(lane_session 266 gate-agent foundation)
 git -C "$d_wt" checkout -q -b not-a-ticket-branch >/dev/null 2>&1
 expect_fail "a lane checked out off its issue branch is refused" "$d_sid" "branch-mismatch"
+
+# Lane G — the ticket reference is in the SUBJECT line only. The rule is
+# positional: a subject is not a trailer block, so a substring test would accept
+# this commit while the rule refuses it. This is the measured shape of the real
+# commits `6d89618` and `576edce` (issue #287).
+read -r g_sid g_wt < <(lane_session 269 gate-agent foundation)
+echo "subject-only.txt" > "$g_wt/subject-only.txt"
+git -C "$g_wt" add subject-only.txt >/dev/null 2>&1
+git -C "$g_wt" commit -q -m "Refs kushin77/agent-orchestrator#269: the ref is only in the subject" >/dev/null 2>&1
+expect_fail "a reference only in the subject line is refused" "$g_sid" \
+  "commit-missing-ticket-trailer" "commit-ref-only-in-subject"
+
+# The audit's verdict must BE the shared gate's verdict for the same commit —
+# one rule with two surfaces, not two rules that happen to agree today.
+g_sha="$(git -C "$g_wt" rev-parse HEAD 2>/dev/null)"
+gate_out="$(bash "$predicate" --repo "$scratch" --landed --range "$g_sha^..$g_sha" --enforcement-gate "$g_sha^" 2>&1)"
+if printf '%s' "$gate_out" | grep -qF -- "commit-ref-only-in-subject:${g_sha:0:12}"; then
+  echo "  OK    $predicate names the same defect: commit-ref-only-in-subject:${g_sha:0:12}"
+else
+  echo "  FAIL  $predicate did not name commit-ref-only-in-subject:${g_sha:0:12} for the same commit" >&2
+  printf '%s\n' "$gate_out" | sed 's/^/        /' >&2
+  fail=$((fail + 1))
+fi
+
+# Lane H — the reference sits in a PROSE paragraph, not in the trailing block
+# (a substring test accepts this too).
+read -r h_sid h_wt < <(lane_session 270 gate-agent foundation)
+echo "prose.txt" > "$h_wt/prose.txt"
+git -C "$h_wt" add prose.txt >/dev/null 2>&1
+git -C "$h_wt" commit -q -m "work on prose.txt" \
+  -m "The change is tracked as Refs kushin77/agent-orchestrator#270 in prose." \
+  -m "Co-authored-by: gate <gate@example.invalid>" >/dev/null 2>&1
+expect_fail "a reference buried in prose is refused" "$h_sid" \
+  "commit-missing-ticket-trailer" "commit-ref-outside-the-trailer-block"
 
 # Lane E — the lane's signature leaked into the shared config, where every other
 # lane would inherit it. Done last-but-one: it makes the shared config agent-owned.
