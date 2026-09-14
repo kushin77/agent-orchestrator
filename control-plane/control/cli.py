@@ -53,7 +53,7 @@ SOURCES: dict[str, set[str]] = {
     "fleet/channel.py": {
         "verify", "send", "status", "report", "wait", "watch", "escalate",
         "listen", "order", "brain-inbox", "brain-outbox", "head-commit",
-        "consume",
+        "consume", "log", "follow", "kb", "steer",
     },
     "governance/dispatch/cli.py": {
         "audit", "eligible", "claim", "release", "status", "held", "reap",

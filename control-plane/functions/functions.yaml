@@ -481,6 +481,56 @@ functions:
     flags: [surfaces.remote_control]
     roles: [VP-Eng, Manager]
 
+  # -- live debug observability (#367) -------------------------------------
+  - id: STREAM
+    title: "Read a directive's live log stream"
+    kind: view
+    endpoints: [channel/log]
+    parameters:
+      - {name: directive, type: string, required: true, default: null}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: FOLLOW
+    title: "Tail a directive's live log stream"
+    kind: view
+    endpoints: [channel/follow]
+    parameters:
+      - {name: directive, type: string, required: true, default: null}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: KB
+    title: "Query the knowledge index"
+    kind: view
+    endpoints: [channel/kb]
+    parameters:
+      - {name: query, type: string, required: true, default: null}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: STEER
+    title: "Steer a running run mid-flight"
+    kind: command
+    endpoints: [channel/steer]
+    parameters:
+      - {name: directive, type: string, required: true, default: null}
+      - {name: body, type: string, required: false, default: null}
+    scope: {capability: fleet:steer, level: org, tenant: platform}
+    effect_class: hold
+    audit: channel.steer
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
   # -- board commands -------------------------------------------------------
   - id: CLAIM
     title: "Claim an issue before working it"
