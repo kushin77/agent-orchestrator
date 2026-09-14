@@ -35,6 +35,13 @@ if str(ROOT) not in sys.path:
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
 from governance.lifecycle.closeout import CloseOutResult, closeout, describe  # noqa: E402
 from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
+from governance.lifecycle.report import (  # noqa: E402
+    DEDUPED,
+    FILED,
+    BoardReporter,
+    GhFiler,
+    board_report_findings,
+)
 
 EXIT_OK = 0
 EXIT_NOT_OK = 1
@@ -45,6 +52,22 @@ BASELINE = Path("governance/lifecycle/baseline.json")
 
 CLOSE_PATTERN = re.compile(r"(?:closes|fixes|resolves)\s+#(\d+)", re.IGNORECASE)
 BRANCH_PATTERN = re.compile(r"^issue-(\d+)")
+
+
+def _reporter() -> BoardReporter:
+    """The board-reporting seam for this repo (issue #321), dry-run gated by
+    each command's own ``--apply`` flag."""
+    return BoardReporter(GhFiler(), ledger=ROOT / ".fleet" / "board-reports.json")
+
+
+def _print_board_reports(reports: list) -> None:
+    for board_report in reports:
+        if board_report.action == FILED:
+            print(f"board: filed #{board_report.number} for {board_report.key}")
+        elif board_report.action == DEDUPED:
+            print(f"board: already filed (#{board_report.number}) for {board_report.key}")
+        else:
+            print(f"board: dry-run — would file for {board_report.key}")
 
 
 def _git(*args: str) -> str:
@@ -345,6 +368,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
     if report["hygienic"]:
         print(f"lifecycle-hygiene: OK ({report['items']} item(s), 0 finding(s))")
         return EXIT_OK
+    findings = audit(record, quarantine)
+    board_reports = board_report_findings(findings, _reporter(), apply=args.apply)
+    if not args.json:
+        _print_board_reports(board_reports)
     print(f"lifecycle-hygiene: FAIL ({len(report['findings'])} finding(s))", file=sys.stderr)
     return EXIT_NOT_OK
 
@@ -365,8 +392,11 @@ def cmd_close(args: argparse.Namespace) -> int:
     if item is None:
         print(f"close: CANNOT-ASSESS — #{args.issue} is outside the audit scope", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
-    result: CloseOutResult = closeout(item, GhOps(), evidence=args.evidence)
+    result: CloseOutResult = closeout(
+        item, GhOps(), evidence=args.evidence, reporter=_reporter(), apply=args.apply
+    )
     print(describe(result))
+    _print_board_reports(result.board_reports)
     return EXIT_OK if result.ok else EXIT_NOT_OK
 
 
@@ -387,6 +417,7 @@ def build_parser() -> argparse.ArgumentParser:
     audit_cmd.add_argument("--record", default="", help="read a recorded lifecycle document instead of collecting live")
     audit_cmd.add_argument("--baseline", default="", help="the legacy quarantine to honour (default: the repo's)")
     audit_cmd.add_argument("--json", action="store_true")
+    audit_cmd.add_argument("--apply", action="store_true", help="file findings on the board (default: dry-run)")
     audit_cmd.set_defaults(func=cmd_audit)
 
     status_cmd = sub.add_parser("status", help="where one item sits, and what it still owes")
@@ -396,6 +427,7 @@ def build_parser() -> argparse.ArgumentParser:
     close_cmd = sub.add_parser("close", help="drive one item to hygiene, in dependency order")
     close_cmd.add_argument("--issue", type=int, required=True)
     close_cmd.add_argument("--evidence", default="", help="the evidence to record when closing")
+    close_cmd.add_argument("--apply", action="store_true", help="file remaining findings on the board (default: dry-run)")
     close_cmd.set_defaults(func=cmd_close)
 
     collect_cmd = sub.add_parser("collect", help="write the live lifecycle record")
