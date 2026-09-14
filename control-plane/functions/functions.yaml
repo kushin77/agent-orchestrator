@@ -1,0 +1,601 @@
+# control-plane/functions/functions.yaml
+#
+# THE ONE DECLARATION OF EVERY COCKPIT FUNCTION (issue #565, RC-10 of #551).
+#
+# ADR-0026 D9 fixes the shape and decision 10 is the mandate: adding a domain --
+# FinOps, SLO, audit, tickets, paperclip -- is a DECLARATION here, never a fork of
+# the cockpit client. This file is the extensibility contract: the closed
+# catalogue of the panels the cockpit renders, the views it offers and the
+# commands the operator types, each declared exactly once.
+#
+# NOTHING HERE IS RE-DECLARED. This registry CONSUMES the authorities that
+# already exist, and the gate proves each one is the live article:
+#
+#   * effect classes, capabilities, and every verb a function binds
+#     -> control-plane/control/verbs.yaml            (RC-2, issue #553)
+#   * the API endpoint set a function may bind
+#     -> portal/server/control_api.py                (RC-3, issue #554)
+#   * the live streams a function may subscribe to
+#     -> portal/server/fleet.py, portal/server/live_feed.py
+#   * the scope levels a function may require
+#     -> identity/rbac/model.py; the control path's org -> fleet_authz.PLATFORM_ORG
+#   * the feature flags a function names
+#     -> infra/feature-flags/registry.yaml
+#   * the panels the existing cockpit renders
+#     -> fleet/console.py (rendered headlessly by the gate, section by section)
+#
+# A function carries: a stable id (the operator-typed mnemonic), a title, the
+# endpoints it binds, its parameters, its scope requirement (capability + tenant
+# scope), its effect class -- RC-2's vocabulary, not a second one -- the stream it
+# subscribes to when it is live, and the roles it is designed for.
+#
+# ROLE SUITABILITY IS ADDITIVE FILTERING ONLY (ADR-0026 decision 9). `roles` says
+# who a function is DESIGNED FOR; it never says who is PERMITTED. Permission stays
+# where it already lives (`identity/rbac`, via the capability in `scope`), and the
+# gate fails if role information ever appears inside a function's scope block.
+
+schema: cmr.cockpit-functions/v1
+
+# ---------------------------------------------------------------------------
+# The closed kinds. What a function IS to the operator.
+# ---------------------------------------------------------------------------
+# panel    a section of the rendered frame, refreshed in place
+# view     a read-only screen over a projection
+# command  something the operator types that can change fleet state
+kinds:
+  panel: "a section of the rendered frame"
+  view: "a read-only screen over a projection"
+  command: "an operator-typed action; its effect class is RC-2's"
+
+# ---------------------------------------------------------------------------
+# The closed parameter types. A parameter with no type is a defect.
+# ---------------------------------------------------------------------------
+parameter_types:
+  string: "free text"
+  integer: "a whole number"
+  number: "a number (integer or fractional)"
+  boolean: "true/false (a flag)"
+  enum: "one of the closed `values` list"
+
+# ---------------------------------------------------------------------------
+# The closed role set (ADR-0026 D8: role tiers are views, never products).
+# ---------------------------------------------------------------------------
+roles:
+  CTO: "the whole fleet, and the irreversible verbs"
+  VP-Eng: "rungs, dispatch, recovery, closure"
+  Manager: "day-to-day rung and board state"
+  Analyst: "ledgers, events and read-only evidence"
+
+# ---------------------------------------------------------------------------
+# What this registry consumes (verified by the gate against the live article).
+# ---------------------------------------------------------------------------
+consumes:
+  verbs: control-plane/control/verbs.yaml
+  transport: portal/server/control_api.py
+  scopes: identity/rbac/model.py
+  flags: infra/feature-flags/registry.yaml
+  cockpit: fleet/console.py
+  streams:
+    fleet_projection: portal/server/fleet.py
+    telemetry_live_feed: portal/server/live_feed.py
+
+# ---------------------------------------------------------------------------
+# The panels the existing cockpit renders, by function.
+# ---------------------------------------------------------------------------
+# The key is the section title `fleet/console.py` renders (the gate derives the
+# set by rendering that module headlessly, so a new section there is a FAILURE
+# naming the panel here until it is declared). The value is the function that
+# owns it. Both directions are checked: a rendered panel with no function, and a
+# function that no longer exists, are each a defect.
+renders:
+  HEADER: HEADER
+  RUNGS: RUNGS
+  ORDERS: ORDERS
+  DISPATCHES: DISPATCHES
+  LIVE CLAIMS: CLAIMS
+  WAVES: WAVES
+  RECENT EVENTS: EVENTS
+  WATCHDOG: WATCHDOG
+
+# ---------------------------------------------------------------------------
+# The functions.
+# ---------------------------------------------------------------------------
+# id          the operator-typed mnemonic (Bloomberg-function style, upper case)
+# endpoints   the API endpoints it binds, `<family>/<action>`, each of which
+#             must resolve in RC-3's declared route set and be exposed there
+# stream      the live surface it subscribes to, if it is live
+# parameters  name, type, required, default (null = "the lever's own default")
+# scope       capability (from RC-2) + level (from identity/rbac) + tenant
+# effect_class read | hold | stop | irreversible -- RC-2's closed set
+# audit       null for a read, the recorded action for anything else (RC-2 rule)
+# flags       every feature flag the function's visibility depends on
+# roles       DESIGNED FOR -- additive filtering only, never permission
+functions:
+  # -- the panels the cockpit already renders -------------------------------
+  - id: HEADER
+    title: "Fleet header — repo, session, HEAD and uptime"
+    kind: panel
+    endpoints: [fleet/status]
+    parameters: []
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: RUNGS
+    title: "Rungs — every resident rung, its beat and its state"
+    kind: panel
+    endpoints: [fleet/status]
+    stream: fleet_projection
+    parameters: []
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control, surfaces.fleet_projection]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: ORDERS
+    title: "Orders — operator to brain, and the brain's replies"
+    kind: panel
+    endpoints: [channel/brain-outbox]
+    parameters:
+      - {name: limit, type: integer, required: false, default: 10}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: DISPATCHES
+    title: "Dispatches — brain to operator acknowledgements"
+    kind: panel
+    endpoints: [channel/listen]
+    stream: telemetry_live_feed
+    parameters:
+      - {name: timeout-seconds, type: number, required: false, default: 0.0}
+      - {name: interval, type: number, required: false, default: 1.0}
+      - {name: max-messages, type: integer, required: false, default: 0}
+      - {name: from-start, type: boolean, required: false, default: false}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control, surfaces.telemetry_live_feed]
+    roles: [VP-Eng, Manager, Analyst]
+
+  - id: CLAIMS
+    title: "Live claims — who holds which issue, and whether it is held"
+    kind: panel
+    endpoints: [board/status, board/held]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: WAVES
+    title: "Waves — the wave plan and whether the next item is eligible"
+    kind: panel
+    endpoints: [board/status, board/eligible]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: agent, type: string, required: false, default: agent}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: EVENTS
+    title: "Recent events — the slog tail, live where the feed is on"
+    kind: panel
+    endpoints: [channel/listen]
+    stream: telemetry_live_feed
+    parameters:
+      - {name: timeout-seconds, type: number, required: false, default: 0.0}
+      - {name: max-messages, type: integer, required: false, default: 0}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control, surfaces.telemetry_live_feed]
+    roles: [VP-Eng, Analyst]
+
+  - id: WATCHDOG
+    title: "Watchdog — session reconciliation and orphan verdicts"
+    kind: panel
+    endpoints: [recover/status]
+    parameters:
+      - {name: ttl-minutes, type: number, required: false, default: null}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [VP-Eng, Manager]
+
+  # -- views ----------------------------------------------------------------
+  - id: VERBS
+    title: "Vocabulary — the closed control-verb set the API serves"
+    kind: view
+    endpoints: [fleet/verbs]
+    parameters: []
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: SCHEDULE
+    title: "Schedule — the host cron table the fleet runs on"
+    kind: view
+    endpoints: [fleet/cron]
+    parameters:
+      - {name: cron-args, type: string, required: false, default: null}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Analyst]
+
+  - id: HEALTH
+    title: "Health — rung liveness and staleness"
+    kind: view
+    endpoints: [fleet/health]
+    parameters:
+      - {name: stale-minutes, type: number, required: false, default: 30.0}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: BOARD
+    title: "Board — milestone, frontier, live claims and the claim ledger"
+    kind: view
+    endpoints: [board/status, board/held, board/eligible, board/audit]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: agent, type: string, required: false, default: agent}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: LEDGER
+    title: "Ledger — the audit rails, read-only"
+    kind: view
+    endpoints: [board/audit, closure/audit, closure/status]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: record, type: string, required: false, default: ""}
+      - {name: baseline, type: string, required: false, default: ""}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, Analyst]
+
+  - id: CLOSURE
+    title: "Closure — what each item still owes before it is terminal"
+    kind: view
+    endpoints: [closure/status, closure/collect]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: out, type: string, required: true, default: null}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Analyst]
+
+  - id: RECOVER
+    title: "Recover — every session and its orphan verdict"
+    kind: view
+    endpoints: [recover/status]
+    parameters:
+      - {name: ttl-minutes, type: number, required: false, default: null}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [VP-Eng, Manager]
+
+  - id: CHANNEL
+    title: "Channel — mailbox counts on the steering transport"
+    kind: view
+    endpoints: [channel/status]
+    parameters: []
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: WATCH
+    title: "Watch — follow a rung's state without attaching to the host"
+    kind: view
+    endpoints: [fleet/watch, fleet/status]
+    stream: fleet_projection
+    parameters: []
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control, surfaces.fleet_projection]
+    roles: [VP-Eng, Manager]
+
+  - id: LOG
+    title: "Log — tail one rung's log"
+    kind: view
+    endpoints: [fleet/debug]
+    stream: telemetry_live_feed
+    parameters:
+      - {name: tail, type: integer, required: false, default: 20}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control, surfaces.telemetry_live_feed]
+    roles: [VP-Eng, Analyst]
+
+  # -- rung lifecycle commands ---------------------------------------------
+  - id: START
+    title: "Start a rung"
+    kind: command
+    endpoints: [fleet/start]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: hold
+    audit: fleet.start
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: PAUSE
+    title: "Pause a rung, keeping its run state"
+    kind: command
+    endpoints: [fleet/pause]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: hold
+    audit: fleet.pause
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: RESUME
+    title: "Resume a paused rung"
+    kind: command
+    endpoints: [fleet/resume]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: hold
+    audit: fleet.resume
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: REFRESH
+    title: "Re-materialise a rung (refresh, update, poke)"
+    kind: command
+    endpoints: [fleet/refresh, fleet/update, fleet/poke]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: hold
+    audit: fleet.refresh
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: STOP
+    title: "Stop a rung gracefully"
+    kind: command
+    endpoints: [fleet/stop]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: stop
+    audit: fleet.stop
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+
+  - id: KILL
+    title: "Kill a rung without a graceful drain"
+    kind: command
+    endpoints: [fleet/kill]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: stop
+    audit: fleet.kill
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+
+  - id: RESTART
+    title: "Restart a rung"
+    kind: command
+    endpoints: [fleet/restart]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: stop
+    audit: fleet.restart
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+
+  - id: HALT
+    title: "Halt the whole fleet"
+    kind: command
+    endpoints: [fleet/halt]
+    parameters: []
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: stop
+    audit: fleet.halt
+    flags: [surfaces.remote_control]
+    roles: [CTO]
+
+  - id: OVERRIDE
+    title: "Operator override — persist an override against an issue"
+    kind: command
+    endpoints: [fleet/override]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: lane, type: string, required: false, default: null}
+      - {name: body, type: string, required: false, default: null}
+    scope: {capability: fleet:override, level: org, tenant: platform}
+    effect_class: irreversible
+    audit: fleet.override
+    flags: [surfaces.remote_control]
+    roles: [CTO]
+
+  # -- steering commands ----------------------------------------------------
+  - id: SEND
+    title: "Send a steering message"
+    kind: command
+    endpoints: [channel/send]
+    parameters:
+      - {name: message, type: string, required: true, default: null}
+    scope: {capability: fleet:steer, level: org, tenant: platform}
+    effect_class: hold
+    audit: channel.send
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: ORDER
+    title: "Order the brain (never the sister)"
+    kind: command
+    endpoints: [channel/order]
+    parameters:
+      - {name: message, type: string, required: true, default: null}
+    scope: {capability: fleet:steer, level: org, tenant: platform}
+    effect_class: hold
+    audit: channel.order
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: ESCALATE
+    title: "Escalate a problem to the brain"
+    kind: command
+    endpoints: [channel/escalate]
+    parameters:
+      - {name: from, type: string, required: true, default: null}
+      - {name: correlation, type: string, required: true, default: null}
+      - {name: severity, type: enum, required: true, default: null, values: [info, warn, critical]}
+      - {name: body, type: string, required: false, default: null}
+    scope: {capability: fleet:steer, level: org, tenant: platform}
+    effect_class: hold
+    audit: channel.escalate
+    flags: [surfaces.remote_control]
+    roles: [VP-Eng, Manager]
+
+  # -- board commands -------------------------------------------------------
+  - id: CLAIM
+    title: "Claim an issue before working it"
+    kind: command
+    endpoints: [board/claim]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: agent, type: string, required: true, default: null}
+      - {name: lane, type: string, required: false, default: ""}
+      - {name: ttl-hours, type: integer, required: false, default: null}
+      - {name: base-commit, type: string, required: false, default: ""}
+      - {name: directive, type: string, required: false, default: ""}
+    scope: {capability: board:claim, level: org, tenant: platform}
+    effect_class: hold
+    audit: board.claim
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: RELEASE
+    title: "Release a claim"
+    kind: command
+    endpoints: [board/release]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: agent, type: string, required: true, default: null}
+    scope: {capability: board:claim, level: org, tenant: platform}
+    effect_class: hold
+    audit: board.release
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
+  - id: SNAPSHOT
+    title: "Refresh the board snapshot from GitHub"
+    kind: command
+    endpoints: [board/snapshot]
+    parameters:
+      - {name: from-github, type: boolean, required: false, default: false}
+      - {name: repo, type: string, required: false, default: kushin77/agent-orchestrator}
+      - {name: out, type: string, required: false, default: null}
+    scope: {capability: board:admin, level: org, tenant: platform}
+    effect_class: hold
+    audit: board.snapshot
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Analyst]
+
+  - id: REAP
+    title: "Reap claims wedged by dead agents"
+    kind: command
+    endpoints: [board/reap]
+    parameters:
+      - {name: older-than-minutes, type: integer, required: false, default: null}
+      - {name: issue, type: integer, required: false, default: null}
+      - {name: reaper, type: string, required: false, default: brain}
+    scope: {capability: board:admin, level: org, tenant: platform}
+    effect_class: stop
+    audit: board.reap
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+
+  # -- orphan reconciliation ------------------------------------------------
+  - id: SWEEP
+    title: "One reconciliation pass over orphaned sessions"
+    kind: command
+    endpoints: [recover/sweep]
+    parameters:
+      - {name: ttl-minutes, type: number, required: false, default: null}
+      - {name: apply, type: boolean, required: false, default: false}
+    scope: {capability: fleet:recover, level: org, tenant: platform}
+    effect_class: stop
+    audit: recover.sweep
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+
+  - id: STAMP
+    title: "Stamp a session heartbeat"
+    kind: command
+    endpoints: [recover/stamp]
+    parameters:
+      - {name: session, type: string, required: true, default: null}
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: agent, type: string, required: true, default: null}
+      - {name: lane, type: string, required: false, default: ""}
+      - {name: worktree, type: string, required: false, default: ""}
+      - {name: branch, type: string, required: false, default: ""}
+      - {name: pid, type: integer, required: false, default: null}
+      - {name: note, type: string, required: false, default: ""}
+    scope: {capability: fleet:recover, level: org, tenant: platform}
+    effect_class: hold
+    audit: recover.stamp
+    flags: [surfaces.remote_control]
+    roles: [VP-Eng]
+
+  - id: CLEAR
+    title: "Clear a session heartbeat"
+    kind: command
+    endpoints: [recover/clear]
+    parameters:
+      - {name: session, type: string, required: true, default: null}
+    scope: {capability: fleet:recover, level: org, tenant: platform}
+    effect_class: hold
+    audit: recover.clear
+    flags: [surfaces.remote_control]
+    roles: [VP-Eng]
+
+  # -- closure --------------------------------------------------------------
+  - id: CLOSE
+    title: "Drive one item to hygienic closure"
+    kind: command
+    endpoints: [closure/close]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: evidence, type: string, required: false, default: ""}
+      - {name: apply, type: boolean, required: false, default: false}
+    scope: {capability: board:close, level: org, tenant: platform}
+    effect_class: irreversible
+    audit: closure.close
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]

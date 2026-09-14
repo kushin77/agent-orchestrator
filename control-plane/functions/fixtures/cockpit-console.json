@@ -1,0 +1,17 @@
+{
+  "why": "The fixture snapshot `fleet/console.py` renders. Not decoration: the gate DERIVES the panel set by rendering this snapshot headlessly, so a section added to the cockpit is an UNDECLARED-PANEL failure until it is declared in functions.yaml.",
+  "snapshot": {
+    "repo": "kushin77/agent-orchestrator",
+    "head": "3bd6bf1",
+    "now": "2026-09-14T00:00:00Z",
+    "uptime": "up 1h",
+    "rungs": {},
+    "orders": {},
+    "dispatches": [],
+    "claims": [],
+    "waves": [],
+    "events": [],
+    "watchdog": [],
+    "closed": []
+  }
+}

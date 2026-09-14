@@ -1,0 +1,10 @@
+{
+  "why": "The closed outcome set every fixture must use. A fifth outcome is not renderable, which is how a panel would end up silently empty.",
+  "closed": ["ok", "no_data", "disabled", "error"],
+  "meanings": {
+    "ok": "the read returned data; render it",
+    "no_data": "the source reports absence of data; render absence, never a green state",
+    "disabled": "the surface's feature flag is off; render the absence AND name the flag",
+    "error": "the read failed; render the failure with its reason, never an empty panel"
+  }
+}

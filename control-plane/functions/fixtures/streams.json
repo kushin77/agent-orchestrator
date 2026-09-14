@@ -1,0 +1,13 @@
+{
+  "why": "One real frame per declared live surface. The gate cross-checks the event name each frame carries against the SSE_EVENT constant of the module that serves that surface, so the registry cannot cite a stream event name that no server sends.",
+  "frames": {
+    "fleet_projection": {
+      "module": "portal/server/fleet.py",
+      "frame": "event: snapshot\ndata: {\"repo\": \"kushin77/agent-orchestrator\", \"rungs\": {}}\n\n"
+    },
+    "telemetry_live_feed": {
+      "module": "portal/server/live_feed.py",
+      "frame": "event: telemetry\ndata: {\"kind\": \"dispatch\", \"callId\": \"c-1\"}\n\n"
+    }
+  }
+}
