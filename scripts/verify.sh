@@ -69,6 +69,12 @@ checks=(
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
   'paperclip-adapter|bash scripts/check-paperclip-integration-adapter.sh'
   'paperclip-canonical-module|bash scripts/check-paperclip-canonical-module.sh'
+  # paperclip-auth (issue #412, ADR-0013): the cross-boundary auth seam in
+  # integrations/paperclip/auth/ must mint/verify agent identity from the
+  # registry, map a human onto the board session path, bridge the run id, and
+  # refuse every negative control by name (incl. 403-not-404); the check runs
+  # the boundary suite and provokes each refusal, so it cannot pass vacuously.
+  'paperclip-auth|bash scripts/check-paperclip-auth.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
