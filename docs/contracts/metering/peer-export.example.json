@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "metering",
+  "identity": {
+    "tenantId": "acme",
+    "agentId": "deepseek-prober",
+    "runId": "deepseek-run-4410",
+    "recordId": "peer-8d20f5aa",
+    "sourceType": "gateway_record",
+    "sourceKey": "deepseek:usage:4410"
+  },
+  "quantity": {
+    "inputTokens": 300,
+    "outputTokens": 120,
+    "totalTokens": 420,
+    "costUsd": 0.0021,
+    "costSource": "attached",
+    "currency": "USD",
+    "metered": true,
+    "billable": true,
+    "cacheHit": false,
+    "unmeteredReason": null
+  },
+  "receipt": {
+    "ticket": "kushin77/deepseek#55",
+    "receipt": "deepseek:receipt:4410",
+    "evidence": "kushin77/deepseek#55 export run 4410 cost row"
+  },
+  "attribution": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "route": "deepseek-v4-pro",
+    "tier": "pro",
+    "taskClass": "telemetry_export",
+    "outcome": "ok",
+    "scope": { "level": "team", "id": "acme" },
+    "period": "month",
+    "cap": 50.0,
+    "spent": 0.0021,
+    "hardStop": true,
+    "burnRateAlertPct": 80
+  },
+  "claims": [
+    {
+      "kind": "cap",
+      "metric": "costUsd",
+      "value": 50.0,
+      "evidence": "kushin77/deepseek#29 budget policy acme limit"
+    }
+  ]
+}

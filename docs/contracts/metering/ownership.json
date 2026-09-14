@@ -1,0 +1,261 @@
+{
+  "contract": "metering-boundary",
+  "version": "1.0.0",
+  "title": "Metering/budget record ownership map (one writer per field)",
+  "description": "The machine-readable producer seam for the frozen metering/budget record shape (issue #425). For every canonical field of metering-record.schema.json this map names exactly ONE side that emits it \u2014 so 'the record shape exists but nothing produces it' (kushin77/deepseek#115) cannot recur silently. A field with no producer is unowned and is refused by name; a field with two producers is a second authority and is refused by name. scripts/check-metering-parity.sh reads this map with the schema and field-map.json and refuses either case.",
+  "sides": {
+    "fleet-metering": {
+      "where": "telemetry/metering/model.py (UsageRecord), intake.py, ratecards.py",
+      "emits": "the identity, measured-quantity and call-attribution fields of every absorbed model-call record"
+    },
+    "fleet-run-identity": {
+      "where": "governance/isolation/identity.py (minted session identity)",
+      "emits": "the run/session id stamped on every record the session produces"
+    },
+    "fleet-budget": {
+      "where": "telemetry/budgets/, gateway/finops/ (budget rail + chooser)",
+      "emits": "the budget scope, period, cap, spend, hard-stop and burn-rate attribution, and the cap/saving claims"
+    },
+    "fleet-paperclip-adapter": {
+      "where": "integrations/paperclip/budget.py (per-task budget adapter, #415)",
+      "emits": "the per-task receipt that ties spend to a ticket, and its evidence reference"
+    },
+    "peer-deepseek-export": {
+      "where": "kushin77/deepseek (telemetry export; kushin77/deepseek#55, #71, #30)",
+      "emits": "the peer export's own records, mapped onto this same shape"
+    },
+    "peer-ollama-budget": {
+      "where": "kushin77/ollama (context-window token budget; kushin77/ollama#199)",
+      "emits": "the second peer producer's budget records, mapped onto this same shape"
+    }
+  },
+  "peer": {
+    "repo": "kushin77/deepseek",
+    "issues": [
+      55,
+      71,
+      29,
+      30,
+      115,
+      106
+    ],
+    "third_producer": "kushin77/ollama#199 (token-budget enforcement at the context window)",
+    "role": "producer of their own records, mapped onto this shape \u2014 never an editor of this contract (NG4)"
+  },
+  "schemas": {
+    "record": "docs/contracts/metering/metering-record.schema.json",
+    "field_map": "docs/contracts/metering/field-map.json"
+  },
+  "fields": {
+    "schemaVersion": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the record-shape version"
+    },
+    "kind": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the record kind (metering)"
+    },
+    "identity.tenantId": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the tenant the spend is attributed to"
+    },
+    "identity.agentId": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the agent whose call this is"
+    },
+    "identity.runId": {
+      "producers": [
+        "fleet-run-identity"
+      ],
+      "meaning": "the run/session that emitted the call"
+    },
+    "identity.recordId": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the row's own id"
+    },
+    "identity.sourceType": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "which sibling record shape the row was absorbed from"
+    },
+    "identity.sourceKey": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the source record's key within its own shape"
+    },
+    "quantity.inputTokens": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "prompt/input tokens"
+    },
+    "quantity.outputTokens": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "completion/output tokens"
+    },
+    "quantity.totalTokens": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "input + output tokens"
+    },
+    "quantity.costUsd": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the resolved cost, or null when unmetered"
+    },
+    "quantity.costSource": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "why the cost figure is trustworthy"
+    },
+    "quantity.currency": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the ISO-4217 currency of costUsd"
+    },
+    "quantity.metered": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "whether a cost was resolved"
+    },
+    "quantity.billable": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "whether the call is billable"
+    },
+    "quantity.cacheHit": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the explicit zero-cost cache-hit path"
+    },
+    "quantity.unmeteredReason": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "why the row is unmetered"
+    },
+    "receipt.ticket": {
+      "producers": [
+        "fleet-paperclip-adapter"
+      ],
+      "meaning": "the ticket the spend is tied to"
+    },
+    "receipt.receipt": {
+      "producers": [
+        "fleet-paperclip-adapter"
+      ],
+      "meaning": "the per-task receipt id"
+    },
+    "receipt.evidence": {
+      "producers": [
+        "fleet-paperclip-adapter"
+      ],
+      "meaning": "the evidence reference backing the receipt"
+    },
+    "attribution.provider": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the provider id"
+    },
+    "attribution.model": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the concrete model id"
+    },
+    "attribution.route": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the route taken"
+    },
+    "attribution.tier": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the effective model tier"
+    },
+    "attribution.taskClass": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the task class the chooser attributed"
+    },
+    "attribution.outcome": {
+      "producers": [
+        "fleet-metering"
+      ],
+      "meaning": "the call outcome"
+    },
+    "attribution.scope.level": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "the scoping level of the cap"
+    },
+    "attribution.scope.id": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "the agent/team/project id the cap applies to"
+    },
+    "attribution.period": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "the budget window"
+    },
+    "attribution.cap": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "the spend limit for the period"
+    },
+    "attribution.spent": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "spend consumed in the period"
+    },
+    "attribution.hardStop": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "whether the cap is absolute"
+    },
+    "attribution.burnRateAlertPct": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "the burn-rate alert threshold"
+    },
+    "claims": {
+      "producers": [
+        "fleet-budget"
+      ],
+      "meaning": "the asserted cap/saving claims, each with its evidence"
+    }
+  }
+}
