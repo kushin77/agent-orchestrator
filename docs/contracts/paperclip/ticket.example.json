@@ -1,0 +1,27 @@
+{
+  "id": "kushin77/agent-orchestrator#359",
+  "kind": "task",
+  "owner": "session-ao400contract0001",
+  "status": "done",
+  "blocked_by": ["#370"],
+  "goal": "#338",
+  "evidence": [
+    {"kind": "gate-run", "ref": "b2dfeca1a2b3c4d5e6f708192a3b4c5d6e7f8091", "result": "PASS", "checks": 29}
+  ],
+  "facets": {
+    "lessons": {"incident": "INC-0001", "rca": "RCA-0001",
+                "corrective_actions": ["CA-0001"], "class": "faang"},
+    "raid": {"risk": "high", "remediation": "#170"},
+    "budget": {"scope": {"level": "agent", "id": "paperclip"},
+               "spent": 1.23, "cap": 5.00, "receipt": "telemetry/ledger#a1b2c3d4"}
+  },
+  "authority": {
+    "owner": "governance/isolation",
+    "status": "governance/dispatch",
+    "goal": ".board/snapshot.json",
+    "blocked_by": ".board/snapshot.json",
+    "facets.lessons": "governance/lessons",
+    "facets.raid": "derived",
+    "facets.budget": "telemetry/budgets"
+  }
+}

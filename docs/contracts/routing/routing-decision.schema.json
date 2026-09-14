@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/docs/contracts/routing/routing-decision.schema.json",
+  "title": "Routing seam decision contract (routing authority -> caller)",
+  "description": "The frozen OUTPUT half of the routing seam (issue #426, ADR-0015). The routing authority (gateway/sme-routing) writes every field here and is the single producer of all of them; the caller consumes the decision and runs the work. There is no second producer: the extracted tier-routing package from kushin77/hermes-agents#2 is a policy source we map, never a decision producer (ADR-0015). Field names align with the live authority's Decision/Outcome: tier is the effective model tier, model is the concrete model id, escalation records the ladder outcome and its terminal. See docs/contracts/routing/README.md.",
+  "type": "object",
+  "required": ["tier", "model", "escalation"],
+  "additionalProperties": false,
+  "properties": {
+    "tier": {
+      "enum": ["flash", "pro", "auditor"],
+      "description": "The effective model tier the authority selected for this request, after complexity bands, task overrides and the security/IaC floor. This is the authority's own field; the caller's requested tier is an input, not this value."
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The concrete model id within the tier (the live authority's tier-policy models, e.g. deepseek-v4-flash, deepseek-v4-pro). Selected by the authority from the chosen tier and its health; the caller may not name a model directly."
+    },
+    "escalation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "ladder", "terminal"],
+      "description": "The escalation record: what the cost-control ladder did and where it ended. A cap breach is an explicit outcome, never a silent pass.",
+      "properties": {
+        "status": {
+          "enum": ["none", "climbed", "refused", "human_advisor"],
+          "description": "none = the first tier accepted; climbed = the ladder advanced past the first tier; refused = a cap breach without authorisation to escalate; human_advisor = the ladder exhausted and terminated at the declared human hand-off (never an exception, never an unbounded loop)."
+        },
+        "ladder": {
+          "type": "array",
+          "items": { "enum": ["flash", "pro", "auditor"] },
+          "description": "The tiers attempted, in order. The declared ladder is flash -> pro -> auditor and is strictly increasing, acyclic and terminating at a null fallback."
+        },
+        "terminal": {
+          "enum": ["dispatched", "refused", "human_advisor"],
+          "description": "The terminal outcome of the decision. A decision is not a promise: it ends in a dispatch, an explicit refusal, or a bounded human hand-off."
+        }
+      }
+    }
+  }
+}

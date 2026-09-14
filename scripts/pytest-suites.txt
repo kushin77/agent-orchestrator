@@ -20,6 +20,7 @@
 
 guardrails/dlp
 guardrails/policy
+guardrails/controls
 guardrails/honesty
 guardrails/isolation
 guardrails/sandbox

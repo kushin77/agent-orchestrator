@@ -114,6 +114,80 @@ append-only audit log; "done is a verdict, not a self-report".
 | `goal` | the epic the issue serves (e.g. EPIC-00 = issue #4) | goal / project reference |
 | `evidence` | the `Verify:` command + its real output (GR-12) | evidence on the issue |
 
+### 3.1 Ticket contract v2 — the single join node (ADR-0014, #400)
+
+[ADR-0014](decision-records/ADR-0014-ticket-single-join-node-contract-v2.md)
+decides that **the ticket is the single join node** (mesh → hub): tasks, agents,
+the lessons register and the PMO all join on the ticket. v2 is **additive** — the
+six v1 keys above keep their meaning and a v1 document still validates
+([`ticket.example.v1.json`](contracts/paperclip/ticket.example.v1.json)); the
+canonical v2 document is
+[`ticket.example.json`](contracts/paperclip/ticket.example.json). v2 adds `kind`,
+`facets` and `authority`:
+
+```json
+{
+  "id": "kushin77/agent-orchestrator#359",
+  "kind": "task",
+  "owner": "<AO_SESSION_ID>",
+  "status": "done",
+  "blocked_by": ["#370"],
+  "goal": "#338",
+  "evidence": [
+    {"kind": "gate-run", "ref": "<attestation git_sha>", "result": "PASS", "checks": 29}
+  ],
+  "facets": {
+    "lessons": {"incident": "INC-0001", "rca": "RCA-0001",
+                "corrective_actions": ["CA-0001"], "class": "faang"},
+    "raid": {"risk": "high", "remediation": "#170"},
+    "budget": {"scope": {"level": "agent", "id": "paperclip"},
+               "spent": 1.23, "cap": 5.00, "receipt": "<ledger ref>"}
+  },
+  "authority": {
+    "owner": "governance/isolation",
+    "status": "governance/dispatch",
+    "goal": ".board/snapshot.json",
+    "blocked_by": ".board/snapshot.json",
+    "facets.lessons": "governance/lessons",
+    "facets.raid": "derived",
+    "facets.budget": "telemetry/budgets"
+  }
+}
+```
+
+**The four rules v2 freezes** (enforced by
+`scripts/check-paperclip-integration.sh`, so a bad contract fails by name):
+
+1. **`kind`** ∈ `task | incident | rca | corrective-action | lesson | suggestion`.
+   The **generic improvement register is a ticket kind** — this is how an open
+   `SUGGEST-*` becomes an addressable node instead of a ledger id with no shape.
+2. **`facets` is a closed set** (`lessons`, `raid`, `budget`). An unknown facet
+   fails; a new facet is a contract change, not a silent extension.
+3. **`authority` is the one-writer-per-field map.** Each populated field names
+   **exactly one** producing lane; a field with two writers fails and a populated
+   field with no declared writer fails. The ticket is a **projection, never
+   authority** — a projection is only rebuildable when every field has exactly one
+   source, and that source is a real authoritative surface.
+4. **`evidence[]` entries are structured**, additively: a receipt object
+   `{kind, ref, result, checks}` alongside the v1 string form, so the same receipt
+   that proves delivery also backs the budget charge (mismatches #6 and #10).
+
+**Authority table** (the frozen one-writer map — the join's single source of
+truth per field):
+
+| Ticket field | Single writer (`authority`) | Surface it projects |
+|---|---|---|
+| `owner` | `governance/isolation` | the minted session identity (ADR-0011, #263) |
+| `status` | `governance/dispatch` | the claim ledger / lifecycle |
+| `goal` | `.board/snapshot.json` | the epic the ticket serves |
+| `blocked_by` | `.board/snapshot.json` | the dependency chain edges |
+| `facets.lessons` | `governance/lessons` | the lessons register |
+| `facets.raid` | `derived` | computed from the ticket's risk signals |
+| `facets.budget` | `telemetry/budgets` | the budget rail |
+
+`id` and `kind` are the node's own identity (not authority-tracked); `evidence`
+is appended by whichever lane ran the proof (not authority-tracked).
+
 ## 4. Contract 3 — budget
 
 **Fleet-side producer:** `governance/finops/` (tier vocabulary, chooser),
@@ -147,6 +221,25 @@ alerts before the stop; roll-ups by agent/goal/time; per-task receipts.
 The fleet's shape does **not** match upstream's exactly. The happy-path table above
 is the mapping; these are the places where an adapter is required. Each is a
 work-order item for the adoption, not a claim that the seam is free.
+
+**Status after ticket contract v2 (ADR-0014, #400).** v2 freezes the ticket as the
+single join node and makes its evidence structured, which closes the four
+ticket/evidence/budget-receipt mismatches below and leaves the heartbeat and
+auth mismatches as adoption work:
+
+| # | Mismatch | Status after v2 |
+|---|---|---|
+| 1 | Heartbeat granularity | **OPEN** — heartbeat schema untouched by v2 |
+| 2 | Heartbeat state vocabulary | **OPEN** — heartbeat schema untouched by v2 |
+| 3 | Cadence is implicit | **OPEN** — heartbeat schema untouched by v2 |
+| 4 | Ticket status is not first-class | **CLOSED** — `status` is a first-class ticket field with a single declared producer (`authority.status = governance/dispatch`) |
+| 5 | No goal reference on a claim | **CLOSED** — `goal` is a ticket field; `authority.goal = .board/snapshot.json` |
+| 6 | Evidence is a convention, not a field | **CLOSED** — `evidence[]` is a field and admits a structured receipt |
+| 7 | Budget scope differs | **SHAPE CLOSED / PRODUCER OPEN** — `facets.budget.scope{level,id}` admits `agent`/`team`/`project`; the fleet producer for `scope.level = agent` is still adoption work |
+| 8 | No explicit currency | **OPEN** — the ticket facet does not add a currency column; the budget rail still encodes USD by convention |
+| 9 | Hard stop is a percentage, not a boolean | **OPEN** — upstream's absolute cap/stop is not modelled by the ticket facet |
+| 10 | No per-task receipt field | **CLOSED** — `facets.budget.receipt` and the structured `evidence[]` receipt carry the same receipt id, tying spend to the task |
+| 11 | Auth models do not meet natively | **OPEN** — cross-boundary auth is one-time adoption work, not a field mapping |
 
 1. **Heartbeat granularity.** The fleet beat is a flat process-liveness record
    (`pid`, `state`, `started_at`, `commit`, `ts`) — it has **no** `wake.cause`, no

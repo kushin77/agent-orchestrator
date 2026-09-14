@@ -1,0 +1,29 @@
+{
+  "contract": "routing-seam",
+  "version": "1.0.0",
+  "title": "Routing seam policy-field vocabulary",
+  "description": "The declared POLICY vocabulary of the routing authority (issue #426, ADR-0015). These are the fields of the routing policy the authority reads to produce a decision. They are not wire fields: no caller sends them and no peer package produces them. They are listed here as their own vocabulary so the ownership map must account for each one by name, and so a policy field that loses its producer is refused rather than silently unowned. Each key below is the authority's own field, mapped to the live declared policy under gateway/sme-routing/policies/ (read-only here; the seam changes nothing there).",
+  "authority": "gateway/sme-routing",
+  "policy_fields": {
+    "fail_safe_route": {
+      "meaning": "The route an undeclared task type takes when no positive signal selects one. Enforced to be the deep path, so unrecognised work escalates rather than slipping through cheaply.",
+      "declared_as": "gateway/sme-routing/policies/route-policy.yaml dispatch_defaults.unknown_task_type",
+      "constraint": "must remain the deep path; the loader refuses the policy otherwise"
+    },
+    "complexity_to_tier": {
+      "meaning": "The band map from a 0..100 complexity score to a model tier.",
+      "declared_as": "gateway/sme-routing/policies/tier-policy.yaml complexity_to_tier",
+      "constraint": "bands are half-open integer ranges and must cover 0..100"
+    },
+    "task_overrides": {
+      "meaning": "Per-task-type tier overrides that take precedence over the complexity band for a named task type.",
+      "declared_as": "gateway/sme-routing/policies/tier-policy.yaml task_overrides",
+      "constraint": "keys are normalised (underscore to hyphen) and a collision after normalisation is refused"
+    },
+    "tier_escalation_ladder": {
+      "meaning": "The per-tier fallback chain the authority climbs on a cap breach, terminating at a null fallback.",
+      "declared_as": "gateway/sme-routing/policies/tier-policy.yaml tiers.*.fallback",
+      "constraint": "acyclic, strictly increasing, terminating at a null fallback (the declared human hand-off)"
+    }
+  }
+}

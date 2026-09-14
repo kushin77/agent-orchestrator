@@ -1,0 +1,9 @@
+{
+  "tier": "flash",
+  "model": "deepseek-v4-flash",
+  "escalation": {
+    "status": "none",
+    "ladder": ["flash"],
+    "terminal": "dispatched"
+  }
+}

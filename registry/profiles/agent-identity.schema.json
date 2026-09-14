@@ -1,0 +1,307 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:agent-identity.schema:v1",
+  "x-schema-version": 1,
+  "title": "AgentIdentity",
+  "description": "AgentIdentity — the ONE shared, versioned agent-identity schema (issue #346): the single source of truth for the agent record both agent-orchestrator and shared-frontend carry. It is the UNION of the shared-frontend TeamAgent wire fields ({id, name, provider, modelTier, status, capabilities}) and the agent-orchestrator AgentProfile contract fields (version, owner, systemPromptRef, toolAllowlist, constraintSet, capabilitySet, defaultModelTier, memoryScope, guardrailPolicyRef, plus the optional role/model/transport/effort/capabilityTier/fallbackChain/canonicalLanes/weekly_spend_ceiling). Every enum is CLOSED: a status outside registered|active|paused|retired, a modelTier outside LOW|MED|HIGH|MAX, or a capability that is free text rather than a capabilityId is refused by the schema itself. The vocabularies are pinned to agent-profile.schema.json and catalog.yaml by a parity gate (registry/profiles/parity/, scripts/check-agent-identity-parity.sh): a vocabulary or field change on EITHER side fails the gate until it is reconciled here, never forked. The contract and the three drift axes are documented in docs/AGENT-IDENTITY.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "provider",
+    "modelTier",
+    "status",
+    "capabilities",
+    "version",
+    "owner",
+    "systemPromptRef",
+    "toolAllowlist",
+    "constraintSet",
+    "capabilitySet",
+    "defaultModelTier",
+    "memoryScope",
+    "guardrailPolicyRef"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Stable agent id (lowercase, dash-separated, e.g. orchestrator, data-agent). Both repos address an agent by this id; for an agent-orchestrator seed it must equal the seed filename stem."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "Human-readable display name. shared-frontend carries a free-text name; here it is a bounded string (1..80 characters). An agent-orchestrator seed that declares no name is PROJECTED to its id (see docs/AGENT-IDENTITY.md), so the field is never absent from the identity view."
+    },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Provider slug that carries the agent's model (lowercase, dash-separated; e.g. anthropic, deepseek, ollama). Shape-constrained so free prose cannot drift into the field; the VALUE SET is owned by the gateway provider registry and is deliberately not duplicated here. Projection: a seed's transport maps deepseek->deepseek, api->anthropic, session->anthropic, and a seed declaring no transport projects to unspecified."
+    },
+    "modelTier": {
+      "$ref": "#/definitions/modelTier",
+      "description": "Dispatch tier on the flash/pro ladder. The CLOSED four-rung ladder (LOW/MED/HIGH/MAX) is the superset of the shared-frontend two-tier notion (fast/pro), so both repos validate against one vocabulary. A seed's defaultModelTier is projected here when the seed does not declare modelTier explicitly."
+    },
+    "status": {
+      "$ref": "#/definitions/statusValue",
+      "description": "Agent lifecycle status. The CLOSED four-value union of agent-orchestrator (registered|active|paused|retired) and shared-frontend (active|paused|retired), so a record from either repo validates. A seed that declares no status is projected to registered."
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/capabilityId" },
+      "description": "CLOSED capability list (catalog capabilityId ids). This is the field that killed the free-text capabilities drift: a capability that is not a catalog id is refused by the schema and by the parity gate, never silently accepted."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "SemVer version of THIS record (X.Y.Z). A published (id, version) is immutable: once recorded in versions/manifest.yaml, editing the file that carries it is refused by the validator (sha256 mismatch)."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Accountable owner of the identity's lifecycle, expressed as namespace/team (e.g. platform/quality). Identity/RBAC consumes this as a principal/team reference."
+    },
+    "systemPromptRef": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)*@v[0-9]+$",
+      "description": "Pinned reference to a versioned prompt module, format <module>/<name>@v<n> (e.g. coder/primary@v1)."
+    },
+    "role": {
+      "$ref": "#/definitions/roleId",
+      "description": "Canonical CMR agent role this identity fills. Optional: a platform identity need not name a role, but when it does the id must exist in the canonical role vocabulary."
+    },
+    "model": {
+      "$ref": "#/definitions/workerModel",
+      "description": "Concrete worker model for the default tier (flash or pro), separating the MODEL axis from the tier axis. Optional."
+    },
+    "transport": {
+      "$ref": "#/definitions/transport",
+      "description": "How the model is carried: a provider API (deepseek/api) or the running CLI session. Optional; the provider projection reads it (see the provider property)."
+    },
+    "effort": {
+      "$ref": "#/definitions/effort",
+      "description": "Reasoning effort for this identity's dispatches (low/medium/high). Optional."
+    },
+    "capabilityTier": {
+      "$ref": "#/definitions/capabilityTier",
+      "description": "Capability tier (deep/balanced/fast) chosen from dispatch complexity, distinct from the semantic model tier. Optional."
+    },
+    "fallbackChain": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/roleId" },
+      "description": "Ordered fallback chain of canonical role ids to dispatch when this identity cannot serve the task. Optional."
+    },
+    "canonicalLanes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/canonicalLane" },
+      "description": "Canonical lane ids this identity owns. Optional."
+    },
+    "toolAllowlist": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/toolId" },
+      "description": "Closed allowlist of tool ids this identity may invoke. Any tool not in the platform tool catalog is rejected (fail closed)."
+    },
+    "constraintSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/constraintId" },
+      "description": "Boundary constraints (deny/require rules) this identity operates under, drawn from the closed constraint catalog."
+    },
+    "capabilitySet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/capabilityId" },
+      "description": "The agent-orchestrator spelling of the closed capability set. Kept alongside capabilities so an AgentProfile seed validates unchanged; the identity projection copies it into capabilities."
+    },
+    "defaultModelTier": {
+      "$ref": "#/definitions/modelTier",
+      "description": "The agent-orchestrator spelling of the default dispatch tier. Kept alongside modelTier; the identity projection copies it into modelTier."
+    },
+    "memoryScope": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/memoryScopeValue" },
+      "description": "Memory scopes this identity may read/write (user/session/repository). At least one scope is required."
+    },
+    "guardrailPolicyRef": {
+      "$ref": "#/definitions/guardrailPolicyId",
+      "description": "Single reference to the guardrail policy (atomic or bundle id) bound to this identity. Unknown policy ids are rejected (fail closed)."
+    },
+    "weekly_spend_ceiling": {
+      "$ref": "#/definitions/weeklySpendCeiling",
+      "description": "First-class per-identity FinOps ceiling: the maximum the platform may spend on this identity in a rolling week, in USD. Optional."
+    }
+  },
+  "definitions": {
+    "statusValue": {
+      "type": "string",
+      "enum": ["registered", "active", "paused", "retired"],
+      "description": "CLOSED lifecycle status: the union of agent-orchestrator (registered|active|paused|retired) and shared-frontend (active|paused|retired). The superset is deliberate — both repos validate against ONE vocabulary, and neither may add a status without reconciling this enum (the parity gate fails until it is)."
+    },
+    "roleId": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "architecture-sme",
+        "iac-sme",
+        "security-sme",
+        "sync-sme",
+        "platform-sme",
+        "qa-sme",
+        "frontend-sme",
+        "pmo-sme",
+        "general",
+        "vendor",
+        "spoke-consumer"
+      ],
+      "description": "Canonical CMR agent-role vocabulary. Pinned to agent-profile.schema.json definitions.roleId by the parity gate."
+    },
+    "workerModel": {
+      "type": "string",
+      "enum": ["flash", "pro"],
+      "description": "Concrete worker model: flash = the volume tier, pro = the reasoning tier. Pinned to agent-profile.schema.json."
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["deepseek", "session", "api"],
+      "description": "Transport that carries the model. Pinned to agent-profile.schema.json."
+    },
+    "effort": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Reasoning effort. Pinned to agent-profile.schema.json."
+    },
+    "capabilityTier": {
+      "type": "string",
+      "enum": ["deep", "balanced", "fast"],
+      "description": "Capability tier for three-tier routing. Pinned to agent-profile.schema.json."
+    },
+    "canonicalLane": {
+      "type": "string",
+      "enum": [
+        "arch",
+        "gov-iac",
+        "security",
+        "sync-engine",
+        "harvest",
+        "module-contract",
+        "catalog",
+        "registry",
+        "gates",
+        "observability",
+        "pilot-frontend",
+        "guardrails",
+        "standards",
+        "dx",
+        "meta",
+        "hygiene",
+        "pmo"
+      ],
+      "description": "Canonical CMR lane vocabulary. Pinned to agent-profile.schema.json."
+    },
+    "weeklySpendCeiling": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Non-negative weekly spend ceiling in USD. Draft-07 treats booleans as a distinct type, so true/false fail here."
+    },
+    "toolId": {
+      "type": "string",
+      "enum": [
+        "gh_issue",
+        "gh_pr",
+        "board_sync",
+        "git_worktree",
+        "file_read",
+        "file_write",
+        "shell_exec",
+        "search_memory",
+        "store_memory",
+        "web_fetch",
+        "sql_query",
+        "mail_read",
+        "mail_send",
+        "calendar_query",
+        "crm_contact",
+        "crm_task",
+        "sms_send"
+      ],
+      "description": "Closed platform tool catalog. Pinned to agent-profile.schema.json AND catalog.yaml tools by the parity gate."
+    },
+    "capabilityId": {
+      "type": "string",
+      "enum": [
+        "task-claim",
+        "orchestrate",
+        "code-author",
+        "test-author",
+        "test-run",
+        "code-review",
+        "security-review",
+        "architecture-decision",
+        "research",
+        "data-analysis",
+        "infra-authoring",
+        "docs-authoring",
+        "audit",
+        "finops-meter",
+        "memory-ops"
+      ],
+      "description": "Closed platform capability catalog. Pinned to agent-profile.schema.json AND catalog.yaml capabilities by the parity gate — this is the vocabulary that refuses free-text capabilities."
+    },
+    "constraintId": {
+      "type": "string",
+      "enum": [
+        "issue-first",
+        "stay-in-lane",
+        "no-unrelated-edits",
+        "verify-before-done",
+        "evidence-on-pr",
+        "no-direct-push",
+        "no-secrets",
+        "no-adhoc-iac",
+        "no-unverified-merge",
+        "no-debug-leftovers"
+      ],
+      "description": "Closed platform constraint catalog. Pinned to agent-profile.schema.json AND catalog.yaml constraints by the parity gate."
+    },
+    "guardrailPolicyId": {
+      "type": "string",
+      "enum": [
+        "no-secrets",
+        "no-direct-push-master",
+        "no-unverified-merge",
+        "no-adhoc-iac-apply",
+        "dlp-redact",
+        "prompt-injection-defense",
+        "budget-finops-cap",
+        "audit-trail-everywhere",
+        "flag-gated-off",
+        "tool-allowlist-enforcement",
+        "capability-bounds-enforcement",
+        "worker-bundle",
+        "reviewer-bundle"
+      ],
+      "description": "Closed guardrail-policy catalog: atomic policy ids plus named bundle ids. Pinned to agent-profile.schema.json AND catalog.yaml guardrailPolicies by the parity gate."
+    },
+    "modelTier": {
+      "type": "string",
+      "enum": ["LOW", "MED", "HIGH", "MAX"],
+      "description": "Dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro). Pinned to agent-profile.schema.json AND catalog.yaml tiers by the parity gate."
+    },
+    "memoryScopeValue": {
+      "type": "string",
+      "enum": ["user", "session", "repository"],
+      "description": "Memory scope. Pinned to agent-profile.schema.json AND catalog.yaml memoryScopes by the parity gate."
+    }
+  }
+}

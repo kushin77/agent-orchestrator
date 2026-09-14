@@ -21,6 +21,8 @@ Index of the repo's canonical documentation. Agents start at
 | [`FLEET-TEMPLATE.md`](FLEET-TEMPLATE.md) | The parameterized per-repo fleet template — schema-validated composition, definition-vs-run-state split, drift + two-repo isolation (EPIC #144, issue #146). |
 | [`SME-ROUTING.md`](SME-ROUTING.md) | SME-squad routing + capability/route/tier FinOps: domain→SME, complexity→chain+tier, caps and the human/advisor escalation terminal (EPIC #144, issue #149). |
 | [`REGISTRY-PROVENANCE.md`](REGISTRY-PROVENANCE.md) | Harvest provenance for the profile/persona/SME vocabularies, and the frozen canonical-CMR parity baseline with its refresh command (issue #145). |
+| [`MODULE-ADMISSION.md`](MODULE-ADMISSION.md) | The parent-side sub-module admission contract — what a sub-module is, what each side declares, and what a module must not inherit (EPIC #422, issue #423). |
+| [`CROSS-REPO-SYNC-OWNER.md`](CROSS-REPO-SYNC-OWNER.md) | The standing peer-board triage: dispositions with mandatory provenance, dry-run direction issues, no silent adoption or cross-repo close (EPIC #422, issue #427). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
 
