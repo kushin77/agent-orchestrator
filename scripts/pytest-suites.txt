@@ -56,6 +56,10 @@ telemetry/budgets
 portal
 control-plane/instructions
 control-plane/sdk/python
+control-plane/control
+control-plane/cli
+control-plane/functions
+control-plane/cockpit
 governance/merge
 governance/dispatch
 fleet

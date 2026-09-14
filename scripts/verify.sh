@@ -291,6 +291,24 @@ checks=(
   # no gate at all -- check-drift.sh saw it only at WARN. Wired here for the same
   # reason as pytest-fleet: a suite nothing names is decorous but inert.
   'pytest-chat|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/chat/tests'
+  # EPIC #551 (the remote control command center): the three control-plane
+  # gates delivered by RC-2 (#553), RC-4 (#555) and RC-10 (#565). Each is
+  # offline and deterministic and provokes its own negative controls; they
+  # are registered here deliberately because this array is explicit and an
+  # unwired check is inert (GR-12). Wiring them retires their baseline rows
+  # (tracker #559).
+  'control-verbs|bash scripts/check-control-verbs.sh'
+  'control-audit|bash scripts/check-control-audit.sh'
+  'control-functions|bash scripts/check-control-functions.sh'
+  # EPIC #551 (the remote control command center): the four control-plane
+  # pytest suites (RC-2 #553, RC-5 #556, RC-10 #565, RC-11 #566). Each is
+  # offline and deterministic. They are named here deliberately: a suite that
+  # is declared in scripts/pytest-suites.txt but named by no gate is refused
+  # by check-gate-coverage, which never grandfathers a newly declared one.
+  'pytest-control|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/control/tests'
+  'pytest-control-cli|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/cli/tests'
+  'pytest-control-functions|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/functions/tests'
+  'pytest-cockpit|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/cockpit/tests'
 )
 
 # --- duplicate-registration guard (issue #499) -------------------------------
