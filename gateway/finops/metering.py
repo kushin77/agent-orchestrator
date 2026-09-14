@@ -15,9 +15,15 @@ real call).
 
 Call semantics:
 
-- ``ALLOW`` / ``WARN`` / ``FALLBACK`` decisions emit a record for the model
-  that was actually chosen.
-- ``STOP`` (budget block) emits nothing — no call was made.
+- ``ALLOW`` / ``WARN`` / ``FALLBACK`` decisions emit a ``CallRecord`` for the
+  model that was actually chosen.
+- A per-role cap ``STOP`` (issue #633) emits **no** ``CallRecord`` — no model
+  call happened — but **does** emit a ``RefusalRecord``, because a cap refusal
+  is itself a decision the metering store must account for: a budget alert is
+  raised, never silently absorbed.
+- A tenant ``STOP`` (issue #17) emits nothing at all, preserving the original
+  behaviour; ``RefusalRecord`` exists for the per-role axis that requires the
+  refusal to be metered.
 
 Standalone module (stdlib only); no cross-package imports.
 """
@@ -45,6 +51,11 @@ class CallRecord:
     budget_action: str = "allow"
     complexity: Optional[float] = None
     reasons: List[str] = field(default_factory=list)
+    # Per-role cap attribution (issue #633): the persona the call was
+    # dispatched for and the ceiling it was checked against, when one applied.
+    role_id: Optional[str] = None
+    role_cap_usd: Optional[float] = None
+    role_pct_used: Optional[float] = None
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -55,12 +66,47 @@ class CallRecord:
         return payload
 
 
+@dataclass(frozen=True)
+class RefusalRecord:
+    """A refused call, recorded so a cap decision is never invisible.
+
+    A ``STOP`` produces no ``CallRecord`` (no model call happened), but a
+    per-role cap refusal is still a metered event: the workbook rule is that a
+    budget alert is raised, never silently absorbed. This record carries the
+    scope that refused (``role`` or ``tenant``) so the metering store can
+    attribute the refusal to the ceiling that fired.
+    """
+
+    tenant_id: str
+    agent_id: str
+    task_class: str
+    tier: str
+    model: str
+    provider: str
+    estimated_cost_usd: float
+    budget_action: str = "stop"
+    reason: str = ""
+    cap_usd: Optional[float] = None
+    pct_used: Optional[float] = None
+    scope: str = "tenant"  # role | tenant
+    role_id: Optional[str] = None
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = asdict(self)
+        if payload.get("role_id") is None:
+            payload["role_id"] = self.agent_id if self.scope == "role" else None
+        return payload
+
+
 @runtime_checkable
 class MeteringSink(Protocol):
     """Interface the gateway/chooser calls to persist a call record."""
 
     def record(self, record: CallRecord) -> None:
-        """Persist one routed model call."""
+        """Persist one routed model call (or refusal) record."""
         ...
 
 

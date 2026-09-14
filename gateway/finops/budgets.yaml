@@ -1,4 +1,10 @@
-# gateway/finops/budgets.yaml — per-tenant budget configuration (seed shape).
+# gateway/finops/budgets.yaml — per-tenant AND per-role budget configuration.
+#
+# Two budget axes are enforced before any model call:
+#
+#   1. per-tenant (issue #17) — the `budgets` mapping below.
+#   2. per-role   (issue #633) — the `roles` defaults block at the foot of this
+#      file; the caps themselves are CONSUMED from registry/personas.
 #
 # The runtime per-tenant budget set is provisioned by the control plane
 # (tenant identity / billing); this file ships the loader's seed/default shape
@@ -44,3 +50,40 @@ budgets:
     policy: warn
     warnAtPct: 85
     hardCapPct: 100
+
+# ---------------------------------------------------------------------------
+# Per-role monthly caps (issue #633, workbook-2).
+#
+# The CAPS THEMSELVES are not declared here. They are consumed from the
+# registry org chart, which is the workbook-1 declaration and the single source
+# of truth:
+#
+#   registry/personas/org-chart.yaml   -> roles[].monthlyBudgetCapUsd
+#   registry/personas/cards/<role>.yaml -> monthlyBudgetCapUsd  (must agree)
+#
+# budget.load_role_budgets() reads that declaration and fails closed on drift,
+# a missing card, or a non-numeric cap — so this file cannot silently restate a
+# number the org chart owns. It documents the vocabulary and the *policy* only.
+#
+# Enforcement: the chooser checks the role cap for the persona a call is
+# dispatched for BEFORE the tenant budget, because the narrower ceiling is the
+# one that must not be crossed. The cap path is deterministic arithmetic
+# (percentage comparison over the spend ledger) — no model call, no tokens.
+# This is the workbook mechanical rule "zero-token arithmetic" (CFO row):
+# deciding whether tokens may be spent must never itself spend tokens.
+roles:
+  # Source of the per-role cap numbers (read-only consumer; never redefined).
+  capSource: registry/personas/org-chart.yaml
+
+  # Over-cap policy. `stop` = a role at its cap REFUSES spend (the workbook-2
+  # acceptance criterion). `warn` flags and allows, `fallback` downgrades the
+  # tier. The default is deliberately the strictest.
+  defaultPolicy: stop
+
+  # A role is at cap when projected spend reaches the cap itself, so the warn
+  # threshold defaults to 100% (unlike a tenant's soft early-warning line).
+  warnAtPct: 100
+  hardCapPct: 100
+
+  # Ledger keys are namespaced `role:<tenant>/<role_id>`, so a role's spend is
+  # accounted separately from its tenant's budget while sharing one ledger.
