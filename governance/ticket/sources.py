@@ -362,6 +362,13 @@ def read_lessons(
     line. A ``pr`` origin is deliberately *not* a ticket edge — a pull request is
     not a ticket, and the fleet's issue and PR numbering share one sequence, so
     coercing one into the other would invent an edge.
+
+    The register is read **defensively**: ``kind``, ``origin`` and the typed-edge
+    fields are read with ``.get`` and type-checked, so a field that is absent — or
+    an edge vocabulary a parallel lane adds later (issue #402 extends this same
+    ledger) — is treated as *absent*, never as an error. Unknown top-level keys
+    are ignored and only the frozen v2 facet vocabulary is emitted, so the
+    projection is correct both before and after that vocabulary lands.
     """
     root = Path(root)
     records, violations = _ledger_records(root)
