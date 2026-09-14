@@ -186,8 +186,9 @@ than stored again here.
 
 ## The incidents recorded so far
 
-Six real incidents from this repository's own history, each with an artifact,
-a corrective action and a lesson:
+Thirteen real incidents from this repository's own history, each with an artifact,
+a corrective action and a lesson — the seven recorded below, and the six the
+EPIC #708 wave registered in its own section:
 
 | Incident | Origin | RCA | What it was |
 |---|---|---|---|
@@ -204,11 +205,11 @@ a corrective action and a lesson:
 quoted, the provoked control included; the long policy refusals are elided:
 
 ```text
-incidents: 6 (5 closed) | rcas: 6 | corrective actions: 8 (1 open) | lessons: 4
-| suggestions: 4 | board issues carrying the `incident` record label: 0
+incidents: 12 (5 closed) | rcas: 12 | corrective actions: 14 (7 open) | lessons: 4
+| suggestions: 10 | board issues carrying the `incident` record label: 0
   WARNING suggestion-open         SUGGEST-0001 is open (owner: gate lane); ...
   WARNING corrective-action-open  CA-0007 is open; remediation is tracked in #170
-lessons: OK (6 incident(s), 4 lesson(s) enforced, 5 deviation(s) tracked)
+lessons: OK (12 incident(s), 4 lesson(s) enforced, 17 deviation(s) tracked)
   probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s), scanned=0, errors=[]
   probe RECORD-LABEL-WITHOUT-A-RECORD-IS-REFUSED: PASS — code=board-incident-without-rca subject=#900 errors=['board-incident-without-rca']
   probe LEDGER-INCIDENT-WITHOUT-RCA-IS-REFUSED: PASS — code=incident-without-rca count=1 errors=['corrective-action-unlinked', 'incident-without-rca', 'unknown-reference', 'unknown-reference']
@@ -234,6 +235,29 @@ holder, and then unable to fail (issue #766).
 Five errors were raised and fixed while seeding the ledger — five artifacts
 that were not yet committed (`rca-artifact-untracked`). That is the gate doing
 its job on its own author: an uncommitted RCA does not exist (`RCA-0002`).
+
+### The EPIC #708 wave (2026-09-14)
+
+Six incidents from the fleet runaway-prevention wave. Each one is **open** against
+the child issue that carries its corrective action, and each RCA is a committed
+artifact in [`rca/`](rca/). The wave's incidents carry an `event` origin rather
+than an issue origin because the committed board snapshot does not reach them —
+which is `INC-0014` itself.
+
+| Incident | Tracked by | RCA | What it was |
+|---|---|---|---|
+| `INC-0009` | #729 | [`RCA-0009`](rca/RCA-0009-infra-limits-tmpfs-exhaustion.md) | a shared 16 GiB `/tmp` filled to 100 %, and a 0-byte write passed as evidence |
+| `INC-0010` | #726 | [`RCA-0010`](rca/RCA-0010-a2a-no-arbitration.md) | agent-to-agent dispatch with no arbiter between two claimants |
+| `INC-0011` | #724 | [`RCA-0011`](rca/RCA-0011-gate-stacking.md) | gates stacked on one box with no lock and no queue |
+| `INC-0012` | #723 | [`RCA-0012`](rca/RCA-0012-uncapped-redispatch.md) | an uncapped retry stacked 137+ gates and starved the box |
+| `INC-0013` | #725 | [`RCA-0013`](rca/RCA-0013-inert-gate.md) | delivered gates that no gate invokes |
+| `INC-0014` | #727 | [`RCA-0014`](rca/RCA-0014-stale-snapshot-no-trigger.md) | a committed snapshot with a timestamp, a tolerance and no trigger |
+
+Six errors were raised and fixed while recording the EPIC #708 wave — the six
+new RCA artifacts, each refused as `rca-artifact-untracked` until it was
+committed. That is the gate doing its job on its own author a second time: an
+uncommitted RCA does not exist (`RCA-0002`), and five errors had already been
+raised the same way when this ledger was seeded.
 
 ## Layout
 
