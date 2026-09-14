@@ -104,3 +104,15 @@ surfaces:
       fleet/console.py snapshot() served at GET /api/fleet/snapshot, the
       push channel GET /api/fleet/stream (SSE), and the history endpoint
       GET /api/fleet/events. Offline (no tmux, no TTY, no network egress).
+  finops_reports:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      FinOps single-pane reports (issue #341): live per-tenant and per-agent
+      cost/budget/usage from telemetry/metering + telemetry/budgets, with
+      pricing-tier cost_details, soft vs hard cap semantics, spend alerts on
+      warning/alert thresholds and an honest NO_DATA path. Served read-only at
+      GET /api/finops/overview, GET /api/finops/report?tenant=<id> and
+      GET /api/finops/alerts. Offline (no network egress).

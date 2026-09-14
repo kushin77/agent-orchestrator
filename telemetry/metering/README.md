@@ -35,6 +35,7 @@ network, no server, no npm/node.
 | Durable aggregation — no lost counts across instances | `store.py` (append-only JSONL; rollups re-scan the full log) |
 | Daily + monthly usage rollups per tenant/agent/model; usage API for tenants + internal billing | `report.py` (`UsageReporter`) |
 | Cost attribution (per-tenant, per-agent, provider mix) | `report.py`, `cli.py report` |
+| `usageDetails` / `costDetails` breakdown per pricing tier (issue #341) | `cost_details.py` (`CostModel`, `CostBreakdown`, `TierTotals`) |
 | Observe→enforce toggle: enforce daily token budgets when enabled (safe rollout) | `budget.py`, `config/budgets.yaml` |
 | Idempotent ingest — replay never double-counts | `store.py` + `intake.py` (source-key dedup), negative tests |
 
@@ -115,6 +116,7 @@ reconcilable against a specific historical rate.
 | `intake.py` | `MeteringIntake`: source-vocabulary detection, normalization, cost resolution, idempotent `ingest()`. |
 | `store.py` | `MemoryUsageStore` / `JsonlUsageStore` — durable append-only JSONL + source-key dedup. |
 | `report.py` | `UsageReporter`: daily/monthly rollups, per-tenant/agent/model cost attribution, provider mix, billing feed. |
+| `cost_details.py` | `CostModel` + `CostBreakdown` — the `usageDetails` / `costDetails` split of usage and cost by pricing tier (`standard` / `longContext` / `local`); unknown stays `None`, never `0`. |
 | `budget.py` | `DailyTokenBudget` — observe→enforce daily token budget toggle. |
 | `config/budgets.yaml` | Default budget policies (all `observe` except the explicitly-flipped examples). |
 | `cli.py` | Offline operator CLI (`python3 -m telemetry.metering.cli …`). |

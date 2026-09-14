@@ -33,8 +33,10 @@ import subprocess
 import sys
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 import runtime
 
@@ -101,6 +103,355 @@ STALE_HEARTBEAT_SECONDS = lease.RUNG_HEARTBEAT_SECONDS
 # A directive the sister never drains is abandoned after this long; `status`
 # reports the abandoned ones rather than counting them as queued.
 DIRECTIVE_LIFETIME_SECONDS = lease.DIRECTIVE_LIFETIME_SECONDS
+
+
+# ── the declared capability set (issue #319) ────────────────────────────────
+# A control that ships but is not live is a silently absent control: after
+# isolation (#263), lifecycle (#269) and reconciliation (#304) merged, the
+# running sister kept executing pre-merge code and the only signal was
+# `watchdog decide() == "drifted"` — which compares *commits*, is reported per
+# rung, and never says WHICH capability is missing. An operator cannot tell
+# "the loop is old" from "the loop is old and therefore lanes are not being
+# beat, so orphans will never be flagged".
+#
+# So the repository declares, once, every control the fleet's rungs must have
+# live (below), a rung declares the set its build implements (in its beat), and
+# the watchdog compares the two. Each capability is anchored at the commit that
+# first provided it — `since` — so a rung that predates it is reported by NAME.
+CAPABILITY_VOCABULARY_VERSION = 1
+
+#: The rungs the watchdog supervises with a heartbeat. A capability naming any
+#: other rung could never be compared, so `scripts/check-fleet-runbook.sh`
+#: refuses a declaration that does.
+CAPABILITY_RUNGS = ("brain", "sister")
+
+
+@dataclass(frozen=True)
+class Capability:
+    """One control the fleet must have live: where it lives, and since when."""
+
+    name: str
+    version: int
+    rungs: tuple[str, ...]
+    since: str
+    evidence: str
+    summary: str
+
+    @property
+    def id(self) -> str:
+        return f"{self.name}@{self.version}"
+
+
+#: The repository's declaration: the capability set the code provides. `since`
+#: is the commit that first provided it and `evidence` the path that implements
+#: it; the gate proves both (the commit is an ancestor of HEAD and it touches
+#: that path), so a capability declared ahead of its code is a gate finding.
+CAPABILITIES: tuple[Capability, ...] = (
+    Capability(
+        name="steering-channel",
+        version=1,
+        rungs=("brain", "sister"),
+        since="01e1b4edee4a9f7b83d68b4cdcc98638ee3b5b44",
+        evidence="fleet/channel.py",
+        summary="a validated file mailbox carries every directive between the rungs",
+    ),
+    Capability(
+        name="brain-decompose",
+        version=1,
+        rungs=("brain",),
+        since="9c559f6825594726f95725181d19c51fc49ef652",
+        evidence="fleet/brain.py",
+        summary="the brain decomposes an epic into child issues and dispatches the ready wave",
+    ),
+    Capability(
+        name="lane-isolation",
+        version=1,
+        rungs=("sister",),
+        since="8b97ab612e4f7235796cf7817a8e56169091e4c0",
+        evidence="governance/isolation/cli.py",
+        summary="every dispatch mints a session identity and its own lane worktree",
+    ),
+    Capability(
+        name="lifecycle-closeout",
+        version=1,
+        rungs=("sister",),
+        since="eb081c86f0c52b0f7d052c8c0a6db6f840c2563b",
+        evidence="governance/lifecycle/cli.py",
+        summary="a merged work item is driven to terminal state instead of left half-closed",
+    ),
+    Capability(
+        name="orphan-reconcile",
+        version=1,
+        rungs=("sister",),
+        since="0ff8adf59e32f39292d8188c45249a55ddb53a0e",
+        evidence="governance/reconcile/cli.py",
+        summary="a session beats while it runs and its orphan is swept, parked or shelved",
+    ),
+    Capability(
+        name="run-pool",
+        version=1,
+        rungs=("sister",),
+        since="1a97c1f25b202efe2f5f42beefc204ace0992862",
+        evidence="fleet/terminal.py",
+        summary="each dispatch is a run marker with its own beat, so N runs read as N beats",
+    ),
+)
+
+# The three cases the signal must separate, each with its OWN remediation (the
+# issue's acceptance criterion). A case label is part of the operator contract:
+# `scripts/check-fleet-runbook.sh` requires each one to appear in a provoked
+# report, so a label cannot be renamed out of existence silently.
+KIND_CURRENT = "current"
+KIND_DOWN = "down"
+KIND_DRIFTED = "drifted"
+KIND_CAPABILITY_STALE = "capability-stale"
+KIND_UNKNOWN = "unknown"
+
+CASE_LABELS = {
+    KIND_CURRENT: "capabilities current",
+    KIND_DOWN: "rung DOWN",
+    KIND_DRIFTED: "rung on DRIFTED CODE",
+    KIND_CAPABILITY_STALE: "rung on CURRENT code MISSING a declared capability",
+    KIND_UNKNOWN: "capability declaration UNKNOWN",
+}
+
+REMEDIATION_DOWN = (
+    "start the rung: bash fleet/run-fleet.sh (one brain + one sister), or respawn just this one "
+    "with python3 fleet/watchdog.py run"
+)
+REMEDIATION_DRIFTED = (
+    "restart the rung BETWEEN runs so it loads HEAD: bash fleet/terminal.sh (sister) / "
+    "bash fleet/brain.sh (brain). python3 fleet/watchdog.py run respawns an idle drifted rung "
+    "and deliberately leaves a run in flight alone"
+)
+REMEDIATION_CAPABILITY_STALE = (
+    "a restart will NOT fix this: the rung is already on HEAD and does not implement what the "
+    "repository declares, so the owning lane must wire the capability (or correct the "
+    "declaration) and the restart then loads the fix"
+)
+REMEDIATION_UNKNOWN = (
+    "cannot assess the rung's declaration: fix the vocabulary version it reports (or the commit "
+    "it beats with) and re-run"
+)
+
+
+@dataclass(frozen=True)
+class CapabilityFinding:
+    """What one rung implements, measured against the repository's declaration."""
+
+    rung: str
+    kind: str
+    missing: tuple[str, ...] = ()
+    undeclared: tuple[str, ...] = ()
+    detail: str = ""
+    remediation: str = ""
+
+    @property
+    def case(self) -> str:
+        return CASE_LABELS[self.kind]
+
+    @property
+    def stale(self) -> bool:
+        """True when a declared capability is provably missing on this rung."""
+        return bool(self.missing)
+
+
+@dataclass(frozen=True)
+class CapabilityDeclaration:
+    """A rung's own declaration of what it implements, and where it came from."""
+
+    ids: frozenset[str] | None
+    source: str  # "beat" (the rung declared a list) or "commit" (derived)
+    version: int | None = None
+
+    @property
+    def assessable(self) -> bool:
+        return self.ids is not None
+
+
+#: `git` answers per commit are cached: one watchdog pass resolves a rung's
+#: commit once, and `status` re-reads the same beats within a tick.
+_COMMIT_CAPABILITIES: dict[str, frozenset[str] | None] = {}
+
+
+def _git(args: list[str]) -> subprocess.CompletedProcess | None:
+    try:
+        return subprocess.run(
+            ["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def capabilities_for_rung(rung: str) -> tuple[Capability, ...]:
+    """The capability set the repository declares for one rung."""
+    return tuple(cap for cap in CAPABILITIES if rung in cap.rungs)
+
+
+def commit_capabilities(commit: str) -> frozenset[str] | None:
+    """The capability ids the code at `commit` provides, or None if unassessable.
+
+    A capability is provided at a commit when the commit it shipped in (`since`)
+    is an ancestor of it — the rung that declares that commit loaded a build
+    containing the capability's code. An unknown or malformed commit answers
+    None (CANNOT-ASSESS) rather than "missing nothing", so it can never be read
+    as a pass.
+    """
+    if not commit or commit == "unknown":
+        return None
+    if commit in _COMMIT_CAPABILITIES:
+        return _COMMIT_CAPABILITIES[commit]
+    verified = _git(["rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}"])
+    if verified is None or verified.returncode != 0:
+        _COMMIT_CAPABILITIES[commit] = None
+        return None
+    provided: set[str] = set()
+    for cap in CAPABILITIES:
+        result = _git(["merge-base", "--is-ancestor", cap.since, commit])
+        if result is None or result.returncode not in (0, 1):
+            _COMMIT_CAPABILITIES[commit] = None
+            return None
+        if result.returncode == 0:
+            provided.add(cap.id)
+    frozen = frozenset(provided)
+    _COMMIT_CAPABILITIES[commit] = frozen
+    return frozen
+
+
+def rung_declaration(
+    beat: dict | None,
+    *,
+    resolve: Callable[[str], frozenset[str] | None] = commit_capabilities,
+) -> CapabilityDeclaration:
+    """Read what a rung says it implements — its own declaration, twice over.
+
+    A beat may carry `capabilities` (the versioned list its build implements)
+    and `capabilities_version` (the vocabulary it speaks). That field is
+    ADDITIVE: every beat written before it shipped carries no list, and those
+    rungs declare themselves through the `commit` they beat with, which is a
+    declaration the running build writes about itself. Either way the set is
+    the rung's, never the watchdog's.
+    """
+    if beat is None:
+        return CapabilityDeclaration(ids=None, source="beat")
+    entry = beat.get("capabilities")
+    if entry is not None:
+        version = beat.get("capabilities_version")
+        if version != CAPABILITY_VOCABULARY_VERSION:
+            return CapabilityDeclaration(ids=None, source="beat", version=version)
+        if not isinstance(entry, (list, tuple)) or any(not isinstance(item, str) for item in entry):
+            return CapabilityDeclaration(ids=None, source="beat", version=version)
+        return CapabilityDeclaration(ids=frozenset(entry), source="beat", version=version)
+    return CapabilityDeclaration(ids=resolve(str(beat.get("commit", "unknown"))), source="commit")
+
+
+def capability_finding(
+    rung: str,
+    beat: dict | None,
+    head: str,
+    *,
+    resolve: Callable[[str], frozenset[str] | None] = commit_capabilities,
+) -> CapabilityFinding:
+    """Compare what a rung implements against what the repository declares.
+
+    Separates the three cases the fleet must not conflate, each with its own
+    remediation: a rung that is DOWN (no beat), a rung on DRIFTED CODE (a
+    different commit from HEAD), and a rung on CURRENT code that does not
+    implement a capability the repository declares — the one a commit
+    comparison calls healthy.
+    """
+    declared = capabilities_for_rung(rung)
+    if not declared:
+        return CapabilityFinding(rung=rung, kind=KIND_CURRENT, detail="no capability is declared for this rung")
+    if beat is None:
+        return CapabilityFinding(rung=rung, kind=KIND_DOWN, detail="no heartbeat", remediation=REMEDIATION_DOWN)
+    if head in ("", "unknown"):
+        return CapabilityFinding(
+            rung=rung,
+            kind=KIND_UNKNOWN,
+            detail="HEAD cannot be read, so the repository's live declaration cannot be compared",
+            remediation=REMEDIATION_UNKNOWN,
+        )
+    running = str(beat.get("commit", "unknown"))
+    drifted = running != head
+    if not drifted and beat.get("capabilities") is None:
+        # The rung beats HEAD's commit and declares no list of its own: its build
+        # IS the build HEAD describes, so it provides every declared capability
+        # (the gate proves each `since` is an ancestor of HEAD). No ancestry walk
+        # is needed — and a short sha in a beat is therefore not "unreadable".
+        return CapabilityFinding(
+            rung=rung,
+            kind=KIND_CURRENT,
+            detail=f"on HEAD {head}; its build is the declared build",
+        )
+    declaration = rung_declaration(beat, resolve=resolve)
+    if not declaration.assessable:
+        detail = (
+            f"running {running}, HEAD {head}: the beat's capability list is not readable"
+            if declaration.source == "beat"
+            else f"running {running}, HEAD {head}: its commit cannot be resolved to a capability set"
+        )
+        return CapabilityFinding(
+            rung=rung,
+            kind=KIND_UNKNOWN,
+            detail=detail,
+            remediation=REMEDIATION_UNKNOWN,
+        )
+    declared_ids = declaration.ids
+    if declared_ids is None:  # `assessable` already refused this; kept as the type narrowing
+        return CapabilityFinding(
+            rung=rung,
+            kind=KIND_UNKNOWN,
+            detail=f"running {running}, HEAD {head}: the rung's declaration could not be read",
+            remediation=REMEDIATION_UNKNOWN,
+        )
+    missing = tuple(cap.id for cap in declared if cap.id not in declared_ids)
+    known = {cap.id for cap in CAPABILITIES}
+    undeclared = tuple(sorted(declared_ids - known))
+    if drifted:
+        return CapabilityFinding(
+            rung=rung,
+            kind=KIND_DRIFTED,
+            missing=missing,
+            undeclared=undeclared,
+            detail=f"running {running}, HEAD {head} (declared from its {declaration.source})",
+            remediation=REMEDIATION_DRIFTED,
+        )
+    if missing:
+        declares = len(declared) - len(missing)
+        return CapabilityFinding(
+            rung=rung,
+            kind=KIND_CAPABILITY_STALE,
+            missing=missing,
+            undeclared=undeclared,
+            detail=f"on HEAD {head} yet declaring {declares} of {len(declared)} ({declaration.source})",
+            remediation=REMEDIATION_CAPABILITY_STALE,
+        )
+    return CapabilityFinding(
+        rung=rung,
+        kind=KIND_CURRENT,
+        undeclared=undeclared,
+        detail=f"on HEAD {head}, declaring all {len(declared)}",
+    )
+
+
+def capability_line(finding: CapabilityFinding) -> str:
+    """One operator line per rung: the case, every missing capability, the fix."""
+    prefix = f"{finding.rung}: {finding.case}"
+    if finding.kind == KIND_CURRENT:
+        extra = ""
+        if finding.undeclared:
+            extra = (
+                f" — WARNING: it declares {', '.join(finding.undeclared)}, which the repository does "
+                "not declare (the declaration is behind the code)"
+            )
+        return f"{prefix} — {finding.detail}{extra}"
+    if finding.missing:
+        return (
+            f"{prefix} — CAPABILITY STALE: missing {', '.join(finding.missing)} "
+            f"({finding.detail}); remediation: {finding.remediation}"
+        )
+    return f"{prefix} — {finding.detail}; remediation: {finding.remediation}"
 
 
 def now_iso() -> str:
@@ -384,11 +735,14 @@ def running_loop_pids() -> list[int]:
 
 
 def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -> bool:
-    """Report one rung's liveness and code drift; True when it is live and current.
+    """Report one rung's liveness, code drift and capability set; True when it is live and current.
 
     Shared by the brain and the sister so neither can be silently absent from
     `status`, and so a rung running merged-but-unrestarted code is reported as
-    such instead of looking dead.
+    such instead of looking dead. Issue #319 adds the third question a commit
+    comparison cannot answer: does the running rung implement the controls the
+    repository declares? A rung that is *current* and still missing a capability
+    is reported by name, because a restart cannot fix it.
     """
     try:
         beat = json.loads(heartbeat_path.read_text(encoding="utf-8"))
@@ -408,6 +762,7 @@ def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -
             )
         else:
             print(f"{name}: NO HEARTBEAT and no process — this rung is down (start: {start_cmd})")
+        print(capability_line(capability_finding(name, None, head_commit())))
         return False
 
     age = heartbeat_age_seconds(beat)
@@ -420,13 +775,19 @@ def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -
     current = head_commit()
     print(f"{name}: {verdict} — pid {beat.get('pid', '?')}, state {state}, last beat {int(age)}s ago")
     print(f"{name}: running commit {running} | HEAD {current}")
-    if current != "unknown" and running != current:
+    drifted = current != "unknown" and running != current
+    if drifted:
         print(
             f"{name}: CODE DRIFT — it is running {running}, not HEAD {current}; merged fixes are not "
             f"live. Restart: {start_cmd}"
         )
-        return False
-    return age <= STALE_HEARTBEAT_SECONDS
+    finding = capability_finding(name, beat, current)
+    print(capability_line(finding))
+    return (
+        age <= STALE_HEARTBEAT_SECONDS
+        and not drifted
+        and finding.kind not in (KIND_CAPABILITY_STALE, KIND_UNKNOWN)
+    )
 
 
 def expired_directives(directory: Path, moment: float | None = None) -> list[Path]:
