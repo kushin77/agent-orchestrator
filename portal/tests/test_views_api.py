@@ -4,16 +4,42 @@ Each console surface is served by a data endpoint returning the envelope, and
 every view document exists as a static frame. Destructive ops are
 approval-gated (cpapi, issue #38 shape): retire creates a pending approval,
 approve executes it, deny never executes it.
+
+Issue #348: budgets/quota/usage are READ from the live telemetry stores
+(``telemetry/budgets|metering``), so the budget test below asserts the portal
+equals the telemetry config it consumes instead of a hardcoded demo number.
 """
 
 from __future__ import annotations
 
 import pytest
-from conftest import ApiClient, login_as
+import yaml
+from conftest import REPO_ROOT, ApiClient, login_as
 
 
 def _data(payload):
     return payload["data"]
+
+
+_TELEMETRY = REPO_ROOT / "telemetry"
+
+
+def _telemetry_policy(tenant_id: str) -> dict:
+    """The tenant's cost/token policy from telemetry/budgets/config/policies.yaml."""
+    cfg = yaml.safe_load(
+        (_TELEMETRY / "budgets" / "config" / "policies.yaml").read_text(encoding="utf-8")
+    )
+    return next(p for p in cfg["policies"] if p["tenantId"] == tenant_id)
+
+
+def _telemetry_quota(tenant_id: str) -> tuple[dict, dict]:
+    """(planDefaults, tenant overrides) from telemetry/budgets/config/quotas.yaml."""
+    cfg = yaml.safe_load(
+        (_TELEMETRY / "budgets" / "config" / "quotas.yaml").read_text(encoding="utf-8")
+    )
+    plan_defaults = cfg["planDefaults"]
+    entry = next(t for t in cfg["tenantQuotas"] if t["tenantId"] == tenant_id)
+    return plan_defaults[entry["plan"]], entry.get("quotas", {})
 
 
 VIEW_NAMES = [
@@ -78,16 +104,27 @@ def test_personas_and_prompts_surfaces(app):
 
 
 def test_budgets_and_usage_surfaces(app):
+    """Budgets/quota/usage project the LIVE telemetry config + metering feed."""
     api = login_as(app, "alice@acme.example.com", "acme")
     status, payload = api.get("/api/tenants/acme/budgets")
     budgets = _data(payload)
-    assert budgets["monthlyBudgetUsd"] == 2500.0
-    assert 0 < budgets["budgetUtilizationPct"] < 100
-    assert "quota" in budgets
+    policy = _telemetry_policy("acme")
+    assert budgets["monthlyBudgetUsd"] == policy["cost"]["limitUsd"]
+    assert budgets["dailyTokenLimit"] == policy["tokens"]["limit"]
+    # No metering feed on this checkout => zero spend against the declared
+    # budget: an honest zero, not a fabricated utilization figure.
+    assert budgets["usageMonthUsd"] == 0.0
+    assert budgets["budgetUtilizationPct"] == 0.0
+    # The quota is the telemetry tenant's effective plan quota.
+    plan_defaults, overrides = _telemetry_quota("acme")
+    assert budgets["quota"]["calls"]["soft"] == overrides["requests"]["softLimit"]
+    assert budgets["quota"]["calls"]["hard"] == overrides["requests"]["hardLimit"]
+    assert budgets["quota"]["tokens"]["soft"] == plan_defaults["tokens"]["softLimit"]
     status, payload = api.get("/api/tenants/acme/usage")
     usage = _data(payload)
-    assert usage["series"]
-    assert usage["totals"]["calls"] > 0
+    # The feed is empty here, so the projection is empty and totals are zero.
+    assert usage["series"] == []
+    assert usage["totals"] == {"calls": 0, "tokens": 0, "costUsd": 0.0}
 
 
 def test_agent_activate_pause_lifecycle(app):

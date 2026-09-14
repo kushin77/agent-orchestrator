@@ -1,10 +1,14 @@
 """portal.server.catalog — read-model projections over :class:`ConsoleState`.
 
-Each view's data is a pure projection (never a second source of truth) over
-the seeded console state. Shapes mirror the merged pillar vocabularies so the
-front-end JSON matches what the control-plane REST surface (issue #38) would
-return: agent statuses from registry/service, budgets from telemetry/budgets,
-audit records from telemetry/ledger, prompt FP/FN from registry/prompts.
+Each view's data is a pure projection (never a second source of truth) over the
+console state, which is itself hydrated from the **live** registry +
+telemetry stores (issue #348): the agent roster resolves its identity from
+``registry/profiles/seeds`` and budgets/quota/usage are read from
+``telemetry/budgets|metering``. Shapes mirror the merged pillar vocabularies so
+the front-end JSON matches what the control-plane REST surface (issue #38)
+would return: agent statuses from registry/service, budgets from
+telemetry/budgets, audit records from telemetry/ledger, prompt FP/FN from
+registry/prompts.
 """
 
 from __future__ import annotations
@@ -147,6 +151,44 @@ def prompts(state: ConsoleState) -> list[dict[str, Any]]:
     return result
 
 
+def _quota_projection(state: ConsoleState, tenant_id: str) -> dict[str, Any]:
+    """The tenant's effective quota, READ from the live telemetry config.
+
+    ``soft``/``hard`` come from ``telemetry/budgets/config/quotas.yaml``
+    (plan defaults overlaid with the tenant's explicit overrides); ``used``
+    comes from the live metering feed for the metered resources (calls/tokens)
+    and is 0 for the resources with no live probe (concurrency/storage) — an
+    honest zero, never an invented figure. A tenant with no declared plan reads
+    as zeros across the board (nothing declared).
+    """
+    declared: dict[str, dict[str, Any]] = {}
+    if state.telemetry is not None:
+        declared = state.telemetry.effective_quota(tenant_id)
+    totals = (
+        state.telemetry.usage_totals(tenant_id)
+        if state.telemetry is not None
+        else {"calls": 0, "tokens": 0}
+    )
+    tenant = state.tenants[tenant_id]
+
+    def spec(resource: str, used: int) -> dict[str, int]:
+        entry = declared.get(resource) or {}
+        return {
+            "soft": int(entry.get("softLimit") or 0),
+            "hard": int(entry.get("hardLimit") or 0),
+            "used": int(used),
+        }
+
+    return {
+        # telemetry calls the request resource `requests`; the console's
+        # vocabulary (and the Budgets view) calls it `calls`.
+        "calls": spec("requests", totals["calls"]),
+        "tokens": spec("tokens", tenant.usage_today_tokens),
+        "concurrency": spec("concurrency", 0),
+        "storage": spec("storage", 0),
+    }
+
+
 def budgets(state: ConsoleState, tenant_id: str) -> dict[str, Any]:
     tenant = state.tenants[tenant_id]
     utilization = (
@@ -167,16 +209,7 @@ def budgets(state: ConsoleState, tenant_id: str) -> dict[str, Any]:
         "dailyTokenLimit": tenant.daily_token_limit,
         "usageTodayTokens": tenant.usage_today_tokens,
         "tokenUtilizationPct": token_utilization,
-        "quota": {
-            "calls": {"soft": 120_000, "hard": 150_000, "used": 41_300},
-            "tokens": {
-                "soft": tenant.daily_token_limit,
-                "hard": tenant.daily_token_limit * 2,
-                "used": tenant.usage_today_tokens,
-            },
-            "concurrency": {"soft": 24, "hard": 48, "used": 11},
-            "storage": {"soft": 100_000, "hard": 200_000, "used": 28_400},
-        },
+        "quota": _quota_projection(state, tenant_id),
         "paused": tenant.paused,
     }
 
