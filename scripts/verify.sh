@@ -220,6 +220,28 @@ checks=(
   'diagrams-capability-tracker|bash scripts/track-diagrams-capabilities.sh'
   'codeidx-capability-register|bash scripts/check-codeidx-capability-register.sh'
   'codeidx-capability-tracker|bash scripts/track-codeidx-capabilities.sh'
+  # EPIC #500 (M30 — the enterprise chat surface in the Single Pane of Glass):
+  # the six conversational-surface gates delivered by the sibling chat lanes.
+  # They are registered here because this array is explicit and nothing is
+  # auto-discovered, so a `scripts/check-*.sh` that is not named here is inert —
+  # it runs only if someone remembers to run it, which is the formality GR-12
+  # forbids. All six are offline and deterministic (no network, no `vendor/CMR`
+  # submodule, no vendored seed), so unlike the `diagrams-declaration` /
+  # `codeidx-surface` gates above they RUN for real (rc 0) in a fresh worktree
+  # and are never recorded as CANNOT-ASSESS. Each also provokes its own negative
+  # controls, so a green result cannot come from a gate that exercises nothing.
+  # NB: the seventh gate named by issue #502, `check-chat-surface.sh`, was NOT
+  # registered when this lane was written because it did not exist yet — it is
+  # owned by #503, which has since landed (PR #564). It is registered directly
+  # below by issue #568, which wired it and repaired the red gate of record its
+  # landing caused. Naming that gap was honest; a stub would have been an
+  # invented check, which is worse than a named gap.
+  'chat-tools|bash scripts/check-chat-tools.sh'            # #504 grounding lane
+  'chat-identity|bash scripts/check-chat-identity.sh'      # #505 identity lane
+  'chat-finops|bash scripts/check-chat-finops.sh'          # #506 FinOps lane
+  'chat-guardrails|bash scripts/check-chat-guardrails.sh'  # #507 guardrails lane
+  'chat-ux|bash scripts/check-chat-ux.sh'                  # #508 UX lane
+  'chat-eval|bash scripts/check-chat-eval.sh'              # #509 eval lane
   # EPIC #500 (the enterprise chat surface), issue #568: the seventh chat gate.
   # #503 (PR #564) shipped `scripts/check-chat-surface.sh` -- the OpenAI-/
   # Ollama-compatible contract and its flag gate -- but nothing invoked it, so
