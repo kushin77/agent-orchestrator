@@ -220,6 +220,26 @@ checks=(
   'diagrams-capability-tracker|bash scripts/track-diagrams-capabilities.sh'
   'codeidx-capability-register|bash scripts/check-codeidx-capability-register.sh'
   'codeidx-capability-tracker|bash scripts/track-codeidx-capabilities.sh'
+  # EPIC #500 (M30 — the enterprise chat surface in the Single Pane of Glass):
+  # the six conversational-surface gates delivered by the sibling chat lanes.
+  # They are registered here because this array is explicit and nothing is
+  # auto-discovered, so a `scripts/check-*.sh` that is not named here is inert —
+  # it runs only if someone remembers to run it, which is the formality GR-12
+  # forbids. All six are offline and deterministic (no network, no `vendor/CMR`
+  # submodule, no vendored seed), so unlike the `diagrams-declaration` /
+  # `codeidx-surface` gates above they RUN for real (rc 0) in a fresh worktree
+  # and are never recorded as CANNOT-ASSESS. Each also provokes its own negative
+  # controls, so a green result cannot come from a gate that exercises nothing.
+  # NB: the seventh gate named by issue #502, `check-chat-surface.sh`, is NOT
+  # registered because it does not exist yet — it is owned by #503 (the
+  # serving-surface lane, still open). Naming that gap is honest; a stub for it
+  # would be an invented check, which is worse than a named gap.
+  'chat-tools|bash scripts/check-chat-tools.sh'            # #504 grounding lane
+  'chat-identity|bash scripts/check-chat-identity.sh'      # #505 identity lane
+  'chat-finops|bash scripts/check-chat-finops.sh'          # #506 FinOps lane
+  'chat-guardrails|bash scripts/check-chat-guardrails.sh'  # #507 guardrails lane
+  'chat-ux|bash scripts/check-chat-ux.sh'                  # #508 UX lane
+  'chat-eval|bash scripts/check-chat-eval.sh'              # #509 eval lane
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master
