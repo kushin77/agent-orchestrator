@@ -59,7 +59,9 @@ def all_controls_on():
     """A controls registry with every shipped control flipped ON (for tests).
 
     Shipping-ON controls carry the required on_since_rationale; this registry
-    exists only to exercise the engine, never as the deployed default.
+    exists only to exercise the engine, never as the deployed default.  It must
+    register EVERY control the shipped bundle references, because the startup
+    gate rejects a bundle whose policies name an unregistered control.
     """
     from policy.controls import ControlRegistry
 
@@ -77,7 +79,18 @@ def all_controls_on():
                     "since": "issue #26 tests",
                     "on_since_rationale": "test-only registry enabling the control",
                 }
-                for control_id in ("model-call-budget", "tool-use-guard", "data-egress-guard")
+                for control_id in (
+                    # issue #26 platform examples
+                    "model-call-budget",
+                    "tool-use-guard",
+                    "data-egress-guard",
+                    # issue #636 workbook mechanical rules
+                    "workbook-vector-memory-frontload",
+                    "workbook-drawio-mcp-diagramming",
+                    "workbook-external-state-caching",
+                    "workbook-zero-token-arithmetic",
+                    "workbook-webhook-caching",
+                )
             ],
         }
     )

@@ -164,6 +164,9 @@ controls:
     since: "issue #26"
 ```
 
+The registry ships **eight** controls: the three platform examples above plus
+the five workbook mechanical-rule controls of issue #636 (all default OFF).
+
 * A control is **active** only when it is registered **and** `enabled: true`.
 * A policy is enforced only when `policy.enabled` is true **and** every control
   id it declares is registered AND active.  Referencing an unregistered control
@@ -223,6 +226,30 @@ controls OFF by default):
 | [`model-call-budget.yaml`](bundles/platform/model-call-budget.yaml) | `model-call-budget` | BLOCK at utilization ≥ 1.0, WARN at ≥ 0.8, LOG otherwise |
 | [`tool-use.yaml`](bundles/platform/tool-use.yaml) | `tool-use-guard` | BLOCK shell without tenant grant (fail-closed on absent grant), BLOCK exfiltration family, WARN on network probes |
 | [`data-egress.yaml`](bundles/platform/data-egress.yaml) | `data-egress-guard` | BLOCK pii/secret egress + cleartext http, WARN sensitive, LOG benign |
+
+### Workbook mechanical rules (issue #636)
+
+The enterprise workbook's Tab 3 mechanical enforcement rules (derived from the
+C-suite org chart, issue #614 / gap analysis #631) ship as five named policy
+ids in
+[`bundles/platform/workbook-mechanical-rules.yaml`](bundles/platform/workbook-mechanical-rules.yaml),
+one per rule, each gated behind its own control (all OFF):
+
+| Policy id | Control | Rule (persona) | Gate attribute | Shape |
+|---|---|---|---|---|
+| `workbook-vector-memory-frontload` | `workbook-vector-memory-frontload` | vector-memory frontload (CEO) | `prefetch.frontloaded == true` → BLOCK | deny-list |
+| `workbook-drawio-mcp-diagramming` | `workbook-drawio-mcp-diagramming` | draw.io MCP diagramming (CTO) | `drawio.mcp_tool_list_cacheable == true` → LOG | allow-list |
+| `workbook-external-state-caching` | `workbook-external-state-caching` | external-state caching (COO) | `external_state.cacheable == true` → LOG | allow-list |
+| `workbook-zero-token-arithmetic` | `workbook-zero-token-arithmetic` | zero-token arithmetic (CFO) | `arithmetic.cacheable == true` → LOG | allow-list |
+| `workbook-webhook-caching` | `workbook-webhook-caching` | webhook caching (CMO) | `webhook.cacheable == true` → LOG | allow-list |
+
+Every rule's decision is **mechanical**: it is one boolean a producer
+publishes in the evaluation context, never prose, a wording match or a review.
+The four cache rules are statement-of-intent gates (`default: block`) — a
+value declared cacheable is allowed, and anything else, including the gate
+attribute being **absent**, fails closed to BLOCK. The contract, the
+reasoning behind each shape, and the per-rule semantics are documented in
+[`workbook-mechanical-rules.md`](workbook-mechanical-rules.md).
 
 ## Acceptance criteria (issue #26)
 
