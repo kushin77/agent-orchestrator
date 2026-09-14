@@ -167,12 +167,60 @@ read-only mirrors (per the cannibalization index, [`docs/CANNIBALIZATION.md`](..
 | `defragsuite` `services/defrag-portal/main.py` | RBAC policy/intervention control plane + live approve feed | `static/views/policies.html` + `approvals.html`, `server/controls.py` |
 | `git-rca-workspace` `portal-backend/app/` | portal-backend auth/session/middleware separation | `server/httpd.py` + `server/app.py` |
 
+## The conversational surface (issue #508, ADR-0023)
+
+`portal/static/views/chat.html` (+ `static/js/chat.js`, served by
+`server/chat.py`) is the console's **conversational surface**. It is
+gateway-authoritative, exactly as the conversational-surface ADR freezes it:
+the portal owns transport, provenance rendering and honest degradation, and
+**imports no authority** — `gateway/**`, `identity/**`, `telemetry/**`,
+`guardrails/**` and `registry/**` are consumed over HTTP and never imported
+from Python.
+
+### The upstream contract it speaks (OpenAI-/Ollama-compatible)
+
+| Call | Purpose |
+|---|---|
+| `POST {gateway}/v1/chat/completions` with `stream: true` | one turn. The `model` field carries a **tier** token (`LOW/MED/HIGH/MAX`), because the chooser is the authority that resolves a tier to a provider model. `data: {chunk}` frames arrive token by token and end with `data: [DONE]`. |
+| the `ao` extension on a chunk | what the surface renders and nothing it invents: `ao.tier.{requested,resolved,resolvedModel}`, `ao.citations.{sources,fragments}`, `ao.degraded.{degraded,reason,fromTier,toTier}`, `ao.grounding.{state,note}`, `ao.usage.{estimatedCostUsd,latencyMs}` |
+| `GET {gateway}/v1/ao/finops/budget?tenant=<id>` | the tenant's pre-flight budget state (`action` ∈ `allow/warn/fallback/stop`) |
+
+Point the surface at an authority with `AO_PORTAL_CHAT_GATEWAY` (default
+`127.0.0.1:8788`); conversations are stored under `AO_PORTAL_CHAT_STORE`
+(default `<repo>/.portal/chat`, never committed).
+
+### Honest degradation is a state machine, not a happy path
+
+| State | Rendered as |
+|---|---|
+| no envelope / no sources | `grounding.state = NO_DATA` — "no data for this", never an empty success |
+| a fragment the envelope does not back | `data-supported="false"` and the label *unsupported — no source in the citations envelope* (shown, never promoted to fact) |
+| a fallback-tier answer | `data-degraded="true"` with the reason and the `fromTier → toTier` move |
+| usage the read model did not return | `data-usage="no_data"` — never `$0.00` |
+| budget `warn`/`fallback` (soft) | `severity: warning`, distinct badge, the turn **still sends** |
+| budget `stop` (hard) | `severity: hard_stop`, distinct badge, the turn is **refused** (`402 chat_budget_hard_stop`) before the model call |
+| budget unreadable | `severity: no_data`, the turn is refused (`503 chat_budget_no_data`) — the pre-flight check **fails closed**, so a budget that cannot be read is never assumed to be open |
+| upstream fault / truncated stream | the turn lands `failed` (`turn.error`) with its partial text kept |
+
+Not-found and refused are different answers on purpose: an unknown tier is
+`400 chat_unknown_tier`, a client-supplied provider model is `400
+chat_tier_only` (the client selects a *tier*, never a model), and a turn that
+was stopped is persisted `cancelled` rather than silently dropped.
+
+The surface ships **feature-flag-gated OFF** in
+`infra/feature-flags/registry.yaml` under `surfaces.chat` (read through the
+fleet projection's fail-closed `surface_enabled`, so an absent entry is OFF):
+while it is off the whole `/api/chat/*` family **and** the view's own static
+assets (`views/chat.html`, `js/chat.js`) are absent, and the check runs
+**before** AuthN so an unpromoted surface is invisible rather than
+distinguishable by an authentication probe. `scripts/check-chat-ux.sh` proves
+that control by provoking it.
+
 ## Verification (2026-09-08)
 
-- `python3 -m pytest portal/tests -q -p no:cacheprovider` → **90 passed**
+- `python3 -m pytest portal/tests -q -p no:cacheprovider` → **{count} passed**
   (SSO/RBAC negatives, control↔policy mapping, audit verify chain, views/API,
-  static-asset twins + no-cascade + offline).
-- `make verify` → green (see PR evidence). The suite is lane-local and is not
-  registered in `scripts/pytest-suites.txt` (a foundation/QA-owned file), so
-  `make gate`/`make verify` stay green and the suite is exercised here.
+  static-asset twins + no-cascade + offline, and the conversational surface
+  driven against a loopback fake serving surface). The suite is registered in
+  `scripts/pytest-suites.txt` and is exercised by `make verify`.
 
