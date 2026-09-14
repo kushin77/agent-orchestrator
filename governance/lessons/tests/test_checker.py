@@ -558,20 +558,29 @@ def test_breaking_a_required_link_turns_the_gate_red(report_factory, clean_recor
 
 
 def test_the_repositorys_own_ledger_is_green():
-    """The shipped ledger must satisfy the gate it installs (real data)."""
+    """The shipped ledger must satisfy the gate it installs (real data).
+
+    The gate of record (``cli.py check``) loads ``policy.yaml`` before it
+    checks, so this self-control mirrors it instead of using the empty default
+    policy: issue #141 — the issue that installs this process — is exempt by
+    policy and reported as such, never silently skipped.
+    """
     probe = GitProbe(REPO_ROOT)
     if not probe.available:
         pytest.skip("not a git work tree; tracked-ness cannot be assessed")
     ledger = load_ledger(REPO_ROOT / "governance/lessons/ledger.jsonl")
     snapshot = load_snapshot(REPO_ROOT / ".board/snapshot.json")
+    policy = load_policy(REPO_ROOT / "governance/lessons/policy.yaml")
     report = check_ledger(
         ledger,
         root=REPO_ROOT,
         snapshot=snapshot,
+        policy=policy,
         today=date(2026, 9, 15),
         git=probe,
     )
     assert errors(report.findings) == []
+    assert CODE_BOARD_INCIDENT_EXEMPT in codes(report)
     assert report.counts["incidents"] >= 5
     assert report.counts["incidents_closed"] >= 4
     assert report.counts["rcas"] >= 5
