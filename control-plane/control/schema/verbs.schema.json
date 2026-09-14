@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cmr.control-verbs/v1",
+  "title": "Control-verb vocabulary (issue #553, EPIC #551)",
+  "description": "The one declaration of every control verb. Closed sets: effect_classes, refusals. A verb outside this file does not exist.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "effect_classes", "refusals", "verbs"],
+  "properties": {
+    "schema": { "const": "cmr.control-verbs/v1" },
+    "effect_classes": {
+      "type": "object",
+      "description": "Closed map of effect class -> meaning. The class set is exactly these four keys.",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "required": ["read", "hold", "stop", "irreversible"]
+    },
+    "refusals": {
+      "type": "object",
+      "description": "Closed map of HTTP refusal code -> reason. A verb may cite only these codes.",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "minProperties": 1
+    },
+    "verbs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "source", "local", "effect_class",
+          "capability", "audit", "idempotent", "exposed", "refusals"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9-]*$",
+            "description": "`<family>.<action>`. ADR-0025 D2: the API resource segment is `fleet`; the action segment is owned here."
+          },
+          "source": {
+            "type": "string",
+            "description": "The file that implements the local lever."
+          },
+          "local": {
+            "type": "string",
+            "description": "The local subcommand name in that file."
+          },
+          "effect_class": {
+            "enum": ["read", "hold", "stop", "irreversible"]
+          },
+          "capability": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$",
+            "description": "identity/rbac capability the caller must hold, `resource:action`."
+          },
+          "audit": {
+            "type": ["string", "null"],
+            "description": "Action recorded on the existing rails. MUST be non-null for every non-read verb and null for a read (ADR-0025 D3)."
+          },
+          "idempotent": { "type": "boolean" },
+          "exposed": {
+            "type": "boolean",
+            "description": "May this verb be reached over the control API (RC-3)? false requires why_not_exposed."
+          },
+          "why_not_exposed": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when exposed is false: a verb is never silently dropped."
+          },
+          "immediate": {
+            "type": "boolean",
+            "description": "Terminates without a graceful drain (e.g. kill vs stop)."
+          },
+          "refusals": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "integer" },
+            "description": "Subset of the closed refusal-code set above; must include 401/403/503 unless justified in `note`."
+          },
+          "note": {
+            "type": "string",
+            "description": "Why this verb is declared the way it is. Optional; never a substitute for a field."
+          }
+        }
+      }
+    }
+  }
+}
