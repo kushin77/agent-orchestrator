@@ -73,6 +73,12 @@ variable "enable_web" {
   default     = false
 }
 
+variable "enable_paperclip" {
+  description = "Deploy the self-hosted upstream paperclip runtime beside the control plane (issue #411, ADR-0013). OFF until promoted."
+  type        = bool
+  default     = false
+}
+
 # --- Deployer service account (the ONLY apply route) ------------------------
 
 variable "deployer_enabled" {
@@ -145,4 +151,16 @@ variable "web_domain" {
   description = "Public hostname served by the web surface (custom domain + Google-managed TLS)."
   type        = string
   default     = "ai.purebliss.app"
+}
+
+# --- Pinned upstream runtime image (self-hosted paperclip, issue #411) -------
+#
+# The runtime is consumed as a pinned OCI image — never a floating `latest`.
+# The pin and its provenance are recorded in infra/paperclip/release.yaml; an
+# upgrade bumps both this default and that record in one reviewed PR.
+
+variable "paperclip_image" {
+  description = "Pinned upstream image for the self-hosted paperclip runtime (see infra/paperclip/release.yaml)."
+  type        = string
+  default     = "ghcr.io/paperclipai/paperclip:v2026.831.1"
 }

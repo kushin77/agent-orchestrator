@@ -1,0 +1,15 @@
+# Importable trigger for the self-hosted paperclip runtime deploy (issue #411).
+#
+# Ships disabled with its flag OFF (GR-5): importing this trigger does nothing
+# until a reviewed go-live sets `disabled: false` and flips `enable_paperclip`
+# in infra/feature-flags/registry.yaml. mirrors infra/cloudbuild's trigger shape.
+name: paperclip-runtime-deploy
+description: Flag-gated deploy of the self-hosted paperclip runtime (declaration only until promoted).
+disabled: true
+filename: infra/paperclip/cloudbuild/deploy.yaml
+substitutions:
+  _ENABLE_PAPERCLIP: 'false'
+  _PAPERCLIP_IMAGE: 'ghcr.io/paperclipai/paperclip:v2026.831.1'
+  _PAPERCLIP_SERVICE: 'paperclip'
+  _PAPERCLIP_REGION: 'us-central1'
+  _PAPERCLIP_BASE_URL: 'https://paperclip-internal.invalid'

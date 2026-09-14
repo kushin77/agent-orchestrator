@@ -50,3 +50,16 @@ module "web_surface" {
   region     = var.region
   domain     = var.web_domain
 }
+
+# The self-hosted upstream paperclip runtime (issue #411, ADR-0013): a process
+# boundary beside the control plane, not a control-plane service. Count-gated on
+# enable_paperclip, so with the flag OFF (the committed default) it is inert.
+module "paperclip_runtime" {
+  source = "../paperclip/terraform"
+
+  enabled    = var.enable_paperclip
+  name       = "${var.env}-paperclip"
+  image      = var.paperclip_image
+  project_id = var.project_id
+  region     = var.region
+}

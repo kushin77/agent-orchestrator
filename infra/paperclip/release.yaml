@@ -1,0 +1,44 @@
+# paperclip runtime release pin — issue #411, ADR-0013.
+#
+# The self-hosted upstream runtime is pinned to one exact upstream release — a
+# tag, never a floating `latest`. An upgrade is a deliberate version bump that
+# edits this file (and the matching Terraform image default) in a single
+# reviewed PR; nothing here floats.
+#
+# GR-10: no upstream source is vendored into this repository. The runtime is
+# consumed as a pinned OCI image reference at deploy time — this tree keeps the
+# pin and the provenance, never a copy of the code.
+apiVersion: v1
+kind: PaperclipReleasePin
+
+source:
+  product: paperclip.ing
+  repository: paperclipai/paperclip
+  license: MIT
+
+pin:
+  # The exact tag this deployment runs. `latest` is refused by
+  # scripts/check-paperclip-deploy.sh.
+  version: v2026.831.1
+  released: 2026-09-02
+  retrieved: 2026-09-14
+  policy: exact-tag
+
+image:
+  # The pinned OCI reference the flag-gated deploy pipeline pulls. The immutable
+  # digest is recorded here at promotion, once the image is pulled a single time
+  # through that pipeline; the tag above is the pin in force before promotion.
+  reference: ghcr.io/paperclipai/paperclip:v2026.831.1
+  digest: recorded-at-promotion
+
+runtime:
+  # Upstream's machine surface: GET /api/health. The deploy step probes it and
+  # the Cloud Run template declares startup + liveness probes against it.
+  health_path: /api/health
+  default_port: 3100
+  # ADR-0013: a process boundary — not an embed and not a fork.
+  boundary: process
+
+vendoring:
+  # GR-10 — nothing from paperclipai/paperclip lands in this tree.
+  upstream_source: none
