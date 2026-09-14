@@ -149,6 +149,8 @@ entries:
   version: 1.0.0
   file: cards/mechanical-sme.yaml
   sha256: 0a425874334b2afe7fb3c8f8170960f242cb6bc6325f7eebb3aa716195815c7c
+  status: published
+- tenant: platform
   persona: copilot
   version: 1.0.0
   file: cards/copilot.yaml
@@ -159,4 +161,34 @@ entries:
   version: 1.1.0
   file: cards/paperclip.yaml
   sha256: c61e1cb5d9a668f111cac822ed2132153b36df32283e13def41be5bd136203b7
+  status: published
+- tenant: platform
+  persona: ceo
+  version: 1.0.0
+  file: cards/ceo.yaml
+  sha256: 6040daef593da3ee5fa501fd3e564b417a207b3e9a98bbeeda01c039f62ec233
+  status: published
+- tenant: platform
+  persona: cto
+  version: 1.0.0
+  file: cards/cto.yaml
+  sha256: 744c50ae1c7eb5672141f88c4fc4b7eab5afce0d82dc1d0ed613447f6a0f0651
+  status: published
+- tenant: platform
+  persona: coo
+  version: 1.0.0
+  file: cards/coo.yaml
+  sha256: 7ed2b0fec2b766348c3749175950446252ca7644f97dc4e85c046bc76fbfb6a4
+  status: published
+- tenant: platform
+  persona: cfo
+  version: 1.0.0
+  file: cards/cfo.yaml
+  sha256: af0c9edec254c625e6e1c9f21ab5ebf600a888b6fa4bc98293179a7d26e33af5
+  status: published
+- tenant: platform
+  persona: cmo
+  version: 1.0.0
+  file: cards/cmo.yaml
+  sha256: bcf980c036b36ea0ee908ec3ee1d1530342fc6111a14eef8718f0ad85fba57c7
   status: published

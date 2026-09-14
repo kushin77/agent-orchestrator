@@ -57,6 +57,10 @@ memoryScope: [session, repository]          # closed platform memory scopes
 provenance:                                   # GR-10: read-only sources derived from
   - "kushin77/capital-underwriting scripts/agent/sme/security.txt"
 guardrails: [ ... ]        # optional human-readable non-negotiables
+# --- org-chart fields (issue #632, all OPTIONAL — backwards-compatible) ---
+reportsTo: ceo             # platform persona id, or 'board' for the chart root
+monthlyBudgetCapUsd: 300   # monthly FinOps cap in USD (non-negative number)
+heartbeatSchedule: hourly  # hourly|every-30m|every-15m|daily|event|webhook
 ```
 
 Lifecycle state (draft / published / retired) is **not** a card field — it is
@@ -72,13 +76,60 @@ and published.
 registry/personas/
 ├── README.md                  # this file — the contract doc
 ├── persona-card.schema.json   # PersonaCard JSON Schema (draft-07), closed enums
-├── registry.py                # registry API + CLI (discover/get/publish/retire/resolve)
+├── org-chart.schema.json      # OrgChart JSON Schema (issue #632)
+├── org-chart.yaml             # the platform C-suite org-chart declaration
+├── registry.py                # registry API + CLI (discover/get/publish/retire/resolve/org-chart)
 ├── mapping.py                 # persona -> AgentProfile mapping + reviewer doctrine
-├── cards/                     # seed persona cards, one file per persona (15)
+├── cards/                     # seed persona cards, one file per persona (31)
 ├── versions/
 │   └── manifest.yaml          # append-only publish/retire ledger (sha256)
-└── tests/                     # pytest suite (40 tests, offline)
+└── tests/                     # pytest suite (offline)
 ```
+
+## The org chart (issue #632, workbook-1)
+
+[`org-chart.yaml`](org-chart.yaml) is the **declared reporting structure** of
+the tenant's agent org, validated against [`org-chart.schema.json`](org-chart.schema.json)
+and, structurally, against the live persona library by
+`registry.validate_org_chart()`. It declares the five C-suite roles from the
+issue #614 Tab 1 workbook, their reporting edges, and the chart's single root:
+
+```text
+        board  (principal — a human principal OUTSIDE the agent org, never a persona)
+          ^
+          | reportsTo: board
+        ceo    (root)
+   ^      ^      ^      ^
+   |      |      |      |
+  cto    coo    cfo    cmo
+```
+
+| role | title | tier | monthly cap | heartbeat |
+|---|---|---|---|---|
+| `ceo` | Executive Strategy Director | MAX | $300 | hourly |
+| `cto` | System Architect & Dev Lead | HIGH | $250 | every-30m |
+| `coo` | Operations & Pacing Lead | MED | $100 | every-15m |
+| `cfo` | Financial & Compute Controller | LOW | $50 | daily |
+| `cmo` | Marketing & Sales Automation | MED | $200 | hourly |
+
+`validate_org_chart()` is **fail-closed** and refuses, with a named error:
+
+- an **unresolvable edge** — a `reportsTo` whose target is neither the principal
+  nor a persona that actually resolves in `cards/` (tenant-first, platform
+  fallback);
+- a **second root** — any count of roles reporting to the principal other than
+  exactly one, including zero;
+- a **root that is not the declared root**, a **cycle** or a dangling reporting
+  line, and **drift** between a node's tier/cap/heartbeat and its card's.
+
+Validate it directly:
+
+```bash
+python3 registry/personas/registry.py org-chart
+# OK    org chart platform/platform-csuite v1.0.0 (root=ceo, principal=board, 5 roles)
+#       [ceo->board, cto->ceo, coo->ceo, cfo->ceo, cmo->ceo]
+```
+
 
 ## Registry API — tenant-scoped lifecycle
 
@@ -98,6 +149,7 @@ another tenant (no cross-tenant leakage).
 | `publish(tenant, id)` | freeze current `(tenant, persona, version)` + sha256 into the ledger as published; idempotent for the same snapshot; refuses editing a published version |
 | `retire(tenant, id)` | append `status: retired`; retired personas no longer resolve |
 | `resolve(tenant, id)` | returns the published persona; refuses unknown / unpublished / retired / integrity-violated personas |
+| `load_org_chart()` / `validate_org_chart()` | load + structurally validate the org-chart declaration (issue #632): exactly one root, every edge resolvable, chart and cards in agreement |
 
 **No unversioned ad-hoc persona dispatch**: a persona must be published before
 it resolves, and `resolve` verifies the on-disk sha256 against the frozen

@@ -1,0 +1,48 @@
+# OrgChart: the platform C-suite agent org chart (issue #632, workbook-1)
+#
+# Source: issue #614 Tab 1 (C-suite org-chart table) via EPIC #631, Pillar 2
+# "Org Chart for Agents". Every row below is the workbook row verbatim in
+# `title`, with the governance columns (tier / monthly cap / heartbeat) carried
+# on both this node and the bound persona card — registry.validate_org_chart()
+# refuses the chart if the two disagree.
+#
+# Reporting lines (edges): cto/coo/cfo/cmo -> ceo; ceo -> board.
+# The board is the chart's `principal`: a human principal OUTSIDE the agent org,
+# deliberately not a persona, so it never resolves to a card.
+orgChartSchema: persona-org-chart/v1
+id: platform-csuite
+tenant: platform
+version: 1.0.0
+principal: board
+root: ceo
+roles:
+  - id: ceo
+    title: Executive Strategy Director
+    reportsTo: board
+    defaultModelTier: MAX
+    monthlyBudgetCapUsd: 300
+    heartbeatSchedule: hourly
+  - id: cto
+    title: System Architect & Dev Lead
+    reportsTo: ceo
+    defaultModelTier: HIGH
+    monthlyBudgetCapUsd: 250
+    heartbeatSchedule: every-30m
+  - id: coo
+    title: Operations & Pacing Lead
+    reportsTo: ceo
+    defaultModelTier: MED
+    monthlyBudgetCapUsd: 100
+    heartbeatSchedule: every-15m
+  - id: cfo
+    title: Financial & Compute Controller
+    reportsTo: ceo
+    defaultModelTier: LOW
+    monthlyBudgetCapUsd: 50
+    heartbeatSchedule: daily
+  - id: cmo
+    title: Marketing & Sales Automation
+    reportsTo: ceo
+    defaultModelTier: MED
+    monthlyBudgetCapUsd: 200
+    heartbeatSchedule: hourly
