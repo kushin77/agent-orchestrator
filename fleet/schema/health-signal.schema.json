@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kushin77.github.io/agent-orchestrator/fleet/schema/health-signal.schema.json",
+  "title": "agent-orchestrator fleet-health signal family (issue #498)",
+  "description": "The declared, closed machine shape of the fleet's OWN health signals as they leave the process for the monitoring plane. Consumes ADR-0022 (docs/decision-records/ADR-0022-telemetry-exposition-authority-split.md): OTLP/HTTP push, plane-owned endpoint, flag-gated OFF, and a closed bounded label set. The labels are counts and closed-set states ONLY — a session id is this fleet's pod_id and is refused by kushin77/monitoring-stack#178. The declared values are mirrored, and enforced at construction, by fleet/health_signals.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["resourceMetrics"],
+  "properties": {
+    "resourceMetrics": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/resourceMetrics" }
+    }
+  },
+  "$defs": {
+    "serviceName": {
+      "description": "The constant service label (ADR-0022 D5 bounds it to one value).",
+      "const": "agent-orchestrator"
+    },
+    "signalKind": {
+      "description": "One fact per kind. fleet/health_signals.SIGNAL_KINDS.",
+      "enum": ["rung_state", "rung_beat_age_seconds", "reconcile_outcome", "watchdog_verdict"]
+    },
+    "labelKey": {
+      "description": "The closed label set. Nothing else may be emitted; identity-shaped keys (session_id, worktree, branch, agent, commit, host, ...) are refused by name.",
+      "enum": ["service", "signal", "rung", "state", "bucket", "outcome", "verdict"]
+    },
+    "rung": {
+      "description": "The supervised rungs, derived from fleet/watchdog.py's own table.",
+      "enum": ["brain", "monitor", "sister"]
+    },
+    "rungState": {
+      "description": "fleet/watchdog.decide's own closed vocabulary, plus the honest no-data member. A stale beat may never be published as healthy.",
+      "enum": ["healthy", "missing", "stale", "drifted", "no-data"]
+    },
+    "beatAgeBucket": {
+      "description": "The beat-age bucket, split at channel.STALE_HEARTBEAT_SECONDS. An unreadable beat is OMITTED rather than bucketed, because rung_state already publishes the watchdog's measured verdict for that rung.",
+      "enum": ["fresh", "stale"]
+    },
+    "reconcileOutcome": {
+      "description": "governance/reconcile's own vocabulary: the judge's status (Action.status) and the teardown outcome (Action.outcome), both imported, plus the honest no-data member. Disjoint sets, so one closed label carries both facets. `shelved` (unmerged work kept) may never be published as `reclaimed`.",
+      "enum": [
+        "live",
+        "suspect",
+        "orphan",
+        "reclaimed",
+        "parked",
+        "shelved",
+        "reported",
+        "failed",
+        "no-data"
+      ]
+    },
+    "watchdogVerdict": {
+      "description": "fleet/channel.capability_finding's closed capability kinds (issue #319), plus the honest no-data member. Only rungs channel.CAPABILITY_RUNGS declares are published.",
+      "enum": ["current", "down", "drifted", "capability-stale", "unknown", "no-data"]
+    },
+    "attribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "value"],
+      "properties": {
+        "key": { "$ref": "#/$defs/labelKey" },
+        "value": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stringValue"],
+          "properties": { "stringValue": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "dataPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asDouble", "timeUnixNano", "attributes"],
+      "properties": {
+        "asDouble": { "type": "number", "minimum": 0 },
+        "timeUnixNano": { "type": "string", "pattern": "^[0-9]+$" },
+        "attributes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/attribute" }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "unit", "gauge"],
+      "properties": {
+        "name": {
+          "description": "fleet.<kind>, one series family per declared signal kind.",
+          "type": "string",
+          "enum": [
+            "fleet.rung_state",
+            "fleet.rung_beat_age_seconds",
+            "fleet.reconcile_outcome",
+            "fleet.watchdog_verdict"
+          ]
+        },
+        "unit": {
+          "description": "UCUM: `1` dimensionless, `s` seconds, `{lane}` a count of lanes.",
+          "enum": ["1", "s", "{lane}"]
+        },
+        "gauge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dataPoints"],
+          "properties": {
+            "dataPoints": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/dataPoint" } }
+          }
+        }
+      }
+    },
+    "resourceMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource", "scopeMetrics"],
+      "properties": {
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attributes"],
+          "properties": {
+            "attributes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "value"],
+                "properties": {
+                  "key": { "const": "service.name" },
+                  "value": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["stringValue"],
+                    "properties": { "stringValue": { "$ref": "#/$defs/serviceName" } }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "scopeMetrics": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scope", "metrics"],
+            "properties": {
+              "scope": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name"],
+                "properties": { "name": { "const": "fleet.health" } }
+              },
+              "metrics": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/$defs/metric" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

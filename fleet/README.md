@@ -429,6 +429,69 @@ cat .fleet/monitor.heartbeat.json     # the monitor's liveness beat (JSON)
 All monitor output lives under the gitignored `.fleet/` directory; the module
 itself is tracked.
 
+## Fleet-health export (issue #498)
+
+`fleet/health_publish.py` is the fleet's own exit: it renders the verdicts the
+fleet computes about **itself** — rung state, beat age, reconciliation outcomes,
+watchdog verdicts — as monitoring events, in the transport
+[`ADR-0022`](../docs/decision-records/ADR-0022-telemetry-exposition-authority-split.md)
+fixes (OTLP/HTTP push, plane-owned endpoint, **flag-gated OFF**).
+
+The machine shape is **declared in-tree** and enforced at construction
+(`fleet/health_signals.py`, plus `fleet/schema/health-signal.schema.json`):
+
+| Signal | Labels | Value | Verdict source (imported, never re-declared) |
+|---|---|---|---|
+| `fleet.rung_state` | `rung`, `state` | 1 | `watchdog.decide` — `healthy` / `stale` / `drifted` / `missing` |
+| `fleet.rung_beat_age_seconds` | `rung`, `bucket` | seconds | `channel.heartbeat_age_seconds` — `fresh` / `stale` |
+| `fleet.reconcile_outcome` | `outcome` | count | `governance/reconcile` sweep report |
+| `fleet.watchdog_verdict` | `rung`, `verdict` | 1 | `channel.capability_finding` (#319) |
+
+Every signal also carries the constant `service` and its own `signal` label — the
+only seven label keys are `service`, `signal`, `rung`, `state`, `bucket`,
+`outcome`, `verdict`. **A session id is refused by name**: ADR-0022 D5 and the
+vendor's `kushin77/monitoring-stack#178` drop that dimension, so the family
+publishes *counts and closed-set states* and per-lane detail stays in the ticket
+and the log.
+
+Three refusals survive the export, each with a mutation-proven test:
+
+- a **stale** beat leaves as `stale`, never as `healthy`;
+- an orphan whose unmerged work exists nowhere else leaves as **`shelved`**, never
+  as `reclaimed` (`AGENTS.md` rule 17);
+- a state that **cannot be established** leaves as `no-data`, never as a
+  fabricated `healthy`.
+
+```bash
+python3 fleet/health_publish.py plan            # render, send nothing (read-only)
+python3 fleet/health_publish.py plan --json     # the exact OTLP/HTTP payload
+python3 fleet/health_publish.py push            # needs the flag ON + an endpoint
+```
+
+`push` is inert until the surface is promoted **and** the plane has named an
+endpoint (`$AO_MONITORING_ENDPOINT`, GR-6: environment or a secret manager). The
+promotion entry this surface reads is:
+
+```yaml
+surfaces:
+  fleet_health_export:
+    default: off          # promotion is a reviewed registry change
+    promoted: false
+    service: control-plane
+    description: >
+      Fleet-health push exporter (issue #498, ADR-0022): the fleet's own
+      verdicts — rung state + beat age, reconciliation outcomes
+      (reclaimed/parked/shelved/suspect) and watchdog capability verdicts —
+      pushed to the monitoring plane. Closed label set only (no session ids,
+      paths, branches or commits). Inert when unconfigured.
+```
+
+> **Wiring (lane #499).** This module's tests are not registered in
+> `scripts/pytest-suites.txt` yet, and the flag entry above is not in
+> `infra/feature-flags/registry.yaml` — both files belong to other lanes
+> (#497/#499) this wave. Until the entry exists the surface reads as `off`
+> (deny by default), which is why no flag edit was required to ship it inert.
+
 ## The gate
 
 ```bash
