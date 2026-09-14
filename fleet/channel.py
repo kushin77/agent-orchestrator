@@ -50,6 +50,55 @@ if str(ROOT) not in sys.path:
 
 from governance.policy import lease  # noqa: E402
 
+# The stale-snapshot trigger's deferred queue (issue #727). `watch` holds a
+# PARKED directive exactly as it already holds a backoff or a dead letter, and
+# releases it with no operator action the moment the board is fresh again.
+#
+# The module is resolved LAZILY, through a function rather than a module-level
+# `import`: the trigger is one verb on a large CLI, and a hard import would make
+# this file unloadable wherever `governance/dispatch/` is not a sibling — the
+# gate scripts copy `fleet/` alone into a scratch tree to provoke a mutation, and
+# a module-level import turned that copy into a crash instead of a test (the
+# sibling provocation reported `failed, but not for the reason ... targets`).
+_BOARD_SNAPSHOT = None
+
+
+def _dispatch_root() -> Path | None:
+    """The tree holding ``governance/dispatch`` — searched upward from ``__file__``.
+
+    A scratch copy of ``fleet/`` alone (``cp -R fleet <scratch>``, how the gate
+    scripts stage a mutation) has no ``governance/`` child, but its parent chain
+    does reach the checkout the copy was taken from; walking up finds it. When
+    nothing on the chain has the dispatch tree the trigger is simply not
+    deployed here and callers degrade — the module must never fail to import for
+    a feature one verb uses.
+    """
+    for base in Path(__file__).resolve().parents:
+        if (base / "governance" / "dispatch" / "snapshot.py").is_file():
+            return base / "governance" / "dispatch"
+    return None
+
+
+def board_snapshot():
+    """The board trigger module, or ``None`` when this checkout does not ship it."""
+    global _BOARD_SNAPSHOT
+    if _BOARD_SNAPSHOT is None:
+        directory = _dispatch_root()
+        if directory is None:
+            return None
+        if str(directory) not in sys.path:
+            sys.path.insert(0, str(directory))
+        import snapshot as module  # noqa: PLC0415 - resolved on first use, by design
+
+        _BOARD_SNAPSHOT = module
+    return _BOARD_SNAPSHOT
+
+
+#: The board a stale snapshot is refreshed from. A snapshot of the default is
+#: read from the module lazily; the fallback keeps this constant usable when the
+#: dispatch tree is absent (the constant is data, not a code path).
+BOARD_REPO = "kushin77/agent-orchestrator"
+
 FLEET_DIR = runtime.FLEET_DIR
 SCHEMA_PATH = ROOT / "fleet" / "schema" / "message.schema.json"
 INBOX = FLEET_DIR / "inbox"
@@ -1547,10 +1596,24 @@ def cmd_watch(args: argparse.Namespace) -> int:
     still the operator's record that the work was ordered, but not dispatched
     early. That is what stops a refused or crashed order from being re-read every
     cycle, without the loop sleeping on it.
+
+    The board trigger (issue #727) filters on it too: a directive PARKED because
+    the board snapshot was stale is the operator's live order waiting on the
+    board, so it is held while the snapshot is stale and released the moment
+    freshness returns — no operator action, and never a re-dispatch per cycle.
     """
     INBOX.mkdir(parents=True, exist_ok=True)
     skip = set(getattr(args, "skip", None) or [])
     guard_base = INBOX.parent
+    # Resolved once per watch, not once per directive: the hot loop below reads a
+    # plain local. `None` means this checkout ships no dispatch tree, so there is
+    # no park to filter on and the loop behaves exactly as it did before #727.
+    trigger = board_snapshot()
+    snapshot_path = getattr(args, "snapshot", None)
+    stale_minutes = getattr(args, "stale_minutes", None)
+    if trigger is not None:
+        snapshot_path = snapshot_path or trigger.DEFAULT_PATH
+        stale_minutes = stale_minutes or trigger.DEFAULT_STALENESS_MINUTES
     deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
     while True:
         held: list[str] = []
@@ -1561,6 +1624,11 @@ def cmd_watch(args: argparse.Namespace) -> int:
             if not runaway.dispatchable(path.stem, base=guard_base):
                 held.append(path.stem)
                 continue
+            if trigger is not None and trigger.parked(path.stem, base=guard_base):
+                if not trigger.freshness_restored(snapshot_path, stale_minutes):
+                    held.append(path.stem)
+                    continue
+                trigger.unpark(path.stem, base=guard_base)
             pending.append(path)
         if pending:
             try:
@@ -1572,7 +1640,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
             print(f"channel watch: DIRECTIVE {message.get('id')} — {len(pending)} pending")
             return EXIT_OK
         if deadline is not None and time.monotonic() >= deadline:
-            held_note = f" — {len(held)} held by the runaway guard (backoff or dead-letter)" if held else ""
+            held_note = f" — {len(held)} held (backoff, dead-letter or a stale-board park)" if held else ""
             print(f"channel watch: IDLE — no directive within {args.timeout_seconds}s{held_note}", file=sys.stderr)
             return EXIT_NOT_OK
         nap = args.interval
@@ -1613,6 +1681,8 @@ def build_parser() -> argparse.ArgumentParser:
     watch.add_argument("--timeout-seconds", type=float, default=600.0)
     watch.add_argument("--interval", type=float, default=1.0)
     watch.add_argument("--skip", action="append", default=[], help="directive ids to skip (already dispatched)")
+    watch.add_argument("--snapshot", default="", help="the board snapshot whose freshness releases a park (issue #727)")
+    watch.add_argument("--stale-minutes", type=int, default=None, help="the staleness threshold a park is held against")
     watch.set_defaults(func=cmd_watch)
 
     escalate = sub.add_parser("escalate", help="raise a problem to the brain (sister/subagent side)")

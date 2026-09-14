@@ -347,15 +347,38 @@ def cmd_snapshot(args: argparse.Namespace) -> int:
     if not args.from_github:
         print("snapshot: pass --from-github (this is the only network-touching path)", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
-    try:
-        records = snapshot_mod.github_records(args.repo)
-    except RuntimeError as exc:
-        print(f"snapshot: CANNOT-ASSESS — {exc}", file=sys.stderr)
+    # The refresh itself lives in the trigger's own verb (`refresh_or_park`, #727),
+    # so the network path and its bounded window are declared in exactly one place.
+    refreshed, detail = snapshot_mod.refresh(args.out, repo=args.repo)
+    if not refreshed:
+        print(f"snapshot: CANNOT-ASSESS — {detail}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
-    built = snapshot_mod.build_snapshot(records, source=args.repo)
-    target = snapshot_mod.save(built, args.out)
+    built = snapshot_mod.load(args.out)
     edged = [issue for issue in built.issues.values() if issue.parent or issue.blocked_by]
-    print(f"snapshot: wrote {target} ({len(built.issues)} issues, {len(edged)} with declared chain edges)")
+    print(f"snapshot: wrote {args.out} ({len(built.issues)} issues, {len(edged)} with declared chain edges)")
+    return EXIT_OK
+
+
+def cmd_trigger(args: argparse.Namespace) -> int:
+    """The consumer's trigger for a ``snapshot-stale`` refusal (issue #727).
+
+    A refusal that names its own remedy must also invoke it: this performs the
+    ONE bounded refresh, and when that does not clear the staleness it PARKS the
+    directive in the deferred queue instead of leaving it to be re-dispatched
+    every cycle. Exit 0 = the directive is dispatchable, 1 = the park holds it,
+    2 = CANNOT-ASSESS (the snapshot's age could not be established at all).
+    """
+    trigger = snapshot_mod.refresh_or_park(
+        args.directive,
+        snapshot_path=Path(args.snapshot),
+        base=Path(args.fleet_dir) if args.fleet_dir else None,
+        repo=args.repo,
+        threshold_minutes=args.stale_minutes,
+    )
+    print(json.dumps(trigger.to_json(), indent=2))
+    print(f"trigger: {trigger.action} — {trigger.reason}")
+    if not trigger.dispatchable:
+        return EXIT_NOT_OK
     return EXIT_OK
 
 
@@ -430,9 +453,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     snap = sub.add_parser("snapshot", help="refresh .board/snapshot.json from GitHub")
     snap.add_argument("--from-github", action="store_true")
-    snap.add_argument("--repo", default="kushin77/agent-orchestrator")
+    snap.add_argument("--repo", default=snapshot_mod.DEFAULT_REPO)
     snap.add_argument("--out", default=str(snapshot_mod.DEFAULT_PATH))
     snap.set_defaults(func=cmd_snapshot)
+
+    trigger = sub.add_parser(
+        "trigger",
+        help="on a stale snapshot: refresh ONCE, else PARK the directive (#727)",
+    )
+    add_paths(trigger)
+    trigger.add_argument("--directive", required=True, help="the deferred directive's id")
+    trigger.add_argument("--repo", default=snapshot_mod.DEFAULT_REPO)
+    trigger.add_argument(
+        "--fleet-dir",
+        default="",
+        help="the fleet runtime dir holding parked/ (default AO_FLEET_DIR, else <repo>/.fleet)",
+    )
+    trigger.set_defaults(func=cmd_trigger)
     return parser
 
 

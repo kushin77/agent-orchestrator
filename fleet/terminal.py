@@ -70,6 +70,17 @@ LIFECYCLE_CLI = str(ROOT / "governance" / "lifecycle" / "cli.py")
 #: is visible as a dead lane rather than as work in progress.
 sys.path.insert(0, str(ROOT))
 from governance.reconcile.heartbeat import DEFAULT_BEAT_SECONDS, Beater as SessionBeater  # noqa: E402
+#: The board trigger (issue #727): on a `snapshot-stale` refusal the loop runs
+#: ONE bounded refresh, and when freshness does not return it PARKS the
+#: directive instead of re-dispatching it every cycle.
+#:
+#: The resolver lives in `channel` (already imported above) so there is exactly
+#: one implementation of "where is governance/dispatch from here" in the fleet.
+#: `board_snapshot()` also memoizes the module, so both callers share one copy.
+board_snapshot = channel.board_snapshot
+
+#: The board a stale snapshot is refreshed from.
+BOARD_REPO = channel.BOARD_REPO
 
 SESSION_BEAT_SECONDS = DEFAULT_BEAT_SECONDS
 
@@ -1836,6 +1847,76 @@ def dead_letter_inventory() -> list[dict]:
     return sorted(records, key=lambda record: str(record.get("ts") or ""), reverse=True)
 
 
+# --- the board trigger (issue #727) ------------------------------------------
+#
+# `claims` refuses a claim against a stale snapshot with `snapshot-stale` and
+# prints the remedy ("refresh first: ... snapshot --from-github") — and nothing
+# ran the remedy, so the refusal re-fired every cycle: a fail-closed refusal is
+# only half a control. The trigger below is the other half — ONE bounded
+# refresh, and when freshness does not return the directive is PARKED (held by
+# `channel watch` until the board is fresh again) rather than re-dispatched.
+#
+# A PARK is not a dead letter: the dead letter retires an order for ever, a park
+# keeps it as the operator's pending work. The two compose — the park holds the
+# directive and the runaway guard still counts the attempt, so neither the park
+# nor the budget can be bypassed.
+
+
+def board_trigger(
+    directive_id: str,
+    issue: int,
+    *,
+    runner=None,
+    snapshot_path: str | None = None,
+    threshold_minutes: int | None = None,
+) -> object:
+    """Refresh the board ONCE on a stale-snapshot refusal, else PARK the directive.
+
+    ``runner`` is injectable so the contract is provable offline (the real path
+    shells out to ``gh``, which the gate cannot reach). A refused network is a
+    first-class outcome — ``refresh`` reports it and the trigger parks — never an
+    unhandled crash. The transition is reported ONCE, with the snapshot's
+    ``generated_at`` and the threshold it tripped, so the operator reads the
+    board's age instead of a refusal repeated every cycle.
+
+    Returns the trigger's :class:`StaleTrigger`; the annotation is ``object``
+    because the type lives in the lazily-imported module above. A checkout that
+    does not ship the trigger has nothing to refresh for and reports none.
+    """
+    board = board_snapshot()
+    if board is None:
+        return None
+    trigger = board.refresh_or_park(
+        directive_id,
+        snapshot_path=snapshot_path or board.DEFAULT_PATH,
+        base=guard_base(),
+        repo=BOARD_REPO,
+        runner=runner,
+        threshold_minutes=(
+            board.DEFAULT_STALENESS_MINUTES
+            if threshold_minutes is None
+            else threshold_minutes
+        ),
+    )
+    print(
+        f"[terminal] #{issue} board trigger: {trigger.action} — {trigger.reason}",
+        file=sys.stderr,
+        flush=True,
+    )
+    stream_run_event(directive_id, f"BOARD-TRIGGER {trigger.action}: {trigger.reason}")
+    report_once(
+        directive_id,
+        key=f"board-trigger:{trigger.action}",
+        message_type="escalate",
+        body=(
+            f"#{issue} board snapshot generated_at={trigger.generated_at or '<unreadable>'} "
+            f"(age {trigger.age_minutes:.1f}m > threshold {trigger.threshold_minutes}m) — "
+            f"board trigger {trigger.action}: {trigger.reason}"
+        ),
+    )
+    return trigger
+
+
 # --- controls (the operator's levers, relayed by the brain) -------------------
 #
 # The loop is the only place these can be honoured: it owns the run, the queue
@@ -2668,6 +2749,13 @@ def loop(args: argparse.Namespace) -> int:
             # budget is exhausted the order is retired to the dead-letter store and
             # `channel watch` never returns it again (#723).
             print(f"[terminal] claim refused for #{issue}: {claim_output}", file=sys.stderr, flush=True)
+            if "snapshot-stale" in claim_output:
+                # The refusal names its own remedy, so the loop TRIGGERS it
+                # (#727): exactly one bounded refresh, and if freshness does not
+                # return the directive is parked and held by `channel watch`
+                # instead of re-dispatched every cycle. The attempt below still
+                # counts, so the park and the budget compose rather than compete.
+                board_trigger(directive_id, issue)
             guard_retire(directive_id, issue, f"claim refused: {claim_output[-120:]}")
             if args.once:
                 return 1
