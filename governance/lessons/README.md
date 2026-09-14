@@ -157,8 +157,10 @@ than stored again here.
 
 ## The incidents recorded so far
 
-Five real incidents from this repository's own history, each with an artifact,
-a corrective action and a lesson:
+Eleven real incidents from this repository's own history, each with an artifact,
+a corrective action and a lesson (the ledger carries a twelfth, `INC-0006`, which
+#823 registered; this register is the EPIC #708 lane's and #823 did not extend
+it):
 
 | Incident | Origin | RCA | What it was |
 |---|---|---|---|
@@ -168,24 +170,45 @@ a corrective action and a lesson:
 | `INC-0004` | #157 | [`RCA-0004`](rca/RCA-0004-claim-replay-historical-truth.md) | the claim audit judged a historical claim by today's snapshot |
 | `INC-0005` | #157 | [`RCA-0005`](rca/RCA-0005-stale-snapshot-frontier.md) | a 19-minute-old snapshot named a closed issue as the frontier (**open**, #170) |
 
-## Measured state (2026-09-13)
+### The EPIC #708 wave (2026-09-14)
 
-`bash scripts/check-lessons.sh` on this branch, exit code 0:
+Six incidents from the fleet runaway-prevention wave. Each one is **open** against
+the child issue that carries its corrective action, and each RCA is a committed
+artifact in [`rca/`](rca/). The wave's incidents carry an `event` origin rather
+than an issue origin because the committed board snapshot does not reach them —
+which is `INC-0012` itself.
+
+| Incident | Tracked by | RCA | What it was |
+|---|---|---|---|
+| `INC-0007` | #729 | [`RCA-0007`](rca/RCA-0007-infra-limits-tmpfs-exhaustion.md) | a shared 16 GiB `/tmp` filled to 100 %, and a 0-byte write passed as evidence |
+| `INC-0008` | #726 | [`RCA-0008`](rca/RCA-0008-a2a-no-arbitration.md) | agent-to-agent dispatch with no arbiter between two claimants |
+| `INC-0009` | #724 | [`RCA-0009`](rca/RCA-0009-gate-stacking.md) | gates stacked on one box with no lock and no queue |
+| `INC-0010` | #723 | [`RCA-0010`](rca/RCA-0010-uncapped-redispatch.md) | an uncapped retry stacked 137+ gates and starved the box |
+| `INC-0011` | #725 | [`RCA-0011`](rca/RCA-0011-inert-gate.md) | delivered gates that no gate invokes |
+| `INC-0012` | #727 | [`RCA-0012`](rca/RCA-0012-stale-snapshot-no-trigger.md) | a committed snapshot with a timestamp, a tolerance and no trigger |
+
+## Measured state (2026-09-15)
+
+`bash scripts/check-lessons.sh` on this branch, exit code 0. The counts line and
+the verdict are quoted verbatim, re-measured after this branch was rebased onto
+`master` — so master's `INC-0006` is included; the 21 deviation lines are
+excerpted with `...`:
 
 ```text
-incidents: 5 (4 closed) | rcas: 5 | corrective actions: 7 (1 open) | lessons: 4
-| suggestions: 3 | board incident-labelled issues scanned: 1 (1 exempt)
-  WARNING suggestion-open         SUGGEST-0001 is open (owner: gate lane); ...
-  WARNING suggestion-open         SUGGEST-0003 is open (owner: fleet lane); ...
-  WARNING suggestion-open         SUGGEST-0002 is open (owner: governance lane); ...
-  WARNING corrective-action-open  CA-0007 is open; remediation is tracked in #170
-  WARNING board-incident-exempt   incident-labelled issue #141 is exempt: ...
-lessons: OK (5 incident(s), 4 lesson(s) enforced, 5 deviation(s) tracked)
+incidents: 12 (5 closed) | rcas: 12 | corrective actions: 14 (7 open) | lessons: 4 | suggestions: 10 | board incident-labelled issues scanned: 4 (4 exempt)
+  WARNING suggestion-open                    SUGGEST-0005 is open (owner: infra-limits lane); keep scripts/check-infra-limits.sh wired into the gate of record and extend it when a new shared resource or a new silent-failure mode appears (issue #729) [SUGGEST-0005] -> close it as a LESSON-<n> when the change lands
+  ...
+  WARNING corrective-action-open             CA-0009 is open; remediation is tracked in #729 [CA-0009] -> close the action when #729 lands
+  WARNING corrective-action-open             CA-0010 is open; remediation is tracked in #726 [CA-0010] -> close the action when #726 lands
+  ...
+lessons: OK (12 incident(s), 4 lesson(s) enforced, 21 deviation(s) tracked)
 ```
 
-Five errors were raised and fixed while seeding the ledger — five artifacts
-that were not yet committed (`rca-artifact-untracked`). That is the gate doing
-its job on its own author: an uncommitted RCA does not exist (`RCA-0002`).
+Six errors were raised and fixed while recording the EPIC #708 wave — the six
+new RCA artifacts, each refused as `rca-artifact-untracked` until it was
+committed. That is the gate doing its job on its own author a second time: an
+uncommitted RCA does not exist (`RCA-0002`), and five errors had already been
+raised the same way when this ledger was seeded.
 
 ## Layout
 

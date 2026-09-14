@@ -292,6 +292,7 @@ The gate must be green before any PR or merge; its output is the evidence.
 - `docs/EXECUTION-PLAN.md` — parallel dispatch contract, lane ownership,
   phase/wave sequencing.
 - `docs/GOVERNANCE.md` — branch, provenance, session-label, review conventions.
+- `docs/INFRA-LIMITS.md` — the sandbox + ephemeral-storage contract (issue #729): the shared `/tmp` limit, the read-back-non-empty write rule, and `scripts/check-infra-limits.sh`.
 - `CONTRIBUTING.md` — human contributor workflow.
 - `RELEASING.md` — SemVer release process.
 - GitHub issues board — the canonical roadmap; EPIC-00 = issue #4.
