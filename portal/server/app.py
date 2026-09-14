@@ -26,6 +26,12 @@ from portal.server import catalog as catalog_mod
 from portal.server.auditlog import AuditLedger
 from portal.server.authz import Authorizer, Principal
 from portal.server.bridge import LiveBridge
+from portal.server.chat import (
+    CHAT_ASSETS,
+    ChatError,
+    ChatSurface,
+    parse_turn_request,
+)
 from portal.server.controls import (
     ControlCatalog,
     PolicyEnforcer,
@@ -114,6 +120,7 @@ class ConsoleApplication:
         live_feed: Optional[LiveFeed] = None,
         ops_health: Optional[OpsHealthReports] = None,
         bridge: Optional[LiveBridge] = None,
+        chat_surface: Optional[ChatSurface] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -170,6 +177,12 @@ class ConsoleApplication:
             if bridge is not None
             else LiveBridge(repo_root=self.repo_root, live_feed=self.live)
         )
+        # The conversational surface (issue #508, ADR-0023) — flag-gated OFF.
+        self.chat = (
+            chat_surface
+            if chat_surface is not None
+            else ChatSurface(repo_root=self.repo_root)
+        )
 
     # -- request pipeline ---------------------------------------------------
     def handle(
@@ -188,6 +201,17 @@ class ConsoleApplication:
         try:
             if path == "/" or path == "/index.html":
                 return self._index(cookies)
+            # The conversational surface's own documents (issue #508) are
+            # *absent* — not refused — while the surface is unpromoted. The
+            # flag is checked here, before any session work, so an
+            # unauthenticated probe cannot even tell the view exists.
+            if not self.chat.enabled and path.strip("/") in CHAT_ASSETS:
+                raise ApiError(
+                    404,
+                    "feature_disabled",
+                    "the chat surface is feature-flag-gated OFF "
+                    "(infra/feature-flags/registry.yaml surfaces.chat)",
+                )
             if self._is_static(path):
                 return self._serve_static(path)
             if path.startswith("/api/"):
@@ -348,6 +372,17 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.live_bridge)",
             )
 
+        # The conversational surface (issue #508) ships the same way (GR-5),
+        # also before authN: an unpromoted chat surface is invisible rather
+        # than merely unauthorised.
+        if parts[0] == "chat" and not self.chat.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the chat surface is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.chat)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -363,6 +398,8 @@ class ConsoleApplication:
                 return self._route_ops(parts, principal, method, query)
             if parts[:2] == ["v1", "bridge"]:
                 return self._route_bridge(parts[2:], principal, method, query)
+            if parts[0] == "chat":
+                return self._route_chat(parts, method, query, body, principal)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -679,6 +716,172 @@ class ConsoleApplication:
         except (TypeError, ValueError):
             raise ApiError(400, "invalid_request", "limit must be an integer") from None
         return max(1, limit)
+
+    # -- conversational surface (issue #508, ADR-0023) ----------------------
+    def _route_chat(
+        self,
+        parts: list[str],
+        method: str,
+        query: dict[str, str],
+        body: dict[str, Any],
+        principal: Principal,
+    ) -> Response | StreamResponse:
+        """The gateway-authoritative conversational surface (issue #508).
+
+        Transport, authorization and *refusal shape* only: every tier, source,
+        figure and verdict is delegated to ``ChatSurface``, which consumes the
+        serving surface over HTTP and imports no authority. A turn is streamed
+        (``StreamResponse``), and the two ways a turn can be refused before it
+        starts — a measured hard budget stop and a budget that could not be read
+        — are distinct statuses and distinct codes, because they mean different
+        things to an operator.
+
+        Permissions come from the platform's existing vocabulary: reading the
+        history is ``session:read``, opening one is ``session:manage``, running
+        a turn is ``agent:run``, the tier ladder is ``model:read`` and the budget
+        state is ``budget:read``. No new vocabulary is minted here.
+        """
+        surface = parts[1:]
+        if surface == ["tiers"]:
+            self._require_method(method, "GET", "the tier picker is GET only")
+            tenant_id = self._chat_tenant(principal, query, body, "model:read")
+            return self._ok(self.chat.tiers(tenant_id))
+        if surface == ["budget"]:
+            self._require_method(method, "GET", "the budget state is GET only")
+            tenant_id = self._chat_tenant(principal, query, body, "budget:read")
+            return self._ok(self.chat.budget(tenant_id).as_json())
+        if surface == ["conversations"]:
+            if method == "GET":
+                tenant_id = self._chat_tenant(principal, query, body, "session:read")
+                return self._ok(
+                    {
+                        "tenantId": tenant_id,
+                        "conversations": self.chat.conversations(tenant_id),
+                    }
+                )
+            if method == "POST":
+                tenant_id = self._chat_tenant(principal, query, body, "session:manage")
+                conversation = self._chat_call(
+                    self.chat.create_conversation,
+                    tenant_id,
+                    str(body.get("title") or ""),
+                )
+                return self._ok({"conversation": conversation})
+            raise ApiError(405, "method_not_allowed", "conversations is GET or POST")
+        if len(surface) >= 2 and surface[0] == "conversations":
+            conversation_id = surface[1]
+            tail = surface[2:]
+            if not tail:
+                self._require_method(method, "GET", "a conversation is GET only")
+                tenant_id = self._chat_tenant(principal, query, body, "session:read")
+                conversation = self._chat_call(
+                    self.chat.conversation, tenant_id, conversation_id
+                )
+                return self._ok({"conversation": conversation})
+            if tail == ["turns"]:
+                self._require_method(method, "POST", "a turn is POST only")
+                tenant_id = self._chat_tenant(principal, query, body, "agent:run")
+                text, tier = self._chat_call(parse_turn_request, body)
+                return self._chat_turn(
+                    tenant_id, conversation_id, text=text, tier=tier
+                )
+            if tail == ["cancel"]:
+                self._require_method(method, "POST", "cancel is POST only")
+                tenant_id = self._chat_tenant(principal, query, body, "agent:run")
+                self._chat_call(
+                    self.chat.require_conversation, tenant_id, conversation_id
+                )
+                return self._ok(
+                    self._chat_call(self.chat.cancel, tenant_id, conversation_id)
+                )
+            if tail == ["retry"]:
+                self._require_method(method, "POST", "retry is POST only")
+                tenant_id = self._chat_tenant(principal, query, body, "agent:run")
+                text, tier, retry_of = self._chat_call(
+                    self.chat.retry_request,
+                    tenant_id,
+                    conversation_id,
+                    str(body.get("tier") or "").strip().upper(),
+                )
+                return self._chat_turn(
+                    tenant_id,
+                    conversation_id,
+                    text=text,
+                    tier=tier,
+                    retry_of=retry_of,
+                )
+        raise ApiError(404, "not_found", f"no such chat surface: {'/'.join(surface)}")
+
+    def _chat_turn(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        *,
+        text: str,
+        tier: str,
+        retry_of: str = "",
+    ) -> StreamResponse:
+        """Build the turn stream, refusing (not starting) on a closed budget.
+
+        The budget is read **before** anything is written: a hard stop and an
+        unreadable budget both refuse here, so a stream never opens with a frame
+        that pretends the turn was allowed.
+        """
+        self._chat_call(self.chat.require_conversation, tenant_id, conversation_id)
+        budget = self.chat.budget(tenant_id)
+        refusal = self.chat.refusal(tenant_id, budget)
+        if refusal is not None:
+            raise ApiError(refusal.status, refusal.code, refusal.message)
+        frames = self.chat.turn_stream(
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            text=text,
+            tier=tier,
+            budget=budget,
+            retry_of=retry_of,
+        )
+        return StreamResponse(frames=frames)
+
+    def _chat_tenant(
+        self,
+        principal: Principal,
+        query: dict[str, str],
+        body: dict[str, Any],
+        permission: str,
+    ) -> str:
+        """The tenant a chat request acts in, with the route's own permission.
+
+        Explicit ``tenant`` wins; otherwise a single-tenant principal is
+        unambiguous and a multi-tenant one must say which — never a silent
+        default that could act in the wrong tenant.
+        """
+        tenant_id = str(query.get("tenant") or body.get("tenant") or "").strip()
+        if not tenant_id:
+            scoped = self.authorizer.scope_tenants(principal, self.state.tenant_ids())
+            if len(scoped) != 1:
+                raise ApiError(
+                    400,
+                    "invalid_request",
+                    "tenant is required: this principal is scoped to "
+                    f"{len(scoped)} tenants",
+                )
+            tenant_id = scoped[0]
+        self._require_tenant(tenant_id)
+        self._require(principal, tenant_id, permission)
+        return tenant_id
+
+    @staticmethod
+    def _require_method(method: str, allowed: str, message: str) -> None:
+        if method != allowed:
+            raise ApiError(405, "method_not_allowed", message)
+
+    @staticmethod
+    def _chat_call(callback, *args):
+        """Run a surface call, translating its refusal into the envelope."""
+        try:
+            return callback(*args)
+        except ChatError as exc:
+            raise ApiError(exc.status, exc.code, exc.message) from exc
 
     # -- session ------------------------------------------------------------
     def _require_session(self, cookies: dict[str, str]) -> tuple[Principal, dict[str, Any]]:

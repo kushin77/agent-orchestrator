@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat — agent-orchestrator console</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Chat</h1>
+    <span class="grow"></span>
+    <label class="field" for="tierPicker">tier
+      <select class="mono" id="tierPicker"
+              aria-describedby="tierResolved tierOnlyNote"></select>
+    </label>
+    <span class="hint mono" id="tierResolved" data-resolved=""
+          title="the model the chooser resolved for the selected tier">resolved at send</span>
+    <span class="badge info" id="budgetState" data-severity="no_data"
+          role="status">budget ?</span>
+  </header>
+
+  <main class="view-main" id="app">
+    <p class="hint" id="tierOnlyNote" data-selects="tier">
+      you pick a tier; the serving surface's chooser resolves the model and this
+      view only displays it.
+    </p>
+
+    <div class="grid two">
+      <section class="card">
+        <div class="spread">
+          <strong>Conversations</strong>
+          <button class="btn ghost small" type="button" id="newConversation">new</button>
+        </div>
+        <ul class="tree" id="conversationList" aria-label="conversations"
+            style="margin-top:var(--os-space-2);list-style:none;padding:0"></ul>
+        <p class="hint" id="historyState" data-count="0">0 conversation(s)</p>
+      </section>
+
+      <section class="card">
+        <div class="spread">
+          <strong id="conversationTitle">New conversation</strong>
+          <span class="hint mono" id="turnState" data-state="idle">idle</span>
+        </div>
+
+        <div id="messages" role="log" aria-label="conversation transcript"
+             aria-live="off"
+             style="margin-top:var(--os-space-2);min-height:180px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:var(--os-space-2)"></div>
+
+        <p class="hint" id="liveRegion" aria-live="polite" aria-atomic="false"
+           data-announce="idle">ready</p>
+
+        <form class="flex" id="composer" style="align-items:flex-end">
+          <label class="field grow" for="input">
+            <span class="dim">message</span>
+            <textarea class="mono" id="input" rows="2" maxlength="8000"
+                      aria-describedby="composerHint"
+                      style="width:100%;background:var(--os-color-bg-subtle);color:var(--os-color-fg);border:1px solid var(--os-color-border);border-radius:var(--os-radius-md);padding:var(--os-space-2)"></textarea>
+          </label>
+          <button class="btn primary" type="submit" id="send">send</button>
+          <button class="btn danger" type="button" id="stop" disabled>stop</button>
+          <button class="btn ghost" type="button" id="retry">retry</button>
+        </form>
+
+        <p class="hint" id="composerHint">
+          enter sends · shift+enter newline · esc stops generation
+        </p>
+
+        <div id="turnFooter" class="hint mono" data-usage="no_data"
+             style="margin-top:var(--os-space-2);border-top:1px solid var(--os-color-border-subtle);padding-top:var(--os-space-2)">
+          <span id="turnTokens" data-tokens="no_data">tokens: no data</span>
+          <span id="turnLatency" data-latency="no_data">latency: no data</span>
+          <span id="turnCost" data-cost="no_data">cost: no data</span>
+          <span id="turnGrounding" data-state="NO_DATA">grounding: no data for this</span>
+          <span id="turnDegraded" data-degraded="false" hidden>not degraded</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/chat.js"></script>
+</body>
+</html>
