@@ -269,6 +269,11 @@ checks=(
   # gate names -- declaring it without wiring it would fail the gate of record.
   # Offline, deterministic, stdlib only: no network, no model, no vendor seed.
   'pytest-conversation|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/conversation/tests'
+  # EPIC #500 (issue #579): the chat SERVING surface's own suite. It shipped
+  # with #503 and nothing ever named or declared it, so 50 passing tests ran in
+  # no gate at all -- check-drift.sh saw it only at WARN. Wired here for the same
+  # reason as pytest-fleet: a suite nothing names is decorous but inert.
+  'pytest-chat|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/chat/tests'
 )
 
 # --- duplicate-registration guard (issue #499) -------------------------------
