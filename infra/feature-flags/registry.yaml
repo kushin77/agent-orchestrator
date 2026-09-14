@@ -116,3 +116,16 @@ surfaces:
       warning/alert thresholds and an honest NO_DATA path. Served read-only at
       GET /api/finops/overview, GET /api/finops/report?tenant=<id> and
       GET /api/finops/alerts. Offline (no network egress).
+  telemetry_live_feed:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Live telemetry event feed (issue #345): SSE push of the platform's own
+      per-dispatch call records (model, provider, latency, tokens, status,
+      estimated cost) and guardrail verdicts as they land in the live
+      telemetry stores, plus GET /api/telemetry/recent for hydration. Honest
+      NO_DATA handling (an absent or empty store is never reported as "no
+      traffic"); verdicts are attached to a call only on an exact identifier
+      match. Offline (reads local JSONL only; no network egress).
