@@ -1,0 +1,49 @@
+# Build config for the public web-surface image (ai.purebliss.app).
+#
+# Produces the container artifact the web-surface module needs: builds
+# portal/Dockerfile and pushes it to Artifact Registry. This fills the
+# `image` placeholder in infra/terraform/modules/web-surface (variable
+# `image`: "Placeholder until the web build promotes a real artifact").
+#
+# The image is the portal console (stdlib + PyYAML) serving
+# portal.server.main on 0.0.0.0:8080. Runtime secrets (auth-gate JWKS mirror,
+# root-admin allowlist) are injected by the apply pipeline — never baked in.
+#
+# Substitutions (set at go-live):
+#   _AR_REPO   — Artifact Registry repository, e.g. us-central1-docker.pkg.dev/$PROJECT_ID/ao-images
+#   _IMAGE     — image name inside the repo, e.g. portal
+#   _TAG       — immutable tag, e.g. $COMMIT_SHA (never `latest` for deploys)
+
+options:
+  logging: GCS_ONLY
+
+steps:
+  # The tag must be explicit: deploys never reference a mutable `latest`.
+  - id: gate-tag
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        if [ -z "$_TAG" ] || [ "$_TAG" = "latest" ]; then
+          echo "refusing to build a mutable/missing tag (_TAG=$_TAG)" >&2
+          exit 1
+        fi
+        echo "image tag OK: $_TAG"
+
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - '--tag=$_AR_REPO/$_IMAGE:$_TAG'
+      - '--file=portal/Dockerfile'
+      - .
+
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - '$_AR_REPO/$_IMAGE:$_TAG'
+
+images:
+  - '$_AR_REPO/$_IMAGE:$_TAG'
