@@ -22,18 +22,25 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from governance.policy import lease  # noqa: E402
 from model import Issue, Snapshot
 
 DEFAULT_PATH = Path(".board/snapshot.json")
 
 # A snapshot older than this is refused as stale (issue #170): the board moves
 # faster than an hour-old artifact, and answering confidently from stale data is
-# the failure mode the gate exists to prevent.
-DEFAULT_STALENESS_MINUTES = 15
+# the failure mode the gate exists to prevent. Declared once in
+# governance/policy/lease.py.
+DEFAULT_STALENESS_MINUTES = lease.SNAPSHOT_STALENESS_MINUTES
 
 _PARENT_RE = re.compile(r"^\s*(?:parent|part[-_ ]of)\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
 _BLOCKED_RE = re.compile(r"^\s*blocked[-_ ]by\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
