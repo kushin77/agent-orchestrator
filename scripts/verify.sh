@@ -242,6 +242,23 @@ checks=(
   'diagrams-capability-tracker|bash scripts/track-diagrams-capabilities.sh'
   'codeidx-capability-register|bash scripts/check-codeidx-capability-register.sh'
   'codeidx-capability-tracker|bash scripts/track-codeidx-capabilities.sh'
+  # EPIC-09 / #703 (the shared-frontend mandatory module, GR-18 /
+  # CMR:ONBOARD-0003): the third mandatory module's onboarding. The gate proves
+  # the root `tokens.json` is the vendored `--os-` twin at the pinned rev
+  # (ace748f4 / v0.2.0, sha256 pinned in the lane), that `gdc-manifest.yaml`
+  # still carries all three mandatory pins (`code-indexing.mcp`,
+  # `diagrams.blueprint`, `shared-frontend.tokens`), and that BOTH root assets
+  # are the render of governance/onboarding/shared-frontend/instance.yaml — with
+  # a provoked control for every refusal (deleted twin, drifted twin, dropped
+  # pin, unknown tenant, unparseable lane input), so it cannot pass vacuously.
+  # Registered here rather than baselined, because a baseline row is refused for
+  # a NEWLY delivered artifact: `scripts/check-gate-coverage.sh` fails "a row for
+  # an artifact that did not exist at the baseline's own last-touched commit", so
+  # wiring is the only honest route for a new check. Offline and deterministic:
+  # no `vendor/CMR` submodule is required (the pinned digest is the authority and
+  # the vendored seed is a cross-check that runs when the submodule IS
+  # initialised), so it READS OK (rc 0) in a fresh worktree rather than SKIPping.
+  'shared-frontend-onboarding|bash scripts/check-shared-frontend-onboarding.sh'
   # EPIC #500 (M30 — the enterprise chat surface in the Single Pane of Glass):
   # the six conversational-surface gates delivered by the sibling chat lanes.
   # They are registered here because this array is explicit and nothing is
