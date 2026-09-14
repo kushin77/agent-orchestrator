@@ -6,6 +6,7 @@ Typical use, from the execution loop:
     python3 governance/isolation/cli.py open --issue 263 --agent copilot-brain --lane governance-isolation
     eval "$(python3 governance/isolation/cli.py env --issue 263 --agent copilot-brain)"
     python3 governance/isolation/cli.py audit --all
+    python3 governance/isolation/cli.py landed --commit <sha>      # real landed history
 
 Exit-code contract (repo tri-state convention): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 """
@@ -27,10 +28,16 @@ from governance.isolation.identity import (  # noqa: E402
     SessionIdentity,
     mint,
 )
+from governance.isolation.trailer import (  # noqa: E402
+    PredicateUnavailable,
+    classify_commit,
+    run_landed,
+)
 from governance.isolation.worktree import (  # noqa: E402
     ProvisionRefused,
     close,
     default_worktree_root,
+    git,
     list_records,
     main_repo_root,
     provision,
@@ -135,6 +142,66 @@ def cmd_list(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_landed(args: argparse.Namespace) -> int:
+    """Re-check the ticket-trailer rule against real landed history.
+
+    The lane audit re-derives isolation from the *live* worktrees, so history
+    that already landed on the default branch is never examined — the second
+    gap #287 names. This mode points the same rule at commits that have landed:
+    one named commit (``--commit``), or a whole range. Either way the verdict is
+    the shared predicate's (``scripts/check-pr-contract.sh``), so this is a
+    second *surface* for the rule and never a second rule.
+    """
+    main = Path(args.main)
+    if not main.exists():
+        print(f"landed: CANNOT-ASSESS — {main} does not exist", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    if args.commit:
+        resolved = git(main, "rev-parse", "--verify", f"{args.commit}^{{commit}}")
+        if resolved.returncode != 0:
+            print(f"landed: CANNOT-ASSESS — {args.commit} does not resolve to a commit in {main}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        sha = resolved.stdout.strip()
+        author = git(main, "log", "-1", "--format=%an <%ae>", sha).stdout.strip()
+        try:
+            finding = classify_commit(main, sha)
+        except PredicateUnavailable as exc:
+            print(f"landed: CANNOT-ASSESS — {exc}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        if finding:
+            print(f"  FAIL  {finding}:{sha[:12]} (authored by {author})", file=sys.stderr)
+            print(
+                "isolation-landed: FAIL — a landed commit does not carry `Refs <slug>#<n>` "
+                "in its trailing trailer block",
+                file=sys.stderr,
+            )
+            return EXIT_NOT_OK
+        print(f"  OK    {sha[:12]} carries the ticket trailer in its trailing block (authored by {author})")
+        return EXIT_OK
+
+    try:
+        result = run_landed(main, args.range_, args.gate)
+    except PredicateUnavailable as exc:
+        print(f"landed: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    # The shared gate's own output, verbatim: the verdict is delegated, not
+    # re-interpreted. The grandfathered boundary it reports is part of that
+    # verdict.
+    if result.output.strip():
+        print(result.output.rstrip(), file=sys.stderr)
+    if result.returncode == 0:
+        print(
+            f"isolation-landed: OK — no landed commit in {args.range_} lacks the ticket trailer "
+            "where the shared predicate requires it"
+        )
+        return EXIT_OK
+    if result.returncode == EXIT_CANNOT_ASSESS:
+        return EXIT_CANNOT_ASSESS
+    print(f"isolation-landed: FAIL — the shared predicate named landed commit(s) in {args.range_}", file=sys.stderr)
+    return EXIT_NOT_OK
+
+
 def cmd_close(args: argparse.Namespace) -> int:
     """Remove a lane's worktree — never discarding uncommitted work silently."""
     main = Path(args.main)
@@ -192,6 +259,13 @@ def build_parser() -> argparse.ArgumentParser:
     list_cmd.add_argument("--main", default=default_main())
     list_cmd.add_argument("--json", action="store_true")
     list_cmd.set_defaults(func=cmd_list)
+
+    landed_cmd = sub.add_parser("landed", help="re-check the ticket-trailer rule against landed history")
+    landed_cmd.add_argument("--main", default=default_main(), help="the repository whose landed history is re-checked")
+    landed_cmd.add_argument("--commit", default="", help="classify one landed commit (any rev)")
+    landed_cmd.add_argument("--range", dest="range_", default="HEAD", help="the landed range to re-check (default HEAD)")
+    landed_cmd.add_argument("--gate", default="", help="the enforcement boundary commit (default: the shared gate's own)")
+    landed_cmd.set_defaults(func=cmd_landed)
 
     close_cmd = sub.add_parser("close", help="remove a lane worktree")
     close_cmd.add_argument("--session", required=True)
