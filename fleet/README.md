@@ -258,8 +258,33 @@ bash fleet/terminal.sh         # sister: never-idle loop (watch -> run -> report
 The sister loop (`fleet/terminal.py`) is code-native: it watches `.fleet/inbox`
 forever, runs one subagent per directive with the agent CLI (`--runner "claude
 -p"` by default; `--dry-run` prints the command), reports the result, and
-escalates any failure. An empty inbox is just another poll cycle — it never
+escaluates any failure. An empty inbox is just another poll cycle — it never
 idles out. `FLEET_RUNNER` overrides the runner.
+
+### The runner preflight (issue #733)
+
+The loop resolves its runner **in code**, before it reads the inbox, every cycle:
+`resolve_runner` looks the executable up on PATH and then in the documented
+per-user install directories (`~/.local/bin`, `~/bin`, `~/.claude/local`, …,
+derived from HOME — `fleet/runtime.py`), and `argv[0]` is handed to the child as
+an **absolute** path. This is not belt-and-braces: the loop is cron's child and
+inherits cron's minimal PATH, and the measured failure was the fleet being unable
+to spawn a single subagent because `~/.local/bin` was not on it.
+
+The same environment is passed explicitly at spawn (`fleet/watchdog.py`), so the
+whole chain — cron → watchdog → launcher → loop → subagent — sees one PATH.
+
+An unresolvable runner is a **startup condition, not a per-directive failure**:
+the loop escalates **once**, holds the queue via `.fleet/paused` (so every control
+is still read — the hold is released automatically the moment the runner
+resolves), and dispatches nothing. The hold is recorded in
+`.fleet/runner-hold.json`, so the preflight never releases a pause an operator
+set.
+
+A gate the loop could not assess is **CANNOT-ASSESS**, never a failure of the
+work: a timed-out `make verify` (the gate of record's budget is 1800s) is reported
+as CANNOT-ASSESS at `warn`, because escalating it `critical` is what re-dispatched
+the directive every cycle.
 
 ## Log into the live session
 
@@ -545,3 +570,15 @@ The check validates `fleet/directive.json` against the contract and runs the
 channel's own mutants (unknown message type, bad tier, bad thinking, missing
 role, a sister-issued directive) — each mutant must be refused, so the check
 cannot pass vacuously.
+
+```bash
+bash scripts/check-fleet-runner-preflight.sh   # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
+```
+
+The runner preflight is gated the same way (#733): the declarations are asserted
+by name, the preflight call site is asserted to *precede* the inbox read, and the
+REAL loop is driven in an isolated scratch tree with three queued directives and a
+runner that is on neither PATH nor HOME — exactly one escalation, nothing
+dispatched, the queue held, the work left pending. Two mutants of the real loop
+(the preflight neutralised, the hold removed) must each be **detected**, so a
+regression cannot pass by looking right.

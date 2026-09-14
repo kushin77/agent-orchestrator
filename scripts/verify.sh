@@ -62,6 +62,14 @@ checks=(
   'fleet-channel|bash scripts/check-fleet-channel.sh'
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'fleet-runbook|bash scripts/check-fleet-runbook.sh'
+  # runner-preflight (issue #733): the fleet could not spawn a single subagent
+  # because the loop inherited cron's minimal PATH, and it failed per directive
+  # per cycle (a runaway amplifier). The check names the resolution, the hold and
+  # the CANNOT-ASSESS timeout semantics, drives the REAL loop in a scratch tree
+  # with the runner off PATH and off HOME (exactly one escalation, nothing
+  # dispatched, the queue held), and mutation-proves it with two mutants of the
+  # real loop — the preflight neutralised, and the hold removed.
+  'runner-preflight|bash scripts/check-fleet-runner-preflight.sh'
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'

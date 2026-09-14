@@ -54,7 +54,7 @@ RUNTIME_PATHS = {
         "LOGS",
         "STEERS",
     ),
-    "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "WORKTREE_ROOT"),
+    "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "RUNNER_HOLD", "WORKTREE_ROOT"),
     "brain": ("HEARTBEAT", "WAVES"),
     "health": ("SISTER_HEARTBEAT", "BRAIN_HEARTBEAT"),
     "telemetry": ("RUNS_LOG",),
@@ -116,6 +116,30 @@ def isolate_fleet_runtime(tmp_path, monkeypatch):
     singleton = importlib.import_module("singleton")
     monkeypatch.setattr(singleton, "FLEET", tmp_path / "singleton")
     return tmp_path
+
+
+#: The executable the fleet's default runner names (`terminal.DEFAULT_RUNNER`).
+DEFAULT_RUNNER_BINARY = "claude"
+
+
+@pytest.fixture(autouse=True)
+def resolvable_default_runner(tmp_path, monkeypatch):
+    """Put a stand-in runner on PATH, so the run path resolves deterministically.
+
+    The loop resolves its runner explicitly (#733), so a suite that drives the run
+    path must not depend on whether the HOST has the agent CLI installed — the same
+    reason this file redirects `.fleet/` instead of promising every test will patch
+    it. This is NOT a stub of the resolution: ``shutil.which`` really finds a real
+    executable file on a PATH built here. A test that wants an unresolvable runner
+    asks for one by name (``resolve_runner("claude-733-absent")``) or empties PATH
+    itself, which is how the negative controls are written.
+    """
+    binary = tmp_path / "runner-bin" / DEFAULT_RUNNER_BINARY
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    binary.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binary.parent}{os.pathsep}{os.environ.get('PATH', '')}")
+    return binary
 
 
 #: The probe the guard writes and then looks for. It deliberately carries a

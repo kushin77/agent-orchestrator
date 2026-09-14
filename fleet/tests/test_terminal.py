@@ -382,30 +382,40 @@ def _board(body: str, state: str):
 def test_p10a_prose_alone_can_no_longer_produce_a_success(monkeypatch):
     """Negative control for #279: confident prose with no work is not a success."""
     monkeypatch.setattr(
-        terminal, "run_gate", lambda command, cwd, timeout: (False, f"`{command}` rc=1: 3 checks failed")
+        terminal,
+        "run_gate",
+        lambda command, cwd, timeout: (terminal.GATE_NOT_OK, f"`{command}` rc=1: 3 checks failed"),
     )
     monkeypatch.setattr(terminal, "gh_issue_field", _board("", "open"))
 
-    gate_ok, gate_detail = terminal.gate_evidence(279, None, 30.0)
+    gate_outcome, gate_detail = terminal.gate_evidence(279, None, 30.0)
     landed, landing_detail = terminal.landed_evidence(279)
     status, _ = terminal.verdict(
-        0, "All checks are green. Opened PR #279 and merged it. Everything is done.", gate_ok, landed
+        0,
+        "All checks are green. Opened PR #279 and merged it. Everything is done.",
+        gate_outcome == terminal.GATE_OK,
+        landed,
     )
 
-    assert gate_ok is False and landed is False
+    assert gate_outcome == terminal.GATE_NOT_OK and landed is False
     assert "rc=1" in gate_detail and "#279 is open" in landing_detail
     assert status == "failed", "prose alone must never read as a success"
 
 
 def test_p10b_a_run_that_merely_quotes_refused_is_not_a_failure(monkeypatch):
     """The inverse of #279: the loop's evidence outranks a quoted 'REFUSED'."""
-    monkeypatch.setattr(terminal, "run_gate", lambda command, cwd, timeout: (True, f"`{command}` rc=0: PASS"))
+    monkeypatch.setattr(
+        terminal, "run_gate", lambda command, cwd, timeout: (terminal.GATE_OK, f"`{command}` rc=0: PASS")
+    )
     monkeypatch.setattr(terminal, "gh_issue_field", _board("", "closed"))
 
-    gate_ok, _ = terminal.gate_evidence(279, None, 30.0)
+    gate_outcome, _ = terminal.gate_evidence(279, None, 30.0)
     landed, _ = terminal.landed_evidence(279)
     status, hint = terminal.verdict(
-        0, "channel send: REFUSED (replay detected) — nothing else happened", gate_ok, landed
+        0,
+        "channel send: REFUSED (replay detected) — nothing else happened",
+        gate_outcome == terminal.GATE_OK,
+        landed,
     )
 
     assert status == "done", "a quoted REFUSED must not downgrade verified evidence"
@@ -418,24 +428,26 @@ def test_the_issues_own_verify_command_is_what_the_loop_runs(monkeypatch):
 
     def fake_gate(command, cwd, timeout):
         seen.append(command)
-        return True, f"`{command}` rc=0"
+        return terminal.GATE_OK, f"`{command}` rc=0"
 
     monkeypatch.setattr(terminal, "run_gate", fake_gate)
     monkeypatch.setattr(terminal, "gh_issue_field", _board("Verify: `bash scripts/check-secrets.sh`", "closed"))
-    ok, _ = terminal.gate_evidence(285, None, 30.0)
-    assert ok is True
+    outcome, _ = terminal.gate_evidence(285, None, 30.0)
+    assert outcome == terminal.GATE_OK
     assert seen == ["bash scripts/check-secrets.sh", "make verify"], f"gates run were {seen}"
 
 
 def test_a_prose_verify_line_falls_back_to_make_verify(monkeypatch):
     """Prose after `Verify:` is never executed as a command (#279)."""
-    monkeypatch.setattr(terminal, "run_gate", lambda command, cwd, timeout: (True, f"`{command}` rc=0"))
+    monkeypatch.setattr(
+        terminal, "run_gate", lambda command, cwd, timeout: (terminal.GATE_OK, f"`{command}` rc=0")
+    )
     monkeypatch.setattr(
         terminal, "gh_issue_field", _board("`Verify:` the new test fails against today's code", "closed")
     )
     assert terminal.issue_verify_command(285) is None
-    ok, detail = terminal.gate_evidence(285, None, 30.0)
-    assert ok is True and "make verify" in detail
+    outcome, detail = terminal.gate_evidence(285, None, 30.0)
+    assert outcome == terminal.GATE_OK and "make verify" in detail
 
 
 def test_extract_verify_command_reads_a_real_command_and_ignores_prose():
@@ -569,7 +581,7 @@ def test_n_workers_run_concurrently(monkeypatch):
     monkeypatch.setattr(terminal, "run_once", fake_run_once)
     monkeypatch.setattr(terminal, "start_beating", lambda *a, **k: _FakeBeater())
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "ok"))
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "rc=0"))
     monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
     monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Completed())
@@ -601,7 +613,7 @@ def test_children_claim_and_release_in_isolation(monkeypatch):
     monkeypatch.setattr(terminal, "run_once", lambda *a, **k: (0, "done"))
     monkeypatch.setattr(terminal, "start_beating", lambda *a, **k: _FakeBeater())
     monkeypatch.setattr(terminal, "release_issue", fake_release)
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "rc=0"))
     monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
     monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Completed())
@@ -704,7 +716,7 @@ def test_loop_no_longer_shadows_verdict(monkeypatch):
     monkeypatch.setattr(terminal, "provision_worktree", lambda *a, **k: None)
     monkeypatch.setattr(terminal, "run_once", lambda *a, **k: (0, "runner finished"))
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "ok"))
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "rc=0"))
     monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
     monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
     monkeypatch.setattr(terminal, "IN_FLIGHT", {})
