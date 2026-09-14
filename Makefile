@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -89,6 +89,9 @@ help:
 	@echo "                milestoned issue classified; mandates checked on the diff"
 	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
 	@echo "                RCA, every action recorded, every lesson evidenced"
+	@echo "  fleet-state   Unified fleet-state projection (#323): lanes + sessions +"
+	@echo "                claims + journals + directives joined per item; exits"
+	@echo "                non-zero when anything is orphaned, shelved or wedged"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  worktrees     Reclaim stale lane worktrees (dry run; --apply via"
 	@echo "                scripts/prune-worktrees.sh). Keeps dirty, in-use and"
@@ -107,7 +110,7 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -235,6 +238,16 @@ lease-policy:
 ## mutates its own input, so it cannot pass vacuously
 paperclip-gap-analysis:
 	@bash scripts/check-paperclip-gap-analysis.sh
+
+
+## fleet-state — unified fleet-state projection (issue #323): one read-only
+## command joins lanes, session heartbeats, closure journals, claims and
+## authorisation directives per work item, exits non-zero when anything is
+## orphaned, shelved or wedged, and reports a disagreement between two stores
+## instead of silently resolving it; the gate exercises one fixture item in each
+## state and provokes the failure path, so the projection cannot pass vacuously
+fleet-state:
+	@bash scripts/check-fleet-state.sh
 
 
 ## knowledge-index — the institutional knowledge index must be valid (issue #139):
