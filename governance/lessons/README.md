@@ -27,6 +27,15 @@ Relations: an `rca` names its `incident` and lists its `corrective_actions`;
 an action names its `rca`; a lesson names its `rca`. Everything is traceable in
 both directions, and the gate fails a reference that does not resolve.
 
+Those relations are **typed ticket edges**, not free strings (issue #402):
+[`edges.py`](edges.py) is the single place a lessons reference becomes a node id,
+and the ticket-graph edge vocabulary is closed at four types — `caused-by`
+(`RCA-*` → `INC-*`), `origin` (an `RCA`/`INC` → its source `issue-*` / `pr-*` /
+`commit-*` / `event-*`), `mitigates` (a `CA-*` → its `RCA-*`, a lesson → the
+incident of its RCA) and `remediation-of` (an open action → the `issue-*` that
+carries it). The edges are **derived**, never stored: a stored copy would be a
+second source of truth the ledger could drift from.
+
 ## Recording an incident
 
 1. **Write the incident line** with its origin — `{"kind": "issue"|"pr"|
@@ -84,6 +93,7 @@ that carries them.
 | `suggestion-without-remediation` | error | an open idea with no proposed change |
 | `suggestion-without-owner` | error | an open idea with nobody accountable |
 | `evidence-unresolvable` | error | a cited commit is not in this repository's history, or a cited artifact is absent (a **deviation** in a shallow clone, where history cannot be resolved) |
+| `edge-unresolved` | error | a cross-record reference cannot be typed as a ticket edge (a malformed `origin` or `remediation_issue`, issue #402) |
 | `board-incident-without-rca` | error | an incident-labelled issue was closed with no RCA record |
 | `board-incident-pending` | deviation | an incident-labelled issue is open and has no RCA record yet |
 | `board-incident-exempt` | deviation | an explicitly exempt issue; the reason is printed every run |
@@ -121,6 +131,29 @@ least every 180 days (`review_cadence_days`); past that the gate reports
 in the report (`.verify/lessons-report.json`) are re-checked and attached to
 the closing evidence. Ledger review is part of milestone close-out, not a
 separate ceremony.
+
+## One ledger, one view
+
+There is exactly one authoritative ledger — [`ledger.jsonl`](ledger.jsonl). The
+hub's `vendor/CMR/docs/LESSONS.md` is a *rendered* view of the same register, not
+a second source: the gate reads this ledger alone, and the CMR-hub asset is
+treated as an optional, absent-unless-checked-out submodule source
+(`governance/knowledge/sources.py`). Migrating that view into this register is
+**dual-read, single-write**: readers may still resolve a hub asset when the
+submodule is present, but nothing writes it, so the two cannot diverge into a
+silent duplicate. The hub-side retirement is a follow-up, tracked on the board;
+until it lands the hub asset remains read-only here.
+
+## PMO-readable
+
+Every learning carries what the PMO needs without a second store:
+[`edges.py`](edges.py) exposes `pmo_rows(records, snapshot)` — one row per
+learning with its `owner`, `status`, `class` and the `goal` (the epic, or the
+milestone) it belongs to, derived from its origin through the committed board
+snapshot. The lessons lane never invents an authority: `owner` comes from the
+record when it carries one (a `SUGGEST-*` does) and the ticket projection
+supplies it otherwise, and `goal` is resolved from the board snapshot rather
+than stored again here.
 
 ## The incidents recorded so far
 
@@ -163,6 +196,7 @@ its job on its own author: an uncommitted RCA does not exist (`RCA-0002`).
 | [`rca-template.md`](rca-template.md) | the RCA template every artifact follows |
 | [`rca/`](rca/) | the RCA artifacts themselves |
 | [`model.py`](model.py) | record kinds, vocabularies, findings, report |
+| [`edges.py`](edges.py) | the typed ticket edges, node kinds and the PMO view (issue #402) |
 | [`checker.py`](checker.py) | detection logic over the ledger and the board |
 | [`cli.py`](cli.py) | `check` / `status` / `record` / `template` |
 

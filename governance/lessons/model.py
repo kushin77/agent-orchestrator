@@ -84,6 +84,56 @@ ORIGIN_KINDS = ("issue", "pr", "commit", "event")
 
 EVIDENCE_KINDS = ("commit", "issue", "pr", "artifact", "event")
 
+#: The lessons register is an edge source in the ticket graph (ADR-0014,
+#: issue #402): every ledger record is a ticket *node* and every cross-record
+#: reference is a *typed edge*, never a free string a reader re-parses on its
+#: own. The node kinds are the ticket contract's own ``kind`` enum
+#: (``docs/contracts/paperclip/ticket.schema.json``), so an open ``SUGGEST-*``
+#: is a ticket of kind ``suggestion`` — addressable like any other node.
+TICKET_KIND_TASK = "task"
+TICKET_KIND_INCIDENT = "incident"
+TICKET_KIND_RCA = "rca"
+TICKET_KIND_CORRECTIVE_ACTION = "corrective-action"
+TICKET_KIND_LESSON = "lesson"
+TICKET_KIND_SUGGESTION = "suggestion"
+
+TICKET_KINDS = (
+    TICKET_KIND_TASK,
+    TICKET_KIND_INCIDENT,
+    TICKET_KIND_RCA,
+    TICKET_KIND_CORRECTIVE_ACTION,
+    TICKET_KIND_LESSON,
+    TICKET_KIND_SUGGESTION,
+)
+
+#: Ledger kind to ticket kind, for the ledger kinds that map one-to-one.
+#: ``lesson`` is deliberately absent: one ledger kind splits into ``lesson``
+#: (a closed ``LESSON-*``) and ``suggestion`` (an open ``SUGGEST-*``); see
+#: :func:`ticket_kind_for`.
+TICKET_KIND_BY_LEDGER_KIND: Dict[str, str] = {
+    KIND_INCIDENT: TICKET_KIND_INCIDENT,
+    KIND_RCA: TICKET_KIND_RCA,
+    KIND_CORRECTIVE_ACTION: TICKET_KIND_CORRECTIVE_ACTION,
+}
+
+#: The ticket graph's closed edge vocabulary (issue #402). This is **not** the
+#: cross-reference spine's nine-type vocabulary: the spine admits the subset it
+#: can carry (see ``governance/knowledge/crossref.py``) and the rest stay
+#: ticket-graph edges. ``origin`` replaces the free-string ``origin`` field and
+#: ``remediation-of`` replaces the free-string ``remediation_issue`` field, so
+#: no reader resolves either by itself.
+EDGE_CAUSED_BY = "caused-by"
+EDGE_ORIGIN = "origin"
+EDGE_MITIGATES = "mitigates"
+EDGE_REMEDIATION_OF = "remediation-of"
+
+TICKET_EDGE_TYPES: Tuple[str, ...] = (
+    EDGE_CAUSED_BY,
+    EDGE_ORIGIN,
+    EDGE_MITIGATES,
+    EDGE_REMEDIATION_OF,
+)
+
 #: An RCA artifact must carry these section headings, so an "RCA" cannot be a
 #: one-line note that says nothing about cause or remedy.
 RCA_REQUIRED_SECTIONS = (
@@ -110,6 +160,7 @@ CODE_DUPLICATE_ID = "duplicate-id"
 CODE_RECORD_INCOMPLETE = "record-incomplete"
 CODE_INVALID_FIELD = "invalid-field"
 CODE_UNKNOWN_REFERENCE = "unknown-reference"
+CODE_EDGE_UNRESOLVED = "edge-unresolved"
 CODE_INCIDENT_WITHOUT_RCA = "incident-without-rca"
 CODE_RCA_WITHOUT_ORIGIN = "rca-without-origin"
 CODE_ORIGIN_UNRESOLVED = "origin-unresolved"
@@ -213,6 +264,20 @@ def is_suggestion(record_id: Any) -> bool:
 def is_lesson(record_id: Any) -> bool:
     """A ``LESSON-`` record is a learning that must be closed with evidence."""
     return isinstance(record_id, str) and record_id.startswith(LESSON_PREFIX_CLOSED)
+
+
+def ticket_kind_for(record: Dict[str, Any]) -> str:
+    """The ticket-graph node kind for one ledger record, or ``""``.
+
+    A ``SUGGEST-*`` is a ``suggestion`` and a ``LESSON-*`` a ``lesson``, so the
+    open improvement register is addressable exactly like a closed learning.
+    """
+    record_id = str(record.get("id", ""))
+    if is_suggestion(record_id):
+        return TICKET_KIND_SUGGESTION
+    if is_lesson(record_id):
+        return TICKET_KIND_LESSON
+    return TICKET_KIND_BY_LEDGER_KIND.get(str(record.get("kind", "")), "")
 
 
 @dataclass(frozen=True)
