@@ -127,6 +127,11 @@ queue is executed in chronological, dependency-aware order.
 5. **Close the chain before launching new work.** New issue selection is only
    allowed after the current chain reaches verification/closeout or when the new
    issue is the direct required continuation of the same chain.
+6. **The active epic is a chain edge.** A `Parent:` edge to the epic the fleet is
+   currently driving (`.board/focus.json`, epic focus) is a dependency edge: its
+   children are claimable under the additive reason `active-epic-child`. This
+   tightens the milestone frontier rather than opening the board — an item with
+   no such edge is still refused `no-chain-edge`.
 
 This is a governance rule, not an optimization preference. Any agent that
 starts choosing issues ad hoc is violating the repo's execution contract.

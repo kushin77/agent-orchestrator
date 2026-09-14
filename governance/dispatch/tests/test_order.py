@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
+
 import order
 from model import (
+    REASON_ACTIVE_EPIC_CHILD,
     REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
     REASON_CHILD_OF_CLAIM,
@@ -201,3 +204,75 @@ def test_frontier_is_never_a_blocked_issue(snapshot):
     assert frontier is not None
     assert frontier.number == 601
     assert snapshot.blockers_open(frontier) == []
+
+
+# --- #717: the active epic is a chain edge (epic focus #707) -----------------
+
+
+def _focus_file(tmp_path, epic):
+    """A valid ``.board/focus.json`` pinning ``epic`` (offline fixture)."""
+    path = tmp_path / "focus.json"
+    path.write_text(
+        json.dumps(
+            {
+                "active_epic": epic,
+                "activated_at": "2026-09-13T12:00:00Z",
+                "wave_cap": 12,
+                "max_agents": 0,
+                "pooled": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _epic_board() -> Snapshot:
+    """#600 is the pinned epic with child #607; #609 is an unrelated epic with #608."""
+    issues = {
+        600: Issue(600, "the active epic", milestone="M25", labels=("type:epic",)),
+        601: Issue(601, "frontier", milestone="M25"),
+        607: Issue(607, "child of the active epic", milestone="M99", parent=600),
+        608: Issue(608, "child of another epic", milestone="M99", parent=609),
+        609: Issue(609, "another epic", milestone="M99", labels=("type:epic",)),
+    }
+    return Snapshot(generated_at="2026-09-13T12:00:00Z", source="test", issues=issues)
+
+
+def test_child_of_the_active_epic_is_eligible(tmp_path):
+    verdict = order.eligible(_epic_board(), 607, focus_path=_focus_file(tmp_path, 600))
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_ACTIVE_EPIC_CHILD
+    assert "#600" in verdict.detail
+
+
+def test_child_of_a_non_active_epic_is_still_refused(tmp_path):
+    verdict = order.eligible(_epic_board(), 608, focus_path=_focus_file(tmp_path, 600))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_NO_CHAIN_EDGE
+
+
+def test_an_unrelated_open_board_item_is_still_refused(tmp_path, snapshot):
+    """Regression: epic focus adds an edge, it does not open the board."""
+    verdict = order.eligible(snapshot, 603, focus_path=_focus_file(tmp_path, 600))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_NO_CHAIN_EDGE
+
+
+def test_child_of_a_held_epic_is_child_of_claim_not_active_epic_child(tmp_path):
+    """Precedence: the agent's own held parent still wins (child-of-claim first)."""
+    verdict = order.eligible(
+        _epic_board(), 607, active_claims=frozenset({600}), focus_path=_focus_file(tmp_path, 600)
+    )
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_CHILD_OF_CLAIM
+
+
+def test_a_blocked_active_epic_child_is_still_refused(tmp_path):
+    """The new edge never bypasses a blocker."""
+    issues = dict(_epic_board().issues)
+    issues[607] = Issue(607, "child, blocked", milestone="M99", parent=600, blocked_by=(699,))
+    board = Snapshot(generated_at="2026-09-13T12:00:00Z", source="test", issues=issues)
+    verdict = order.eligible(board, 607, focus_path=_focus_file(tmp_path, 600))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_BLOCKED

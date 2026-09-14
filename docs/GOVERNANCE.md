@@ -179,6 +179,11 @@ free-form board queue.
   planned continuation of the same execution path.
 - **Rule 5: monotonic progress.** Agents must advance from prerequisite → child
   → validation → closeout, not skip ahead to unrelated tasks.
+- **Rule 6: the active epic is a chain edge.** A `Parent: #n` edge to the epic
+  the fleet is currently driving (`.board/focus.json`, epic focus #707) is a real
+  dependency edge: that epic's open children are the next valid steps. This is
+  *stricter* than the milestone frontier, never a relaxation — an item with no
+  such edge is still refused `no-chain-edge`.
 
 This prevents "issue scavenging" and ensures the board behaves like a governed
 execution plan instead of a generic kanban.
@@ -200,6 +205,10 @@ enforced by code:
   the directive must exist in `.fleet/sent`, be a brain-issued directive, and
   name exactly this issue — the claim is then recorded as `brain-directed`.
   Off-frontier work without a directive remains refused.
+- **Epic focus is a chain edge.** A child of the active epic may be claimed with
+  the additive reason `active-epic-child`. The audit re-derives the edge — the
+  issue must declare a `Parent:` naming an open epic that IS the active epic —
+  and reports the claim otherwise, so the reason cannot be abused.
 - **Single claim.** An in-flight issue is locked; a second agent's claim fails
   loudly. A claim whose TTL elapsed may be taken over, so a dead agent cannot
   wedge the chain.
