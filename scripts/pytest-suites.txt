@@ -106,3 +106,7 @@ guardrails/chat
 identity/chat
 registry/chat
 telemetry/chat
+# EPIC #500 (issue #513): the conversation transcript store. Declared AND named
+# by a gate (scripts/verify.sh) -- a declared-but-unnamed suite is refused by
+# check-gate-coverage, which never grandfathers a newly declared one.
+engine/conversation
