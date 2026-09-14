@@ -69,6 +69,12 @@ checks=(
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
   'paperclip-adapter|bash scripts/check-paperclip-integration-adapter.sh'
   'paperclip-canonical-module|bash scripts/check-paperclip-canonical-module.sh'
+  # paperclip-auth (issue #412, ADR-0013): the cross-boundary auth seam in
+  # integrations/paperclip/auth/ must mint/verify agent identity from the
+  # registry, map a human onto the board session path, bridge the run id, and
+  # refuse every negative control by name (incl. 403-not-404); the check runs
+  # the boundary suite and provokes each refusal, so it cannot pass vacuously.
+  'paperclip-auth|bash scripts/check-paperclip-auth.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
@@ -98,6 +104,7 @@ checks=(
   'cross-repo-sync|bash scripts/check-cross-repo-sync.sh'
   'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
   'paperclip-budget|bash scripts/check-paperclip-budget.sh'
+  'metering-parity|bash scripts/check-metering-parity.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master

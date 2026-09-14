@@ -4,7 +4,7 @@
 #
 # The fleet beat is a flat process-liveness record with no wake.cause, no
 # wake.delta and no outcome, and no explicit tick or cadence. The adapter under
-# paperclip/adapters/heartbeat/ derives all of them from the fleet's real rung
+# integrations/paperclip/adapters/heartbeat/ derives all of them from the fleet's real rung
 # activity. A seam that nothing validates is a formality (no-false-green
 # doctrine, GR-12), so this gate fails, by name, when the adapter drifts:
 #
@@ -35,8 +35,8 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-if [ ! -d "$root/paperclip/adapters/heartbeat" ]; then
-  echo "check-paperclip-heartbeat: FAIL — paperclip/adapters/heartbeat/ is missing" >&2
+if [ ! -d "$root/integrations/paperclip/adapters/heartbeat" ]; then
+  echo "check-paperclip-heartbeat: FAIL — integrations/paperclip/adapters/heartbeat/ is missing" >&2
   exit 1
 fi
 
@@ -62,7 +62,7 @@ scratch = Path(sys.argv[2])
 if str(root) not in sys.path:
     sys.path.insert(0, str(root))
 
-from paperclip.adapters.heartbeat import adapter  # noqa: E402
+from integrations.paperclip.adapters.heartbeat import adapter  # noqa: E402
 
 fail = 0
 T0 = "2026-09-14T00:00:05Z"
@@ -205,7 +205,7 @@ fi
 
 echo "== pytest suite =="
 if ! env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
-    paperclip/adapters/heartbeat/tests; then
+    integrations/paperclip/adapters/heartbeat/tests; then
   echo "check-paperclip-heartbeat: FAIL — pytest suite red" >&2
   exit 1
 fi

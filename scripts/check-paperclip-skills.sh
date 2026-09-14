@@ -3,7 +3,7 @@
 #
 # Upstream's extensibility family (``SKILL.md`` skills, plugins/extensions, MCP
 # tool access) had no fleet-side producer: nothing said which skill an agent may
-# load or which MCP tool a run may call. ``paperclip/adapters/skills/`` is the
+# load or which MCP tool a run may call. ``integrations/paperclip/adapters/skills/`` is the
 # adapter that maps it onto what the fleet already runs — the tool authority
 # ``gateway/mcp/`` for tools, the agent profile for what an agent may use, and a
 # closed ``SKILL.md`` registry for what is loadable.
@@ -35,7 +35,7 @@ set -u
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
 
-PKG="paperclip/adapters/skills"
+PKG="integrations/paperclip/adapters/skills"
 GATE="check-paperclip-skills"
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -59,7 +59,7 @@ note_fail() {
 cli() {
   local data_root="$1"
   shift
-  python3 -m paperclip.adapters.skills.cli --root "$data_root" "$@"
+  python3 -m integrations.paperclip.adapters.skills.cli --root "$data_root" "$@"
 }
 
 # --- baseline: the structure is coherent -------------------------------------
@@ -100,8 +100,8 @@ trap 'rm -rf "$scratch"' EXIT
 fresh_root() {
   local into="$1"
   rm -rf "$into"
-  mkdir -p "$into/paperclip/adapters" "$into/registry/profiles"
-  cp -a "$root/$PKG" "$into/paperclip/adapters/skills"
+  mkdir -p "$into/integrations/paperclip/adapters" "$into/registry/profiles"
+  cp -a "$root/$PKG" "$into/integrations/paperclip/adapters/skills"
   cp -a "$root/gateway" "$into/gateway"
   cp -a "$root/registry/profiles/seeds" "$into/registry/profiles/seeds"
 }
@@ -122,8 +122,8 @@ guarded_before="$(for f in "${guarded_files[@]}"; do sha256_of "$f"; done)"
 echo "== provocation A: an undeclared SKILL.md must be refused by name =="
 ra="$scratch/a"
 fresh_root "$ra"
-mkdir -p "$ra/paperclip/adapters/skills/library/rogue-skill"
-cat > "$ra/paperclip/adapters/skills/library/rogue-skill/SKILL.md" <<'SKILLDOC'
+mkdir -p "$ra/integrations/paperclip/adapters/skills/library/rogue-skill"
+cat > "$ra/integrations/paperclip/adapters/skills/library/rogue-skill/SKILL.md" <<'SKILLDOC'
 ---
 id: rogue-skill
 kind: skill
@@ -161,7 +161,7 @@ fi
 echo "== provocation B: a callable tool absent from the projection is a FAIL =="
 rb="$scratch/b"
 fresh_root "$rb"
-printf '%s\n' "$(python3 - "$rb/paperclip/adapters/skills/mcp_tools.json" <<'PY'
+printf '%s\n' "$(python3 - "$rb/integrations/paperclip/adapters/skills/mcp_tools.json" <<'PY'
 import json, sys
 path = sys.argv[1]
 data = json.load(open(path, encoding="utf-8"))
@@ -197,7 +197,7 @@ fi
 echo "== provocation D: a declaration with no provenance is refused by name =="
 rd="$scratch/d"
 fresh_root "$rd"
-python3 - "$rd/paperclip/adapters/skills/library/ticket-contract-read/SKILL.md" <<'PY'
+python3 - "$rd/integrations/paperclip/adapters/skills/library/ticket-contract-read/SKILL.md" <<'PY'
 import sys
 path = sys.argv[1]
 text = open(path, encoding="utf-8").read()
@@ -227,7 +227,7 @@ echo "== provocation E: a vendored implementation is refused by name =="
 re="$scratch/e"
 fresh_root "$re"
 printf 'def copied_upstream_implementation():\n    return 1\n' \
-  > "$re/paperclip/adapters/skills/library/ticket-contract-read/vendor_copy.py"
+  > "$re/integrations/paperclip/adapters/skills/library/ticket-contract-read/vendor_copy.py"
 out_e="$(cli "$re" check 2>&1)"
 rc_e=$?
 if [ "$rc_e" -eq 1 ] && printf '%s\n' "$out_e" | grep -q "vendor_copy.py"; then

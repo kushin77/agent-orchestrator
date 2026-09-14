@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "kind": "metering",
+  "identity": {
+    "tenantId": "acme",
+    "agentId": "paperclip",
+    "runId": "ao-sess-7f3a91c2",
+    "recordId": "9c1e4b7a2f0d",
+    "sourceType": "model_call_event",
+    "sourceKey": "route:deepseek-v4-flash:2026-09-14T09:00:00Z"
+  },
+  "quantity": {
+    "inputTokens": 1200,
+    "outputTokens": 800,
+    "totalTokens": 2000,
+    "costUsd": 0.0123,
+    "costSource": "rate_card",
+    "currency": "USD",
+    "metered": true,
+    "billable": true,
+    "cacheHit": false,
+    "unmeteredReason": null
+  },
+  "receipt": {
+    "ticket": "kushin77/agent-orchestrator#425",
+    "receipt": "ledger:2026-09-14:acme:paperclip:9c1e4b7a2f0d",
+    "evidence": "make verify attestation git_sha=9e0c8b7 check=paperclip-budget PASS"
+  },
+  "attribution": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "route": "deepseek-v4-flash",
+    "tier": "flash",
+    "taskClass": "doc_update",
+    "outcome": "ok",
+    "scope": { "level": "agent", "id": "paperclip" },
+    "period": "month",
+    "cap": 5.0,
+    "spent": 1.23,
+    "hardStop": true,
+    "burnRateAlertPct": 80
+  },
+  "claims": [
+    {
+      "kind": "cap",
+      "metric": "costUsd",
+      "value": 5.0,
+      "evidence": "telemetry/budgets/config/policies.yaml tenant acme cost.limitUsd"
+    },
+    {
+      "kind": "saving",
+      "metric": "costUsd",
+      "value": 0.0041,
+      "evidence": "ledger:2026-09-14:acme:paperclip:9c1e4b7a2f0d costSource=cache_hit"
+    }
+  ]
+}
