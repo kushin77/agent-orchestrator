@@ -510,5 +510,34 @@ The private key is discarded after signing (GR-6: env/secret-manager-only at
 publish time); all four release signatures verify against the committed public
 key via `registry/packs/validate.py`.
 
+## 12. paperclip.ing gap analysis (issue #368) — upstream product vs fleet primitives
+
+Issue #368 analyses the upstream product **paperclip.ing**
+(`paperclipai/paperclip`, **MIT License**, latest release seen v2026.831.1,
+retrieved 2026-09-13) as a **fork-map / adoption decision**, never a vendoring.
+The artifact is `docs/PAPERCLIP-ING-GAP-ANALYSIS.md`; its gate is
+`scripts/check-paperclip-gap-analysis.sh` (it mutates its own input, so it cannot
+pass vacuously). The document maps upstream's six capability families — org
+chart, goal alignment, heartbeats, budgets & costs, tickets + audit, governance —
+onto the fleet's own primitives, **by file path**, then records a
+cannibalize-vs-build table.
+
+| Source (upstream) | Asset | Verdict | Feeds |
+|---|---|---|---|
+| `paperclipai/paperclip` (product **paperclip.ing**) | six capability families (org chart, goal alignment, heartbeats, budgets & costs, tickets + audit, governance) + a company-scoped `/api` control-plane surface (`/api/companies/{companyId}/...`, `X-Paperclip-Run-Id`, `GET /api/openapi.json`) | REFERENCE | `docs/PAPERCLIP-ING-GAP-ANALYSIS.md` (fork-map), `scripts/check-paperclip-gap-analysis.sh`, and the follow-on integration lane (issue #370) |
+
+**Namesake disambiguation — four distinct "paperclips".** The fleet *agent*
+`paperclip` (`registry/profiles/seeds/paperclip.1.0.0.yaml`,
+`registry/personas/cards/paperclip.yaml`), the gateway *provider* `paperclip`
+(`gateway/providers/paperclip.py`), the vendored CMR *planning module*
+`paperclip` (`vendor/CMR/catalog/modules/paperclip`) and the upstream *product*
+`paperclip.ing` are four unrelated artifacts; the first two are separated by
+`docs/decision-records/ADR-0012-hermes-paperclip-boundary.md`.
+
+**License / provenance (GR-6, GR-10).** Upstream is MIT; only its public
+documentation and repository surface (docs.paperclip.ing, the `paperclipai/paperclip`
+repo) were read. **No upstream code was copied into this repository**, and no
+upstream file is a dependency of any fleet primitive named in the analysis.
+
 ---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*
