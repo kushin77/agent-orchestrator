@@ -9,6 +9,12 @@ taskTypes:
     - digest: sha256:161b4b06f943ff1a011e3ccfbb124e9fe995231783612d2c639ab2d865706b56
       publishedAt: '2026-09-08T18:04:47+00:00'
       version: v2
+  code-author:
+    pinned: v1
+    published:
+    - digest: sha256:958a85d1cff96c6662708121ecc11fe3492e367581fa0f38c8ece777c3e0a77f
+      publishedAt: '2026-09-14T02:17:13+00:00'
+      version: v1
   code-review-verdict:
     pinned: v1
     published:
@@ -20,4 +26,10 @@ taskTypes:
     published:
     - digest: sha256:4c5743814b26d43a54773dd92f4d94e1ba3861f32a427ab094ba4f10a4e03536
       publishedAt: '2026-09-08T18:04:47+00:00'
+      version: v1
+  test-run:
+    pinned: v1
+    published:
+    - digest: sha256:4a47cceb793636acb25b14dd8ffa0c12424216b2e4a3232f805eae9490835430
+      publishedAt: '2026-09-14T02:17:13+00:00'
       version: v1

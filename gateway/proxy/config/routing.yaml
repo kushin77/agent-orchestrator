@@ -28,6 +28,16 @@ routes:
   summarize:
     capability: research
     taskClass: research
+  # Capability-holder routes (issue #337): the purebliss-team hermes + ollama
+  # personas hold code-author / test-run but no route referenced a capability
+  # they hold, so their pins were unreachable. These routes reference only
+  # capabilities those personas already declare (no capabilitySet widening).
+  test-run:
+    capability: test-run
+    taskClass: test-run
+  code-author:
+    capability: code-author
+    taskClass: code-author
 
 # FinOps ladder tier (L0/L1/L2) -> registry profile tier (LOW/MED/HIGH/MAX).
 # The chooser picks the ladder tier; the proxy maps it onto the registry

@@ -60,6 +60,7 @@ governance/merge
 governance/dispatch
 fleet
 governance/knowledge
+governance/modules
 governance/conformance
 governance/finops
 # Final registration (issue #46, E2E lane): the top-level negative-control +
@@ -110,3 +111,7 @@ telemetry/chat
 # by a gate (scripts/verify.sh) -- a declared-but-unnamed suite is refused by
 # check-gate-coverage, which never grandfathers a newly declared one.
 engine/conversation
+# EPIC #500 (issue #579): the chat serving surface (#503). Declared AND named
+# by scripts/verify.sh -- declaring it alone would fail check-gate-coverage,
+# which never grandfathers a newly declared suite.
+gateway/chat
