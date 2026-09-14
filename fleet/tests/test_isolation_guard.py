@@ -23,15 +23,17 @@ What is asserted here
 * the cover and the leak detector can FAIL: a deliberate write into a ``.fleet/``
   audit log is reported by the same helper the guard asserts with, and a covered
   path left pointing at the live tree is named by the cover check;
-* the loop's run path really emits its ``started`` record (#286): driving
+* the loop's run path really emits BOTH of its records (#286): driving
   ``terminal.loop`` into one dispatch — with every expensive seam stubbed —
-  writes the record that a source-text grep used to stand in for, so deleting the
-  emission fails here. The OUTCOME record is not asserted: the build this test
-  was written against crashes at ``terminal.py:1192`` with an ``UnboundLocalError``
-  (``loop`` shadows the module-level ``verdict()`` with a local bound only inside
-  ``if control:``), which makes it unreachable. That defect is in a file this lane
-  does not own; it is reproduced and filed separately rather than worked around
-  silently.
+  writes the ``started`` record *and* the terminal outcome record that a
+  source-text grep used to stand in for, so deleting either emission fails here.
+  When this test was first written it could assert only ``started``: the
+  ``terminal.loop`` of that day crashed at the verdict with an
+  ``UnboundLocalError`` (``loop`` shadowed the module-level ``verdict()``), so
+  the outcome was unreachable and a narrow ``except`` absorbed the crash. ``loop``
+  no longer shadows ``verdict()``, so both emissions are asserted and that
+  ``except`` is gone — it would have hidden exactly the regression this test
+  exists to catch.
 """
 
 from __future__ import annotations
@@ -203,13 +205,11 @@ def _run_one_cycle(monkeypatch) -> list[list[str]]:
     be about the loop's OWN behaviour (which telemetry it emits). Returns the
     commands the loop issued, so a test can prove the cycle really ran.
 
-    NOTE (reported separately, see the defect note below): the build this test
-    was written against crashes at ``terminal.py:1192`` with
-    ``UnboundLocalError: verdict`` because ``loop`` shadows the module-level
-    ``verdict()`` with a local that is assigned only inside ``if control:``. The
-    ``started`` record is written at line 1136 — before that point — and pinning
-    it behaviourally is this module's job (#286). Any OTHER exception still
-    propagates and fails the test.
+    Nothing is caught: ``loop --once`` is driven to completion and any exception
+    it raises fails the test. The crash this harness once absorbed narrowly (an
+    ``UnboundLocalError: verdict``, from ``loop`` shadowing the module-level
+    ``verdict()``) cannot occur at this commit, and an ``except`` that swallows it
+    would hide a regression rather than report one (#286).
     """
     calls: list[list[str]] = []
     directive = {
@@ -254,27 +254,29 @@ def _run_one_cycle(monkeypatch) -> list[list[str]]:
     )
     saved = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
-        try:
-            terminal.loop(args)
-        except UnboundLocalError as exc:
-            # The known, separately-reported defect named in the docstring above.
-            # Narrow on purpose: it documents WHY the outcome record is not
-            # asserted here, and any other failure still fails the test.
-            assert "verdict" in str(exc), exc
+        returned = terminal.loop(args)
     finally:
         for sig, handler in saved.items():
             signal.signal(sig, handler)
+    assert returned == 0, f"`loop --once` returned {returned}; the cycle did not finish"
     return calls
 
 
-def test_the_run_path_emits_the_started_record_by_effect(monkeypatch):
-    """#286: the emission is proved by effect, not by grepping the source.
+def test_loop_wires_record_run_into_the_run_path(monkeypatch):
+    """#286: the run path's telemetry is proved by EFFECT, not by source text.
 
-    ``test_loop_wires_record_run_into_the_run_path`` asserted that a *string*
-    appeared in ``inspect.getsource(terminal.loop)``, so commenting the call out
-    — while keeping its text — stayed green (measured: the mutant survived).
-    Here one real dispatch is driven and the records are read back from the
-    JSONL, so removing the ``started`` emission fails this test.
+    The version of this test in ``test_terminal_telemetry.py`` asserted that the
+    two ``record_run(...)`` call *strings* appeared in
+    ``inspect.getsource(terminal.loop)``. A substring assertion is green while the
+    characters are present and the call is dead — commenting the call out while
+    keeping its text survived (measured, GR-12) — and red when the call is merely
+    reformatted. It proved nothing about the wiring and could not fail on the
+    defect it claimed to guard.
+
+    Here one real dispatch is driven end to end with every out-of-process seam
+    stubbed, and the records the run path itself wrote are read back from the
+    JSONL. Both emissions the old grep named are asserted — the ``started`` record
+    and the terminal outcome record — so deleting either one fails.
     """
     calls = _run_one_cycle(monkeypatch)
     assert any("watch" in command for command in calls), "the driver never fed the loop a directive"
@@ -283,12 +285,28 @@ def test_the_run_path_emits_the_started_record_by_effect(monkeypatch):
     )
 
     records = telemetry.read_records(telemetry.RUNS_LOG)
-    assert [record["status"] for record in records][:1] == ["started"], (
-        f"the run path emitted {[record['status'] for record in records]}, not a start record"
+    statuses = [record["status"] for record in records]
+    assert {record["run_id"] for record in records} == {DIRECTIVE_ID}, (
+        f"the run path wrote records for other runs: {records}"
     )
-    started = records[0]
-    assert started["run_id"] == DIRECTIVE_ID
+
+    started = [record for record in records if record["status"] == "started"]
+    assert len(started) == 1, f"expected exactly one start record, got {statuses}"
+    started = started[0]
     assert started["issue"] == str(DIRECTIVE_ISSUE)
     assert started["agent"] == terminal.agent_id_for(DIRECTIVE_ID)
+    assert started["started_at"], "the start record must carry the run's start time"
     assert started["finished_at"] is None
-    assert started["started_at"]
+
+    outcome = [record for record in records if record["status"] in {"done", "failed"}]
+    assert len(outcome) == 1, (
+        f"the run path wrote no terminal record for {DIRECTIVE_ID}: emitted {statuses}"
+    )
+    outcome = outcome[0]
+    assert outcome["issue"] == str(DIRECTIVE_ISSUE)
+    assert outcome["agent"] == terminal.agent_id_for(DIRECTIVE_ID)
+    assert outcome["started_at"] == started["started_at"], (
+        "the outcome record must name the same run as the start record"
+    )
+    assert outcome["finished_at"], "the outcome record must carry a finish time"
+    assert outcome["detail"], "the outcome record must carry what the run decided"

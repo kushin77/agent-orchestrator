@@ -124,6 +124,41 @@
   --os-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --os-transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --os-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* CONVERSATIONAL COMPONENTS (EPIC #500, issue #515) — the chat surface is
+     styled from declared tokens only. Every value below REUSES an existing
+     token's value (no new palette is introduced); the four non-colour state
+     distinctions are flagged local choices in PROVENANCE.md, required so the
+     budget warning and hard-stop states are distinguishable without colour
+     alone. Dark overrides live in the dark block below. */
+  --os-chat-bubble-radius:                0.5rem;     /* = --os-radius-md */
+  --os-chat-bubble-assistant-bg:          #f9fafb;    /* = --os-color-surface-hover */
+  --os-chat-bubble-assistant-border:      #e5e7eb;    /* = --os-color-border */
+  --os-chat-bubble-user-bg:               #dbeafe;    /* = --os-color-primary-soft */
+  --os-chat-bubble-user-border:           #e5e7eb;    /* = --os-color-border */
+  --os-chat-caret-color:                  #8b5cf6;    /* = --os-color-accent */
+  --os-chat-caret-width:                  8px;        /* = --os-space-2 */
+  --os-chat-citation-bg:                  #ede9fe;    /* = --os-color-accent-soft */
+  --os-chat-citation-fg:                  #4b5563;    /* = --os-color-fg-subtle */
+  --os-chat-citation-radius:              9999px;     /* = --os-radius-full */
+  --os-chat-unsupported-fg:               #ef4444;    /* = --os-color-error */
+  --os-chat-unsupported-bg:               #f9fafb;    /* = --os-color-bg-subtle */
+  --os-chat-tier-bg:                      #f3f4f6;    /* = --os-color-border-subtle */
+  --os-chat-tier-fg:                      #4b5563;    /* = --os-color-fg-subtle */
+  --os-chat-metric-bg:                    #f9fafb;    /* = --os-color-bg-subtle */
+  --os-chat-metric-fg:                    #6b7280;    /* = --os-color-muted */
+  --os-chat-budget-warning-bg:            #f9fafb;    /* = --os-color-bg-subtle */
+  --os-chat-budget-warning-fg:            #f59e0b;    /* = --os-color-warning */
+  --os-chat-budget-hardstop-bg:           #f9fafb;    /* = --os-color-bg-subtle */
+  --os-chat-budget-hardstop-fg:           #ef4444;    /* = --os-color-error */
+  --os-chat-degradation-bg:               #f9fafb;    /* = --os-color-bg-subtle */
+  --os-chat-degradation-fg:               #0ea5e9;    /* = --os-color-info */
+  --os-chat-composer-focus-ring:          0 0 0 3px rgba(59, 130, 246, 0.1); /* = --os-shadow-focus */
+  --os-chat-budget-warning-border-style:  solid;
+  --os-chat-budget-hardstop-border-style: dashed;
+  --os-chat-budget-warning-border-width:  1px;
+  --os-chat-budget-hardstop-border-width: 2px;
+
 }
 
 /* =====================================================================
@@ -184,4 +219,27 @@
   --os-color-warning:        #fbbf24;
   --os-color-error:          #ef4444;
   --os-color-info:           #38bdf8;
+  /* CONVERSATIONAL COMPONENTS (issue #515) — dark overrides for the tokens
+     whose source token itself has a dark value. The non-colour distinctions
+     (border style/width, radius, caret width, focus ring) are mode-independent
+     and are intentionally not repeated here. */
+  --os-chat-bubble-assistant-bg:          #232a47;                 /* = --os-color-surface-hover (dark) */
+  --os-chat-bubble-assistant-border:      #2c3454;                 /* = --os-color-border (dark) */
+  --os-chat-bubble-user-bg:               rgba(91, 140, 255, 0.16); /* = --os-color-primary-soft (dark) */
+  --os-chat-bubble-user-border:           #2c3454;                 /* = --os-color-border (dark) */
+  --os-chat-caret-color:                  #22d3ee;                 /* = --os-color-accent (dark) */
+  --os-chat-citation-bg:                  rgba(34, 211, 238, 0.14); /* = --os-color-accent-soft (dark) */
+  --os-chat-citation-fg:                  #aebfd0;                 /* = --os-color-fg-subtle (dark) */
+  --os-chat-unsupported-fg:               #ef4444;                 /* = --os-color-error (dark) */
+  --os-chat-unsupported-bg:               #232a47;                 /* = --os-color-bg-subtle (dark) */
+  --os-chat-tier-bg:                      #1e2742;                 /* = --os-color-border-subtle (dark) */
+  --os-chat-tier-fg:                      #aebfd0;                 /* = --os-color-fg-subtle (dark) */
+  --os-chat-metric-bg:                    #232a47;                 /* = --os-color-bg-subtle (dark) */
+  --os-chat-metric-fg:                    #7c93a8;                 /* = --os-color-muted (dark) */
+  --os-chat-budget-warning-bg:            #232a47;                 /* = --os-color-bg-subtle (dark) */
+  --os-chat-budget-warning-fg:            #fbbf24;                 /* = --os-color-warning (dark) */
+  --os-chat-budget-hardstop-bg:           #232a47;                 /* = --os-color-bg-subtle (dark) */
+  --os-chat-budget-hardstop-fg:           #ef4444;                 /* = --os-color-error (dark) */
+  --os-chat-degradation-bg:               #232a47;                 /* = --os-color-bg-subtle (dark) */
+  --os-chat-degradation-fg:               #38bdf8;                 /* = --os-color-info (dark) */
 }

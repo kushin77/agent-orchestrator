@@ -31,14 +31,18 @@
 # failed this gate naming both until they were removed — 79 check scripts, now
 # WIRED 73, UNWIRED 6, and 71 suites, WIRED 5, UNWIRED 66. The list cannot rot:
 # a wired entry is a stale entry and a stale entry is a red gate.
+# It shrank again with the chat wiring lane (#502): naming the six
+# `scripts/check-chat-*.sh` in scripts/verify.sh's checks=() array made all six
+# stale entries below, so they were removed — 79 check scripts, WIRED 79,
+# UNWIRED 0. The declared suite count rose 71 -> 75 when that lane registered
+# the four chat suites; of those, `identity/chat` is deliberately ABSENT from
+# this list because its own gate (scripts/check-chat-identity.sh) names
+# `identity/chat/tests` as a pytest target, so it reads WIRED. The other three
+# are named by no gate file and are listed swept-only below — 75 suites, WIRED
+# 6, UNWIRED 69, baselined 69.
 # The gate-invocation universe, the match-by-path rule and the rejected
 # alternatives are stated in scripts/check-gate-coverage.sh.
-script	scripts/check-chat-eval.sh	uninvoked	#499
-script	scripts/check-chat-finops.sh	uninvoked	#499
-script	scripts/check-chat-guardrails.sh	uninvoked	#499
-script	scripts/check-chat-identity.sh	uninvoked	#499
-script	scripts/check-chat-tools.sh	uninvoked	#499
-script	scripts/check-chat-ux.sh	uninvoked	#499
+script	scripts/check-control-verbs.sh	uninvoked	#559
 suite	guardrails/dlp	swept-only	#524
 suite	guardrails/policy	swept-only	#524
 suite	guardrails/controls	swept-only	#524
@@ -105,3 +109,6 @@ suite	integrations/paperclip/adapters/secrets	swept-only	#524
 suite	integrations/paperclip/adapters/skills	swept-only	#524
 suite	registry/parity	swept-only	#524
 suite	scripts	swept-only	#524
+suite	guardrails/chat	swept-only	#502
+suite	registry/chat	swept-only	#502
+suite	telemetry/chat	swept-only	#502

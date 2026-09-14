@@ -29,6 +29,23 @@ def test_expectations_are_per_class(policy):
     assert policy.expectations_for("template") == ()
 
 
+def test_declaring_fields_are_the_policys_whole_vocabulary(policy):
+    """The criterion the filing path refuses a `--declare` by (issue #517): class,
+    the required companions, every rung's expectations and the `prefixed` set."""
+    assert policy.declaring_fields == (
+        "class",
+        "type",
+        "priority",
+        "area",
+        "gdc",
+        "pillar",
+        "phase",
+        "source",
+    )
+    assert policy.declares("phase") is True  # `prefixed`, but no rung requires it
+    assert policy.declares("priorty") is False  # a typo is not a declaring label
+
+
 def test_missing_policy_is_cannot_assess(tmp_path: Path):
     with pytest.raises(PolicyUnavailable):
         load_policy(tmp_path / "absent.yaml")
