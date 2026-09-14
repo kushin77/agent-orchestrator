@@ -1,0 +1,157 @@
+# Authority matrix — repo separation, scoped admin rights, separation of duties,
+# end-to-end closure (issue #150, EPIC-00 #144).
+#
+# This is the SHIPPED binding matrix. It is validated against schema.json and
+# checked for the semantic invariants listed in docs/AUTHORITY-MODEL.md.
+#
+# Reading it:
+#   * Every repo names the ONE fleet that administers it. Admin rights are per
+#     repo: a fleet can only ever act on the repo in its own scope.
+#   * Exactly one principal carries `cross_repo: true` — the enterprise
+#     controller — and it is the only actor that may touch more than one repo.
+#     A second `cross_repo: true` principal is a validation failure.
+#   * Actors carry the harvested chain-of-command role (the ELITE_* charters),
+#     the closed persona posture (registry/personas/persona-card.schema.json)
+#     and a dispatch tier (docs/MODEL-PROFILES.md).
+#   * A work item is CLOSED only when both its own gate evidence and the repo's
+#     `make verify` evidence are recorded with real output. Evidence is produced
+#     per run and is deliberately NOT committed here: a committed attestation
+#     would be stale by construction, so the shipped items below carry no
+#     evidence and are correctly reported as open.
+version: 1
+
+repos:
+  - id: kushin77/agent-orchestrator
+    fleet: ao-fleet
+    gate: make verify
+    admin_rights: [files, issues, state, merge]
+  - id: kushin77/capital-underwriting
+    fleet: cu-fleet
+    gate: make verify
+    admin_rights: [files, issues, state, merge]
+
+principals:
+  # --- fleet: the agent-orchestrator repo's own engineering team -------------
+  - id: ao-fleet
+    kind: repo-fleet
+    scope: [kushin77/agent-orchestrator]
+    cross_repo: false
+    admin_rights: [files, issues, state, merge]
+    actors:
+      # Commander: brain only, never executes, holds the fleet's merge authority
+      # (ELITE_COMMANDER_LTC_CHARTER.md §1). Posture `reviewer` because the
+      # commander's permitted direct actions are read + judge + file issues;
+      # it is never the executor of the work it decides on.
+      - id: ao-commander
+        role: commander
+        posture: reviewer
+        model_tier: HIGH
+        merge_authority: true
+      # Lieutenant-Commander: the commander's execution arm, absorbs the
+      # verification loop (ELITE_COMMANDER_LTC_CHARTER.md §2).
+      - id: ao-lieutenant
+        role: lieutenant-commander
+        posture: executor
+        model_tier: MAX
+      # General: owns pipeline hygiene and promotion custody, decides on gate
+      # evidence (ELITE_GENERAL_CHARTER.md §1).
+      - id: ao-general
+        role: general
+        posture: reviewer
+        model_tier: HIGH
+      # Platoon Leader: owns a wave batch through closure, carries the attached
+      # review duty (ELITE_PLATOON_LEADER_CHARTER.md).
+      - id: ao-platoon-leader-1
+        role: platoon-leader
+        posture: reviewer
+        model_tier: MED
+      # Soldier: bounded mechanical execution on the flash tier.
+      - id: ao-soldier-1
+        role: soldier
+        posture: executor
+        model_tier: LOW
+      # Auditor: adversarial audit of claims against evidence; never executes
+      # what it audits (ELITE_AUDITOR_CHARTER.md).
+      - id: ao-auditor-1
+        role: auditor
+        posture: auditor
+        model_tier: HIGH
+      # Scribe: records verdicts and closure evidence; does not execute work.
+      - id: ao-scribe-1
+        role: scribe
+        posture: reviewer
+        model_tier: MED
+
+  # --- fleet: the capital-underwriting repo's own engineering team -----------
+  - id: cu-fleet
+    kind: repo-fleet
+    scope: [kushin77/capital-underwriting]
+    cross_repo: false
+    admin_rights: [files, issues, state, merge]
+    actors:
+      - id: cu-commander
+        role: commander
+        posture: reviewer
+        model_tier: HIGH
+        merge_authority: true
+      - id: cu-lieutenant
+        role: lieutenant-commander
+        posture: executor
+        model_tier: MAX
+      - id: cu-general
+        role: general
+        posture: reviewer
+        model_tier: HIGH
+      - id: cu-platoon-leader-1
+        role: platoon-leader
+        posture: reviewer
+        model_tier: MED
+      - id: cu-soldier-1
+        role: soldier
+        posture: executor
+        model_tier: LOW
+      - id: cu-auditor-1
+        role: auditor
+        posture: auditor
+        model_tier: HIGH
+      - id: cu-scribe-1
+        role: scribe
+        posture: reviewer
+        model_tier: MED
+
+  # --- enterprise controller: the ONLY cross-repo actor ----------------------
+  - id: enterprise-controller
+    kind: enterprise-controller
+    scope: [kushin77/agent-orchestrator, kushin77/capital-underwriting]
+    cross_repo: true
+    admin_rights: [files, issues, state, merge, rollup]
+    actors:
+      # Rolls up across repos for reporting and direction. It deliberately does
+      # NOT hold merge authority: merge stays with the repo's own fleet
+      # commander, so no cross-repo actor can land another repo's work
+      # (merge_authority is false — the matrix's one cross-repo actor is a
+      # roll-up brain, not an executor).
+      - id: enterprise-commander
+        role: commander
+        posture: reviewer
+        model_tier: HIGH
+        merge_authority: false
+
+work_items:
+  # Shipped open items. No evidence is recorded here by construction: evidence
+  # is a per-run artifact (it names a commit), so these items are reported
+  # NOT closed until a run records both records. The authority gate asserts
+  # exactly that — a closure check that passed on an evidence-less item would
+  # be a false green.
+  - id: kushin77/agent-orchestrator#150
+    repo: kushin77/agent-orchestrator
+    sod:
+      executor: ao-soldier-1
+      reviewer: ao-platoon-leader-1
+      auditor: ao-auditor-1
+  - id: kushin77/capital-underwriting#1391
+    repo: kushin77/capital-underwriting
+    sod:
+      executor: cu-soldier-1
+      reviewer: cu-platoon-leader-1
+      auditor: cu-auditor-1
