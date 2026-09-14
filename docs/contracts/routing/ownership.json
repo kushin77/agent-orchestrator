@@ -1,0 +1,75 @@
+{
+  "contract": "routing-seam",
+  "version": "1.0.0",
+  "seam": "routing",
+  "title": "Routing seam ownership map (one writer per field)",
+  "description": "The machine-readable authority for the routing seam (issue #426, ADR-0015). For every field of the routing contract -- the request fields, the decision fields, and the policy fields -- this map names the single side that produces it. One writer per field, the same rule the paperclip ticket contract applies to a ticket owner. A field with two producers is a second authority and is refused by name; a field with no producer is unowned and is refused by name. The gate scripts/check-routing-seam.sh reads this map together with the two schemas and policy-fields.json and refuses either case. The peer tier-routing package (kushin77/hermes-agents#2) is recorded as a SOURCE, never a producer: a source informs the declared policy, a producer writes a field.",
+  "sides": {
+    "caller": {
+      "description": "The fleet work-issuer: the dispatch loop and the brain that hand a unit of work to the routing authority.",
+      "where": "governance/dispatch/ and fleet/brain.py"
+    },
+    "authority": {
+      "description": "This repo's single routing authority: the RoutingPolicy port implementation that produces every decision and owns the declared policy.",
+      "where": "gateway/sme-routing"
+    }
+  },
+  "peer": {
+    "repo": "kushin77/hermes-agents",
+    "issue": 2,
+    "role": "source",
+    "decision": "policy source we map, not a runtime we couple and not a producer of any contract field",
+    "adr": "ADR-0015"
+  },
+  "schemas": {
+    "request": "docs/contracts/routing/routing-request.schema.json",
+    "decision": "docs/contracts/routing/routing-decision.schema.json",
+    "policy": "docs/contracts/routing/policy-fields.json"
+  },
+  "fields": {
+    "request.task_type": {
+      "producers": ["caller"],
+      "meaning": "The kind of work the caller asks to be routed."
+    },
+    "request.complexity": {
+      "producers": ["caller"],
+      "meaning": "The caller's 0..100 difficulty estimate."
+    },
+    "request.capability": {
+      "producers": ["caller"],
+      "meaning": "The capability the work requires."
+    },
+    "request.tier": {
+      "producers": ["caller"],
+      "meaning": "The tier the caller requests or floors at."
+    },
+    "decision.tier": {
+      "producers": ["authority"],
+      "meaning": "The effective tier the authority selected."
+    },
+    "decision.model": {
+      "producers": ["authority"],
+      "meaning": "The concrete model id the authority selected within the tier."
+    },
+    "decision.escalation": {
+      "producers": ["authority"],
+      "meaning": "The escalation record: status, ladder and terminal outcome."
+    },
+    "policy.fail_safe_route": {
+      "producers": ["authority"],
+      "meaning": "The declared route for an undeclared task type."
+    },
+    "policy.complexity_to_tier": {
+      "producers": ["authority"],
+      "meaning": "The declared 0..100 complexity band map."
+    },
+    "policy.task_overrides": {
+      "producers": ["authority"],
+      "meaning": "The declared per-task-type tier overrides."
+    },
+    "policy.tier_escalation_ladder": {
+      "producers": ["authority"],
+      "meaning": "The declared per-tier fallback chain."
+    }
+  }
+}
