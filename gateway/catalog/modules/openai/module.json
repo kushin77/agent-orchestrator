@@ -1,0 +1,64 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "openai",
+  "name": "openai",
+  "description": "OpenAI provider module: OpenAI-compatible chat/completions model routing across the gpt-4o-mini (flash-class) and gpt-4o (pro-class) tiers, serving Copilot and enterprise GPT deployments through a per-deployment base_url override, with cloud-to-local (Ollama) graceful degradation.",
+  "source": {
+    "repo": "kushin77/gov-ai-scout",
+    "default_branch": "master",
+    "path": "backend/src/services/ai-provider.ts"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "openai", "gpt"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.openai",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "chat-completions",
+      "default": "on",
+      "flags": ["openai.chat"],
+      "desc": "OpenAI-compatible chat/completions chat with Bearer auth and typed output validation."
+    },
+    {
+      "id": "tier-routing",
+      "default": "on",
+      "flags": ["openai.tiers"],
+      "desc": "LOW/MED route to gpt-4o-mini, HIGH/MAX to gpt-4o, chosen from the issue-#9 tier ladder."
+    },
+    {
+      "id": "deployment-override",
+      "default": "on",
+      "flags": ["openai.base-url"],
+      "desc": "The same adapter serves Copilot and any enterprise GPT deployment by overriding base_url per deployment/tenant."
+    },
+    {
+      "id": "graceful-degradation",
+      "default": "on",
+      "flags": ["openai.fallback"],
+      "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-14",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/gov-ai-scout backend/src/services/ai-provider.ts; kushin77/llm-triage src/llm_triage/classifier.py",
+    "note": "Gateway-owned module-catalog entry (issue #349) for the registered `openai` provider adapter. Pattern only; the OpenAI-compatible provider-gateway shape and the provider-neutral classifier vocabulary were re-implemented for this repo's Python substrate, no source file was copied."
+  }
+}

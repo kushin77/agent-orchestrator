@@ -26,6 +26,7 @@ guardrails/sandbox
 gateway/finops
 gateway/health
 gateway/providers
+gateway/catalog
 gateway/limits
 gateway/mcp
 gateway/proxy
