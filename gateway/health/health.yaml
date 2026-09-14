@@ -36,6 +36,20 @@
 #     alternate commercial -> local last resort). An unlisted route falls back
 #     to [primary, localLastResort] (every provider degrades to Ollama, the
 #     providers #15 default).
+#   - sharedServices is the POST-CHAIN remote rung (issue #375): the shared
+#     platform model server shipped by kushin77/shared-services
+#     (services/model-server/, services/mcp-hub/, agents/ollama/). When the
+#     local provider rungs (hermes / paperclip / ollama) are all unreachable
+#     there is no rung left INSIDE the chain, so resolve() would return None
+#     and the caller would fail hard — the fleet crash-loop trigger (#366).
+#     The shared rung therefore lives OUTSIDE the chains: resolve() tries it
+#     once, after the ordered rungs are exhausted and before refusing, and
+#     only when it is itself healthy. Two reasons it is not a chain rung:
+#     (a) FallbackChain requires its final rung to be local, and a remote
+#     shared rung is not; (b) a local outage must DEGRADE onto the shared
+#     platform, never fail hard. The endpoint host is never hardcoded here:
+#     endpointEnv names the environment variable the resolver reads at call
+#     time (an unset variable falls back to a documented non-secret default).
 
 schemaVersion: 1
 
@@ -51,6 +65,10 @@ monitor:
 
 chains:
   localLastResort: ollama/llama3.2
+  sharedServices:
+    provider: shared-services
+    model: llama3.2
+    endpointEnv: AO_SHARED_SERVICES_MODEL_URL
   explicit:
     - key: deepseek/deepseek-chat
       rungs:

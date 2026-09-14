@@ -72,7 +72,14 @@ def test_ollama_marked_unhealthy_means_no_route(config, clock) -> None:
     m.mark_unhealthy("deepseek", "deepseek-chat", detail="cloud incident")
     m.mark_unhealthy("anthropic", "claude-haiku-4-5", detail="alternate down")
     m.mark_unhealthy("ollama", "llama3.2", detail="ollama daemon down")
-    # Even though ollama is the last resort, a dead last resort is a dead end.
+    # The local last resort is dead, so the dispatch degrades onto the declared
+    # shared-services rung (issue #375) instead of failing hard (#366).
+    degraded = registry.resolve("deepseek", "deepseek-chat", m.is_healthy)
+    assert degraded is not None
+    assert degraded.provider == "shared-services"
+    # With the shared rung dead too the route is explicitly refused: a dead
+    # last resort is a dead end, never a silent fall-through (no-false-green).
+    m.mark_unhealthy("shared-services", "llama3.2", detail="shared rung down")
     assert registry.resolve("deepseek", "deepseek-chat", m.is_healthy) is None
     assert m.is_healthy("ollama", "llama3.2") is False
 
