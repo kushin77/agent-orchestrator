@@ -1,0 +1,369 @@
+apiVersion: ao.fleet-template/v1
+kind: FleetInstance
+metadata:
+  repo: shared-frontend
+  display_name: shared-frontend portal fleet
+  template: per-repo-sme-fleet
+  template_version: 1.0.0
+  template_sha256: b22985e69b9a748456490800722e82a1eb407b3df8b77980d2f2698c86052a94
+  params_sha256: b3e5fdce9c809a156c60d79dac56952f916e9f7163fbf2e393d7d4426a15be2e
+  params_source: pilots/shared-frontend.params.yaml
+  generated_by: control-plane/fleet-template/render.py
+isolation:
+  fleet_id: fleet-shared-frontend
+  state_prefix: .fleet/shared-frontend
+  worktree_prefix: ao-shared-frontend-
+  lane_namespace: shared-frontend
+  exclusive: true
+definition:
+  repo: shared-frontend
+  roles:
+  - id: shared-frontend:commander
+    role: commander
+    tier: brain
+    model: claude-sonnet-5
+    transport: api
+    effort: medium
+    description: routing, decomposition, dispatch decisions
+    memory_file: .fleet/shared-frontend/memory/commander.md
+    state: required
+    parallelism: 1
+  - id: shared-frontend:general
+    role: general
+    tier: brain
+    model: claude-sonnet-5
+    transport: api
+    effort: medium
+    description: CI triage, merge order, cross-cutting judgement
+    memory_file: .fleet/shared-frontend/memory/general.md
+    state: required
+    parallelism: 1
+  - id: shared-frontend:soldier
+    role: soldier
+    tier: volume
+    model: deepseek-v4-flash
+    transport: api
+    effort: low
+    description: bulk execution -- the volume tier
+    memory_file: .fleet/shared-frontend/memory/soldier.md
+    state: required
+    parallelism: 12
+  - id: shared-frontend:auditor
+    role: auditor
+    tier: verify
+    model: deepseek-v4-pro
+    transport: api
+    effort: medium
+    description: verdicts on soldier output; the seat the architecture rests on
+    memory_file: .fleet/shared-frontend/memory/auditor.md
+    state: required
+    parallelism: 1
+  - id: shared-frontend:advisor
+    role: advisor
+    tier: escalate
+    model: claude-opus-4-8
+    transport: cli
+    effort: high
+    description: escalation path when a soldier is stuck
+    memory_file: .fleet/shared-frontend/memory/advisor.md
+    state: parked
+    parallelism: 1
+  smes:
+  - id: shared-frontend:sme:testing
+    domain: testing
+    sme: test-quality
+    role: soldier
+    tier: volume
+    model: deepseek-v4-flash
+    labels:
+    - domain:testing
+    - testing
+    - test
+    - e2e
+    - vitest
+    prompt: test-quality.txt
+    state: required
+  - id: shared-frontend:sme:security-scanning
+    domain: security-scanning
+    sme: security
+    role: soldier
+    tier: volume
+    model: deepseek-v4-flash
+    labels:
+    - domain:security
+    - security
+    - auth
+    - session
+    - cookie
+    prompt: security.txt
+    state: required
+  - id: shared-frontend:sme:debugging
+    domain: debugging
+    sme: sniper-generic
+    role: soldier
+    tier: volume
+    model: deepseek-v4-flash
+    labels:
+    - domain:debugging
+    - bug
+    - debug
+    - incident
+    - flake
+    prompt: sniper-generic.txt
+    state: required
+  - id: shared-frontend:sme:infra
+    domain: infra
+    sme: terraform
+    role: soldier
+    tier: volume
+    model: deepseek-v4-flash
+    labels:
+    - domain:infra
+    - infra
+    - deploy
+    - cloudbuild
+    - docker
+    prompt: terraform.txt
+    state: required
+  - id: shared-frontend:sme:frontend-vibe
+    domain: frontend-vibe
+    sme: ui-ux
+    role: soldier
+    tier: volume
+    model: deepseek-v4-flash
+    labels:
+    - domain:frontend
+    - frontend
+    - ui
+    - ux
+    - portal
+    - visual
+    prompt: frontend-vibe.txt
+    state: required
+  - id: shared-frontend:sme:docs
+    domain: docs
+    sme: sniper-generic
+    role: soldier
+    tier: volume
+    model: deepseek-v4-flash
+    labels:
+    - domain:docs
+    - docs
+    - readme
+    - runbook
+    prompt: sniper-generic.txt
+    state: required
+  routing:
+    lenses:
+    - lens: lens:testing
+      platoon: qa
+      parallelism: 3
+      domains:
+      - testing
+    - lens: lens:security-scanning
+      platoon: security
+      parallelism: 2
+      domains:
+      - security-scanning
+    - lens: lens:debugging
+      platoon: debugging
+      parallelism: 2
+      domains:
+      - debugging
+    - lens: lens:infra
+      platoon: infra
+      parallelism: 2
+      domains:
+      - infra
+    - lens: lens:frontend-vibe
+      platoon: frontend
+      parallelism: 2
+      domains:
+      - frontend-vibe
+    - lens: lens:docs
+      platoon: docs
+      parallelism: 1
+      domains:
+      - docs
+    domain_to_role:
+      testing: soldier
+      security-scanning: soldier
+      debugging: soldier
+      infra: soldier
+      frontend-vibe: soldier
+      docs: soldier
+  finops:
+    currency: USD
+    fleet_total: 520
+    per_role:
+      commander: 50
+      general: 35
+      soldier: 140
+      auditor: 60
+      advisor: 25
+    per_domain:
+      testing: 30
+      security-scanning: 20
+      debugging: 15
+      infra: 20
+      frontend-vibe: 25
+      docs: 15
+    max_parallelism: 12
+  parallelism:
+    total: 12
+    per_lens:
+      lens:testing: 3
+      lens:security-scanning: 2
+      lens:debugging: 2
+      lens:infra: 2
+      lens:frontend-vibe: 2
+      lens:docs: 1
+run_state:
+  observations:
+    source: fleet live session/lane snapshot, recorded by the orchestrator
+    observed_present:
+    - shared-frontend:commander
+    - shared-frontend:general
+    - shared-frontend:soldier
+    - shared-frontend:auditor
+    - shared-frontend:sme:testing
+    - shared-frontend:sme:security-scanning
+    - shared-frontend:sme:frontend-vibe
+    - shared-frontend:sme:docs
+  declared:
+    required:
+    - shared-frontend:commander
+    - shared-frontend:general
+    - shared-frontend:soldier
+    - shared-frontend:auditor
+    - shared-frontend:sme:testing
+    - shared-frontend:sme:security-scanning
+    - shared-frontend:sme:debugging
+    - shared-frontend:sme:infra
+    - shared-frontend:sme:frontend-vibe
+    - shared-frontend:sme:docs
+    parked:
+    - shared-frontend:advisor
+  tri_state:
+    required:
+    - shared-frontend:commander
+    - shared-frontend:general
+    - shared-frontend:soldier
+    - shared-frontend:auditor
+    - shared-frontend:sme:testing
+    - shared-frontend:sme:security-scanning
+    - shared-frontend:sme:frontend-vibe
+    - shared-frontend:sme:docs
+    parked:
+    - shared-frontend:advisor
+    unverified:
+    - shared-frontend:sme:debugging
+    - shared-frontend:sme:infra
+  present:
+  - shared-frontend:commander
+  - shared-frontend:general
+  - shared-frontend:soldier
+  - shared-frontend:auditor
+  - shared-frontend:sme:testing
+  - shared-frontend:sme:security-scanning
+  - shared-frontend:sme:frontend-vibe
+  - shared-frontend:sme:docs
+  counts:
+    required: 8
+    parked: 1
+    unverified: 2
+    present: 8
+params_digest:
+  sha256: 4e257335e087b25eff4286ac32c927d015773ebf76654855f675892d5566fdc4
+  values:
+    repo: shared-frontend
+    display_name: shared-frontend portal fleet
+    domains:
+    - name: testing
+      sme: test-quality
+      labels:
+      - domain:testing
+      - testing
+      - test
+      - e2e
+      - vitest
+      prompt: test-quality.txt
+      platoon: qa
+      parallelism: 3
+    - name: security-scanning
+      sme: security
+      labels:
+      - domain:security
+      - security
+      - auth
+      - session
+      - cookie
+      prompt: security.txt
+      platoon: security
+      parallelism: 2
+    - name: debugging
+      sme: sniper-generic
+      labels:
+      - domain:debugging
+      - bug
+      - debug
+      - incident
+      - flake
+      prompt: sniper-generic.txt
+      platoon: debugging
+      parallelism: 2
+    - name: infra
+      sme: terraform
+      labels:
+      - domain:infra
+      - infra
+      - deploy
+      - cloudbuild
+      - docker
+      prompt: terraform.txt
+      platoon: infra
+      parallelism: 2
+    - name: frontend-vibe
+      sme: ui-ux
+      labels:
+      - domain:frontend
+      - frontend
+      - ui
+      - ux
+      - portal
+      - visual
+      prompt: frontend-vibe.txt
+      platoon: frontend
+      parallelism: 2
+    - name: docs
+      sme: sniper-generic
+      labels:
+      - domain:docs
+      - docs
+      - readme
+      - runbook
+      prompt: sniper-generic.txt
+      platoon: docs
+      parallelism: 1
+    model_tiers:
+      brain: claude-sonnet-5
+      volume: deepseek-v4-flash
+      verify: deepseek-v4-pro
+      escalate: claude-opus-4-8
+    budget:
+      currency: USD
+      fleet_total: 520
+      per_role:
+        commander: 50
+        general: 35
+        soldier: 140
+        auditor: 60
+        advisor: 25
+      per_domain:
+        testing: 30
+        security-scanning: 20
+        debugging: 15
+        infra: 20
+        frontend-vibe: 25
+        docs: 15
+      max_parallelism: 12

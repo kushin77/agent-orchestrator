@@ -104,6 +104,19 @@ surfaces:
       fleet/console.py snapshot() served at GET /api/fleet/snapshot, the
       push channel GET /api/fleet/stream (SSE), and the history endpoint
       GET /api/fleet/events. Offline (no tmux, no TTY, no network egress).
+  portal_surfaces:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Settings→Modules surface feed (issue #350): the serving layer's read-only
+      projection of the CMR fleet-surface catalog (kushin77/CMR
+      catalog/portal-surfaces.json; the pinned revision and the upstream blob's
+      sha256 are recorded in registry/portal-surfaces.pinned.json) served at
+      GET /api/portal/surfaces. Offline: the pinned document is on disk, so the
+      route needs no network egress. Unblocks the shell's Settings→Modules page,
+      which had nothing to render while kushin77/CMR#708 was open.
   finops_reports:
     default: off
     promoted: false
@@ -116,3 +129,18 @@ surfaces:
       warning/alert thresholds and an honest NO_DATA path. Served read-only at
       GET /api/finops/overview, GET /api/finops/report?tenant=<id> and
       GET /api/finops/alerts. Offline (no network egress).
+  ops_health:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Ops/health/SLO surface (issue #342): live per-tenant and per-agent
+      health from the telemetry/observability span feed — SLO verdicts from
+      slo_templates/*, breach alerts and the alert severity state machine
+      (OK / WARNING / ALERT / NO_DATA / PAUSED, with breach and recovery
+      transitions), latency/error-rate/token figures and the observability
+      dashboard projection. Served read-only at GET /api/ops/overview,
+      GET /api/ops/agents?tenant=<id>, GET /api/ops/slos?tenant=<id>,
+      GET /api/ops/alerts and GET /api/ops/dashboard. Offline (no network
+      egress).

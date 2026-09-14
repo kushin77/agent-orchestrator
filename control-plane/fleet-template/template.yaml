@@ -1,0 +1,142 @@
+# Per-repo agent fleet template (issue kushin77/agent-orchestrator#146).
+#
+# NOT hand-edited per instance. This file is the PARAMETERIZED source: it is
+# rendered by control-plane/fleet-template/render.py into a complete fleet
+# instance for one repository, from that repository's own params file.
+#
+# Two substitution forms are used, both implemented in render.py:
+#   * `${path.to.param}` -- a placeholder. When the whole scalar is the
+#     placeholder, the resolved value keeps its type (list/dict/int), which is
+#     what lets the budget object pass through unchanged. When it is embedded
+#     in a longer string ("fleet-${repo}"), it is interpolated as text.
+#   * `$for_each` / `$as` / `$template` (plus `$key` / `$value`) -- a list
+#     expansion over a parameter. `$key`+`$value` build a mapping instead of a
+#     list. This is why changing the `domains` parameter changes the rendered
+#     fleet's SME squad, lens routing and domain map at once.
+#
+# Vocabulary is harvested, not invented (see docs/FLEET-TEMPLATE.md
+# PROVENANCE): the five roles and the ROLE -> TIER -> MODEL split come from
+# leaderboard/lib/fleet-roster.sh; lens -> platoon -> parallelism comes from
+# leaderboard/config/platoons.yaml; the SME domain taxonomy comes from
+# capital-underwriting docs/operations/SME_SQUAD_DESIGN.md.
+apiVersion: ao.fleet-template/v1
+kind: FleetTemplate
+metadata:
+  name: per-repo-sme-fleet
+  version: 1.0.0
+  description: >-
+    Parameterized per-repo SME fleet: five roles whose models bind through the
+    model_tiers parameter, one SME per declared domain, lens -> platoon
+    routing, FinOps ceilings from the budget parameter, and a run-state block
+    split into declared composition vs observed reality. Every identity is
+    namespaced by the `repo` parameter, which is the mechanism that keeps two
+    repositories' fleets disjoint.
+
+parameters:
+  - name: repo
+    type: string
+    required: true
+    description: "Repository id. Namespaces every identity, path and ceiling."
+  - name: display_name
+    type: string
+    required: false
+    default: "${repo} agent fleet"
+    description: "Human label for the rendered fleet instance."
+  - name: domains
+    type: array
+    required: true
+    description: "SME domains this repo's fleet covers (one SME member each)."
+  - name: model_tiers
+    type: object
+    required: true
+    description: "tier -> model map. Changing one entry changes every role on that tier."
+  - name: budget
+    type: object
+    required: true
+    description: "FinOps ceilings: fleet_total, per_role, per_domain, max_parallelism."
+
+defaults: {}
+
+spec:
+  isolation:
+    fleet_id: "fleet-${repo}"
+    state_prefix: ".fleet/${repo}"
+    worktree_prefix: "ao-${repo}-"
+    lane_namespace: "${repo}"
+    exclusive: true
+
+  roles:
+    - role: commander
+      tier: brain
+      transport: api
+      effort: medium
+      description: "routing, decomposition, dispatch decisions"
+      memory_file: ".fleet/${repo}/memory/commander.md"
+      state: required
+      parallelism: 1
+    - role: general
+      tier: brain
+      transport: api
+      effort: medium
+      description: "CI triage, merge order, cross-cutting judgement"
+      memory_file: ".fleet/${repo}/memory/general.md"
+      state: required
+      parallelism: 1
+    - role: soldier
+      tier: volume
+      transport: api
+      effort: low
+      description: "bulk execution -- the volume tier"
+      memory_file: ".fleet/${repo}/memory/soldier.md"
+      state: required
+      parallelism: "${budget.max_parallelism}"
+    - role: auditor
+      tier: verify
+      transport: api
+      effort: medium
+      description: "verdicts on soldier output; the seat the architecture rests on"
+      memory_file: ".fleet/${repo}/memory/auditor.md"
+      state: required
+      parallelism: 1
+    - role: advisor
+      tier: escalate
+      transport: cli
+      effort: high
+      description: "escalation path when a soldier is stuck"
+      memory_file: ".fleet/${repo}/memory/advisor.md"
+      state: parked
+      parallelism: 1
+
+  smes:
+    $for_each: domains
+    $as: domain
+    $template:
+      domain: "${domain.name}"
+      sme: "${domain.sme}"
+      role: soldier
+      tier: volume
+      labels: "${domain.labels}"
+      prompt: "${domain.prompt}"
+      state: required
+
+  routing:
+    lenses:
+      $for_each: domains
+      $as: domain
+      $template:
+        lens: "lens:${domain.name}"
+        platoon: "${domain.platoon}"
+        parallelism: "${domain.parallelism}"
+        domains: ["${domain.name}"]
+    domain_to_role:
+      $for_each: domains
+      $as: domain
+      $key: "${domain.name}"
+      $value: soldier
+
+  finops:
+    currency: "${budget.currency}"
+    fleet_total: "${budget.fleet_total}"
+    per_role: "${budget.per_role}"
+    per_domain: "${budget.per_domain}"
+    max_parallelism: "${budget.max_parallelism}"

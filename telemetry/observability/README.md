@@ -31,6 +31,7 @@ HTML/JSON (or a terminal report) generated offline from the telemetry model.
 | `slos.py` | `SloDefinition` / `SloTemplate` / `SloEvaluator` — per-tenant SLO definitions + honest evaluation |
 | `slo_templates/` | Parameterized offline SLO templates (availability / latency / cost) |
 | `breach.py` | `BreachDetector` / `Alert` / `AlertPolicy` — outcome-not-liveness breach detection |
+| `severity.py` | `AlertStateMachine` — per-subject alert severity (OK/WARNING/ALERT/NO_DATA/PAUSED) with breach **and** recovery transitions |
 | `usage.py` | Per-tenant usage / chargeback aggregation (the billing feed) |
 | `dashboard.py` | Static HTML + JSON data + terminal health report |
 | `cli.py` | Offline operator CLI (`python3 -m telemetry.observability.cli …`) |
@@ -102,6 +103,50 @@ The `slo-eval` and `breach` CLI commands exit non-zero on any
 `BREACHED`/`AT_RISK`/`NO_DATA` — a tenant missing its SLO window fails the
 gate (this is the outcome-not-liveness doctrine, cannibalized from the
 leaderboard `loop-outcome-check.sh`: "HEALTHY IS NOT WORKING").
+
+## Alert severity state machine (`severity.py`, issue #342)
+
+A verdict is not a state: an operator surface must know which severity a
+subject (a tenant, or one agent inside it) is *in*, since when, what moved it
+there and what would move it back. `AlertStateMachine` is that machine, and it
+runs in **both** directions:
+
+- **breach escalates immediately** — `OK` -> `WARNING` (an error budget
+  consumed) -> `ALERT` (an SLO target missed);
+- **recovery de-escalates** — a subject that stops breaching returns to
+  `WARNING`/`OK`, and the recovery transition is recorded. `recovery_confirmations`
+  (default 1 = immediate) is how many consecutive calmer evaluations a subject
+  must produce before it de-escalates; it can only ever *delay a recovery*,
+  never hide a breach.
+
+Two states are deliberately **off the ladder**, because neither is a
+measurement of health:
+
+- `NO_DATA` — nothing was measured (no telemetry in the window, no serve
+  attempts, or no SLOs declared). It outranks `WARNING`: a silent subject is
+  more dangerous than a noisy one. Never `OK`.
+- `PAUSED` — an operator stopped evaluating the subject (`pause(subject,
+  reason=…, actor=…)`). The state keeps `previousState` **and** keeps tracking
+  `observedState`, so a paused-and-breaching subject is visibly both; removing
+  the pause (`resume`) lands on whatever the verdicts justify.
+
+Every transition carries its reason code (`slo_target_breached`,
+`error_budget_at_risk`, `no_window_data`, `recovered`, `paused_by_operator`,
+`resumed_by_operator`, `first_observation`, `no_slos_declared`) and the SLO
+names that drove it, so a client can explain a badge instead of only colouring
+one. The machine is in-memory: `snapshot()` and `history()` are serializable,
+and a process restart re-derives the ladder from its first observation rather
+than pretending to remember.
+
+## Serving the lane (issue #342)
+
+The lane's evaluation is served read-only by `portal/server/ops_health.py`
+(`OpsHealthReports`) — flag-gated OFF under `surfaces.ops_health`: live
+per-tenant and per-agent health, SLO verdicts, breach alerts, the severity
+ladder, latency/error-rate/token figures and this module's dashboard
+projection. Nothing in the adapter re-implements a reader or a threshold; the
+figures describe the same window the evaluator judged, and an unmeasured figure
+is `null` — never a comforting `0`.
 
 ## Provenance (cannibalized sources)
 

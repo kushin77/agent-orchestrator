@@ -53,6 +53,10 @@ features:
     kind: feature
     description: Single sign-on through the tenant IdP (identity phase 6).
     grants: []
+  - key: fleet_dashboard
+    kind: feature
+    description: Live fleet single-pane-of-glass - the read-only dashboard rows and the cross-org roll-up.
+    grants: [fleet:read, fleet:rollup]
 
 # --- commercial plans --------------------------------------------------------
 plans:
@@ -77,6 +81,8 @@ plans:
         enabled: false
       - feature: sso
         enabled: false
+      - feature: fleet_dashboard
+        enabled: false
   - key: pro
     name: Pro
     description: Multi-team tier with budgets, model routing, tool governance and audit.
@@ -98,6 +104,8 @@ plans:
         enabled: true
       - feature: sso
         enabled: false
+      - feature: fleet_dashboard
+        enabled: true
   - key: enterprise
     name: Enterprise
     description: Unlimited fleet, full governance surface and SSO.
@@ -118,4 +126,6 @@ plans:
       - feature: api_access
         enabled: true
       - feature: sso
+        enabled: true
+      - feature: fleet_dashboard
         enabled: true

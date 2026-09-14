@@ -1,0 +1,73 @@
+# Pilot B -- kushin77/shared-frontend (a second, independent repo).
+#
+# Rendered from the SAME template as pilot A with different params: a
+# different repo id (which namespaces every identity), a different domain set
+# (frontend-vibe instead of backend-server), a different `volume` model and a
+# different budget. The isolation gate proves the two rendered fleets share
+# no identity and no state.
+apiVersion: ao.fleet-template/v1
+kind: FleetParams
+repo: shared-frontend
+observations: shared-frontend.observations.yaml
+values:
+  repo: shared-frontend
+  display_name: shared-frontend portal fleet
+  domains:
+    - name: testing
+      sme: test-quality
+      labels: [domain:testing, testing, test, e2e, vitest]
+      prompt: test-quality.txt
+      platoon: qa
+      parallelism: 3
+    - name: security-scanning
+      sme: security
+      labels: [domain:security, security, auth, session, cookie]
+      prompt: security.txt
+      platoon: security
+      parallelism: 2
+    - name: debugging
+      sme: sniper-generic
+      labels: [domain:debugging, bug, debug, incident, flake]
+      prompt: sniper-generic.txt
+      platoon: debugging
+      parallelism: 2
+    - name: infra
+      sme: terraform
+      labels: [domain:infra, infra, deploy, cloudbuild, docker]
+      prompt: terraform.txt
+      platoon: infra
+      parallelism: 2
+    - name: frontend-vibe
+      sme: ui-ux
+      labels: [domain:frontend, frontend, ui, ux, portal, visual]
+      prompt: frontend-vibe.txt
+      platoon: frontend
+      parallelism: 2
+    - name: docs
+      sme: sniper-generic
+      labels: [domain:docs, docs, readme, runbook]
+      prompt: sniper-generic.txt
+      platoon: docs
+      parallelism: 1
+  model_tiers:
+    brain: claude-sonnet-5
+    volume: deepseek-v4-flash
+    verify: deepseek-v4-pro
+    escalate: claude-opus-4-8
+  budget:
+    currency: USD
+    fleet_total: 520
+    per_role:
+      commander: 50
+      general: 35
+      soldier: 140
+      auditor: 60
+      advisor: 25
+    per_domain:
+      testing: 30
+      security-scanning: 20
+      debugging: 15
+      infra: 20
+      frontend-vibe: 25
+      docs: 15
+    max_parallelism: 12

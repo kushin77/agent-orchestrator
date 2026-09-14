@@ -1,0 +1,227 @@
+# SME-squad capability registry -- which agent role, which worker fleet, which
+# SME and which authoritative module carries which domain.
+#
+# PROVENANCE (GR-10; full ledger in docs/SME-ROUTING.md "PROVENANCE"):
+#   * kushin77/capital-underwriting config/leaderboard/capability-registry.json
+#     verdict PORTED -- agents/worker_fleet/dispatch_routing kept verbatim
+#     (names, access levels, chains); re-expressed as schema-validated YAML.
+#   * kushin77/capital-underwriting scripts/agent/sme/sme-dispatch.sh
+#     verdict RE-IMPLEMENTED -- DOMAIN_LABELS / DOMAIN_DESC / DOMAIN_SME are
+#     ported here as data; the bash classifier becomes router.classify_domain.
+#   * kushin77/leaderboard scripts/dispatch/sme-squad-router.sh
+#     verdict RE-IMPLEMENTED -- SQUAD_LENS + the _infer_squad keyword arms are
+#     ported here as data; the bash `case` fallthrough becomes squad_default.
+#   * kushin77/capital-underwriting config/agent-module-authority.json
+#     verdict PORTED SUBSET -- domain/module/owns/policy only; the
+#     capital-underwriting-local fields (tracks, command_to_reference,
+#     documentation, auto_sync, enforcement) are dropped as repo-local.
+version: "1.0.0"
+updated_at: "2026-07-24"
+source: "ported from kushin77/capital-underwriting config/leaderboard/capability-registry.json"
+description: >-
+  Agent capability registry: the agent roles, the worker fleets that carry
+  them, the dispatch chains, and the domain -> SME and domain -> module
+  authority routing, all declared as data under schema.yaml.
+agents:
+  - id: planner
+    owner: Platform Orchestration
+    capabilities: [decompose_task, estimate_risk, choose_path]
+    tools_allowed: [read_file, grep_search, file_search, list_dir]
+    latency_tier: medium
+    cost_tier: medium
+    fallback: [executor]
+    worker_types: [scout-fleet, scribe-fleet]
+  - id: executor
+    owner: Platform Orchestration
+    capabilities: [edit_files, run_commands, apply_changes, commit_code]
+    tools_allowed: [apply_patch, run_in_terminal, read_file,
+                    replace_string_in_file, multi_replace_string_in_file]
+    latency_tier: low
+    cost_tier: low
+    fallback: [verifier]
+    worker_types: [code-fleet, shell-fleet, text-fleet]
+  - id: verifier
+    owner: Reliability Engineering
+    capabilities: [run_tests, validate_contracts, check_policies, audit_output]
+    tools_allowed: [run_in_terminal, read_file, get_errors, grep_search]
+    latency_tier: medium
+    cost_tier: medium
+    fallback: [critic]
+    worker_types: [auditor-fleet]
+  - id: critic
+    owner: Reliability Engineering
+    capabilities: [classify_failure, propose_retry_plan, escalate_to_human]
+    tools_allowed: [read_file, grep_search, run_in_terminal]
+    latency_tier: medium
+    cost_tier: high
+    fallback: []
+    worker_types: [auditor-fleet]
+worker_fleet:
+  text-fleet:
+    description: >-
+      DeepSeek API-only -- no shell, no file access. Text generation and
+      analysis.
+    access_level: api
+    agent_roles: [executor]
+    default_model: deepseek-v4-flash
+  shell-fleet:
+    description: >-
+      Bash-capable -- local filesystem access, can run commands but no code
+      edits.
+    access_level: shell
+    agent_roles: [executor]
+    default_model: deepseek-v4-flash
+  code-fleet:
+    description: Full repo access -- can read, write, and test code.
+    access_level: full
+    agent_roles: [executor, planner]
+    default_model: deepseek-v4-pro
+  scout-fleet:
+    description: >-
+      Read-only codebase survey -- finds patterns, identifies issues, reports
+      findings.
+    access_level: read
+    agent_roles: [planner]
+    default_model: deepseek-v4-flash
+  scribe-fleet:
+    description: >-
+      Documentation and wiki maintenance -- writes markdown, charters,
+      knowledge base.
+    access_level: write_docs
+    agent_roles: [planner, executor]
+    default_model: deepseek-v4-flash
+  auditor-fleet:
+    description: >-
+      Output verification and governance enforcement -- runs mechanical checks,
+      validates claims.
+    access_level: read
+    agent_roles: [verifier, critic]
+    default_model: deepseek-v4-pro
+dispatch_routing:
+  default_chain: [executor, verifier]
+  governance_chain: [planner, executor, verifier, critic]
+  doc_chain: [planner, executor]
+  audit_chain: [planner, verifier]
+# Domain -> SME. Labels are the harvested DOMAIN_LABELS keyword sets; the
+# classifier scores every domain by keyword occurrence and returns the
+# highest-scoring one ("general" wins a zero-score tie).
+sme_domains:
+  general:
+    description: Unclassified work -- no domain keyword matched.
+    labels: []
+    sme: sniper-generic
+    module: ""
+  testing:
+    description: Test writing, test quality, coverage, E2E, mutation testing
+    labels: [domain:testing, test, vitest, jest, mocha, coverage, e2e,
+             integration-test, mutation-test]
+    sme: test-quality
+    module: vendor/testing-suite
+  security-scanning:
+    description: Security audits, SAST/DAST, secret scanning, OWASP, auth review
+    labels: [domain:security, security, auth, injection, secret, owasp, sast,
+             dast, zap, semgrep, xss, csrf, vulnerability, cve, exploit]
+    sme: security
+    module: ""
+  debugging:
+    description: Bug investigation, root cause analysis, incident response
+    labels: [domain:debugging, bug, debug, incident, crash, root-cause,
+             investigation]
+    sme: sniper-generic
+    module: ""
+  infra:
+    description: Infrastructure, Terraform, Cloud Build, Docker, CI/CD, deployment
+    labels: [domain:infra, infra, terraform, cloudbuild, docker, ci/cd, deploy,
+             iac, gcp, cloud-run]
+    sme: terraform
+    module: vendor/gcp-gatekeeper
+  frontend-vibe:
+    description: Frontend UI changes, Vibe editor, portal, CSS, React
+    labels: [domain:frontend, frontend, vibe, ui, ux, portal, css, react]
+    sme: sniper-generic
+    module: ""
+  backend-server:
+    description: API routes, Prisma schema, middleware, business logic, server
+    labels: [domain:backend, backend, api, prisma, route, middleware, server,
+             express, node]
+    sme: prisma-db
+    module: ""
+  docs:
+    description: Documentation, wiki, knowledge base, README updates
+    labels: [domain:docs, docs, wiki, readme, knowledge, documentation, scribe]
+    sme: sniper-generic
+    module: vendor/mxdocs
+# Squad -> board lens. Declaration order is load-bearing: the classifier takes
+# the first squad whose keywords appear, exactly like the harvested bash
+# `case` statement. The keyword-less squad is the declared default arm.
+squads:
+  security:
+    lens: lens:security
+    keywords: [secret, credential, token, auth, vulnerab, injection]
+  deploy:
+    lens: lens:deploy
+    keywords: [deploy, docker, compose, container, fleet]
+  testing:
+    lens: lens:testing
+    keywords: [test, qa, gate, coverage, fuzz]
+  staff:
+    lens: lens:staff
+    keywords: [strategy, architecture, advisor]
+  shell:
+    lens: lens:shell
+    keywords: []
+squad_default: shell
+sme_default: sniper-generic
+# Authoritative module per domain. Domains with no authoritative module carry
+# an empty string -- a declared "no module owns this", never an omission.
+module_authority:
+  - domain: Testing
+    module: vendor/testing-suite
+    owns: [E2E test framework, Test fixtures, Test utilities and helpers,
+           Mock patterns, Test infrastructure decisions]
+    policy: >-
+      NEVER write your own E2E framework or test utilities. Use module
+      patterns. File PRs upstream if enhancement needed.
+  - domain: GitHub Workflows
+    module: vendor/github-workflow
+    owns: [GitHub Actions workflows, Workflow triggers and automation,
+           CI/CD automation patterns, GitHub-specific infrastructure]
+    policy: >-
+      NEVER write GitHub Actions in capital-underwriting/.github/workflows/.
+      Add to vendor/github-workflow/, which auto-syncs.
+  - domain: Rate-Limiting & Caching
+    module: vendor/leaderboard
+    owns: [Rate-limiting logic, Caching patterns (GitHub API, LLM calls),
+           FinOps routing (cheap vs capable models), Fleet metrics and
+           observability]
+    policy: >-
+      NEVER call raw APIs. Always use gh_cached(), llm_cached(), or
+      rate_limit wrappers from vendor/leaderboard.
+  - domain: Cloud Build & Deploy Gates
+    module: vendor/gcp-gatekeeper
+    owns: [Cloud Build gate definitions, Deploy validation logic,
+           CI/CD enforcement patterns, Pre/post-deploy checks]
+    policy: >-
+      NEVER write raw Cloud Build gate logic. Use vendor/gcp-gatekeeper
+      patterns. Propose enhancements upstream.
+  - domain: RBAC & Multi-Tenancy
+    module: vendor/saas-rbac
+    owns: [RBAC enforcement logic, Multi-tenant filtering patterns,
+           Role hierarchy definitions, Access control decisions]
+    policy: >-
+      NEVER duplicate tenant filtering or RBAC logic. Use module's
+      established patterns. No custom per-route checks.
+  - domain: Documentation Automation
+    module: vendor/mxdocs
+    owns: [Documentation generation, Wiki automation, Doc sync patterns,
+           Documentation infrastructure]
+    policy: >-
+      NEVER write custom doc generation scripts. Use vendor/mxdocs
+      automation. File PRs for enhancements.
+  - domain: Code Indexing & Search
+    module: vendor/code-indexing
+    owns: [Code search infrastructure, Corpus freshness validation,
+           Code indexing patterns, Cross-repo search capabilities]
+    policy: >-
+      NEVER build custom code search. Use vendor/code-indexing. File PRs for
+      search enhancement ideas.
