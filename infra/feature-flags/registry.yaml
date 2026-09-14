@@ -97,6 +97,23 @@ services:
       #411, ADR-0013): a process boundary, not a control-plane service. Pinned
       OCI image (infra/paperclip/release.yaml), health-probed at GET /api/health,
       nothing vendored. Inert until a reviewed go-live promotes this flag.
+  chat:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_chat
+    description: >
+      Conversational serving surface (issue #503, ADR-0023): the
+      OpenAI-/Ollama-compatible endpoints of `gateway/chat`
+      (POST /v1/chat/completions, POST /api/chat, GET /v1/models) that dispatch
+      every turn through the existing `gateway/proxy` funnel. Declared as its own
+      promotion unit, with its own `enable_chat`, so promoting (or killing) chat
+      neither implies nor requires promoting the gateway or the portal it is
+      embedded in — ADR-0023 §5. It is not a separate deployable process: the
+      endpoints are served by the gateway service, and this entry exists so the
+      surface has an independent switch and so the feature-flag gate's
+      services—terraform parity holds for `enable_chat`. Ships invisible: while
+      `surfaces.chat` is off the routes answer 404 before AuthN.
 
 # Endpoint-level surfaces: a single endpoint family inside a service that is
 # promoted independently of the service flag around it (the service flag alone
@@ -203,4 +220,23 @@ surfaces:
       healthy signal — until both this flag and an endpoint are configured. The
       label set is closed and bounded to
       {service, slo_kind, slo_id, verdict, tenant}.
+  chat:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_chat
+    description: >
+      Conversational surface (issue #503, ADR-0023): the
+      OpenAI-/Ollama-compatible endpoints `gateway/chat` serves —
+      POST /v1/chat/completions (JSON + SSE), POST /api/chat (JSON + NDJSON) and
+      GET /v1/models — for the chat experience in the single pane of glass. The
+      flag is checked BEFORE AuthN, so while it is off the whole family (and the
+      model list) answers 404 feature_disabled: an unpromoted surface is absent,
+      not merely unauthorised (the live_bridge precedent). The surface has its
+      OWN tf_flag (`enable_chat`) rather than the portal's or the gateway's, so
+      promotion and the kill switch are independent of both; `service: portal`
+      records whose experience it belongs to. Every turn is one dispatch through
+      gateway/proxy, so routing, caps, budgets, DLP, metering and the ledger are
+      inherited rather than re-implemented. Offline in tests: provider traffic
+      goes through the proxy's scriptable transport rig.
 
