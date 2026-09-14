@@ -415,20 +415,33 @@ ships — and per AO-GR-4 that gap is stated, never implied-enforced.
 
 ### AO-GR-21 — Bounded work: no queue item is retried forever
 
-**Origin.** Issue #723 (measured 2026-09-14; the wedge itself was #366).
+**Origin.** Issue #723 (measured 2026-09-14; the wedge itself was #366). The A2A
+half is issue #754.
 
 **Rule.** Every dispatched directive carries an **attempt budget** with
 exponential backoff and a **terminal dead-letter state**. A refusal is a state
 transition, not a reason to try again next tick. A directive that exhausts its
 budget moves to the dead-letter mailbox and is **never re-read**; the brain is
-escalated exactly once.
+escalated exactly once. Retiring an order is **a protocol operation, not a file
+operation**: `control:drop` (routed by `fleet/control.py drop --directive <id>
+--reason "<text>"`) tells the sister to dead-letter a named directive and acks
+the sender. The automatic path and the verb are **one implementation**
+(`runaway.dead_letter`) writing **one record shape**, so they cannot diverge.
+Reaching into `.fleet/inbox/` and `mv`-ing an order aside is **legacy
+remediation, superseded** — it races the loop's mid-`watch` reader, loses the
+attempt history and the reason, bypasses the channel (no ack, no audit) and
+cannot be done by an agent at all.
 
 **Why.** `fleet/terminal.py` left a directive **PENDING** on a refused claim and
 re-read it every cycle with no attempt counter, no backoff and no dead-letter
 (`report_once` deduped the *escalation*, not the *attempt*). Measured: **49
 concurrent `make verify` runs, 43 stacked in two worktrees, ~16 hours**; the
 wedge that caused it (#366) was itself re-dispatched in the same loop. A work
-queue with no dead-letter is an infinite loop with extra steps.
+queue with no dead-letter is an infinite loop with extra steps. The runaway fix
+was then itself performed **out of band** — 23 directives swept to
+`/tmp/dead-directives/` by `mv`, an operator reaching into another process's
+queue, which is why the verb exists: the fleet is agent-to-agent, and an agent
+that cannot tell its peer "this order is dead" is not an agent, it is a script.
 
 **Verify.**
 - Per-directive attempts are persisted and survive a loop restart; attempts are
@@ -436,6 +449,11 @@ queue with no dead-letter is an infinite loop with extra steps.
 - `bash scripts/check-runaway-guard.sh` provokes a directive that always fails
   and **must** observe it dead-lettered, never re-dispatched (AO-GR-4: the
   check can genuinely fail).
+- `bash scripts/check-dead-letter.sh` drives `control:drop` against the real
+  tree, proves the verb and the automatic path write the **same record shape**,
+  proves an **undropped** directive is still returned (the negative control),
+  and mutation-proves the retire path by refusing a mutant that leaves the order
+  in the inbox (AO-GR-4).
 
 ### AO-GR-22 — One gate per worktree, and the gate is admission-controlled
 

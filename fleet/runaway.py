@@ -84,8 +84,21 @@ CLI (operator)::
     python3 fleet/runaway.py status                    # counts, no judgement
     python3 fleet/runaway.py show --directive <id>     # one directive's history
     python3 fleet/runaway.py rearm --directive <id>    # re-arm after a fix
+    python3 fleet/runaway.py dead-letter [--directive <id>]  # the mailbox, by verb
 
 Exit codes are the repo tri-state: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+
+A SECOND CALLER (issue #754)
+----------------------------
+Retiring a directive is not only the guard's business. A peer agent or an
+operator can *know* an order is dead — the issue's work already landed on
+`master`, the directive was re-minted from a stale queue — and must be able to
+say so over the control channel instead of `mv`-ing a file out of
+`.fleet/inbox/` while the loop reads it. That is `control:drop`, and it calls
+the SAME :func:`dead_letter` used here: only the ``dropped_by`` label differs.
+:data:`RECORD_FIELDS` names the shape both callers produce, and
+``scripts/check-dead-letter.sh`` asserts the two records are identical field-
+for-field, so a change to one path cannot silently miss the other.
 """
 
 from __future__ import annotations
@@ -336,6 +349,48 @@ def dead_lettered(directive_id: str, base: Path | str | None = None) -> bool:
     return (dead_letter_dir(base) / f"{directive_id}.json").exists()
 
 
+#: The keys every dead-letter record carries, in one place (issue #754).
+#:
+#: The record has TWO callers — the automatic path (`terminal.guard_retire`, when
+#: the attempt budget is exhausted) and the operator/A2A verb
+#: (`control:drop`, when a peer tells the sister an order is dead). They must
+#: produce the *same shape*, and the only way to guarantee that is for the shape
+#: to be built in one function that both call. This tuple is the contract the
+#: gate asserts against, so a field cannot be added to one caller's record and
+#: silently missed by the other.
+RECORD_FIELDS = (
+    "id",
+    "issue",
+    "reason",
+    "attempts",
+    "dropped_by",
+    "ts",
+)
+
+
+def record_shape(base: Path | str | None = None, directive_id: str | None = None) -> dict:
+    """The dead-letter record for a directive, normalised to :data:`RECORD_FIELDS`.
+
+    The store's own payload (``Attempt.as_dict()`` plus ``reason``/``envelope``)
+    is the durable artifact; this is its *named* projection, and it exists so the
+    auto path and the A2A verb agree by construction rather than by convention.
+    ``id``/``issue`` come from the stored envelope when it is present, so a
+    dropped directive's issue is recorded even though the caller may only have
+    had the directive id.
+    """
+    payload = _read_json(dead_letter_dir(base) / f"{directive_id or ''}.json") or {}
+    envelope = payload.get("envelope") if isinstance(payload.get("envelope"), dict) else {}
+    task = envelope.get("task") if isinstance(envelope.get("task"), dict) else {}
+    return {
+        "id": str(envelope.get("id") or directive_id or payload.get("directive_id") or ""),
+        "issue": task.get("issue"),
+        "reason": payload.get("reason"),
+        "attempts": payload.get("attempts"),
+        "dropped_by": payload.get("dropped_by"),
+        "ts": payload.get("dead_lettered_at"),
+    }
+
+
 def load(directive_id: str, base: Path | str | None = None) -> Attempt | None:
     """The directive's record, or None when it has never failed.
 
@@ -436,6 +491,7 @@ def dead_letter(
     base: Path | str | None = None,
     inbox: Path | str | None = None,
     now: float | None = None,
+    dropped_by: str = "runaway-guard",
 ) -> Path:
     """Retire a directive: stamp the terminal state, move the order, return the artifact.
 
@@ -444,6 +500,13 @@ def dead_letter(
     attempt history and the reason — the audit an operator needs to re-order it.
     The counter record is stamped terminal too, so a reader of ``attempts/``
     cannot mistake it for a live budget.
+
+    ``dropped_by`` names WHO retired the order. There are two callers and they
+    share this function (issue #754): the automatic path (the attempt budget was
+    exhausted) passes the default, and the operator/A2A ``control:drop`` verb
+    passes the sender. Because it is a *parameter of the one implementation*
+    rather than a second implementation, the two records cannot drift in shape —
+    which is the acceptance criterion, not a nicety.
     """
     epoch = _now_epoch(now)
     stamp = _iso(epoch)
@@ -465,10 +528,18 @@ def dead_letter(
         state=STATE_DEAD_LETTER,
         dead_lettered_at=stamp,
     )
-    payload = {**terminal.as_dict(), "reason": reason, "envelope": envelope}
+    payload = {
+        **terminal.as_dict(),
+        "reason": reason,
+        "dropped_by": dropped_by,
+        "envelope": envelope,
+    }
     target = dead_letter_dir(base) / f"{directive_id}.json"
     _write_json(target, payload)
-    _write_json(attempts_dir(base) / f"{directive_id}.json", {**terminal.as_dict(), "reason": reason})
+    _write_json(
+        attempts_dir(base) / f"{directive_id}.json",
+        {**terminal.as_dict(), "reason": reason, "dropped_by": dropped_by},
+    )
     try:
         source.unlink()
     except OSError:
@@ -562,6 +633,36 @@ def cmd_rearm(args: argparse.Namespace) -> int:
     return EXIT_NOT_OK
 
 
+def cmd_dead_letter(args: argparse.Namespace) -> int:
+    """List/inspect the dead-letter mailbox — a verb, never a filesystem read.
+
+    The issue asks for this explicitly: an operator (or the brain) must be able
+    to see WHAT was dropped and WHY without reaching into the runtime directory.
+    With no ``--directive`` it lists every retired order with its one-line
+    summary; with one, it prints the full normalised record (the same
+    :data:`RECORD_FIELDS` shape the verb and the automatic path both write).
+    """
+    state = inventory(args.fleet_dir)
+    if not state["dead_letters"]:
+        print("runaway guard: dead-letter mailbox is empty")
+        return EXIT_NOT_OK
+    if args.directive:
+        if args.directive not in state["dead_letters"]:
+            print(f"runaway guard: {args.directive} is not in the dead-letter mailbox", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        print(json.dumps(record_shape(args.fleet_dir, args.directive), indent=2, sort_keys=True))
+        return EXIT_OK
+    print(f"runaway guard: {len(state['dead_letters'])} dead-lettered directive(s)")
+    for directive_id in state["dead_letters"]:
+        record = record_shape(args.fleet_dir, directive_id)
+        print(
+            f"  {directive_id}  issue={record.get('issue')}  attempts={record.get('attempts')}  "
+            f"by={record.get('dropped_by')}  at={record.get('ts')}\n"
+            f"    reason: {record.get('reason')}"
+        )
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-runaway", description=__doc__)
     parser.add_argument(
@@ -578,6 +679,9 @@ def build_parser() -> argparse.ArgumentParser:
     rearm_cmd = sub.add_parser("rearm", help="return a retired directive to the queue")
     rearm_cmd.add_argument("--directive", required=True)
     rearm_cmd.set_defaults(func=cmd_rearm)
+    mailbox = sub.add_parser("dead-letter", help="list/inspect the dead-letter mailbox")
+    mailbox.add_argument("--directive", default=None, help="print one record in full")
+    mailbox.set_defaults(func=cmd_dead_letter)
     return parser
 
 

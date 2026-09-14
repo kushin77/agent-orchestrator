@@ -14,6 +14,8 @@ stopping it:
     python3 fleet/control.py refresh    # git pull --ff-only + snapshot + verify + re-exec
     python3 fleet/control.py update     # refresh + rebuild the knowledge index
     python3 fleet/control.py override --issue N   # force #N past a live claim
+    python3 fleet/control.py drop --directive <id> --reason "<text>"  # dead-letter a wedged directive
+    python3 fleet/control.py dead-letter [--directive <id>]  # inspect the dead-letter mailbox
     python3 fleet/control.py poke       # ping the sister; it acks (liveness)
     python3 fleet/control.py halt       # stop the fleet
     python3 fleet/control.py debug      # full non-destructive state dump
@@ -78,14 +80,23 @@ def _run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     return result
 
 
-def _send_control(action: str) -> None:
+def _send_control(action: str, task: dict | None = None, body: str | None = None) -> None:
+    """Send one control verb to the sister over the existing channel.
+
+    ``task`` carries the target of a control that acts on a NAMED directive
+    (``drop`` names the order it is retiring) — the control's own id and the
+    directive it acts on are different things, and conflating them would retire
+    the control instead of the wedged order (issue #754).
+    """
     message = {
         "from": "brain",
         "to": "sister",
         "type": "directive",
         "control": action,
-        "body": f"control:{action}",
+        "body": body or f"control:{action}",
     }
+    if task:
+        message["task"] = task
     path = ROOT / FLEET_SUBDIR / f"control-{uuid.uuid4().hex[:8]}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(message))
@@ -278,6 +289,37 @@ def cmd_halt(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_drop(args: argparse.Namespace) -> int:
+    """Operator lever: order the sister to dead-letter a named directive (#754).
+
+    This is the protocol route a `mv .fleet/inbox/<d>.json /tmp/...` used to
+    stand in for. The hierarchy holds — the operator orders the brain and the
+    brain issues the control — and the order travels the same `_send_control`
+    path as every other lever, so it is acked and recorded rather than reaching
+    into another process's queue.
+    """
+    task: dict = {"directive": args.directive}
+    if args.issue is not None:
+        task["issue"] = args.issue
+    reason = args.reason or "operator dead-letter (control:drop)"
+    task["reason"] = reason
+    _send_control("drop", task=task, body=f"control:drop — dead-letter {args.directive}: {reason}")
+    print(f"drop sent — the sister will dead-letter directive {args.directive} to the mailbox")
+    print("inspect the mailbox with: python3 fleet/control.py dead-letter")
+    return 0
+
+
+def cmd_dead_letter(args: argparse.Namespace) -> int:
+    """Read the dead-letter mailbox by verb, never by walking the runtime dir."""
+    result = _run(
+        ["python3", "fleet/runaway.py", "dead-letter"]
+        + (["--directive", args.directive] if args.directive else []),
+        check=False,
+    )
+    print((result.stdout + result.stderr).rstrip())
+    return result.returncode
+
+
 def cmd_debug(args: argparse.Namespace) -> int:
     print("== channel ==")
     _run(["python3", CHANNEL, "status"], check=False)
@@ -422,6 +464,8 @@ def build_parser() -> argparse.ArgumentParser:
         ("restart", cmd_restart),
         ("halt", cmd_halt),
         ("override", cmd_override),
+        ("drop", cmd_drop),
+        ("dead-letter", cmd_dead_letter),
         ("debug", cmd_debug),
         ("watch", cmd_watch),
         ("health", cmd_health),
@@ -436,6 +480,12 @@ def build_parser() -> argparse.ArgumentParser:
     override.add_argument("--issue", type=int, required=True)
     override.add_argument("--lane", default=None)
     override.add_argument("--body", default=None)
+    drop = sub.choices["drop"]
+    drop.add_argument("--directive", required=True, help="the id of the wedged directive to dead-letter")
+    drop.add_argument("--reason", default=None, help="why it is dead — recorded durably")
+    drop.add_argument("--issue", type=int, default=None, help="the issue the directive carried")
+    mailbox = sub.choices["dead-letter"]
+    mailbox.add_argument("--directive", default=None, help="print one record in full")
     health = sub.choices["health"]
     health.add_argument("--stale-minutes", type=float, default=30.0)
     cron = sub.choices["cron"]

@@ -416,10 +416,46 @@ synthetic fleet, no network and no tmux.
 .fleet/done/     directives answered and consumed   (runtime, gitignored)
 .fleet/runs/     run markers + each run's live log stream (`<id>.log`)  (runtime, gitignored)
 .fleet/brain/steer/  the brain's pending steering hints, one per directive  (runtime, gitignored)
+.fleet/attempts/     one persisted attempt budget per directive  (runtime, gitignored)
+.fleet/dead-letter/  the terminal artifact of a retired directive  (runtime, gitignored)
 ```
 
 `fleet/directive.json` and the schema are tracked artifacts — the sister can
 always discover its standing orders from a clean clone.
+
+## Dead-lettering a directive by protocol (`control:drop`)
+
+A directive the fleet cannot execute must not be retried for ever. There are two
+ways one becomes **terminal**, and they share one implementation
+(`runaway.dead_letter`) and one record shape, so they can never disagree:
+
+1. **Automatically** — the loop exhausts the directive's attempt budget
+   (`.fleet/attempts/<id>.json`, `AO_RUNAWAY_ATTEMPTS`, default 5). Its held
+   paths (a refused claim, a run that did not land, a self-heal, an in-flight
+   hold, an untracked foreign claim) all count against that one counter.
+2. **By protocol** — an operator, or a peer agent that can see the order is
+   wedged, says so **over the control channel**:
+
+```bash
+python3 fleet/control.py drop --directive <id> --reason "its work already landed"
+python3 fleet/control.py dead-letter                       # list the mailbox
+python3 fleet/control.py dead-letter --directive <id>      # inspect one record
+```
+
+The verb orders the **brain**, which issues the control to the sister exactly
+like every other lever; the sister retires the named directive, **acks** the
+sender naming what it dropped, and the order is moved to
+`.fleet/dead-letter/<id>.json`. `channel watch` will never return it again.
+
+**Out-of-band `mv` is legacy remediation and is superseded by the verb.** Moving
+`.fleet/inbox/<id>.json` aside by hand (the 23 directives swept to
+`/tmp/dead-directives/` on 2026-09-14) *works*, but it races the loop's
+mid-`watch` reader, loses the attempt history and the reason, bypasses the
+channel so there is no ack and no audit record, and **cannot be done by an agent
+at all** — a subagent that detects its own directive is wedged has no way to say
+so. Use the verb; it is the same lever the automatic path uses. To revive a
+retired order after fixing the cause:
+`python3 fleet/runaway.py rearm --directive <id>`.
 
 ## Recovery (no operator step — code handles each failure)
 
