@@ -107,7 +107,41 @@ def test_a_child_naming_a_different_parent_is_not_this_epics_child():
 
 def test_a_child_without_a_parent_marker_is_not_a_declared_child():
     item = clean_item(children=[{"number": 300, "state": "open", "body": "no marker here"}])
-    assert audit_item(item) == []
+    findings = audit_item(item)
+    # It is NOT this epic's child — and it is not silently passed either (#720):
+    # "no children found" must never read as "all children closed".
+    assert codes(findings) == {"EPIC_CHILD_MARKER_MISSING"}
+    assert "#300" in str(findings[0])
+
+
+def test_an_epic_with_no_child_edge_established_is_reported_not_passed():
+    """The silent pass #720 forbids: a child the audit cannot tie to the epic.
+
+    A supplied child whose body declares no marker cannot be shown closed *or*
+    open, so treating the empty declared set as "every child is terminal" would
+    let an epic close over a child the audit never saw. The child is named, and
+    the finding carries a remediation that says how to establish the edge.
+    """
+    findings = audit_item(clean_item(children=[{"number": 300, "state": "closed", "body": ""}]))
+    assert codes(findings) == {"EPIC_CHILD_MARKER_MISSING"}
+    assert "cannot be established" in str(findings[0])
+    assert "Parent: #<n>" in findings[0].remediation
+
+
+def test_a_terminal_child_edge_and_an_unverifiable_one_are_reported_together():
+    """Both halves are owed: the closed child is clean, the unedged one is not."""
+    item = clean_item(children=[
+        {"number": 300, "state": "closed", "body": "Parent: #269"},
+        {"number": 301, "state": "closed", "body": "no marker"},
+    ])
+    findings = audit_item(item)
+    assert [finding.code for finding in findings] == ["EPIC_CHILD_MARKER_MISSING"]
+    assert "#301" in str(findings[0])
+
+
+def test_an_epic_with_no_supplied_child_set_is_not_charged_for_one():
+    """An epic with no children at all declares nothing, so nothing is unverifiable."""
+    assert audit_item(clean_item(children=[])) == []
 
 
 def test_github_casing_of_state_and_pr_is_read_correctly():
