@@ -1,0 +1,34 @@
+{
+  "note": "Offline canned responses for FixtureTransport (issue #465): the diagrams blueprint state served over the paperclip seam. Used by the unit tests and by scripts/check-paperclip-diagrams.sh, which is why neither touches the network. ADR-0017 froze the shape: a diagram signal rides a ticket's structured evidence[] as the v2 receipt {kind, ref, result, checks}.",
+  "responses": [
+    {
+      "method": "GET",
+      "path": "/api/companies/acme/diagrams",
+      "status": 200,
+      "body": {
+        "blueprint": {
+          "content_hash": "sha256:6b1f0c8a41d5e2f7b9c0a3d64e8f1b2c5d7a9e0f3b6c8d1e4f7a0b3c6d9e2f5a",
+          "rendered": "docs/diagrams/live-architecture.svg",
+          "ref": "diagrams://blueprint/kushin77/agent-orchestrator"
+        },
+        "findings": [
+          {
+            "resource": "gateway/proxy/router.py",
+            "attribute": "replicas",
+            "declared": "3",
+            "live": "1",
+            "status": "drift",
+            "ticket": "kushin77/agent-orchestrator#999"
+          },
+          {
+            "resource": "engine/core/state.py",
+            "attribute": "timeout",
+            "declared": "30s",
+            "live": "30s",
+            "status": "aligned"
+          }
+        ]
+      }
+    }
+  ]
+}
