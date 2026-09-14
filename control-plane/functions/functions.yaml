@@ -312,6 +312,21 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng, Analyst]
 
+  - id: DISPATCH
+    title: "Dispatch — arbitrate a directive: prove issue, epic and lane before it routes"
+    kind: view
+    endpoints: [board/dispatch]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: agent, type: string, required: true, default: null}
+      - {name: lane, type: string, required: false, default: ""}
+      - {name: directive, type: string, required: false, default: ""}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
   - id: RECOVER
     title: "Recover — every session and its orphan verdict"
     kind: view

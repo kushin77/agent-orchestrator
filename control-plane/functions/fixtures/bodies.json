@@ -17,6 +17,7 @@
     "BOARD": {"outcome": "ok", "rows": ["milestone RC active · frontier #565"]},
     "LEDGER": {"outcome": "ok", "rows": ["audit rail readable · 0 non-hygienic items"]},
     "CLOSURE": {"outcome": "ok", "rows": ["#565 owes: merge, close, release"]},
+    "DISPATCH": {"outcome": "ok", "rows": ["#726 arbitrated: epic #551, lane control-plane, unowned"]},
     "RECOVER": {"outcome": "ok", "rows": ["2 sessions: 2 live, 0 orphaned"]},
     "CHANNEL": {"outcome": "ok", "rows": ["inbox 0 · outbox 1"]},
     "WATCH": {"outcome": "ok", "rows": ["following fleet_projection · event snapshot"]},
