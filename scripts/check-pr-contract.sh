@@ -23,6 +23,13 @@
 #     reference in the subject, or buried in an earlier prose paragraph, is
 #     refused by name. (A plain substring test accepts both — that is defect
 #     #287 in the lane audit; this gate must not repeat it.)
+#     A bare `---------` separator line is a boundary *inside* that block, not
+#     the end of it: the fleet's landing path (`gh pr merge --squash`, GitHub
+#     composing the message) inserts one and appends its own `Co-authored-by:`
+#     paragraph after it, so refusing that layout made this gate disagree with
+#     the very merge path it audits (issue #522, measured on PR #520 / PR #493).
+#     The separator is therefore transparent to the walk-back; prose is not,
+#     so a subject-line or prose `Refs` is still refused (#309's complaint).
 #   * the PR body declares `Closes #<n>`;
 #   * the PR body carries a filled-in `AI-assistance:` line (a placeholder such
 #     as `<runtime>` is refused — that is how the template distinguishes itself
@@ -165,13 +172,43 @@ def is_trailer_line(line: str) -> bool:
     return bool(re.match(r"^[A-Za-z][A-Za-z0-9_-]*:[ \t]*\S", line))
 
 
+# A `---------` line is GitHub's paragraph separator in a squash-merge message:
+# it sits BETWEEN the lane's trailer paragraph and the `Co-authored-by:`
+# paragraph GitHub appends, i.e. inside the trailing block, not before it. It is
+# not a `Token: value` line, so a walk-back that only asked `is_trailer_line`
+# stopped on it and reported a `Refs` line *above* it as
+# `commit-ref-outside-the-trailer-block` (#522). Treat it as transparent: it
+# neither terminates the block nor contributes a line to it. This does not
+# weaken the position rule — a paragraph that is not entirely trailer lines
+# still ends the block, and prose is never a separator.
+separator_re = re.compile(r"^-{2,}[ \t]*$")
+
+
+def is_separator_line(line: str) -> bool:
+    """A bare `---------` squash/paragraph separator line."""
+    return bool(separator_re.fullmatch(line.strip()))
+
+
+def paragraph_kind(paragraph: list[str]) -> str:
+    """`trailer`, `separator`, or `other` (anything else ends the block)."""
+    significant = [line for line in paragraph if not is_separator_line(line)]
+    if not significant:
+        return "separator"
+    if all(is_trailer_line(line) for line in significant):
+        return "trailer"
+    return "other"
+
+
 # Walk back over the trailing all-trailer paragraphs; the first paragraph that
-# is not entirely trailer lines ends the block.
+# is not entirely trailer lines ends the block, and a separator paragraph is
+# stepped over without ending it.
 region: list[str] = []
 for paragraph in reversed(paragraphs):
-    if not all(is_trailer_line(line) for line in paragraph):
+    kind = paragraph_kind(paragraph)
+    if kind == "other":
         break
-    region = paragraph + region
+    if kind == "trailer":
+        region = paragraph + region
 
 if any(ref_re.fullmatch(line.strip()) for line in region):
     sys.exit(0)
@@ -478,6 +515,47 @@ MD
     printf '  OK    a reference buried in prose is refused by name\n'
   else
     printf '  FAIL  a prose-only reference went undetected\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 2c. the SQUASH-MERGE layout (#522): the trailer block is followed by a
+  #     `---------` separator and GitHub's own co-author paragraph. The separator
+  #     is a boundary inside the block, so this commit must be ACCEPTED — before
+  #     the fix it was refused as `commit-ref-outside-the-trailer-block`, which
+  #     is how two real merges (07b3d5d, 8c0669f) failed `--landed`.
+  printf 'e.txt\n' >"$scratch/e.txt"
+  git -C "$scratch" add e.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "a squash-merged commit whose trailer block GitHub extended" \
+    -m "Refs kushin77/agent-orchestrator#522" \
+    -m "---------" \
+    -m "Co-authored-by: agent-copilot-522 <agent+copilot-522@agents.invalid>" >/dev/null 2>&1
+  e_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(run_checks "$good_body" "${e_sha}^..$e_sha" 2>&1)"
+  if [ $? -eq 0 ] && printf '%s' "$out" | grep -qF "check-pr-contract: OK"; then
+    printf '  OK    a separator inside the trailer block is stepped over\n'
+  else
+    printf '  FAIL  a squash separator broke the trailer block\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 2d. …and the separator must not smuggle PROSE into the block: the identical
+  #     layout with the reference in the prose paragraph ABOVE it is still
+  #     refused by name. Without this control the fix would have traded #309's
+  #     defect (#287: a substring test) for #522's.
+  printf 'f.txt\n' >"$scratch/f.txt"
+  git -C "$scratch" add f.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "a commit whose prose mentions the ticket, then a separator" \
+    -m "The change is tracked as Refs kushin77/agent-orchestrator#522 in prose." \
+    -m "---------" \
+    -m "Co-authored-by: agent-copilot-522 <agent+copilot-522@agents.invalid>" >/dev/null 2>&1
+  f_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(run_checks "$good_body" "${f_sha}^..$f_sha" 2>&1)"
+  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "commit-ref-outside-the-trailer-block"; then
+    printf '  OK    a prose reference below a separator is still refused by name\n'
+  else
+    printf '  FAIL  a separator let a prose-only reference through\n%s\n' "$out" >&2
     ok=1
   fi
 
