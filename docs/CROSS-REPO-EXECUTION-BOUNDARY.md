@@ -98,10 +98,53 @@ open. The epic did not fail; it was *unobservable*.
 The requirement that follows: when a work item's payload is not measurable in
 this repository, the boundary condition around it **must** be gated in this
 repository. For #125 that gate is `governance/board/boundary.py`, which makes
-the violation class itself the local signal — an issue on this board whose body
-marks its backlog as owned elsewhere (`self-parent`), or references a foreign
-repo in a `Closes` / `Refs` / `Parent:` form (`foreign-repo-issue`), is a
-finding this repo can observe, count, and act on without any network access.
+the violation class itself the local signal. It carries three checks, each of
+which can genuinely fail:
+
+| Check | The violation it names |
+|---|---|
+| `self-parent` | the body marks its backlog as owned elsewhere (`Parent: #125`) |
+| `foreign-repo-issue` | the body references a foreign repo in a `Closes` / `Refs` / `Parent:` form |
+| `foreign-repo-declaration` | the body **declares** its repo with the board's own `## Repo` convention and that repo is not this one |
+
+### 4.1 The declaration check, and the false green it closes
+
+`foreign-repo-declaration` is the signal that reads the boundary the way the
+board actually writes it. Every child of #125 declares its repo in the board's
+own convention — a `## Repo` heading (also accepted: a `Repo:` / `**Repo**:` /
+`**Repo**` label, case-insensitively, with the value on the same line after a
+colon or on the next non-blank line, bare name or `owner/name`, backticks and
+quotes stripped) — and a declaration naming any repo other than this one is a
+cross-repo backlog item filed on the wrong board.
+
+**Measured verdict (2026-09-13, live board).** The check flags **11 open
+children**, each naming its foreign repo: #126 `saas-rbac`, #127
+`github-workflow`, #128 `shared-temporal`, #129 `Shared_Integrations`, #131
+`shared-governance`, #132 `shared-services`, #133 `googleworkspace`, #134
+`SharedFeatures`, #135 `ERP-CRM`, #136 `code-indexing`, #137 `diagrams`. **#130
+(`shared-frontend`) is closed and is deliberately not a finding** — a closed
+child is resolved history, not a live violation — and #125 itself declares no
+repo and is never flagged. The count is pinned by a committed fixture of the
+real issues, `governance/board/tests/fixtures/board-125-children.json`.
+
+**State rule — fail-closed.** The declaration check flags only *open* issues.
+Only a literal `closed` state (case-insensitive) suppresses a finding, so a
+snapshot that omits `state` can never turn a real violation into a silent pass.
+That is the defect this check fixes, measured: the first version of this
+detector reported
+
+```
+boundary: OK — 13 issue(s), no boundary violation
+```
+
+for the real board when it was pointed at this repo's own board-export shape
+(`number` / `title` / `state` — no body field), which is the shape a local gate
+would actually read from the committed board snapshot. The two original checks
+had nothing to read, so a missing field produced a pass. The declaration check
+closes that class: it needs no legacy marker (the `Parent: #125` line survives
+on only part of the backlog — #130 already dropped it), it names the foreign
+repo in the finding, and it distinguishes a live violation from resolved
+history.
 
 The detector is tri-state on the same honesty contract as every other gate here:
 `0` OK, `1` NOT-OK (findings), `2` CANNOT-ASSESS (snapshot missing, unreadable,
@@ -159,8 +202,9 @@ edits reach more than one repo — which is precisely why the direction issue
 
 | Surface | Role |
 |---|---|
-| `governance/board/boundary.py` | The detector: `self-parent` + `foreign-repo-issue`, tri-state exit |
-| `governance/board/tests/test_boundary.py` | Behavioural proof the detector fires, including its negative control |
+| `governance/board/boundary.py` | The detector: `self-parent` + `foreign-repo-issue` + `foreign-repo-declaration`, tri-state exit |
+| `governance/board/tests/test_boundary.py` | Behavioural proof the detector fires, including a negative control per check |
+| `governance/board/tests/fixtures/board-125-children.json` | The real #125-#137 issues; pins the live verdict at exactly 11 open children |
 | This document | The contract the detector enforces |
 
 The detector is pure, offline, and stdlib-only: it reads a JSON snapshot of

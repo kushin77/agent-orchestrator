@@ -13,6 +13,27 @@ measurable locally: a backlog item that names a foreign repo, filed on this
 repo's board, is a finding, and the honest fix is a direction issue on the
 owning repo's board rather than an edit made from here.
 
+Three checks, none of which may be vacuous (GR-12):
+
+``self-parent``
+    The body carries a marker declaring the backlog is owned elsewhere.
+
+``foreign-repo-issue``
+    The body references a foreign repo in a ``Closes``/``Refs``/``Parent:``
+    form.
+
+``foreign-repo-declaration``
+    The body *declares* its repo with the board's own ``## Repo`` convention —
+    the pattern the live #126-#137 children actually use — and that repo is not
+    this one. This is the check that reads the boundary the way the board
+    writes it, rather than the way the epic's first draft happened to mark it:
+    it needs no legacy marker, it names the foreign repo, and it ignores
+    children that have since closed, because those are resolved history rather
+    than a live finding. Its state rule is fail-closed: only a literal
+    ``closed`` state suppresses a finding, so a snapshot that omits ``state``
+    altogether (as this repo's own ``.board/snapshot.json`` export shape does
+    for every other field) can never turn a real violation into a silent pass.
+
 The detector is deliberately **pure, offline and stdlib-only** (``yaml`` is an
 optional convenience, already a repo dependency; it is not required): it reads a
 JSON snapshot of already-fetched issues and never calls the network, never runs
@@ -45,6 +66,7 @@ __all__ = [
     "EXIT_CANNOT_ASSESS",
     "FINDING_SELF_PARENT",
     "FINDING_FOREIGN_REPO_ISSUE",
+    "FINDING_FOREIGN_REPO_DECLARATION",
     "load_issues",
     "check_issues",
     "main",
@@ -58,6 +80,7 @@ EXIT_CANNOT_ASSESS = 2
 # --- finding kinds ----------------------------------------------------------
 FINDING_SELF_PARENT = "self-parent"
 FINDING_FOREIGN_REPO_ISSUE = "foreign-repo-issue"
+FINDING_FOREIGN_REPO_DECLARATION = "foreign-repo-declaration"
 
 # ``Closes owner/repo#N`` / ``Refs owner/repo#N`` / ``Parent: owner/repo#N``.
 # Case sensitive on the keyword (``Closes``), permissive on spacing, and it
@@ -69,6 +92,45 @@ _OWNER_REPO = r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*"
 _FOREIGN_REF_RE = re.compile(
     r"\b(?:Closes|Refs|Parent:)\s+(%s)#(\d+)\b" % _OWNER_REPO
 )
+
+# --- the ``## Repo`` declaration convention ---------------------------------
+# The pattern every live #126-#137 child actually carries (measured on the
+# board, 2026-09-13):
+#
+#     ## Repo
+#     saas-rbac
+#
+# Accepted variants, all case-insensitive: a heading (``## Repo``, ``### Repo:``)
+# or a label (``Repo:``, ``**Repo**:``, ``**Repo**``), with the value either
+# after a colon on the same line or on the next non-blank line. The value is a
+# bare repo name (``saas-rbac``) or ``owner/name`` (``kushin77/saas-rbac``),
+# stripped of backticks/quotes/emphasis and reduced to its first token.
+#
+# The marker must be the *whole* heading or label: a heading that merely starts
+# with the word (``## Repository layout``) or a plural label (``Repos:``) is
+# prose, not a declaration. Widening that boundary is what would make the
+# finding unusable — every issue with a "Repository" heading would light up.
+_REPO_WORD = r"(?:\*\*|__)?Repo(?:\*\*|__)?"
+_DECL_HEADING_COLON_RE = re.compile(
+    r"^ {0,3}#{1,6}[ \t]+" + _REPO_WORD + r"[ \t]*:[ \t]*(?P<value>.*?)[ \t]*$",
+    re.IGNORECASE,
+)
+_DECL_HEADING_BARE_RE = re.compile(
+    r"^ {0,3}#{1,6}[ \t]+" + _REPO_WORD + r"[ \t]*$", re.IGNORECASE
+)
+_DECL_LABEL_COLON_RE = re.compile(
+    r"^ {0,3}" + _REPO_WORD + r"[ \t]*:[ \t]*(?P<value>.*?)[ \t]*$", re.IGNORECASE
+)
+_DECL_LABEL_BARE_RE = re.compile(
+    r"^ {0,3}(?:\*\*|__)Repo(?:\*\*|__)[ \t]*$", re.IGNORECASE
+)
+_REPO_NAME_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)?$"
+)
+# Markdown wrappers that may surround a repo name: backticks, straight/curly
+# quotes, emphasis. None of them is a legal repo-name character, so stripping
+# them can never damage a real name.
+_DECL_STRIP_CHARS = "`'\"\u2018\u2019\u201c\u201d*"
 
 
 @dataclass(frozen=True)
@@ -91,12 +153,19 @@ class BoundaryPolicy:
 
 @dataclass(frozen=True)
 class Finding:
-    """One boundary violation. ``finding`` is one of the two kind constants."""
+    """One boundary violation.
+
+    ``finding`` is one of the three kind constants. ``repos`` names the foreign
+    repo(s) the finding is about — empty for kinds whose detail already carries
+    the reference — so a caller can group findings per repo without parsing the
+    human-readable ``detail``.
+    """
 
     issue: int
     title: str
     finding: str
     detail: str
+    repos: Tuple[str, ...] = ()
 
 
 def load_issues(path: Any) -> List[Dict[str, Any]]:
@@ -132,13 +201,104 @@ def _as_int(value: Any) -> Optional[int]:
     return None
 
 
+def _normalise_repo(text: str) -> Optional[str]:
+    """Normalise a declaration value to a repo name, or ``None`` if it is not one.
+
+    Whitespace is collapsed, markdown wrappers are stripped, and the first
+    token is taken (``saas-rbac (see report)`` → ``saas-rbac``). Anything that
+    is not a bare repo name or ``owner/name`` is rejected — an unparseable
+    value is *not* a declaration, so it can never manufacture a finding.
+    """
+
+    value = str(text or "").strip().strip(_DECL_STRIP_CHARS).strip()
+    if not value:
+        return None
+    token = value.split()[0].strip(_DECL_STRIP_CHARS).rstrip(".,;:!")
+    if _REPO_NAME_RE.match(token):
+        return token
+    return None
+
+
+def _declared_repos(body: str) -> List[str]:
+    """Return every repo named by a ``Repo`` declaration in ``body``, in order.
+
+    Deduplicated case-insensitively, so repeating the same heading twice names
+    one repo. A heading or label whose value is missing or unparseable yields
+    no declaration at all (see ``_normalise_repo``).
+    """
+
+    lines = body.splitlines()
+    repos: List[str] = []
+    seen: set = set()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        value: Optional[str] = None
+        match = _DECL_HEADING_COLON_RE.match(line)
+        if match is None:
+            match = _DECL_LABEL_COLON_RE.match(line)
+        if match is not None:
+            value = match.group("value")
+        elif _DECL_HEADING_BARE_RE.match(line) or _DECL_LABEL_BARE_RE.match(line):
+            value = ""
+        if value is not None:
+            normalised = _normalise_repo(value)
+            if normalised is None:
+                # The value may sit on the next non-blank line. When it does
+                # not, the line is left to be parsed on its own — it is often
+                # the next heading.
+                probe = index + 1
+                while probe < len(lines) and not lines[probe].strip():
+                    probe += 1
+                if probe < len(lines):
+                    candidate = _normalise_repo(lines[probe])
+                    if candidate is not None:
+                        normalised = candidate
+                        index = probe
+            if normalised is not None and normalised.lower() not in seen:
+                seen.add(normalised.lower())
+                repos.append(normalised)
+        index += 1
+    return repos
+
+
+def _is_own_repo(declared: str, own: str) -> bool:
+    """Is ``declared`` the policy's own repo? Compares name and ``owner/name``.
+
+    Case-insensitive, per the board's own usage: ``kushin77/agent-orchestrator``
+    and ``agent-orchestrator`` are the same repo, so either spelling is self.
+    """
+
+    declared_lower = declared.strip().lower()
+    own_lower = own.strip().lower()
+    if "/" in declared_lower:
+        return declared_lower == own_lower
+    own_name = own_lower.rsplit("/", 1)[-1]
+    return declared_lower == own_name
+
+
+def _is_open(issue: Dict[str, Any]) -> bool:
+    """Is the issue open? Absent or unreadable state counts as OPEN.
+
+    Fail-closed by contract: only a literal ``closed`` (case-insensitive)
+    suppresses a finding. A snapshot that omits ``state`` — or carries
+    ``OPEN``/``open``/anything else — is treated as open, so a missing field
+    can never silently produce a pass for a real violation.
+    """
+
+    state = issue.get("state")
+    if state is None or not str(state).strip():
+        return True
+    return str(state).strip().lower() != "closed"
+
+
 def check_issues(
     policy: BoundaryPolicy,
     issues: Sequence[Dict[str, Any]],
 ) -> List[Finding]:
     """Return every boundary violation in ``issues`` ([] when clean).
 
-    Two real checks, both of which must be able to fail:
+    Three real checks, all of which must be able to fail:
 
     ``self-parent``
         The issue's body carries one of ``policy.out_of_scope_markers`` — the
@@ -153,14 +313,28 @@ def check_issues(
         A same-repo ``Closes #N`` (no ``owner/repo``) is compliant and is never
         flagged.
 
-    Both checks are case-sensitive on the keyword, as documented: the repo's
-    own conventions write them capitalised, so ``refs #12`` is not treated as a
-    reference. That is pinned by a test rather than left implicit.
+    ``foreign-repo-declaration``
+        The issue's body declares its repo with the board's own ``## Repo``
+        convention and that repo is not ``policy.own_repo`` — a foreign repo's
+        backlog item filed on this board. Only **open** issues are flagged (a
+        closed child is resolved history, not a live finding) and a missing
+        ``state`` counts as open, so the check fails closed. The finding names
+        the foreign repo in ``repos`` and in the detail.
+
+    The reference check is case-sensitive on the keyword, as documented: the
+    repo's own conventions write them capitalised, so ``refs #12`` is not
+    treated as a reference. That is pinned by a test rather than left implicit.
+    The declaration check is case-insensitive on the marker and on the repo
+    comparison, because the board writes both freely (``## Repo`` vs
+    ``## repo``, ``ERP-CRM`` vs ``erp-crm``).
 
     Marker matching is a deliberate plain-substring test, not a word-boundary
     regex: the detector errs toward over-reporting and a human quarantines the
     false positive by name. A cleverer pattern would silently miss a real child
-    issue, which is the failure mode this gate exists to prevent.
+    issue, which is the failure mode this gate exists to prevent. The
+    declaration check is the one deliberate exception — it must be the *whole*
+    heading or label — because over-reporting every ``## Repository`` heading
+    would drown the finding that matters.
     """
 
     own = policy.own_repo.strip()
@@ -183,6 +357,24 @@ def check_issues(
                             "body carries out-of-scope marker %r: the marked "
                             "backlog is owned by another repo, not %s" % (marker, own)
                         ),
+                    )
+                )
+
+        if _is_open(issue):
+            for declared in _declared_repos(body):
+                if _is_own_repo(declared, own):
+                    continue
+                findings.append(
+                    Finding(
+                        issue=number,
+                        title=title,
+                        finding=FINDING_FOREIGN_REPO_DECLARATION,
+                        detail=(
+                            "body declares repo %s, not %s: a foreign repo's "
+                            "backlog filed on this board; file a direction "
+                            "issue on %s instead" % (declared, own, declared)
+                        ),
+                        repos=(declared,),
                     )
                 )
 
