@@ -34,10 +34,10 @@ the pass only **reports** the direction issues it would file: it is dry-run by
 default, exactly like this repository's standards-push tooling. A direction
 issue is never filed by the pass itself.
 
-The boundary contract itself currently lives on an unmerged branch
-(`docs/CROSS-REPO-EXECUTION-BOUNDARY.md` is not in this tree yet), so it is
-cited here in backticks rather than as a link — a relative link into a file that
-does not exist breaks the docs gate on a fresh checkout.
+The boundary contract itself is `docs/CROSS-REPO-EXECUTION-BOUNDARY.md`, merged
+to `master` via #387 (`de5b7ed`). It is cited here in backticks rather than as a
+relative link to keep this section readable; the obligation it states is
+binding regardless of how it is referenced.
 
 ## 3. What the pass produces
 
