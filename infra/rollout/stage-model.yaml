@@ -68,6 +68,17 @@ promotion_rules:
   to_full_requires:
     - canary_health_ok
     - gradual_complete
+  # Policy-based approval tier (issue #700): a promotion whose TARGET stage
+  # is listed here is auto-approved on green verification evidence (plus the
+  # target's own health/complete signals) with no human approval_code. The
+  # auto-approval is recorded in the audit trail (who/when/why/which policy),
+  # never silent. `full` is deliberately absent: the final promotion and the
+  # downstream apply remain human-gated (no policy bypass).
+  policy_auto_approve:
+    policy: "low-risk-auto-approve"
+    targets:
+      - canary
+      - gradual
 
 rollback_rules:
   mode: auto

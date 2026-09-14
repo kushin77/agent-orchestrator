@@ -39,6 +39,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from infra.rollout.model import (  # noqa: E402
+    RolloutStage,
     StageModel,
     validate_go_live_plan_doc,
     validate_rollout_state_doc,
@@ -74,6 +75,8 @@ def check_stage_model(doc: object) -> list:
         errors.append("stage-model: promotion_rules.jump_allowed must be false (strict-forward)")
     if model.rollback_target != "off":
         errors.append(f"stage-model: rollback target must be 'off', got '{model.rollback_target}'")
+    if model.approval_policy is not None and model.approval_policy.auto_approves(RolloutStage.FULL):
+        errors.append("stage-model: policy_auto_approve must not include 'full' (human-gated apply)")
     return errors
 
 
@@ -187,9 +190,28 @@ def _probes() -> list:
     }
     bad_registry = {"services": {"gateway": {}}, "ci_cd": {}}
     bad_trigger_dir = os.path.join(ROLLOUT_DIR, "checks")  # no rollout triggers here
+    bad_full_policy = {
+        "stages": {
+            "off": {"order": 0, "rollout_pct": 0, "exposed": False},
+            "canary": {"order": 1, "rollout_pct": 5, "exposed": True},
+            "gradual": {"order": 2, "rollout_pct": 100, "exposed": True},
+            "full": {"order": 3, "rollout_pct": 100, "exposed": True},
+        },
+        "promotion_rules": {
+            "mode": "strict-forward",
+            "every_transition_requires": ["verify_green"],
+            "policy_auto_approve": {
+                "policy": "low-risk-auto-approve",
+                "targets": ["canary", "gradual", "full"],
+            },
+        },
+    }
 
     def stage_probe():
         return check_stage_model(bad_stage)
+
+    def full_autoapprove_probe():
+        return check_stage_model(bad_full_policy)
 
     def state_probe():
         return check_rollout_state(bad_state)
@@ -206,6 +228,7 @@ def _probes() -> list:
 
     return [
         ("stage-model rejects unknown stage", stage_probe),
+        ("stage-model rejects policy auto-approving full", full_autoapprove_probe),
         ("rollout-state rejects default-ON flag", state_probe),
         ("go-live-plan rejects partial phase coverage", plan_probe),
         ("registry parity rejects unknown service flag", parity_probe),

@@ -46,14 +46,19 @@ Closed vocabulary, strict forward promotion, no jumps:
 | Stage | Exposure | Default | Requirements to enter |
 |-------|----------|---------|-----------------------|
 | `off` | none | 0% | — (birth state) |
-| `canary` | targeted + 5% slice | 5% | verify-green + approval-code |
-| `gradual` | percentage ramp | 10 → 25 → 50 → 100 | verify-green + approval-code + canary-health-ok |
+| `canary` | targeted + 5% slice | 5% | verify-green (policy auto-approved) |
+| `gradual` | percentage ramp | 10 → 25 → 50 → 100 | verify-green + canary-health-ok (policy auto-approved) |
 | `full` | all tenants | 100% | verify-green + approval-code + canary-health-ok + gradual-complete |
 
 Every transition requires **green verification evidence** (`make verify` /
-merge-gate, GR-12) **and an approval-as-code record** from an approver
-distinct from the executing actor (AO-GR-14; the issue #43 `merge_verdict`
-gate shape applied to rollout). Promotions are **audit-logged**.
+merge-gate, GR-12). Low-risk hops (`off → canary`, `canary → gradual`) are
+**auto-approved by policy** on green evidence (plus canary health for the
+ramp) with no human approval code — the auto-approval is recorded in the
+audit trail (who/when/why/which policy), never silent. The final promotion
+(`gradual → full`) and the downstream apply remain **human-gated**: an
+approval-as-code record from an approver distinct from the executing actor
+(AO-GR-14; the issue #43 `merge_verdict` gate shape applied to rollout) is
+still required. Promotions are **audit-logged**.
 
 Audience exposure is **deterministic**: a subject is exposed only if it is
 explicitly targeted or its stable hash bucket (`sha256(flag:subject) % 100`)
