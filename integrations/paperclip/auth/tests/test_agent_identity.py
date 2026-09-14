@@ -17,7 +17,9 @@ def test_registered_agents_read_from_seeds(root: Path) -> None:
     assert {"paperclip", "orchestrator", "claude"}.issubset(agents)
     assert agents["paperclip"].owner == "platform/purebliss"
     # a profile reference is `<id>@<version>` (registry/service/catalog.resolve_profile)
-    assert agents["paperclip"].profile_ref == "paperclip@1.0.0"
+    # paperclip is at 1.1.0: issue #447 published the reporting capability as a NEW
+    # version rather than editing the immutable 1.0.0 seed.
+    assert agents["paperclip"].profile_ref == "paperclip@1.1.0"
 
 
 def test_mint_and_verify_round_trip(root: Path, company: str, key: str, now: int) -> None:
