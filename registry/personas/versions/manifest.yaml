@@ -154,3 +154,9 @@ entries:
   file: cards/copilot.yaml
   sha256: 19d4cff551318e2e570bdb8d34610be5698d732aff88a07a0c1696814cb47c95
   status: published
+- tenant: platform
+  persona: paperclip
+  version: 1.1.0
+  file: cards/paperclip.yaml
+  sha256: c61e1cb5d9a668f111cac822ed2132153b36df32283e13def41be5bd136203b7
+  status: published

@@ -150,6 +150,16 @@ checks=(
   'cross-repo-lessons|bash scripts/check-cross-repo-lessons.sh'
   'paperclip-budget|bash scripts/check-paperclip-budget.sh'
   'metering-parity|bash scripts/check-metering-parity.sh'
+  # #445 (the M28 tail): the ecosystem module registry — mandatory status read
+  # from the hub catalog, three honest states, membership refused by name, a
+  # no-vendoring finding, deterministic rebuilds. It returns CANNOT-ASSESS (rc 2)
+  # when `vendor/CMR` is not initialised, never a pass.
+  'module-registry|bash scripts/check-module-registry.sh'
+  # #447 (the M28 tail): the paperclip reporting agent's module brief — the
+  # artifact composes only from #445's registry, every claim resolves to a
+  # registry row or a cited hub path, Pending is never rendered as shipped, and
+  # the capability the persona declares is one its allowlist actually grants.
+  'module-brief|bash scripts/check-module-brief.sh'
   # EPIC #461 (the diagrams chain): diagrams-declaration (#464) proves the
   # architecture.yaml / gdc-manifest.yaml seeds conform to the vendored CMR
   # contract. (Its sibling, the #465 ADR-0017 projection gate
@@ -264,6 +274,11 @@ checks=(
   # gate names -- declaring it without wiring it would fail the gate of record.
   # Offline, deterministic, stdlib only: no network, no model, no vendor seed.
   'pytest-conversation|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/conversation/tests'
+  # EPIC #500 (issue #579): the chat SERVING surface's own suite. It shipped
+  # with #503 and nothing ever named or declared it, so 50 passing tests ran in
+  # no gate at all -- check-drift.sh saw it only at WARN. Wired here for the same
+  # reason as pytest-fleet: a suite nothing names is decorous but inert.
+  'pytest-chat|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/chat/tests'
 )
 
 # --- duplicate-registration guard (issue #499) -------------------------------

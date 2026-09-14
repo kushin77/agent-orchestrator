@@ -62,9 +62,9 @@
     "paperclip": {
       "role": "knowledge assistant",
       "card": "registry/personas/cards/paperclip.yaml",
-      "profile": "registry/profiles/seeds/paperclip.1.0.0.yaml",
+      "profile": "registry/profiles/seeds/paperclip.1.1.0.yaml",
       "tier": "LOW",
-      "lanes": ["paperclip", "knowledge"]
+      "lanes": ["paperclip", "knowledge", "module-brief"]
     }
   },
   "capabilities": {
@@ -74,7 +74,8 @@
     "code-review": {"persona": "hermes", "summary": "Review code correctness and quality."},
     "research": {"persona": "paperclip", "summary": "Investigate, root-cause analysis, evidence gathering."},
     "docs-authoring": {"persona": "paperclip", "summary": "Documentation and knowledge-base writing."},
-    "memory-ops": {"persona": "paperclip", "summary": "Read/write scoped memory (repository, session, user). Declared by both cards; routed once, to the knowledge assistant (see shared_capabilities)."}
+    "memory-ops": {"persona": "paperclip", "summary": "Read/write scoped memory (repository, session, user). Declared by both cards; routed once, to the knowledge assistant (see shared_capabilities)."},
+    "module-brief": {"persona": "paperclip", "summary": "Compose each mandatory module's distributable brief from the module registry, the committed board snapshot and the hub catalog (ADR-0012 reporting half; issue #447)."}
   },
   "shared_capabilities": {
     "memory-ops": ["hermes", "paperclip"]

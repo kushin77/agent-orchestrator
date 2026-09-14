@@ -1,0 +1,44 @@
+{
+  "schema": "ao.module-targets/v1",
+  "source": "vendor/CMR/docs/MANDATORY-MODULES.md — the \"Target set (GR-18) — 6 modules\" table, rows marked Pending; cross-checked against this repo's issue #445 inventory",
+  "note": "The declared target set is a claim about what the mandatory set should become. The hub catalog (vendor/CMR/catalog/) is the authority on what it is; a target that lands there is derived as registered, and this file never overrides it. Every target names the blocking hub issue(s) that keep it pending, because target-pending without a named blocker is indistinguishable from a wish.",
+  "targets": [
+    {
+      "id": "pmo",
+      "repo": "kushin77/pmo",
+      "blocking": ["kushin77/CMR#435", "kushin77/pmo#1"],
+      "onboarding": "CMR:ONBOARD-0009",
+      "note": "Pending on the vendor module.json; CMR-side tracking issue is BLOCKED."
+    },
+    {
+      "id": "shared-governance",
+      "repo": "kushin77/shared-governance",
+      "blocking": ["kushin77/CMR#264", "kushin77/shared-governance#727"],
+      "onboarding": "CMR:ONBOARD-0008",
+      "note": "Dual-role registration ratified by the hub's ADR-0019; CMR-side tracking issue is BLOCKED."
+    },
+    {
+      "id": "shared-services",
+      "repo": "kushin77/shared-services",
+      "blocking": ["kushin77/CMR#442", "kushin77/shared-services#4040"],
+      "onboarding": "CMR:ONBOARD-0010",
+      "note": "Pending on the vendor module.json; CMR-side tracking issue is BLOCKED."
+    }
+  ],
+  "watch": [
+    {
+      "id": "monitoring-stack",
+      "repo": null,
+      "hub_issue": "kushin77/CMR#765",
+      "disposition": "becoming-a-module",
+      "note": "MON-005: module contract plus mandatory-set registration not done — the hub states it is not yet a module."
+    },
+    {
+      "id": "gcp-gatekeeper",
+      "repo": null,
+      "hub_issue": "kushin77/CMR#734",
+      "disposition": "admission-undecided",
+      "note": "Open admission decision at the hub. A question about membership is not membership."
+    }
+  ]
+}

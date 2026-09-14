@@ -383,6 +383,13 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.chat)",
             )
 
+        # The remote control family (issue #554, RC-3) is the one hook line this
+        # lane adds. It hooks here, before authN, so its own flag gate runs first;
+        # the module is imported late so the hook needs no import and no new app
+        # state (see portal/server/control_api.py for the refusal matrix).
+        if parts[0] == "control":
+            return __import__("portal.server.control_api", fromlist=["control"]).control(self, parts[1:], method, body, cookies, now_iso)
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:

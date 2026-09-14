@@ -254,7 +254,8 @@
         "docs-authoring",
         "audit",
         "finops-meter",
-        "memory-ops"
+        "memory-ops",
+        "module-brief"
       ],
       "description": "Closed platform capability catalog. Pinned to agent-profile.schema.json AND catalog.yaml capabilities by the parity gate — this is the vocabulary that refuses free-text capabilities."
     },

@@ -65,3 +65,9 @@ published:
     version: 1.0.0
     file: seeds/copilot.1.0.0.yaml
     sha256: 9bc9a3fd6b48b821632e5cce15b9b17e5edf4caf74265493cc4e896cbeea8bf8
+  # v1.1.0 published 2026-09-14 by issue #447: the reporting capability
+  # (`module-brief`) plus the read-only sources it needs. 1.0.0 stays frozen above.
+  - profile: paperclip
+    version: 1.1.0
+    file: seeds/paperclip.1.1.0.yaml
+    sha256: 6d4c533e95862875fd287f1de31fae846980546649444620fc11f826ff612a82

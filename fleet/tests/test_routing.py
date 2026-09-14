@@ -119,7 +119,8 @@ def test_research_and_docs_resolve_to_the_paperclip_persona_at_low():
 def test_a_lane_a_persona_owns_resolves_to_that_persona():
     """The registry cards' `ownedLanes` are load-bearing, not decorative (#300)."""
     assert set(policy().owned_lanes("hermes")) == {"hermes", "code-authoring"}
-    assert set(policy().owned_lanes("paperclip")) == {"paperclip", "knowledge"}
+    # paperclip gained the reporting lane with the `module-brief` capability (#447).
+    assert set(policy().owned_lanes("paperclip")) == {"paperclip", "knowledge", "module-brief"}
     assert policy().primary_capability("hermes") == "code-author"
     assert policy().primary_capability("paperclip") == "research"
 

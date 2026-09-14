@@ -28,6 +28,26 @@ class TestRoutingPolicyTable:
         assert router.config.route_for("code-review-verdict").capability == "code-review"
         assert router.config.route_for("summarize").capability == "research"
 
+    def test_issue_337_capability_holder_routes_present(self, router):
+        """The hermes/ollama capability-holder routes exist (issue #337).
+
+        The purebliss-team hermes + ollama personas hold code-author / test-run
+        but no route referenced a capability they hold, so their pins were
+        unreachable. These routes name the capabilities those personas already
+        declare (no capabilitySet widening) and keep the pre-existing routes.
+        """
+        assert (router.config.route_for("test-run").capability,
+                router.config.route_for("test-run").task_class) == ("test-run", "test-run")
+        assert (router.config.route_for("code-author").capability,
+                router.config.route_for("code-author").task_class) == ("code-author", "code-author")
+        # pre-existing routes are unchanged
+        for task_type, capability in (
+            ("classify-route", "orchestrate"),
+            ("code-review-verdict", "code-review"),
+            ("summarize", "research"),
+        ):
+            assert router.config.route_for(task_type).capability == capability
+
     def test_unknown_task_type_refused(self, router):
         with pytest.raises(UnknownTaskRouteError):
             router.config.route_for("ad-hoc-inline")

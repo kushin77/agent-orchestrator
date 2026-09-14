@@ -247,4 +247,25 @@ surfaces:
       gateway/proxy, so routing, caps, budgets, DLP, metering and the ledger are
       inherited rather than re-implemented. Offline in tests: provider traffic
       goes through the proxy's scriptable transport rig.
+  remote_control:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Remote control API (issue #554, RC-3 of EPIC #551; ADR-0025 D1.1): the
+      operator→fleet command channel, `POST /api/control/<family>/<action>` on
+      the existing console app — one route family, no second listener and no
+      second service. Every verb is consumed from RC-2's closed declaration
+      (`control-plane/control/verbs.yaml`), and each command is delivered by
+      running the local lever that declaration names (`fleet/control.py`,
+      `fleet/channel.py`, and the governance dispatch/reconcile/lifecycle CLIs);
+      the API re-implements no control action and holds no verb list of its own.
+      The caller is the existing console session (`os-session-token`) and the
+      capability is RC-2's declared `capability` evaluated through the
+      `identity/rbac` two gates (scope, then permission) at the fleet's own org,
+      so the path adds no second identity and no second policy engine. The flag
+      is checked BEFORE AuthN: while it is off the whole family answers 404
+      `feature_disabled`, because an unpromoted surface is absent rather than
+      merely unauthorised (the `live_bridge` and `chat` precedent).
 
