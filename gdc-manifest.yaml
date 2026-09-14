@@ -1,0 +1,29 @@
+# Spoke-side declaration (EPIC-09 / CMR-901), born from templates/module/ in
+# kushin77/CMR. The mandatory indexer-KB pin (GR-18), the diagrams.blueprint
+# pin (GR-18, CMR:ONBOARD-0005, second mandatory module) and the
+# shared-frontend.tokens pin (GR-18, CMR:ONBOARD-0003, third mandatory module)
+# are pre-declared — none must be removed. Declare the module's own
+# features/integrations alongside them.
+#
+# Reproduced in lockstep with the vendored template
+# (vendor/CMR/templates/module/gdc-manifest.yaml); the declaration gate
+# (scripts/check-diagrams-declaration.sh) fails by name if a mandatory pin or
+# its version/update policy drifts from that template.
+repo: kushin77/agent-orchestrator
+schema: cmr.gdc-manifest/v1
+features:
+  - id: code-indexing.mcp
+    default: "on"
+    flags: ["codeidx.surface.mcp"]
+integrations: []
+modules:
+  - module: code-indexing.mcp
+    version: "~0.1"
+    updates: pr
+  - module: diagrams.blueprint
+    version: "~0.1"
+    updates: pr
+  - module: shared-frontend.tokens
+    version: "~0.1"
+    updates: pr
+updates: pr
