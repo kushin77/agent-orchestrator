@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import claims  # noqa: E402
 import focus as focus_mod  # noqa: E402
 import order  # noqa: E402
+import pool as pool_mod  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 
 EXIT_OK = 0
@@ -211,11 +212,70 @@ def cmd_focus(args: argparse.Namespace) -> int:
     if len(pool) > 20:
         head += " ..."
     print(f"pooled ({len(pool)}): {head or '<none>'}")
+    # The pool drains when the focus does (#707, F6). `focus` is a read-only verb,
+    # so this REPORTS what a drain would take — the truncation itself happens on
+    # the claim path and in `board.drain`, which are the writers.
+    if epic_number is None:
+        print(
+            f"drain: focus is <none> — {len(pool)} pooled issue(s) would be drained "
+            "(the brain calls board.drain to execute it)"
+        )
+    else:
+        print(f"drain: none — focus #{epic_number} is active")
     if focus is not None:
         print(
             f"wave_cap: {focus.wave_cap}  max_agents: {focus.max_agents}  "
             f"activated_at: {focus.activated_at}"
         )
+    return EXIT_OK
+
+
+def cmd_pool(args: argparse.Namespace) -> int:
+    """Print the out-of-epic pool, or prove it can fail (epic #707, lane F6/#721).
+
+    The pool is where an `out-of-epic-pooled` refusal parks work so it is not
+    silently dropped. With ``--self-control`` it first drives ``pool.self_control``:
+    a reader that skips a malformed line turns a corrupt rail into an empty one,
+    so the gate requires the mutants to be rejected. With ``--snapshot`` it also
+    reports what a focus of ``None`` would drain (read-only: it never truncates).
+    """
+    if args.self_control:
+        problems = pool_mod.self_control()
+        if problems:
+            print(f"pool: FAIL ({len(problems)} self-control problem(s))", file=sys.stderr)
+            for problem in problems:
+                print(f"  - {problem}", file=sys.stderr)
+            return EXIT_NOT_OK
+        print("pool: OK (self-control mutants all rejected)")
+
+    try:
+        records = pool_mod.read(args.pool)
+    except pool_mod.PoolInvalid as exc:
+        print(f"pool: NOT-OK — {exc}", file=sys.stderr)
+        return EXIT_NOT_OK
+    pooled = pool_mod.numbers(args.pool)
+    listed = " ".join(f"#{number}" for number in pooled)
+    print(f"pooled ({len(pooled)}): {listed or '<none>'}")
+    for record in records:
+        print(f"  #{record.issue} reason={record.reason} at={record.at}")
+
+    if args.snapshot:
+        snapshot_path = Path(args.snapshot)
+        if not snapshot_path.exists():
+            print(f"pool: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        snapshot = _load_snapshot(snapshot_path)
+        try:
+            focus = focus_mod.load(args.focus)
+        except focus_mod.FocusInvalid as exc:
+            print(f"pool: NOT-OK — {exc}", file=sys.stderr)
+            return EXIT_NOT_OK
+        epic = focus_mod.active(snapshot, args.focus)
+        if epic is None:
+            # Read-only: report what a drain WOULD take, never truncate here.
+            print(f"drain: focus is <none> — {len(pooled)} pooled issue(s) would be drained: {listed or '<none>'}")
+        else:
+            print(f"drain: none — focus #{epic.number} is active")
     return EXIT_OK
 
 
@@ -270,6 +330,7 @@ def add_paths(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--ledger", default=str(claims.DEFAULT_CLAIMS_DIR))
     parser.add_argument("--locks", default=str(claims.DEFAULT_LOCK_DIR))
     parser.add_argument("--stale-minutes", type=int, default=snapshot_mod.DEFAULT_STALENESS_MINUTES)
+    parser.add_argument("--pool", default=str(pool_mod.POOL_PATH))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -318,6 +379,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--self-control", action="store_true", help="also prove the resolver and schema can fail"
     )
     focus_cmd.set_defaults(func=cmd_focus)
+
+    pool_cmd = sub.add_parser("pool", help="show the out-of-epic pool (or prove it can fail)")
+    add_paths(pool_cmd)
+    pool_cmd.add_argument("--focus", default=str(focus_mod.DEFAULT_PATH))
+    pool_cmd.add_argument("--self-control", action="store_true", help="also prove the pool reader can fail")
+    pool_cmd.set_defaults(func=cmd_pool)
 
     reap = sub.add_parser("reap", help="release claims wedged by dead agents past a threshold")
     add_paths(reap)

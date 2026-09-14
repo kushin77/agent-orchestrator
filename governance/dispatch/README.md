@@ -18,12 +18,40 @@ An issue is claimable only when one of these holds:
 | `next-in-milestone` | It is the frontier of the active milestone: the lowest-numbered open, unblocked, unclaimed **non-epic** issue in that milestone. |
 | `child-of-claim` | It declares `Parent: #n` and the agent already holds #n. |
 | `successor-of-claim` | It declares `Blocked-by: #n` and the agent already advanced #n. |
+| `active-epic-child` | It declares `Parent: #n` and #n is the **active epic** (`.board/focus.json`, epic #707). Stricter than the frontier, never a relaxation. |
 | `brain-directed` | A brain directive recorded in `.fleet/sent` names exactly this issue (`claim --directive <id>`). The brain is the chain. |
 
 Everything else is refused with a reason: `unknown-issue`, `issue-closed`,
-`blocked`, `already-claimed`, `epic-not-workable`, or `no-chain-edge` — the last
-being kanban scavenging. Epics are never claim targets: an epic closes with its
-children.
+`blocked`, `already-claimed`, `epic-not-workable`, `out-of-epic-pooled` (outside
+the active epic — parked, see below), or `no-chain-edge` — the last being kanban
+scavenging. Epics are never claim targets: an epic closes with its children.
+
+## The out-of-epic pool (#707 lane F6 / #721)
+
+Epic focus concentrates the fleet on one epic. That is only honest if the work it
+defers is **parked**. When an active focus makes an issue out-of-epic, the claim is
+refused `out-of-epic-pooled` **and** a record is appended to
+`.board/pool.jsonl`:
+
+```json
+{"issue": 902, "reason": "out-of-epic", "at": "2026-09-14T00:00:00Z"}
+```
+
+* The check sits **before** the milestone-frontier branch in `order.eligible`, so an
+  out-of-epic issue is never dispatched on the frontier — a frontier that
+  interleaves epics is the incoherence focus exists to remove.
+* A `Blocked-by:` blocker of an active-epic child is promoted **just-in-time**
+  through the *existing* `claim --directive <id>` path (reason `brain-directed`).
+  No new authorisation mechanism is invented.
+* When the resolver returns `None` (no workable epic) the pool **drains** and the
+  drained numbers are returned/reported — a pooled issue is never silently
+  dropped.
+* `governance/dispatch/cli.py pool` prints the rail; `pool --self-control` proves
+  the reader rejects a malformed line and that a drain reports what it drained, so
+  the behaviour is gate-enforced by `scripts/check-epic-focus.sh`.
+
+The rail is runtime state and is gitignored (`.board/pool.jsonl`), like
+`.board/locks/` — the decision log is the branch/PR history.
 
 ## Claim protocol
 

@@ -44,6 +44,7 @@ import runtime  # noqa: E402
 
 import order
 import focus
+import pool
 from model import (
     ALLOWED_CLAIM_REASONS,
     REASON_ACTIVE_EPIC_CHILD,
@@ -52,6 +53,7 @@ from model import (
     REASON_CHILD_OF_CLAIM,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
+    REASON_OUT_OF_EPIC_POOLED,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_UNKNOWN_ISSUE,
     ClaimEvent,
@@ -326,6 +328,37 @@ def _load_brain_directive(directive_id: str, issue_number: int) -> dict:
     return data
 
 
+def _resolve_focus(focus_path: Path | str | None) -> Path | str:
+    """Resolve the focus path at CALL time, never as a frozen default argument.
+
+    ``focus.DEFAULT_PATH`` is a module constant that a caller (or a test) may
+    repoint; a default argument would have captured its value at import and kept
+    judging against the stale file while appearing to honour the override.
+    """
+    return focus.DEFAULT_PATH if focus_path is None else focus_path
+
+
+def drain_pool_when_no_focus(
+    snapshot: Snapshot,
+    focus_path: Path | str | None = None,
+    pool_path: Path | str = pool.POOL_PATH,
+) -> list[int]:
+    """Drain the out-of-epic pool when the resolver returns ``None`` (#707, F6).
+
+    "The pool empties when the focus does" is only true if something empties it.
+    The resolver returning ``None`` means no epic is driving, so nothing can be
+    out-of-epic: every parked issue is un-parked, and the returned numbers are the
+    evidence of what left. A caller that wants a human-readable line uses
+    ``pool.drain_and_report``.
+
+    Called on the claim path (every claim re-checks the focus) and exposed on the
+    focus CLI, so the board-drain is driven by the same resolver that pools it.
+    """
+    if focus.active(snapshot, _resolve_focus(focus_path)) is not None:
+        return []
+    return pool.drain(pool_path)
+
+
 def claim(
     issue_number: int,
     agent: str,
@@ -339,10 +372,20 @@ def claim(
     now: datetime | None = None,
     directive_id: str = "",
     stale_minutes: int = DEFAULT_STALENESS_MINUTES,
-    focus_path: Path | str = focus.DEFAULT_PATH,
+    focus_path: Path | str | None = None,
+    pool_path: Path | str = pool.POOL_PATH,
 ) -> ClaimEvent:
-    """Claim an issue after checking order. Raises ClaimRefused when it is not the next step."""
+    """Claim an issue after checking order. Raises ClaimRefused when it is not the next step.
+
+    ``focus_path``/``pool_path`` keep the epic-focus edges resolvable offline
+    against fixtures: the focus decides eligibility, the pool records the deferral
+    (#707 lane F6). When the resolver returns ``None`` — no active epic — an
+    out-of-epic refusal cannot happen, so any pool left over from a previous focus
+    is DRAINED here and reported, never silently carried forward.
+    """
+    focus_path = _resolve_focus(focus_path)
     moment = now or datetime.now(timezone.utc)
+    drain_pool_when_no_focus(snapshot, focus_path, pool_path)
     events = read_ledger(ledger)
     live = active_claims(events, moment)
     latest = replay(events).get(issue_number)
@@ -396,6 +439,12 @@ def claim(
             focus_path=focus_path,
         )
         if not verdict.eligible:
+            # Epic focus (#707, lane F6): out-of-epic work is parked, not dropped.
+            # The refusal still stands — this only records WHY the issue is
+            # waiting, so the pool is a decision log and the issue can be found
+            # again. A drain (focus == None) is what takes it back out.
+            if verdict.reason == REASON_OUT_OF_EPIC_POOLED:
+                pool.note(issue_number, pool.REASON_OUT_OF_EPIC, path=pool_path)
             raise ClaimRefused(verdict.reason, verdict.detail)
 
     if not _acquire_lock(issue_number, lock_dir, takeover=takeover):
@@ -452,7 +501,7 @@ def audit(
     events: list[ClaimEvent],
     snapshot: Snapshot,
     now: datetime | None = None,
-    focus_path: Path | str = focus.DEFAULT_PATH,
+    focus_path: Path | str | None = None,
 ) -> list[str]:
     """Replay the ledger against the snapshot; return every structural problem.
 
@@ -464,6 +513,7 @@ def audit(
     """
     problems: list[str] = []
     moment = now or datetime.now(timezone.utc)
+    focus_path = _resolve_focus(focus_path)
     holder: dict[int, ClaimEvent] = {}
 
     for index, event in enumerate(events):
@@ -516,7 +566,7 @@ def _claim_problems(
     event: ClaimEvent,
     events: list[ClaimEvent],
     snapshot: Snapshot,
-    focus_path: Path | str = focus.DEFAULT_PATH,
+    focus_path: Path | str | None = None,
 ) -> list[str]:
     """Structural problems with one claim record (schema-valid but unjustified).
 
@@ -527,6 +577,7 @@ def _claim_problems(
     claimed it.
     """
     problems: list[str] = []
+    focus_path = _resolve_focus(focus_path)
     issue = snapshot.get(event.issue)
     if issue is None:
         return [f"#{event.issue}: claimed but absent from the snapshot"]
@@ -694,7 +745,7 @@ def audit_ledger(
     path: Path | str = DEFAULT_CLAIMS_DIR,
     snapshot: Snapshot | None = None,
     now: datetime | None = None,
-    focus_path: Path | str = focus.DEFAULT_PATH,
+    focus_path: Path | str | None = None,
 ) -> list[str]:
     """Audit the full ledger (legacy file + claims directory) against the snapshot.
 
@@ -702,6 +753,7 @@ def audit_ledger(
     names them instead of crashing — the same contract as ``audit_text``, but
     over both storage forms in temporal order.
     """
+    focus_path = _resolve_focus(focus_path)
     problems: list[str] = []
     events: list[ClaimEvent] = []
     target = Path(path)
@@ -727,7 +779,7 @@ def audit_text(
     text: str,
     snapshot: Snapshot,
     now: datetime | None = None,
-    focus_path: Path | str = focus.DEFAULT_PATH,
+    focus_path: Path | str | None = None,
 ) -> list[str]:
     """Audit raw ledger text (the gate path): malformed lines become problems."""
     problems: list[str] = []

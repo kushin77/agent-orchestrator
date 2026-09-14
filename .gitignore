@@ -39,6 +39,12 @@ governance/board/violations.jsonl
 # Claim locks are runtime state (the claim ledger itself is tracked evidence)
 .board/locks/
 
+# The out-of-epic pool rail is runtime state too (epic #707, lane F6/#721): it
+# records which issues the active focus parked and is rewritten on every
+# drain, so committing it would put a moving dispatch signal in the diff.
+# The decision log is the branch/PR history; the rail is the working state.
+.board/pool.jsonl
+
 # Fleet steering mailboxes are runtime state (schema + standing directive are tracked)
 .fleet/inbox/
 .fleet/outbox/
