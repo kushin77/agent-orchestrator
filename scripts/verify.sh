@@ -75,7 +75,7 @@ checks=(
   # refuse every negative control by name (incl. 403-not-404); the check runs
   # the boundary suite and provokes each refusal, so it cannot pass vacuously.
   'paperclip-auth|bash scripts/check-paperclip-auth.sh'
-  # EPIC-410 paperclip parity adapters (issue #420, the wiring lane): the six
+  # EPIC-410 paperclip parity adapters (issue #420, the wiring lane): the
   # adapter gates below are registered here deliberately — a check that only
   # runs when someone remembers to run it is a formality, not a gate. Each
   # carries its own self-mutating negative control (a scratch-copy mutant the
@@ -88,6 +88,17 @@ checks=(
   'paperclip-openapi|bash scripts/check-paperclip-openapi.sh'
   'paperclip-secrets|bash scripts/check-paperclip-secrets.sh'
   'paperclip-skills|bash scripts/check-paperclip-skills.sh'
+  # paperclip-diagrams (issue #465, completing #420): the diagrams blueprint
+  # projection adapter landed before #420's wiring branch was cut and was still
+  # not registered when the wiring lane ran, so it was missed twice. It has the
+  # same self-mutating negative-control shape; its tests live inside the already
+  # declared integrations/paperclip suite (integrations/paperclip/tests).
+  'paperclip-diagrams|bash scripts/check-paperclip-diagrams.sh'
+  # paperclip-routines (issue #418, completing #420): the routines adapter
+  # landed AFTER #420's branch was cut, so the wiring lane could not register
+  # it then. It is the same shape as its siblings; its suite is declared in
+  # scripts/pytest-suites.txt (integrations/paperclip/adapters/routines).
+  'paperclip-routines|bash scripts/check-paperclip-routines.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
