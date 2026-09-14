@@ -39,6 +39,7 @@ script	scripts/check-chat-guardrails.sh	uninvoked	#499
 script	scripts/check-chat-identity.sh	uninvoked	#499
 script	scripts/check-chat-tools.sh	uninvoked	#499
 script	scripts/check-chat-ux.sh	uninvoked	#499
+script	scripts/check-control-verbs.sh	uninvoked	#559
 suite	guardrails/dlp	swept-only	#524
 suite	guardrails/policy	swept-only	#524
 suite	guardrails/controls	swept-only	#524
