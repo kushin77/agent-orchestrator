@@ -2,14 +2,19 @@
 
 Rule (AGENTS.md golden rule 14 / GR-20): an agent may work an issue only when it
 is (a) a child of an issue the agent already holds open, (b) the successor of an
-issue the agent already took through the chain, or (c) the frontier of the active
-milestone — the lowest-numbered open, unblocked, unclaimed issue in the milestone
-the agent is already working. Anything else is kanban scavenging and is refused.
+issue the agent already took through the chain, (c) a child of the ACTIVE epic
+(epic focus, issue #707), or (d) the frontier of the active milestone — the
+lowest-numbered open, unblocked, unclaimed issue in the milestone the agent is
+already working. Anything else is kanban scavenging and is refused.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import focus
 from model import (
+    REASON_ACTIVE_EPIC_CHILD,
     REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
     REASON_CHILD_OF_CLAIM,
@@ -57,8 +62,13 @@ def eligible(
     active_claims: frozenset[int] = frozenset(),
     agent_history: frozenset[int] = frozenset(),
     claimed_by_others: frozenset[int] = frozenset(),
+    focus_path: Path | str = focus.DEFAULT_PATH,
 ) -> Eligibility:
-    """Decide whether ``issue_number`` is the next eligible step for this agent."""
+    """Decide whether ``issue_number`` is the next eligible step for this agent.
+
+    ``focus_path`` names the pinned ``.board/focus.json`` (epic focus, #707) so
+    the active-epic edge is resolvable offline against a fixture.
+    """
     issue = snapshot.get(issue_number)
     if issue is None:
         return Eligibility(issue_number, False, REASON_UNKNOWN_ISSUE, "not present in .board/snapshot.json")
@@ -86,6 +96,19 @@ def eligible(
             REASON_CHILD_OF_CLAIM,
             f"child of #{issue.parent}, which this agent holds open",
         )
+
+    # Epic focus (#707): a `Parent: #<active-epic>` edge is a real chain edge even
+    # though the agent does not hold the epic — the fleet is driving exactly this
+    # epic. This is stricter than the milestone frontier, never a relaxation.
+    if issue.parent is not None:
+        active_epic = focus.active(snapshot, focus_path)
+        if active_epic is not None and active_epic.number == issue.parent:
+            return Eligibility(
+                issue_number,
+                True,
+                REASON_ACTIVE_EPIC_CHILD,
+                f"child of #{issue.parent}, the active epic",
+            )
 
     owners = sorted(set(issue.blocked_by) & set(agent_history))
     if owners:

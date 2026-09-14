@@ -8,6 +8,7 @@ from datetime import timedelta
 import claims
 import pytest
 from model import (
+    REASON_ACTIVE_EPIC_CHILD,
     REASON_BLOCKED,
     REASON_BRAIN_DIRECTED,
     REASON_CHILD_OF_CLAIM,
@@ -355,3 +356,85 @@ def test_audit_flags_a_reap_that_names_no_agent(snapshot, base_time):
     events = [claims.ClaimEvent(event="reap", issue=601, agent="brain", at=moment)]
     problems = claims.audit(events, snapshot, base_time)
     assert any("does not name the reaped agent" in problem for problem in problems)
+
+
+# --- #717: the active epic is a chain edge (epic focus #707) -----------------
+
+
+def _focus_file(tmp_path, epic):
+    """A valid ``.board/focus.json`` pinning ``epic`` (offline fixture)."""
+    path = tmp_path / "focus.json"
+    path.write_text(
+        json.dumps(
+            {
+                "active_epic": epic,
+                "activated_at": "2026-09-13T12:00:00Z",
+                "wave_cap": 12,
+                "max_agents": 0,
+                "pooled": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _epic_snapshot() -> Snapshot:
+    """#707 is the epic; #710 is its child, #712 is a child of the other epic #713."""
+    return Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            707: Issue(707, "the active epic", labels=("type:epic",)),
+            710: Issue(710, "child of the active epic", parent=707),
+            712: Issue(712, "child of another epic", parent=713),
+            713: Issue(713, "another epic", labels=("type:epic",)),
+        },
+    )
+
+
+def test_audit_accepts_a_claim_on_a_child_of_the_active_epic(tmp_path, base_time):
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [
+        claims.ClaimEvent(event="claim", issue=710, agent="agent-a", at=moment, reason=REASON_ACTIVE_EPIC_CHILD)
+    ]
+    assert claims.audit(events, _epic_snapshot(), base_time, _focus_file(tmp_path, 707)) == []
+
+
+def test_audit_rejects_active_epic_child_on_another_epics_child(tmp_path, base_time):
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [
+        claims.ClaimEvent(event="claim", issue=712, agent="agent-a", at=moment, reason=REASON_ACTIVE_EPIC_CHILD)
+    ]
+    problems = claims.audit(events, _epic_snapshot(), base_time, _focus_file(tmp_path, 707))
+    assert any("not the active epic" in problem for problem in problems)
+
+
+def test_claim_grants_active_epic_child_when_the_parent_is_the_active_epic(tmp_path, base_time):
+    event = claims.claim(
+        710,
+        "agent-a",
+        "epic",
+        _epic_snapshot(),
+        ledger=tmp_path / "claims.jsonl",
+        lock_dir=tmp_path / "locks",
+        now=base_time,
+        focus_path=_focus_file(tmp_path, 707),
+    )
+    assert event.reason == REASON_ACTIVE_EPIC_CHILD
+
+
+def test_claim_still_refuses_an_unrelated_board_item(tmp_path, snapshot, base_time):
+    """Regression: the epic edge is additive, never a relaxation."""
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            603,
+            "agent-a",
+            "governance",
+            snapshot,
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            focus_path=_focus_file(tmp_path, 600),
+        )
+    assert excinfo.value.reason == REASON_NO_CHAIN_EDGE

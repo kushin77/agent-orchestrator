@@ -30,11 +30,15 @@ REASON_CHILD_OF_CLAIM = "child-of-claim"
 REASON_SUCCESSOR_OF_CLAIM = "successor-of-claim"
 REASON_NEXT_IN_MILESTONE = "next-in-milestone"
 REASON_BRAIN_DIRECTED = "brain-directed"
+# A child of the ACTIVE epic (epic focus, issue #707): stricter than the
+# milestone frontier, it is a chain edge to the epic the fleet is driving.
+REASON_ACTIVE_EPIC_CHILD = "active-epic-child"
 ALLOWED_CLAIM_REASONS = (
     REASON_CHILD_OF_CLAIM,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_NEXT_IN_MILESTONE,
     REASON_BRAIN_DIRECTED,
+    REASON_ACTIVE_EPIC_CHILD,
 )
 
 # Reasons a claim is refused.
