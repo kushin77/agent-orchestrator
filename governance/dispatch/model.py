@@ -44,6 +44,7 @@ ALLOWED_CLAIM_REASONS = (
 # Reasons a claim is refused.
 REASON_UNKNOWN_ISSUE = "unknown-issue"
 REASON_ISSUE_CLOSED = "issue-closed"
+REASON_EPIC_CLOSED = "epic-closed"
 REASON_BLOCKED = "blocked"
 REASON_ALREADY_CLAIMED = "already-claimed"
 REASON_NO_CHAIN_EDGE = "no-chain-edge"
@@ -53,6 +54,28 @@ REASON_EPIC_NOT_WORKABLE = "epic-not-workable"
 # the issue is not being rejected as scavenging — it is being WAITING, and it is
 # parked in `.board/pool.jsonl` so it is never silently dropped.
 REASON_OUT_OF_EPIC_POOLED = "out-of-epic-pooled"
+# Provenance refusals (#726): an addressable unit of work must PROVE
+# issue -> epic -> lane ownership before it is dispatched, so a unit that is
+# already owned, mis-declared or unowned is refused rather than routed.
+REASON_PROVENANCE_MISMATCH = "provenance-mismatch"
+REASON_UNOWNED = "unowned"
+# Not an ownership refusal: the board evidence is too old to judge with at all.
+REASON_SNAPSHOT_STALE = "snapshot-stale"
+
+#: Every reason the A2A arbitration (`claims.arbitrate`) can refuse with. Its
+#: self-control must provoke all of them or the gate fails, so a refusal cannot
+#: be added without a control that proves it bites (GR-12 / AO-GR-19).
+ARBITRATION_REFUSALS = (
+    REASON_UNKNOWN_ISSUE,
+    REASON_ISSUE_CLOSED,
+    REASON_EPIC_CLOSED,
+    REASON_EPIC_NOT_WORKABLE,
+    REASON_BLOCKED,
+    REASON_ALREADY_CLAIMED,
+    REASON_PROVENANCE_MISMATCH,
+    REASON_UNOWNED,
+    REASON_SNAPSHOT_STALE,
+)
 
 CLAIM_EVENTS = ("claim", "release", "take-over", "reap")
 
@@ -156,6 +179,64 @@ class Eligibility:
 
 
 @dataclass(frozen=True)
+class Provenance:
+    """Who owns a unit of work: issue -> epic -> lane, plus the evidence checked.
+
+    Recorded on the claim that took the unit (#726) and printed by the
+    ``dispatch`` arbitration, so a reader can see *why* the owner is the owner.
+    ``evidence`` names the artifacts the arbitration actually read (the board
+    snapshot it judged against, the directive envelope, the ledger record), which
+    is what a refusal quotes back.
+    """
+
+    issue: int
+    epic: int | None = None
+    lane: str = ""
+    evidence: tuple[str, ...] = ()
+
+    @property
+    def owned(self) -> bool:
+        """Whether a lane owns the unit — an unowned unit is never dispatchable."""
+        return bool(self.lane.strip())
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "issue": self.issue,
+            "epic": self.epic,
+            "lane": self.lane,
+            "evidence": list(self.evidence),
+        }
+
+
+@dataclass(frozen=True)
+class Arbitration:
+    """The verdict of an A2A dispatch arbitration (issue #726).
+
+    A granted verdict is the proof that was missing: the unit's issue, the epic
+    it belongs to, and the lane that owns it — each resolved from named evidence
+    rather than assumed from the directive's own say-so.
+    """
+
+    issue: int
+    agent: str
+    lane: str
+    epic: int | None
+    directive_id: str
+    provenance: Provenance
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "verdict": "granted",
+            "issue": self.issue,
+            "agent": self.agent,
+            "lane": self.lane,
+            "epic": self.epic,
+            "directive_id": self.directive_id,
+            "provenance": self.provenance.to_json(),
+        }
+
+
+@dataclass(frozen=True)
 class ClaimEvent:
     """One line of the append-only claim ledger."""
 
@@ -172,13 +253,15 @@ class ClaimEvent:
     directive_id: str = ""
     directive_from: str = ""
     reaped_agent: str = ""
+    #: issue -> epic -> lane ownership, arbitrated before the claim was recorded.
+    provenance: Provenance | None = None
 
     @property
     def is_claim(self) -> bool:
         return self.event in ("claim", "take-over")
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        payload = {
             "event": self.event,
             "issue": self.issue,
             "agent": self.agent,
@@ -192,6 +275,12 @@ class ClaimEvent:
             "directive_from": self.directive_from,
             "reaped_agent": self.reaped_agent,
         }
+        # Provenance belongs to the claim that took the unit, not to the
+        # release/reap that ended it, so the key is only written when it was
+        # arbitrated (a release record keeps its pre-#726 shape).
+        if self.provenance is not None:
+            payload["provenance"] = self.provenance.to_json()
+        return payload
 
 
 def _require(obj: Any, key: str, kind: type, where: str) -> Any:
@@ -204,6 +293,23 @@ def _require(obj: Any, key: str, kind: type, where: str) -> Any:
     elif not isinstance(value, kind):
         raise ValueError(f"{where}: field '{key}' must be {kind.__name__}, got {type(value).__name__}")
     return value
+
+
+def parse_provenance(obj: Any, where: str = "ledger") -> Provenance:
+    """Parse and validate a recorded provenance. Raises ValueError with the reason."""
+    if not isinstance(obj, dict):
+        raise ValueError(f"{where}: field 'provenance' must be a JSON object")
+    issue = _require(obj, "issue", int, where)
+    epic = obj.get("epic")
+    if epic is not None and (isinstance(epic, bool) or not isinstance(epic, int)):
+        raise ValueError(f"{where}: field 'provenance.epic' must be an integer or null")
+    lane = obj.get("lane", "")
+    if not isinstance(lane, str):
+        raise ValueError(f"{where}: field 'provenance.lane' must be a string")
+    evidence = obj.get("evidence") or []
+    if not isinstance(evidence, list) or not all(isinstance(item, str) for item in evidence):
+        raise ValueError(f"{where}: field 'provenance.evidence' must be a list of strings")
+    return Provenance(issue=issue, epic=epic, lane=lane, evidence=tuple(evidence))
 
 
 def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
@@ -221,6 +327,8 @@ def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
     ttl = obj.get("ttl_hours", lease.CLAIM_TTL_HOURS)
     if isinstance(ttl, bool) or not isinstance(ttl, int) or ttl <= 0:
         raise ValueError(f"{where}: field 'ttl_hours' must be a positive integer")
+    recorded = obj.get("provenance")
+    provenance = parse_provenance(recorded, where=where) if recorded is not None else None
     return ClaimEvent(
         event=event,
         issue=issue,
@@ -234,4 +342,5 @@ def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
         directive_id=str(obj.get("directive_id", "") or ""),
         directive_from=str(obj.get("directive_from", "") or ""),
         reaped_agent=str(obj.get("reaped_agent", "") or ""),
+        provenance=provenance,
     )

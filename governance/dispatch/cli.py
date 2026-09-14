@@ -13,12 +13,19 @@ Exit codes follow the repo's tri-state convention (guardrails/honesty):
 Typical agent flow::
 
     python3 governance/dispatch/cli.py eligible --issue 157 --agent me   # check first
+    python3 governance/dispatch/cli.py dispatch --issue 157 --agent me --lane governance
     python3 governance/dispatch/cli.py claim --issue 157 --agent me --lane governance
     ...do the work, open the PR...
     python3 governance/dispatch/cli.py release --issue 157 --agent me
 
-The gate runs ``audit``, which always includes the self-control mutants: if the
-audit cannot fail, ``audit`` fails.
+``dispatch`` is the A2A arbitration seam (issue #726): it is read-only and proves
+issue -> epic -> lane ownership — the issue is open, its epic is open, the lane
+owns it, no other lane already holds it — naming the evidence it checked. ``claim``
+runs the same arbitration before it writes, so the refusal cannot be sidestepped
+by calling the mutation directly.
+
+The gate runs ``audit``, which always includes the self-control mutants (ledger
+and A2A dispatch alike): if the audit cannot fail, ``audit`` fails.
 """
 
 from __future__ import annotations
@@ -77,6 +84,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
         return EXIT_CANNOT_ASSESS
 
     problems = claims.self_control()
+    # The arbitration controls run here too: the ledger audit and the dispatch
+    # refusals are both gates of record, so either one going quiet fails the gate.
+    problems.extend(claims.arbitration_self_control())
     problems.extend(claims.audit_ledger(ledger_path, snapshot))
 
     if problems:
@@ -84,7 +94,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         return EXIT_NOT_OK
-    print("issue-claims: OK (no violations; self-control mutants all rejected)")
+    print(
+        "issue-claims: OK (no violations; self-control mutants all rejected; "
+        "A2A dispatch refusals all provoked)"
+    )
     return EXIT_OK
 
 
@@ -144,9 +157,56 @@ def cmd_claim(args: argparse.Namespace) -> int:
         )
     except claims.ClaimRefused as exc:
         print(f"claim REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
-        return EXIT_CANNOT_ASSESS if exc.reason == "snapshot-stale" else EXIT_NOT_OK
+        return EXIT_CANNOT_ASSESS if exc.reason == claims.REASON_SNAPSHOT_STALE else EXIT_NOT_OK
     print(json.dumps(event.to_json(), indent=2))
     print(f"claim accepted: #{event.issue} as {event.agent} ({event.reason})")
+    return EXIT_OK
+
+
+def cmd_dispatch(args: argparse.Namespace) -> int:
+    """Arbitrate a directive: prove issue -> epic -> lane ownership before routing.
+
+    Read-only: it takes no claim and writes no ledger entry. A refusal names the
+    evidence checked, so the caller learns *why* the unit is unowned rather than
+    discovering it when the work is already half-done.
+    """
+    snapshot_path = Path(args.snapshot)
+    if not snapshot_path.exists():
+        print(
+            f"dispatch: CANNOT-ASSESS — {snapshot_path} is missing "
+            "(refresh it with: python3 governance/dispatch/cli.py snapshot --from-github)",
+            file=sys.stderr,
+        )
+        return EXIT_CANNOT_ASSESS
+    try:
+        snapshot = _load_snapshot(snapshot_path)
+    except ValueError as exc:
+        print(f"dispatch: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    age = snapshot_mod.age_minutes(snapshot)
+    print(f"dispatch: snapshot age {age:.1f}m (threshold {args.stale_minutes}m)", file=sys.stderr)
+    try:
+        arbitration = claims.arbitrate(
+            args.issue,
+            args.agent,
+            args.lane,
+            snapshot,
+            ledger=args.ledger,
+            lock_dir=args.locks,
+            directive_id=args.directive,
+            require_lane=True,
+            snapshot_path=str(snapshot_path),
+            snapshot_sha256=snapshot_mod.content_sha256(snapshot_path),
+            stale_minutes=args.stale_minutes,
+        )
+    except claims.ClaimRefused as exc:
+        print(f"dispatch REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS if exc.reason == claims.REASON_SNAPSHOT_STALE else EXIT_NOT_OK
+    print(json.dumps(arbitration.to_json(), indent=2))
+    print(
+        f"dispatch granted: #{arbitration.issue} -> epic {arbitration.epic or '<none>'} "
+        f"-> lane {arbitration.lane}"
+    )
     return EXIT_OK
 
 
@@ -339,7 +399,16 @@ def cmd_held(args: argparse.Namespace) -> int:
     if holder is None:
         print(json.dumps({"issue": args.issue, "agent": None}))
         return EXIT_NOT_OK
-    print(json.dumps({"issue": args.issue, "agent": holder.agent, "at": holder.at, "reason": holder.reason}))
+    payload = {
+        "issue": args.issue,
+        "agent": holder.agent,
+        "lane": holder.lane,
+        "at": holder.at,
+        "reason": holder.reason,
+    }
+    if holder.provenance is not None:
+        payload["epic"] = holder.provenance.epic
+    print(json.dumps(payload))
     return EXIT_OK
 
 
@@ -414,6 +483,18 @@ def build_parser() -> argparse.ArgumentParser:
     claim.add_argument("--base-commit", default="")
     claim.add_argument("--directive", default="", help="brain directive id authorizing this claim")
     claim.set_defaults(func=cmd_claim)
+
+    dispatch = sub.add_parser(
+        "dispatch", help="arbitrate a directive: prove issue -> epic -> lane before routing (read-only)"
+    )
+    add_paths(dispatch)
+    dispatch.add_argument("--issue", type=int, required=True)
+    dispatch.add_argument("--agent", required=True)
+    dispatch.add_argument(
+        "--lane", default="", help="the lane that owns the unit (required unless the directive declares one)"
+    )
+    dispatch.add_argument("--directive", default="", help="brain directive id that would authorize the dispatch")
+    dispatch.set_defaults(func=cmd_dispatch)
 
     release = sub.add_parser("release", help="release a claim")
     add_paths(release)

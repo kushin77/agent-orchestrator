@@ -16,6 +16,7 @@ from model import (
     REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
     REASON_CHILD_OF_CLAIM,
+    REASON_EPIC_CLOSED,
     REASON_EPIC_NOT_WORKABLE,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
@@ -252,7 +253,14 @@ def test_child_of_a_non_active_epic_is_still_refused(focused):
 
 
 def test_a_non_active_epic_child_is_out_of_order_without_a_focus(tmp_path):
-    """With no active epic, another epic's child is refused as scavenging."""
+    """With no active epic, another epic's child is refused.
+
+    Every epic here is closed, so the refusal is the *specific* one #726 added:
+    an issue whose declared epic is closed has no owner to work under. Reporting
+    ``epic-closed`` — rather than falling through to the generic
+    ``no-chain-edge`` — is what keeps ``order.eligible`` and the claim-time
+    arbitration from disagreeing about the same board.
+    """
     board = Snapshot(
         generated_at="2026-09-13T12:00:00Z",
         source="test",
@@ -263,7 +271,7 @@ def test_a_non_active_epic_child_is_out_of_order_without_a_focus(tmp_path):
     )
     verdict = order.eligible(board, 608, focus_path=tmp_path / "absent.json")
     assert verdict.eligible is False
-    assert verdict.reason == REASON_NO_CHAIN_EDGE
+    assert verdict.reason == REASON_EPIC_CLOSED
 
 
 def test_an_unrelated_open_board_item_is_still_refused(focused, snapshot):
