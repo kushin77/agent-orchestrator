@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "note": "Declared external-client-identity -> (tenant, agent, role) bindings for the chat front door (issue #505, ADR-0023). The client's own user table is advisory, never authoritative: an identity absent from this list is REFUSED, never defaulted to a tenant. This file carries no secret material - no key, token, password or credential of any kind lives here (GR-6); the credential signing key comes from the deployment environment.",
+  "bindings": [
+    {
+      "client": "openwebui",
+      "externalId": "ada@acme.example",
+      "tenantId": "tenant-acme",
+      "agentId": "coder",
+      "role": "chat-user"
+    },
+    {
+      "client": "openwebui",
+      "externalId": "ops@acme.example",
+      "tenantId": "tenant-acme",
+      "agentId": "coder",
+      "role": "chat-operator"
+    },
+    {
+      "client": "openwebui",
+      "externalId": "grace@globex.example",
+      "tenantId": "tenant-globex",
+      "agentId": "analyst",
+      "role": "chat-user"
+    }
+  ]
+}
