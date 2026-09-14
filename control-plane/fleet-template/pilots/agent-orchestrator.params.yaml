@@ -1,0 +1,74 @@
+# Pilot A -- kushin77/agent-orchestrator (the control plane itself).
+#
+# Params only. This file is the whole per-repo input to the shared template:
+# nothing about the rendered fleet (pilots/agent-orchestrator.fleet.yaml) is
+# hand-edited, and the gate fails if the committed instance stops matching a
+# fresh render of this file.
+apiVersion: ao.fleet-template/v1
+kind: FleetParams
+repo: agent-orchestrator
+observations: agent-orchestrator.observations.yaml
+values:
+  repo: agent-orchestrator
+  # display_name is deliberately omitted: the template's declared default
+  # (${repo} agent fleet) must fill it in, and the rendered instance records
+  # the filled-in value -- so the default path is exercised, not just declared.
+  domains:
+    - name: testing
+      sme: test-quality
+      labels: [domain:testing, testing, test, coverage, vitest]
+      prompt: test-quality.txt
+      platoon: qa
+      parallelism: 3
+    - name: security-scanning
+      sme: security
+      labels: [domain:security, security, auth, secret, injection]
+      prompt: security.txt
+      platoon: security
+      parallelism: 2
+    - name: debugging
+      sme: sniper-generic
+      labels: [domain:debugging, bug, debug, incident, crash]
+      prompt: sniper-generic.txt
+      platoon: debugging
+      parallelism: 2
+    - name: infra
+      sme: terraform
+      labels: [domain:infra, infra, terraform, cloudbuild, deploy]
+      prompt: terraform.txt
+      platoon: infra
+      parallelism: 2
+    - name: backend-server
+      sme: prisma-db
+      labels: [domain:backend, backend, api, server, middleware]
+      prompt: prisma-db.txt
+      platoon: backend
+      parallelism: 2
+    - name: docs
+      sme: sniper-generic
+      labels: [domain:docs, docs, readme, knowledge]
+      prompt: sniper-generic.txt
+      platoon: docs
+      parallelism: 1
+  model_tiers:
+    brain: claude-sonnet-5
+    volume: deepseek-v4-pro
+    verify: deepseek-v4-pro
+    escalate: claude-opus-4-8
+  budget:
+    currency: USD
+    fleet_total: 600
+    per_role:
+      commander: 60
+      general: 40
+      soldier: 160
+      auditor: 70
+      advisor: 30
+    per_domain:
+      testing: 30
+      security-scanning: 20
+      debugging: 15
+      infra: 20
+      backend-server: 20
+      docs: 15
+    max_parallelism: 12

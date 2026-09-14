@@ -1,0 +1,16 @@
+{
+  "schema": "wave-pins/1",
+  "note": "Offline bootstrap pins — a test seam, not the real feed. The real feed is the network path (`bootstrap --online`), which queries the deepseek and code-indexing boards and is never run by the gate. This baseline is intentionally empty.",
+  "as_of": "2026-09-13T00:00:00Z",
+  "modules": {
+    "deepseek": {
+      "sha": "",
+      "state": "empty-baseline"
+    },
+    "codeidx-context-pack": {
+      "sha": "",
+      "state": "empty-baseline"
+    }
+  },
+  "board_deltas": []
+}

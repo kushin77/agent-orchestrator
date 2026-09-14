@@ -1,0 +1,583 @@
+# Declared behavioral controls for the authority model (issue #150).
+#
+# A guard that ships no negative control proves nothing, and a control that
+# cannot fail is a formality (AO-GR-19, no-false-green). `cli.py selfcheck` runs
+# every control below against the LIVE engine and compares the verdict it got
+# with the verdict the control declares; one mismatch fails the gate. Weakening
+# the scoping rule, the separation-of-duties rule or the closure rule therefore
+# turns the authority gate red instead of silently passing.
+#
+# Kinds:
+#   can-act    principal/repo/action      expect ALLOW | DENY | CANNOT-ASSESS
+#   sod        work_item                  expect ALLOW | DENY | CANNOT-ASSESS
+#   closure    work_item                  expect ALLOW | DENY | CANNOT-ASSESS
+#   validate   (matrix + overlay)          expect OK | NOT-OK | CANNOT-ASSESS
+#   load       (raw text / missing path)   expect OK | NOT-OK | CANNOT-ASSESS
+#   isolation  (two-repo scenario)         expect OK | NOT-OK | CANNOT-ASSESS
+#
+# `overlay` mutates a DEEP COPY of the shipped matrix in memory only — nothing
+# is ever written back, so a control can assert a verdict for a document the
+# repo would never ship (a second cross-repo principal, a SoD collision, an
+# evidence field that is present but empty). The two evidence records in the
+# closure controls are SYNTHETIC fixtures: they exist to prove the closure rule
+# fires in both directions, and the shipped matrix deliberately carries no
+# evidence at all.
+version: 1
+
+controls:
+  # --------------------------------------------------------------------- #
+  # Scoping: a fleet acts on its own repo, and only its own repo           #
+  # --------------------------------------------------------------------- #
+  - id: ao-own-repo-files-allowed
+    kind: can-act
+    principal: ao-soldier-1
+    repo: kushin77/agent-orchestrator
+    action: files
+    expect: ALLOW
+  - id: ao-own-repo-issues-allowed
+    kind: can-act
+    principal: ao-platoon-leader-1
+    repo: kushin77/agent-orchestrator
+    action: issues
+    expect: ALLOW
+  - id: ao-own-repo-state-allowed
+    kind: can-act
+    principal: ao-scribe-1
+    repo: kushin77/agent-orchestrator
+    action: state
+    expect: ALLOW
+  - id: cu-own-repo-files-allowed
+    kind: can-act
+    principal: cu-soldier-1
+    repo: kushin77/capital-underwriting
+    action: files
+    expect: ALLOW
+  - id: ao-on-cu-repo-files-denied
+    kind: can-act
+    principal: ao-soldier-1
+    repo: kushin77/capital-underwriting
+    action: files
+    expect: DENY
+  - id: ao-on-cu-repo-issues-denied
+    kind: can-act
+    principal: ao-platoon-leader-1
+    repo: kushin77/capital-underwriting
+    action: issues
+    expect: DENY
+  - id: ao-on-cu-repo-state-denied
+    kind: can-act
+    principal: ao-lieutenant
+    repo: kushin77/capital-underwriting
+    action: state
+    expect: DENY
+  - id: ao-on-cu-repo-merge-denied
+    kind: can-act
+    principal: ao-commander
+    repo: kushin77/capital-underwriting
+    action: merge
+    expect: DENY
+  - id: ao-on-cu-repo-rollup-denied
+    kind: can-act
+    principal: ao-commander
+    repo: kushin77/capital-underwriting
+    action: rollup
+    expect: DENY
+  - id: cu-on-ao-repo-files-denied
+    kind: can-act
+    principal: cu-soldier-1
+    repo: kushin77/agent-orchestrator
+    action: files
+    expect: DENY
+  - id: fleet-principal-rollup-denied
+    kind: can-act
+    principal: ao-fleet
+    repo: kushin77/agent-orchestrator
+    action: rollup
+    expect: DENY
+
+  # --------------------------------------------------------------------- #
+  # Merge authority stays with the repo's own fleet commander             #
+  # --------------------------------------------------------------------- #
+  - id: ao-commander-merge-allowed
+    kind: can-act
+    principal: ao-commander
+    repo: kushin77/agent-orchestrator
+    action: merge
+    expect: ALLOW
+  - id: ao-soldier-merge-denied
+    kind: can-act
+    principal: ao-soldier-1
+    repo: kushin77/agent-orchestrator
+    action: merge
+    expect: DENY
+  - id: enterprise-controller-merge-denied
+    kind: can-act
+    principal: enterprise-controller
+    repo: kushin77/agent-orchestrator
+    action: merge
+    expect: DENY
+
+  # --------------------------------------------------------------------- #
+  # The enterprise controller is the only cross-repo actor                #
+  # --------------------------------------------------------------------- #
+  - id: enterprise-on-ao-repo-allowed
+    kind: can-act
+    principal: enterprise-controller
+    repo: kushin77/agent-orchestrator
+    action: files
+    expect: ALLOW
+  - id: enterprise-on-cu-repo-allowed
+    kind: can-act
+    principal: enterprise-controller
+    repo: kushin77/capital-underwriting
+    action: files
+    expect: ALLOW
+  - id: enterprise-rollup-allowed
+    kind: can-act
+    principal: enterprise-controller
+    repo: kushin77/agent-orchestrator
+    action: rollup
+    expect: ALLOW
+  - id: two-repos-fully-isolated
+    kind: isolation
+    expect: OK
+
+  # --------------------------------------------------------------------- #
+  # Fail-closed: what the matrix never declares is CANNOT-ASSESS           #
+  # --------------------------------------------------------------------- #
+  - id: unknown-principal-cannot-assess
+    kind: can-act
+    principal: ghost-principal
+    repo: kushin77/agent-orchestrator
+    action: files
+    expect: CANNOT-ASSESS
+  - id: unknown-repo-cannot-assess
+    kind: can-act
+    principal: ao-soldier-1
+    repo: kushin77/undeclared-repo
+    action: files
+    expect: CANNOT-ASSESS
+  - id: unknown-action-cannot-assess
+    kind: can-act
+    principal: ao-soldier-1
+    repo: kushin77/agent-orchestrator
+    action: deploy-to-production
+    expect: CANNOT-ASSESS
+  - id: unknown-work-item-cannot-assess
+    kind: closure
+    work_item: kushin77/agent-orchestrator#424242
+    expect: CANNOT-ASSESS
+
+  # --------------------------------------------------------------------- #
+  # Separation of duties: three distinct principals, three matching postures #
+  # --------------------------------------------------------------------- #
+  - id: sod-shipped-item-allowed
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: ALLOW
+  - id: sod-executor-equals-reviewer-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            executor: ao-soldier-1
+            reviewer: ao-soldier-1
+  - id: sod-executor-equals-auditor-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            auditor: ao-soldier-1
+  - id: sod-reviewer-equals-auditor-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            reviewer: ao-auditor-1
+            auditor: ao-auditor-1
+  - id: sod-auditor-cannot-execute-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            executor: ao-auditor-1
+            reviewer: ao-platoon-leader-1
+            auditor: ao-general
+  - id: sod-posture-mismatch-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            executor: ao-platoon-leader-1
+            reviewer: ao-general
+            auditor: ao-auditor-1
+  - id: sod-cross-repo-actor-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            executor: cu-soldier-1
+  - id: sod-auditor-tier-below-executor-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            executor: ao-lieutenant
+  - id: sod-unknown-actor-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          sod:
+            executor: ghost-agent
+  - id: sod-unassigned-duty-denied
+    kind: sod
+    work_item: kushin77/agent-orchestrator#424242
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#424242
+          repo: kushin77/agent-orchestrator
+          sod:
+            executor: ao-soldier-1
+
+  # --------------------------------------------------------------------- #
+  # Closure: both evidences, real output, one commit, scoped recorder      #
+  # --------------------------------------------------------------------- #
+  - id: closure-without-evidence-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+  - id: closure-second-item-without-evidence-denied
+    kind: closure
+    work_item: kushin77/capital-underwriting#1391
+    expect: DENY
+  - id: closure-both-evidences-allowed
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: ALLOW
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            output: "check-authority: OK — matrix valid, controls met"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+  - id: closure-blank-output-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            output: "   "
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+  - id: closure-missing-output-field-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+  - id: closure-failing-gate-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            output: "check-authority: FAIL — out-of-scope action allowed"
+            exit_code: 1
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+  - id: closure-sha-not-the-item-head-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            output: "check-authority: OK — matrix valid, controls met"
+            exit_code: 0
+            git_sha: fedcba9876543210fedcba9876543210fedcba98
+            recorded_by: ao-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+  - id: closure-divergent-commits-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            output: "check-authority: OK — matrix valid, controls met"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: fedcba9876543210fedcba9876543210fedcba98
+            recorded_by: ao-scribe-1
+  - id: closure-evidence-from-another-repo-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/capital-underwriting
+            command: bash scripts/check-authority.sh
+            output: "check-authority: OK — matrix valid, controls met"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+  - id: closure-recorder-without-authority-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            output: "check-authority: OK — matrix valid, controls met"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: cu-scribe-1
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+  - id: closure-unknown-recorder-denied
+    kind: closure
+    work_item: kushin77/agent-orchestrator#150
+    expect: DENY
+    overlay:
+      work_items:
+        - id: kushin77/agent-orchestrator#150
+          head_sha: 0123456789abcdef0123456789abcdef01234567
+          gate_evidence:
+            repo: kushin77/agent-orchestrator
+            command: bash scripts/check-authority.sh
+            output: "check-authority: OK — matrix valid, controls met"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ghost-scribe
+          verify_evidence:
+            repo: kushin77/agent-orchestrator
+            command: make verify
+            output: "verify: PASS (28 of 28 checks)"
+            exit_code: 0
+            git_sha: 0123456789abcdef0123456789abcdef01234567
+            recorded_by: ao-scribe-1
+
+  # --------------------------------------------------------------------- #
+  # Document validity: a real defect is NOT-OK, never a silent pass        #
+  # --------------------------------------------------------------------- #
+  - id: second-cross-repo-principal-is-a-validation-failure
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: cu-fleet
+          cross_repo: true
+  - id: cross-repo-principal-that-is-not-the-enterprise-controller-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: enterprise-controller
+          kind: repo-fleet
+  - id: fleet-scoped-to-two-repos-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: ao-fleet
+          scope: [kushin77/agent-orchestrator, kushin77/capital-underwriting]
+  - id: rollup-right-on-a-scoped-fleet-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: ao-fleet
+          admin_rights: [files, issues, state, merge, rollup]
+  - id: merge-authority-outside-the-commander-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: ao-fleet
+          actors:
+            - id: ao-soldier-1
+              merge_authority: true
+  - id: auditor-role-with-executor-posture-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: ao-fleet
+          actors:
+            - id: ao-auditor-1
+              posture: executor
+  - id: fleet-without-an-auditor-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: cu-fleet
+          actors:
+            - id: cu-auditor-1
+              role: soldier
+              posture: executor
+  - id: undeclared-repo-in-a-scope-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: cu-fleet
+          scope: [kushin77/ghost-repo]
+  - id: work-item-on-an-undeclared-repo-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      work_items:
+        - id: kushin77/ghost-repo#7
+          repo: kushin77/ghost-repo
+          sod:
+            executor: ao-soldier-1
+  - id: unknown-vocabulary-value-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: ao-fleet
+          kind: freelancer
+  - id: fleet-holding-rights-the-repo-never-delegated-fails-validation
+    kind: validate
+    expect: NOT-OK
+    overlay:
+      principals:
+        - id: ao-fleet
+          admin_rights: [files, issues, state, merge, rollup]
+
+  # --------------------------------------------------------------------- #
+  # Cannot-assess: an unreadable matrix is never a pass                    #
+  # --------------------------------------------------------------------- #
+  - id: unparseable-yaml-cannot-assess
+    kind: load
+    expect: CANNOT-ASSESS
+    raw: |
+      version: 1
+      principals: [
+  - id: non-mapping-root-cannot-assess
+    kind: load
+    expect: CANNOT-ASSESS
+    raw: |
+      - version
+      - principals
+  - id: missing-matrix-file-cannot-assess
+    kind: load
+    expect: CANNOT-ASSESS
+    missing: true

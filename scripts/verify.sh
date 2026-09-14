@@ -62,6 +62,13 @@ checks=(
   'feature-flags|python3 scripts/check-feature-flags.py'
   'cloudbuild|bash scripts/check-cloudbuild.sh'
   'terraform|bash scripts/check-terraform.sh'
+  # EPIC #144 (per-repo agent fleet) governance surfaces — each is tri-state
+  # (0 OK / 1 NOT-OK / 2 CANNOT-ASSESS) and proves its own negative control.
+  'cto-overlay|bash scripts/check-cto-overlay.sh'
+  'authority|bash scripts/check-authority.sh'
+  'rollup|bash scripts/check-rollup.sh'
+  'fleet-template|bash scripts/check-fleet-template.sh'
+  'sme-routing|bash scripts/check-sme-routing.sh'
   # The declared suite manifest (scripts/pytest-suites.txt) is run in full and in
   # isolation by `make gate` / `make tests`; this gate runs the `fleet` suite the
   # same way run-pytest-suites.sh does, so a red fleet test cannot reach master

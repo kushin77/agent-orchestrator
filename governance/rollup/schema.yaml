@@ -1,0 +1,173 @@
+# Enterprise roll-up input contract (issue #151).
+#
+# Two documents make the roll-up computable, and only two: the **org
+# declaration** (the tenant hierarchy the enterprise/GDC owns) and one **fleet
+# inventory** per repo (that repo's fleet facts for a window). Everything the
+# org-level view reports is derived from these — the view is a projection, never
+# a second source of truth, so there is deliberately no third input.
+#
+# The document is real JSON Schema (draft-07), expressed in YAML like this
+# repo's other governance policies. `governance/rollup/schema.py` implements the
+# keyword subset listed here and REFUSES TO ASSESS a schema that uses anything
+# outside it: a validator that silently ignores a keyword it does not know would
+# report every input as valid, which is the false green the contract exists to
+# prevent.
+#
+# Provenance of the vocabulary (see docs/ENTERPRISE-ROLLUP.md, PROVENANCE):
+#   * `repo` as `owner/name` and the GDC-manifest field set —
+#     vendor/CMR/catalog/schemas/gdc-manifest.schema.json
+#   * tenant ids as `[a-z][a-z0-9-]*` with the same lowercase-dash grammar the
+#     persona-card schema uses for its `tenant` field —
+#     registry/personas/persona-card.schema.json
+#   * the metric shapes (invocations / success / failure / cost-per-model) —
+#     kushin77/leaderboard scripts/data/fleet-metrics-per-model.sh
+schema: http://json-schema.org/draft-07/schema#
+$id: urn:agent-orchestrator:rollup/inputs:v1
+title: Enterprise roll-up inputs
+description: >-
+  The tenant hierarchy (org declaration) and the per-repo fleet inventory the
+  roll-up aggregates. Validate a document against `#/definitions/org` or
+  `#/definitions/inventory`; the `schema` const of the document selects which.
+definitions:
+
+  # The hierarchy: one enterprise/GDC org, the tenants beneath it, and the repos
+  # each tenant owns. A repo appears under exactly one tenant — a repo listed
+  # twice would be counted twice in the aggregate, which is why the projection
+  # treats that as an isolation violation rather than a merge.
+  org:
+    type: object
+    additionalProperties: false
+    required: [schema, source, enterprise, tenants]
+    properties:
+      schema:
+        const: ao.rollup/org-v1
+      source:
+        enum: [declared, measured]
+      generated_at:
+        type: string
+        pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      enterprise:
+        type: object
+        additionalProperties: false
+        required: [id, name, weekly_spend_ceiling_usd]
+        properties:
+          id:
+            type: string
+            pattern: '^[a-z][a-z0-9-]*$'
+          name:
+            type: string
+            minLength: 1
+          weekly_spend_ceiling_usd:
+            type: number
+            minimum: 0
+      tenants:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [id, name, weekly_spend_ceiling_usd, repos]
+          properties:
+            id:
+              type: string
+              pattern: '^[a-z][a-z0-9-]*$'
+            name:
+              type: string
+              minLength: 1
+            weekly_spend_ceiling_usd:
+              type: number
+              minimum: 0
+            repos:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                type: string
+                pattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+
+  # One repo's fleet for one window. `tenant` is declared here as well as in the
+  # org so a misfiled inventory is detected instead of silently landing under the
+  # wrong tenant; the two must agree.
+  inventory:
+    type: object
+    additionalProperties: false
+    required: [schema, repo, tenant, window, smes, drift]
+    properties:
+      schema:
+        const: ao.rollup/fleet-inventory-v1
+      repo:
+        type: string
+        pattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+      tenant:
+        type: string
+        pattern: '^[a-z][a-z0-9-]*$'
+      source:
+        enum: [declared, measured]
+      window:
+        type: object
+        additionalProperties: false
+        required: [start, end]
+        properties:
+          start:
+            type: string
+            pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          end:
+            type: string
+            pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      # Per-SME facts. `weekly_spend_ceiling_usd` is the FinOps roll-up
+      # primitive: spend above it is an explicit finding, spend equal to it is
+      # reported as at-ceiling telemetry, and neither is ever clamped to the
+      # ceiling.
+      smes:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - persona_tenant
+            - weekly_spend_ceiling_usd
+            - spend_usd
+            - capacity_hours
+            - engaged_hours
+            - dispatched
+            - closed
+          properties:
+            id:
+              type: string
+              pattern: '^[a-z][a-z0-9-]*$'
+            persona_tenant:
+              type: string
+              pattern: '^[a-z][a-z0-9-]*$'
+            weekly_spend_ceiling_usd:
+              type: number
+              minimum: 0
+            spend_usd:
+              type: number
+              minimum: 0
+            capacity_hours:
+              type: number
+              minimum: 0
+            engaged_hours:
+              type: number
+              minimum: 0
+            dispatched:
+              type: integer
+              minimum: 0
+            closed:
+              type: integer
+              minimum: 0
+      # Repo-wide drift measurement: how many checks the repo ran in the window
+      # and how many of them found drift. A rate is only reported when `checks`
+      # is non-zero; otherwise the drift rate is CANNOT-ASSESS.
+      drift:
+        type: object
+        additionalProperties: false
+        required: [checks, findings]
+        properties:
+          checks:
+            type: integer
+            minimum: 0
+          findings:
+            type: integer
+            minimum: 0

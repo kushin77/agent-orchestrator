@@ -1,0 +1,363 @@
+apiVersion: ao.fleet-template/v1
+kind: FleetInstance
+metadata:
+  repo: agent-orchestrator
+  display_name: agent-orchestrator agent fleet
+  template: per-repo-sme-fleet
+  template_version: 1.0.0
+  template_sha256: b22985e69b9a748456490800722e82a1eb407b3df8b77980d2f2698c86052a94
+  params_sha256: 0eb84a2503121e2092def2345d18d5d038f9e9100908572e99e34d2267f9199d
+  params_source: pilots/agent-orchestrator.params.yaml
+  generated_by: control-plane/fleet-template/render.py
+isolation:
+  fleet_id: fleet-agent-orchestrator
+  state_prefix: .fleet/agent-orchestrator
+  worktree_prefix: ao-agent-orchestrator-
+  lane_namespace: agent-orchestrator
+  exclusive: true
+definition:
+  repo: agent-orchestrator
+  roles:
+  - id: agent-orchestrator:commander
+    role: commander
+    tier: brain
+    model: claude-sonnet-5
+    transport: api
+    effort: medium
+    description: routing, decomposition, dispatch decisions
+    memory_file: .fleet/agent-orchestrator/memory/commander.md
+    state: required
+    parallelism: 1
+  - id: agent-orchestrator:general
+    role: general
+    tier: brain
+    model: claude-sonnet-5
+    transport: api
+    effort: medium
+    description: CI triage, merge order, cross-cutting judgement
+    memory_file: .fleet/agent-orchestrator/memory/general.md
+    state: required
+    parallelism: 1
+  - id: agent-orchestrator:soldier
+    role: soldier
+    tier: volume
+    model: deepseek-v4-pro
+    transport: api
+    effort: low
+    description: bulk execution -- the volume tier
+    memory_file: .fleet/agent-orchestrator/memory/soldier.md
+    state: required
+    parallelism: 12
+  - id: agent-orchestrator:auditor
+    role: auditor
+    tier: verify
+    model: deepseek-v4-pro
+    transport: api
+    effort: medium
+    description: verdicts on soldier output; the seat the architecture rests on
+    memory_file: .fleet/agent-orchestrator/memory/auditor.md
+    state: required
+    parallelism: 1
+  - id: agent-orchestrator:advisor
+    role: advisor
+    tier: escalate
+    model: claude-opus-4-8
+    transport: cli
+    effort: high
+    description: escalation path when a soldier is stuck
+    memory_file: .fleet/agent-orchestrator/memory/advisor.md
+    state: parked
+    parallelism: 1
+  smes:
+  - id: agent-orchestrator:sme:testing
+    domain: testing
+    sme: test-quality
+    role: soldier
+    tier: volume
+    model: deepseek-v4-pro
+    labels:
+    - domain:testing
+    - testing
+    - test
+    - coverage
+    - vitest
+    prompt: test-quality.txt
+    state: required
+  - id: agent-orchestrator:sme:security-scanning
+    domain: security-scanning
+    sme: security
+    role: soldier
+    tier: volume
+    model: deepseek-v4-pro
+    labels:
+    - domain:security
+    - security
+    - auth
+    - secret
+    - injection
+    prompt: security.txt
+    state: required
+  - id: agent-orchestrator:sme:debugging
+    domain: debugging
+    sme: sniper-generic
+    role: soldier
+    tier: volume
+    model: deepseek-v4-pro
+    labels:
+    - domain:debugging
+    - bug
+    - debug
+    - incident
+    - crash
+    prompt: sniper-generic.txt
+    state: required
+  - id: agent-orchestrator:sme:infra
+    domain: infra
+    sme: terraform
+    role: soldier
+    tier: volume
+    model: deepseek-v4-pro
+    labels:
+    - domain:infra
+    - infra
+    - terraform
+    - cloudbuild
+    - deploy
+    prompt: terraform.txt
+    state: required
+  - id: agent-orchestrator:sme:backend-server
+    domain: backend-server
+    sme: prisma-db
+    role: soldier
+    tier: volume
+    model: deepseek-v4-pro
+    labels:
+    - domain:backend
+    - backend
+    - api
+    - server
+    - middleware
+    prompt: prisma-db.txt
+    state: required
+  - id: agent-orchestrator:sme:docs
+    domain: docs
+    sme: sniper-generic
+    role: soldier
+    tier: volume
+    model: deepseek-v4-pro
+    labels:
+    - domain:docs
+    - docs
+    - readme
+    - knowledge
+    prompt: sniper-generic.txt
+    state: required
+  routing:
+    lenses:
+    - lens: lens:testing
+      platoon: qa
+      parallelism: 3
+      domains:
+      - testing
+    - lens: lens:security-scanning
+      platoon: security
+      parallelism: 2
+      domains:
+      - security-scanning
+    - lens: lens:debugging
+      platoon: debugging
+      parallelism: 2
+      domains:
+      - debugging
+    - lens: lens:infra
+      platoon: infra
+      parallelism: 2
+      domains:
+      - infra
+    - lens: lens:backend-server
+      platoon: backend
+      parallelism: 2
+      domains:
+      - backend-server
+    - lens: lens:docs
+      platoon: docs
+      parallelism: 1
+      domains:
+      - docs
+    domain_to_role:
+      testing: soldier
+      security-scanning: soldier
+      debugging: soldier
+      infra: soldier
+      backend-server: soldier
+      docs: soldier
+  finops:
+    currency: USD
+    fleet_total: 600
+    per_role:
+      commander: 60
+      general: 40
+      soldier: 160
+      auditor: 70
+      advisor: 30
+    per_domain:
+      testing: 30
+      security-scanning: 20
+      debugging: 15
+      infra: 20
+      backend-server: 20
+      docs: 15
+    max_parallelism: 12
+  parallelism:
+    total: 12
+    per_lens:
+      lens:testing: 3
+      lens:security-scanning: 2
+      lens:debugging: 2
+      lens:infra: 2
+      lens:backend-server: 2
+      lens:docs: 1
+run_state:
+  observations:
+    source: fleet live session/lane snapshot, recorded by the orchestrator
+    observed_present:
+    - agent-orchestrator:commander
+    - agent-orchestrator:general
+    - agent-orchestrator:soldier
+    - agent-orchestrator:sme:testing
+    - agent-orchestrator:sme:security-scanning
+    - agent-orchestrator:sme:infra
+  declared:
+    required:
+    - agent-orchestrator:commander
+    - agent-orchestrator:general
+    - agent-orchestrator:soldier
+    - agent-orchestrator:auditor
+    - agent-orchestrator:sme:testing
+    - agent-orchestrator:sme:security-scanning
+    - agent-orchestrator:sme:debugging
+    - agent-orchestrator:sme:infra
+    - agent-orchestrator:sme:backend-server
+    - agent-orchestrator:sme:docs
+    parked:
+    - agent-orchestrator:advisor
+  tri_state:
+    required:
+    - agent-orchestrator:commander
+    - agent-orchestrator:general
+    - agent-orchestrator:soldier
+    - agent-orchestrator:sme:testing
+    - agent-orchestrator:sme:security-scanning
+    - agent-orchestrator:sme:infra
+    parked:
+    - agent-orchestrator:advisor
+    unverified:
+    - agent-orchestrator:auditor
+    - agent-orchestrator:sme:debugging
+    - agent-orchestrator:sme:backend-server
+    - agent-orchestrator:sme:docs
+  present:
+  - agent-orchestrator:commander
+  - agent-orchestrator:general
+  - agent-orchestrator:soldier
+  - agent-orchestrator:sme:testing
+  - agent-orchestrator:sme:security-scanning
+  - agent-orchestrator:sme:infra
+  counts:
+    required: 6
+    parked: 1
+    unverified: 4
+    present: 6
+params_digest:
+  sha256: e5ebdc2f2537bc982e07c87bfcafbcaff4e29cffce00d57116d24d51ae739211
+  values:
+    repo: agent-orchestrator
+    display_name: agent-orchestrator agent fleet
+    domains:
+    - name: testing
+      sme: test-quality
+      labels:
+      - domain:testing
+      - testing
+      - test
+      - coverage
+      - vitest
+      prompt: test-quality.txt
+      platoon: qa
+      parallelism: 3
+    - name: security-scanning
+      sme: security
+      labels:
+      - domain:security
+      - security
+      - auth
+      - secret
+      - injection
+      prompt: security.txt
+      platoon: security
+      parallelism: 2
+    - name: debugging
+      sme: sniper-generic
+      labels:
+      - domain:debugging
+      - bug
+      - debug
+      - incident
+      - crash
+      prompt: sniper-generic.txt
+      platoon: debugging
+      parallelism: 2
+    - name: infra
+      sme: terraform
+      labels:
+      - domain:infra
+      - infra
+      - terraform
+      - cloudbuild
+      - deploy
+      prompt: terraform.txt
+      platoon: infra
+      parallelism: 2
+    - name: backend-server
+      sme: prisma-db
+      labels:
+      - domain:backend
+      - backend
+      - api
+      - server
+      - middleware
+      prompt: prisma-db.txt
+      platoon: backend
+      parallelism: 2
+    - name: docs
+      sme: sniper-generic
+      labels:
+      - domain:docs
+      - docs
+      - readme
+      - knowledge
+      prompt: sniper-generic.txt
+      platoon: docs
+      parallelism: 1
+    model_tiers:
+      brain: claude-sonnet-5
+      volume: deepseek-v4-pro
+      verify: deepseek-v4-pro
+      escalate: claude-opus-4-8
+    budget:
+      currency: USD
+      fleet_total: 600
+      per_role:
+        commander: 60
+        general: 40
+        soldier: 160
+        auditor: 70
+        advisor: 30
+      per_domain:
+        testing: 30
+        security-scanning: 20
+        debugging: 15
+        infra: 20
+        backend-server: 20
+        docs: 15
+      max_parallelism: 12
