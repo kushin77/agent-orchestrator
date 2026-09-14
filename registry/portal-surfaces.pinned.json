@@ -1,0 +1,599 @@
+{
+  "schema": "cmr.portal-surfaces/v1",
+  "pin": {
+    "repo": "kushin77/CMR",
+    "path": "catalog/portal-surfaces.json",
+    "revision": "aab865e3ba58fff271d092a76c383792abe37509",
+    "retrievedAt": "2026-09-14T02:48:27Z",
+    "state": "pinned",
+    "sha256": "1d284478619951fdf0d524ff5fcd613e6e9a8062412813f16d60b87db3620b78",
+    "bytes": 18017
+  },
+  "note": "Provenance pin for the portal-surfaces feed (issue #350), served live by this repo's portal serving layer at GET /api/portal/surfaces (feature-flag surfaces.portal_surfaces, OFF by default - infra/feature-flags/registry.yaml). The `generated_from`, `surfaces` and `gaps` fields are copied VERBATIM from kushin77/CMR `catalog/portal-surfaces.json` at the revision recorded above; `pin` and `note` are this repo's provenance record. The upstream blob was fetched with `gh api -H 'Accept: application/vnd.github.raw' 'repos/kushin77/CMR/contents/catalog/portal-surfaces.json?ref=<revision>'` and its sha256 recorded in pin.sha256, so the copy is auditable. Refresh = re-fetch that path at a newer revision, re-record revision/retrievedAt/sha256/bytes, re-copy the three verbatim fields - never hand-edit surfaces[]. While the pin cannot be read the server answers an explicitly `unresolved` document with an empty surfaces list; no surface is invented here. kushin77/CMR#708 (which this issue was blocked on) closed 2026-09-11 with the artifact published; the consuming shell (kushin77/shared-frontend) still reads its OWN registry/portal-surfaces.pinned.json - adopting this feed there is shell-side work.",
+  "generated_from": {
+    "spokes": "channels/spokes.tsv",
+    "mandatory": "catalog/mandatory.tsv",
+    "modules_dir": "catalog/modules"
+  },
+  "surfaces": [
+    {
+      "id": "code-indexing",
+      "type": "service",
+      "class": [
+        "backend",
+        "indexing",
+        "data"
+      ],
+      "source": {
+        "repo": "kushin77/code-indexing"
+      },
+      "versions": {
+        "latest": "v0.2.0"
+      },
+      "mandatory": true,
+      "toggle_locked": true,
+      "features": [
+        {
+          "id": "indexer",
+          "default": "on",
+          "flags": [
+            "codeidx.feature.indexer"
+          ],
+          "desc": "Producer spine: per-language SCIP/ctags indexers, ingest into index.db, atomic publish, --allow-partial policy"
+        },
+        {
+          "id": "lang-ts-js",
+          "default": "on",
+          "flags": [
+            "codeidx.language.ts-js"
+          ],
+          "desc": "TypeScript/JavaScript semantic indexer (scip-typescript)"
+        },
+        {
+          "id": "lang-python",
+          "default": "on",
+          "flags": [
+            "codeidx.language.python"
+          ],
+          "desc": "Python semantic indexer (scip-python)"
+        },
+        {
+          "id": "lang-go",
+          "default": "on",
+          "flags": [
+            "codeidx.language.go"
+          ],
+          "desc": "Go semantic indexer (scip-go)"
+        },
+        {
+          "id": "lang-java",
+          "default": "on",
+          "flags": [
+            "codeidx.language.java"
+          ],
+          "desc": "Java semantic indexer (scip-java; Kotlin* and Scala* conditional)"
+        },
+        {
+          "id": "lang-rust",
+          "default": "on",
+          "flags": [
+            "codeidx.language.rust"
+          ],
+          "desc": "Rust semantic indexer (scip-rust)"
+        },
+        {
+          "id": "lang-shell",
+          "default": "on",
+          "flags": [
+            "codeidx.language.shell"
+          ],
+          "desc": "Bash/shell/config lexical indexer (universal-ctags); definitions only, references unresolvable"
+        },
+        {
+          "id": "cli",
+          "default": "on",
+          "flags": [
+            "codeidx.surface.cli"
+          ],
+          "desc": "CLI query surface: def/refs/search/repos/runs/changed (pyproject extras: core)"
+        },
+        {
+          "id": "http-api",
+          "default": "on",
+          "flags": [
+            "codeidx.surface.http-api"
+          ],
+          "desc": "HTTP API surface (codeidx.api via uvicorn; pyproject extras: api)"
+        },
+        {
+          "id": "web-ui",
+          "default": "on",
+          "flags": [
+            "codeidx.surface.web-ui"
+          ],
+          "desc": "Web UI served by the HTTP API (ships in the codeidx package)"
+        },
+        {
+          "id": "mcp",
+          "default": "on",
+          "flags": [
+            "codeidx.surface.mcp"
+          ],
+          "desc": "MCP server surface (codeidx.mcp_server; .mcp.json / scripts/codeidx-mcp; pyproject extras: mcp)"
+        },
+        {
+          "id": "lsp",
+          "default": "off",
+          "flags": [
+            "codeidx.surface.lsp"
+          ],
+          "desc": "LSP surface (codeidx.lsp_server via pygls; pyproject extras: lsp)"
+        },
+        {
+          "id": "secret-scan",
+          "default": "on",
+          "flags": [
+            "codeidx.feature.secret-scan"
+          ],
+          "desc": "Publish gate: refuses to index/publish credential material (codeidx.secret_scan, scripts/prescan-credentials.py)"
+        }
+      ],
+      "integrations": []
+    },
+    {
+      "id": "diagrams",
+      "type": "service",
+      "class": [
+        "architecture",
+        "blueprint",
+        "ssot",
+        "backend",
+        "frontend",
+        "data"
+      ],
+      "source": {
+        "repo": "kushin77/diagrams"
+      },
+      "versions": {
+        "latest": "v0.1.0"
+      },
+      "mandatory": true,
+      "toggle_locked": true,
+      "features": [
+        {
+          "id": "ssot-extract",
+          "default": "on",
+          "flags": [],
+          "desc": "GCP org/folder/project/resource extraction via the Cloud Asset API with PostgreSQL persistence (cloud_asset_api/extractors.py's OrgExtractor, cloud_asset_api/persistence.py)."
+        },
+        {
+          "id": "blueprint-gen",
+          "default": "on",
+          "flags": [],
+          "desc": "Architecture diagram generation from extracted/topology data via Graphviz, plus Mermaid import and diagrams.net/drawio (mxGraph) export (cloud_asset_api/diagram_generators.py)."
+        },
+        {
+          "id": "blueprint-engine",
+          "default": "on",
+          "flags": [],
+          "desc": "Reverse-direction codegen: parses a saved drawio diagram whose shapes are tagged with resourceType custom properties and generates real Terraform HCL from it (cloud_asset_api/blueprint_engine.py, kushin77/diagrams#147)."
+        },
+        {
+          "id": "drift-detect",
+          "default": "on",
+          "flags": [],
+          "desc": "Deterministic diffing of live extracted state vs. Terraform-declared state (declared-but-missing, live-but-undeclared, or mismatched-attribute), surfaced as Findings (cloud_asset_api/drift.py, kushin77/diagrams#148)."
+        },
+        {
+          "id": "plan-preview",
+          "default": "on",
+          "flags": [],
+          "desc": "Renders a diagram preview from a Terraform plan's proposed changes before anyone runs `terraform apply` (cloud_asset_api/plan_preview.py, POST /api/diagrams/plan_preview)."
+        },
+        {
+          "id": "topology-graph",
+          "default": "on",
+          "flags": [],
+          "desc": "Generalized node/edge dependency-graph model plus overlay rendering (cost, health, severity, drift status), used across the extraction-to-diagram feature set (cloud_asset_api/topology.py, kushin77/diagrams#176)."
+        },
+        {
+          "id": "rest-api",
+          "default": "on",
+          "flags": [],
+          "desc": "Flask REST API plus authenticated WebSocket updates, OAuth-gated with RBAC, with an OpenAPI spec (cloud_asset_api/api.py, cloud_asset_api/openapi_spec.py)."
+        },
+        {
+          "id": "portal-web",
+          "default": "on",
+          "flags": [],
+          "desc": "React web portal (web_ui/) for hierarchy, diagrams, the drawio-based editor, findings, catalog, and admin views, served behind the auth-hub.purebliss.app SSO relay."
+        },
+        {
+          "id": "vendor-adapters",
+          "default": "on",
+          "flags": [],
+          "desc": "Pluggable adapter framework for extracting real resources from AWS, Azure, GCP (incl. billing), GitHub, GitHub Actions, Google Workspace, GoHighLevel, Kubernetes, Datadog, OCI, on-prem (Docker), PostgreSQL, and Terraform state (cloud_asset_api/vendors/)."
+        },
+        {
+          "id": "mechanical-checks",
+          "default": "on",
+          "flags": [],
+          "desc": "Deterministic, no-LLM-judgment checks (post-deploy health, dependency CVE scan-and-report, etc.) run on a timer or on demand, reported via a durable local log and optional webhook/Findings API (mechanical/)."
+        },
+        {
+          "id": "mcp-kb",
+          "default": "off",
+          "flags": [],
+          "desc": "The diagrams-kb MCP server (kb://<topic>, kb_search) registered in this repo's own root .mcp.json is repo-local dev tooling for sessions working in this repo, not an org-wide consumable surface -- left default off pending any future CMR-governed decision to expose it more broadly."
+        }
+      ],
+      "integrations": []
+    },
+    {
+      "id": "erp-crm",
+      "type": "app",
+      "class": [
+        "frontend",
+        "backend"
+      ],
+      "source": {
+        "repo": "kushin77/ERP-CRM"
+      },
+      "versions": {
+        "latest": null
+      },
+      "mandatory": false,
+      "toggle_locked": false,
+      "features": [],
+      "integrations": []
+    },
+    {
+      "id": "googleworkspace",
+      "type": "integration",
+      "class": [
+        "backend",
+        "integration"
+      ],
+      "source": {
+        "repo": "kushin77/googleworkspace"
+      },
+      "versions": {
+        "latest": "v0.3.0"
+      },
+      "mandatory": false,
+      "toggle_locked": false,
+      "features": [
+        {
+          "id": "addon-ui",
+          "default": "off",
+          "flags": [
+            "gws.feature.addon-ui"
+          ],
+          "desc": "Workspace Control Center CardService add-on (Gmail/Drive/Docs/Sheets contexts)"
+        },
+        {
+          "id": "control-engine",
+          "default": "off",
+          "flags": [
+            "gws.feature.control-engine"
+          ],
+          "desc": "Dispatch API + action registry + job runner (Cloud Run)"
+        },
+        {
+          "id": "jml-lifecycle",
+          "default": "off",
+          "flags": [
+            "gws.feature.jml-lifecycle"
+          ],
+          "desc": "Joiner/mover/leaver provisioning (users, OUs, groups, Drive transfer)"
+        },
+        {
+          "id": "group-rbac-sync",
+          "default": "off",
+          "flags": [
+            "gws.feature.group-rbac-sync"
+          ],
+          "desc": "Directory groups -> saas-rbac role bindings"
+        },
+        {
+          "id": "automation-recipes",
+          "default": "off",
+          "flags": [
+            "gws.feature.automation-recipes"
+          ],
+          "desc": "Declarative cross-suite recipes (when X do Y, dry-run first)"
+        },
+        {
+          "id": "audit-log",
+          "default": "on",
+          "flags": [
+            "gws.feature.audit-log"
+          ],
+          "desc": "Audit capture on every admin/domain operation (invariant)"
+        },
+        {
+          "id": "realtime-watch",
+          "default": "off",
+          "flags": [
+            "gws.feature.realtime-watch"
+          ],
+          "desc": "Gmail/Calendar watch -> Pub/Sub -> Cloud Tasks pipeline"
+        },
+        {
+          "id": "live-data",
+          "default": "off",
+          "flags": [
+            "gws.feature.live-data"
+          ],
+          "desc": "Read-only live workspace data API (directory/groups/calendar summary) with audit + least-privilege scopes"
+        }
+      ],
+      "integrations": [
+        {
+          "id": "workspace-addon",
+          "type": "google-workspace-addon"
+        },
+        {
+          "id": "cloud-run",
+          "type": "gcp-service"
+        },
+        {
+          "id": "directory",
+          "type": "google-api-admin-sdk"
+        },
+        {
+          "id": "gmail",
+          "type": "google-api"
+        },
+        {
+          "id": "calendar",
+          "type": "google-api"
+        },
+        {
+          "id": "drive",
+          "type": "google-api"
+        },
+        {
+          "id": "sheets",
+          "type": "google-api"
+        },
+        {
+          "id": "docs",
+          "type": "google-api"
+        },
+        {
+          "id": "contacts",
+          "type": "google-api"
+        },
+        {
+          "id": "meet",
+          "type": "google-api"
+        },
+        {
+          "id": "pubsub",
+          "type": "gcp-events"
+        },
+        {
+          "id": "domains",
+          "type": "google-api-admin-sdk"
+        },
+        {
+          "id": "licensing",
+          "type": "google-api-admin-sdk"
+        },
+        {
+          "id": "chrome-devices",
+          "type": "google-api-admin-sdk"
+        },
+        {
+          "id": "alerts",
+          "type": "google-api-admin-sdk"
+        }
+      ]
+    },
+    {
+      "id": "pmo",
+      "type": "service",
+      "class": [
+        "program-management",
+        "governance",
+        "data"
+      ],
+      "source": {
+        "repo": "kushin77/pmo"
+      },
+      "versions": {
+        "latest": "v0.1.0"
+      },
+      "mandatory": true,
+      "toggle_locked": true,
+      "features": [
+        {
+          "id": "dependency-graph",
+          "default": "on",
+          "flags": [
+            "pmo.feature.dependency-graph"
+          ],
+          "desc": "Module-manifest dependency closure, cycle detection, reverse-dependents, transitive deps (extracted from fleet/pmo.sh deps)"
+        },
+        {
+          "id": "raid-register",
+          "default": "on",
+          "flags": [
+            "pmo.feature.raid-register"
+          ],
+          "desc": "Risk/Assumption/Issue/Dependency register with SLA-aging tiers (extracted from fleet/pmo.sh raid + aging)"
+        },
+        {
+          "id": "status-rollup",
+          "default": "on",
+          "flags": [
+            "pmo.feature.status-rollup"
+          ],
+          "desc": "Cross-repo status/program rollup reporting (extracted from fleet/pmo.sh report)"
+        },
+        {
+          "id": "priority-tiers",
+          "default": "on",
+          "flags": [
+            "pmo.feature.priority-tiers"
+          ],
+          "desc": "P0/BAU/project priority normalization across heterogeneous per-repo vocabularies (channels/priority-map.tsv pattern)"
+        },
+        {
+          "id": "intake-scoring",
+          "default": "on",
+          "flags": [
+            "pmo.feature.intake-scoring"
+          ],
+          "desc": "Deterministic program-intake scoring + routing (extracted from fleet/pmo.sh intake, DR-038)"
+        },
+        {
+          "id": "dashboard-sync",
+          "default": "off",
+          "flags": [
+            "pmo.feature.dashboard-sync"
+          ],
+          "desc": "Secondary visualization layer: sync GitHub Projects data into an OpenProject view. GitHub Projects stays the system of record; this is read-only visualization, never a competing tracker. Not yet implemented (see kushin77/pmo issue: PMO dashboard sync)."
+        }
+      ],
+      "integrations": []
+    },
+    {
+      "id": "saas-rbac",
+      "type": "integration",
+      "class": [
+        "backend",
+        "integration",
+        "security"
+      ],
+      "source": {
+        "repo": "kushin77/saas-rbac"
+      },
+      "versions": {
+        "latest": "v2.4.0"
+      },
+      "mandatory": false,
+      "toggle_locked": false,
+      "features": [
+        {
+          "id": "rbac",
+          "default": "on",
+          "flags": [
+            "rbac.enabled"
+          ],
+          "desc": ""
+        },
+        {
+          "id": "scim",
+          "default": "off",
+          "flags": [
+            "scim.enabled"
+          ],
+          "desc": ""
+        }
+      ],
+      "integrations": [
+        {
+          "id": "keycloak",
+          "type": "oidc"
+        },
+        {
+          "id": "google-workspace",
+          "type": "oauth2"
+        }
+      ]
+    },
+    {
+      "id": "shared-frontend",
+      "type": "frontend",
+      "class": [
+        "frontend",
+        "ui",
+        "shell",
+        "design-system"
+      ],
+      "source": {
+        "repo": "kushin77/shared-frontend"
+      },
+      "versions": {
+        "latest": "v0.2.0"
+      },
+      "mandatory": true,
+      "toggle_locked": true,
+      "features": [
+        {
+          "id": "os-shell",
+          "default": "on",
+          "flags": [
+            "registry.portal"
+          ],
+          "desc": "Single-chrome OS portal: AppShell sidebar/topbar/bottom-tab, Desktop tiles, portal switcher, Settings→Clients, ErrorBoundary + load lifecycle, os.activeModule persist/restore. Registry portal entry in registry/modules.json is the surface."
+        },
+        {
+          "id": "native-addons",
+          "default": "on",
+          "flags": [
+            "registry.mount.native"
+          ],
+          "desc": "ADR-0007 native addons: addons/<id>/ React component lazy-loaded into the OS shell (OsModuleContext/useOsModule, addonNav body-only rendering). Mount.type=native + mount.entry in the registry."
+        },
+        {
+          "id": "module-contract",
+          "default": "on",
+          "flags": [
+            "registry.schema"
+          ],
+          "desc": "modules/schema.json (ModuleMount native|iframe|tab, enabled) + registry/modules.json + verify-registry.js — the machine-readable module contract consumers register against."
+        },
+        {
+          "id": "design-tokens",
+          "default": "on",
+          "flags": [
+            "tokens.css"
+          ],
+          "desc": "shared/design-tokens twin (tokens.json ⇄ tokens.css, --os-* namespace) with verify-design-tokens.js parity gate — provenance-grounded palette shared with consumers."
+        },
+        {
+          "id": "app-template",
+          "default": "on",
+          "flags": [
+            "make.template"
+          ],
+          "desc": "templates/diagrams-layout reusable chrome + lib/osBridge.js + scripts/template-scaffold.sh (`NAME=<id> make template`) — one-command scaffolder for consumer frontends."
+        },
+        {
+          "id": "iframe-mount",
+          "default": "on",
+          "flags": [
+            "bridge.os-envelope"
+          ],
+          "desc": "Sandboxed-iframe fallback mount (ADR-0001) + typed os:* postMessage envelope (shell/src/bridge.ts: os-module:ready/os:session/os:theme/os:navigate) + contrib/portal-snippet.js drop-in."
+        },
+        {
+          "id": "os-auth",
+          "default": "on",
+          "flags": [
+            "auth.rs256"
+          ],
+          "desc": "Google OAuth gate (shared auth-hub relay) → short-lived RS256 os-session-token minted by /auth/me, JWKS at /auth/.well-known/jwks.json, /auth/verify for consumer backends, multi-key rotation, no-cache SPA serving."
+        },
+        {
+          "id": "vendor-sync",
+          "default": "off",
+          "flags": [
+            "vendor-sync.enabled"
+          ],
+          "desc": "Vendor/sync tooling (scripts/vendor-sync.sh, vendor-drift-check.sh, verify-vendor-deploy.sh, addon provenance). Default off — consumers do not need upstream sync to consume the engine."
+        }
+      ],
+      "integrations": [
+        {
+          "id": "google-oauth",
+          "type": "oauth2"
+        }
+      ]
+    }
+  ],
+  "gaps": []
+}

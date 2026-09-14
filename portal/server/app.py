@@ -34,6 +34,7 @@ from portal.server.controls import (
 from portal.server.fleet import FleetProjection
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
+from portal.server.surfaces import PortalSurfacesFeed
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -103,6 +104,7 @@ class ConsoleApplication:
         root_admin_emails: Optional[tuple[str, ...]] = None,
         allowlist_only: bool = False,
         fleet_projection: Optional[FleetProjection] = None,
+        portal_surfaces: Optional[PortalSurfacesFeed] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -126,6 +128,12 @@ class ConsoleApplication:
             fleet_projection
             if fleet_projection is not None
             else FleetProjection(repo_root=self.repo_root)
+        )
+        # The portal-surfaces feed (issue #350) — feature-flag-gated OFF.
+        self.surfaces = (
+            portal_surfaces
+            if portal_surfaces is not None
+            else PortalSurfacesFeed(repo_root=self.repo_root)
         )
 
     # -- request pipeline ---------------------------------------------------
@@ -253,11 +261,24 @@ class ConsoleApplication:
                 "(infra/feature-flags/registry.yaml surfaces.fleet_projection)",
             )
 
+        # The portal-surfaces feed (issue #350) is gated the same way and for
+        # the same reason: an unpromoted surface is invisible, not merely
+        # unauthorised.
+        if parts[0] == "portal" and not self.surfaces.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the portal-surfaces feed is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.portal_surfaces)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
             if parts[0] == "fleet":
                 return self._route_fleet(parts, method, query)
+            if parts[0] == "portal":
+                return self._route_portal(parts, method)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -310,6 +331,22 @@ class ConsoleApplication:
         except (TypeError, ValueError):
             raise ApiError(400, "invalid_request", "limit must be an integer") from None
         return max(1, min(limit, self.FLEET_EVENTS_MAX_LIMIT))
+
+    # -- portal-surfaces feed (issue #350) -----------------------------------
+    def _route_portal(self, parts: list[str], method: str) -> Response:
+        """The portal-surfaces feed (issue #350).
+
+        One read: the pinned CMR fleet-surface document the serving layer ships
+        (``registry/portal-surfaces.pinned.json``, provenance in its ``pin``
+        block). GET-only; when the feature flag is off the route never reaches
+        here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the portal-surfaces feed is GET only")
+        surface = parts[1:]
+        if surface == ["surfaces"]:
+            return self._ok(self.surfaces.document())
+        raise ApiError(404, "not_found", f"no such portal surface: {'/'.join(surface)}")
 
     # -- session ------------------------------------------------------------
     def _require_session(self, cookies: dict[str, str]) -> tuple[Principal, dict[str, Any]]:

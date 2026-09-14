@@ -104,3 +104,16 @@ surfaces:
       fleet/console.py snapshot() served at GET /api/fleet/snapshot, the
       push channel GET /api/fleet/stream (SSE), and the history endpoint
       GET /api/fleet/events. Offline (no tmux, no TTY, no network egress).
+  portal_surfaces:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Settings→Modules surface feed (issue #350): the serving layer's read-only
+      projection of the CMR fleet-surface catalog (kushin77/CMR
+      catalog/portal-surfaces.json; the pinned revision and the upstream blob's
+      sha256 are recorded in registry/portal-surfaces.pinned.json) served at
+      GET /api/portal/surfaces. Offline: the pinned document is on disk, so the
+      route needs no network egress. Unblocks the shell's Settings→Modules page,
+      which had nothing to render while kushin77/CMR#708 was open.
