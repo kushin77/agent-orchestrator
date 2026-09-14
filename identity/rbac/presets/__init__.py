@@ -35,6 +35,12 @@ _PRESETS_DIR = Path(__file__).resolve().parent
 # Tenant types served by the built-in packs on disk.
 BUILTIN_TENANT_TYPES: tuple[str, ...] = ("platform", "startup", "smb", "enterprise")
 
+#: The C-suite boundary pack (issue #638). It is a *named* built-in pack, but
+#: deliberately NOT a tenant type: the four tenant types above keep their exact
+#: role mixes (asserted by the preset tests), while a caller that wants the
+#: executive seats asks for this key explicitly via ``resolve_csuite_pack()``.
+CSUITE_PACK_KEY = "csuite"
+
 _custom_packs: dict[str, "RolePack"] = {}
 
 
@@ -151,13 +157,23 @@ def parse_pack(yaml_text: str, *, fallback_key: str | None = None) -> RolePack:
     )
 
 
+def available_packs() -> tuple[str, ...]:
+    """Every pack key with a YAML file on disk, built-ins plus named packs."""
+    keys = {path.stem for path in _PRESETS_DIR.glob("*.yaml")}
+    return tuple(sorted(keys | set(BUILTIN_TENANT_TYPES)))
+
+
 def load_pack(key: str) -> RolePack:
-    """Load a built-in pack from the on-disk YAML beside this module."""
+    """Load a built-in or named pack from the on-disk YAML beside this module.
+
+    Accepts any ``<key>.yaml`` beside this module - the four tenant-type packs
+    plus named packs such as the C-suite boundary pack - so callers can load a
+    named pack without it becoming a tenant type.
+    """
     path = _PRESETS_DIR / f"{key}.yaml"
     if not path.is_file():
         raise KeyError(
-            f"unknown built-in pack {key!r}; registered built-ins: "
-            f"{', '.join(BUILTIN_TENANT_TYPES)}"
+            f"unknown pack {key!r}; packs on disk: {', '.join(available_packs())}"
         )
     return parse_pack(path.read_text(encoding="utf-8"), fallback_key=key)
 
@@ -179,6 +195,16 @@ def resolve_pack(tenant_type: str) -> RolePack:
         f"no pack for tenant type {tenant_type!r}; use a built-in "
         f"({', '.join(BUILTIN_TENANT_TYPES)}) or register a custom pack"
     )
+
+
+def load_csuite_pack() -> RolePack:
+    """Load the C-suite boundary pack (issue #638) from its YAML on disk.
+
+    Not a tenant type - the four built-in packs keep their exact role mixes - so
+    it is loaded by name. Refuses (``KeyError``) if the pack file is absent, so
+    a caller that needs the executive seats never silently gets an empty pack.
+    """
+    return load_pack(CSUITE_PACK_KEY)
 
 
 def seed_org(store, org, pack: RolePack | None = None) -> list[Role]:

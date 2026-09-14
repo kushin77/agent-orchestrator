@@ -135,7 +135,8 @@ Tests: [`tests/test_no_lockout.py`](tests/test_no_lockout.py).
 
 ## Preset role packs
 
-[`presets/`](presets/) holds YAML role packs, one per tenant type:
+[`presets/`](presets/) holds YAML role packs. Four are per **tenant type**
+(what `seed_org` resolves by default):
 
 | Pack | tenant_type | Roles |
 |------|-------------|-------|
@@ -143,6 +144,16 @@ Tests: [`tests/test_no_lockout.py`](tests/test_no_lockout.py).
 | [`startup.yaml`](presets/startup.yaml) | `startup` | owner, admin, member |
 | [`smb.yaml`](presets/smb.yaml) | `smb` | owner, admin, team-admin, member |
 | [`enterprise.yaml`](presets/enterprise.yaml) | `enterprise` | owner, admin, team-admin, agent-operator, member, viewer, auditor |
+
+Plus one **named** pack — loaded by name, deliberately *not* a tenant type, so
+the four above keep their exact role mixes:
+
+| Pack | key | Roles |
+|------|-----|-------|
+| [`csuite.yaml`](presets/csuite.yaml) | `csuite` | ceo, cto, coo, cfo, cmo (issue #638) |
+
+`load_pack(key)` accepts any `<key>.yaml` beside the module; `available_packs()`
+lists them; `load_csuite_pack()` loads the executive pack.
 
 Pack schema (see the YAML files):
 
@@ -198,6 +209,74 @@ Middleware contract (documented in full in the `guard.py` module docstring):
    fewer denials and is invisible to monitoring).
 
 Tests: [`tests/test_guard_sessions.py`](tests/test_guard_sessions.py).
+
+## C-suite role boundaries (issue #638)
+
+The two gates answer *what a principal may do*. [`boundaries.py`](boundaries.py)
+answers the complementary workbook question: *what is outside a seat's
+boundary*, so leaving it is **refused** rather than merely un-granted.
+
+A boundary is **derived, never restated**: `load_csuite_boundaries()` reads the
+landed persona cards `registry/personas/cards/{ceo,cto,coo,cfo,cmo}.yaml`
+(issue #632, read-only) plus `org-chart.yaml`, and cross-checks that the chart
+and the cards agree on each seat's reporting edge and monthly cap. The three
+boundary axes are the card's own fields:
+
+| Axis | Card field | Refusal |
+|------|-----------|---------|
+| lanes | `ownedLanes` | `"lanes"` — the target lane is not the seat's |
+| tools | `toolAllowlist` | `"tools"` — the tool is outside the seat's allowlist |
+| capability | `capabilitySet` | `"capabilities"` — the seat does not hold it |
+| budget | `monthlyBudgetCapUsd` (+ `guardrailPolicyRef`) | `"budget"` — spend would exceed the cap |
+
+```python
+pack = load_csuite_boundaries()                       # 5 seats, from the cards
+decision = guard_boundary(pack, "cfo", BoundaryAction(lane="marketing"))
+assert decision.refused and decision.axis == "lanes"  # refused, naming the axis
+```
+
+A refusal names the offender (lane / tool / capability / amount) and the seat's
+own boundary on that axis, so a gate can quote the reason. An unreadable
+boundary — a card missing a boundary field, or a chart disagreeing with a card —
+is a loud error at load time, never a silently unbounded seat.
+
+The RBAC **preset pack** for the same five seats is
+[`presets/csuite.yaml`](presets/csuite.yaml) (`load_csuite_pack()`); its
+permissions are the RBAC projection of the same cards. Pack key `csuite` is a
+*named* pack, deliberately **not** a tenant type, so the four built-in packs
+keep their exact role mixes. Only the CEO grants `roles:manage` — the executive
+authority the no-lockout invariant protects.
+
+Tests: [`tests/test_csuite_boundaries.py`](tests/test_csuite_boundaries.py).
+
+## Org-wide skill sharing and cross-tenant isolation (issue #638)
+
+The skills adapter (`integrations/paperclip/adapters/skills/`) declares *which*
+`SKILL.md` files load; it deliberately carries no tenancy. [`skills.py`](skills.py)
+supplies the audience half:
+
+- **Platform** skills are owned by `PLATFORM_ORG` (`platform`) and shared
+  **read-only** with every org — visible to all, modifiable by none, and never
+  shadowable (a tenant registering the same id is refused).
+- **Tenant** skills are owned by exactly one Org and are **never visible to
+  another tenant** — no wildcard, no fallback.
+- **Org-scoped shares** (`share_org_scope`) are **explicit**: only the owner may
+  share, and every target org is named. A wildcard (`"*"`) target is refused
+  (`CrossTenantShareError`) rather than silently widened to every tenant.
+
+Visibility is *computed* (`visible_skills(viewer_org)` / `invisible_skills`),
+never a stored mutable flag — the dangerous failure mode of a stored field is
+that it silently drifts from the shares that justify it, the same reasoning that
+makes the guard re-resolve live bindings instead of trusting a session snapshot.
+
+```python
+reg = SkillShareRegistry()
+reg.register_platform("mcp-tool-projection")           # visible to every org
+reg.register_tenant("acme-onboarding", owner_org="acme")
+assert "acme-onboarding" not in {s.id for s in reg.visible_skills("globex")}
+```
+
+Tests: [`tests/test_skills_isolation.py`](tests/test_skills_isolation.py).
 
 ## Layout
 
