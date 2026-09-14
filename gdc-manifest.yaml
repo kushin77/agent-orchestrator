@@ -9,8 +9,22 @@
 # (vendor/CMR/templates/module/gdc-manifest.yaml); the declaration gate
 # (scripts/check-diagrams-declaration.sh) fails by name if a mandatory pin or
 # its version/update policy drifts from that template.
+#
+# RENDERED, NOT HAND-EDITED (issue #703): this file is the render of
+# governance/onboarding/shared-frontend/template.yaml for the instance
+# governance/onboarding/shared-frontend/instance.yaml. Its
+# shared-frontend.tokens twin is vendored byte-verbatim from
+# kushin77/shared-frontend@shared/design-tokens/tokens.json (rev
+# ace748f4, tag v0.2.0); the onboarding gate
+# (scripts/check-shared-frontend-onboarding.sh) refuses a dropped pin, a
+# pin whose version/update policy moved, a token set that drifted from the
+# pinned rev, and this file disagreeing with the render of the instance.
 repo: kushin77/agent-orchestrator
 schema: cmr.gdc-manifest/v1
+x-onboarding:
+  org: elevatediq
+  tenant: kushin77-platform
+  domain: ai.purebliss.app
 features:
   - id: code-indexing.mcp
     default: "on"

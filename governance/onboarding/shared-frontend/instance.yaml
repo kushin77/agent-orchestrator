@@ -1,0 +1,21 @@
+# The onboarding INSTANCE for kushin77/agent-orchestrator (issue #703).
+#
+# This is the only hand-edited file in the lane: it names WHO is being onboarded
+# (org / tenant / domain) and WHICH repo consumes the assets. Everything else —
+# `tokens.json` and `gdc-manifest.yaml` at the repo root — is RENDERED from
+# `template.yaml` by `render.py`, and
+# `scripts/check-shared-frontend-onboarding.sh` fails by name when the committed
+# files are not that render.
+#
+# Every value below resolves against `vocabulary.yaml`:
+#   * org    — the enterprise/GDC org (`governance/rollup/pilot/org.yaml`)
+#   * tenant — the tenant under that org that owns this repo
+#   * domain — the host the tenant owns; `ai.purebliss.app` is the measured
+#              default of infra/terraform/modules/web-surface/variables.tf
+#   * repo   — the `owner/name` slug the spoke manifest declares
+schema: ao.shared-frontend-onboarding/instance/v1
+kind: SharedFrontendOnboardingInstance
+org: elevatediq
+tenant: kushin77-platform
+domain: ai.purebliss.app
+repo: kushin77/agent-orchestrator
