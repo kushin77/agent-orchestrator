@@ -63,6 +63,24 @@ python3 governance/conformance/cli.py policy
 `make conformance` runs the board check *and* the filing self-control;
 `make verify` runs it as the 12th check via `scripts/check-conformance.sh`.
 
+## Per-surface target solution-classes (issue #351)
+
+The board check above classifies a piece of *work*. The surface counterpart
+classifies a *surface*: every product surface declares the rung of the ladder it
+is held to, and the gate fails while the surface sits below that declaration.
+`make surface-class` runs it (wired into `make verify` right after
+`conformance`); the declaration table, the measured class of each surface and
+what is mechanised versus `manual` are in
+[`docs/SURFACE-CLASS.md`](../../docs/SURFACE-CLASS.md).
+
+* [`surfaces.yaml`](surfaces.yaml) — the declared surfaces, the closed evidence
+  vocabulary and the cumulative per-rung requirements.
+* [`surfaces.py`](surfaces.py) — the checker: measures the machine evidence,
+  derives the measured class and emits stable finding codes.
+* `scripts/check-surface-class.sh` — the tri-state gate, with a self-mutating
+  negative control that raises a declared class beyond its evidence and requires
+  the refusal by name.
+
 ## The filing path — prevention, not repair (issue #320)
 
 A gate that only refuses an unclassified issue *after* it exists leaves the board
@@ -127,6 +145,8 @@ Path arguments are repository-relative, which is what git reports.
 | [`checker.py`](checker.py) | board and change-set checking |
 | [`filing.py`](filing.py) | the issue-filing seam: derive the declaring labels, or refuse (#320) |
 | [`cli.py`](cli.py) | check / change-set / filing-check / file / policy / report |
+| [`surfaces.yaml`](surfaces.yaml) | the declared surfaces + the closed evidence vocabulary (#351) |
+| [`surfaces.py`](surfaces.py) | the per-surface target-class checker (#351) |
 
 To change the standard, edit [`policy.yaml`](policy.yaml) — it is the single
 declaration of what conformance means. No code change is needed to add a rung, an

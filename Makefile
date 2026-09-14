@@ -16,8 +16,8 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity paperclip-adapter \
-        brain-profile conformance lessons ticket secrets feature-flags cloudbuild terraform tf-fmt \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
+        brain-profile conformance lessons ticket secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
 
@@ -92,11 +92,16 @@ help:
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
 	@echo "                milestoned issue classified; mandates checked on the diff"
+	@echo "  surface-class Per-surface target solution-class (#351): every surface"
+	@echo "                meets the rung it declares, or the gate fails"
 	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
 	@echo "                RCA, every action recorded, every lesson evidenced"
 	@echo "  fleet-state   Unified fleet-state projection (#323): lanes + sessions +"
 	@echo "                claims + journals + directives joined per item; exits"
 	@echo "                non-zero when anything is orphaned, shelved or wedged"
+	@echo "  agent-identity-parity  Shared agent-identity schema (#346): the closed"
+	@echo "                vocabularies must equal the AgentProfile schema and the"
+	@echo "                catalog, and every seed must validate as an identity"
 	@echo "  secrets       Mechanical secret scan (always on)"
 	@echo "  worktrees     Reclaim stale lane worktrees (dry run; --apply via"
 	@echo "                scripts/prune-worktrees.sh). Keeps dirty, in-use and"
@@ -261,6 +266,24 @@ paperclip-gap-analysis:
 ## cannot pass vacuously
 gateway-catalog-parity:
 	@bash scripts/check-gateway-catalog-parity.sh
+## agent-identity-parity — one shared, versioned agent-identity schema is the
+## single source of truth for both repos (issue #346): the shared schema's
+## closed vocabularies must EQUAL agent-profile.schema.json + catalog.yaml and
+## the status enum must be the union of both repos, every seed is projected to
+## the identity view and validated (a free-text capability or an
+## out-of-vocabulary status is refused), and the check mutates a scratch copy
+## and requires each mutant to be refused, so it cannot pass vacuously
+agent-identity-parity:
+	@bash scripts/check-agent-identity-parity.sh
+
+## guardrail-controls — server-side guardrail control semantics (issue #343):
+## every control defaults OFF, an unknown control is refused, a toggle writes
+## exactly one append-only audit record and flips observable state a second
+## reader sees, the Portkey-style 246 PASSED / 446 BLOCKED vocabulary is closed,
+## and a control that ships ON is refused (self-mutating negative control), so
+## it cannot pass vacuously
+guardrail-controls:
+	@bash scripts/check-guardrail-controls.sh
 
 
 ## fleet-state — unified fleet-state projection (issue #323): one read-only
@@ -310,6 +333,13 @@ conformance:
 ## (GR-15 code-native automation; new infrastructure ships flag-gated OFF)
 conformance-change-set:
 	@python3 governance/conformance/cli.py change-set
+
+## surface-class — per-surface target solution-class enforcement (issue #351):
+## every product surface declares a rung of the CMR ladder and the gate fails
+## while a surface sits below its declaration; a declared class raised above the
+## surface's evidence is refused by name (self-mutating negative control)
+surface-class:
+	@bash scripts/check-surface-class.sh
 
 ## remediation — auto-generate violator remediation issues from policy drift
 ## (issue #142): board conformance findings must produce a well-formed
@@ -372,6 +402,16 @@ board-gate:
 ## open, and a snapshot whose records lack a body is CANNOT-ASSESS, never OK
 cross-repo-boundary:
 	@bash scripts/check-cross-repo-boundary.sh
+
+## audit-read-model — the read-only, filterable audit read model (issue #347):
+## the tamper-evident trail served as a deterministic read model with
+## verify-chain semantics; an intact chain is OK, a modified / reordered /
+## removed / truncated record is NOT-OK named by position, an unparseable chain
+## is CANNOT-ASSESS (never a pass), an unknown filter field is refused, and the
+## module exposes no write path (proved by parsing its source). Every tamper is
+## provoked on a temp copy with a self-mutating negative control.
+audit-read-model:
+	@bash scripts/check-audit-read-model.sh
 
 ## secrets — mechanical secret scan (always on, no external tool dependency)
 secrets:

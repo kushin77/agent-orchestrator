@@ -1,0 +1,9 @@
+{
+  "tier": "auditor",
+  "model": "deepseek-v4-pro",
+  "escalation": {
+    "status": "human_advisor",
+    "ladder": ["flash", "pro", "auditor"],
+    "terminal": "human_advisor"
+  }
+}

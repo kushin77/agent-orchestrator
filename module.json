@@ -137,5 +137,60 @@
   },
   "provenance": {
     "harvested_from": null
-  }
+  },
+  "parent": {
+    "schema": "cmr.module.admission/v1",
+    "module_id": "agent-orchestrator",
+    "repo": "kushin77/agent-orchestrator",
+    "uplink": "kushin77/CMR",
+    "contract": "docs/MODULE-ADMISSION.md"
+  },
+  "submodules": [
+    {
+      "id": "hermes-agents",
+      "repo": "kushin77/hermes-agents",
+      "admission": "requested",
+      "request": "kushin77/hermes-agents#3",
+      "repo_exists": true,
+      "peer_manifest": false,
+      "peer_parent": null,
+      "module_version": null,
+      "evidence": "gh api repos/kushin77/hermes-agents/contents/module.json -> HTTP 404 (2026-09-14)"
+    },
+    {
+      "id": "deepseek",
+      "repo": "kushin77/deepseek",
+      "admission": "requested",
+      "request": "kushin77/deepseek#1",
+      "repo_exists": true,
+      "peer_manifest": true,
+      "peer_parent": null,
+      "module_version": "v0.1.0",
+      "evidence": "module.json present (blob d02f3eb5), cmr.module/v1, versions.latest v0.1.0, no parent key (2026-09-14)"
+    },
+    {
+      "id": "ollama",
+      "repo": "kushin77/ollama",
+      "admission": "requested",
+      "request": "kushin77/ollama#429",
+      "repo_exists": true,
+      "peer_manifest": false,
+      "peer_parent": null,
+      "module_version": null,
+      "evidence": "gh api repos/kushin77/ollama/contents/module.json -> HTTP 404 (2026-09-14)"
+    },
+    {
+      "id": "paperclip",
+      "repo": "kushin77/paperclip",
+      "admission": "independent",
+      "request": "kushin77/paperclip#10",
+      "rationale": "kushin77/CMR#794",
+      "repo_exists": true,
+      "peer_manifest": false,
+      "peer_parent": null,
+      "module_version": null,
+      "evidence": "answered not-a-sub-module: paperclip.ing is the external serving layer, not a child module; hub doubt raised in kushin77/CMR#794 (2026-09-14)"
+    }
+  ],
+  "dependencies": []
 }

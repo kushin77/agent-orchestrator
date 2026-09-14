@@ -73,6 +73,7 @@ writes the real ADR.
 | [ADR-0012](ADR-0012-hermes-paperclip-boundary.md) | Hermes/Paperclip ownership boundary for the fleet | accepted | issue #303, amended by #317 (M26) |
 | [ADR-0013](ADR-0013-paperclip-ing-integration.md) | Paperclip-ing integration mode — adopt the upstream CLI over HTTP (embed-vs-fork-vs-CLI) | accepted | issue #370 (M26) |
 | [ADR-0014](ADR-0014-ticket-single-join-node-contract-v2.md) | The paperclip ticket is the single join node — ticket contract v2 (facets, authority) | accepted | issue #400 (EPIC #399, M26) |
+| [ADR-0015](ADR-0015-routing-seam-single-authority.md) | Routing seam — the extracted tier-routing package is a policy source we map, not a runtime we couple | accepted | issue #426 (M28) |
 
 The reserved set covers every pillar contract named in EPIC-00 (issue #4) and
 [`ARCHITECTURE.md`](../ARCHITECTURE.md): agent-registry, model-gateway,
