@@ -105,8 +105,18 @@ manifest `scripts/pytest-suites.txt`. `make gate` runs it in isolation like
 every other suite (a combined invocation would collide on `conftest.py`
 bootstraps — see `docs/QA-GATE.md`).
 
+**Since issue #525 this suite is also an entry in the gate of record**: it is
+wired into `scripts/verify.sh`'s `checks=(...)` array as `e2e`, so `make verify`
+executes it in every lane and the attestation's `check_count` names it. Before
+that it ran only under `make gate` / `make tests`, which nothing enforces, so
+this Definition-of-Done proof could be skipped. It is wired as a real PASS/FAIL
+check — never the `rc 2` CANNOT-ASSESS state — because the suite is offline and
+deterministic, so a genuine regression reds the gate by name.
+
 ```bash
+make e2e          # only the capstone e2e suite (same command as the gate entry)
 make tests        # every declared suite incl. e2e, in isolation
+make verify       # gate of record, now incl. e2e (issue #525)
 make gate         # GATE: PASS requires e2e green
 make merge-gate   # pre-merge contract incl. attestation naming the commit
 ```

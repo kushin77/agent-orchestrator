@@ -13,12 +13,16 @@
 # failure -- and is named in the summary and in the attestation, so a skip can
 # never hide. Only a definite NOT-OK (or an unexpected code) fails the run.
 #
-# The check set includes the declared `fleet` pytest suite (`pytest-fleet`).
+# The check set includes the declared `fleet` pytest suite (`pytest-fleet`) and
+# the declared capstone `e2e` suite (`e2e`).
 # The gate of record must exercise the tests it claims to cover: a red fleet
 # suite sat on master undetected because this gate ran no pytest at all — only
-# `make gate` / `make tests` did (gate gap, issue #331). The remaining declared
-# suites are still exercised only by `make gate`; `governance/lessons` is red
-# for an unrelated board-hygiene defect (#312).
+# `make gate` / `make tests` did (gate gap, issue #331). The capstone E2E suite
+# had the same gap: it was declared in scripts/pytest-suites.txt, but only `make
+# gate` / `make tests` ran it, so the EPIC-00 Definition-of-Done proof could be
+# skipped outright (issue #525). The remaining declared suites are still
+# exercised only by `make gate`; `governance/lessons` is red for an unrelated
+# board-hygiene defect (#312).
 #
 # Usage: scripts/verify.sh [verify|gate]
 set -u
@@ -160,6 +164,20 @@ checks=(
   'codeidx-surface|bash scripts/check-codeidx-surface.sh'
   'codeidx-backend|bash scripts/check-codeidx-backend.sh'
   'context-pack-consumption|bash scripts/check-context-pack-consumption.sh'
+  # e2e (issue #525): the capstone end-to-end suite. e2e/README.md calls this
+  # subtree the gate of the whole product build — it proves the EPIC-00
+  # Definition of Done (signup -> org -> personas -> agents -> routed model
+  # calls -> audit + usage billing, across all six providers, with 10 real
+  # negative controls in e2e/negative_controls.py). It was declared in
+  # scripts/pytest-suites.txt but ran only under `make gate` / `make tests`,
+  # which nothing enforces, so the DoD proof could be skipped and a broken DoD
+  # could reach master. It is wired as an ordinary PASS/FAIL check — a real
+  # failure is rc 1, never a SKIP — because the suite is offline, deterministic
+  # and green, so the CANNOT-ASSESS third state does not apply.
+  # PYTHONDONTWRITEBYTECODE + `-p no:cacheprovider` keep the gate clear of the
+  # __pycache__ state that can make a later run read a stale module instead of
+  # the tree under test.
+  'e2e|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q e2e/tests'
   # EPIC #494 (the monitoring program; issue #499 is the wiring lane): the
   # declaration gate (#496, ADR-0022) proves BOTH halves of the monitoring
   # declaration are real -- `module.json` carries exactly one flat
