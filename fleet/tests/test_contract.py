@@ -8,6 +8,7 @@ can actually carry.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -17,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "fleet" / "CONTRACT.md"
 ADR = ROOT / "docs" / "decision-records" / "ADR-0011-session-fleet-transport.md"
 SCHEMA = ROOT / "fleet" / "schema" / "message.schema.json"
+STANDING_DIRECTIVE = ROOT / "fleet" / "directive.json"
 
 DIRECTIVE_VERBS = (
     "spawn-epic-agent",
@@ -94,3 +96,80 @@ def test_the_readme_runbook_defers_to_the_contract():
     assert "CONTRACT.md" in runbook, (
         "fleet/README.md is the runbook and must defer to the normative contract"
     )
+
+
+def standing_body() -> str:
+    return str(json.loads(STANDING_DIRECTIVE.read_text(encoding="utf-8")).get("body") or "")
+
+
+def test_standing_directive_declares_the_live_cicd_sdlc_clause():
+    """The operator's standing order (2026-09-14) is carried in the directive itself."""
+    body = standing_body()
+    assert "LIVE CI/CD SDLC (standing clause)" in body, (
+        "the standing directive must declare the live CI/CD SDLC clause by name"
+    )
+    for marker in (
+        "Verify:",
+        "make verify",
+        "REAL output",
+        "ATOMIC",
+        "one issue = one lane = one self-contained, green, reversible commit",
+        "ON MERGE",
+        "apply pipeline",
+        "No agent merges failing or unverified work",
+        "GR-15",
+        "GitHub Actions",
+    ):
+        assert marker in body, f"the live CI/CD SDLC clause must declare '{marker}'"
+
+
+def test_standing_directive_declares_the_replaceability_clause():
+    body = standing_body()
+    assert "REPLACEABILITY / LIVE INSTRUCTIONS (standing clause)" in body, (
+        "the standing directive must declare the replaceability clause by name"
+    )
+    for marker in (
+        "REPLACED",
+        "NEW INSTRUCTIONS FRONTLOADED",
+        "executes ONLY the directive it was given",
+        "never only in the agent's context",
+        "TERMINAL",
+        "SUPERSEDES",
+        "supersedes",
+    ):
+        assert marker in body, f"the replaceability clause must declare '{marker}'"
+
+
+def test_standing_directive_keeps_the_dsv4fnone_and_roles_content():
+    """The new clauses are additive: the DSv4FNone order and the roles stay."""
+    body = standing_body()
+    for marker in (
+        "DSv4FNone",
+        "DeepSeek v4.1 Flash",
+        "dumb terminal",
+        "ROLES:",
+        "brain = DSv4PM (DeepSeek v4 Pro Max)",
+        "fleet/control.py",
+    ):
+        assert marker in body, f"the standing directive must keep '{marker}'"
+
+
+def test_the_subagent_prompt_frontloads_the_standing_mandate():
+    """The loop's prompt must carry the standing clauses, in its first paragraph.
+
+    This is the cross-artifact edge: the directive declares the mandate AND the
+    prompt the loop actually writes frontloads it, so an edit that drops either
+    half fails here rather than shipping silently.
+    """
+    sys_path_bootstrap = ROOT / "fleet"
+    import sys
+
+    sys.path.insert(0, str(sys_path_bootstrap))
+    import terminal  # noqa: E402  (repo convention: fleet/ namespace module)
+
+    prompt = terminal.build_prompt({"id": "d-1", "task": {"issue": 163}, "body": "x"})
+    first_paragraph = prompt.split("\n\n", 1)[0]
+    assert "STANDING MANDATE" in first_paragraph
+    assert "LIVE CI/CD SDLC" in first_paragraph
+    assert "REPLACEABILITY" in first_paragraph
+    assert standing_body() in prompt

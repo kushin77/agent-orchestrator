@@ -41,6 +41,24 @@ import singleton
 import telemetry
 
 ROOT = Path(__file__).resolve().parent.parent
+#: The standing directive (`fleet/directive.json`) — "the DSv4FNone order, in code".
+#: Every subagent prompt carries its standing clauses verbatim rather than a
+#: paraphrase, so the mandate travels with the order and cannot drift from it.
+DIRECTIVE_PATH = ROOT / "fleet" / "directive.json"
+
+
+def load_standing_body(path: Path | None = None) -> str:
+    """The standing directive's body, or '' when it cannot be read.
+
+    The prompt frontload must survive a directive file that is missing or
+    malformed — the dispatch itself is more important than the preamble — so a
+    read failure degrades to the inline default in `build_prompt` instead of
+    killing the spawn.
+    """
+    try:
+        return str(json.loads((path or DIRECTIVE_PATH).read_text(encoding="utf-8")).get("body") or "")
+    except (OSError, json.JSONDecodeError):
+        return ""
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 #: The institutional lane provisioner: mints the session identity before each spawn.
 ISOLATION_CLI = str(ROOT / "governance" / "isolation" / "cli.py")
@@ -276,6 +294,14 @@ def build_prompt(
     which branch it is on cannot keep its commits traceable to the ticket, so the
     id, the branch and the required trailer are stated rather than assumed.
 
+    The mandate comes FIRST. The standing directive's live-CI/CD-SDLC and
+    replaceability clauses are frontloaded ahead of the order itself, because a
+    subagent that reads only the first lines must still know that it is gated
+    (real `Verify:` + `make verify` output is the evidence), that its commit must
+    be atomic and green, and that it may be replaced at any moment — so it
+    executes only this directive, keeps every fact it needs in artifacts, and
+    leaves every artifact terminal.
+
     The prompt also carries a CONTEXT PACK (#220) — the issue's title, body and
     acceptance criteria, its lane and its own ``Verify:`` clause, plus the lessons
     a previous lane already paid for — so the subagent does not have to rediscover
@@ -292,6 +318,34 @@ def build_prompt(
     identity = env or {}
     session = identity.get("AO_SESSION_ID", "")
     branch = identity.get("AO_BRANCH", "")
+    standing = load_standing_body() or (
+        "LIVE CI/CD SDLC: run the issue's own `Verify:` command AND `make verify`; their REAL output "
+        "is the only evidence; one issue = one lane = one self-contained green commit. "
+        "REPLACEABILITY: the brain may replace you or frontload new instructions at any moment — "
+        "execute ONLY this directive, keep every fact that matters in artifacts (issue, branch, "
+        "claim ledger, board), and leave every artifact terminal."
+    )
+    mandate = (
+        "STANDING MANDATE — LIVE CI/CD SDLC + REPLACEABILITY (read this first; it is the operator's "
+        "standing order as carried in fleet/directive.json):\n"
+        f"{standing}\n"
+        "What that means for THIS run, in order:\n"
+        f"a. GATE OF RECORD: run issue #{issue}'s own `Verify:` command AND `make verify`, and quote "
+        "their REAL output. Unverified work is not done, and neither command may be skipped or "
+        "reported from memory.\n"
+        "b. ATOMIC + GREEN: one issue = one lane = one self-contained, green, reversible commit; a "
+        "perfected (green-verified) commit reaches production on merge through the declared apply "
+        "pipeline — never a hand-carried deploy and never a console click.\n"
+        "c. NEVER MERGE FAILING WORK and never add a GitHub Actions workflow (GR-15 — automation is "
+        "code-native `make` targets run by the ops runner and cron).\n"
+        "d. REPLACEABLE, NOT AUTHORITATIVE: the brain may replace you or frontload new instructions "
+        "at any moment. Execute ONLY this directive — do not self-escalate scope, pick your own "
+        "issue, or re-plan the board.\n"
+        "e. STATE LIVES IN ARTIFACTS: anything a replacement needs must live in the issue, the "
+        "branch, the claim ledger or the board — never only in your context.\n"
+        "f. LEAVE EVERY ARTIFACT TERMINAL: PR merged at green evidence, source branch deleted, claim "
+        "released, directive consumed, issue closed with evidence. Strand nothing.\n\n"
+    )
     where = (
         f"Your worktree is {worktree} (branch {branch or worktree.name}). Work ONLY there — never in the "
         "shared checkout, which other lanes are using.\n"
@@ -310,6 +364,7 @@ def build_prompt(
     )
     context_block = render_context_pack(pack) if pack else ""
     return (
+        f"{mandate}"
         "You are an epic-focused subagent in the kushin77/agent-orchestrator fleet, "
         "steered by the brain through the sister session. "
         f"{where}{who}\n"

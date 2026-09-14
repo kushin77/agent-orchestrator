@@ -72,6 +72,60 @@ def test_build_prompt_states_the_session_identity_and_the_ticket_trailer():
     assert "Refs kushin77/agent-orchestrator#163" in prompt
 
 
+def test_build_prompt_frontloads_the_live_cicd_and_replaceability_mandate():
+    """The standing mandate must be in the FIRST paragraph, not buried at the end.
+
+    The operator's standing order (2026-09-14) is that every agent complies to a
+    live CI/CD SDLC and is replaceable at any moment. The repo's own convention is
+    to frontload the goal, so a subagent that reads only the first lines still
+    knows it is gated and that it is not authoritative.
+    """
+    directive = {
+        "id": "d-mandate",
+        "task": {"issue": 163, "lane": "fleet"},
+        "model": {"tier": "flash", "thinking": "low"},
+        "body": "frontload-me",
+    }
+    prompt = terminal.build_prompt(directive)
+    first_paragraph = prompt.split("\n\n", 1)[0]
+    assert "STANDING MANDATE" in first_paragraph
+    assert "LIVE CI/CD SDLC" in first_paragraph
+    assert "REPLACEABILITY" in first_paragraph
+    # The mandate precedes the order and the role statement.
+    assert prompt.index("STANDING MANDATE") < prompt.index("BRAIN DIRECTIVE d-mandate")
+    assert prompt.index("STANDING MANDATE") < prompt.index("epic-focused subagent")
+    assert "frontload-me" in prompt
+    # The gate of record: the issue's own Verify: AND make verify, real output.
+    assert "`make verify`" in prompt
+    assert "REAL output" in prompt
+    # Atomic + green, and the apply pipeline rather than a console click.
+    assert "one issue = one lane = one self-contained, green, reversible commit" in prompt
+    assert "never a console click" in prompt
+    # GR-15: no GitHub Actions workflow.
+    assert "no agent adds a GitHub Actions workflow" in prompt.lower() or "GitHub Actions" in prompt
+    # Replaceability: execute only this directive; state in artifacts; terminal.
+    assert "Execute ONLY this directive" in prompt
+    assert "never only in your context" in prompt
+    assert "LEAVE EVERY ARTIFACT TERMINAL" in prompt
+
+
+def test_build_prompt_standing_mandate_is_carried_verbatim_from_the_directive():
+    """The prompt's mandate is the standing directive's clauses, not a paraphrase."""
+    standing = terminal.load_standing_body()
+    assert "LIVE CI/CD SDLC (standing clause)" in standing
+    assert "REPLACEABILITY / LIVE INSTRUCTIONS (standing clause)" in standing
+    prompt = terminal.build_prompt({"id": "d-1", "task": {"issue": 163}, "body": "x"})
+    assert standing in prompt
+
+
+def test_build_prompt_degrades_when_the_standing_directive_is_unreadable(tmp_path):
+    """A missing directive file must not kill the spawn: the mandate degrades."""
+    missing = tmp_path / "absent.json"
+    assert terminal.load_standing_body(missing) == ""
+    # An empty standing body still yields the explicit block (the inline default).
+    assert "STANDING MANDATE" in terminal.build_prompt({"id": "d-1", "task": {"issue": 163}, "body": "x"})
+
+
 def test_extract_json_parses_watch_output():
     text = '{\n "id": "d-1",\n "type": "directive"\n}\nchannel watch: DIRECTIVE d-1 — 1 pending'
     assert terminal.extract_json(text) == {"id": "d-1", "type": "directive"}
