@@ -16,7 +16,7 @@ SHELL := /bin/bash
 
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
-        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration \
+        issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy knowledge-index knowledge-index-build cross-reference paperclip-gap-analysis paperclip-integration \
         brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
@@ -246,6 +246,14 @@ knowledge-index:
 ## runner invokes the same command on its schedule)
 knowledge-index-build:
 	@python3 governance/knowledge/cli.py build
+
+## cross-reference — cross-reference spine (EPIC #138, issue #384): the
+## catalogue's typed relationships are valid (closed vocabulary, resolvable
+## endpoints), every cmr-refs: marker resolves, and the spine rebuilds
+## deterministically; the check mutates its own input, so it cannot pass
+## vacuously
+cross-reference:
+	@bash scripts/check-cross-reference.sh
 
 ## conformance — CMR class/pattern/template enforcement (issue #140): every
 ## milestoned issue must be classified, and the class it declares must hold

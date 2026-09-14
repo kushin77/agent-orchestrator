@@ -76,6 +76,43 @@ Drift (assets changed, added or removed since the recorded catalogue) is reporte
 as a **warning** naming each asset, because sources legitimately change and a gate
 that blocked every document edit would be disabled within a week.
 
+## Cross-reference spine
+
+The catalogue records *nodes*; the cross-reference spine records the *edges*
+between them as a `relationships` list in `catalog.json`. [`crossref.py`](crossref.py)
+is the deterministic builder — sorted, deduplicated, and byte-stable across
+rebuilds because edges carry no timestamps — and the gate of record is
+[`../../scripts/check-cross-reference.sh`](../../scripts/check-cross-reference.sh)
+(the `cross-reference` target).
+
+Edges are drawn from four sources and typed by a closed vocabulary
+(`supersedes`, `parent-of`, `blocked-by`, `caused-by`, `mitigates`, `origin`,
+`refs`, `part-of`, `implements` — see `RELATIONSHIP_TYPES` in
+[`model.py`](model.py)):
+
+* ADR front-matter `supersedes:` → `supersedes`;
+* `.board/snapshot.json` `parent` / `blocked_by` → `parent-of` / `blocked-by`;
+* `governance/lessons/ledger.jsonl` → `caused-by` (RCA → incident),
+  `mitigates` (corrective action → RCA; lesson → incident) and `origin`
+  (RCA/incident → its source reference);
+* `cmr-refs:` markers in tracked markdown → `refs`.
+
+### `cmr-refs:` markers
+
+A markdown line beginning with `cmr-refs:` declares a comma-separated list of
+targets the document references:
+
+```text
+cmr-refs: ADR-0012, GR-11, RCA-0001
+```
+
+Target forms are closed: `ADR-NNNN`, `GR-N`, `#N` (issue), `RCA-NNNN`,
+`LESSON-NNNN`, `INC-NNNN`, or a repo-relative path in backticks. Every target
+must resolve (the file exists, or the entity id is present in the catalogue,
+board snapshot or ledger); a target that cannot be validated is a FAIL, never a
+skip. The normative convention is
+[`../../docs/CROSS-REFERENCE-SPINE.md`](../../docs/CROSS-REFERENCE-SPINE.md).
+
 ## Maintenance and refresh cadence
 
 | When | Action |
@@ -98,6 +135,7 @@ kind, glob, owner and whether it is required. Nothing else needs touching.
 | [`model.py`](model.py) | kinds, provenance, findings, coverage |
 | [`sources.py`](sources.py) | the declarative source catalogue |
 | [`indexer.py`](indexer.py) | build, coverage, drift |
+| [`crossref.py`](crossref.py) | cross-reference spine: relationship builder + target resolution |
 | [`secretpolicy.py`](secretpolicy.py) | credential scanning for indexed assets |
 | [`query.py`](query.py) | search with source-backed evidence |
 | [`cli.py`](cli.py) | build / validate / query / coverage |

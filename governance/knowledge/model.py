@@ -61,6 +61,33 @@ REQUIRED_KINDS: FrozenSet[str] = frozenset(
 )
 EXPECTED_KINDS: FrozenSet[str] = frozenset({KIND_LESSONS, KIND_RCA})
 
+# -- relationships (cross-reference spine) -----------------------------------
+# The closed vocabulary of edge types. An edge whose type is not drawn from
+# this tuple is invalid; the gate fails it by name. The builder
+# (:mod:`governance.knowledge.crossref`) emits a subset of these today; the rest
+# are reserved so a future source cannot invent an ungoverned edge type.
+RELATIONSHIP_SUPERSEDES = "supersedes"
+RELATIONSHIP_PARENT_OF = "parent-of"
+RELATIONSHIP_BLOCKED_BY = "blocked-by"
+RELATIONSHIP_CAUSED_BY = "caused-by"
+RELATIONSHIP_MITIGATES = "mitigates"
+RELATIONSHIP_ORIGIN = "origin"
+RELATIONSHIP_REFS = "refs"
+RELATIONSHIP_PART_OF = "part-of"
+RELATIONSHIP_IMPLEMENTS = "implements"
+
+RELATIONSHIP_TYPES: Tuple[str, ...] = (
+    RELATIONSHIP_SUPERSEDES,
+    RELATIONSHIP_PARENT_OF,
+    RELATIONSHIP_BLOCKED_BY,
+    RELATIONSHIP_CAUSED_BY,
+    RELATIONSHIP_MITIGATES,
+    RELATIONSHIP_ORIGIN,
+    RELATIONSHIP_REFS,
+    RELATIONSHIP_PART_OF,
+    RELATIONSHIP_IMPLEMENTS,
+)
+
 # -- findings ---------------------------------------------------------------
 SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
@@ -166,6 +193,42 @@ class Provenance:
 
 
 @dataclass(frozen=True)
+class Relationship:
+    """One typed edge between two knowledge nodes.
+
+    ``type`` must be drawn from :data:`RELATIONSHIP_TYPES` — the closed
+    vocabulary. ``via`` is optional and names the artifact that declared the
+    edge (a marker file, a ledger record id, a snapshot field) so the edge is
+    traceable back to its source. Edges carry no timestamps: two builds over one
+    revision must produce identical bytes.
+    """
+
+    from_id: str
+    type: str
+    to_id: str
+    via: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        data = {
+            "from_id": self.from_id,
+            "type": self.type,
+            "to_id": self.to_id,
+        }
+        if self.via:
+            data["via"] = self.via
+        return data
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> "Relationship":
+        return cls(
+            from_id=str(raw.get("from_id", "")),
+            type=str(raw.get("type", "")),
+            to_id=str(raw.get("to_id", "")),
+            via=str(raw.get("via", "")),
+        )
+
+
+@dataclass(frozen=True)
 class KnowledgeItem:
     """One indexed object: an id, its kind, its provenance and its terms.
 
@@ -234,6 +297,7 @@ class Index:
     generated_at: str
     repo: str
     items: List[KnowledgeItem] = field(default_factory=list)
+    relationships: List[Relationship] = field(default_factory=list)
     coverage: List[Coverage] = field(default_factory=list)
     findings: List[Finding] = field(default_factory=list)
     schema: str = SCHEMA_ID
@@ -253,6 +317,7 @@ class Index:
             "counts": self.counts(),
             "coverage": [c.as_dict() for c in self.coverage],
             "findings": [f.as_dict() for f in self.findings],
+            "relationships": [r.as_dict() for r in self.relationships],
             "items": [i.as_dict() for i in self.items],
         }
 
@@ -263,6 +328,10 @@ class Index:
             repo=str(raw.get("repo", "")),
             schema=str(raw.get("schema", SCHEMA_ID)),
             items=[KnowledgeItem.from_dict(i) for i in raw.get("items", []) or []],
+            relationships=[
+                Relationship.from_dict(r)
+                for r in raw.get("relationships", []) or []
+            ],
             coverage=[
                 Coverage(
                     kind=str(c.get("kind", "")),
