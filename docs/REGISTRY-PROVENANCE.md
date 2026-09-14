@@ -28,7 +28,7 @@ literal `XXX` runs in committed files.
 | `kushin77/capital-underwriting` | `config/leaderboard/route-policy.json` | fast/deep/strict routes -> agent chains + model tier | Proprietary (kushin77, All Rights Reserved) | PATTERN | fallback-chain + tier semantics |
 | `kushin77/capital-underwriting` | `infra/docker/worker-fleet/personas.yaml` | ~36 personas (cron_lines/description/env/memory_file/role) | Proprietary (kushin77, All Rights Reserved) | READY | persona coverage; SME role set |
 | `kushin77/capital-underwriting` | `scripts/agent/sme/{auditor,security,terraform,test-quality,prisma-db,sniper-generic}.txt` + `sme-dispatch.sh` | DOMAIN -> SME system-prompt library (6 prompt files, not the 10 the issue text estimated) | Proprietary (kushin77, All Rights Reserved) | REFERENCE | SME card expertise/posture for existing cards |
-| `kushin77/CMR` | `onboarding/agent-profiles/role.schema.json` | canonical role vocabulary (12 roles), `model.tier`/`model.model`/`floor`/`mode`, `ownedLanes` enum (17 lanes) | No LICENSE file in the checkout (internal, kushin77) | READY | `roleId`/`modelTier`/`workerModel`/`canonicalLane` enums; the parity gate's canonical source |
+| `kushin77/CMR` | `onboarding/agent-profiles/role.schema.json` | canonical role vocabulary (12 roles), `model.tier`/`model.model`/`floor`/`mode`, `ownedLanes` enum (17 lanes) | No LICENSE file in the checkout (internal, kushin77) | READY | `roleId`/`modelTier`/`workerModel`/`canonicalLane` enums; the parity gate's canonical source, frozen at `registry/parity/canonical/cmr-role-vocabulary.json` |
 | `kushin77/CMR` | `onboarding/agent-profiles/profiles/*.json` | per-role cards (`platform-sme`, `pmo-sme`, `sync-sme`, `iac-sme`, `security-sme`, `general`, ...) | No LICENSE file in the checkout (internal, kushin77) | REFERENCE | new SME cards `platform-sme`, `pmo-sme`, `sync-sme` |
 | `kushin77/CMR` | `docs/SME-PROFILES.md` | SME card doctrine + lane map | No LICENSE file in the checkout (internal, kushin77) | REFERENCE | SME card structure |
 | `kushin77/capital-underwriting` | `.claude/agents/{gcp-gatekeeper-sme,ltc-brain-fleet-sre,qa-playwright-sme}.md` | mature SME cards (frontmatter + Mission/Constraints/Approach/Output-Format) | Proprietary (kushin77, All Rights Reserved) | **ABSENT** | not used — see *Absent sources* |
@@ -67,10 +67,43 @@ field is **defined in this repository**:
 ## Parity gate direction
 
 `registry/parity/` (library) + `scripts/check-registry-parity.sh` (gate) compare
-the registry's *declared* vocabulary against the canonical CMR catalog. The
+the registry's *declared* vocabulary against the canonical CMR vocabulary. The
 direction is documented as **equality, both ways** — see `registry/parity/README.md`.
 The gate is tri-state (0 OK / 1 NOT-OK / 2 CANNOT-ASSESS) and is deliberately not
 yet wired into `make verify` (that file is orchestrator-owned).
+
+### The frozen canonical baseline
+
+The canonical CMR source lives in the `vendor/CMR` submodule, which is
+**unpopulated in a fresh git worktree**. A gate that reads it directly therefore
+returns CANNOT-ASSESS (rc 2) on every clone and can never be enforced
+(GR-29 — a rule that cannot run is advisory). So issue #145 **freezes** the
+canonical vocabulary as a committed artifact:
+
+| Artifact | Value |
+|---|---|
+| frozen baseline | `registry/parity/canonical/cmr-role-vocabulary.json` |
+| vendor repo | `kushin77/CMR` |
+| source path | `onboarding/agent-profiles/role.schema.json` |
+| source sha256 | `64966d36dbf62f95a4a526ac78862587e3659eb4b23956a73e05c730f23c4528` |
+| vendor commit | `b6c49aa03992dba9fe4b87b46104b8fc2f69f224` |
+| extracted | 2026-09-14 |
+| axes frozen | 12 roles, 4 tiers, 2 worker models, 17 lanes |
+
+Two modes:
+
+* **default (offline)** — registry vocabulary ↔ the frozen baseline. Deterministic,
+  no network, no `vendor/` dependency; this is the mode `make verify` will run.
+* **`--verify-source`** — frozen baseline ↔ the live `vendor/CMR` source (content
+  sha256 + vocabulary). Reports a **stale freeze** (rc 1) when the live source has
+  moved on; rc 2 when the source is unavailable (never 0).
+
+**Refresh the freeze** (only where the submodule is populated), then commit the
+result and update the sha256 in this table:
+
+```bash
+python3 registry/parity/parity.py --refresh-baseline
+```
 
 ## New assets added by this issue
 
@@ -81,4 +114,5 @@ yet wired into `make verify` (that file is orchestrator-owned).
 | profile seed | `registry/profiles/seeds/finops-steward.1.0.0.yaml` | leaderboard fleet-roster + capital-underwriting tier/capability policy |
 | persona cards | `registry/personas/cards/{platform-sme,pmo-sme,sync-sme,gcp-gatekeeper-sme,mechanical-sme}.yaml` | CMR profiles + capital-underwriting sources (see table) |
 | parity gate | `registry/parity/` + `scripts/check-registry-parity.sh` | new (this issue) |
+| frozen canonical baseline | `registry/parity/canonical/cmr-role-vocabulary.json` | extracted from `vendor/CMR/onboarding/agent-profiles/role.schema.json` (sha256 `64966d36…c4528`, vendor commit `b6c49aa…224`); frozen in-repo because `vendor/CMR` is unpopulated in a fresh worktree |
 | seed provenance | `registry/profiles/seeds/PROVENANCE.md` | extended here |

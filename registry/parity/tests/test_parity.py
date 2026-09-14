@@ -3,8 +3,13 @@
 These are REAL behavioral tests (they drive the parity library and the
 validator code paths), not source-text greps. They prove:
 
-  * parity is OK on the aligned vocabulary;
-  * drift in EITHER direction is NOT-OK (exit 1);
+  * default (offline) mode: registry mirrors the FROZEN baseline -> 0; registry
+    drift -> 1; an edited / malformed baseline -> 1; a missing baseline -> 2;
+  * ``--verify-source`` mode: the freeze matches the live source -> 0; a drifted
+    source -> 1; a missing source -> 2 (never 0); the recorded source sha256 is
+    actually checked (mutating it refuses);
+  * the frozen baseline carries provenance (vendor/repo/path/sha256/refresh) and
+    its payload digest is verified, so it cannot be edited silently;
   * a missing/unreadable canonical source is CANNOT-ASSESS (exit 2), never 0;
   * the two registry schemas disagreeing is NOT-OK;
   * a committed asset naming a non-canonical role/lane is NOT-OK;
@@ -21,6 +26,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -38,6 +44,9 @@ FIXTURES = os.path.join(PKG, "fixtures")
 CANONICAL = os.path.join(FIXTURES, "canonical")
 DRIFT_CANONICAL = os.path.join(FIXTURES, "drift-canonical")
 REAL_CMR = os.path.join(REPO, "vendor", "CMR")
+BASELINE = os.path.join(PKG, "canonical", "cmr-role-vocabulary.json")
+MISSING_BASELINE = os.path.join(PKG, "canonical", "does-not-exist-baseline.json")
+GATE = os.path.join(REPO, "scripts", "check-registry-parity.sh")
 
 PROFILE_SCHEMA = os.path.join(PROFILES_DIR, "agent-profile.schema.json")
 PERSONA_SCHEMA = os.path.join(PERSONAS_DIR, "persona-card.schema.json")
@@ -288,3 +297,161 @@ def test_backfilled_vocabulary_validates_every_committed_seed():
     for name in names:
         errs = V.validate_seed_file(os.path.join(PROFILE_SEEDS, name), schema, catalog)
         assert errs == [], "%s: %s" % (name, errs)
+
+
+# --------------------------------------------------------------------------
+# mode 1 (default): registry <-> FROZEN baseline (offline, deterministic)
+# --------------------------------------------------------------------------
+
+def _scratch_baseline(tmp_path, cmr_root, name="baseline.json"):
+    """Freeze a scratch baseline from ``cmr_root`` (a fixture source)."""
+    doc = parity.refresh_baseline(cmr_root, extracted="2026-09-14")
+    path = tmp_path / name
+    path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    return str(path)
+
+
+def test_frozen_baseline_carries_provenance_and_passes_integrity():
+    doc = parity.load_baseline(BASELINE)
+    assert parity.check_baseline_integrity(doc) == []
+    prov = doc["_provenance"]
+    assert prov["vendor_repo"] == "kushin77/CMR"
+    assert prov["source_path"] == "onboarding/agent-profiles/role.schema.json"
+    assert len(prov["sha256"]) == 64
+    assert prov["payload_sha256"] == parity._payload_sha256(parity.baseline_axes(doc))
+    # the artifact itself says why it exists and how to refresh it
+    assert "unpopulated" in prov["frozen_because"].lower()
+    assert "--refresh-baseline" in prov["refresh_command"]
+
+
+def test_default_mode_is_green_offline_with_no_vendor_source():
+    """The whole point: registry vs frozen baseline, rc 0, without vendor/CMR."""
+    status, report = parity.evaluate_offline(REPO, BASELINE)
+    assert status == parity.OK, report
+
+
+def test_default_mode_registry_drift_is_not_ok(tmp_path):
+    """A registry role absent from the frozen canonical set is drift (rc 1)."""
+    frozen_roles = list(parity.baseline_axes(parity.load_baseline(BASELINE))["roles"])
+    root = _make_registry(tmp_path, role_enum=frozen_roles + ["registry-invented-role"])
+    status, report = parity.evaluate_offline(root, BASELINE)
+    assert status == parity.NOT_OK, report
+    assert any("registry-invented-role" in line for line in report), report
+
+
+def test_default_mode_missing_baseline_is_cannot_assess():
+    status, report = parity.evaluate_offline(REPO, MISSING_BASELINE)
+    assert status == parity.CANNOT_ASSESS, report
+    assert status != parity.OK
+    assert "CANNOT-ASSESS" in report[0]
+
+
+def test_default_mode_edited_baseline_payload_is_not_ok(tmp_path):
+    """Editing the frozen vocabulary without re-freezing must refuse (rc 1)."""
+    doc = parity.load_baseline(BASELINE)
+    doc["roles"] = list(doc["roles"]) + ["sneaky-role"]
+    edited = tmp_path / "edited-baseline.json"
+    edited.write_text(json.dumps(doc), encoding="utf-8")
+    status, report = parity.evaluate_offline(REPO, str(edited))
+    assert status == parity.NOT_OK, report
+    assert any("payload_sha256 mismatch" in line for line in report), report
+
+
+def test_default_mode_malformed_sha256_is_not_ok(tmp_path):
+    """A baseline whose recorded source digest is malformed refuses (rc 1)."""
+    doc = parity.load_baseline(BASELINE)
+    doc["_provenance"]["sha256"] = "not-a-digest"
+    edited = tmp_path / "malformed-sha.json"
+    edited.write_text(json.dumps(doc), encoding="utf-8")
+    status, report = parity.evaluate_offline(REPO, str(edited))
+    assert status == parity.NOT_OK, report
+    assert any("64-hex" in line for line in report), report
+
+
+# --------------------------------------------------------------------------
+# mode 2 (--verify-source): frozen baseline <-> live vendor/CMR source
+# --------------------------------------------------------------------------
+
+def test_verify_source_matches_the_fixture_source(tmp_path):
+    baseline = _scratch_baseline(tmp_path, CANONICAL)
+    status, report = parity.verify_source(baseline, CANONICAL)
+    assert status == parity.OK, report
+
+
+def test_verify_source_drifted_source_is_not_ok(tmp_path):
+    """A live source the freeze no longer matches is stale -> rc 1."""
+    baseline = _scratch_baseline(tmp_path, CANONICAL)
+    status, report = parity.verify_source(baseline, DRIFT_CANONICAL)
+    assert status == parity.NOT_OK, report
+    assert any("stale freeze" in line or "cmr-new-role" in line for line in report), report
+
+
+def test_verify_source_missing_source_is_cannot_assess_never_ok(tmp_path):
+    baseline = _scratch_baseline(tmp_path, CANONICAL)
+    status, report = parity.verify_source(
+        baseline, os.path.join(REPO, "no-such-cmr-root"))
+    assert status == parity.CANNOT_ASSESS, report
+    assert status != parity.OK
+    assert "CANNOT-ASSESS" in report[0]
+
+
+def test_verify_source_recorded_sha256_is_actually_checked(tmp_path):
+    """Mutating the recorded source sha256 must refuse, not pass silently."""
+    baseline = _scratch_baseline(tmp_path, CANONICAL)
+    doc = json.load(open(baseline, encoding="utf-8"))
+    doc["_provenance"]["sha256"] = "0" * 64
+    mutated = tmp_path / "mutated-sha.json"
+    mutated.write_text(json.dumps(doc), encoding="utf-8")
+    status, report = parity.verify_source(str(mutated), CANONICAL)
+    assert status == parity.NOT_OK, report
+    assert any("sha256" in line and "stale freeze" in line for line in report), report
+
+
+def test_verify_source_missing_baseline_is_cannot_assess():
+    status, report = parity.verify_source(MISSING_BASELINE, CANONICAL)
+    assert status == parity.CANNOT_ASSESS, report
+
+
+def test_refresh_baseline_round_trips(tmp_path):
+    """The documented refresh command produces a baseline that then verifies."""
+    path = _scratch_baseline(tmp_path, CANONICAL)
+    doc = parity.load_baseline(path)
+    assert parity.check_baseline_integrity(doc) == []
+    status, report = parity.verify_source(path, CANONICAL)
+    assert status == parity.OK, report
+
+
+def test_frozen_baseline_matches_the_hermetic_canonical_fixture():
+    committed = parity.baseline_axes(parity.load_baseline(BASELINE))
+    fixture = parity.canonical_vocab(CANONICAL)
+    for axis in parity.AXIS_ORDER:
+        assert committed[axis] == fixture[axis], axis
+
+
+def test_frozen_baseline_verifies_against_the_real_cmr_source_when_populated():
+    role_schema = os.path.join(REAL_CMR, "onboarding", "agent-profiles",
+                               "role.schema.json")
+    if not os.path.isfile(role_schema):
+        pytest.skip("vendor/CMR is unpopulated here (fresh worktree)")
+    status, report = parity.verify_source(BASELINE, REAL_CMR)
+    assert status == parity.OK, report
+
+
+# --------------------------------------------------------------------------
+# the shell gate wires those modes
+# --------------------------------------------------------------------------
+
+def test_shell_gate_default_mode_is_green_offline():
+    proc = subprocess.run(["bash", GATE], cwd=REPO, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_shell_gate_verify_source_refuses_without_the_submodule():
+    """In a fresh worktree vendor/CMR is empty -> rc 2, never 0."""
+    role_schema = os.path.join(REAL_CMR, "onboarding", "agent-profiles",
+                               "role.schema.json")
+    if os.path.isfile(role_schema):
+        pytest.skip("vendor/CMR is populated here; the refusal path is exercised elsewhere")
+    proc = subprocess.run(["bash", GATE, "--verify-source"], cwd=REPO,
+                          capture_output=True, text=True)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
