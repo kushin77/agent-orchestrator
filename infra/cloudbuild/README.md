@@ -12,6 +12,7 @@
 |------|---------|
 | `verify.yaml` | Build config: run the repo gate (`make verify`) as a CI status. |
 | `apply.yaml`  | Build config: flag-gated `terraform apply` as the deployer SA — the ONLY apply route (no console). |
+| `web-image.yaml` | Build config: build `portal/Dockerfile` and push the web-surface image to Artifact Registry (fills the `web-surface.image` placeholder). |
 | `verify-trigger.yaml` | Importable pull_request trigger for `verify.yaml` (disabled by default). |
 | `apply-trigger.yaml`  | Importable push trigger for `apply.yaml` (disabled by default). |
 
