@@ -1,0 +1,58 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "deepseek",
+  "name": "deepseek",
+  "description": "DeepSeek provider module: OpenAI-compatible chat/completions model routing across the deepseek-chat (flash-class) and deepseek-reasoner (pro-class) tiers with cloud-to-local (Ollama) graceful degradation.",
+  "source": {
+    "repo": "kushin77/gov-ai-scout",
+    "default_branch": "master",
+    "path": "backend/src/services/ai-provider.ts"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "deepseek"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.deepseek",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "chat-completions",
+      "default": "on",
+      "flags": ["deepseek.chat"],
+      "desc": "OpenAI-compatible chat/completions chat with Bearer auth and typed output validation."
+    },
+    {
+      "id": "tier-routing",
+      "default": "on",
+      "flags": ["deepseek.tiers"],
+      "desc": "LOW/MED route to deepseek-chat, HIGH/MAX to deepseek-reasoner, chosen from the issue-#9 tier ladder."
+    },
+    {
+      "id": "graceful-degradation",
+      "default": "on",
+      "flags": ["deepseek.fallback"],
+      "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-14",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/gov-ai-scout backend/src/services/ai-provider.ts; kushin77/leaderboard config/deepseek-capabilities.txt",
+    "note": "Gateway-owned module-catalog entry (issue #349) for the registered `deepseek` provider adapter. Pattern only; the OpenAI-compatible provider-gateway shape and the DeepSeek capability/tier vocabulary were re-implemented for this repo's Python substrate, no source file was copied."
+  }
+}

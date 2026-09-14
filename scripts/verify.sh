@@ -54,6 +54,7 @@ checks=(
   'remediation|bash scripts/check-remediation.sh'
   'board-gate|bash scripts/check-board-gate.sh'
   'cross-repo-boundary|bash scripts/check-cross-repo-boundary.sh'
+  'gateway-catalog-parity|bash scripts/check-gateway-catalog-parity.sh'
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'

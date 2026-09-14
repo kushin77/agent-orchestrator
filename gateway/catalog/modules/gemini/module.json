@@ -1,0 +1,64 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "gemini",
+  "name": "gemini",
+  "description": "Google Gemini provider module: generateContent model routing across the gemini-2.5-flash (flash-class) and gemini-2.5-pro (pro-class) tiers over the Generative Language API, with per-deployment (Vertex AI) override and cloud-to-local (Ollama) graceful degradation.",
+  "source": {
+    "repo": "kushin77/gov-ai-scout",
+    "default_branch": "master",
+    "path": "backend/src/services/ai-provider.ts"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "gemini", "google"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.gemini",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "generate-content",
+      "default": "on",
+      "flags": ["gemini.generate"],
+      "desc": "Generative Language generateContent chat with x-goog-api-key auth, systemInstruction lifting and typed output validation."
+    },
+    {
+      "id": "tier-routing",
+      "default": "on",
+      "flags": ["gemini.tiers"],
+      "desc": "LOW/MED route to gemini-2.5-flash, HIGH/MAX to gemini-2.5-pro, chosen from the issue-#9 tier ladder."
+    },
+    {
+      "id": "deployment-override",
+      "default": "on",
+      "flags": ["gemini.vertex"],
+      "desc": "A Vertex AI deployment is reached by overriding base_url and extra_headers in the provider config (the harvested per-deployment override approach)."
+    },
+    {
+      "id": "graceful-degradation",
+      "default": "on",
+      "flags": ["gemini.fallback"],
+      "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-14",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "kushin77/gov-ai-scout backend/src/services/ai-provider.ts; kushin77/capital-underwriting (Gemini per-deployment client, model constants)",
+    "note": "Gateway-owned module-catalog entry (issue #349) for the registered `gemini` provider adapter. Pattern only; the provider-gateway shape and the per-deployment override approach were re-implemented for this repo's Python substrate, no source file was copied."
+  }
+}
