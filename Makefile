@@ -17,7 +17,7 @@ SHELL := /bin/bash
 .PHONY: help verify lint gate merge-gate qa-loop tests \
         shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity \
-        brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt \
+brain-profile conformance lessons secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees \
         remediation remediation-scan remediation-dispatch
 
@@ -92,6 +92,8 @@ help:
 	@echo "                coverage and secret policy over the indexed assets"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
 	@echo "                milestoned issue classified; mandates checked on the diff"
+	@echo "  surface-class Per-surface target solution-class (#351): every surface"
+	@echo "                meets the rung it declares, or the gate fails"
 	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
 	@echo "                RCA, every action recorded, every lesson evidenced"
 	@echo "  fleet-state   Unified fleet-state projection (#323): lanes + sessions +"
@@ -321,6 +323,13 @@ conformance:
 ## (GR-15 code-native automation; new infrastructure ships flag-gated OFF)
 conformance-change-set:
 	@python3 governance/conformance/cli.py change-set
+
+## surface-class — per-surface target solution-class enforcement (issue #351):
+## every product surface declares a rung of the CMR ladder and the gate fails
+## while a surface sits below its declaration; a declared class raised above the
+## surface's evidence is refused by name (self-mutating negative control)
+surface-class:
+	@bash scripts/check-surface-class.sh
 
 ## remediation — auto-generate violator remediation issues from policy drift
 ## (issue #142): board conformance findings must produce a well-formed
