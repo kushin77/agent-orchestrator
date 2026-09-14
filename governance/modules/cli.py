@@ -4,15 +4,18 @@
     python3 governance/modules/cli.py build                 # canonical registry JSON
     python3 governance/modules/cli.py build --out FILE      # … written instead of printed
     python3 governance/modules/cli.py verify                # drift + refusals (gate core)
+    python3 governance/modules/cli.py verify --audit TRAIL   # … and append the judged records
     python3 governance/modules/cli.py membership pmo        # one name -> a state
     python3 governance/modules/cli.py membership hermes-agents   # -> refused, by name
     python3 governance/modules/cli.py vendoring             # the no-vendoring scan
     python3 governance/modules/cli.py probe --live          # pin health probes
 
 Every subcommand runs offline by default and exits tri-state (the repository
-convention): ``0`` OK, ``1`` NOT-OK (a refusal was found, or membership was
-refused), ``2`` CANNOT-ASSESS — the hub catalog is absent or unreadable, so the
-registry cannot be built at all. **CANNOT-ASSESS is never reported as a pass.**
+convention): ``0`` OK, ``1`` NOT-OK (a fatal refusal was found, or membership was
+refused), ``2`` CANNOT-ASSESS — the hub catalog is absent or unreadable, the
+declared acceptance policy (``controls.yaml``) does not judge what the registry
+emits, or the emitted document does not satisfy the frozen schema. So
+**CANNOT-ASSESS is never reported as a pass.**
 """
 
 from __future__ import annotations
@@ -26,7 +29,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from governance.modules import audit  # noqa: E402
+from governance.modules import policy as acceptance  # noqa: E402
 from governance.modules import registry  # noqa: E402
+from governance.modules import schema  # noqa: E402
 from governance.modules import vendoring  # noqa: E402
 from governance.modules.hub import DEFAULT_HUB, load as load_hub  # noqa: E402
 from governance.modules.model import (  # noqa: E402
@@ -58,6 +64,25 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_acceptance(parser: argparse.ArgumentParser) -> None:
+    """The two artifacts that judge a build (issue #591), overridable for the gate.
+
+    The defaults are packaged with this module, so no caller's working directory
+    decides which policy judged a registry or which schema approved it.
+    """
+    parser.add_argument(
+        "--policy",
+        default=None,
+        help="declared acceptance policy (default: <package>/controls.yaml)",
+    )
+    parser.add_argument(
+        "--schema",
+        default=None,
+        help="frozen registry schema the emitted document must satisfy "
+        "(default: <package>/module-registry.schema.json)",
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="governance/modules/cli.py",
@@ -67,16 +92,29 @@ def _parser() -> argparse.ArgumentParser:
 
     build = sub.add_parser("build", help="emit the canonical registry document")
     _add_common(build)
+    _add_acceptance(build)
     build.add_argument("--out", default=None, help="write the document here instead of stdout")
     build.add_argument("--live", action="store_true", help="run the pin probes (needs network)")
+    build.add_argument(
+        "--audit",
+        default=None,
+        help="append the document's judged records to this append-only trail",
+    )
     build.set_defaults(handler=_cmd_build)
 
     verify = sub.add_parser("verify", help="report the three states and every refusal")
     _add_common(verify)
+    _add_acceptance(verify)
+    verify.add_argument(
+        "--audit",
+        default=None,
+        help="append the document's judged records to this append-only trail",
+    )
     verify.set_defaults(handler=_cmd_verify)
 
     member = sub.add_parser("membership", help="resolve one name: a state, or a refusal")
     _add_common(member)
+    _add_acceptance(member)
     member.add_argument("name", help="the module / repo name to resolve")
     member.set_defaults(handler=_cmd_membership)
 
@@ -91,6 +129,7 @@ def _parser() -> argparse.ArgumentParser:
 
     probe = sub.add_parser("probe", help="the per-module health probes")
     _add_common(probe)
+    _add_acceptance(probe)
     probe.add_argument("--live", action="store_true", help="run the probes (needs network)")
     probe.set_defaults(handler=_cmd_probe)
 
@@ -104,7 +143,68 @@ def _hub_for(args: argparse.Namespace) -> Path:
 def _registry_for(args: argparse.Namespace, live: bool = False):
     repo = Path(args.repo)
     targets = Path(args.targets) if args.targets else None
-    return registry.build(repo, _hub_for(args), targets, live=live)
+    controls = Path(args.policy) if getattr(args, "policy", None) else None
+    frozen = Path(args.schema) if getattr(args, "schema", None) else None
+    return registry.build(
+        repo,
+        _hub_for(args),
+        targets,
+        live=live,
+        controls_path=controls,
+        schema_path=frozen,
+    )
+
+
+def _print_acceptance(doc, args: argparse.Namespace) -> None:
+    """The artifacts that judged this build, named so a reader can audit them."""
+    declared = doc["policy"]
+    print("== acceptance ==")
+    print(
+        "  {:<10} {} — {} refusal code(s), all fatal, {} condition(s), {} judgment(s)".format(
+            "policy",
+            declared["path"],
+            len(declared["refusal_codes"]),
+            len(declared["conditions"]),
+            len(declared["judgments"]),
+        )
+    )
+    print(
+        "  {:<10} {} (frozen; the emitted document satisfies it)".format(
+            "schema", getattr(args, "schema", None) or schema.DEFAULT_SCHEMA
+        )
+    )
+    print(
+        "  {:<10} {} record(s) for {} judged name(s) — recorded, not fatal".format(
+            "audit", len(doc["audit"]["records"]), len(doc["modules"]) + len(doc["not_modules"])
+        )
+    )
+
+
+def _record_trail(args: argparse.Namespace, doc) -> None:
+    """Append the document's judged records to the trail the caller named.
+
+    The trail is written only when a path is given: the registry never writes into
+    the tree it reads (NG4), and a build that silently grew a tracked file would
+    be a build nobody can reproduce.
+    """
+    trail = getattr(args, "audit", None)
+    if not trail:
+        return
+    path = Path(trail)
+    appended = audit.append(path, doc["audit"]["records"])
+    counts = audit.summary(doc["audit"]["records"])
+    print("== audit trail ==")
+    print("  {:<10} {}".format("trail", path))
+    print(
+        "  {:<10} appended {} record(s) ({} refusal(s), {} judgment(s)); {} in the "
+        "trail".format(
+            "records",
+            appended,
+            counts[audit.KIND_REFUSAL],
+            counts[audit.KIND_JUDGMENT],
+            len(audit.read(path)),
+        )
+    )
 
 
 def _print_findings(refusals, stream=None) -> int:
@@ -136,6 +236,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
         print("module-registry: wrote {} ({} bytes)".format(args.out, len(text.encode("utf-8"))))
     else:
         sys.stdout.write(text)
+    _record_trail(args, doc)
     refusals = registry.findings(doc)
     if refusals:
         _print_findings(refusals, stream=sys.stderr)
@@ -157,11 +258,20 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     print("  {:<10} {} module(s); declared targets: {}".format("catalog", health["module_count"], doc["declared"]["targets"]))
     print("== registry ==")
     _print_states(doc)
-    refusals = registry.findings(doc)
-    print("== refusals ({}) ==".format(len(refusals)))
-    _print_findings(refusals)
-    if refusals:
-        print("module-registry: NOT-OK — {} refusal(s)".format(len(refusals)))
+    _print_acceptance(doc, args)
+    # The exit code follows the *declared* disposition the document carries, not a
+    # second copy of the rule in this file: a refusal the policy files as fatal
+    # fails the gate, and `policy.load` refuses a policy that would file one
+    # otherwise.
+    fatal = registry.by_disposition(doc, acceptance.DISPOSITION_FATAL)
+    recorded = registry.by_disposition(doc, acceptance.DISPOSITION_RECORDED)
+    print("== refusals ({}) ==".format(len(fatal)))
+    _print_findings(fatal)
+    for finding in recorded:
+        print("  RECORDED  {}".format(finding.render()))
+    _record_trail(args, doc)
+    if fatal:
+        print("module-registry: NOT-OK — {} refusal(s)".format(len(fatal)))
         return EXIT_NOT_OK
     print(
         "module-registry: OK — {} name(s), {} state(s), 0 refusal(s)".format(

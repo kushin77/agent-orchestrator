@@ -26,6 +26,14 @@
 #     mandatory, a hub module manifest copied in-tree, a module distribution
 #     package carried in-tree, a registry reference pointing outside the hub,
 #     and membership claimed for a name the catalog does not carry;
+#   * DRIVES the three artifacts that judge a build (issue #591) through the CLI,
+#     so an artifact the code ignores cannot ship as decoration: a declared
+#     acceptance policy that files a refusal code as `recorded`, one that omits a
+#     code the registry emits, one whose authority would let a claim confer
+#     membership, a frozen schema the emitted document cannot satisfy, and an
+#     append-only audit trail that must grow in place while recording every
+#     judged name exactly once — with the clean run still green, because a gate
+#     that is only ever red proves nothing;
 #   * returns CANNOT-ASSESS (2) — never a pass — when the pinned hub catalog is
 #     absent, and proves that path with a provoked empty hub.
 #
@@ -70,6 +78,11 @@ for required in \
   governance/modules/health.py \
   governance/modules/cli.py \
   governance/modules/targets.json \
+  governance/modules/controls.yaml \
+  governance/modules/policy.py \
+  governance/modules/module-registry.schema.json \
+  governance/modules/schema.py \
+  governance/modules/audit.py \
   governance/modules/README.md \
   docs/MODULE-REGISTRY.md
 do
@@ -423,6 +436,253 @@ else
   fail=$((fail + 1))
 fi
 
+echo "== the three artifacts that judge a build (issue #591) =="
+
+# The policy, the frozen schema and the audit trail are only worth shipping if the
+# code path reads them. Every provocation below drives a *scratch mutant* through
+# the CLI — the lane tree is never edited — and requires the refusal BY NAME: a
+# mutant the registry ignored would prove the artifact decorative.
+expect_cannot_assess() { # expect_cannot_assess <label> <want> <want2|-> <cli args...>
+  local label="$1" want="$2" want2="$3"
+  shift 3
+  local out rc shown="$want"
+  [ "$want2" = "-" ] || shown="$shown / $want2"
+  out="$($cli verify "$@" 2>&1)"
+  rc=$?
+  if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF -- "$want" \
+    && { [ "$want2" = "-" ] || printf '%s' "$out" | grep -qF -- "$want2"; }
+  then
+    echo "  OK    REFUSED $label — $shown"
+    ok=$((ok + 1))
+  else
+    echo "  FAIL  $label: expected rc=2 and '$shown' (got rc=$rc)" >&2
+    printf '%s\n' "$out" | sed 's/^/        /' >&2
+    fail=$((fail + 1))
+  fi
+}
+
+# The defaults are the packaged artifacts: the report names the policy it read and
+# the schema it enforced, so "the artifact was used" is observed rather than assumed.
+if grep -qF "governance/modules/controls.yaml" "$work/verify.out" \
+  && grep -qF "governance/modules/module-registry.schema.json" "$work/verify.out"; then
+  echo "  OK    the packaged policy and schema judged the build (named in the verify report)"
+  ok=$((ok + 1))
+else
+  echo "  FAIL  the verify report does not name the packaged policy/schema" >&2
+  sed 's/^/        /' "$work/verify.out" >&2
+  fail=$((fail + 1))
+fi
+
+policy_mutant() { # policy_mutant <name> <python body reading `data`>
+  python3 - "governance/modules/controls.yaml" "$work/$1" "$2" <<'PY'
+import sys
+import yaml
+
+src, dst, body = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(src, encoding="utf-8") as handle:
+    data = yaml.safe_load(handle)
+namespace = {"data": data}
+exec(body, namespace)
+with open(dst, "w", encoding="utf-8") as handle:
+    yaml.safe_dump(data, handle, sort_keys=False)
+PY
+}
+
+recorded="$work/controls-recorded.yaml"
+if policy_mutant controls-recorded.yaml '
+for condition in data["conditions"]:
+    if "MODULE-DUPLICATE-ID" in condition.get("codes", []):
+        condition["disposition"] = "recorded"
+'; then
+  expect_cannot_assess "a policy that files a refusal code as recorded" \
+    "MODULE-DUPLICATE-ID" "fatal" --policy "$recorded"
+else
+  echo "  FAIL  could not write the recorded-disposition policy mutant" >&2
+  fail=$((fail + 1))
+fi
+
+undeclared="$work/controls-undeclared.yaml"
+if policy_mutant controls-undeclared.yaml '
+for condition in data["conditions"]:
+    condition["codes"] = [
+        code for code in condition.get("codes", []) if code != "VENDOR-EXTRA-SUBMODULE"
+    ]
+'; then
+  expect_cannot_assess "a policy that does not declare a code the registry emits" \
+    "VENDOR-EXTRA-SUBMODULE" "declares no condition" --policy "$undeclared"
+else
+  echo "  FAIL  could not write the undeclared-code policy mutant" >&2
+  fail=$((fail + 1))
+fi
+
+claiming="$work/controls-claim.yaml"
+if policy_mutant controls-claim.yaml '
+data["authority"]["claim_effect"] = "confers-membership"
+'; then
+  expect_cannot_assess "a policy that would let a claim confer membership" \
+    "membership-not-inferred-from-a-claim" "claim_effect" --policy "$claiming"
+else
+  echo "  FAIL  could not write the claim-authority policy mutant" >&2
+  fail=$((fail + 1))
+fi
+
+narrowed="$work/schema-narrowed.json"
+if python3 - "governance/modules/module-registry.schema.json" "$narrowed" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    data = json.load(handle)
+data["properties"]["states"]["items"] = {"enum": ["registered-mandatory"]}
+with open(sys.argv[2], "w", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2)
+PY
+then
+  expect_cannot_assess "a schema the emitted document cannot satisfy" \
+    "frozen schema" "states" --schema "$narrowed"
+else
+  echo "  FAIL  could not write the narrowed schema mutant" >&2
+  fail=$((fail + 1))
+fi
+
+echo "== the audit trail is append-only, and records every judgment =="
+trail="$work/trail.jsonl"
+$cli verify --audit "$trail" > "$work/trail1.out" 2>&1
+rc_one=$?
+cp -f "$trail" "$work/trail1.copy"
+$cli verify --audit "$trail" > "$work/trail2.out" 2>&1
+rc_two=$?
+if [ "$rc_one" -eq 0 ] && [ "$rc_two" -eq 0 ]; then
+  if python3 - "$work/a.json" "$work/trail1.copy" "$trail" <<'PY'
+import json
+import sys
+
+doc = json.load(open(sys.argv[1], encoding="utf-8"))
+first = open(sys.argv[2], "rb").read()
+second = open(sys.argv[3], "rb").read()
+keys = {
+    "schema", "kind", "subject", "code", "state",
+    "condition", "disposition", "detail", "source",
+}
+problems = []
+
+if not first:
+    problems.append("the first append wrote nothing")
+if not second.startswith(first) or len(second) != 2 * len(first):
+    problems.append(
+        "the trail was not appended to in place: %d byte(s), then %d"
+        % (len(first), len(second))
+    )
+
+records = []
+for number, line in enumerate(second.decode("utf-8").splitlines(), start=1):
+    if not line.strip():
+        continue
+    try:
+        record = json.loads(line)
+    except ValueError as exc:
+        problems.append("line %d is not JSON: %s" % (number, exc))
+        continue
+    if set(record) != keys:
+        problems.append("line %d carries %s" % (number, sorted(set(record) ^ keys)))
+    if record.get("schema") != "ao.module-registry/audit-v1":
+        problems.append("line %d carries schema %r" % (number, record.get("schema")))
+    if record.get("kind") not in ("refusal", "judgment"):
+        problems.append("line %d carries kind %r" % (number, record.get("kind")))
+    if record.get("disposition") not in ("fatal", "recorded"):
+        problems.append("line %d carries disposition %r" % (number, record.get("disposition")))
+    records.append(record)
+
+half = len(records) // 2
+if records[:half] != records[half:]:
+    problems.append("the two appends did not record the same judgments")
+expected = sorted(
+    [entry["id"] for entry in doc["modules"]]
+    + [entry["id"] for entry in doc["not_modules"]]
+)
+if sorted(record["subject"] for record in records[:half]) != expected:
+    problems.append("the trail and the document judge different names")
+if len(set(record["subject"] for record in records[:half])) != half:
+    problems.append("a judged name was recorded twice")
+
+if problems:
+    print("  FAIL  the audit trail is not what it claims:", file=sys.stderr)
+    for problem in problems:
+        print("        %s" % problem, file=sys.stderr)
+    raise SystemExit(1)
+print(
+    "  OK    %d record(s) appended twice, in place, every judged name recorded once"
+    % half
+)
+PY
+  then
+    ok=$((ok + 1))
+  else
+    fail=$((fail + 1))
+  fi
+else
+  echo "  FAIL  the trail probe did not run clean (rc=$rc_one / $rc_two)" >&2
+  for trail_run in "$work/trail1.out" "$work/trail2.out"; do
+    sed 's/^/        /' "$trail_run" >&2
+  done
+  fail=$((fail + 1))
+fi
+
+# One refusal, one record: the drift hub is reused, and the *delta* the trail
+# attributes to the refusal must be exactly one refusal record — with the
+# judgments still recorded beside it.
+trail_refusals="$work/trail-refusals.jsonl"
+$cli verify --hub "$work/hub-tsv-only" --audit "$trail_refusals" > "$work/trail3.out" 2>&1
+rc_three=$?
+if [ "$rc_three" -eq 1 ]; then
+  if python3 - "$trail_refusals" <<'PY'
+import json
+import sys
+
+records = [
+    json.loads(line)
+    for line in open(sys.argv[1], encoding="utf-8")
+    if line.strip()
+]
+refusals = [record for record in records if record["kind"] == "refusal"]
+judgments = [record for record in records if record["kind"] == "judgment"]
+problems = []
+
+if len(refusals) != 1:
+    problems.append("expected exactly one refusal record, found %d" % len(refusals))
+else:
+    if refusals[0]["code"] != "MODULE-UNREGISTERED-MANDATORY":
+        problems.append("the refusal record names %r" % refusals[0]["code"])
+    if refusals[0]["subject"] != "ghost-module":
+        problems.append("the refusal record names subject %r" % refusals[0]["subject"])
+    if refusals[0]["disposition"] != "fatal":
+        problems.append("the refusal record carries disposition %r" % refusals[0]["disposition"])
+    if not refusals[0]["condition"]:
+        problems.append("the refusal record names no declared condition")
+if not judgments:
+    problems.append("the judged names were not recorded beside the refusal")
+
+if problems:
+    print("  FAIL  one refusal did not append exactly one judgement:", file=sys.stderr)
+    for problem in problems:
+        print("        %s" % problem, file=sys.stderr)
+    raise SystemExit(1)
+print(
+    "  OK    one refusal appended exactly one refusal record (%s), with %d judgment(s) beside it"
+    % (refusals[0]["code"], len(judgments))
+)
+PY
+  then
+    ok=$((ok + 1))
+  else
+    fail=$((fail + 1))
+  fi
+else
+  echo "  FAIL  the drift hub was not NOT-OK (rc=$rc_three; expected 1)" >&2
+  sed 's/^/        /' "$work/trail3.out" >&2
+  fail=$((fail + 1))
+fi
+
 echo "== membership is refused, not inferred =="
 scratch="$work/repo-claim"
 mkdir -p "$scratch"
@@ -455,5 +715,5 @@ if [ "$fail" -ne 0 ]; then
   echo "check-module-registry: FAIL — $fail of $((ok + fail)) check(s) failed" >&2
   exit 1
 fi
-echo "check-module-registry: OK — $ok check(s) passed (registry clean, deterministic, reconciled, every refusal provoked by name)"
+echo "check-module-registry: OK — $ok check(s) passed (registry clean, deterministic, reconciled, every refusal provoked by name, policy/schema/trail driven through the CLI)"
 exit 0

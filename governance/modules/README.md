@@ -48,21 +48,53 @@ folded into the module list.
 | `vendoring.py` | the no-vendoring scan: references, never in-tree source |
 | `health.py` | the probe spec + status per entry (`not-run` unless the probe actually ran) |
 | `targets.json` | the declared target set and watch questions (package data) |
+| `controls.yaml` | the **declared acceptance policy**: which conditions are fatal, which judgments are recorded (#591) |
+| `policy.py` | reads that policy; stamps every refusal with its declared condition and disposition |
+| `module-registry.schema.json` | the **frozen** document and row shape, refusal vocabulary included (#591) |
+| `schema.py` | the stdlib-only subset validator the generator runs on what it emits (#591) |
+| `audit.py` | the **append-only** trail: one record per refusal and per judged name (#591) |
 | `cli.py` | the machine surface |
+
+## Three artifacts judge a build (issue #591)
+
+A registry nothing judges is a report, not a control. Three declared artifacts are
+part of the code path, each read rather than described:
+
+1. **`controls.yaml`** — the acceptance policy. `registry.build` calls
+   `policy.Policy.judge` on every refusal, so a refusal travels with the condition
+   that governs it and the disposition it carries; a code the policy does not
+   declare is CANNOT-ASSESS (a refusal nobody declared is a refusal nobody
+   reviewed). A refusal is **always** `fatal`: `policy.load` refuses a policy that
+   files a refusal code as `recorded`, and refuses one whose authority would let a
+   claim confer membership (the `kushin77/CMR#952` drift guard).
+2. **`module-registry.schema.json`** — the frozen row shape. `registry.build`
+   validates the document it is about to return, so a malformed row never leaves
+   the generator; the violation names its JSON path. The validator is a stdlib-only
+   JSON-Schema subset and refuses a schema keyword it cannot enforce.
+3. **`audit.py`** — the append-only trail. `build`/`verify --audit FILE` appends one
+   record per refusal and per judged name, then proves the file grew rather than
+   changed: the bytes read before the write must be an exact prefix afterwards.
+   A trail of another shape is refused, never mixed into. Nothing is written unless
+   a caller names a path — the registry reads this tree and writes nothing into it.
 
 ## CLI
 
 ```bash
-python3 governance/modules/cli.py build [--out FILE] [--live]
-python3 governance/modules/cli.py verify
+python3 governance/modules/cli.py build [--out FILE] [--live] [--audit TRAIL]
+python3 governance/modules/cli.py verify [--audit TRAIL]
 python3 governance/modules/cli.py membership <name>
 python3 governance/modules/cli.py vendoring [--registry FILE]
 python3 governance/modules/cli.py probe [--live]
 ```
 
+`--policy FILE` and `--schema FILE` override the two packaged artifacts (the gate
+drives mutants through them); the defaults are always this package's files, so no
+caller's working directory decides what judged a build.
+
 Exit codes are the repository's tri-state convention: **0** OK, **1** NOT-OK (a
-refusal, or membership refused), **2** CANNOT-ASSESS — the hub catalog is absent
-or unreadable, so the registry cannot be built at all. CANNOT-ASSESS is never
+fatal refusal, or membership refused), **2** CANNOT-ASSESS — the hub catalog is
+absent or unreadable, the policy cannot judge what the registry emits, or the
+emitted document does not satisfy the frozen schema. CANNOT-ASSESS is never
 reported as a pass, which is what makes the gate honest on a clean clone with no
 submodule.
 
@@ -83,7 +115,10 @@ The suite is hermetic — every mutation happens on a scratch hub in a tmp
 directory, because `vendor/CMR` is read-only and is the authority being read.
 The gate provokes every acceptance refusal in a scratch copy and requires each
 to be refused **by name**; it returns CANNOT-ASSESS rather than a pass when the
-hub is not there.
+hub is not there. It also provokes the three artifacts of §"Three artifacts judge
+a build": a policy that would file a refusal as `recorded`, a policy missing a
+declared code, a policy whose authority would let a claim confer membership, a
+schema the emitted document violates, and a trail of another shape appended to.
 
 ## Boundary (NG4)
 
