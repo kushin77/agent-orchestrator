@@ -145,10 +145,11 @@
           "docs-authoring",
           "audit",
           "finops-meter",
-          "memory-ops"
+          "memory-ops",
+          "module-brief"
         ]
       },
-      "description": "Closed capability set this persona may exercise (issue #9 catalog). Unknown capability => rejected (fail closed)."
+      "description": "Closed capability set this persona may exercise (issue #9 catalog). Unknown capability => rejected (fail closed). A capability whose declared requirements (integrations/paperclip/reporting/capability.py) name a tool the persona's toolAllowlist does not grant is refused by name — declared and usable must not diverge (issue #447)."
     },
     "constraintSet": {
       "type": "array",

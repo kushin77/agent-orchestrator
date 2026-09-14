@@ -1,0 +1,41 @@
+# AgentProfile seed: paperclip (provider-neutral knowledge assistant / reporting agent) v1.1.0
+#
+# Published as a NEW version, not an edit: registry/profiles/versions/manifest.yaml
+# records the sha256 of every published seed and the validator refuses a seed whose
+# on-disk digest no longer matches ("Never edit a published file"). 1.0.0 stays on
+# disk untouched; this file publishes the same agent with the reporting capability
+# declared (issue #447).
+#
+# PROVENANCE (see seeds/PROVENANCE.md for the full table):
+#   - kushin77/llm-triage src/llm_triage/classifier.py (provider-neutral
+#     classifier behind one ABC; cache + retry)
+#   - kushin77/gov-ai-scout backend/src/services/ai-provider.ts (provider gateway
+#     + typed structured outputs)
+#   - kushin77/CMR onboarding/agent-profiles/role.schema.json (model-tier ladder)
+#   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
+#   - registry/personas/cards/paperclip.yaml v1.1.0 (the persona card this seed
+#     mirrors; the brief capability + read-only sources, issue #447)
+id: paperclip
+version: 1.1.0
+owner: platform/purebliss
+systemPromptRef: paperclip/primary@v1
+toolAllowlist:
+  - file_read
+  - file_write
+  - web_fetch
+  - search_memory
+  - store_memory
+constraintSet:
+  - issue-first
+  - verify-before-done
+  - no-debug-leftovers
+capabilitySet:
+  - research
+  - docs-authoring
+  - memory-ops
+  - module-brief
+defaultModelTier: LOW
+memoryScope:
+  - user
+  - repository
+guardrailPolicyRef: worker-bundle

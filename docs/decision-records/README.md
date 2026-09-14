@@ -79,6 +79,7 @@ writes the real ADR.
 | [ADR-0018](ADR-0018-codeidx-consumption-and-index-authority.md) | The two-index authority split + the no-re-derivation rule | accepted | issue #474 (EPIC #472) |
 | [ADR-0022](ADR-0022-telemetry-exposition-authority-split.md) | The telemetry-exposition authority split + the no-second-dashboard rule | accepted | issue #495 (EPIC #494) |
 | [ADR-0025](ADR-0025-remote-control-transport.md) | The remote control transport and the authority split | accepted | issue #552 (EPIC #551) |
+| [ADR-0026](ADR-0026-control-substrate.md) | The control substrate — the supervision and live-view mechanism that replaces tmux | accepted | issue #563 (EPIC #551) |
 
 > **Numbering gap `ADR-0019`–`ADR-0021`.** Those numbers are **CMR-hub** records
 > cited from this repo with an explicit `CMR (fleet)` prefix

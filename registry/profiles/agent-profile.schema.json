@@ -217,7 +217,8 @@
         "docs-authoring",
         "audit",
         "finops-meter",
-        "memory-ops"
+        "memory-ops",
+        "module-brief"
       ],
       "description": "Closed platform capability catalog. Keep in sync with catalog.yaml capabilities (validate.py parity gate enforces it)."
     },
