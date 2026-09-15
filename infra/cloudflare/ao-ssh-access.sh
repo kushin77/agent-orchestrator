@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
-# ao-ssh-access.sh — publish one host's SSH through the shared Cloudflare
-# Tunnel, with Cloudflare Access in front (issue #771).
+# ao-ssh-access.sh — the remote operator SSH route, end to end (issues #771,
+# #785): provision the tunnel, publish the hostname through it, and deploy the
+# connector, with Cloudflare Access in front.
 #
 # THE PROBLEM
 #   Every operator surface this repo ships needs a shell on the host, and the one
 #   remote-capable surface (the browser console) refuses every session until the
 #   OS auth gate issues a token. This script is the transport half of the remote
 #   way in: it publishes a hostname that reaches the host's sshd through the
-#   EXISTING Cloudflare Tunnel, so an operator with no shell on the box reaches
-#   one without opening port 22 to the internet.
+#   Cloudflare Tunnel, so an operator with no shell on the box reaches one
+#   without opening port 22 to the internet. Until #785 the route only did the
+#   publish half and ASSUMED the tunnel existed and a connector ran; those two
+#   jobs lived in another repo (`shared-services`). This script now owns the
+#   whole flow, so the route is one coherent, vendorable module.
 #
-# THE FOUR STEPS (all idempotent)
+# THE STAGES (each idempotent)
+#   0/5 PROVISION (--provision) find-or-create the tunnel by name; seed the
+#       trailing catch-all when it is created. The read is FAIL-CLOSED: an
+#       unreadable tunnel list is a refusal, never "no tunnel exists".
 #   1/4 merge an `ssh://<origin>:<port>` rule for the hostname into the tunnel's
 #       LIVE remote ingress config and PUT the merged array back. The merge is
 #       the point of the whole script: the API has no "add one rule" call, so a
@@ -24,6 +31,8 @@
 #       that skips it.
 #   4/4 verify: the rule is present in the live configuration, and the name
 #       resolves (A/AAAA).
+#   5/5 CONNECTOR (--connector) deploy `cloudflared` on each connector host,
+#       idempotently (pull, rm -f, run --restart unless-stopped).
 #
 # DRY RUN IS THE DEFAULT. `--apply` is the only way to mutate; it refuses while
 # the route's feature flag is OFF (GR-5), and it is an OPERATOR act -- an agent
@@ -33,11 +42,13 @@
 # promise.
 #
 # NO ESTATE IDENTIFIERS IN THIS TREE. The account id, zone id, tunnel id, origin
-# host and operator emails all come from the environment, and a missing one is
-# REFUSED BY NAME rather than defaulted -- a default here would point the run at
-# somebody else's estate. The API token comes from `CF_API_TOKEN` or GCP Secret
-# Manager (`AO_CF_TOKEN_SECRET` + `AO_GCP_SECRET_PROJECT`); never a file, never
-# git (GR-6).
+# host, connector hosts and operator emails all come from the environment, and a
+# missing one is REFUSED BY NAME rather than defaulted -- a default here would
+# point the run at somebody else's estate. The API token comes from `CF_API_TOKEN`
+# or GCP Secret Manager (`AO_CF_TOKEN_SECRET` + `AO_GCP_SECRET_PROJECT`), and the
+# connector's tunnel token from the environment (`AO_SSH_CONNECTOR_TOKEN`, which
+# an operator can source from Vault or Secret Manager); never a file, never git
+# (GR-6).
 #
 # Exit codes: 0 the run did what was asked / 1 refusal (flag, configuration,
 # token) / 2 usage error / 3 an API or verification failure. Nothing is ever
@@ -46,6 +57,8 @@
 # Usage:
 #   infra/cloudflare/ao-ssh-access.sh              # dry run (the default)
 #   infra/cloudflare/ao-ssh-access.sh --apply      # mutate (flag must be ON)
+#   infra/cloudflare/ao-ssh-access.sh --provision  # also find-or-create the tunnel
+#   infra/cloudflare/ao-ssh-access.sh --connector  # also deploy the connector
 set -euo pipefail
 
 SURFACE="remote_ssh_access"
@@ -55,22 +68,28 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
 DRY_RUN=true
+PROVISION=false
+CONNECTOR=false
 flag_state=""
 
 usage() {
   cat <<'TEXT'
-ao-ssh-access.sh — publish one host's SSH through the shared Cloudflare
-Tunnel, with Cloudflare Access in front (issue #771). Dry run by default;
-`--apply` mutates and refuses while the route's feature flag is OFF (GR-5).
+ao-ssh-access.sh — the remote operator SSH route, end to end (issues #771, #785).
+Dry run by default; `--apply` mutates and refuses while the route's feature flag
+is OFF (GR-5).
 
 Usage:
   infra/cloudflare/ao-ssh-access.sh              # dry run (the default)
   infra/cloudflare/ao-ssh-access.sh --apply      # mutate (flag must be ON)
+  infra/cloudflare/ao-ssh-access.sh --provision  # also find-or-create the tunnel
+  infra/cloudflare/ao-ssh-access.sh --connector  # also deploy the connector
 
 Environment (every identifier is REQUIRED; a missing one is refused by name):
   CF_ACCOUNT_ID            the Cloudflare account that owns the tunnel
   CF_ZONE_ID               the zone that holds the published hostname
-  CF_TUNNEL_ID             the tunnel that serves the hostname
+  CF_TUNNEL_ID             the tunnel that serves the hostname (required unless
+                           --provision, which finds or creates it instead)
+  CF_TUNNEL_NAME           with --provision: the tunnel name to find-or-create
   AO_SSH_HOSTNAME          the public hostname to publish
   AO_SSH_ORIGIN_HOST       the host the tunnel reaches sshd on
   AO_SSH_ACCESS_EMAILS     comma-separated operator emails for the allow-policy
@@ -80,6 +99,13 @@ Environment (every identifier is REQUIRED; a missing one is refused by name):
   AO_CF_TOKEN_SECRET       the GCP Secret Manager secret holding the token
   AO_GCP_SECRET_PROJECT    the project that secret lives in
   AO_CF_API_BASE           the API base URL (a seam for offline dry runs)
+  AO_SSH_CONNECTOR_HOSTS   with --connector: comma-separated connector host(s)
+  AO_SSH_CONNECTOR_USER    with --connector: the SSH user on those host(s)
+  AO_SSH_CONNECTOR_TOKEN   with --connector --apply: the tunnel token (env/Vault/GSM)
+  AO_SSH_CONNECTOR_KEY     with --connector --apply: path to the SSH private key
+  AO_SSH_CONNECTOR_IMAGE   the cloudflared image (default cloudflare/cloudflared:2026.7.2)
+  AO_SSH_CONNECTOR_NETWORK the docker network (default bridge)
+  AO_SSH_CONNECTOR_CONTAINER_PREFIX  the connector container name prefix (default ao-tunnel)
 TEXT
 }
 refuse() { printf 'ao-ssh-access: REFUSED: %s\n' "$1" >&2; exit 1; }
@@ -89,6 +115,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --apply) DRY_RUN=false; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
+    --provision) PROVISION=true; shift ;;
+    --connector) CONNECTOR=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'ao-ssh-access: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -137,7 +165,11 @@ require_var() { # require_var <NAME> <what it is for>
 
 require_var CF_ACCOUNT_ID "the Cloudflare account that owns the tunnel"
 require_var CF_ZONE_ID "the zone that holds the published hostname"
-require_var CF_TUNNEL_ID "the tunnel that serves the hostname"
+if [ "$PROVISION" = true ]; then
+  require_var CF_TUNNEL_NAME "the tunnel to find-or-create when --provision is set"
+else
+  require_var CF_TUNNEL_ID "the tunnel that serves the hostname"
+fi
 require_var AO_SSH_HOSTNAME "the public hostname to publish"
 require_var AO_SSH_ORIGIN_HOST "the host the tunnel reaches sshd on"
 require_var AO_SSH_ACCESS_EMAILS "the operator emails the Access allow-policy lists"
@@ -189,6 +221,139 @@ token_source="$(resolve_token)"
 CF_TOKEN="$(cat "$scratch/token")"
 rm -f "$scratch/token"
 
+# The one function that talks to the API. Its only mutating entry point is
+# `cf_mutate`, which is unreachable in a dry run -- so "a dry run sends nothing"
+# is a property of the code rather than of the care taken writing the branches.
+# It is defined before the provision stage because both the provision and the
+# publish stages call it.
+cf() { # cf <METHOD> <PATH> [BODY]
+  local method="$1" path="$2" body="${3:-}"
+  local -a args=(-sS -X "$method" "${API_BASE}${path}"
+    -H "Authorization: Bearer ${CF_TOKEN}" -H "Content-Type: application/json")
+  if [ -n "$body" ]; then args+=(--data "$body"); fi
+  curl "${args[@]}"
+}
+
+cf_mutate() { # cf_mutate <METHOD> <PATH> [BODY]
+  if [ "$DRY_RUN" = true ]; then
+    abort "internal: a mutating request (${1} ${2}) was attempted in a dry run"
+  fi
+  cf "$@"
+}
+
+ack() { # ack <description> <response json>
+  python3 - "$1" "$2" <<'PY'
+import json
+import sys
+
+what, raw = sys.argv[1], sys.argv[2]
+try:
+    document = json.loads(raw)
+except ValueError:
+    print("ao-ssh-access: FAILED: %s returned something that is not JSON: %.200s"
+          % (what, raw), file=sys.stderr)
+    raise SystemExit(3)
+if not isinstance(document, dict) or document.get("success") is not True:
+    errors = document.get("errors") if isinstance(document, dict) else raw
+    print("ao-ssh-access: FAILED: %s was refused by the API: %s" % (what, errors),
+          file=sys.stderr)
+    raise SystemExit(3)
+print("ao-ssh-access:   ok  %s" % what)
+PY
+}
+
+# ── 0/5: provision — find-or-create the tunnel (issue #785) ────────────────
+# The route used to assume the tunnel already existed. The provision step makes
+# that true, idempotently: it looks the tunnel up by name, reuses it when it is
+# there, and creates it (seeding the trailing catch-all) when it is not. The
+# read is fail-closed — an unreadable tunnel list is a refusal, never "no tunnel
+# exists" — so a create can only ever be authorised by an honest empty list.
+if [ "$PROVISION" = true ]; then
+  echo "[0/5] finding or creating the tunnel '${CF_TUNNEL_NAME}' ..."
+  if ! tunnel_list_json="$(cf GET "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel?name=${CF_TUNNEL_NAME}&is_deleted=false")"; then
+    abort "[0/5] the tunnel list could not be read"
+  fi
+  if ! tunnel_id="$(python3 - "$tunnel_list_json" "$root" <<'PY'
+import json
+import sys
+
+sys.dont_write_bytecode = True
+raw, root = sys.argv[1], sys.argv[2]
+sys.path.insert(0, root)
+from infra.cloudflare.provision import tunnel_id_from_list
+
+try:
+    document = json.loads(raw)
+except ValueError:
+    print("ao-ssh-access: FAILED: [0/5] the tunnel list response is not JSON",
+          file=sys.stderr)
+    raise SystemExit(3)
+try:
+    print(tunnel_id_from_list(document))
+except ValueError as exc:
+    print("ao-ssh-access: FAILED: %s" % exc, file=sys.stderr)
+    raise SystemExit(3)
+PY
+)"; then
+    abort "[0/5] the tunnel list could not be parsed (fail-closed: an unreadable list is never treated as 'no tunnel')"
+  fi
+
+  if [ -n "$tunnel_id" ]; then
+    echo "      reusing the existing tunnel ${tunnel_id}"
+  else
+    echo "      no tunnel named '${CF_TUNNEL_NAME}' exists — one must be created"
+    if [ "$DRY_RUN" = true ]; then
+      echo "      (dry run: not created)"
+    else
+      create_body="$(python3 - "$CF_TUNNEL_NAME" <<'PY'
+import json
+import sys
+
+print(json.dumps({"name": sys.argv[1], "config_src": "cloudflare"}, sort_keys=True))
+PY
+)"
+      response="$(cf_mutate POST "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel" "$create_body")" \
+        || abort "[0/5] the tunnel could not be created"
+      ack "[0/5] the new tunnel" "$response"
+      tunnel_id="$(python3 - "$response" <<'PY'
+import json
+import sys
+
+try:
+    document = json.loads(sys.argv[1])
+except ValueError:
+    print("ao-ssh-access: FAILED: [0/5] the create response is not JSON",
+          file=sys.stderr)
+    raise SystemExit(3)
+print((document.get("result") or {}).get("id", ""))
+PY
+)" || abort "[0/5] the new tunnel's id could not be read"
+      if [ -z "$tunnel_id" ]; then
+        abort "[0/5] the new tunnel has no id, so refusing to continue"
+      fi
+      # Seed the trailing catch-all so the publish merge has a rule to land
+      # before, and so the tunnel never sits with an unreadably-empty config.
+      seed_body="$(python3 - "$root" <<'PY'
+import json
+import sys
+
+sys.dont_write_bytecode = True
+root = sys.argv[1]
+sys.path.insert(0, root)
+from infra.cloudflare.provision import initial_tunnel_config
+
+print(json.dumps(initial_tunnel_config(), indent=2, sort_keys=True))
+PY
+)"
+      response="$(cf_mutate PUT "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${tunnel_id}/configurations" "$seed_body")" \
+        || abort "[0/5] the new tunnel's catch-all could not be seeded"
+      ack "[0/5] the new tunnel's catch-all seed" "$response"
+    fi
+  fi
+  CF_TUNNEL_ID="$tunnel_id"
+  echo "      tunnel id: ${CF_TUNNEL_ID}"
+fi
+
 # The service string and the CNAME content come from the pure module, so the
 # shell holds no formatting rule of its own.
 if ! service_cname="$(python3 - "$root" "$AO_SSH_ORIGIN_HOST" "$ORIGIN_PORT" "$CF_TUNNEL_ID" <<'PY'
@@ -226,45 +391,6 @@ echo "token     : ${token_source}"
 echo "flag      : ${flag_label}"
 echo "access    : ${AO_SSH_ACCESS_EMAILS} (session ${SESSION_DURATION})"
 echo
-
-# The one function that talks to the API. Its only mutating entry point is
-# `cf_mutate`, which is unreachable in a dry run -- so "a dry run sends nothing"
-# is a property of the code rather than of the care taken writing the branches.
-cf() { # cf <METHOD> <PATH> [BODY]
-  local method="$1" path="$2" body="${3:-}"
-  local -a args=(-sS -X "$method" "${API_BASE}${path}"
-    -H "Authorization: Bearer ${CF_TOKEN}" -H "Content-Type: application/json")
-  if [ -n "$body" ]; then args+=(--data "$body"); fi
-  curl "${args[@]}"
-}
-
-cf_mutate() { # cf_mutate <METHOD> <PATH> [BODY]
-  if [ "$DRY_RUN" = true ]; then
-    abort "internal: a mutating request (${1} ${2}) was attempted in a dry run"
-  fi
-  cf "$@"
-}
-
-ack() { # ack <description> <response json>
-  python3 - "$1" "$2" <<'PY'
-import json
-import sys
-
-what, raw = sys.argv[1], sys.argv[2]
-try:
-    document = json.loads(raw)
-except ValueError:
-    print("ao-ssh-access: FAILED: %s returned something that is not JSON: %.200s"
-          % (what, raw), file=sys.stderr)
-    raise SystemExit(3)
-if not isinstance(document, dict) or document.get("success") is not True:
-    errors = document.get("errors") if isinstance(document, dict) else raw
-    print("ao-ssh-access: FAILED: %s was refused by the API: %s" % (what, errors),
-          file=sys.stderr)
-    raise SystemExit(3)
-print("ao-ssh-access:   ok  %s" % what)
-PY
-}
 
 # ── 1/4: merge the ssh rule into the live ingress ───────────────────────────
 echo "[1/4] reading the live tunnel configuration from ${API_BASE} ..."
@@ -517,6 +643,91 @@ PY
   else
     echo "[4/4] DNS: not checked (dig is not installed on this client)"
   fi
+fi
+
+# ── 5/5: connector deploy (issue #785) ─────────────────────────────────────
+# The publish steps above reach the host through the tunnel; the connector is
+# what actually joins the tunnel to the origin, so without it the route is a
+# configuration that serves nothing. This step deploys `cloudflared` on each
+# connector host, idempotently (pull, rm -f, run --restart unless-stopped). It
+# is an OPERATOR act like --apply: a dry run prints the exact commands per host
+# and sends nothing, and the tunnel token arrives from the environment only —
+# never embedded in a command, never a file, never git (GR-6).
+if [ "$CONNECTOR" = true ]; then
+  require_var AO_SSH_CONNECTOR_HOSTS "the host(s) to deploy the cloudflared connector on (comma-separated)"
+  require_var AO_SSH_CONNECTOR_USER "the SSH user for the connector host(s)"
+
+  CONNECTOR_IMAGE="${AO_SSH_CONNECTOR_IMAGE:-cloudflare/cloudflared:2026.7.2}"
+  CONNECTOR_NETWORK="${AO_SSH_CONNECTOR_NETWORK:-bridge}"
+  CONNECTOR_PREFIX="${AO_SSH_CONNECTOR_CONTAINER_PREFIX:-ao-tunnel}"
+  CONNECTOR_TOKEN="${AO_SSH_CONNECTOR_TOKEN:-}"
+
+  if [ "$DRY_RUN" = false ] && [ -z "$CONNECTOR_TOKEN" ]; then
+    refuse "AO_SSH_CONNECTOR_TOKEN is not set (the connector needs a tunnel token; obtain it with 'cloudflared tunnel token' and hold it in the environment, Vault or GCP Secret Manager — GR-6: never a file, never git)."
+  fi
+
+  echo "[5/5] deploying the cloudflared connector on: ${AO_SSH_CONNECTOR_HOSTS}"
+  echo "      image   : ${CONNECTOR_IMAGE}"
+  echo "      network : ${CONNECTOR_NETWORK}"
+  if [ -n "$CONNECTOR_TOKEN" ]; then
+    echo "      token   : from the environment (never printed)"
+  else
+    echo "      token   : (dry run: not required to plan)"
+  fi
+
+  hosts="$(printf '%s' "$AO_SSH_CONNECTOR_HOSTS" | tr ',' '\n')"
+  while IFS= read -r host; do
+    host="$(printf '%s' "$host" | tr -d '[:space:]')"
+    [ -n "$host" ] || continue
+
+    container="$(python3 - "$root" "$CONNECTOR_PREFIX" "$AO_SSH_HOSTNAME" <<'PY'
+import sys
+
+sys.dont_write_bytecode = True
+root, prefix, hostname = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, root)
+from infra.cloudflare.provision import connector_container_name
+
+print(connector_container_name(prefix, [hostname]))
+PY
+)" || abort "[5/5] the connector container name could not be built"
+
+    deploy_lines_txt="$(python3 - "$root" "$container" "$CONNECTOR_IMAGE" "$CONNECTOR_NETWORK" <<'PY'
+import sys
+
+sys.dont_write_bytecode = True
+root, container, image, network = sys.argv[1:5]
+sys.path.insert(0, root)
+from infra.cloudflare.provision import connector_deploy_lines
+
+for line in connector_deploy_lines(container, image, network):
+    print(line)
+PY
+)" || abort "[5/5] the connector deploy plan could not be built"
+    mapfile -t deploy_lines <<< "$deploy_lines_txt"
+
+    if [ "$DRY_RUN" = true ]; then
+      echo "      host ${host}: would run (idempotent; re-running converges):"
+      for line in "${deploy_lines[@]}"; do
+        echo "        ${line}"
+      done
+    else
+      ssh_args=()
+      [ -n "${AO_SSH_CONNECTOR_KEY:-}" ] && ssh_args+=(-i "$AO_SSH_CONNECTOR_KEY")
+      remote="$(python3 - "$CONNECTOR_TOKEN" "${deploy_lines[@]}" <<'PY'
+import shlex
+import sys
+
+token, lines = sys.argv[1], sys.argv[2:]
+print("export TUNNEL_TOKEN=%s; %s" % (shlex.quote(token), " && ".join(lines)))
+PY
+)"
+      if ! ssh "${ssh_args[@]}" "${AO_SSH_CONNECTOR_USER}@${host}" "$remote"; then
+        abort "[5/5] the connector deploy on ${host} failed"
+      fi
+      echo "      host ${host}: connector deployed (${container})"
+    fi
+  done <<< "$hosts"
 fi
 
 cat <<EOF

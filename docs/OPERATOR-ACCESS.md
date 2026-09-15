@@ -269,7 +269,9 @@ ssh <user>@<the published hostname>
 ```
 
 The route is declared by [`../infra/cloudflare/ao-ssh-access.sh`](../infra/cloudflare/ao-ssh-access.sh)
-(issue #771). It is four steps, and only the first has interesting logic:
+(issues #771, #785). It is one coherent, end-to-end flow — provision the tunnel,
+publish the hostname, deploy the connector — of which the publish step is the
+four steps below and only the first has interesting logic:
 
 1. **Merge an `ssh://<origin>:<port>` rule into the tunnel's live ingress
    configuration.** The Cloudflare API has no "add one rule" call: the tunnel's
@@ -285,6 +287,33 @@ The route is declared by [`../infra/cloudflare/ao-ssh-access.sh`](../infra/cloud
    plus an allow-policy listing the operator emails.
 4. **Verify** the rule is present in the live configuration, and that the name
    resolves (A/AAAA).
+
+### Provision the tunnel and deploy the connector (`--provision`, `--connector`)
+
+Until issue #785 the publish step above *assumed the tunnel already existed* and
+deployed *no connector* — the tunnel creation and the dual-node `cloudflared`
+connector lived in another repo. The route now owns the whole flow:
+
+```bash
+infra/cloudflare/ao-ssh-access.sh --provision            # find-or-create the tunnel
+infra/cloudflare/ao-ssh-access.sh --connector            # deploy the connector
+infra/cloudflare/ao-ssh-access.sh --provision --connector  # the full e2e
+```
+
+- **`--provision`** (stage 0/5) finds the tunnel by name and reuses it, or
+  creates it (seeding the trailing catch-all) when it does not exist. The read
+  is **fail-closed**: an unreadable tunnel list is a refusal, never "no tunnel
+  exists", so a create is only ever authorised by an honest empty list.
+- **`--connector`** (stage 5/5) deploys `cloudflared` on each connector host —
+  `docker pull` + `docker rm -f` + `docker run --restart unless-stopped` — so
+  re-running converges to one running connector. Without a connector the tunnel
+  is a configuration that serves nothing; this is what actually joins it to the
+  origin. The connector's tunnel token arrives from the environment only, and
+  the deploy is an **operator act** like `--apply`.
+
+The provision and connector logic lives in a pure module,
+[`../infra/cloudflare/provision.py`](../infra/cloudflare/provision.py), so it is
+unit-tested and mutation-proved the same way as the merge.
 
 ### The hostname is useless without the Access app
 
@@ -325,11 +354,35 @@ operator act on the same Access application.
 | `CF_API_TOKEN` | the API token, **or** the two Secret Manager variables below |
 | `AO_CF_TOKEN_SECRET` / `AO_GCP_SECRET_PROJECT` | the GCP Secret Manager secret and project holding that token |
 | `AO_CF_API_BASE` | the API base URL — a seam for offline dry runs, never needed live |
+| `CF_TUNNEL_NAME` | with `--provision`: the tunnel to find-or-create (required instead of `CF_TUNNEL_ID`) |
+| `AO_SSH_CONNECTOR_HOSTS` | with `--connector`: comma-separated connector host(s) |
+| `AO_SSH_CONNECTOR_USER` | with `--connector`: the SSH user on those host(s) |
+| `AO_SSH_CONNECTOR_TOKEN` | with `--connector --apply`: the tunnel token (env/Vault/GSM — see below) |
+| `AO_SSH_CONNECTOR_KEY` | with `--connector --apply`: path to the SSH private key |
 
 Every identifier comes from the environment and a missing one is **refused by
 name**: there is no default to fall back on, because a default would silently
-point the run at somebody else's estate. The token is read from the environment
-or from GCP Secret Manager — never from a file, never from git (GR-6).
+point the run at somebody else's estate. The tokens are read from the environment
+or from a secret manager — never from a file, never from git (GR-6).
+
+### One secret posture: environment-first, Vault or GSM upstream
+
+There is exactly **one** secret posture across the route, and it is
+environment-first with a documented manager on each side of the fleet:
+
+- **the API token** (`CF_API_TOKEN`) is read from the environment, or from
+  **GCP Secret Manager** (`AO_CF_TOKEN_SECRET` + `AO_GCP_SECRET_PROJECT`).
+- **the connector tunnel token** (`AO_SSH_CONNECTOR_TOKEN`) is read from the
+  environment only. The operator sources it upstream from whatever manager the
+  estate uses: on the **shared-services** (Vault) side that is a Vault KV read
+  (`vault kv get -field=value <path>`), and on this repo's side GCP Secret
+  Manager — either way it lands in the environment variable, never in a file and
+  never in git.
+
+Because the route takes *all* of its identifiers and tokens from the environment,
+shared-services can vendor this module unchanged: it only has to populate the
+same environment variables from its own Vault loader instead of from GSM. The
+module itself is indifferent to which manager supplied the values (GR-6).
 
 ### Dry run first, then apply
 
