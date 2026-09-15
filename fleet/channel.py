@@ -962,22 +962,43 @@ def remote_head_commit(revision: str = "origin/master") -> str:
 
 
 #: Drift classes, deliberately a superset of the rung states in fleet/watchdog.py
-#: (`missing`/`stale`/`drifted`/`healthy`) so a single classifier answers both
-#: "is there a live loop?" and "is it running current code?".
+#: (`missing`/`stale`/`drifted`/`checkout-behind`/`healthy`) so a single classifier
+#: answers both "is there a live loop?" and "is it running current code?".
 DRIFT_OK = "ok"
 DRIFT_DRIFTED = "drifted"
+#: A THIRD case, distinct from `DRIFT_DRIFTED` because its REMEDY is (#773,
+#: AO-GR-21): the running commit equals the *local* checkout's HEAD, so the rung
+#: is not running stale code relative to what a respawn would give it — the
+#: CHECKOUT is behind `origin/master`. A respawn re-executes the same checkout
+#: and so cannot change the value being compared; the remedy is a fast-forward.
+#: Reporting this as plain `drifted` is what produced 132 respawn decisions and
+#: 45 clean stops in one night on the live fleet.
+DRIFT_CHECKOUT_BEHIND = "checkout-behind"
 DRIFT_CANNOT_ASSESS = "cannot-assess"
 
 
-def classify_drift(running: str, baseline: str, baseline_name: str = "origin/master") -> tuple[str, str]:
+def classify_drift(
+    running: str,
+    baseline: str,
+    baseline_name: str = "origin/master",
+    local_head: str | None = None,
+) -> tuple[str, str]:
     """Classify a running loop's commit against the drift baseline. Never fails open.
 
     Tri-state contract (the repo's gate convention — see `EXIT_OK` /
     `EXIT_NOT_OK` / `EXIT_CANNOT_ASSESS`):
 
       * `DRIFT_OK`          — both commits known and equal; the loop runs current code.
-      * `DRIFT_DRIFTED`     — both known and different; the loop runs stale (or
-                              unreleased) code and must be respawned.
+      * `DRIFT_DRIFTED`     — the loop runs code the checkout no longer holds, so
+                              it must be respawned to load HEAD.
+      * `DRIFT_CHECKOUT_BEHIND` — the loop runs the *local* HEAD, but `origin/master`
+                              is ahead (#773). The rung is current *relative to the
+                              checkout*; the checkout itself is stale. The remedy is
+                              a fast-forward, NOT a respawn — a respawn re-runs the
+                              same checkout and cannot change this value. Only the
+                              caller that knows the local HEAD (`local_head`) can
+                              reach this state, so a caller that passes no
+                              `local_head` keeps the pre-#773 verdict.
       * `DRIFT_CANNOT_ASSESS` — either side unreadable. This is the fail-closed
                               branch: the previous rule was `if baseline != "unknown"
                               and running != baseline`, which read an unreadable
@@ -996,6 +1017,11 @@ def classify_drift(running: str, baseline: str, baseline_name: str = "origin/mas
         return DRIFT_CANNOT_ASSESS, f"loop reports no commit, cannot compare against {baseline_name} {baseline}"
     if running == baseline:
         return DRIFT_OK, f"running {running} = {baseline_name} {baseline}"
+    if local_head not in (None, "", "unknown") and local_head == running:
+        return (
+            DRIFT_CHECKOUT_BEHIND,
+            f"the checkout is behind: running {running} = local HEAD, {baseline_name} {baseline}",
+        )
     return DRIFT_DRIFTED, f"running {running}, {baseline_name} {baseline}"
 
 

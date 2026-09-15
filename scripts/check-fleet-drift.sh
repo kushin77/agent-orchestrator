@@ -322,6 +322,8 @@ fi
 
 line_out="$(env PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT" <<'LINE'
 import sys
+import tempfile
+from pathlib import Path
 
 root = sys.argv[1]
 sys.path.insert(0, f"{root}/fleet")
@@ -330,6 +332,10 @@ sys.dont_write_bytecode = True
 import channel  # noqa: E402
 import watchdog  # noqa: E402
 
+# `rung_action` persists its bounded-remedy ledger under FLEET_DIR (#773), so a
+# probe that drives it must point that ledger at a scratch directory: a check
+# may not write runtime state into the tree it is testing.
+watchdog.FLEET_DIR = Path(tempfile.mkdtemp(prefix="ao-drift-probe-"))
 channel.heartbeat_age_seconds = lambda beat, moment=None: 10.0
 watchdog.channel.heartbeat_age_seconds = lambda beat, moment=None: 10.0
 watchdog.loop_pid = lambda pattern: 111
@@ -359,6 +365,8 @@ fi
 
 exit_rc="$(env PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT" <<'RC' | tail -1
 import sys
+import tempfile
+from pathlib import Path
 
 root = sys.argv[1]
 sys.path.insert(0, f"{root}/fleet")
@@ -367,6 +375,9 @@ sys.dont_write_bytecode = True
 import channel  # noqa: E402
 import watchdog  # noqa: E402
 
+# Same reason as above: `watchdog_once` now records a bounded remedy per rung
+# (#773), and this probe must not leave that ledger in the tested tree.
+watchdog.FLEET_DIR = Path(tempfile.mkdtemp(prefix="ao-drift-rc-"))
 channel.remote_head_commit = lambda: "unknown"
 watchdog.loop_pid = lambda pattern: 111
 watchdog.channel.heartbeat_age_seconds = lambda beat, moment=None: 10.0

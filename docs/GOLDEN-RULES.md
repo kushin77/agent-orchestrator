@@ -437,6 +437,13 @@ queue with no dead-letter is an infinite loop with extra steps.
   and **must** observe it dead-lettered, never re-dispatched (AO-GR-4: the
   check can genuinely fail).
 
+**Applies to the watchdog itself (#773).** A *supervisor* is not exempt from its
+own rule. Every self-healing action the watchdog takes is bounded the same way —
+an attempt cap with backoff, one escalation, then a terminal **parked** state —
+because a remedy that cannot change the value it compares is a runaway, not a
+repair. Measured 2026-09-15: the watchdog respawned a rung **132 times in one
+night** on a mismatch its own remedy could never clear, and did no work at all.
+
 ### AO-GR-22 — One gate per worktree, and the gate is admission-controlled
 
 **Origin.** Issue #724 (measured 2026-09-14: 49 concurrent gates).
@@ -512,7 +519,13 @@ reporting `healthy`).
 **Rule.** A running loop's commit is compared against **`origin/master`** — never
 against the local checkout, which may itself be the stale side. An unreadable
 HEAD is **CANNOT-ASSESS**, never healthy. When the running commit differs from the
-remote, the rung is **drifted** and is respawned.
+remote, the rung is **drifted** — and *which* commit is stale decides the remedy:
+
+* the rung is not on the local HEAD either ⇒ the **rung** is stale ⇒ **respawn**;
+* the rung **is** on the local HEAD ⇒ the **checkout** is stale
+  (`checkout-behind`) ⇒ **fast-forward the checkout** (`git fetch` +
+  `git merge --ff-only`), then one respawn. A respawn alone re-executes the same
+  checkout and cannot change the compared value (#773, AO-GR-21).
 
 **Why.** `fleet/watchdog.py` compared the loop's heartbeat commit to
 `channel.head_commit()`, which reads the **shared checkout**. With the checkout
@@ -533,6 +546,12 @@ control that fails *open* is worse than none.
   measured case and mutation-proves itself: a mutant restoring the local-HEAD
   baseline, and one restoring the fail-open `head != "unknown"` guard, must each
   be caught. It is wired into `scripts/verify.sh` as `fleet-drift`.
+- The remedy is bounded and named (#773): a stale checkout is fast-forwarded
+  rather than respawned, no remedy is retried past its attempt cap, exhaustion
+  escalates **once** and parks the rung, and a busy rung is recorded as *pending
+  drift* instead of being dropped every tick. `bash
+  scripts/check-watchdog-bounded.sh` proves it against a real scratch repository
+  and two mutants of the real source, and is wired as `watchdog-bounded`.
 
 **Baseline tradeoff.** The baseline is the *fetched* `origin/master`
 remote-tracking ref; the watchdog does **not** fetch on every tick (a 2-minute

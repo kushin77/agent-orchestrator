@@ -94,6 +94,22 @@ checks=(
   # mutants of the real classifier — the local-HEAD baseline restored, and the
   # fail-open guard restored.
   'fleet-drift|bash scripts/check-fleet-drift.sh'
+  # watchdog-bounded (issue #773, AO-GR-21): drift detection is only half a
+  # control — the other half is a remedy that can change what was compared. #739
+  # made the watchdog compare the running commit to origin/master and RESPAWN on a
+  # mismatch, but a respawn re-executes the same checkout: when the mismatch was
+  # the CHECKOUT being behind, the watchdog took an action that could not change
+  # the value it compared and repeated it without bound — measured on the live
+  # fleet as 132 `drifted … — respawned` decisions, 45 clean stops, a brain never
+  # older than 60s, and zero work done. The check names the two cases separately
+  # (`checkout-behind` is repaired by a fast-forward, proven against a real git
+  # checkout, never by a blind respawn), proves the remedy is bounded by an attempt
+  # cap with backoff that escalates ONCE and then parks, proves a busy rung is
+  # recorded pending rather than dropped every tick, and mutation-proves itself
+  # with two mutants of the real source — the cap removed, and the local-HEAD
+  # distinction removed — each required to diverge on a probe whose value must
+  # change (a happy-path assertion cannot pass it).
+  'watchdog-bounded|bash scripts/check-watchdog-bounded.sh'
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'

@@ -64,6 +64,10 @@ governance/board/violations.jsonl
 .fleet/lifecycle/
 # Session heartbeats: one per running lane, swept by governance/reconcile (#304)
 .fleet/sessions/
+# Watchdog remedy ledger (tracked module: fleet/watchdog.py, issue #773): one
+# record per rung holding its attempt count and escalation, plus the
+# one-per-incident escalation artifacts. Runtime state, never committed.
+.fleet/watchdog/
 # Fleet monitor runtime output (tracked module: fleet/monitor.py)
 .fleet/open-eye.log
 .fleet/open-eye.heartbeat
