@@ -18,8 +18,22 @@
 #   * and the whole proof is not vacuous: the same double-acquire is driven
 #     against a MUTANT whose exclusion always grants, and the refusal must vanish.
 #
-# Nothing here starts a real `make verify`: a held gate is simulated with the
-# entrypoint the gate itself calls. Every subprocess gets
+# Admission control shipped once as a snippet an operator had to paste into
+# `scripts/verify.sh`, and the snippet was never applied: the control was INERT
+# and nothing bounded a gate. So this gate also proves the WIRING, two ways:
+#
+#   * structurally — `scripts/verify.sh` carries the prelude, and it carries it
+#     BEFORE `.verify/` is reset (a parked gate must not be able to destroy the
+#     last real attestation); a deleted or relocated prelude fails by name;
+#   * live — a REAL `scripts/verify.sh` is started in a scratch worktree and a
+#     SECOND one is started in that same worktree; the second must be refused by
+#     name, run ZERO checks and write NO attestation. A control that asserts
+#     rather than provokes is not a control, so the refusal is provoked, not
+#     assumed.
+#
+# Only that last proof starts a real `scripts/verify.sh`, and it does so in a
+# scratch worktree with its OWN permit store; every other held gate is simulated
+# with the entrypoint the gate itself calls. Every subprocess gets
 # `AO_GATE_LOCK_ROOT` pointed at a scratch directory, so this gate never touches
 # the box's real permit store, the shared checkout's `.fleet/`, or a sibling
 # lane's lock state.
@@ -113,6 +127,7 @@ touches the box's real permit store, the shared checkout's `.fleet/`, or a
 sibling lane's lock state.
 """
 import atexit
+import hashlib
 import os
 import shutil
 import signal
@@ -150,6 +165,16 @@ def check(label, condition, detail=""):
     else:
         problems.append(label)
         print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr, flush=True)
+
+
+def note(label, detail):
+    """Print the evidence VERBATIM without touching the verdict.
+
+    A refusal quoted by the gate itself is evidence a reader can check: a
+    control that only prints "OK    a second gate is refused" asks to be
+    believed.
+    """
+    print(f"  note  {label}: {' '.join(detail.split())}", flush=True)
 
 
 def env(**overrides):
@@ -200,6 +225,11 @@ def wait_until(predicate, timeout=15.0):
     return predicate()
 
 
+# Every permit store this gate creates, so the reaper below covers the scratch
+# worktree's store as well as the mocked-gate store built at the top.
+stores = [store]
+
+
 def reap():
     """Leave no holder behind, whatever happened above.
 
@@ -207,16 +237,17 @@ def reap():
     anything it finds would kill the gate it is running inside.
     """
     protected = {os.getpid(), os.getppid()}
-    for candidate in sorted(store.rglob("*.lock")):
-        try:
-            owner = gatelock.read_owner(candidate)
-        except gatelock.GateLockError:
-            continue
-        if owner and owner.pid not in protected and gatelock.pid_alive(owner.pid):
+    for base in stores:
+        for candidate in sorted(base.rglob("*.lock")):
             try:
-                os.kill(owner.pid, signal.SIGKILL)
-            except OSError:
-                pass
+                owner = gatelock.read_owner(candidate)
+            except gatelock.GateLockError:
+                continue
+            if owner and owner.pid not in protected and gatelock.pid_alive(owner.pid):
+                try:
+                    os.kill(owner.pid, signal.SIGKILL)
+                except OSError:
+                    pass
 
 
 atexit.register(reap)
@@ -648,6 +679,307 @@ finally:
         except OSError:
             pass
 
+# --- 12. the prelude is really APPLIED to scripts/verify.sh ----------------
+# The admission control is only an institution if the gate of record carries it.
+# It was once delivered as a snippet a human had to paste, and the paste never
+# happened: the control was INERT and nothing bounded a gate. This proves the
+# wiring structurally, INCLUDING the ordering — the prelude must run before
+# `.verify/` is reset, or a parked gate would truncate the last real attestation
+# instead of leaving it untouched. A deleted or relocated prelude fails here.
+verify_sh = repo / "scripts" / "verify.sh"
+verify_lines = verify_sh.read_text(encoding="utf-8").splitlines()
+
+
+def line_index(needle):
+    for index, line in enumerate(verify_lines):
+        if needle in line:
+            return index
+    return -1
+
+
+i_acquire = line_index('gate-lock.sh" acquire')
+i_release = line_index('gate-lock.sh" release')
+i_refuse_exit = line_index('exit "$lock_rc"')
+i_log_reset = line_index(': > "$log"')
+i_results_reset = line_index(': > "$results_tsv"')
+i_park = line_index("verify: PARKED")
+i_int = line_index("trap 'exit 130' INT")
+i_term = line_index("trap 'exit 143' TERM")
+i_hup = line_index("trap 'exit 129' HUP")
+
+check("scripts/verify.sh acquires the gate lock", i_acquire >= 0,
+      "the prelude is not applied — the admission control is inert")
+check("scripts/verify.sh releases it from a trap", i_release >= 0)
+check(
+    "the prelude runs BEFORE .verify/ is reset, so a parked gate destroys nothing",
+    i_acquire >= 0 and i_log_reset > i_acquire and i_results_reset > i_acquire,
+    f"acquire@{i_acquire} log-reset@{i_log_reset} results-reset@{i_results_reset}",
+)
+check(
+    "a refused gate exits BEFORE the traps are installed (it releases only what it owns)",
+    i_refuse_exit > i_acquire and 0 <= i_refuse_exit < min(i_int, i_term, i_hup, i_release),
+    f"exit@{i_refuse_exit} INT@{i_int} TERM@{i_term} HUP@{i_hup} release@{i_release}",
+)
+check(
+    "the refused path names itself outside the 0/1/2 tri-state",
+    i_park >= 0,
+)
+doc_text = (repo / "docs" / "EXECUTION-PLAN.md").read_text(encoding="utf-8")
+doc_lines = doc_text.splitlines()
+check(
+    "the documented prelude and the applied prelude are the same acquire line",
+    any('gate-lock.sh" acquire --worktree' in line for line in verify_lines)
+    and any('gate-lock.sh" acquire --worktree' in line for line in doc_lines),
+)
+# A document that still tells a reader to paste the prelude IS the human step
+# this control exists to remove, and a human step is exactly how the prelude went
+# unapplied in the first place. So its absence is checked by name, not trusted.
+stale_instructions = (
+    "NOT yet applied",
+    "inserts it",
+    "Until the snippet lands",
+    "Applying the snippet",
+)
+still_offered = [phrase for phrase in stale_instructions if phrase in doc_text]
+check(
+    "docs/EXECUTION-PLAN.md no longer instructs a human to paste the prelude",
+    not still_offered,
+    f"stale instruction still present: {still_offered}",
+)
+
+# --- 13. NEGATIVE CONTROL: a second scripts/VERIFY.SH is refused -----------
+# Sections 1-11 drive `scripts/gate-lock.sh`, the entrypoint — none of them
+# proves that `scripts/verify.sh` CALLS it, and proving only that would leave the
+# inert-control bug unproven. So this starts a REAL `scripts/verify.sh`, in a
+# scratch worktree carrying byte-identical copies of this tree's orchestrator
+# files (digests checked below), and then starts a SECOND one in that same
+# worktree. The second must be refused by name, run ZERO checks, and write no
+# attestation.
+#
+# Bound, not open-ended: the scratch tree's check set is bounded to the checks
+# the explicit array names (absent there, so they fail fast) plus one discovered
+# probe that parks the FIRST gate inside a check until this control releases it.
+# That makes the first gate's window deterministic rather than a race, and the
+# probe's witness file counts exactly how many gates reached a check body.
+verify_store = work / "verify-store"
+verify_store.mkdir(parents=True, exist_ok=True)
+stores.append(verify_store)
+
+scratch = work / "scratch-wt"
+(scratch / "scripts").mkdir(parents=True, exist_ok=True)
+(scratch / "fleet").mkdir(parents=True, exist_ok=True)
+
+orchestrator_files = (
+    "scripts/verify.sh",
+    "scripts/gate-lock.sh",
+    "scripts/discover-checks.sh",
+    "fleet/gatelock.py",
+)
+identical = True
+for relative in orchestrator_files:
+    shutil.copyfile(repo / relative, scratch / relative)
+    if hashlib.sha256((repo / relative).read_bytes()).digest() != hashlib.sha256(
+        (scratch / relative).read_bytes()
+    ).digest():
+        identical = False
+check("the scratch worktree runs THIS tree's orchestrator files, byte for byte", identical)
+check(
+    "the scratch worktree's verify.sh is the one that carries the prelude",
+    'gate-lock.sh" acquire' in (scratch / "scripts" / "verify.sh").read_text(encoding="utf-8"),
+)
+
+witness = work / "verify-probe.witness"
+release_file = work / "verify-probe.release"
+witness.write_text("", encoding="utf-8")
+release_file.unlink(missing_ok=True)
+probe = scratch / "scripts" / "check-verify-probe.sh"
+probe.write_text(
+    """#!/usr/bin/env bash
+set -u
+printf 'PROBE-ENTER pid=%s\\n' "$$" >> "$AO724_PROBE_WITNESS"
+deadline=$(( $(date +%s) + ${AO724_PROBE_TIMEOUT:-180} ))
+while [ ! -e "$AO724_PROBE_RELEASE" ] && [ "$(date +%s)" -lt "$deadline" ]; do sleep 0.1; done
+printf 'PROBE-EXIT\\n' >> "$AO724_PROBE_WITNESS"
+exit 0
+""",
+    encoding="utf-8",
+)
+
+
+def start_verify_gate(tag):
+    """Start a REAL scripts/verify.sh in the scratch worktree, detached."""
+    log_path = work / f"verify-gate-{tag}.log"
+    handle = open(log_path, "w", encoding="utf-8")
+    process = subprocess.Popen(
+        ["bash", str(scratch / "scripts" / "verify.sh"), "verify"],
+        cwd=str(scratch),
+        stdout=handle,
+        stderr=subprocess.STDOUT,
+        env=env(
+            AO_GATE_LOCK_ROOT=verify_store,
+            AO_GATE_MAX_CONCURRENT=4,
+            AO724_PROBE_WITNESS=witness,
+            AO724_PROBE_RELEASE=release_file,
+            AO724_PROBE_TIMEOUT=180,
+        ),
+        start_new_session=True,
+    )
+    return process, handle, log_path
+
+
+scratch_lock = gatelock.worktree_lock_path(scratch, verify_store)
+scratch_log = scratch / ".verify" / "verify.log"
+scratch_results = scratch / ".verify" / ".results.tsv"
+sentinel_attestation = scratch / ".verify" / "attestation.json"
+sentinel_bytes = b'{"gate": "PRIOR-RUN-SENTINEL", "note": "planted by check-gate-lock"}\n'
+# The header verify.sh writes before each check's transcript (`\n== name ==\n`).
+HEADER = b"\n== "
+
+gate_a = gate_b = None
+handle_a = handle_b = None
+path_a = path_b = None
+try:
+    gate_a, handle_a, path_a = start_verify_gate("A")
+    admitted = wait_until(
+        lambda: gatelock.probe(scratch_lock).held
+        and witness.exists()
+        and "PROBE-ENTER" in witness.read_text(encoding="utf-8"),
+        timeout=180,
+    )
+    a_text_early = path_a.read_text(encoding="utf-8")
+    for line in a_text_early.splitlines():
+        if "ADMITTED" in line:
+            note("gate A receipt", line)
+            break
+    check(
+        "gate A — a real scripts/verify.sh — is ADMITTED and reaches a check",
+        admitted,
+        f"lock={gatelock.state_text(gatelock.probe(scratch_lock))} "
+        f"witness={witness.read_text(encoding='utf-8').strip()!r}",
+    )
+    check(
+        "gate A's own transcript carries the admission receipt",
+        "ADMITTED" in path_a.read_text(encoding="utf-8"),
+        path_a.read_text(encoding="utf-8")[:400],
+    )
+    check(
+        "gate A's holder is a live process in THIS gate's scratch store",
+        gatelock.read_owner(scratch_lock) is not None
+        and gatelock.pid_alive(gatelock.read_owner(scratch_lock).pid),
+        gatelock.state_text(gatelock.probe(scratch_lock)),
+    )
+    check(
+        "gate A is running real checks before the refusal is provoked",
+        scratch_log.exists() and b"\n== shell-syntax ==\n" in scratch_log.read_bytes(),
+        "gate A never ran a check",
+    )
+
+    # Plant a prior attestation and snapshot every artifact gate B must not
+    # touch. Gate A is parked inside its probe, so it cannot rewrite these.
+    sentinel_attestation.write_bytes(sentinel_bytes)
+    before_log = hashlib.sha256(scratch_log.read_bytes()).hexdigest()
+    before_results = hashlib.sha256(scratch_results.read_bytes()).hexdigest()
+    before_attest = hashlib.sha256(sentinel_attestation.read_bytes()).hexdigest()
+    before_headers = scratch_log.read_bytes().count(HEADER)
+
+    gate_b, handle_b, path_b = start_verify_gate("B")
+    gate_b.wait(timeout=180)
+    b_rc = gate_b.returncode
+    b_text = path_b.read_text(encoding="utf-8")
+    holder_a = gatelock.read_owner(scratch_lock)
+    holder_a_pid = holder_a.pid if holder_a else None
+    note("the second scripts/verify.sh was refused with", b_text)
+    note(
+        "and it wrote nothing: transcript sha256 before -> after",
+        f"{before_log} -> {hashlib.sha256(scratch_log.read_bytes()).hexdigest()}",
+    )
+
+    check(
+        "a SECOND scripts/verify.sh in the same worktree is refused (rc 10)",
+        b_rc == gatelock.EXIT_REFUSED,
+        f"rc={b_rc} {b_text.strip()}",
+    )
+    check(
+        "the refusal is the PARKED line plus gate-lock's REFUSED, naming the holder's pid",
+        "PARKED (rc 10" in b_text
+        and "REFUSED" in b_text
+        and holder_a_pid is not None
+        and f"pid {holder_a_pid}" in b_text,
+        b_text.strip(),
+    )
+    check(
+        "the refusal names the worktree it refused in",
+        str(scratch) in b_text,
+        b_text.strip(),
+    )
+    check(
+        "the refused gate printed no verdict and no ADMITTED receipt",
+        "verify: PASS" not in b_text
+        and "verify: FAIL" not in b_text
+        and "ADMITTED" not in b_text,
+        b_text.strip(),
+    )
+    check(
+        "gate B ran ZERO checks: gate A's transcript is byte-identical across B",
+        hashlib.sha256(scratch_log.read_bytes()).hexdigest() == before_log,
+        "the live transcript changed under a refused gate",
+    )
+    after_log_bytes = scratch_log.read_bytes()
+    check(
+        "gate B added no check header to the transcript",
+        after_log_bytes.count(HEADER) == before_headers,
+        f"{before_headers} -> {after_log_bytes.count(HEADER)}",
+    )
+    check(
+        "gate B's per-check record is byte-identical: no check reached a body",
+        hashlib.sha256(scratch_results.read_bytes()).hexdigest() == before_results,
+        "the per-check record moved under a refused gate",
+    )
+    check(
+        "gate B overwrote no previous attestation",
+        sentinel_attestation.read_bytes() == sentinel_bytes
+        and hashlib.sha256(sentinel_attestation.read_bytes()).hexdigest() == before_attest,
+        "the planted prior attestation changed under a refused gate",
+    )
+    check(
+        "gate B logged no check header of its own at all",
+        b_text.count("\n== ") == 0,
+        b_text.strip(),
+    )
+    check(
+        "exactly one gate reached a check body (the probe witness)",
+        witness.read_bytes().count(b"PROBE-ENTER") == 1,
+        witness.read_text(encoding="utf-8").strip(),
+    )
+    check(
+        "gate A was still running while gate B was refused",
+        gate_a.poll() is None,
+        "gate A exited before the refusal was proven",
+    )
+finally:
+    release_file.write_text("release\n", encoding="utf-8")
+    for process, handle in ((gate_b, handle_b), (gate_a, handle_a)):
+        if process is None:
+            continue
+        try:
+            process.wait(timeout=180)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=20)
+        if handle is not None:
+            handle.close()
+
+check(
+    "gate A released its worktree lock on EXIT, so the trap path is wired too",
+    wait_until(lambda: not gatelock.probe(scratch_lock).held),
+    gatelock.state_text(gatelock.probe(scratch_lock)),
+)
+a_text = path_a.read_text(encoding="utf-8") if path_a else ""
+check(
+    "gate A completed a full gate run and printed its own verdict (never B's)",
+    "verify: PASS" in a_text or "verify: FAIL" in a_text,
+    a_text[-300:],
+)
 if problems:
     print(f"  ({len(problems)} live proof(s) failed)", file=sys.stderr)
     raise SystemExit(1)
@@ -663,5 +995,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-gate-lock: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-gate-lock: OK — a second gate in one worktree is refused by name, the box cap parks the rest, and both signal and crash release the permit"
+echo "check-gate-lock: OK — the prelude is applied to scripts/verify.sh before .verify/ is reset, a second verify.sh in one worktree is refused by name having run zero checks and written no attestation, the box cap parks the rest, and both signal and crash release the permit"
 exit 0

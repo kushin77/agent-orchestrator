@@ -24,6 +24,16 @@
 # exercised only by `make gate`; `governance/lessons` is red for an unrelated
 # board-hygiene defect (#312).
 #
+# ADMISSION CONTROL (issue #724). The operator measured 49 concurrent `make
+# verify` runs, 43 of them stacked in two worktrees, ~16 hours of duplicated
+# work. This gate therefore admits work instead of assuming it: it takes an
+# exclusive lock on its OWN worktree and one box-wide permit BEFORE it discovers
+# a check or touches `.verify/`, and parks (running nothing) if either is
+# unavailable. The control is self-applying — it is these lines, not a snippet an
+# operator pastes — so no gate run can bypass it. It is proven end to end by
+# scripts/check-gate-lock.sh, which starts a real second `scripts/verify.sh` in
+# one worktree and requires it to be refused by name.
+#
 # Usage: scripts/verify.sh [verify|gate]
 set -u
 
@@ -31,6 +41,37 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 1
 
 mode="${1:-verify}"
+
+# --- admission control (issue #724) -----------------------------------------
+# One composite gate per worktree, bounded box-wide by a permit store outside
+# every workspace. This runs BEFORE any check is discovered and BEFORE `.verify/`
+# is touched, so a gate that cannot get a permit is PARKED: it runs no check and
+# it overwrites no previous attestation. The exit codes are deliberately OUTSIDE
+# this gate's own 0/1/2 tri-state (0 PASS / 1 NOT-OK / 2 CANNOT-ASSESS) so a
+# parked run can never be read as a pass or as a failure: 10 another gate holds
+# this worktree, 11 the box-wide cap is reached, 12 the permit store is unusable.
+bash "$root/scripts/gate-lock.sh" acquire --worktree "$root" --mode "$mode" \
+  --owner-pid $$
+lock_rc=$?
+if [ "$lock_rc" -ne 0 ]; then
+  case "$lock_rc" in
+    10) echo "verify: PARKED (rc 10, not a pass and not a failure) — another gate already holds this worktree; nothing was run and no attestation was touched" >&2 ;;
+    11) echo "verify: PARKED (rc 11, not a pass and not a failure) — the box-wide gate cap is reached; nothing was run and no attestation was touched" >&2 ;;
+    *) echo "verify: CANNOT-ASSESS (rc $lock_rc, not a pass and not a failure) — the gate permit store is unusable; nothing was run and no attestation was touched" >&2 ;;
+  esac
+  exit "$lock_rc"
+fi
+# Only a gate that ACQUIRED installs the release traps: a refused gate exits
+# above, before these lines, so it can never release a lock it does not own
+# (and `release` refuses anyway when the lock belongs to another live gate). The
+# traps cover EXIT — the normal path — and INT/TERM/HUP, each mapped to a real
+# exit code so the EXIT trap runs and the lock is released. A gate killed
+# outright cannot run any trap; its holder watches this shell's pid and releases
+# the moment the shell is gone, SIGKILL included.
+trap 'bash "$root/scripts/gate-lock.sh" release --worktree "$root" --owner-pid $$ >/dev/null 2>&1' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 verify_dir="$root/.verify"
 mkdir -p "$verify_dir"

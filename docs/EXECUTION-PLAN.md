@@ -272,38 +272,40 @@ bytes, so the store verifies its own writes (a grant it cannot evidence is an
 error, not a grant), and a 0-byte record is never read as an empty slot: the
 `flock`, not the bytes, is the exclusion.
 
-**The wiring is RC-8 territory (issue #559) and is NOT yet applied.**
-`scripts/verify.sh` is single-writer territory, so the admission block ships as
-the exact snippet below and the wiring lane inserts it. It goes immediately
-after the `mode="${1:-verify}"` line in `scripts/verify.sh` — *before*
-`verify_dir`/`log` are reset, so a parked gate leaves the previous attestation
-untouched instead of truncating the only evidence of the last real run.
+**The wiring is APPLIED and self-applying (issue #724).** The admission block is
+part of `scripts/verify.sh` itself — it is not a snippet an operator pastes, and
+no gate run can skip it, because the gate IS the file that carries it. It sits
+immediately after the `mode="${1:-verify}"` line and *before* `verify_dir`/`log`
+are reset, so a parked gate leaves the previous attestation untouched instead of
+truncating the only evidence of the last real run. **If you edit
+`scripts/verify.sh`, keep that ordering**: an admission check placed after the
+`.verify/` reset would let a parked gate destroy the last real attestation.
 
-Until the snippet lands, `scripts/check-gate-lock.sh` is delivered but invoked by
-no gate file, so `scripts/check-gate-coverage.sh` reports it as `uninvoked`.
-Applying the snippet is what makes it wired: no baseline row is involved, and a
-baseline row for it would be refused by the detector anyway.
+`scripts/check-gate-lock.sh` is wired into the gate of record by
+`scripts/verify.sh`'s check-discovery layer (#698), so
+`scripts/check-gate-coverage.sh` reports it as invoked rather than as an
+`uninvoked` artifact. It proves the wiring two ways, and both can genuinely fail:
+**structurally** (the prelude is present in `scripts/verify.sh` and precedes the
+`.verify/` truncation, so a deleted or relocated prelude fails by name) and
+**live** (a second real `scripts/verify.sh` is started in the same worktree and
+must be refused by name while running zero checks and writing nothing).
+
+The lines now in `scripts/verify.sh`:
 
 ```bash
 # --- admission control (issue #724) -----------------------------------------
-# One composite gate per worktree, bounded box-wide by a permit store outside
-# every workspace. A gate that cannot get a permit is PARKED: it runs no check
-# and it overwrites no previous attestation. Exit codes: 10 another gate holds
-# this worktree, 11 the box-wide cap is reached, 12 the permit store is unusable.
 bash "$root/scripts/gate-lock.sh" acquire --worktree "$root" --mode "$mode" \
   --owner-pid $$
 lock_rc=$?
 if [ "$lock_rc" -ne 0 ]; then
   case "$lock_rc" in
-    10) echo "verify: PARKED — another gate already holds this worktree; nothing was run" >&2 ;;
-    11) echo "verify: PARKED — the box-wide gate cap is reached; nothing was run" >&2 ;;
-    *) echo "verify: CANNOT-ASSESS — the gate permit store is unusable; nothing was run" >&2 ;;
+    10) echo "verify: PARKED (rc 10, not a pass and not a failure) — another gate already holds this worktree; ..." >&2 ;;
+    11) echo "verify: PARKED (rc 11, not a pass and not a failure) — the box-wide gate cap is reached; ..." >&2 ;;
+    *) echo "verify: CANNOT-ASSESS (rc $lock_rc, not a pass and not a failure) — the gate permit store is unusable; ..." >&2 ;;
   esac
   exit "$lock_rc"
 fi
-# Only a gate that holds the lock installs the release traps: a refused gate
-# must never release the lock it was refused by, and release refuses anyway when
-# the lock belongs to another gate that is still alive.
+# Only a gate that HELD the lock installs the release traps.
 trap 'bash "$root/scripts/gate-lock.sh" release --worktree "$root" --owner-pid $$ >/dev/null 2>&1' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -311,14 +313,24 @@ trap 'exit 129' HUP
 ```
 
 The `release` call belongs in the EXIT trap and the signal traps map to a real
-exit code, so the trap runs on `Ctrl-C` (`exit 130`) and on `TERM` (`exit 143`)
-and every one of those paths releases the worktree lock and the permit slot.
-Until that trap exists — the admission window itself — the holder is what keeps
-the bound: `--owner-pid $$` makes it watch the gate's own pid and release the
-moment that process is gone, however it died, `SIGKILL` included.
+exit code, so the trap runs on `Ctrl-C` (`exit 130`), on `TERM` (`exit 143`) and
+on `HUP` (`exit 129`), and every one of those paths releases the worktree lock
+and the permit slot. `SIGHUP` is handled deliberately: its default action
+terminates the shell immediately, so a loop that left it unhandled would skip the
+release. A gate killed outright runs no trap at all; there the holder is what
+keeps the bound — `--owner-pid $$` makes it watch the gate's own pid and release
+the moment that process is gone, however it died, `SIGKILL` included.
 
 `scripts/gate-lock.sh acquire|release|status` is the only interface a gate needs;
 `fleet/gatelock.py` holds the mechanism and `scripts/check-gate-lock.sh` proves
 the refusals — including a mutant whose exclusion always grants, so the refusal
 proof cannot pass vacuously.
+
+**Running a gate while another holds your worktree.** Query before you start:
+`bash scripts/gate-lock.sh status --worktree "$PWD"` reports `HELD`, `STALE` or
+`FREE`. A `STALE` record (a holder killed outright) is reclaimed by the next
+`acquire`, which names the owner it took it from, so no manual clearing is
+needed for that case. Do not clear a `HELD` lock to "unblock" a run: that is the
+bound doing its job, and the honest response is to wait for the holder or to
+raise `AO_GATE_MAX_CONCURRENT` — never to disable the lock.
 
