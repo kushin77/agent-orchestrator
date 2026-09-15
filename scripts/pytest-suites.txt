@@ -120,3 +120,9 @@ engine/conversation
 # by scripts/verify.sh -- declaring it alone would fail check-gate-coverage,
 # which never grandfathers a newly declared suite.
 gateway/chat
+# Issue #771: the remote operator SSH route. The suite covers the ingress merge
+# (`infra/cloudflare/ingress.py`) -- the step that must never drop a live rule --
+# and is declared here because an undeclared suite is drift; scripts/check-drift.sh
+# warns on it and scripts/gate-coverage-baseline.txt never grandfathers a newly
+# declared one. It is named by scripts/verify.sh (`pytest-cloudflare`).
+infra/cloudflare

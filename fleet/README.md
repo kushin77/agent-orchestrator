@@ -18,6 +18,11 @@ plane, §7.1 of the contract), this file's control verbs, `make operator` (the
 live view) and `make console` (the browser console, loopback and fail-closed by
 default) — with the exact command for each and what needs a shell on the box.
 This runbook defers to it for access; it stays authoritative for mechanics.
+An operator who has **no** shell on the box starts at §6 of that page: the
+remote route (SSH over the existing Cloudflare Tunnel, with Cloudflare Access in
+front) that removes that first need. It is flag-gated OFF and publishes nothing
+until an operator applies it, so none of the bootstrap below changes while it
+ships off.
 
 ## The model
 
