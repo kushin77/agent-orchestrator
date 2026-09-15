@@ -242,8 +242,18 @@ class GitHubOps:
         (PATH for git/gh, HOME, the session's GIT_* identity) — never used to
         replace it: an empty environment would run the contract without git on
         PATH and the failure would look like a red gate.
+
+        The argument is authoritative in both directions: with no pull request the
+        variable is *removed*, not merely left unset. The driver runs the contract
+        with ``AO_PR_NUMBER`` set, and the contract's own ``tests`` signal runs
+        the suite sweep inside that environment — so an inherited value reaches
+        the corpus and mislabels a no-PR contract run as having one. That is
+        exactly what
+        ``test_without_a_pull_request_the_contract_runs_without_the_pr_context``
+        catches, and how this was found (#764).
         """
         env = dict(self.env) if self.env else dict(os.environ)
+        env.pop("AO_PR_NUMBER", None)
         if pr_number:
             env["AO_PR_NUMBER"] = str(pr_number)
         return _run(["bash", str(self.root / "scripts" / "merge-gate.sh"), "run"], cwd=self.root, env=env)
