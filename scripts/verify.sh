@@ -92,6 +92,20 @@ checks=(
   # a baselined one and requires it to be ACCEPTED -- asserting only the empty
   # case would pass a detector that matches nothing.
   'no-actions|bash scripts/check-no-actions.sh'
+  # cpapi-spec-drift (issue #816): `identity/cpapi/openapi.yaml` is a PUBLISHED
+  # contract -- its own description says it is "the contract the generated clients
+  # in `clients/` are built against". Measured 2026-09-15 it matched the router
+  # exactly (29 routes / 29 paths, zero drift both ways) and NOTHING kept it that
+  # way: no gate compared the two, so a route added, renamed or removed in code
+  # would invalidate the contract silently. A contract that has drifted is worse
+  # than no contract, because a consumer trusts it.
+  #
+  # Provoked in BOTH directions, because drift fails the consumer two ways: a
+  # route in the CODE but not the SPEC under-documents (a client cannot call a
+  # feature that exists), and a path in the SPEC but not the CODE over-promises
+  # (a client generates against a route that 404s). A comparator reporting only
+  # one class would look healthy while the other rotted.
+  'cpapi-spec-drift|bash scripts/check-cpapi-spec-drift.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'epic-focus|bash scripts/check-epic-focus.sh'
