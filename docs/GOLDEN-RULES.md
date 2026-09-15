@@ -528,6 +528,14 @@ lanes.
   presents two colliding children and the dispatcher **refuses the second**.
 - Max-agents fan-out is **blocked** until this check is green — the raising
   change and this gate land together or not at all.
+- **Landed (issue #718).** `fleet/capacity.py` resolves the fan-out as
+  `min(pool, disjoint ready lanes, resource ceiling)` and the loop holds a
+  directive it cannot take, naming the binding bound;
+  `scripts/check-capacity-gate.sh` **provokes** this rule's control — two ready
+  lanes claiming one file, the later **held** and the collision named by lane and
+  path — and then requires the relaxed pair admitted, so the two paths cannot
+  share an exit code. The rule is therefore mechanically enforced, not merely
+  declared (see `docs/EXECUTION-PLAN.md` §8).
 
 ### AO-GR-25 — Drift is measured against the remote, and never fails open
 

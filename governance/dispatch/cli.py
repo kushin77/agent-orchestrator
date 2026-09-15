@@ -40,6 +40,21 @@ EXIT_OK = 0
 EXIT_NOT_OK = 1
 EXIT_CANNOT_ASSESS = 2
 
+#: The capacity gate lives with the loop it bounds (``fleet/capacity.py``, #718).
+#: Imported LAZILY and by path: `focus` is the verb that reports the fan-out, but
+#: no other dispatch verb should fail to start because the loop's module moved.
+FLEET_DIR = Path(__file__).resolve().parents[2] / "fleet"
+
+
+def _capacity_module():
+    """Import ``fleet/capacity.py``; raise ``ImportError`` when it is missing."""
+    if str(FLEET_DIR) not in sys.path:
+        sys.path.insert(0, str(FLEET_DIR))
+    import capacity  # noqa: PLC0415 — deliberate: lazy, so a missing module cannot
+    # break the verbs that do not report the fan-out.
+
+    return capacity
+
 
 def _load_snapshot(path: Path) -> snapshot_mod.Snapshot:
     return snapshot_mod.load(path)
@@ -181,6 +196,13 @@ def cmd_focus(args: argparse.Namespace) -> int:
     """
     if args.self_control:
         problems = focus_mod.self_control()
+        # The capacity gate is the fan-out half of the focus contract (#718):
+        # max-agents is ON and bounded only if the bounds can genuinely bind, so
+        # the epic-focus check drives its mutants here rather than asserting it.
+        try:
+            problems.extend(_capacity_module().self_control())
+        except ImportError as exc:
+            problems.append(f"fleet/capacity.py is missing — the fan-out is unbounded ({exc})")
         if problems:
             print(f"focus: FAIL ({len(problems)} self-control problem(s))", file=sys.stderr)
             for problem in problems:
@@ -227,6 +249,19 @@ def cmd_focus(args: argparse.Namespace) -> int:
             f"wave_cap: {focus.wave_cap}  max_agents: {focus.max_agents}  "
             f"activated_at: {focus.activated_at}"
         )
+    # The resolved fan-out — what the loop will actually run at (#718). The
+    # focus's `max_agents` above is the raw pin (0 = "the pool"); this is the
+    # number the three bounds produce. Reported even with no focus, because the
+    # env/pool default applies regardless of whether anything is pinned.
+    try:
+        print(
+            _capacity_module().headline(
+                focus_max_agents=focus.max_agents if focus is not None else None
+            )
+        )
+    except ImportError as exc:
+        print(f"capacity: CANNOT-ASSESS — fleet/capacity.py is missing ({exc})", file=sys.stderr)
+        return EXIT_NOT_OK
     return EXIT_OK
 
 
