@@ -22,6 +22,7 @@ from portal.server.livestore import (
     RegistryDriftError,
     RegistrySnapshot,
     TelemetrySnapshot,
+    resolve_seed_path,
 )
 from portal.server.state import seed_state
 from telemetry.metering.model import UsageRecord
@@ -36,16 +37,21 @@ def _seed(profile_id: str) -> dict:
     """The revision the live registry resolves for ``profile_id``.
 
     A profile may publish more than one version — ``paperclip`` publishes 1.0.0
-    and 1.1.0 (issue #447) — and ``RegistrySnapshot`` resolves the highest
-    published version. ``Path.glob`` yields entries in *filesystem* order, so
-    ``next(...)`` would compare the projection against an arbitrary revision and
-    this suite would go red on a correct build depending on the order the
-    checkout happened to create the seeds directory in. Sort and take the last,
-    which is the registry's own rule.
+    and 1.1.0 (issue #447) — and the live registry resolves the HIGHEST
+    published one. That rule lives in exactly one place and this helper asks it
+    rather than restating it (``portal.server.livestore.resolve_seed_path``),
+    because a second copy is how this suite drifted from the code under test:
+    ``next(glob())`` picks by *filesystem* order and ``sorted(glob())[-1]`` by
+    *string* order, so either compares the projection against a revision the
+    console does not use and goes red on a correct build depending only on where
+    the checkout lives (issue #794, #642 before it).
+    ``portal/tests/test_seed_resolution.py`` proves the resolution is
+    independent of the order the seeds directory is written in, and that a
+    restated rule fails that control.
     """
-    paths = sorted(_SEEDS.glob(f"{profile_id}.*.yaml"))
-    assert paths, f"no AgentProfile seed for {profile_id!r} under {_SEEDS}"
-    return yaml.safe_load(paths[-1].read_text(encoding="utf-8"))
+    return yaml.safe_load(
+        resolve_seed_path(profile_id, _SEEDS).read_text(encoding="utf-8")
+    )
 
 
 def _tier_ladder() -> dict:
