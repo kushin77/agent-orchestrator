@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/document.schema.json",
+  "title": "ERP document model — shared definitions",
+  "description": "The definitions every ERP document family composes from: identifiers, money, quantities, rates, dates, the closed docstatus vocabulary and the two line shapes (transaction and tax). This schema is not itself a document family — it declares no x-erp-document — so it has no workflow and no state enum; the families $ref into it so that a unit of measure, a currency code or a line item means exactly one thing across the whole model. A family that redefined 'amount' locally could drift from every other family while still validating, which is why these are shared definitions rather than per-family copies.",
+  "type": "object",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "description": "A document or master identifier (item code, warehouse, party, account, voucher). Shape-constrained so prose cannot drift into a key field; the value set is owned by the data, not by this schema."
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "Free-text human display name or description."
+    },
+    "currencyCode": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 alphabetic currency code. The closed three-letter shape is enforced; the value set is the ISO standard, deliberately not duplicated here."
+    },
+    "money": {
+      "type": "number",
+      "minimum": 0,
+      "description": "A non-negative monetary amount in the document's own currency. Signs are carried by the side of the double entry, never by a negative amount."
+    },
+    "quantity": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "A strictly positive quantity."
+    },
+    "rate": {
+      "type": "number",
+      "minimum": 0,
+      "description": "A non-negative unit rate or valuation."
+    },
+    "isoDate": {
+      "type": "string",
+      "format": "date",
+      "description": "An ISO 8601 calendar date (YYYY-MM-DD)."
+    },
+    "docstatus": {
+      "type": "integer",
+      "enum": [0, 1, 2],
+      "description": "The closed upstream docstatus vocabulary the document model adopts: 0 draft, 1 submitted, 2 cancelled. Every lifecycle schema pins this enum and tests/test_assets.py proves it equals the docstatuses its workflow's states declare."
+    },
+    "taxLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account", "amount"],
+      "properties": {
+        "account": {
+          "$ref": "#/$defs/identifier",
+          "description": "The tax or charge account the row posts to."
+        },
+        "rate": {
+          "$ref": "#/$defs/rate",
+          "description": "The percentage applied, when the row is rate-derived rather than an explicit charge."
+        },
+        "amount": {
+          "$ref": "#/$defs/money",
+          "description": "The charged amount."
+        },
+        "description": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "transactionLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_code", "qty", "rate"],
+      "properties": {
+        "item_code": {
+          "$ref": "#/$defs/identifier",
+          "description": "Link to the item master."
+        },
+        "description": {
+          "$ref": "#/$defs/label",
+          "description": "The line description, which the upstream shape allows to differ from the item's own name."
+        },
+        "qty": {
+          "$ref": "#/$defs/quantity"
+        },
+        "rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "amount": {
+          "$ref": "#/$defs/money",
+          "description": "The line total. Optional so a caller may send qty and rate and let the platform derive it."
+        },
+        "warehouse": {
+          "$ref": "#/$defs/identifier",
+          "description": "Link to the warehouse the line is fulfilled from, for families whose lines touch stock."
+        }
+      }
+    }
+  },
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "upstream_doctype": "erpnext doctype field definitions (all doctypes)",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/**/doctype/*/*.json",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "harvest": [
+      "field shapes shared across doctypes (identifier, currency, amount, quantity, rate, date)",
+      "the docstatus closed vocabulary 0 draft / 1 submitted / 2 cancelled",
+      "the child-table row shape (item, qty, rate, amount, warehouse) for transaction doctypes"
+    ],
+    "note": "Shared field shapes from the upstream doctype surface, re-expressed. No upstream file was read into this repository, and no upstream code, schema or text is copied or vendored — the upstream is GPL-3.0 and a pattern source only."
+  }
+}

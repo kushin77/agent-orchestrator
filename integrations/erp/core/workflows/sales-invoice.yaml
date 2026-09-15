@@ -1,0 +1,47 @@
+# Sales invoice lifecycle — ERP-02 core document model (issue #647).
+#
+# The invoice commits the general ledger on submit, so the terminal state is
+# reached by settlement rather than by submission: `complete` is labelled Mark
+# Paid. The docstatus stays 1 through settlement, because a paid invoice is
+# still a submitted accounting document — only cancellation is docstatus 2.
+schema: erp.workflow/v1
+workflow: sales-invoice-lifecycle
+document: sales-invoice
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: Submitted
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Paid
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Cancelled
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Submit
+  - action: complete
+    from: submitted
+    to: completed
+    label: Mark Paid
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Cancel

@@ -483,6 +483,23 @@ checks=(
   # provocation in the suite this check runs, and a clean copy must be refused
   # nothing, so no rule in it is a formality.
   'erp-module|bash scripts/check-erp-module.sh'
+  # erp-core-model (EPIC #645, ERP-02 / issue #647): the core document model —
+  # the document families as JSON Schema plus each lifecycle as workflow data —
+  # is only a *model* if its two halves cannot drift, so this check runs the
+  # module's suite and then drives the acceptance criteria a second way, from
+  # the filesystem, against a scratch copy of the tree. A clean copy must be
+  # refused nothing (the check cannot be permanently red) and each provoked
+  # breakage must be refused BY NAME: a schema with no harvest record, no `$id`,
+  # a harvest claiming upstream code was copied (the upstream is GPL-3.0 and a
+  # pattern source only), a workflow whose states drift from its schema's enum,
+  # a lifecycle with no workflow, and a provenance record that has gone missing.
+  # Both acceptance refusals are driven with their accepting twins: an invalid
+  # document refused while its valid twin is accepted, and a state jump refused
+  # while the declared path is accepted. Naming the suite's pytest target here is
+  # also what makes the suite covered rather than merely present. Offline and
+  # deterministic — no network, no vendor seed — so it RUNS for real rather than
+  # being recorded as CANNOT-ASSESS.
+  'erp-core-model|bash scripts/check-erp-core-model.sh'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/item.schema.json",
+  "title": "Item — stock and service master",
+  "description": "The item master every transaction line links to. The harvested distinction that matters is is_stock_item: an item either moves through a warehouse (and so commits stock on a delivery note or a purchase receipt) or it does not (a service, a charge), and the transactional spine decides whether to write a stock ledger entry from that flag. uom is required because a quantity without its unit is not a quantity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["doctype", "id", "name", "uom", "is_stock_item"],
+  "properties": {
+    "doctype": {
+      "const": "item",
+      "description": "The document family discriminant."
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The item code every transaction line cites."
+    },
+    "name": {
+      "$ref": "document.schema.json#/$defs/label"
+    },
+    "uom": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "Unit of measure (Nos, Kg, Hour). Required: a quantity with no unit cannot be committed to a ledger."
+    },
+    "item_group": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "is_stock_item": {
+      "type": "boolean",
+      "description": "Whether the item moves through a warehouse. This is the flag the transactional spine reads to decide whether a document commits stock."
+    },
+    "standard_rate": {
+      "$ref": "document.schema.json#/$defs/rate",
+      "description": "The default selling rate a transaction line inherits when the caller sends none."
+    },
+    "valuation_rate": {
+      "$ref": "document.schema.json#/$defs/rate",
+      "description": "The current stock valuation rate, which is what a stock ledger entry debits."
+    },
+    "has_batch_no": {
+      "type": "boolean",
+      "description": "Whether a stock movement of this item must name a batch."
+    },
+    "shelf_life_days": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Shelf life in days; absent for items that do not expire."
+    }
+  },
+  "x-erp-document": "item",
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/stock/doctype/item",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Item",
+    "harvest": [
+      "the item master field surface (uom, item group, standard and valuation rate)",
+      "the is_stock_item flag that gates whether a document commits stock",
+      "batch tracking as an item attribute rather than a transaction attribute"
+    ],
+    "note": "Field shapes from the upstream item doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/quotation.schema.json",
+  "title": "Quotation — the selling cycle's entry document",
+  "description": "A quotation to a customer, priced but not yet an order. Its lifecycle is data (workflows/quotation.yaml) and its state enum here is parity-locked to that workflow: closing the enum is what makes a state the platform cannot execute a schema violation rather than a runtime surprise, and the asset gate refuses a schema and a workflow that disagree.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "party",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "quotation"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"],
+      "description": "The workflow state. Kept equal to workflows/quotation.yaml's state set by the asset gate, so the schema cannot accept a state the workflow cannot execute."
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The internal company the quotation is issued from."
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "document.schema.json#/$defs/isoDate"
+    },
+    "valid_till": {
+      "$ref": "document.schema.json#/$defs/isoDate",
+      "description": "The date the offer lapses. Absent means no declared expiry."
+    },
+    "party": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "Link to the party the quotation is addressed to."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "document.schema.json#/$defs/transactionLine"
+      },
+      "description": "At least one priced line — a quotation with no line item is not an offer."
+    },
+    "taxes": {
+      "type": "array",
+      "items": {
+        "$ref": "document.schema.json#/$defs/taxLine"
+      }
+    },
+    "net_total": {
+      "$ref": "document.schema.json#/$defs/money"
+    },
+    "total": {
+      "$ref": "document.schema.json#/$defs/money",
+      "description": "The grand total including taxes. Optional so a caller may send lines and let the platform derive it."
+    }
+  },
+  "x-erp-document": "quotation",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/selling/doctype/quotation",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Quotation",
+    "harvest": [
+      "the quotation field surface (valid_till, party, currency, company, taxes, totals)",
+      "the parent/child shape: a document header with a priced line table and a tax table",
+      "the docstatus lifecycle the upstream doctype drives (0 draft -> 1 submitted -> 2 cancelled)"
+    ],
+    "note": "Field and lifecycle shapes from the upstream quotation doctype, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied or vendored."
+  }
+}

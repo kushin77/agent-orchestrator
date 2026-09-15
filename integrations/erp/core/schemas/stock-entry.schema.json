@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/stock-entry.schema.json",
+  "title": "Stock Entry — a stock movement with no trading commitment",
+  "description": "A stock entry moves stock when no order stands behind the movement: a receipt with no purchase order, an issue to production, a warehouse transfer, a manufacture. purpose is required and closed because it is the field that decides which warehouses the document must name — the conditional requirements below are expressed in the schema itself (if/then), so a transfer that names one warehouse is a schema violation rather than a rule someone has to remember.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["doctype", "id", "state", "docstatus", "company", "purpose", "lines"],
+  "properties": {
+    "doctype": {
+      "const": "stock-entry"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "purpose": {
+      "enum": ["material_receipt", "material_issue", "material_transfer", "manufacture"],
+      "description": "Why the stock moved. Closed because it selects the required warehouse set — an open vocabulary here would make the conditional below unenforceable."
+    },
+    "transaction_date": {
+      "$ref": "document.schema.json#/$defs/isoDate"
+    },
+    "from_warehouse": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The source warehouse. Required for an issue, a transfer and a manufacture; forbidden for a receipt."
+    },
+    "to_warehouse": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The destination warehouse. Required for a receipt, a transfer and a manufacture; forbidden for an issue."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_code", "qty"],
+        "properties": {
+          "item_code": {
+            "$ref": "document.schema.json#/$defs/identifier"
+          },
+          "qty": {
+            "$ref": "document.schema.json#/$defs/quantity"
+          },
+          "warehouse": {
+            "$ref": "document.schema.json#/$defs/identifier",
+            "description": "Per-line override of the document's warehouse."
+          },
+          "batch_no": {
+            "$ref": "document.schema.json#/$defs/identifier",
+            "description": "The batch, required only for items the item master declares as batch-tracked."
+          },
+          "valuation_rate": {
+            "$ref": "document.schema.json#/$defs/rate",
+            "description": "The rate the stock ledger entry is written at."
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"purpose": {"const": "material_receipt"}},
+        "required": ["purpose"]
+      },
+      "then": {
+        "required": ["to_warehouse"],
+        "properties": {"from_warehouse": false}
+      }
+    },
+    {
+      "if": {
+        "properties": {"purpose": {"const": "material_issue"}},
+        "required": ["purpose"]
+      },
+      "then": {
+        "required": ["from_warehouse"],
+        "properties": {"to_warehouse": false}
+      }
+    },
+    {
+      "if": {
+        "properties": {"purpose": {"const": "material_transfer"}},
+        "required": ["purpose"]
+      },
+      "then": {
+        "required": ["from_warehouse", "to_warehouse"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"purpose": {"const": "manufacture"}},
+        "required": ["purpose"]
+      },
+      "then": {
+        "required": ["from_warehouse", "to_warehouse"]
+      }
+    }
+  ],
+  "x-erp-document": "stock-entry",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/stock/doctype/stock_entry",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Stock Entry",
+    "harvest": [
+      "the stock entry field surface (purpose, from and to warehouse, batch, valuation rate)",
+      "the purpose vocabulary that selects which warehouses a movement must name",
+      "stock movement as a document family of its own rather than an implicit effect of trading documents"
+    ],
+    "note": "Field and lifecycle shapes from the upstream stock entry doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

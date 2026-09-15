@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/party.schema.json",
+  "title": "Party — customer or supplier",
+  "description": "The party master: one document family covering both sides of a trade, distinguished by party_type rather than by two near-identical schemas. The closed party_type enum is the harvested shape (upstream carries Customer and Supplier as separate doctypes with the same field surface), and keeping one family is what lets a purchase order link a party and a sales order link the same document without the model claiming they are different kinds of thing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["doctype", "id", "party_type", "name", "currency"],
+  "properties": {
+    "doctype": {
+      "const": "party",
+      "description": "The document family discriminant."
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "party_type": {
+      "enum": ["customer", "supplier"],
+      "description": "Which side of a trade this party is on. Closing the enum is what makes 'is this a supplier?' a question the model answers rather than guesses at."
+    },
+    "name": {
+      "$ref": "document.schema.json#/$defs/label",
+      "description": "The party's display name (its legal or trading name)."
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "tax_id": {
+      "type": "string",
+      "maxLength": 32,
+      "description": "The jurisdiction's tax registration identifier. Deliberately free-text and bounded: its shape is jurisdiction-specific, so pinning a pattern here would refuse valid parties."
+    },
+    "territory": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "The party's billing contact address."
+    },
+    "credit_limit": {
+      "$ref": "document.schema.json#/$defs/money",
+      "description": "The exposure ceiling a credit check compares against. Absent means no ceiling is declared."
+    },
+    "disabled": {
+      "type": "boolean",
+      "description": "A disabled party stays linked by history but may not be selected on a new document."
+    }
+  },
+  "x-erp-document": "party",
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/{selling,buying}/doctype/{customer,supplier}",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Customer / Supplier",
+    "harvest": [
+      "the party field surface (name, tax_id, territory, credit limit, disabled)",
+      "the two doctypes' shared shape, collapsed into one family with a closed party_type discriminant",
+      "currency is a party attribute, which is what makes a document's currency defaultable from its party"
+    ],
+    "note": "Field shapes from the upstream party doctypes, re-expressed as one family. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

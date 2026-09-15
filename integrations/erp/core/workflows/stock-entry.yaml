@@ -1,0 +1,46 @@
+# Stock entry lifecycle — ERP-02 core document model (issue #647).
+#
+# A movement with no trading commitment behind it. It commits the stock ledger
+# on submit and is complete once the movement is posted; cancellation is the
+# reversal path the stock ledger is written against.
+schema: erp.workflow/v1
+workflow: stock-entry-lifecycle
+document: stock-entry
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: Submitted
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Posted
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Cancelled
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Submit
+  - action: complete
+    from: submitted
+    to: completed
+    label: Mark Posted
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Cancel
