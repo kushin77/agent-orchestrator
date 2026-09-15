@@ -11,6 +11,14 @@ bootstrap, mailbox layout, listener loop and day-to-day commands. Where the two
 could disagree about *who may say what to whom*, the contract wins; where they
 could disagree about *which command to type*, this file wins.
 
+**The operator's way in is its own page:**
+[`../docs/OPERATOR-ACCESS.md`](../docs/OPERATOR-ACCESS.md). It names every
+surface an operator can use — the A2A control channel (the **primary** control
+plane, §7.1 of the contract), this file's control verbs, `make operator` (the
+live view) and `make console` (the browser console, loopback and fail-closed by
+default) — with the exact command for each and what needs a shell on the box.
+This runbook defers to it for access; it stays authoritative for mechanics.
+
 ## The model
 
 | Role | Runtime | Behaviour |

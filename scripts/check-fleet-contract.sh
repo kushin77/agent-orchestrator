@@ -15,8 +15,14 @@
 #   * every declared verb maps onto an envelope type the channel actually
 #     implements (verbs and enforcement cannot drift apart);
 #   * the transport ADR (ADR-0011) is referenced by the channel itself;
+#   * the A2A steering channel is declared the PRIMARY control plane (§7.1,
+#     issue #763) — a claim that existed nowhere in this file until then, so a
+#     later lane could have downgraded it back to "optional extension" and
+#     nothing would have failed. Its markers are pinned by name and the
+#     declaration is mutation-proved like the trust model;
 #   * and the check mutates its own input (a contract with the trust model
-#     stripped) and requires the mutation to be DETECTED — a declaration check
+#     stripped, and a contract with the primary-control-plane declaration
+#     stripped) and requires each mutation to be DETECTED — a declaration check
 #     that cannot fail is a formality.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
@@ -81,14 +87,34 @@ declare -a required_rules=(
   "Everything else is refused."
 )
 
-missing_from() { # missing_from <file> — one named finding per missing element
-  local file="$1" missing=0 marker rule verb
-  for marker in "${required_markers[@]}"; do
+# The primary-control-plane declaration (issue #763). Each phrase exists ONLY in
+# the §7.1 subsection that makes the A2A steering channel the fleet's primary
+# control plane — the claim §7's "extension" heading read against — so removing
+# the claim, or renaming the invariants out of the contract, fails by name here.
+# Keep every probe on ONE source line: this file strips lines by marker, and a
+# probe that spans a wrap is one the mutation control cannot honestly remove.
+declare -a required_primary_markers=(
+  "A2A is the PRIMARY control plane — not a fallback"
+  "à-la-carte reachability invariant"
+  "the only authorisation for work"
+  "never by silent overwrite"
+)
+
+missing_markers_in() { # missing_markers_in <file> <marker...>
+  local file="$1"; shift
+  local missing=0 marker
+  for marker in "$@"; do
     if ! grep -qF -- "$marker" "$file"; then
       printf '  FAIL  %s (missing contract text: %s)\n' "$file" "$marker" >&2
       missing=1
     fi
   done
+  return "$missing"
+}
+
+missing_from() { # missing_from <file> — one named finding per missing element
+  local file="$1" missing=0 rule verb
+  missing_markers_in "$file" "${required_markers[@]}" || missing=1
   for rule in "${required_rules[@]}"; do
     if ! grep -qF -- "$rule" "$file"; then
       printf '  FAIL  %s (missing trust rule: %s)\n' "$file" "$rule" >&2
@@ -101,13 +127,30 @@ missing_from() { # missing_from <file> — one named finding per missing element
       missing=1
     fi
   done
+  missing_markers_in "$file" "${required_primary_markers[@]}" || missing=1
+  return "$missing"
+}
+
+missing_legacy_from() { # missing_legacy_from <file> — everything the gate pinned before #763
+  local file="$1" missing=0 rule verb
+  missing_markers_in "$file" "${required_markers[@]}" || missing=1
+  for rule in "${required_rules[@]}"; do
+    if ! grep -qF -- "$rule" "$file"; then
+      missing=1
+    fi
+  done
+  for verb in "${required_verbs[@]}"; do
+    if ! grep -qF -- "$verb" "$file"; then
+      missing=1
+    fi
+  done
   return "$missing"
 }
 
 fail=0
 
 if missing_from "$contract" >/dev/null 2>&1; then
-  echo "  OK    $contract declares roles, verbs, envelope fields and trust rules"
+  echo "  OK    $contract declares roles, verbs, envelope fields, trust rules and the primary control plane"
 else
   echo "== $contract =="
   missing_from "$contract" || true
@@ -187,9 +230,32 @@ else
   echo "  OK    vacuity control: removing the trust model is detected"
 fi
 
+# Vacuity control for the primary-control-plane declaration (issue #763), in the
+# same style: strip the claim and require the check to notice. Two conditions, so
+# the control cannot pass for the wrong reason — the mutant must FAIL, and it must
+# fail *only* for the stripped claim (the rest of the contract has to survive the
+# strip), otherwise the detection is collateral and proves nothing about §7.1.
+grep -vF \
+  -e "${required_primary_markers[0]}" \
+  -e "${required_primary_markers[1]}" \
+  -e "${required_primary_markers[2]}" \
+  -e "${required_primary_markers[3]}" \
+  "$contract" > "$work/contract-without-primary-control-plane.md"
+
+if missing_markers_in "$work/contract-without-primary-control-plane.md" \
+    "${required_primary_markers[@]}" >/dev/null 2>&1; then
+  echo "  FAIL  vacuity control: removing the primary-control-plane declaration went undetected" >&2
+  fail=$((fail + 1))
+elif ! missing_legacy_from "$work/contract-without-primary-control-plane.md" >/dev/null 2>&1; then
+  echo "  FAIL  vacuity control: the strip removed more than the declaration (detection not attributable)" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    vacuity control: removing the primary-control-plane declaration is detected"
+fi
+
 if [ "$fail" -gt 0 ]; then
   echo "check-fleet-contract: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-fleet-contract: OK — contract declares the topology, vocabulary and trust rules"
+echo "check-fleet-contract: OK — contract declares the topology, vocabulary, trust rules and the primary control plane"
 exit 0
