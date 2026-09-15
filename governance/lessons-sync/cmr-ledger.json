@@ -193,11 +193,13 @@
     "CA-0005",
     "CA-0006",
     "CA-0007",
+    "CA-0008",
     "INC-0001",
     "INC-0002",
     "INC-0003",
     "INC-0004",
     "INC-0005",
+    "INC-0006",
     "LESSON-0001",
     "LESSON-0002",
     "LESSON-0003",
@@ -207,9 +209,10 @@
     "RCA-0003",
     "RCA-0004",
     "RCA-0005",
+    "RCA-0006",
     "SUGGEST-0001",
     "SUGGEST-0002",
-    "SUGGEST-0003"
-  ],
-  "disposition_note": "Every CMR index record is dispositioned by id. hub-only = org-scoped, deliberately not mirrored into governance/lessons/ledger.jsonl; mirrors = maps to a local counterpart that must resolve. A record with neither is a finding."
+    "SUGGEST-0003",
+    "SUGGEST-0004"
+  ]
 }
