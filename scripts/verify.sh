@@ -63,6 +63,17 @@ checks=(
   'fleet-channel|bash scripts/check-fleet-channel.sh'
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'fleet-runbook|bash scripts/check-fleet-runbook.sh'
+  # operator-access (issue #763): every surface an operator can use existed but
+  # was undiscoverable — A2A read as an optional "extension", the 18 override
+  # verbs were unnamed as an operator surface, and the console binds loopback so
+  # it is unreachable from anywhere else. The check pins the access doc (one
+  # probe group per surface), proves the two one-command targets delegate rather
+  # than reimplement, DRIVES the honesty rule (tmux off PATH must fail loudly,
+  # naming the reason, not report a success it cannot evidence), drives the
+  # console's loopback default and its fail-closed session refusal from the
+  # shipped modules, and strips each surface from a copy of the doc in turn — so
+  # a surface that stops being named cannot pass silently.
+  'operator-access|bash scripts/check-operator-access.sh'
   # runner-preflight (issue #733): the fleet could not spawn a single subagent
   # because the loop inherited cron's minimal PATH, and it failed per directive
   # per cycle (a runaway amplifier). The check names the resolution, the hold and

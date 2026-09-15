@@ -65,6 +65,11 @@ declare -a required_markers=(
   "2 failing"
   "1 degraded"
   "fleet/health.py check"
+  # The runbook also has to hand the operator on (#763): the access page names
+  # every surface (the primary control plane, the override verbs, `make
+  # operator`, `make console`), so an operator who starts at the runbook must
+  # arrive there rather than being told to read the source.
+  "docs/OPERATOR-ACCESS.md"
 )
 
 fail=0

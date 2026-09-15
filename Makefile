@@ -14,13 +14,23 @@
 
 SHELL := /bin/bash
 
+# The browser console's bind address (issue #763). Loopback by default ON PURPOSE:
+# the console has no login of its own and establishes a session only from a
+# verified auth-gate RS256 token — with no JWKS mirror it refuses every session.
+# Binding a reachable interface is therefore an explicit operator decision
+# (CONSOLE_HOST=0.0.0.0), and a tunnel/proxy in front of it is a new
+# infrastructure surface that ships flag-gated OFF (GR-5). See
+# docs/OPERATOR-ACCESS.md §4.
+CONSOLE_HOST ?= 127.0.0.1
+CONSOLE_PORT ?= 8787
+
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety \
         remediation remediation-scan remediation-dispatch \
-        control-verbs control-audit control-functions cockpit
+        control-verbs control-audit control-functions cockpit operator console operator-access
 
 .DEFAULT_GOAL := help
 
@@ -46,6 +56,12 @@ help:
 	@echo "  shellcheck    Run shellcheck on scripts/ (skipped if not installed)"
 	@echo "  gitleaks      Run gitleaks with .gitleaks.toml (skipped if absent)"
 	@echo "  pre-commit    Run pre-commit on all files (skipped if absent)"
+	@echo ""
+	@echo "Operator surfaces (issue #763; docs/OPERATOR-ACCESS.md):"
+	@echo "  operator      Report every operator surface, then open the live view"
+	@echo "                (tmux; fails loudly, naming the reason, if tmux is absent)"
+	@echo "  console       Serve the browser console (python3 -m portal.server.main,"
+	@echo "                127.0.0.1:8787 by default; fails closed with no JWKS)"
 	@echo ""
 	@echo "Fine-grained checks (used by verify):"
 	@echo "  shell-syntax  bash -n on every *.sh outside vendor/"
@@ -127,8 +143,33 @@ verify:
 ## worktrees — reclaim stale lane worktrees (dry run by default)
 worktrees:
 	@bash scripts/prune-worktrees.sh
+
+## operator — the operator's way in, one command (issue #763): report every
+## operator surface (the PRIMARY control plane, the override terminal, the live
+## view, the browser console), then start the rungs that are missing and attach
+## to the fleet tmux session. Delegates to fleet/run-fleet.sh (== `python3
+## fleet/control.py live`), so the layout has exactly ONE definition and this
+## target reimplements none of it. Honest, not optimistic: with no tmux it exits
+## non-zero, names the reason, and points at `python3 fleet/console.py` — it
+## never prints a success it cannot evidence. `make operator
+## OPERATOR_ARGS=--dry-run` prints the tmux commands and builds nothing.
+operator:
+	@bash scripts/operator.sh $(OPERATOR_ARGS)
+
+## console — serve the browser console (issue #763): the real server,
+## `python3 -m portal.server.main`, on 127.0.0.1:8787 by default. It binds
+## loopback and fails closed: the console has no login of its own, it establishes
+## a session only from a verified auth-gate RS256 token, and with no JWKS mirror
+## (PORTAL_AUTH_GATE_JWKS_FILE) it refuses every session. Reaching it from
+## elsewhere means binding a reachable interface (CONSOLE_HOST=0.0.0.0) AND
+## putting the auth gate in front — docs/OPERATOR-ACCESS.md §4. A tunnel or
+## reverse proxy in front of it is a new infrastructure surface: declared in
+## code, flag-gated OFF (GR-5), never a console click.
+console:
+	@echo "console: http://$(CONSOLE_HOST):$(CONSOLE_PORT) — loopback by default, and it FAILS CLOSED with no JWKS mirror (PORTAL_AUTH_GATE_JWKS_FILE); see docs/OPERATOR-ACCESS.md §4"
+	@python3 -m portal.server.main --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
 	@echo ""
 	@echo "lint: OK"
 
@@ -547,6 +588,18 @@ control-audit:
 ## control-functions — every cockpit function declared once (RC-10 #565)
 control-functions:
 	@bash scripts/check-control-functions.sh
+
+## operator-access — the operator way in (issue #763): docs/OPERATOR-ACCESS.md
+## names every operator surface with the exact command that reaches it (the A2A
+## control channel, the override terminal's 18 verbs, `make operator`, the
+## browser console and its auth requirement), the two targets exist and delegate
+## to the real implementation, `make operator` FAILS LOUDLY when the box cannot
+## host the live view (no tmux) instead of printing a success it cannot
+## evidence, and the console's loopback default + fail-closed session check are
+## driven rather than asserted. Each surface is stripped from a copy in turn and
+## the gate must notice, so it cannot pass vacuously.
+operator-access:
+	@bash scripts/check-operator-access.sh
 
 ## cockpit — the terminal cockpit (RC-11 #566): one frame, then exit. A client
 ## of the RC-3 API and the authenticated SSE streams that renders only what the
