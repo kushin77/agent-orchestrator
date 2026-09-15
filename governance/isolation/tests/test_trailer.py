@@ -69,6 +69,18 @@ def test_an_unrunnable_predicate_raises_rather_than_passing(lane, repo: Path, mo
         classify_commit(lane.worktree, head(lane.worktree))
 
 
+def test_a_predicate_that_fails_without_naming_a_finding_is_not_clean(lane, repo: Path, monkeypatch):
+    """Unproven is not clean: a non-zero verdict this adapter cannot attribute
+    must raise, never report the commit as compliant (measured by mutation while
+    proving scripts/check-isolation-landed.sh, issue #287)."""
+    commit(lane.worktree, "work.txt", "do the work", trailer=lane.trailer)
+    monkeypatch.setattr(
+        trailer, "_run", lambda *_a, **_k: subprocess.CompletedProcess([], 1, "", "the output shape changed\n")
+    )
+    with pytest.raises(PredicateUnavailable):
+        classify_commit(lane.worktree, head(lane.worktree))
+
+
 def test_the_boundary_finding_is_not_attributed_to_the_commit_under_test(lane, repo: Path):
     """The enforcement boundary is the commit's parent; its findings are its own."""
     commit(lane.worktree, "work.txt", "do the work", trailer=lane.trailer)

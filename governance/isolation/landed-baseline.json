@@ -1,0 +1,73 @@
+{
+  "note": "Recorded legacy for the ticket-trailer rule over LANDED history (issue #287). Every commit here landed AFTER the shared predicate's enforcement boundary and still does not carry the ticket reference in a trailing trailer block, as measured -- not assumed -- by `scripts/check-pr-contract.sh --landed`. They are RECORDED, not accepted: `governance/isolation/cli.py enforce` reports them on every run. This list can only SHRINK: an entry whose commit now complies (`quarantine-entry-stale`) or is outside the assessed range (`quarantine-entry-not-assessed`) fails the check, and adding an entry for a newly landed non-compliant commit is the defect the check exists to catch, not a fix.",
+  "measured_at": "2026-09-15",
+  "measured_head": "97071460fea97d641e9a9ea63f44f811f032e4b0",
+  "measured_by": "governance/isolation/cli.py landed --range HEAD (delegating to scripts/check-pr-contract.sh --landed)",
+  "entries": [
+    {
+      "sha": "afebf84844b76e692f237cafdead2da9d3b688de",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "5d268e43be688c05fdd754378ab10573f1fe9da1",
+      "code": "commit-missing-ticket-trailer",
+      "why": "no `Refs <slug>#<n>` anywhere in the message"
+    },
+    {
+      "sha": "b72916ffd04d9589435efe7eeeb296d3800a6871",
+      "code": "commit-missing-ticket-trailer",
+      "why": "no `Refs <slug>#<n>` anywhere in the message"
+    },
+    {
+      "sha": "a4edda96bbe5c66e52831e4ff355abfe72ca41c1",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "90a0500bbf5573793a3a6e15dd80fee8116a4cbc",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "eea5389e122b115c0f4d5c0afcaf3155ed8641f2",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "d51a9fe32f19e970dc00b26b18d0028a087b15a8",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "eae061df5a55058c5a98987e099ff990e5d3a8f0",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "e0e89435696f941f69332a630baf66fb5858b36f",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "f9065de27669d6dfe420dbb5df0682d768e9b598",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "d9236e8e881e03519b368067b4c47d617336fd84",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "6380f7b4983e9d027a0a03eb3fe948d35098f816",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "6999f2a3bd4ada1332ed032b40d377ece82a453f",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block"
+    }
+  ]
+}

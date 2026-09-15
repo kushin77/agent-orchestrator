@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from governance.isolation import trailer
+from governance.isolation import cli, trailer
 from governance.isolation.audit import audit_all, audit_lane
 from governance.isolation.identity import SessionIdentity, mint
 from governance.isolation.worktree import (
@@ -179,3 +179,22 @@ def test_audit_all_covers_every_recorded_lane(repo: Path, tmp_path: Path, mounts
     assert results[first.session_id] == []
     assert "commit-missing-ticket-trailer" in codes(results[second.session_id])
     assert read_record(second.session_id, repo) == second
+
+
+def test_an_audit_that_assessed_no_lane_is_cannot_assess(tmp_path: Path, capsys):
+    """No lane records is CANNOT-ASSESS, never OK (issue #287).
+
+    An audit with nothing to re-derive used to print `OK (no lanes provisioned)`
+    and exit 0 — the same answer as a machine where lanes were never provisioned,
+    which is the failure the rule exists to catch. A green that was never measured
+    is the false-green class the whole doctrine rejects, so the verdict is that the
+    rule could not be assessed at all.
+    """
+    empty = tmp_path / "no-lanes"
+    empty.mkdir()
+    rc = cli.main(["audit", "--main", str(empty)])
+    captured = capsys.readouterr()
+    assert rc == 2, "an empty audit must not be a pass"
+    assert "CANNOT-ASSESS" in captured.err
+    assert "no lane records" in captured.err
+    assert "OK" not in captured.out, "an empty audit printed OK"

@@ -7,8 +7,9 @@
 > The history rule is positional and single-sourced: the predicate is the one in
 > [`scripts/check-pr-contract.sh`](../../scripts/check-pr-contract.sh) (#288),
 > reached through [`trailer.py`](trailer.py) — never a substring test (#287), and
-> never a second implementation. Landed history is re-checked with
-> `cli.py landed`.
+> never a second implementation. Landed history is re-checked with `cli.py landed`
+> and *enforced* with `cli.py enforce` against the recorded legacy in
+> [`landed-baseline.json`](landed-baseline.json).
 
 An agent session is not an anonymous process working somewhere in a shared
 checkout. It is a **minted identity bound to one GitHub issue**: a unique
@@ -66,11 +67,20 @@ python3 governance/isolation/cli.py close --session <session_id>
 #    or a whole range (delegated to the shared predicate verbatim).
 python3 governance/isolation/cli.py landed --commit 6d89618
 python3 governance/isolation/cli.py landed --range origin/master
+
+# 6. Enforce that rule over landed history: a non-zero exit is a real finding,
+#    and CANNOT-ASSESS says the rule was not assessed — never that it holds.
+python3 governance/isolation/cli.py enforce --range HEAD
 ```
 
 `open` prints machine-readable JSON on stdout (`identity`, `created`, `env`,
 `problems`) and human status on stderr. Exit codes follow the repository's
 tri-state convention: `0` OK, `1` NOT-OK, `2` CANNOT-ASSESS.
+
+An audit that assessed nothing is **CANNOT-ASSESS**, never OK: `audit --all` with
+no lane records reports that the rule could not be assessed rather than that it
+holds (issue #287). An empty run and a satisfied rule are not the same answer, and
+only one of them is a green.
 
 ## 4. Provisioning refusals — before anything is created
 
@@ -153,6 +163,13 @@ drift apart: one rule, one parser, one place to fix a bug in either. Two
 implementations of one rule disagree silently, and the disagreement stays
 invisible until a real commit slips through the weaker one.
 
+The adapter also refuses to call a commit clean when the predicate fails without
+naming a finding it can parse — a changed output shape, a crash, a filtered
+finding. That is the fail-open direction: an unproven rule is reported as
+`commit-trailer-check-unavailable`, never as a compliant commit. (Measured by
+making the finding parser drop everything: a non-compliant lane audited green
+until that branch existed.)
+
 **Landed history is re-checked too.** The lane audit re-derives isolation from
 the *live* worktrees, which leaves the commits already on the default branch
 unexamined — the second gap #287 names. `cli.py landed` closes it:
@@ -161,6 +178,33 @@ unexamined — the second gap #287 names. `cli.py landed` closes it:
 wholesale to the shared gate's own landed audit — its findings, its
 grandfathering boundary and its exit code are reported verbatim rather than
 re-interpreted.
+
+**Landed history is *enforced*, and the legacy is recorded.** Reporting a verdict
+and enforcing it are different jobs, and the difference is a problem the naive
+enforcement cannot solve: measured at `9707146`, thirteen commits that landed
+*after* the shared predicate's enforced boundary still do not carry the reference
+in a trailing trailer block, so a check that simply failed on them would have
+turned `make verify` red for every lane on the day it landed — which is how a gate
+gets disabled instead of obeyed. `cli.py enforce`
+([`landed.py`](landed.py)) is that enforcement, and it has three parts:
+
+* the **legacy class** is grandfathered by the shared predicate's own frozen
+  boundary (`a7e73129`, the commit that landed the PR-contract gate, #308). A
+  boundary is provably frozen — a new commit is always a descendant, never an
+  ancestor, so the grandfathering cannot grow — and it is not restated here:
+  there is no second copy of it to drift;
+* the post-boundary **residue is recorded by commit** in
+  [`landed-baseline.json`](landed-baseline.json), with the finding the predicate
+  measured for each entry, and reported as recorded legacy on every run.
+  Recorded, not accepted — the report names every one of them;
+* the recording **can only shrink**. An entry whose commit now complies is
+  `quarantine-entry-stale`, which is a failure; an entry outside the assessed
+  range is `quarantine-entry-not-assessed`, which is CANNOT-ASSESS and therefore
+  never a pass; a missing or malformed baseline fails rather than skipping,
+  because otherwise deleting the file would switch the check off.
+
+So a genuinely non-compliant **new** commit fails, historical non-compliance does
+not red the gate, and no empty, absent or unparseable input produces green.
 
 ## 6. Enforcement
 
@@ -178,6 +222,20 @@ whose reference sits in a prose paragraph, are each provoked for real and must
 be refused by name. It also checks that the audit **delegates** the predicate to
 `scripts/check-pr-contract.sh` instead of carrying a second copy of the rule.
 
+[`scripts/check-isolation-landed.sh`](../../scripts/check-isolation-landed.sh)
+adds the two surfaces #287 found missing, and provokes each of them for real:
+
+* the lane audit's **tri-state** — no lane records is CANNOT-ASSESS (never the
+  `OK (no lanes provisioned)` green it used to print), a recorded lane that breaks
+  the contract is NOT-OK, and an isolated lane is OK, all three through the real
+  CLI;
+* the **enforcement** of the trailer rule over real landed history against the
+  recorded legacy — with every branch provoked in scratch repositories: an
+  unrecorded non-compliant commit, a subject-only reference, a recorded commit
+  that is accepted *and reported*, a stale entry, an entry outside the assessed
+  range, an empty range, a missing baseline, a malformed baseline, and a clean
+  commit whose own boundary lacks a trailer.
+
 The fleet execution loop ([`fleet/terminal.py`](../../fleet/terminal.py))
 provisions every subagent through this module, so a dispatched agent starts in
 its own lane with its own identity instead of in the shared checkout.
@@ -187,3 +245,11 @@ its own lane with its own identity instead of in the shared checkout.
 `governance/isolation/tests` (declared in [`scripts/pytest-suites.txt`](../../scripts/pytest-suites.txt),
 run per suite by `make tests`) pins the mint, the per-worktree signature, the
 two-lane independence, and every violation above.
+
+[`tests/test_landed.py`](tests/test_landed.py) pins the enforcement verdicts, and
+in particular the guards that make an unmeasured rule unproven rather than green:
+an empty range, an unresolvable range, a predicate that fails without a parseable
+finding, a predicate that passes while reporting findings, and a baseline that is
+missing or malformed. It also proves that every commit recorded in the committed
+baseline exists in the clone, so a hand-edited entry cannot silently grandfather
+nothing.
