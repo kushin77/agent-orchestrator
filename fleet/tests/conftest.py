@@ -155,7 +155,7 @@ BYOK_ENVIRONMENT = ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN")
 def byok_runner_environment(monkeypatch):
     """Satisfy the default runner profile's declared environment for every test.
 
-    Same reason as ``resolvable_default_runner`` above, one question later: the 
+    Same reason as ``resolvable_default_runner`` above, one question later: the
     loop no longer only asks whether its runner *resolves*, it asks whether that
     runner can *honour* the model it is about to be given (#841). A suite that
     drives the run path must therefore supply the environment a BYOK-wired box has,
@@ -164,7 +164,7 @@ def byok_runner_environment(monkeypatch):
     The VALUES are never read — ``fleet/runners.py`` asks only whether each name is
     set, which is the whole of what it can honestly check offline — so these are
     placeholders and no credential is involved. A test that wants the refusal asks
-    for it by clearing them (``monkeypatch.delenv(...)``), which is how the 
+    for it by clearing them (``monkeypatch.delenv(...)``), which is how the
     negative controls are written.
 
     ``FLEET_RUNNER_PROFILE`` is set for the same reason: several tests drive the run
