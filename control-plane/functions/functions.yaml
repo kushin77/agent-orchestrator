@@ -637,6 +637,21 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng]
 
+  - id: TRIGGER
+    title: "Trigger — on a stale snapshot: refresh once, else park the directive"
+    kind: command
+    endpoints: [board/trigger]
+    parameters:
+      - {name: directive, type: string, required: true, default: null}
+      - {name: repo, type: string, required: false, default: kushin77/agent-orchestrator}
+      - {name: stale-minutes, type: integer, required: false, default: null}
+      - {name: fleet-dir, type: string, required: false, default: ""}
+    scope: {capability: board:admin, level: org, tenant: platform}
+    effect_class: hold
+    audit: board.trigger
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+
   # -- orphan reconciliation ------------------------------------------------
   - id: SWEEP
     title: "One reconciliation pass over orphaned sessions"
