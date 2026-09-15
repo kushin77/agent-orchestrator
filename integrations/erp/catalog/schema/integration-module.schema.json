@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.integration-module.schema/v1",
+  "title": "ao.integration-module/v1 — the integration-module manifest (frozen, issue #646)",
+  "description": "The shape of `integrations/<module>/module.yaml`, applied to the YAML parsed as JSON. Frozen because the manifest is what a reviewer, the indexer registration and every later child lane read: the three facts that make the module a module — `mandatory`, the feature flag's `off` default, and `data_source: indexer` — are CONSTRAINED by this schema rather than trusted to prose, so a manifest that stops declaring them stops validating. Every object is closed (`additionalProperties: false`): a new key is a schema change, reviewed as one. Validated by the repository's stdlib subset validator (`governance/modules/schema.py`), which refuses to load a schema using a keyword it cannot enforce — an unenforced keyword would be a requirement nobody measures.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "path",
+    "mandatory",
+    "data_source",
+    "epic",
+    "issue",
+    "features",
+    "catalogue",
+    "indexer_sources",
+    "provenance"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ao.integration-module/v1",
+      "description": "The manifest's own schema tag."
+    },
+    "id": {
+      "type": "string",
+      "description": "The module id (also its directory name under integrations/)."
+    },
+    "name": {
+      "type": "string",
+      "description": "The module's human name."
+    },
+    "path": {
+      "type": "string",
+      "description": "Repository-relative path of the module."
+    },
+    "mandatory": {
+      "const": true,
+      "description": "Admission: this module is part of the product, not an optional add-on. `false` is not an accepted value — a non-mandatory module is a different declaration and does not belong in this shape."
+    },
+    "data_source": {
+      "const": "indexer",
+      "description": "Every datum the module carries is served by governance/knowledge/. There is no second value: a module that reads its domain knowledge from its own files is exactly what this module must not become."
+    },
+    "epic": {
+      "type": "integer",
+      "description": "The epic the module is built under."
+    },
+    "issue": {
+      "type": "integer",
+      "description": "The issue that stood the module up."
+    },
+    "features": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The module's own feature flags. Every one defaults OFF (GR-5), and a flag that defaults ON cannot validate: the enum admits only the two spellings of OFF, because YAML reads an unquoted `off` as the boolean false (the same pair scripts/check-feature-flags.py accepts).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "default"],
+        "properties": {
+          "id": { "type": "string" },
+          "default": {
+            "enum": ["off", false],
+            "description": "OFF: the string `off`, or the boolean YAML reads for an unquoted `off`. Nothing else — `on`, `true` and `\"true\"` are all refused."
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "catalogue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "module_map", "capabilities", "documents", "schema"],
+      "description": "Pointers to the module's single store of domain facts. Each must resolve.",
+      "properties": {
+        "root": { "type": "string" },
+        "module_map": { "type": "string" },
+        "capabilities": { "type": "string" },
+        "documents": { "type": "string" },
+        "schema": { "type": "string" }
+      }
+    },
+    "indexer_sources": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The knowledge-index sources that serve this module. Each glob must be registered verbatim in governance/knowledge/sources.py.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "glob"],
+        "properties": {
+          "kind": {
+            "enum": ["architecture", "golden-rules", "governance", "pattern-template"],
+            "description": "A kind from the indexer's closed vocabulary (governance/knowledge/model.py KINDS)."
+          },
+          "glob": { "type": "string" }
+        }
+      }
+    },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upstream",
+        "license",
+        "pattern_source_only",
+        "code_copied",
+        "retrieved",
+        "source_doc"
+      ],
+      "description": "The GR-10 provenance declaration. Every catalogue file must carry the same one.",
+      "properties": {
+        "upstream": { "type": "string" },
+        "license": { "type": "string" },
+        "pattern_source_only": {
+          "const": true,
+          "description": "Upstream is read for patterns, never copied as code."
+        },
+        "code_copied": {
+          "const": false,
+          "description": "No upstream code is copied into this repository."
+        },
+        "retrieved": { "type": "string" },
+        "source_doc": { "type": "string" }
+      }
+    }
+  }
+}

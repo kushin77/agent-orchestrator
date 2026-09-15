@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp-document.schema/v1",
+  "title": "ao.erp-document/v1 — one declared ERP document type (frozen, issue #646)",
+  "description": "The shape of one file under catalog/documents/: a single document type the module declares, its family, the epic child that delivers it, and the upstream doctype its PATTERN derives from (GR-10). One file per document type on purpose — the indexer indexes one knowledge item per file, so a query for a document type returns the entry that declares exactly that type, and nothing else can restate it: the module's own gate refuses a declaration-surface file that names a document fact. Document PARAMETERS (fields, and the workflow that moves the type between states) are ERP-02's deliverable and are deliberately absent here. Every object is closed (`additionalProperties: false`).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "family",
+    "owning_issue",
+    "upstream",
+    "provenance"
+  ],
+  "properties": {
+    "schema": { "const": "ao.erp-document/v1" },
+    "id": {
+      "type": "string",
+      "description": "The document type's catalogue id. Unique across the catalogue and stable — consumers reference it."
+    },
+    "name": {
+      "type": "string",
+      "description": "The document type's declared name, as the catalogue spells it."
+    },
+    "family": {
+      "type": "string",
+      "description": "The capability id this document belongs to; must be declared in capabilities.json."
+    },
+    "owning_issue": {
+      "type": "integer",
+      "description": "The epic child that delivers the type; must be declared in module-map.json."
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "doctype", "license", "pattern_source_only"],
+      "description": "The upstream entity the PATTERN was read from — a reference for the reviewer, never a copied artifact.",
+      "properties": {
+        "repo": { "type": "string" },
+        "doctype": { "type": "string" },
+        "license": { "type": "string" },
+        "pattern_source_only": { "const": true }
+      }
+    },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upstream",
+        "license",
+        "pattern_source_only",
+        "code_copied",
+        "retrieved",
+        "source_doc"
+      ],
+      "properties": {
+        "upstream": { "type": "string" },
+        "license": { "type": "string" },
+        "pattern_source_only": { "const": true },
+        "code_copied": { "const": false },
+        "retrieved": { "type": "string" },
+        "source_doc": { "type": "string" }
+      }
+    }
+  }
+}

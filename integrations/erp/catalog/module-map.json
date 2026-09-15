@@ -1,0 +1,68 @@
+{
+  "schema": "ao.erp-module-map/v1",
+  "module": "erp",
+  "epic": 645,
+  "issue": 646,
+  "pillars": [
+    {
+      "id": "engine",
+      "path": "engine",
+      "role": "Durable state-machine execution: a document type's lifecycle is data the engine consumes, not code the module ships."
+    },
+    {
+      "id": "registry",
+      "path": "registry",
+      "role": "Schema-authoring discipline the document definitions follow (provenance, identifiers, validation)."
+    },
+    {
+      "id": "identity",
+      "path": "identity",
+      "role": "Tenant scoping and RBAC: which tenant may read or write which document type."
+    },
+    {
+      "id": "guardrails",
+      "path": "guardrails",
+      "role": "Policy gates and DLP applied to module operations."
+    },
+    {
+      "id": "telemetry",
+      "path": "telemetry",
+      "role": "Hash-chained audit and per-tenant usage roll-up for metered operations."
+    },
+    {
+      "id": "control-plane",
+      "path": "control-plane",
+      "role": "The module's management surface and its generated clients."
+    },
+    {
+      "id": "portal",
+      "path": "portal",
+      "role": "The admin UI shell the module's flag-gated frames mount into."
+    },
+    {
+      "id": "gateway",
+      "path": "gateway",
+      "role": "Model routing for the agent-facing operations the module exposes."
+    }
+  ],
+  "children": [
+    { "issue": 646, "name": "ERP-01" },
+    { "issue": 647, "name": "ERP-02" },
+    { "issue": 648, "name": "ERP-03" },
+    { "issue": 649, "name": "ERP-04" },
+    { "issue": 650, "name": "ERP-05" },
+    { "issue": 651, "name": "ERP-06" },
+    { "issue": 652, "name": "ERP-07" },
+    { "issue": 653, "name": "ERP-08" },
+    { "issue": 654, "name": "ERP-09" },
+    { "issue": 655, "name": "ERP-10" }
+  ],
+  "provenance": {
+    "upstream": "frappe/erpnext",
+    "license": "GPL-3.0",
+    "pattern_source_only": true,
+    "code_copied": false,
+    "retrieved": "2026-09-14",
+    "source_doc": "docs/ERP-MODULE-GAP-ANALYSIS.md"
+  }
+}

@@ -26,7 +26,7 @@ CONSOLE_PORT ?= 8787
 
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety \
         remediation remediation-scan remediation-dispatch \
@@ -110,6 +110,10 @@ help:
 
 	@echo "  knowledge-index  Institutional knowledge index (#139): provenance,"
 	@echo "                coverage and secret policy over the indexed assets"
+
+	@echo "  erp-module    ERP module foundation (EPIC #645 #646): the manifest's"
+	@echo "                frozen shape, the catalogue's schemas/provenance/single"
+	@echo "                store, and the indexer proven to serve the catalogue"
 	@echo "  conformance   CMR class/pattern/template enforcement (#140): every"
 	@echo "                milestoned issue classified; mandates checked on the diff"
 	@echo "  surface-class Per-surface target solution-class (#351): every surface"
@@ -382,6 +386,13 @@ knowledge-index:
 ## runner invokes the same command on its schedule)
 knowledge-index-build:
 	@python3 governance/knowledge/cli.py build
+
+## erp-module — the ERP module foundation gate (EPIC #645, issue #646): the
+## manifest's frozen shape (`mandatory: true`, flag OFF, `data_source: indexer`),
+## the catalogue's schemas, provenance, cross-references and single-store rule,
+## with every refusal provoked, and the indexer proven to serve the catalogue
+erp-module:
+	@bash scripts/check-erp-module.sh
 
 ## cross-reference — cross-reference spine (EPIC #138, issue #384): the
 ## catalogue's typed relationships are valid (closed vocabulary, resolvable

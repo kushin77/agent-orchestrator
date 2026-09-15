@@ -144,6 +144,36 @@ SOURCE_SPECS: Tuple[SourceSpec, ...] = (
         required=False,
         note="session environment contract registry; pending lane #627",
     ),
+    # -- ERP module (EPIC #645, issue #646) ---------------------------------
+    # The ERP module declares `data_source: indexer` and points at these four
+    # sources. scripts/check-erp-module.sh refuses a manifest whose declared glob
+    # this file does not carry, so the declaration cannot outrun the indexer — and
+    # refuses a manifest that registers no glob under the catalogue at all, which
+    # would leave the module's own facts outside the index.
+    SourceSpec(
+        KIND_PATTERN_TEMPLATE,
+        "integrations/erp/catalog/**/*.json",
+        _OWNER_PLATFORM,
+        note="ERP domain catalogue: module map, capability list, one file per declared document type, and the schemas they are validated against",
+    ),
+    SourceSpec(
+        KIND_PATTERN_TEMPLATE,
+        "integrations/erp/module.yaml",
+        _OWNER_PLATFORM,
+        note="the ERP module manifest: mandatory admission, flag OFF, data_source indexer",
+    ),
+    SourceSpec(
+        KIND_ARCHITECTURE,
+        "integrations/erp/README.md",
+        _OWNER_ARCH,
+        note="the ERP module contract and its single-store discipline",
+    ),
+    SourceSpec(
+        KIND_GOVERNANCE,
+        "docs/ERP-MODULE-GAP-ANALYSIS.md",
+        _OWNER_PMO,
+        note="the ERP epic's feature-by-feature gap; the module is built against it",
+    ),
     # -- issue metadata (from the committed board snapshot) -----------------
     SourceSpec(
         KIND_ISSUE_METADATA,
