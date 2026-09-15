@@ -1,0 +1,82 @@
+name: Epic
+description: Issue brief for an epic — objective, measured landscape, the child lanes and the verification contract the epic closes on.
+title: "[epic]"
+labels: ["type:epic"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **GOAL first.** State the concrete objective and its success criteria
+        before any constraints or context, so a subagent (or a session resuming
+        after compaction) can act correctly from the first line alone.
+
+        An epic is a **contract**, not a folder. It declares the landscape it
+        measured, the child lanes that will change it, and the command whose
+        real output closes it. The `EPIC #616` brief is the reference shape.
+
+        One issue = one lane = one file-surface. Every child named below must
+        own files no sibling owns, or the wave is refused before dispatch.
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What this epic makes true, in measurable terms, and the gap it closes. Name the measured source of the gap.
+      value: |
+        Close the **<gap>** measured by issue #<n>: <what becomes true>.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: measured-landscape
+    attributes:
+      label: Measured landscape
+      description: One row per surface actually measured — the surface, the path that carries it, the enforcement in place today, and the verdict. A verdict without a measurement is a guess.
+      value: |
+        | Checklist item | Surface (measured) | Verdict |
+        |---|---|---|
+        | <item> | `<path>` (measured <date>) | **GAP** — <what is missing> |
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: children
+    attributes:
+      label: Children (one lane per file-surface)
+      description: The child issues that close this epic, each with the files it owns and the command that proves it. No two children may share a file.
+      value: |
+        | # | Issue | Owned files | Verify |
+        |---|---|---|---|
+        | 1 | **#<n>** <title> | `<path>` | `<command>` |
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification-contract
+    attributes:
+      label: Verification contract
+      description: How this epic closes — the evidence each child must carry, and the condition under which the epic itself may close.
+      value: |
+        Each child ships a `Verify:` command and closes only with its real
+        output. This epic closes only when every declared child is closed with
+        evidence.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose (faster / smarter / more accurate / consistent)
+      description: Why this epic leaves the system faster, smarter, more accurate and more consistent — one line each, tied to a surface measured above.
+      value: |
+        - **Faster:**
+        - **Smarter:**
+        - **More accurate:**
+        - **Consistent:**
+      render: text
+    validations:
+      required: false

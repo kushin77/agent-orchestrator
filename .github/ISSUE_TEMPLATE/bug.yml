@@ -1,0 +1,73 @@
+name: Bug report
+description: Defect brief — observed vs expected, the reproduction command, the canonical severity, and the RCA that closes the loop back into governance/lessons/.
+title: "[bug]"
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **A defect that cannot be reproduced cannot be fixed.** State what you
+        observed, what you expected, and the exact command that shows the
+        difference — before any theory of the cause.
+
+        Order the brief **GOAL -> constraints -> context**, then fill every
+        required field. A defect is closed by a recorded lesson, not by a
+        patch alone: the RCA link below is what stops the same defect from
+        returning in another lane.
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed
+      description: What actually happened, verbatim — real output pasted, never paraphrased. Name the surface and the commit or branch it was measured on.
+      value: |
+        <the real command output, pasted>
+      render: console
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What the contract says should have happened, and the doc, gate or test that says so. A claim with no citation is an opinion.
+      value: |
+        <what should have happened, and the file or gate that requires it>
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction command
+      description: The exact command(s) that show the defect — copy-pasteable, in order, with the real output they print. A defect that cannot be reproduced is not yet a defect.
+      value: |
+        ```bash
+        <command>
+        ```
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: The canonical rung. critical and high auto-BLOCK the surface and are never downgraded; medium queues a named SME review before any change; low is recorded for observability. The vocabulary is harvested from the isolation triage model in guardrails/isolation/model.py, so an invented rung cannot be triaged.
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+
+  - type: input
+    id: rca
+    attributes:
+      label: RCA link (governance/lessons/)
+      description: Where the root-cause analysis lands — governance/lessons/ (its template, its ledger and governance/lessons/rca/). Give the path or the ledger entry id. A defect closes when its lesson is recorded there, not when its patch merges.
+      placeholder: governance/lessons/rca/<slug>.md
+    validations:
+      required: true
