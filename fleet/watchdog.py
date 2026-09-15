@@ -34,6 +34,20 @@ that is *current* and still missing a declared capability is reported and never
 respawned: no restart adds a capability the build does not have. `python3
 fleet/watchdog.py capabilities` prints that report on its own.
 
+**"A run in flight" is evidence of work, not a live pid (issue #366).** The rule
+above — never restart a run just to update code — was enforced by asking whether
+the marker's ``pid`` was alive. A marker's ``pid`` is the *loop's* pid, and it
+outlives the run: a crashed run leaves the marker behind with ``child_pid:
+null`` and a beat that nothing advances any more. On 2026-09-14 three such
+markers, ~4.5h old, named the live sister loop's pid, so the sister's drift lock
+was held open on every tick — `drifted … a run is in flight — left alone` for
+hours, on a loop running a commit that predated five merged fixes. Flight is now
+the marker's OWN evidence, exactly what `fleet/terminal.py`'s `refresh_run`
+maintains while a run works: a **live child**, or a **beat no older than
+`RUN_STALE_SECONDS`**. A marker judged a crashed run is NAMED on the line that
+acts on it, with its child state and age, so a leftover marker can never hold the
+lock invisibly again.
+
 **The remedy is bounded (issue #773, AO-GR-21).** Drift detection is only half a
 control; the other half is an action that can actually change what was compared.
 Measured 2026-09-15: `#739` made the watchdog compare the running commit against
@@ -96,6 +110,13 @@ RUNS_DIR = FLEET_DIR / "runs"
 RESPAWN_VERIFY_SECONDS = 10.0
 RESPAWN_SETTLE_SECONDS = 1.0
 RESPAWN_POLL_SECONDS = 0.25
+
+#: A run marker is a *fresh beat* when its ``ts`` is within this window, because
+#: the run's own beater advances it while the child works (`fleet/terminal.py`,
+#: ``refresh_run``: "``child_pid`` and ``ts`` are refreshed by the run's own
+#: beater"). A marker with no live child and a beat older than this can only be a
+#: CRASHED run's leftover — nothing will ever advance it again (#366).
+RUN_STALE_SECONDS = 120.0
 
 #: The closed rung-state vocabulary `decide` returns. Declared here, as named
 #: constants, so a consumer (the fleet-health publisher, issue #498) IMPORTS the
@@ -385,15 +406,78 @@ def read_beat(path: Path) -> dict | None:
         return None
 
 
-def run_in_flight() -> bool:
-    """True when a run marker names a loop pid that is still alive."""
+def marker_verdict(record: dict, now: float | None = None) -> tuple[bool, str]:
+    """Is ONE run marker evidence of a run in flight? Returns `(in flight, why)`.
+
+    The marker's own contract (`fleet/terminal.py`: `mark_run`, then `refresh_run`
+    from the run's beater) is that ``pid`` is written once and left alone while
+    ``ts`` and ``child_pid`` advance as the run works. So exactly two things are
+    evidence that a run is *progressing* — a live ``child_pid``, or a ``ts`` no
+    older than `RUN_STALE_SECONDS` — and the loop's ``pid`` alone is neither. A
+    crashed run leaves that pid behind for as long as the loop survives, which is
+    how three ~4.5h-old markers held the sister's drift lock open (#366).
+    """
+    child = record.get("child_pid")
+    if process_alive(child):
+        return True, f"live child pid {int(child)}"
+    age = channel.heartbeat_age_seconds(record, moment=now)
+    if age is None:
+        # Decided explicitly, and in the ACTING direction: a marker with no
+        # readable beat is not evidence of a child at work. Both writers store
+        # `_now()` atomically (tmp + rename) in exactly the form
+        # `channel.heartbeat_age_seconds` parses, so an unreadable `ts` means a
+        # corrupted, hand-edited or foreign marker — and nothing in the fleet will
+        # ever advance it, so counting it as flight would restore the very
+        # deadlock this removes: a marker that can never clear, holding the lock
+        # forever. The fail-safe rule is untouched, because a child that is
+        # genuinely running is caught by the live-child test above, which needs no
+        # timestamp at all; and the action it unlocks is bounded (#773), so even a
+        # wrong verdict escalates once and parks instead of retrying.
+        return False, f"no readable beat (child_pid {child!r}, ts {record.get('ts')!r})"
+    if age <= RUN_STALE_SECONDS:
+        # A run that has just started has no child recorded yet — `mark_run`
+        # writes `child_pid: null` before the subagent exists — so the fresh beat
+        # is the only thing protecting it, and it must not be restarted.
+        return True, f"fresh beat {int(age)}s old (child_pid {child!r})"
+    return False, f"child_pid {child!r} not alive, beat {int(age)}s old (> {int(RUN_STALE_SECONDS)}s)"
+
+
+def flight_verdict(now: float | None = None) -> tuple[bool, str]:
+    """Scan `.fleet/runs/`: `(a run is in flight, the reason to log)`.
+
+    The reason NAMES the marker it decided on — which one holds the lock, or
+    which ones were judged a crashed run's leftover and why. A bare boolean
+    cannot carry that, and an unattributable hold is how a marker that can never
+    clear stayed invisible for hours (#366).
+    """
     if not RUNS_DIR.exists():
-        return False
-    for path in RUNS_DIR.glob("*.json"):
+        return False, ""
+    held: list[str] = []
+    crashed: list[str] = []
+    for path in sorted(RUNS_DIR.glob("*.json")):
         record = read_beat(path)
-        if record and process_alive(record.get("pid")):
-            return True
-    return False
+        if not record:
+            # Unreadable is judged the same way as an unreadable beat, and said
+            # out loud: a torn or foreign marker is not evidence of work.
+            crashed.append(f"{path.stem} (unreadable marker)")
+            continue
+        in_flight, why = marker_verdict(record, now)
+        (held if in_flight else crashed).append(f"{path.stem} ({why})")
+    if held:
+        extra = f", +{len(held) - 1} more" if len(held) > 1 else ""
+        return True, f"held by {held[0]}{extra}"
+    if not crashed:
+        return False, ""
+    return False, "crashed run marker(s): " + "; ".join(crashed)
+
+
+def run_in_flight(now: float | None = None) -> bool:
+    """True when a run marker evidences work in progress — a live child or a fresh beat.
+
+    This is the seam `rung_action` calls and the one a test stubs; `flight_verdict`
+    is the same judgement carrying the reason the log line needs.
+    """
+    return flight_verdict(now)[0]
 
 
 def decide(
@@ -727,6 +811,13 @@ def rung_action(
     Issue #773: every acting path goes through `bounded_remedy`, so no remedy is
     repeated indefinitely, and the `checkout-behind` case is repaired by moving
     the CHECKOUT rather than by respawning a rung that is already on its HEAD.
+
+    Issue #366: the safety rule — never restart a run just to update code — asks
+    `run_in_flight`, which now means a marker with a live child or a fresh beat,
+    not merely a live loop pid. A crashed run's leftover marker therefore no
+    longer holds the drift lock open: the remedy PROCEEDS through `bounded_remedy`
+    and is bounded by the attempt cap, exactly as any other remedy here. Both
+    lines that touch it NAME the marker they were decided on.
     """
     moment = time.time() if when is None else when
     if local_head is None:
@@ -748,11 +839,20 @@ def rung_action(
         ok = respawn(pattern, script, name)
         clear_drift_record(name)
         return f"{name}: forced (operator asked to respawn) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
-    if state in (DRIFTED, CHECKOUT_BEHIND) and name == "sister" and run_in_flight():
+    # `run_in_flight` is the verdict this decision rests on — and the seam a test
+    # stubs — while the SCAN is read alongside it for the reason to log: which
+    # marker holds the lock, or which were judged a crashed run's leftover. A bare
+    # boolean cannot carry that, and an unattributable hold is how a marker that
+    # can never clear stayed invisible (#366). A stubbed verdict simply suppresses
+    # the note instead of being contradicted by it.
+    in_flight = run_in_flight()
+    held, note = flight_verdict(moment)
+    held_note = f" — {note}" if note else ""
+    if state in (DRIFTED, CHECKOUT_BEHIND) and name == "sister" and in_flight:
         record_pending(name, state, reason, running, baseline, baseline_name, local_head, moment)
         return (
-            f"{name}: {state} ({reason}) — recorded as pending drift, a run is in flight — left alone "
-            f"until it completes, then acted on | {capability}"
+            f"{name}: {state} ({reason}) — recorded as pending drift, a run is in flight"
+            f"{held_note} — left alone until it completes, then acted on | {capability}"
         )
     # CANNOT_ASSESS respawns too: the watchdog cannot certify the rung, and a
     # respawn is the only action that can restore a readable comparison. It is
@@ -771,7 +871,12 @@ def rung_action(
         moment,
         checkout_root,
     )
-    return f"{name}: {state} ({reason}) — {outcome} | {capability}"
+    # Nothing was in flight, so the remedy genuinely proceeded: name the crashed
+    # markers that would otherwise have held the lock, with their child state and
+    # age. This is the line the operator reads to see WHY a rung that looked busy
+    # was acted on.
+    stalled = f" — {note}" if not held and note else ""
+    return f"{name}: {state} ({reason}) — {outcome}{stalled} | {capability}"
 
 
 def monitor_missing() -> bool:
