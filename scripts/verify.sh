@@ -81,6 +81,17 @@ checks=(
   # SEPARATE deliberate step: requiring one that nothing posts yet would block
   # every merge (#724: an inert control whose own gate could not see it).
   'gate-status|bash scripts/check-gate-status.sh'
+  # no-actions (issue #812, GR-15): "No GitHub Actions workflows" was declared in
+  # AGENTS.md and the fleet doctrine and enforced by NOTHING. Measured: the repo
+  # was running `ci-failure-scanner.yml`, state=active, on a 10-minute cron --
+  # violating its own rule silently -- because no gate looked. The scripts that
+  # merely mention `.github/workflows` parse YAML, and gate-coverage does not
+  # treat a workflow as an artifact at all, so a new one was not even visible.
+  # This check ENFORCES the rule and is PROVOKED: it plants a workflow in a
+  # temporary fixture and requires the detector to refuse it BY NAME, and plants
+  # a baselined one and requires it to be ACCEPTED -- asserting only the empty
+  # case would pass a detector that matches nothing.
+  'no-actions|bash scripts/check-no-actions.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'epic-focus|bash scripts/check-epic-focus.sh'
