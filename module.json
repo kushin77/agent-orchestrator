@@ -88,6 +88,12 @@
       "flags": ["enable_portal"]
     },
     {
+      "id": "operator-terminal",
+      "default": "off",
+      "flags": ["surfaces.operator_terminal", "enable_portal"],
+      "desc": "AgentConsole — the browser operator terminal served at GET /console by the portal service. Its own gate is the surfaces-registry key surfaces.operator_terminal (tf_flag enable_portal); it composes surfaces.fleet_projection for the read half and surfaces.remote_control for the steer half. Default off and promoted false, and the flag is checked before AuthN, so an unpromoted console is absent rather than merely unauthorised."
+    },
+    {
       "id": "consumer-sdk",
       "default": "off"
     },

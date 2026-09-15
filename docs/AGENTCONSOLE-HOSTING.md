@@ -8,7 +8,9 @@
 > and the overlay is not lifted into the shared-services repo yet. Companion
 > pages: [`OPERATOR-ACCESS.md`](OPERATOR-ACCESS.md) (which command reaches which
 > surface), [`../fleet/CONTRACT.md`](../fleet/CONTRACT.md) (the control-plane
-> contract) and [`../portal/README.md`](../portal/README.md) (the portal half).
+> contract), [`../portal/README.md`](../portal/README.md) (the portal half) and
+> [§11](#11-the-modulecatalog-packaging-issue-813) below (the module/catalog
+> packaging).
 
 ## 1. The problem this page closes
 
@@ -247,8 +249,9 @@ make verify
   declares and hands over.
 - It does **not** fetch or hold a secret; the JWKS mirror is the run half's to
   place, and the GSM-held secrets stay in GSM.
-- It does **not** add a readiness/metric signal for the surface (lane #802), a
-  rollback anchor (lane #802), or the module/catalog packaging (lane C).
+- It does **not** add a readiness/metric signal for the surface (lane #802) or a
+  rollback anchor (lane #802). The module/catalog packaging (lane C) was **not**
+  this lane's to add either — it is delivered by issue #813, see §11.
 - The image recipe is now bootable, but the *published* image is still the run
   half's to build and tag: until it does, `AGENTCONSOLE_IMAGE` is unset and the
   overlay falls back to a local `agent-orchestrator-console:local` build.
@@ -260,3 +263,42 @@ make verify
 - `infra/terraform/modules/web-surface` still declares the retired Cloud Run
   route, flag-gated OFF and inert. Retiring or repurposing it is not this lane's
   call and this lane did not touch it.
+
+## 11. The module/catalog packaging (issue #813)
+
+The console is not only a handoff — it is a **declared feature of this repo's
+module manifest**, so the fleet's catalog can resolve the surface by name. Every
+artifact lives in this repo; none of them is an edit to another repo.
+
+| Artifact | Where | What it declares |
+|---|---|---|
+| Feature `operator-terminal` | root [`module.json`](../module.json) (`cmr.module/v1`) | `default: off`, `flags: ["surfaces.operator_terminal", "enable_portal"]` — the surfaces-registry key that actually gates `GET /console`, plus the portal service's Terraform flag |
+| The surface's own gate | [`../infra/feature-flags/registry.yaml`](../infra/feature-flags/registry.yaml) → `surfaces.operator_terminal` | `default: off`, `promoted: false`, service `portal`, `tf_flag: enable_portal`; checked **before** AuthN, so an unpromoted console is absent rather than merely unauthorised |
+| Catalog registration request | `kushin77/CMR#1014` | a **request** (NG4) to refresh the hub's copy of this manifest, `catalog/modules/agent-orchestrator/module.json`, from the root manifest — the hub is never edited from this repo |
+
+**Provenance (GR-10)** for the console — the shared-frontend shell/native-addon
+pattern and the shared-services hosting pattern, *pattern not code* — is recorded
+in [`CANNIBALIZATION.md`](CANNIBALIZATION.md) §17. The console's own adapt-origins
+table is in [`../portal/README.md`](../portal/README.md) §Provenance
+(cannibalization).
+
+Offline checks:
+
+```bash
+python3 -m json.tool module.json    # the manifest is well-formed JSON
+grep -n 'operator-terminal' module.json    # exactly one feature entry
+grep -n -A 3 'operator_terminal' infra/feature-flags/registry.yaml
+```
+
+Schema conformance needs the hub's `catalog/schemas/module.schema.json`, which is
+vendored at `vendor/CMR` once the submodule is initialised:
+
+```bash
+python3 -c "import json, jsonschema; \
+  jsonschema.Draft7Validator(json.load(open('vendor/CMR/catalog/schemas/module.schema.json')))\
+    .validate(json.load(open('module.json'))); print('SCHEMA_OK')"
+```
+
+When the submodule is not initialised the module gates (`module-registry`,
+`module-brief`) report **CANNOT-ASSESS** rather than a pass — offline is not the
+same as verified.

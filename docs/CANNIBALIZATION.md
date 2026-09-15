@@ -775,4 +775,71 @@ not edited here — GR: never edit another repo's files).
 (provision → publish → connector), including the Vault and GSM secret sourcing.
 
 ---
+
+## 17. AgentConsole (issue #813) — shared-frontend shell/native-addon + shared-services hosting — PATTERN, ported
+
+| Field | Value |
+|---|---|
+| Source repos | `kushin77/shared-frontend` (the shell + native-addon pattern) · `kushin77/shared-services` (the hosting pattern) |
+| Source path(s) | shared-frontend: `modules/schema.json` (`mount.type ∈ iframe \| tab \| native`), `shell/src/bridge.ts` (the `os:*` postMessage envelope), `docs/AUTH.md` (one Google login: HttpOnly `SameSite=Lax Secure` cookie + `/auth/me`), `contrib/shared-services/docker-compose.frontends.yml` (`os-portal-shell` → container `shared-services-os`, live on `192.168.168.42:18280`). shared-services: the run-half substrate that overlay lands in — the external `shared-services-net` network, the `shared-services-*` container naming, and the live per-surface port allocation |
+| License | shared-frontend: **MIT declared**, repository **private**. shared-services: **none declared** — private repository with no licence file. Both are the **same owner** as this repo (a first-party estate, not a third party) |
+| Verdict | **PATTERN** — the *shape* is the asset; each implementation is tied to its estate's substrate |
+| Ported to | `contrib/shared-services/agentconsole.compose.yml` (service `agentconsole` → container `shared-services-agentconsole`) and the console surface itself (`surfaces.operator_terminal` in `infra/feature-flags/registry.yaml`; `portal/static/views/console.html` + `portal/static/js/operator.js`), declared by `docs/AGENTCONSOLE-HOSTING.md` (issue #801), enterprise-hardened by #802, packaged as a module product by #813 |
+| Register | feature `operator-terminal` in the root `module.json` (flag `surfaces.operator_terminal`); catalog registration **requested** in `kushin77/CMR#1014` — a request, never an edit of the hub (NG4) |
+
+**The patterns.** Two, answering two different questions.
+
+*The shell / native-addon pattern (shared-frontend).* The OS portal is **one shell
+chrome that mounts feature views**, and its mount contract fixes how a feature may
+appear — `mount.type ∈ iframe | tab | native` (`modules/schema.json`) — with the
+framed case talking to the shell only through the `os:*` postMessage bridge
+(`shell/src/bridge.ts`). Two things were taken: the **`native` half of that
+vocabulary** (a first-party view, not a framed module) and the shell's
+**one-front-door session model** (`docs/AUTH.md`). The console is therefore a
+same-origin view served by this repo's own `portal/` at `GET /console`, with no
+bridge, no frame and no second projection; and it invents no login — an
+unauthenticated visitor is redirected to the gate's `/auth/login`, and a session
+exists only from a verified RS256 `os-session-token` checked **offline** against a
+mirror of the gate's published JWKS (`portal/server/sso.py`). One thing was
+**refused on the record**: packaging the console as a **native React addon inside
+the shell**, which needs six wiring surfaces in shared-frontend for no
+user-visible gain today (`docs/CHAT-MOUNT.md`).
+
+*The hosting pattern (shared-services).* Live hosting is not this repo's to run:
+this repo is the **source + build + registry** half, shared-services is the
+**run** half (owner directive 2026-09-04, shared-frontend `docs/DEPLOYMENT.md`; the
+retired Cloud Run route implied a live host that is not the live host). The
+declaration is an **additive compose overlay** on the already-live external
+`shared-services-net`, under the estate's `shared-services-*` container naming,
+publishing a port taken clear of the live allocation (OS shell `18280`, modules
+`18282`–`18285`, gws `18290`), mounting the host state the console reads, and
+interpolating every secret from the run half's environment with an **empty
+default** so an unconfigured bring-up fails closed.
+
+**No code was copied.** shared-frontend is MIT but **private**; shared-services
+declares **no licence at all**. Nothing was vendored: `vendor/` is untouched, no
+submodule was added and no source file was cloned into the tree. Both patterns
+were reimplemented in this repo's own conventions — its own stdlib-only Python
+service, its own fail-closed JWKS loader (a malformed mirror is a **boot**
+failure, never a silent empty trust set), its own flag-checked-before-AuthN
+surface semantics, its own tests and its own gate. No paragraph, comment or
+identifier was carried across.
+
+**What we changed, and why.**
+
+| Upstream | Here | Why |
+|---|---|---|
+| a React addon mounted in the shell (`mount.type: native`), wired through six shared-frontend surfaces | a **same-origin view served by this repo's own portal** (`portal/static/views/console.html` + `js/operator.js`), reached at `GET /console` | the console owns its transport and imports no authority; the addon route buys no user-visible gain today |
+| the shell's login (HttpOnly cookie + `/auth/me`) | the **same** gate's RS256 `os-session-token`, verified **offline** against a mirrored JWKS — the console issues no credential | one front door: the console is not a second session issuer, and it depends on no live call to the gate |
+| a live host on the remote cluster, wired by the estate | a **declaration**, flag-gated OFF, handed to the run half by a direction issue on that repo's board | GR-5 — new infrastructure ships OFF and is promoted by a reviewed change; this repo never edits shared-services |
+| the estate's own port and secret defaults | the port is re-checked on the host before the first `up`, and every secret comes from the run half's env with an **empty default** | a port is a host fact, not a declaration; and GR-6 — nothing secret in the tree |
+
+**See also.** `docs/AGENTCONSOLE-HOSTING.md` carries the full two-repo split, the
+image outcomes measured *inside the built image*, and the run-half checklist.
+`portal/README.md`'s own adapt-origins table records the console's other four
+sources (design tokens and the SSO model from shared-frontend, the static
+projection pattern from CMR, the RBAC control plane from defragsuite, the
+portal-backend split from git-rca-workspace).
+
+---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*
