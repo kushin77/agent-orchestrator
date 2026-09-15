@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "module": "integrations/erp/crm",
+  "policy": "patterns-only-no-upstream-code",
+  "harvests": [
+    {
+      "shape": "crm-funnel",
+      "upstream": "frappe/erpnext",
+      "upstreamVersion": "v16 docs (read 2026-09-14)",
+      "license": "GPL-3.0",
+      "codeCopied": false,
+      "url": "https://docs.frappe.io/erpnext/user/manual/en/crm",
+      "harvestedAt": "2026-09-14",
+      "note": "The lead -> opportunity -> customer funnel and the separation of a lead's funnel stage from its record state. Harvested as a shape: this module declares its own stage vocabulary and its own state machines, and none of the upstream field names, doctype definitions or Python are reproduced."
+    },
+    {
+      "shape": "projects-timesheet-accumulation",
+      "upstream": "frappe/erpnext",
+      "upstreamVersion": "v16 docs (read 2026-09-14)",
+      "license": "GPL-3.0",
+      "codeCopied": false,
+      "url": "https://docs.frappe.io/erpnext/user/manual/en/projects",
+      "harvestedAt": "2026-09-14",
+      "note": "The shape that a timesheet line is booked against a task which names its project, and that project cost is a derived rollup rather than a stored total. This module computes the rollup from the documents present, with integer minor-unit money of its own design."
+    },
+    {
+      "shape": "inspection-outcome-transitions",
+      "upstream": "frappe/erpnext",
+      "upstreamVersion": "v16 docs (read 2026-09-14)",
+      "license": "GPL-3.0",
+      "codeCopied": false,
+      "url": "https://docs.frappe.io/erpnext/user/manual/en/quality-management",
+      "harvestedAt": "2026-09-14",
+      "note": "The shape of a quality inspection moving pending -> in-progress -> passed/failed, and that a failed inspection is re-inspectable rather than terminal. Reimplemented here as a declaration-driven machine with the transition set shipped in catalog/definitions.json."
+    },
+    {
+      "shape": "support-sla-ageing",
+      "upstream": "frappe/erpnext",
+      "upstreamVersion": "v16 docs (read 2026-09-14)",
+      "license": "GPL-3.0",
+      "codeCopied": false,
+      "url": "https://docs.frappe.io/erpnext/user/manual/en/support",
+      "harvestedAt": "2026-09-14",
+      "note": "The shape that an issue ages against a response window and a resolution window taken from a policy named by the issue's own priority. This module makes the clock an explicit parameter so ageing is reproducible, and expresses the windows as whole minutes plus an integer warning percentage."
+    }
+  ]
+}

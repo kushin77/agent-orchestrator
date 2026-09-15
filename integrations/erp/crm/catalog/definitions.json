@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 1,
+  "source": "local-lane-declaration",
+  "dataSource": "declared locally by lane #650 because integrations/erp/catalog/** is a concurrent sibling lane; definitions.load is the seam the indexer-fed catalogue of EPIC #645 replaces",
+  "kinds": {
+    "lead": {
+      "initial": "new",
+      "states": ["new", "contacted", "qualified", "converted", "lost"],
+      "transitions": {
+        "new": ["contacted", "lost"],
+        "contacted": ["qualified", "lost"],
+        "qualified": ["converted", "lost"],
+        "converted": [],
+        "lost": []
+      },
+      "allowedFields": ["company", "source", "stage", "value"],
+      "requiredFields": ["company", "stage"],
+      "vocabularies": {
+        "stage": "lead-stages",
+        "source": "lead-sources"
+      },
+      "fieldTypes": {
+        "value": "integer"
+      },
+      "openStates": ["new", "contacted", "qualified"]
+    },
+    "opportunity": {
+      "initial": "open",
+      "states": ["open", "proposal", "won", "lost"],
+      "transitions": {
+        "open": ["proposal", "lost"],
+        "proposal": ["won", "lost"],
+        "won": [],
+        "lost": []
+      },
+      "allowedFields": ["company", "stage", "amount", "currency"],
+      "requiredFields": ["company", "amount", "currency"],
+      "vocabularies": {
+        "stage": "opportunity-stages"
+      },
+      "fieldTypes": {
+        "amount": "integer"
+      },
+      "openStates": ["open", "proposal"]
+    },
+    "customer": {
+      "initial": "active",
+      "states": ["active", "dormant", "churned"],
+      "transitions": {
+        "active": ["dormant"],
+        "dormant": ["active", "churned"],
+        "churned": []
+      },
+      "allowedFields": ["legal_name", "tier", "currency"],
+      "requiredFields": ["legal_name", "tier"],
+      "vocabularies": {
+        "tier": "customer-tiers"
+      },
+      "openStates": ["active", "dormant"]
+    },
+    "project": {
+      "initial": "planned",
+      "states": ["planned", "active", "completed", "cancelled"],
+      "transitions": {
+        "planned": ["active", "cancelled"],
+        "active": ["completed", "cancelled"],
+        "completed": [],
+        "cancelled": []
+      },
+      "allowedFields": ["project_type", "customer", "budget_minor", "currency"],
+      "requiredFields": ["project_type"],
+      "vocabularies": {
+        "project_type": "project-types"
+      },
+      "fieldTypes": {
+        "budget_minor": "integer"
+      },
+      "openStates": ["planned", "active"]
+    },
+    "task": {
+      "initial": "open",
+      "states": ["open", "in-progress", "done", "cancelled"],
+      "transitions": {
+        "open": ["in-progress", "cancelled"],
+        "in-progress": ["done", "cancelled"],
+        "done": [],
+        "cancelled": []
+      },
+      "allowedFields": ["project", "task_type", "estimate_minutes", "rate_minor", "currency"],
+      "requiredFields": ["project", "task_type"],
+      "vocabularies": {
+        "task_type": "task-types"
+      },
+      "fieldTypes": {
+        "estimate_minutes": "integer",
+        "rate_minor": "integer"
+      },
+      "openStates": ["open", "in-progress"]
+    },
+    "timesheet": {
+      "initial": "draft",
+      "states": ["draft", "submitted", "approved", "rejected"],
+      "transitions": {
+        "draft": ["submitted"],
+        "submitted": ["approved", "rejected"],
+        "approved": [],
+        "rejected": ["draft"]
+      },
+      "allowedFields": ["project", "task", "minutes", "work_date", "rate_minor", "currency"],
+      "requiredFields": ["project", "task", "minutes", "work_date"],
+      "fieldTypes": {
+        "minutes": "integer",
+        "rate_minor": "integer"
+      },
+      "openStates": ["draft", "rejected"]
+    },
+    "inspection": {
+      "initial": "pending",
+      "states": ["pending", "in-progress", "passed", "failed"],
+      "transitions": {
+        "pending": ["in-progress"],
+        "in-progress": ["passed", "failed"],
+        "passed": [],
+        "failed": ["pending"]
+      },
+      "allowedFields": ["template", "subject", "sample_size", "outcome_note"],
+      "requiredFields": ["template", "subject"],
+      "vocabularies": {
+        "template": "inspection-templates"
+      },
+      "fieldTypes": {
+        "sample_size": "integer"
+      },
+      "openStates": ["pending", "in-progress", "failed"]
+    },
+    "support-issue": {
+      "initial": "open",
+      "states": ["open", "in-progress", "resolved", "closed"],
+      "transitions": {
+        "open": ["in-progress", "closed"],
+        "in-progress": ["resolved", "closed"],
+        "resolved": ["closed", "open"],
+        "closed": []
+      },
+      "allowedFields": [
+        "priority",
+        "channel",
+        "customer",
+        "subject",
+        "opened_at",
+        "responded_at",
+        "resolved_at"
+      ],
+      "requiredFields": ["priority", "channel", "opened_at"],
+      "vocabularies": {
+        "priority": "support-priorities",
+        "channel": "support-channels"
+      },
+      "fieldTypes": {
+        "opened_at": "string",
+        "responded_at": "string",
+        "resolved_at": "string"
+      },
+      "openStates": ["open", "in-progress", "resolved"]
+    }
+  },
+  "vocabularies": {
+    "lead-stages": ["new", "nurture", "qualified", "disqualified"],
+    "lead-sources": ["web", "referral", "campaign", "outbound"],
+    "opportunity-stages": ["discovery", "proposal", "negotiation", "won", "lost"],
+    "customer-tiers": ["standard", "premium", "enterprise"],
+    "project-types": ["delivery", "internal", "maintenance"],
+    "task-types": ["implementation", "review", "support", "documentation"],
+    "inspection-templates": ["incoming", "in-process", "final"],
+    "support-priorities": ["p1", "p2", "p3"],
+    "support-channels": ["email", "portal", "phone"]
+  },
+  "slaPolicies": {
+    "p1": {
+      "respondMinutes": 240,
+      "resolveMinutes": 480,
+      "warnPercent": 75
+    },
+    "p2": {
+      "respondMinutes": 1440,
+      "resolveMinutes": 4320,
+      "warnPercent": 75
+    },
+    "p3": {
+      "respondMinutes": 4320,
+      "resolveMinutes": 10080,
+      "warnPercent": 75
+    }
+  }
+}

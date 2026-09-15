@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kushin77.github.io/agent-orchestrator/integrations/erp/crm/schema/definitions.schema.json",
+  "title": "ERP CRM definition set",
+  "description": "The declaration document the CRM-family lane operates on. Shape only: the graph invariants a declaration must satisfy (a transition target that is a declared state, a referenced vocabulary that exists, a total machine) are cross-checked in definitions._cross_check, because a stdlib subset validator cannot express them. Both layers refuse with the same code, definitions-invalid, naming every problem.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "source", "kinds", "vocabularies", "slaPolicies"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "dataSource": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kinds": {
+      "type": "object"
+    },
+    "vocabularies": {
+      "type": "object"
+    },
+    "slaPolicies": {
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kushin77.github.io/agent-orchestrator/integrations/erp/crm/schema/document.schema.json",
+  "title": "ERP CRM document envelope",
+  "description": "The envelope every CRM-family document carries. It constrains the envelope only: whether a state belongs to its kind, and whether a field belongs to its kind with the right type, are decided against the definition set (documents.parse), because those are properties of the declaration the document was created under, not of the document alone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "id", "tenant", "state", "fields"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[A-Z][A-Z0-9-]*$"
+    },
+    "tenant": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "owner": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "fields": {
+      "type": "object"
+    }
+  }
+}
