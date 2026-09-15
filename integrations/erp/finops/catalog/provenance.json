@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "ao.erp.finops/v1",
+  "module": "integrations/erp/finops",
+  "policy": "patterns-only-no-upstream-code",
+  "harvests": [
+    {
+      "shape": "document-lifecycle-as-the-metered-unit",
+      "upstream": "frappe/erpnext",
+      "upstreamVersion": "v16 docs (read 2026-09-14)",
+      "license": "GPL-3.0",
+      "codeCopied": false,
+      "url": "https://docs.frappe.io/erpnext/user/manual/en/setting-up/print/print-settings",
+      "harvestedAt": "2026-09-14",
+      "note": "The shape that an ERP document's meaningful, billable events are its CREATION and its STATE TRANSITIONS (draft -> submitted -> completed, with a cancel path), not its edits or reads. Harvested as a shape only: this lane declares its own operation vocabulary (create/transition), its own event names and its own rate card, and reproduces none of ERPNEXT's doctype definitions, hooks or Python."
+    },
+    {
+      "shape": "rail-with-a-derived-hard-stop",
+      "upstream": "kushin77/agent-orchestrator (integrations/paperclip/budget.py)",
+      "upstreamVersion": "working tree, 2026-09-15",
+      "license": "MIT",
+      "codeCopied": false,
+      "url": "https://github.com/kushin77/agent-orchestrator/blob/master/integrations/paperclip/budget.py",
+      "harvestedAt": "2026-09-15",
+      "note": "In-repo harvest, credited with the same record the doctrine requires for an upstream one. From integrations/paperclip/budget.py this lane took the SHAPE that a metering record, a charge derived from a declared rail, and a hard stop derived from a cap percentage are three separate facts with three separate names - not its code. The ERP lane derives its stop from the platform budget ladder instead of from a cap percentage of a single charge."
+    },
+    {
+      "shape": "warn-to-block-budget-ladder",
+      "upstream": "kushin77/agent-orchestrator (telemetry/budgets)",
+      "upstreamVersion": "working tree, 2026-09-15",
+      "license": "MIT",
+      "codeCopied": false,
+      "url": "https://github.com/kushin77/agent-orchestrator/blob/master/telemetry/budgets/budget.py",
+      "harvestedAt": "2026-09-15",
+      "note": "In-repo harvest. The ladder (allow / warn / would_warn / would_block / block), the soft-vs-hard cap distinction and the observe-vs-enforce mode are CONSUMED from telemetry.budgets as the public API they are - this lane constructs TenantBudgetPolicy objects and calls BudgetEnforcer rather than re-implementing the ladder. The harvest recorded here is the shape of the decision object, which is what made a named refusal (budget-exhausted) expressible over it."
+    },
+    {
+      "shape": "hash-chained-append-only-audit-record",
+      "upstream": "kushin77/agent-orchestrator (telemetry/ledger)",
+      "upstreamVersion": "working tree, 2026-09-15",
+      "license": "MIT",
+      "codeCopied": false,
+      "url": "https://github.com/kushin77/agent-orchestrator/blob/master/telemetry/ledger/store.py",
+      "harvestedAt": "2026-09-15",
+      "note": "In-repo harvest. From telemetry/ledger this lane took the shape that an append-only record carries (tenant, actor, action, resource, evidence, ts) and the tri-state verification discipline (OK / NOT-OK / CANNOT-ASSESS). It is CONSUMED through the public API (open_ledger, LedgerStore.append, verify_ledger) and never edited: acceptance criterion 3 of issue #654 is exactly that this lane owns no copy of the ledger's files."
+    }
+  ]
+}

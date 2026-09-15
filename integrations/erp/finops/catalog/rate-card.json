@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "ao.erp.finops/v1",
+  "currency": "USD",
+  "supportedCurrencies": ["USD", "EUR", "GBP"],
+  "unit": "per-operation",
+  "rates": [
+    {
+      "kind": "delivery-note",
+      "operation": "create",
+      "price": 0.008,
+      "note": "A delivery note is a high-volume operational document, so it is priced below the financial documents."
+    },
+    {
+      "kind": "delivery-note",
+      "operation": "transition",
+      "price": 0.003
+    },
+    {
+      "kind": "gl-posting",
+      "operation": "create",
+      "price": 0.02,
+      "note": "A general-ledger posting is the most expensive document the module meters: it is the one that touches the books."
+    },
+    {
+      "kind": "gl-posting",
+      "operation": "transition",
+      "price": 0.006
+    },
+    {
+      "kind": "item",
+      "operation": "create",
+      "price": 0.006,
+      "note": "A master document has no lifecycle, so only its creation is priced. Pricing a transition here would price an operation the core model refuses (unknown_workflow)."
+    },
+    {
+      "kind": "party",
+      "operation": "create",
+      "price": 0.006,
+      "note": "As for item: a master, so create only."
+    },
+    {
+      "kind": "purchase-order",
+      "operation": "create",
+      "price": 0.015
+    },
+    {
+      "kind": "purchase-order",
+      "operation": "transition",
+      "price": 0.005
+    },
+    {
+      "kind": "purchase-receipt",
+      "operation": "create",
+      "price": 0.012
+    },
+    {
+      "kind": "purchase-receipt",
+      "operation": "transition",
+      "price": 0.004
+    },
+    {
+      "kind": "quotation",
+      "operation": "create",
+      "price": 0.012
+    },
+    {
+      "kind": "quotation",
+      "operation": "transition",
+      "price": 0.004
+    },
+    {
+      "kind": "sales-invoice",
+      "operation": "create",
+      "price": 0.018
+    },
+    {
+      "kind": "sales-invoice",
+      "operation": "transition",
+      "price": 0.006
+    },
+    {
+      "kind": "sales-order",
+      "operation": "create",
+      "price": 0.015
+    },
+    {
+      "kind": "sales-order",
+      "operation": "transition",
+      "price": 0.005
+    },
+    {
+      "kind": "stock-entry",
+      "operation": "create",
+      "price": 0.014
+    },
+    {
+      "kind": "stock-entry",
+      "operation": "transition",
+      "price": 0.005
+    }
+  ]
+}

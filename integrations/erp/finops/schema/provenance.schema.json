@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp.finops/provenance",
+  "title": "ERP FinOps harvest provenance",
+  "description": "GR-10 for this lane: every shape harvested from an upstream project (or from a sibling module in this repository) records what came from where, under which licence, and confirms that no code was copied. The policy is pinned by const so a record cannot quietly adopt a weaker one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "module", "policy", "harvests"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "ao.erp.finops/v1"
+    },
+    "module": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy": {
+      "type": "string",
+      "const": "patterns-only-no-upstream-code"
+    },
+    "harvests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "shape",
+          "upstream",
+          "upstreamVersion",
+          "license",
+          "codeCopied",
+          "url",
+          "harvestedAt"
+        ],
+        "properties": {
+          "shape": {
+            "type": "string",
+            "minLength": 1
+          },
+          "upstream": {
+            "type": "string",
+            "minLength": 1
+          },
+          "upstreamVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1
+          },
+          "codeCopied": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "harvestedAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
