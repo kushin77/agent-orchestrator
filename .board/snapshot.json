@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T22:47:55Z",
+  "generated_at": "2026-09-15T04:28:44Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -10,6 +10,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-01-28T21:54:20Z"
     },
     {
@@ -20,6 +21,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-01-28T21:54:19Z"
     },
     {
@@ -30,6 +32,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T23:48:46Z"
     },
     {
@@ -46,6 +49,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T23:48:45Z"
     },
     {
@@ -62,6 +66,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T17:42:07Z"
     },
     {
@@ -78,6 +83,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T17:54:47Z"
     },
     {
@@ -94,6 +100,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T17:48:39Z"
     },
     {
@@ -110,6 +117,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T17:37:50Z"
     },
     {
@@ -126,6 +134,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:10:58Z"
     },
     {
@@ -142,6 +151,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:27:56Z"
     },
     {
@@ -158,6 +168,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:28:40Z"
     },
     {
@@ -174,6 +185,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:10:20Z"
     },
     {
@@ -190,6 +202,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:10:28Z"
     },
     {
@@ -206,6 +219,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:33:42Z"
     },
     {
@@ -222,6 +236,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:50:50Z"
     },
     {
@@ -238,6 +253,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T19:16:32Z"
     },
     {
@@ -254,6 +270,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:49:12Z"
     },
     {
@@ -270,6 +287,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T19:06:23Z"
     },
     {
@@ -286,6 +304,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:51:18Z"
     },
     {
@@ -302,6 +321,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T19:09:07Z"
     },
     {
@@ -318,6 +338,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T19:35:18Z"
     },
     {
@@ -334,6 +355,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T19:29:09Z"
     },
     {
@@ -350,6 +372,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T19:55:53Z"
     },
     {
@@ -366,6 +389,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T20:05:14Z"
     },
     {
@@ -382,6 +406,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T19:33:22Z"
     },
     {
@@ -398,6 +423,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T20:22:06Z"
     },
     {
@@ -414,6 +440,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T20:22:25Z"
     },
     {
@@ -430,6 +457,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T20:23:58Z"
     },
     {
@@ -446,6 +474,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T21:01:35Z"
     },
     {
@@ -462,6 +491,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T20:48:37Z"
     },
     {
@@ -478,6 +508,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T21:20:01Z"
     },
     {
@@ -494,6 +525,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T21:25:03Z"
     },
     {
@@ -510,6 +542,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T21:40:45Z"
     },
     {
@@ -526,6 +559,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T21:59:49Z"
     },
     {
@@ -542,6 +576,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T22:03:17Z"
     },
     {
@@ -558,6 +593,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T21:54:25Z"
     },
     {
@@ -574,6 +610,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T22:18:18Z"
     },
     {
@@ -590,6 +627,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T22:26:36Z"
     },
     {
@@ -606,6 +644,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T22:47:46Z"
     },
     {
@@ -622,6 +661,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T22:43:37Z"
     },
     {
@@ -638,6 +678,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T22:49:27Z"
     },
     {
@@ -654,6 +695,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T23:02:03Z"
     },
     {
@@ -670,6 +712,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T23:03:29Z"
     },
     {
@@ -686,6 +729,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T23:24:50Z"
     },
     {
@@ -702,6 +746,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T23:22:20Z"
     },
     {
@@ -718,6 +763,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T23:46:12Z"
     },
     {
@@ -734,6 +780,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T22:59:56Z"
     },
     {
@@ -750,6 +797,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:26:58Z"
     },
     {
@@ -766,6 +814,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T18:07:19Z"
     },
     {
@@ -782,6 +831,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-08T20:42:58Z"
     },
     {
@@ -795,6 +845,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-09T00:12:24Z"
     },
     {
@@ -808,6 +859,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:05Z"
     },
     {
@@ -821,6 +873,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:07Z"
     },
     {
@@ -834,6 +887,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:09Z"
     },
     {
@@ -847,6 +901,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:11Z"
     },
     {
@@ -860,6 +915,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:13Z"
     },
     {
@@ -873,6 +929,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:15Z"
     },
     {
@@ -886,6 +943,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:17Z"
     },
     {
@@ -899,6 +957,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:20Z"
     },
     {
@@ -912,6 +971,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:37:22Z"
     },
     {
@@ -925,6 +985,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:13Z"
     },
     {
@@ -938,6 +999,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:15Z"
     },
     {
@@ -951,6 +1013,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:17Z"
     },
     {
@@ -964,6 +1027,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:19Z"
     },
     {
@@ -977,6 +1041,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:21Z"
     },
     {
@@ -990,6 +1055,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:23Z"
     },
     {
@@ -1003,6 +1069,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:25Z"
     },
     {
@@ -1016,6 +1083,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:27Z"
     },
     {
@@ -1029,6 +1097,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:29Z"
     },
     {
@@ -1042,6 +1111,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T13:50:31Z"
     },
     {
@@ -1052,6 +1122,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T15:44:30Z"
     },
     {
@@ -1062,6 +1133,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T15:44:32Z"
     },
     {
@@ -1072,6 +1144,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T15:49:23Z"
     },
     {
@@ -1082,6 +1155,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T15:49:26Z"
     },
     {
@@ -1092,6 +1166,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T15:49:28Z"
     },
     {
@@ -1104,6 +1179,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:58:26Z"
     },
     {
@@ -1116,6 +1192,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:09:21Z"
     },
     {
@@ -1128,6 +1205,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:09:23Z"
     },
     {
@@ -1140,6 +1218,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:09:24Z"
     },
     {
@@ -1152,6 +1231,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:35:41Z"
     },
     {
@@ -1162,6 +1242,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:55:31Z"
     },
     {
@@ -1174,6 +1255,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T22:20:48Z"
     },
     {
@@ -1186,6 +1268,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -1198,6 +1281,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -1210,6 +1294,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:17:29Z"
     },
     {
@@ -1222,6 +1307,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:45:35Z"
     },
     {
@@ -1234,6 +1320,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:09:26Z"
     },
     {
@@ -1246,6 +1333,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:32:46Z"
     },
     {
@@ -1263,6 +1351,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:11:18Z"
     },
     {
@@ -1279,6 +1368,7 @@
       ],
       "parent": 138,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T18:02:43Z"
     },
     {
@@ -1297,6 +1387,7 @@
       "blocked_by": [
         139
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T18:14:23Z"
     },
     {
@@ -1314,6 +1405,7 @@
       ],
       "parent": 138,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:18:48Z"
     },
     {
@@ -1332,6 +1424,7 @@
       "blocked_by": [
         140
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T20:33:55Z"
     },
     {
@@ -1351,6 +1444,7 @@
       "blocked_by": [
         142
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T20:53:02Z"
     },
     {
@@ -1368,6 +1462,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:35:22Z"
     },
     {
@@ -1385,6 +1480,7 @@
       ],
       "parent": 144,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:24:19Z"
     },
     {
@@ -1401,6 +1497,7 @@
       ],
       "parent": 144,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:56:28Z"
     },
     {
@@ -1418,6 +1515,7 @@
       ],
       "parent": 144,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:28:45Z"
     },
     {
@@ -1435,6 +1533,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T17:41:21Z"
     },
     {
@@ -1452,6 +1551,7 @@
       ],
       "parent": 144,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:56:32Z"
     },
     {
@@ -1469,6 +1569,7 @@
       ],
       "parent": 144,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:28:49Z"
     },
     {
@@ -1485,6 +1586,7 @@
       ],
       "parent": 144,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:28:52Z"
     },
     {
@@ -1502,6 +1604,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T17:36:29Z"
     },
     {
@@ -1519,6 +1622,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T17:38:50Z"
     },
     {
@@ -1536,6 +1640,7 @@
       ],
       "parent": 144,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T17:50:06Z"
     },
     {
@@ -1555,6 +1660,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -1572,6 +1678,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:19:52Z"
     },
     {
@@ -1589,6 +1696,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T18:08:14Z"
     },
     {
@@ -1606,6 +1714,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:39:55Z"
     },
     {
@@ -1624,6 +1733,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:21:29Z"
     },
     {
@@ -1642,6 +1752,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:22:30Z"
     },
     {
@@ -1659,6 +1770,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:46:39Z"
     },
     {
@@ -1676,6 +1788,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:53:29Z"
     },
     {
@@ -1692,6 +1805,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T01:08:09Z"
     },
     {
@@ -1711,6 +1825,7 @@
       "blocked_by": [
         162
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T18:14:12Z"
     },
     {
@@ -1728,6 +1843,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T19:51:56Z"
     },
     {
@@ -1747,6 +1863,7 @@
       "blocked_by": [
         171
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T18:24:57Z"
     },
     {
@@ -1767,6 +1884,7 @@
       "blocked_by": [
         171
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T18:41:19Z"
     },
     {
@@ -1784,6 +1902,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:54:55Z"
     },
     {
@@ -1804,6 +1923,7 @@
       "blocked_by": [
         180
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:01:17Z"
     },
     {
@@ -1823,6 +1943,7 @@
       "blocked_by": [
         175
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:08:57Z"
     },
     {
@@ -1842,6 +1963,7 @@
       "blocked_by": [
         175
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:15:07Z"
     },
     {
@@ -1861,6 +1983,7 @@
       "blocked_by": [
         186
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T19:26:47Z"
     },
     {
@@ -1873,6 +1996,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:58:02Z"
     },
     {
@@ -1885,6 +2009,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:38:07Z"
     },
     {
@@ -1897,6 +2022,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:25:02Z"
     },
     {
@@ -1907,6 +2033,7 @@
       "labels": [],
       "parent": 219,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:48:41Z"
     },
     {
@@ -1917,6 +2044,7 @@
       "labels": [],
       "parent": 219,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:08:15Z"
     },
     {
@@ -1927,6 +2055,7 @@
       "labels": [],
       "parent": 219,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:37:43Z"
     },
     {
@@ -1937,6 +2066,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:05:26Z"
     },
     {
@@ -1947,6 +2077,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:24:53Z"
     },
     {
@@ -1957,6 +2088,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:24:52Z"
     },
     {
@@ -1969,6 +2101,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -1979,6 +2112,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:09:41Z"
     },
     {
@@ -1989,6 +2123,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:38:11Z"
     },
     {
@@ -1999,6 +2134,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:27:21Z"
     },
     {
@@ -2009,6 +2145,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:32:22Z"
     },
     {
@@ -2019,6 +2156,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:32:24Z"
     },
     {
@@ -2029,6 +2167,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:45:15Z"
     },
     {
@@ -2042,6 +2181,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:04:54Z"
     },
     {
@@ -2055,6 +2195,7 @@
       ],
       "parent": 253,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:01:48Z"
     },
     {
@@ -2068,6 +2209,7 @@
       ],
       "parent": 253,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:53:01Z"
     },
     {
@@ -2081,6 +2223,7 @@
       ],
       "parent": 253,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:47:29Z"
     },
     {
@@ -2094,6 +2237,7 @@
       ],
       "parent": 253,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:47:57Z"
     },
     {
@@ -2107,6 +2251,7 @@
       ],
       "parent": 253,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:47:47Z"
     },
     {
@@ -2120,6 +2265,7 @@
       ],
       "parent": 253,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T21:54:13Z"
     },
     {
@@ -2137,6 +2283,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:01:04Z"
     },
     {
@@ -2147,6 +2294,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:05:02Z"
     },
     {
@@ -2163,6 +2311,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:27:37Z"
     },
     {
@@ -2176,6 +2325,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:40:39Z"
     },
     {
@@ -2189,6 +2339,7 @@
       ],
       "parent": 271,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:20:00Z"
     },
     {
@@ -2202,6 +2353,7 @@
       ],
       "parent": 271,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:35:55Z"
     },
     {
@@ -2215,6 +2367,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:05:03Z"
     },
     {
@@ -2228,6 +2381,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:05:03Z"
     },
     {
@@ -2241,6 +2395,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:35:02Z"
     },
     {
@@ -2254,6 +2409,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:35:02Z"
     },
     {
@@ -2267,6 +2423,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:05:04Z"
     },
     {
@@ -2280,6 +2437,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:47:27Z"
     },
     {
@@ -2293,6 +2451,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:12:16Z"
     },
     {
@@ -2306,6 +2465,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:47:27Z"
     },
     {
@@ -2321,6 +2481,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:17:11Z"
     },
     {
@@ -2336,6 +2497,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:47:27Z"
     },
     {
@@ -2351,6 +2513,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:36:24Z"
     },
     {
@@ -2367,6 +2530,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -2382,6 +2546,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T01:01:58Z"
     },
     {
@@ -2397,6 +2562,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:37:53Z"
     },
     {
@@ -2412,6 +2578,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:44:32Z"
     },
     {
@@ -2429,6 +2596,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T22:49:14Z"
     },
     {
@@ -2447,6 +2615,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:50:09Z"
     },
     {
@@ -2466,6 +2635,7 @@
       "blocked_by": [
         274
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:46:13Z"
     },
     {
@@ -2484,6 +2654,7 @@
       ],
       "parent": 299,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:46:13Z"
     },
     {
@@ -2502,6 +2673,7 @@
       ],
       "parent": 299,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:45:41Z"
     },
     {
@@ -2520,6 +2692,7 @@
       ],
       "parent": 299,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:01:21Z"
     },
     {
@@ -2537,6 +2710,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:22:13Z"
     },
     {
@@ -2549,6 +2723,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:56:37Z"
     },
     {
@@ -2559,6 +2734,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:52:11Z"
     },
     {
@@ -2569,6 +2745,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:46:11Z"
     },
     {
@@ -2579,6 +2756,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:34:34Z"
     },
     {
@@ -2592,6 +2770,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:18:41Z"
     },
     {
@@ -2605,6 +2784,7 @@
       ],
       "parent": 313,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:45:55Z"
     },
     {
@@ -2618,6 +2798,7 @@
       ],
       "parent": 313,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:18:39Z"
     },
     {
@@ -2636,6 +2817,7 @@
       ],
       "parent": 299,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-13T23:29:41Z"
     },
     {
@@ -2653,6 +2835,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:03:08Z"
     },
     {
@@ -2670,6 +2853,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:43:21Z"
     },
     {
@@ -2687,6 +2871,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:41:53Z"
     },
     {
@@ -2704,6 +2889,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:25:06Z"
     },
     {
@@ -2721,6 +2907,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:02:58Z"
     },
     {
@@ -2731,6 +2918,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:04:41Z"
     },
     {
@@ -2741,6 +2929,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:04:41Z"
     },
     {
@@ -2751,6 +2940,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:09:01Z"
     },
     {
@@ -2763,6 +2953,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:27:03Z"
     },
     {
@@ -2775,6 +2966,7 @@
       ],
       "parent": 323,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:24:57Z"
     },
     {
@@ -2789,6 +2981,7 @@
       "blocked_by": [
         331
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:43:25Z"
     },
     {
@@ -2803,6 +2996,7 @@
       "blocked_by": [
         331
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:31:24Z"
     },
     {
@@ -2813,6 +3007,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T00:26:43Z"
     },
     {
@@ -2823,6 +3018,7 @@
       "labels": [],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:09:15Z"
     },
     {
@@ -2836,6 +3032,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:11:06Z"
     },
     {
@@ -2849,6 +3046,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:11:24Z"
     },
     {
@@ -2862,6 +3060,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:33:38Z"
     },
     {
@@ -2875,6 +3074,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:19:33Z"
     },
     {
@@ -2888,6 +3088,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:19:35Z"
     },
     {
@@ -2901,6 +3102,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:00:35Z"
     },
     {
@@ -2914,6 +3116,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:59:59Z"
     },
     {
@@ -2927,6 +3130,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:19:37Z"
     },
     {
@@ -2940,6 +3144,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:03:09Z"
     },
     {
@@ -2953,6 +3158,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:19:35Z"
     },
     {
@@ -2966,6 +3172,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:43:30Z"
     },
     {
@@ -2979,6 +3186,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:37:36Z"
     },
     {
@@ -2992,6 +3200,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:56:57Z"
     },
     {
@@ -3005,6 +3214,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:05:19Z"
     },
     {
@@ -3019,6 +3229,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:47:45Z"
     },
     {
@@ -3031,6 +3242,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:34:16Z"
     },
     {
@@ -3043,6 +3255,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:45:22Z"
     },
     {
@@ -3053,6 +3266,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T01:28:44Z"
     },
     {
@@ -3063,6 +3277,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T01:38:37Z"
     },
     {
@@ -3073,6 +3288,7 @@
       "labels": [],
       "parent": 360,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:22:51Z"
     },
     {
@@ -3085,6 +3301,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -3097,6 +3314,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:48:49Z"
     },
     {
@@ -3114,6 +3332,7 @@
       ],
       "parent": 359,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:27:35Z"
     },
     {
@@ -3130,6 +3349,7 @@
       ],
       "parent": 359,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:31:55Z"
     },
     {
@@ -3147,6 +3367,7 @@
       ],
       "parent": 359,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:29:34Z"
     },
     {
@@ -3165,6 +3386,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:30:56Z"
     },
     {
@@ -3179,6 +3401,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T02:45:41Z"
     },
     {
@@ -3196,6 +3419,7 @@
       ],
       "parent": 138,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T03:08:11Z"
     },
     {
@@ -3213,6 +3437,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:04:10Z"
     },
     {
@@ -3231,6 +3456,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:11:03Z"
     },
     {
@@ -3250,6 +3476,7 @@
       ],
       "parent": 399,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:43:35Z"
     },
     {
@@ -3270,6 +3497,7 @@
       "blocked_by": [
         400
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T12:52:38Z"
     },
     {
@@ -3290,6 +3518,7 @@
       "blocked_by": [
         400
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:19:05Z"
     },
     {
@@ -3310,6 +3539,7 @@
       "blocked_by": [
         401
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:02:49Z"
     },
     {
@@ -3328,6 +3558,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:49:17Z"
     },
     {
@@ -3346,6 +3577,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:33:58Z"
     },
     {
@@ -3364,6 +3596,7 @@
       ],
       "parent": 409,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:11:19Z"
     },
     {
@@ -3384,6 +3617,7 @@
       "blocked_by": [
         411
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:38:25Z"
     },
     {
@@ -3405,6 +3639,7 @@
         339,
         412
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:58:40Z"
     },
     {
@@ -3425,6 +3660,7 @@
       "blocked_by": [
         400
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T12:52:32Z"
     },
     {
@@ -3446,6 +3682,7 @@
         400,
         401
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:06:08Z"
     },
     {
@@ -3466,6 +3703,7 @@
       "blocked_by": [
         400
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:20:29Z"
     },
     {
@@ -3486,6 +3724,7 @@
       "blocked_by": [
         400
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:20:34Z"
     },
     {
@@ -3507,6 +3746,7 @@
         400,
         403
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:18:04Z"
     },
     {
@@ -3527,6 +3767,7 @@
       "blocked_by": [
         400
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T05:20:39Z"
     },
     {
@@ -3557,6 +3798,7 @@
         418,
         419
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:18:12Z"
     },
     {
@@ -3575,6 +3817,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:25:56Z"
     },
     {
@@ -3593,6 +3836,7 @@
       ],
       "parent": 422,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:50:12Z"
     },
     {
@@ -3613,6 +3857,7 @@
       "blocked_by": [
         402
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:06:02Z"
     },
     {
@@ -3633,6 +3878,7 @@
       "blocked_by": [
         415
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:18:14Z"
     },
     {
@@ -3652,6 +3898,7 @@
       ],
       "parent": 422,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:53:47Z"
     },
     {
@@ -3670,6 +3917,7 @@
       ],
       "parent": 422,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:50:17Z"
     },
     {
@@ -3686,6 +3934,7 @@
       ],
       "parent": 338,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T04:40:12Z"
     },
     {
@@ -3706,6 +3955,7 @@
       "blocked_by": [
         423
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:09:22Z"
     },
     {
@@ -3726,6 +3976,7 @@
       "blocked_by": [
         445
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:12:47Z"
     },
     {
@@ -3744,6 +3995,7 @@
       ],
       "parent": 409,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:06:30Z"
     },
     {
@@ -3754,6 +4006,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:23:48Z"
     },
     {
@@ -3772,6 +4025,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:49:15Z"
     },
     {
@@ -3790,6 +4044,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:40:29Z"
     },
     {
@@ -3809,6 +4064,7 @@
       ],
       "parent": 461,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:59:02Z"
     },
     {
@@ -3827,6 +4083,7 @@
       ],
       "parent": 461,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T13:50:53Z"
     },
     {
@@ -3847,6 +4104,7 @@
       "blocked_by": [
         463
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:12:04Z"
     },
     {
@@ -3869,6 +4127,7 @@
         464,
         465
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:36:35Z"
     },
     {
@@ -3888,6 +4147,7 @@
       ],
       "parent": 462,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:07:33Z"
     },
     {
@@ -3908,6 +4168,7 @@
       "blocked_by": [
         467
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:21:16Z"
     },
     {
@@ -3928,6 +4189,7 @@
       "blocked_by": [
         467
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:21:19Z"
     },
     {
@@ -3945,6 +4207,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:44:13Z"
     },
     {
@@ -3962,6 +4225,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:40:32Z"
     },
     {
@@ -3980,6 +4244,7 @@
       ],
       "parent": 472,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:16:50Z"
     },
     {
@@ -3999,6 +4264,7 @@
       "blocked_by": [
         464
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:17:02Z"
     },
     {
@@ -4018,6 +4284,7 @@
       "blocked_by": [
         474
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:35:44Z"
     },
     {
@@ -4037,6 +4304,7 @@
       "blocked_by": [
         474
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:35:47Z"
     },
     {
@@ -4055,6 +4323,7 @@
       ],
       "parent": 473,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:07:37Z"
     },
     {
@@ -4074,6 +4343,7 @@
       "blocked_by": [
         478
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:21:23Z"
     },
     {
@@ -4093,6 +4363,7 @@
       "blocked_by": [
         478
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:21:27Z"
     },
     {
@@ -4115,6 +4386,7 @@
         476,
         477
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:41:32Z"
     },
     {
@@ -4132,6 +4404,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:54:42Z"
     },
     {
@@ -4149,6 +4422,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:26:29Z"
     },
     {
@@ -4167,6 +4441,7 @@
       ],
       "parent": 494,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T14:50:45Z"
     },
     {
@@ -4186,6 +4461,7 @@
       "blocked_by": [
         495
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:09:29Z"
     },
     {
@@ -4205,6 +4481,7 @@
       "blocked_by": [
         495
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:09:34Z"
     },
     {
@@ -4224,6 +4501,7 @@
       "blocked_by": [
         495
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:09:40Z"
     },
     {
@@ -4246,6 +4524,7 @@
         497,
         498
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:22:02Z"
     },
     {
@@ -4264,6 +4543,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:16:55Z"
     },
     {
@@ -4283,6 +4563,7 @@
       ],
       "parent": 500,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:20:22Z"
     },
     {
@@ -4303,6 +4584,7 @@
       "blocked_by": [
         501
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:25:03Z"
     },
     {
@@ -4323,6 +4605,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:00:38Z"
     },
     {
@@ -4343,6 +4626,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:20:26Z"
     },
     {
@@ -4363,6 +4647,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:20:31Z"
     },
     {
@@ -4383,6 +4668,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:20:35Z"
     },
     {
@@ -4403,6 +4689,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:20:39Z"
     },
     {
@@ -4423,6 +4710,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:20:42Z"
     },
     {
@@ -4443,6 +4731,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:20:46Z"
     },
     {
@@ -4464,6 +4753,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:31:36Z"
     },
     {
@@ -4485,6 +4775,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:20:20Z"
     },
     {
@@ -4506,6 +4797,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:03:48Z"
     },
     {
@@ -4527,6 +4819,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:50:01Z"
     },
     {
@@ -4548,6 +4841,7 @@
         501,
         502
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:38:11Z"
     },
     {
@@ -4566,6 +4860,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:01:16Z"
     },
     {
@@ -4584,6 +4879,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:47:30Z"
     },
     {
@@ -4594,6 +4890,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:30:50Z"
     },
     {
@@ -4610,6 +4907,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:58:10Z"
     },
     {
@@ -4626,6 +4924,7 @@
       ],
       "parent": 524,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:27:14Z"
     },
     {
@@ -4644,6 +4943,7 @@
       "blocked_by": [
         525
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:52:46Z"
     },
     {
@@ -4654,6 +4954,7 @@
       "labels": [],
       "parent": 462,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:35:56Z"
     },
     {
@@ -4664,6 +4965,7 @@
       "labels": [],
       "parent": 462,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:36:28Z"
     },
     {
@@ -4683,6 +4985,7 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:44:17Z"
     },
     {
@@ -4701,6 +5004,7 @@
       ],
       "parent": 551,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T15:56:17Z"
     },
     {
@@ -4721,6 +5025,7 @@
       "blocked_by": [
         552
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:33:04Z"
     },
     {
@@ -4742,6 +5047,7 @@
         552,
         553
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:07:26Z"
     },
     {
@@ -4762,6 +5068,7 @@
       "blocked_by": [
         554
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:52:33Z"
     },
     {
@@ -4783,6 +5090,7 @@
         554,
         555
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:25:38Z"
     },
     {
@@ -4803,6 +5111,7 @@
       "blocked_by": [
         553
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:07:20Z"
     },
     {
@@ -4824,6 +5133,7 @@
         552,
         557
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:42:27Z"
     },
     {
@@ -4849,6 +5159,7 @@
         556,
         557
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:32:15Z"
     },
     {
@@ -4869,6 +5180,7 @@
       "blocked_by": [
         552
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:07:32Z"
     },
     {
@@ -4889,6 +5201,7 @@
       "blocked_by": [
         563
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:25:45Z"
     },
     {
@@ -4912,6 +5225,7 @@
         555,
         565
       ],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:23:22Z"
     },
     {
@@ -4928,6 +5242,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:07:54Z"
     },
     {
@@ -4938,6 +5253,7 @@
       "labels": [],
       "parent": 500,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T16:19:10Z"
     },
     {
@@ -4954,6 +5270,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:16:11Z"
     },
     {
@@ -4964,6 +5281,7 @@
       "labels": [],
       "parent": 500,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T17:10:22Z"
     },
     {
@@ -4982,6 +5300,7 @@
       ],
       "parent": 422,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:27:49Z"
     },
     {
@@ -5000,6 +5319,7 @@
       ],
       "parent": 590,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:13:55Z"
     },
     {
@@ -5018,6 +5338,7 @@
       ],
       "parent": 590,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T18:14:04Z"
     },
     {
@@ -5033,6 +5354,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:09:40Z"
     },
     {
@@ -5052,6 +5374,7 @@
       ],
       "parent": 269,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:00:16Z"
     },
     {
@@ -5067,6 +5390,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:03:17Z"
     },
     {
@@ -5082,6 +5406,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5092,6 +5417,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:50:24Z"
     },
     {
@@ -5102,6 +5428,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T19:56:56Z"
     },
     {
@@ -5112,6 +5439,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:39:51Z"
     },
     {
@@ -5127,6 +5455,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:04:36Z"
     },
     {
@@ -5137,6 +5466,7 @@
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:50:29Z"
     },
     {
@@ -5152,6 +5482,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5167,6 +5498,7 @@
       ],
       "parent": 607,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:35:09Z"
     },
     {
@@ -5182,6 +5514,7 @@
       ],
       "parent": 607,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T20:41:13Z"
     },
     {
@@ -5197,12 +5530,13 @@
       ],
       "parent": 607,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 620,
       "title": "Declare git-ecosystem surfaces in the surface-class table (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5212,7 +5546,8 @@
       ],
       "parent": 616,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:03:46Z"
     },
     {
       "number": 621,
@@ -5227,12 +5562,13 @@
       ],
       "parent": 616,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 622,
       "title": "Issue forms: epic + bug templates with gate coverage (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5242,12 +5578,13 @@
       ],
       "parent": 616,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:51:52Z"
     },
     {
       "number": 623,
       "title": "Commit contract: .gitmessage trailer layout + PR template epic-edge note (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5257,7 +5594,8 @@
       ],
       "parent": 616,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:51:34Z"
     },
     {
       "number": 624,
@@ -5272,12 +5610,13 @@
       ],
       "parent": 616,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 625,
       "title": "Clobber-prevention gate: runtime-state dirs stay ignored (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5287,12 +5626,13 @@
       ],
       "parent": 616,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T02:35:17Z"
     },
     {
       "number": 626,
       "title": "Register git-ecosystem artifacts in the knowledge indexer (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5302,7 +5642,8 @@
       ],
       "parent": 616,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:52:02Z"
     },
     {
       "number": 627,
@@ -5317,12 +5658,13 @@
       ],
       "parent": 616,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 628,
       "title": "Reconcile hardening: worktree/branch audit vs the claims ledger (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5332,7 +5674,8 @@
       ],
       "parent": 616,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:23:25Z"
     },
     {
       "number": 629,
@@ -5347,6 +5690,7 @@
       ],
       "parent": 616,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5366,12 +5710,13 @@
         624,
         625
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 631,
       "title": "EPIC: close the Paperclip enterprise-workbook four-pillar delta e2e \u2014 C-suite org chart, agentic task manager, skill studio, agentic OS (issue #614)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5383,12 +5728,13 @@
       ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:26:34Z"
     },
     {
       "number": 632,
       "title": "workbook-1 \u00b7 registry: C-suite persona cards + org-chart declaration (reports-to, budget caps, heartbeat schedules)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5401,12 +5747,13 @@
       ],
       "parent": 631,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:27:16Z"
     },
     {
       "number": 633,
       "title": "workbook-2 \u00b7 gateway: per-role monthly budget caps (CEO 300 / CTO 250 / COO 100 / CFO 50 / CMO 200)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5421,12 +5768,13 @@
       "blocked_by": [
         632
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:37:51Z"
     },
     {
       "number": 634,
       "title": "workbook-3 \u00b7 engine: tenant-facing agentic task manager \u2014 board \u2192 decomposition \u2192 durable execution",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5439,12 +5787,13 @@
       ],
       "parent": 631,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:27:24Z"
     },
     {
       "number": 635,
       "title": "workbook-4 \u00b7 governance: review gates + C-suite escalation on the task lifecycle",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5459,12 +5808,13 @@
       "blocked_by": [
         634
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:37:58Z"
     },
     {
       "number": 636,
       "title": "workbook-5 \u00b7 guardrails: sandbox runtime enablement + policy entries for the five workbook mechanical rules",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5477,12 +5827,13 @@
       ],
       "parent": 631,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:27:31Z"
     },
     {
       "number": 637,
       "title": "workbook-6 \u00b7 telemetry: per-role heartbeat health + budget burn alerts and chargeback",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5498,12 +5849,13 @@
         632,
         633
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:56:10Z"
     },
     {
       "number": 638,
       "title": "workbook-7 \u00b7 identity: role-based boundaries for the five C-suite roles + org-wide skill isolation",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5518,12 +5870,13 @@
       "blocked_by": [
         632
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:38:05Z"
     },
     {
       "number": 639,
       "title": "workbook-8 \u00b7 registry: the five Master AI Prompt Templates as published prompt modules + regression evals",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5539,12 +5892,13 @@
         632,
         636
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:38:13Z"
     },
     {
       "number": 640,
       "title": "workbook-9 \u00b7 registry: Skill Studio backend \u2014 skill-level pack granularity, author \u2192 test \u2192 publish",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5559,12 +5913,13 @@
       "blocked_by": [
         639
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:56:18Z"
     },
     {
       "number": 641,
       "title": "workbook-10 \u00b7 gateway: outbound MCP server management (draw.io) \u2014 registry, health, authz",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5579,12 +5934,13 @@
       "blocked_by": [
         639
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:56:26Z"
     },
     {
       "number": 642,
       "title": "workbook-11 \u00b7 portal: org-chart, skill-studio and task-board surfaces \u2014 flag-gated OFF",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5601,12 +5957,13 @@
         637,
         640
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:03:04Z"
     },
     {
       "number": 643,
       "title": "workbook-12 \u00b7 control-plane: instruction-layer mirrors for the five C-suite personas",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5622,12 +5979,13 @@
         632,
         639
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:56:34Z"
     },
     {
       "number": 644,
       "title": "workbook-13 \u00b7 infra: feature flags + Cloud Build wiring \u2014 everything ships OFF",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:enterprise-workbook",
@@ -5643,7 +6001,8 @@
         641,
         642
       ],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:20:57Z"
     },
     {
       "number": 645,
@@ -5662,6 +6021,7 @@
       ],
       "parent": 4,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5681,6 +6041,7 @@
       ],
       "parent": 645,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5700,6 +6061,7 @@
       ],
       "parent": 645,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5721,6 +6083,7 @@
       "blocked_by": [
         647
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5742,6 +6105,7 @@
       "blocked_by": [
         647
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5761,6 +6125,7 @@
       ],
       "parent": 645,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5782,6 +6147,7 @@
       "blocked_by": [
         647
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5803,6 +6169,7 @@
       "blocked_by": [
         651
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5824,6 +6191,7 @@
       "blocked_by": [
         646
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5845,6 +6213,7 @@
       "blocked_by": [
         647
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5868,6 +6237,7 @@
         652,
         653
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5886,6 +6256,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -5903,6 +6274,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:10:37Z"
     },
     {
@@ -5920,6 +6292,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:10:41Z"
     },
     {
@@ -5937,6 +6310,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:10:45Z"
     },
     {
@@ -5954,6 +6328,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:10:48Z"
     },
     {
@@ -5971,6 +6346,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:10:51Z"
     },
     {
@@ -5988,6 +6364,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6005,6 +6382,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:10:55Z"
     },
     {
@@ -6022,6 +6400,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:10:58Z"
     },
     {
@@ -6039,6 +6418,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:11:02Z"
     },
     {
@@ -6056,6 +6436,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6073,6 +6454,7 @@
       ],
       "parent": 665,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:11:06Z"
     },
     {
@@ -6088,6 +6470,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:14:49Z"
     },
     {
@@ -6103,6 +6486,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:09:17Z"
     },
     {
@@ -6115,6 +6499,7 @@
       ],
       "parent": 129,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:33:11Z"
     },
     {
@@ -6132,6 +6517,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:21:37Z"
     },
     {
@@ -6147,6 +6533,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T21:26:23Z"
     },
     {
@@ -6163,12 +6550,13 @@
       ],
       "parent": 160,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 693,
       "title": "A2A: directive provenance \u2014 brain refuses dispatch for an already-closed issue",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6179,7 +6567,8 @@
       ],
       "parent": 160,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T04:07:43Z"
     },
     {
       "number": 694,
@@ -6197,12 +6586,13 @@
       "blocked_by": [
         304
       ],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 695,
       "title": "A2A: queue liveness health signal \u2014 inbox depth / oldest-directive age / wedge count",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6213,7 +6603,8 @@
       ],
       "parent": 160,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T04:01:03Z"
     },
     {
       "number": 696,
@@ -6230,6 +6621,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6248,12 +6640,13 @@
       ],
       "parent": 696,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T22:44:26Z"
     },
     {
       "number": 698,
       "title": "DG-2: Self-wiring shared build files \u2014 end the #559 sole-writer serialization",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6266,7 +6659,8 @@
       ],
       "parent": 696,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T22:49:04Z"
     },
     {
       "number": 699,
@@ -6284,6 +6678,7 @@
       ],
       "parent": 696,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6302,6 +6697,7 @@
       ],
       "parent": 696,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T22:44:33Z"
     },
     {
@@ -6320,6 +6716,7 @@
       ],
       "parent": 696,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T22:44:41Z"
     },
     {
@@ -6338,6 +6735,7 @@
       ],
       "parent": 696,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6354,6 +6752,7 @@
       ],
       "parent": 125,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T22:11:25Z"
     },
     {
@@ -6369,6 +6768,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "2026-09-14T22:00:50Z"
     },
     {
@@ -6387,12 +6787,13 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 707,
       "title": "EPIC: single-epic-focused BAU - micro-decompose, max-agents, advance-to-closure",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6404,7 +6805,8 @@
       ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T02:25:05Z"
     },
     {
       "number": 708,
@@ -6421,6 +6823,7 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6438,6 +6841,7 @@
       ],
       "parent": 706,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6455,6 +6859,7 @@
       ],
       "parent": 706,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6472,6 +6877,7 @@
       ],
       "parent": 706,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6489,6 +6895,7 @@
       ],
       "parent": 706,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6506,6 +6913,7 @@
       ],
       "parent": 706,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6523,6 +6931,7 @@
       ],
       "parent": 706,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6540,12 +6949,13 @@
       ],
       "parent": 706,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 716,
       "title": "epic-focus: active-epic resolver + .board/focus.json + cli [F1]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6557,12 +6967,13 @@
       ],
       "parent": 707,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:29:10Z"
     },
     {
       "number": 717,
       "title": "epic-focus: admit a child of the ACTIVE epic as a new claim reason [F2]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6574,12 +6985,13 @@
       ],
       "parent": 707,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:37:07Z"
     },
     {
       "number": 718,
       "title": "epic-focus: max-agents as the default pool (capacity-gated) [F3]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6591,12 +7003,13 @@
       ],
       "parent": 707,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T02:14:14Z"
     },
     {
       "number": 719,
       "title": "epic-focus: micro-issue decomposition policy + anti-explosion guards [F4]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6608,12 +7021,13 @@
       ],
       "parent": 707,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:56:11Z"
     },
     {
       "number": 720,
       "title": "epic-focus: epic-close -> advance (+ epic-completeness invariant, closes #605) [F5]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6625,12 +7039,13 @@
       ],
       "parent": 707,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T00:10:08Z"
     },
     {
       "number": 721,
       "title": "epic-focus: out-of-epic pooling + a-la-carte blocker escape hatch [F6]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6642,12 +7057,13 @@
       ],
       "parent": 707,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T00:09:30Z"
     },
     {
       "number": 722,
       "title": "epic-focus: operator surface (report / console projection) [F7]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6659,12 +7075,13 @@
       ],
       "parent": 707,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T00:16:16Z"
     },
     {
       "number": 723,
       "title": "P0 runaway guard: attempt cap + backoff + dead-letter [G1]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6676,7 +7093,8 @@
       ],
       "parent": 708,
       "blocked_by": [],
-      "closed_at": ""
+      "cross_refs": [],
+      "closed_at": "2026-09-15T00:53:31Z"
     },
     {
       "number": 724,
@@ -6693,6 +7111,7 @@
       ],
       "parent": 708,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6710,6 +7129,7 @@
       ],
       "parent": 708,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6727,6 +7147,7 @@
       ],
       "parent": 708,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6744,6 +7165,7 @@
       ],
       "parent": 708,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6761,6 +7183,7 @@
       ],
       "parent": 708,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6778,6 +7201,7 @@
       ],
       "parent": 708,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6794,6 +7218,7 @@
       ],
       "parent": 607,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6810,6 +7235,7 @@
       ],
       "parent": 607,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
@@ -6826,12 +7252,13 @@
       ],
       "parent": 607,
       "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     },
     {
       "number": 733,
       "title": "P0: the fleet cannot spawn any subagent \u2014 its runner ('claude') is unresolvable from cron's PATH, and it fails per-directive-per-cycle",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6842,6 +7269,512 @@
       ],
       "parent": null,
       "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:00:58Z"
+    },
+    {
+      "number": 739,
+      "title": "P0: the fleet's code-drift detector compares stale-to-stale and fails open \u2014 a loop can run pre-fix code while the watchdog reports 'healthy'",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:34:51Z"
+    },
+    {
+      "number": 740,
+      "title": "P0: 31 lanes hold 46 unpushed commits, and the epic fan-out produced 27 source-file collisions (GR-3 violated in bulk)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 742,
+      "title": "Codify the fleet's measured failures as binding governance rules (AO-GR-21..27) + a mutation-proved gate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:governance",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-14T23:18:27Z"
+    },
+    {
+      "number": 754,
+      "title": "A2A: a direct control:drop to the sister \u2014 dead-letter a wedged directive by protocol, never by out-of-band file removal",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:35:39Z"
+    },
+    {
+      "number": 763,
+      "title": "operator control surface: A2A is the PRIMARY control plane + a proven operator way in",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T00:48:52Z"
+    },
+    {
+      "number": 764,
+      "title": "Autonomous landing: one code-native driver to push, PR, merge at green evidence, and close (no human step)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 766,
+      "title": "An AREA label ('area:incident-response') is used as an incident marker: 4/4 holders are work items, and the gate was red on master for a finding no lane could fix",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:lessons",
+        "class:elite",
+        "pillar:governance",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 767,
+      "title": "Unblock the fleet: master's gate of record is red on the incident-label false positive (mitigation for #766)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:lessons",
+        "class:elite",
+        "pillar:governance",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T00:36:48Z"
+    },
+    {
+      "number": 771,
+      "title": "operator remote access: vendor the shared-services SSH-over-Cloudflare-Tunnel + Access pattern (flag-gated OFF)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:34:30Z"
+    },
+    {
+      "number": 773,
+      "title": "P0: the drift fix (AO-GR-25) respawns a rung forever when the drift is a stale checkout \u2014 the remedy cannot change the compared commit",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:23:40Z"
+    },
+    {
+      "number": 774,
+      "title": "operator terminal: the browser IT-terminal behind SSO \u2014 live fleet + declared control verbs",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:46:19Z"
+    },
+    {
+      "number": 777,
+      "title": "Rename the fleet's role vocabulary to enterprise terms (brain/sister/dumb-terminal -> a declared glossary) with a versioned contract migration",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 778,
+      "title": "A permanently-busy loop can never be updated: the drift respawn defers on an in-flight run, so the sister is pinned to 5-hour-old code (#739 gap)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T01:42:40Z"
+    },
+    {
+      "number": 780,
+      "title": "The watchdog's stale-checkout remedy cannot bootstrap itself \u2014 the code that fast-forwards the checkout lives in the checkout",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 785,
+      "title": "remote SSH e2e: unify the shared-services tunnel + the ao publish route into one vendorable module",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:01:44Z"
+    },
+    {
+      "number": 786,
+      "title": "Close-out: record-verification is permanently unsatisfiable once the lane is reclaimed, and nothing enforces the ordering",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 793,
+      "title": "Governance is declared in governance/** but not enforced at spawn \u2014 local and fleet subagents obey different rules, and one lane ran 26 gates",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 794,
+      "title": "portal roster test is filesystem-order dependent: seed selected by next(glob()) instead of highest revision",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:49:21Z"
+    },
+    {
+      "number": 796,
+      "title": "`sent` is treated as `done`: a dispatched directive that dies suppresses its issue forever, and the brain idles with ready work",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 797,
+      "title": "rename the operator terminal surface to AgentConsole (human-facing name)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 799,
+      "title": "The fleet acceptance test FAILS: a fleet lane produces no work product and loops unbounded when one stage refuses",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 800,
+      "title": "EPIC: AgentConsole \u2014 the enterprise operator console product",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 801,
+      "title": "AgentConsole A: deployable on the documented live host (shared-services handoff)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 800,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:39:51Z"
+    },
+    {
+      "number": 802,
+      "title": "AgentConsole B: enterprise hardening \u2014 rollout/rollback + observability + security",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 800,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:49:40Z"
+    },
+    {
+      "number": 803,
+      "title": "EPIC: Enterprise readiness \u2014 strong engineering, absent delivery controls (master unprotected, no required checks, GR-15 violated)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": 4,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 804,
+      "title": "mktemp -d and the unfinished-marker scanner are mutually unsatisfiable (missing leading word boundary)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": ""
+    },
+    {
+      "number": 807,
+      "title": "P0-3: branch protection as code \u2014 declared, applied idempotently, read back, gated (#803)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:35:12Z"
+    },
+    {
+      "number": 809,
+      "title": "P0-2: the gate of record becomes a REQUIRED check without GitHub Actions \u2014 ADR-0028 (#803)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:46:58Z"
+    },
+    {
+      "number": 812,
+      "title": "GR-15 is declared and enforced by nothing \u2014 and the repo is violating it (active ci-failure-scanner workflow)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T03:57:28Z"
+    },
+    {
+      "number": 813,
+      "title": "AgentConsole C: package it as a governed module product (module feature + catalog + provenance)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 800,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T04:16:04Z"
+    },
+    {
+      "number": 816,
+      "title": "The control-plane API contract is accurate but undefended: no gate compares identity/cpapi/openapi.yaml to the router",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T04:10:01Z"
+    },
+    {
+      "number": 821,
+      "title": "sent is not done: `channel.py consume` is inbox-only, so a brain-minted directive can never satisfy `consume-directive` (118 stranded)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
       "closed_at": ""
     }
   ]
