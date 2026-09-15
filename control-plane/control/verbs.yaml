@@ -12,8 +12,8 @@
 # This file is validated by `control-plane/control/cli.py validate` and gated by
 # `scripts/check-control-verbs.sh`. The gate also cross-references the four CLI
 # files below, so the registry cannot drift from the levers it describes:
-#   * fleet/control.py        -- the human-override terminal (18 verbs)
-#   * fleet/channel.py        -- the steering transport (13 verbs)
+#   * fleet/control.py        -- the human-override terminal (20 verbs)
+#   * fleet/channel.py        -- the steering transport (17 verbs)
 #   * governance/dispatch/cli.py, governance/reconcile/cli.py,
 #     governance/lifecycle/cli.py -- the ledger/reconciliation/lifecycle verbs
 #

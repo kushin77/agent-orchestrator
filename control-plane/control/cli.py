@@ -6,9 +6,9 @@ schema declares, and — the part that matters — cross-references the four CLI
 files that own the local levers, so the registry cannot drift from what the
 fleet can actually do:
 
-    fleet/control.py            18 verbs
-    fleet/channel.py            13 verbs
-    governance/dispatch/cli.py   8 verbs
+    fleet/control.py            20 verbs
+    fleet/channel.py            17 verbs
+    governance/dispatch/cli.py   9 verbs
     governance/reconcile/cli.py  5 verbs
     governance/lifecycle/cli.py  4 verbs
 
