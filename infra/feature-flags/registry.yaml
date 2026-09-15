@@ -363,8 +363,8 @@ surfaces:
     service: portal
     tf_flag: enable_portal
     description: >
-      The terminal cockpit (issue #566, RC-11 of EPIC #551; ADR-0026): the
-      Bloomberg-terminal-grade operator client of the RC-3 control API and the
+      The terminal cockpit (AgentConsole, issue #566, RC-11 of EPIC #551; ADR-0026): the
+      operator client of the RC-3 control API and the
       two authenticated SSE streams (fleet_projection, telemetry_live_feed).
       A keyboard-first, role-tiered terminal client that renders only what the
       declared cockpit function registry (control-plane/functions/
@@ -481,7 +481,7 @@ surfaces:
     service: portal
     tf_flag: enable_portal
     description: >
-      The operator terminal (issue #774): the browser IT-terminal behind the
+      The AgentConsole (issue #774): the browser IT-terminal behind the
       existing SSO session — one link, `GET /console`, that opens the live fleet
       projection (rungs, heartbeat health, board/focus/pool/claims, directives in
       flight) and a steer panel of the closed control-verb vocabulary. It invents
