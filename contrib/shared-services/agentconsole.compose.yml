@@ -1,0 +1,158 @@
+# agentconsole.compose.yml — ADDITIVE overlay: AgentConsole (the operator console
+# behind the OS SSO gate) as a DECLARED service on the shared-services remote
+# cluster (host 192.168.168.42).
+#
+# WHY this file exists (issue #801, EPIC #800 lane A): the fleet live-hosting
+# contract — owner directive 2026-09-04, recorded in shared-frontend
+# `docs/DEPLOYMENT.md` — is that live hosting of the portal surfaces runs ONLY on
+# the remote cluster wired through the `shared-services` module, never on GCP
+# Cloud Run (that pipeline was deliberately removed). This repo is the
+# SOURCE + BUILD + REGISTRY half; `shared-services` is the RUN half. This overlay
+# is the handoff between them, mirroring shared-frontend's
+# `contrib/shared-services/docker-compose.frontends.yml` (`os-portal-shell`) and
+# `os-modules.compose.yml`.
+#
+# The console's Cloud Run declaration (`infra/terraform/modules/web-surface`,
+# flag-gated OFF and inert) is the RETIRED route; this overlay supersedes it for
+# AgentConsole. Nothing here is applied by agent-orchestrator.
+#
+# SAFETY: ADDITIVE. It is not wired into any running stack by this repo, changes
+# nothing on the live cluster, and defines only the one new service on the
+# existing external `shared-services-net`. The shared-services run half lifts it
+# into its own repo (recommended: `infra/docker-compose.agentconsole.yml`) and
+# brings it up with the console surface flag promoted. Until BOTH happen the
+# console is not exposed: `surfaces.operator_terminal` ships default OFF, and the
+# flag is checked BEFORE authentication, so `/console` and its view answer 404
+# `feature_disabled` rather than being merely unauthorised.
+# Full contract: docs/AGENTCONSOLE-HOSTING.md.
+#
+# ── what the service runs ───────────────────────────────────────────────────
+# `portal/Dockerfile` — a stdlib-only Python HTTP server with no build step and
+# no npm; the build context is the repo ROOT because portal/ imports identity/,
+# telemetry/, fleet/ and infra/feature-flags/. Its dependency set is PyYAML +
+# cryptography (the second is a boot requirement, not an option — see the
+# Dockerfile header). The image's own CMD already binds
+# `0.0.0.0:8080` (`python3 -m portal.server.main --host 0.0.0.0 --port 8080`),
+# so this overlay overrides no `command:` — a port is not configurable here, and
+# declaring a `PORT` env var would be decoration, not configuration.
+#
+# ── conventions followed (observed in shared-services, 2026-09-04) ──────────
+#   - container_name: shared-services-<name>
+#   - networks: [shared-services-net]   (external — same net as the OS shell)
+#   - restart: unless-stopped
+#   - image: prebuilt `${NAME_IMAGE:-<repo>:local}` with a `build:` fallback from
+#     the source checkout, exactly like `os-portal-shell`
+#   - FinOps R4: container-level cpus + mem_limit + a `governance.finops` label
+# No `os.origin` label: that convention marks an iframe mount's CSP framing
+# origin, and AgentConsole is a top-level console behind SSO, never framed.
+#
+# ── secrets: NONE in this file (GR-6) ──────────────────────────────────────
+# Every value below is either a public identifier, a path, or interpolated from
+# the run half's own environment at `up` time. The auth material lives in GSM
+# (project `purebliss-ghl`); nothing here is a credential. The one mounted file,
+# the auth-gate JWKS mirror, is the gate's PUBLISHED public key set — public by
+# construction, and it is never committed to this repo.
+#
+# ── required on the host at enablement (exported by the run half) ───────────
+#   PORTAL_AUTH_GATE_JWKS_FILE  a mounted copy of the OS auth gate's published
+#                               JWKS (GET /auth/.well-known/jwks.json). With
+#                               neither this nor the inline PORTAL_AUTH_GATE_JWKS
+#                               set, the console still starts but refuses EVERY
+#                               session (fail closed); a path that is set but is
+#                               absent or not JSON is a deliberate BOOT failure
+#                               (portal/server/sso.py raises), so the run half
+#                               exports it only once the mirror is in place.
+#                               (All three outcomes measured — see
+#                               docs/AGENTCONSOLE-HOSTING.md section 4.)
+#   ROOT_ADMIN_EMAILS           comma-separated super-admin allowlist.
+# Optional (each has a documented default; override on the host):
+#   AO_ROOT, AGENTCONSOLE_IMAGE, AGENTCONSOLE_PORT, AO_FLEET_HOST,
+#   AO_BOARD_HOST, AO_LEDGER_HOST, AGENTCONSOLE_JWKS_FILE.
+
+x-agentconsole: &agentconsole
+  # FinOps R4: the console is a single-process stdlib HTTP server with no worker
+  # pool, so a small fixed ceiling is honest here rather than decorative.
+  cpus: 0.50
+  mem_limit: 512m
+  restart: unless-stopped
+  networks:
+    - shared-services-net
+
+services:
+  # ── AgentConsole — the operator terminal behind the SSO gate ──────────────
+  agentconsole:
+    <<: *agentconsole
+    image: ${AGENTCONSOLE_IMAGE:-agent-orchestrator-console:local}
+    build:
+      # The portal image builds from the repo ROOT (see portal/Dockerfile).
+      context: ${AO_ROOT:-/home/akushnir/agent-orchestrator}
+      dockerfile: portal/Dockerfile
+    container_name: shared-services-agentconsole
+    ports:
+      # Re-check for collisions on the host before the first up: 18280 is the OS
+      # shell, 18282/18283/18284/18285 the vendored modules, 18290 gws.
+      - "0.0.0.0:${AGENTCONSOLE_PORT:-18286}:8080"
+    environment:
+      # -- the console's real env contract (measured, portal/server/sso.py) ----
+      PORTAL_AUTH_GATE_JWKS: "${PORTAL_AUTH_GATE_JWKS:-}"
+      PORTAL_AUTH_GATE_JWKS_FILE: "${PORTAL_AUTH_GATE_JWKS_FILE:-}"
+      ROOT_ADMIN_EMAILS: "${ROOT_ADMIN_EMAILS:-}"
+      # -- live state: where the console reads the fleet it projects ----------
+      # The image EXCLUDES this state (.dockerignore drops .fleet/.board/.portal),
+      # so without these mounts the console draws an empty fleet. See the
+      # volumes block for what each path is and why it is or is not read-only.
+      AO_FLEET_DIR: "/var/lib/ao/fleet"
+      AO_LEDGER_DIR: "/var/lib/ao/ledger"
+    volumes:
+      # The LIVE fleet state of the host's agent-orchestrator checkout — rungs,
+      # heartbeats, waves, watchdog log, the brain mailboxes the projection
+      # reads, and the control audit slog the steer half appends. Read-write by
+      # design: the read half only reads it, but an allowed steer action appends
+      # to the audit slog on this rail, so a read-only mount would silently drop
+      # the console's own audit trail.
+      - ${AO_FLEET_HOST:-/home/akushnir/agent-orchestrator/.fleet}:/var/lib/ao/fleet
+      # The control ledger — the second rail the steer half appends a receipt to
+      # on every applied command (portal/server/control_audit.py, default
+      # `<repo>/.portal/control/ledger`). Read-write for the same reason.
+      - ${AO_LEDGER_HOST:-/home/akushnir/agent-orchestrator/.portal/control/ledger}:/var/lib/ao/ledger
+      # The board state at the path the console resolves it from: the claims
+      # ledger (`.board/claims`) and the board snapshot the projection's
+      # `governance/dispatch/cli.py status` reads, with cwd=/app. Read-only —
+      # the console claims nothing and writes no board state.
+      - ${AO_BOARD_HOST:-/home/akushnir/agent-orchestrator/.board}:/app/.board:ro
+      # The auth-gate JWKS mirror (public keys; see the secrets note above).
+      # Read-only, and the path the run half must name in
+      # PORTAL_AUTH_GATE_JWKS_FILE for it to take effect.
+      - ${AGENTCONSOLE_JWKS_FILE:-/srv/agentconsole/auth-gate-jwks.json}:/etc/ao/auth-gate-jwks.json:ro
+    healthcheck:
+      # GET /api/healthz is the console's own public readiness answer
+      # (portal/server/app.py, checked before authN) — not a bare TCP probe.
+      #
+      # MEASURED (2026-09-14): the runtime base image `python:3.12-slim` ships
+      # NEITHER curl NOR wget (`command -v curl` -> NO_CURL), so a bare `curl`
+      # probe would leave every container permanently `unhealthy` — a signal that
+      # can never go green, i.e. a formality. The probe therefore prefers curl
+      # and falls back to the interpreter the image does ship; if the image ever
+      # gains curl, the first branch takes over with no edit here.
+      #
+      # LIMIT, stated plainly: this proves the process answers. It does NOT prove
+      # a session can be established — with no JWKS mirror the console is healthy
+      # and refuses every visitor. Readiness is lane #802's deliverable.
+      test:
+        - CMD-SHELL
+        - >-
+          if command -v curl >/dev/null 2>&1;
+          then curl -fsS http://127.0.0.1:8080/api/healthz;
+          else python3 -c "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/api/healthz',timeout=3).status==200 else 1)";
+          fi
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - os.module=agentconsole
+      - governance.finops=limited
+
+networks:
+  shared-services-net:
+    external: true

@@ -1,0 +1,262 @@
+# AgentConsole hosting — where the operator console runs, and who makes it run
+
+> **Status: declaration, not a deployment** (issue #801, EPIC #800 lane A).
+> This page is the handoff between the two halves of the fleet's live-hosting
+> contract. It declares the console as a shared-services compose service and
+> names exactly what is still owed by the run half. **Nothing described here is
+> live**: the surface ships flag-gated OFF (see [Rollout](#5-rollout-rollback-and-the-flag-posture))
+> and the overlay is not lifted into the shared-services repo yet. Companion
+> pages: [`OPERATOR-ACCESS.md`](OPERATOR-ACCESS.md) (which command reaches which
+> surface), [`../fleet/CONTRACT.md`](../fleet/CONTRACT.md) (the control-plane
+> contract) and [`../portal/README.md`](../portal/README.md) (the portal half).
+
+## 1. The problem this page closes
+
+AgentConsole — the browser operator terminal — is merged (#774, rename #797) and
+its transport is unified (#785), but it had **no stated live host**. The host was
+implied by an older, retired route: `infra/terraform/modules/web-surface` declares
+a Cloud Run service for a public web surface, flag-gated OFF and inert.
+
+That route is no longer the fleet's. The contract, recorded by owner directive
+2026-09-04 in shared-frontend `docs/DEPLOYMENT.md`, is:
+
+> Live hosting of the OS portal shell and the vendored modules runs **only on our
+> remote cluster, wired in the `shared-services` module** … This repo is the
+> **source + build + registry** half; `shared-services` is the **run** half. A
+> Cloud Run deploy pipeline … has been **removed**: it implied a live host that is
+> not the live host. **No GCP deploy config lives here.**
+
+So the console's declaration-of-record is the compose overlay in this repo, and
+its hosting is shared-services' to run.
+
+## 2. The two-repo split
+
+| Concern | Where |
+|---|---|
+| Console source (`portal/`), the image recipe (`portal/Dockerfile`), the surface flag (`infra/feature-flags/registry.yaml`) | **this repo** — source + build + registry |
+| The declared service and its run configuration | **this repo** — [`../contrib/shared-services/agentconsole.compose.yml`](../contrib/shared-services/agentconsole.compose.yml) |
+| Building/publishing the image, lifting the overlay, DNS + tunnel ingress, oauth wiring, host secrets | **`kushin77/shared-services`** — the run half |
+| The rebuild/verify gate for the source half | this repo: `make verify` |
+
+The overlay follows the pattern the OS shell already went live with
+(`os-portal-shell` in shared-frontend
+`contrib/shared-services/docker-compose.frontends.yml`, container
+`shared-services-os` on `192.168.168.42:18280`). A direction issue on the
+shared-services board carries the run-half work; this repo never edits that repo.
+
+## 3. What the console actually is (measured)
+
+Every statement below is what the code does today, not an intention:
+
+| Fact | Where it is true |
+|---|---|
+| One link, `GET /console`; the view is `views/console.html` + `js/operator.js` | `portal/server/app.py` |
+| Surface flag `surfaces.operator_terminal`, **default `off`, `promoted: false`**, service `portal` | `infra/feature-flags/registry.yaml` |
+| The flag is checked **before** authentication — while it is off, `/console` and its assets answer `404 feature_disabled`, so an unpromoted surface is absent rather than merely unauthorised | `portal/server/app.py` |
+| It invents no login: an unauthenticated visitor is redirected to the OS auth gate's `/auth/login`, and a session exists only from a verified RS256 `os-session-token` checked **offline** against a mirror of the gate's published JWKS | `portal/server/main.py`, `portal/server/sso.py` |
+| Read half = the existing `GET /api/fleet/*` projection; write half = the existing `POST /api/control/*` verbs, each with its own capability check and the existing audit rail | `portal/server/fleet.py`, `portal/server/control_audit.py` |
+| `GET /api/healthz` is public and checked before authentication | `portal/server/app.py` |
+| The image is stdlib-only Python (PyYAML is the only third-party import), builds from the repo ROOT, and its CMD binds `0.0.0.0:8080` | `portal/Dockerfile` |
+
+## 4. The compose handoff
+
+[`../contrib/shared-services/agentconsole.compose.yml`](../contrib/shared-services/agentconsole.compose.yml)
+declares one additive service, `agentconsole` (container
+`shared-services-agentconsole`), on the existing external `shared-services-net`.
+
+**Port.** The container listens on `8080`; the overlay publishes
+`0.0.0.0:${AGENTCONSOLE_PORT:-18286}`. `18286` is chosen clear of the live
+surfaces (OS shell `18280`, modules `18282`–`18285`, gws `18290`) and **must be
+re-checked on the host before the first `up`** — a port is a host fact, not a
+declaration.
+
+**Environment.** Only variables the code reads are declared; nothing else is
+added for appearance:
+
+| Variable | Read by | Empty/unset behaviour |
+|---|---|---|
+| `PORTAL_AUTH_GATE_JWKS_FILE` | `portal/server/sso.py` | with neither JWKS variable set, the console starts and **refuses every session** |
+| `PORTAL_AUTH_GATE_JWKS` | `portal/server/sso.py` | inline payload; it **wins** over the file variable when both are set |
+| `ROOT_ADMIN_EMAILS` | `portal/server/sso.py` | empty allowlist — no baked-in super-admin |
+| `AO_FLEET_DIR` | `fleet/runtime.py`, `portal/server/control_audit.py` | defaults to `<repo>/.fleet`, which the image does not contain |
+| `AO_LEDGER_DIR` | `portal/server/control_audit.py` | defaults to `<repo>/.portal/control/ledger`, which the image does not contain |
+
+A malformed JWKS mirror is a deliberate **boot** failure, not a silent empty trust
+set (`load_auth_gate_jwks` raises, and `ConsoleSso` calls it eagerly). The four
+outcomes below were **measured inside the built image** (issue #801), not
+inferred — the difference matters, because the middle rows are what tells the run
+half that it exported a mirror path before the mirror was in place:
+
+| Configuration | Observed |
+|---|---|
+| neither JWKS variable set | starts, reports `healthy`, `/api/healthz` 200 — and refuses every session |
+| `PORTAL_AUTH_GATE_JWKS_FILE` set to a path whose content is not JSON | **exits 1** at boot: `ConsoleAuthError … is not valid JSON` |
+| `PORTAL_AUTH_GATE_JWKS_FILE` set to a path that does not exist | **exits 1** at boot: `ConsoleAuthError … cannot be read: [Errno 2]` |
+| `PORTAL_AUTH_GATE_JWKS` set to valid JSON with no usable RSA key (`{"keys": []}`) | starts and stays `healthy`; a session is refused by name — `no auth-gate JWKS is configured; refusing every session` |
+
+So a misconfigured mirror is loud (a crash-loop under `restart: unless-stopped`)
+rather than a silent, degraded trust set — and a **green healthcheck does not
+mean the console is usable**.
+
+**The image.** `portal/Dockerfile` builds from the repo ROOT and installs
+**PyYAML and cryptography**. That second dependency is a fix this lane had to
+make, and the reason is worth keeping: the image as it stood built cleanly and
+then **could not serve its own CMD** — it exited 1 with `RuntimeError: portal SSO
+requires the merged identity/sso lane (issue #35); import failed`, because the
+boot path reaches `identity/sso/saml.py`, whose X.509 helpers
+`identity/sso/jose.py` defines *only* when `cryptography` imports. Nothing had
+noticed, because the only thing that ever built this image was the retired Cloud
+Run route: the recipe had never been run. Verify the dependency set after any
+base-image bump:
+
+```bash
+docker run --rm --entrypoint python3 <image> -c \
+  "import cryptography, yaml; print(cryptography.__version__, yaml.__version__)"
+```
+
+**Live state.** `.dockerignore` excludes `.fleet`, `.board`, `.portal` and
+`.telemetry` from the image, so a container that mounts nothing draws an **empty
+fleet**. The overlay therefore mounts the host checkout's state, with the
+justification for each:
+
+| Mount | Why | Mode |
+|---|---|---|
+| `<checkout>/.fleet` → `/var/lib/ao/fleet` | rungs, heartbeats, waves, watchdog log, the brain mailboxes the projection reads, and the control audit slog | read-write — an allowed steer appends its audit receipt to this rail |
+| `<checkout>/.portal/control/ledger` → `/var/lib/ao/ledger` | the control ledger the steer half appends a receipt to per applied command | read-write — same reason |
+| `<checkout>/.board` → `/app/.board` | the claims ledger and the board snapshot the projection's `dispatch/cli.py status` reads, with `cwd=/app` | read-only — the console claims nothing |
+| the auth-gate JWKS mirror → `/etc/ao/auth-gate-jwks.json` | the public key set session verification needs | read-only |
+
+**Healthcheck.** `GET /api/healthz`. The probe prefers `curl` and falls back to
+`python3`, because the runtime base image `python:3.12-slim` ships **neither curl
+nor wget** — measured in the built image (`command -v curl` there prints nothing,
+reported as `NO_CURL_IN_IMAGE`). A bare `curl` probe would leave every container
+permanently `unhealthy`, a signal that can never go green. The image was measured
+running with this probe: `healthy`, with the `python3` branch doing the work and
+the same probe returning **rc 1 against a closed port** (so the check can fail —
+it is not a formality). **Limit, stated plainly:** a green healthcheck proves the
+process answers; it does not prove a session can be established. A readiness
+signal of the surface's own is lane #802's deliverable, not this one.
+
+## 5. Secrets posture (GR-6)
+
+No secret is written into any file in this repo. The console's configuration is
+environment-only, sourced by the run half at `up` time:
+
+- **Project** `purebliss-ghl`, **deployer service account**
+  `dev-machine@purebliss-ghl` — the identity the run half already uses.
+- **GSM secrets** the fleet documents for these surfaces: `os-google-client-id`,
+  `os-google-client-secret`, `os-jwt-secret-key`, `os-jwt-rs256-private-key`,
+  `os-jwt-rs256-public-key`, `cloudflare-account-id`, `cloudflare-api-token`,
+  `purebliss-cf-tunnel-token`.
+- **The one mounted artifact is not a secret.** The JWKS mirror is the auth
+  gate's *published* public key set (`GET /auth/.well-known/jwks.json`) — public
+  by construction, and it is not committed here. The console needs no Google
+  client secret and no signing key of its own: it issues no credential, it only
+  verifies one the gate minted.
+- The overlay interpolates secrets from the run half's environment and never
+  holds them: every `${...}` in it either has an empty default (so an unconfigured
+  bring-up fails closed) or is a public path, port or image tag.
+
+## 6. Where the console sits relative to the other live surfaces
+
+| Surface | What it is | Live host / port |
+|---|---|---|
+| `ai.purebliss.app` | oauth2-proxy front over Open WebUI | remote cluster `192.168.168.42` |
+| `os.purebliss.app` | the OS portal shell (container `shared-services-os`), live since 2026-09-04 | `192.168.168.42:18280` |
+| **AgentConsole** | this page's subject, behind the same SSO gate | proposed `192.168.168.42:18286` |
+
+Two things follow, and both matter:
+
+1. **The console is not a second front door.** It has no login, no session
+   issuer and no JWKS of its own. It consumes the *same* auth gate as
+   `os.purebliss.app` and verifies the *same* `os-session-token` offline. So the
+   oauth wiring is not a new oauth client: it is the auth-gate JWKS mirror plus an
+   allowlist, exactly as `portal/README.md` documents.
+2. **The ingress hostname is the run half's decision.** The overlay ships no
+   hostname and this page proposes none as fact: DNS, the Cloudflare tunnel
+   ingress rule and (if the run half wants the extra hop) an Access policy are
+   enabled in the shared-services run half, the way `os.purebliss.app` was.
+   Nothing in this repo hardcodes a domain.
+
+Because it is a top-level console behind SSO and never an iframe, the overlay
+carries no `os.origin` (framing/CSP) label — that convention belongs to the framed
+modules, and adding it here would declare a policy nothing applies.
+
+## 7. Rollout, rollback and the flag posture
+
+- The surface is **declared and OFF**: `surfaces.operator_terminal` is
+  `default: off` / `promoted: false`, and the gate is checked before
+  authentication. An unpromoted console is *absent*, not merely unauthorised.
+- Promotion is therefore a reviewed act with two independent halves: flip the
+  flag in this repo (and the two surfaces it composes, `fleet_projection` and
+  `remote_control`), and have the run half lift the overlay.
+- **Rollback**: flipping `operator_terminal` back to OFF removes the surface
+  again; `docker compose … down agentconsole` removes the process. Both are
+  safe because the console writes no fleet state — its only writes are audit
+  receipts on rails the fleet already owns.
+- The **declared rollback *anchor*** (a rollback rule that fires on a health
+  failure and is audited, with a gate probe that provokes it) is lane #802's
+  deliverable. This page does not claim it exists.
+
+## 8. What the run half must do
+
+Handed over by direction issue on the shared-services board (never by an edit to
+that repo):
+
+- [ ] Lift the overlay (recommended `infra/docker-compose.agentconsole.yml`).
+- [ ] Build/publish `agent-orchestrator-console` and set `AGENTCONSOLE_IMAGE`.
+- [ ] Re-check the host port, then publish `${AGENTCONSOLE_PORT:-18286}`.
+- [ ] Seed the state mounts from the host checkout's `.fleet`,
+      `.portal/control/ledger` and `.board`, and make the two read-write ones
+      writable by the image's non-root `ao` user — otherwise the steer half's
+      audit append fails closed (the image creates the `ao` user in
+      `portal/Dockerfile`; a mount the container cannot write is a silent
+      audit gap).
+- [ ] Fetch the auth-gate JWKS mirror to the mounted path and export
+      `PORTAL_AUTH_GATE_JWKS_FILE` for it; export `ROOT_ADMIN_EMAILS`.
+- [ ] Wire DNS + the Cloudflare tunnel ingress rule to `192.168.168.42:<port>`.
+- [ ] Confirm `/api/healthz` answers and that an unauthenticated visit to
+      `/console` redirects to the gate rather than serving the console.
+
+## 9. Verifying this declaration (offline)
+
+```bash
+# the overlay is valid YAML and interpolates with the documented defaults
+python3 -c "import yaml,sys; yaml.safe_load(open('contrib/shared-services/agentconsole.compose.yml'))"
+docker compose -f contrib/shared-services/agentconsole.compose.yml config -q   # needs docker + no host secrets
+
+# the console still serves its own public health answer, with no mirror configured
+python3 -m portal.server.main --port 8787 &
+curl -fsS http://127.0.0.1:8787/api/healthz      # {"status":"ok","service":"portal-console"}
+
+# the image the run half will build: it must boot, and its declared probe must
+# report healthy (add --network=host only where the build network has no DNS)
+docker build -t agent-orchestrator-console:local -f portal/Dockerfile .
+docker run -d --name console-proof \
+  --health-cmd 'python3 -c "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8080/api/healthz\",timeout=3).status==200 else 1)"' \
+  --health-interval 5s --health-retries 3 agent-orchestrator-console:local
+docker inspect -f '{{.State.Health.Status}}' console-proof    # healthy
+
+# the repo gate stays green (the source half's gate of record)
+make verify
+```
+
+## 10. Limits — what this handoff does not do
+
+- It does **not** deploy anything, create DNS, or touch the live cluster. It
+  declares and hands over.
+- It does **not** fetch or hold a secret; the JWKS mirror is the run half's to
+  place, and the GSM-held secrets stay in GSM.
+- It does **not** add a readiness/metric signal for the surface (lane #802), a
+  rollback anchor (lane #802), or the module/catalog packaging (lane C).
+- The image recipe is now bootable, but the *published* image is still the run
+  half's to build and tag: until it does, `AGENTCONSOLE_IMAGE` is unset and the
+  overlay falls back to a local `agent-orchestrator-console:local` build.
+- The image has no `gh` binary, and the projection's closed-issue column is the
+  one section that needs the network; `fleet/console.py` degrades that column to
+  dispatched/pending rather than blanking the frame. Every other section reads
+  the fleet's own files. This is a known, bounded degradation, not a fix made
+  here.
+- `infra/terraform/modules/web-surface` still declares the retired Cloud Run
+  route, flag-gated OFF and inert. Retiring or repurposing it is not this lane's
+  call and this lane did not touch it.
