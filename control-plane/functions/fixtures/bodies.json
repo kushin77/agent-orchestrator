@@ -43,6 +43,7 @@
     "RELEASE": {"outcome": "ok", "rows": ["claim on #565 released"], "receipt": "cmd_8f21d1"},
     "SNAPSHOT": {"outcome": "ok", "rows": ["board snapshot refreshed"], "receipt": "cmd_8f21d2"},
     "REAP": {"outcome": "ok", "rows": ["0 wedged claims reaped"], "receipt": "cmd_8f21d3"},
+    "TRIGGER": {"outcome": "ok", "rows": ["brain-directive-29c8cbf5: refreshed once — dispatchable"], "receipt": "cmd_8f21d8"},
     "SWEEP": {"outcome": "ok", "rows": ["one pass: 0 reclaimed, 0 parked, 0 shelved"], "receipt": "cmd_8f21d4"},
     "STAMP": {"outcome": "ok", "rows": ["heartbeat stamped for ao-rc10"], "receipt": "cmd_8f21d5"},
     "CLEAR": {"outcome": "ok", "rows": ["heartbeat cleared"], "receipt": "cmd_8f21d6"},

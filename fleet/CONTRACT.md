@@ -171,6 +171,7 @@ and its rationale cannot drift apart.
 | `nonce` replay refusal | `fleet/channel.py` `send` | A directive cannot be replayed into the mailbox under a previously seen nonce. |
 | A2A extension enforcement | `fleet/channel.py` (`log`, `follow`, `kb`, `steer`) + `fleet/terminal.py` delivery | A steer must be brain-signed, addressed to the sister, correlated to a directive and name a safe mailbox id; the sister loop streams each run's stdout/events to `.fleet/runs/<directive>.log` (which `follow` tails live), answers `kb` from the recorded knowledge catalogue (CANNOT-ASSESS when it is missing), and delivers a queued steer to the live run (stdin + log stream + run marker) — never a re-dispatch. |
 | `scripts/check-fleet-contract.sh` | `make verify` (`fleet-contract`) | This contract still declares the six verbs, the four trust rules and the schema/ADR references; every declared verb maps to a message type the channel actually implements; and the check proves itself non-vacuous by mutating its own input. |
+| `scripts/check-board-gate.sh` (board triggers) | `make verify` (`board-gate`) | A stale board snapshot produces exactly ONE refresh, and when freshness does not return the directive is PARKED and never re-dispatched; the gate provokes the refusal against a real scratch fleet and fails a mutant that forgets the park. |
 | `fleet/tests/test_contract.py` | `make tests` (`fleet` suite) | The same declarations, asserted in the per-suite test corpus. |
 
 ## 7. Live transport verbs — the A2A extension (issue #367)
@@ -253,7 +254,50 @@ The rules below are normative, and they are what "primary" means here:
 exact command for each, and what works with no shell on the box versus what
 does not: [`../docs/OPERATOR-ACCESS.md`](../docs/OPERATOR-ACCESS.md).
 
-## 8. Provenance
+## 8. Board triggers — refresh-or-park on a stale snapshot (issue #727)
+
+A claim is validated against the committed board snapshot, and a snapshot older
+than the declared threshold (`SNAPSHOT_STALENESS_MINUTES`, 15, in
+`governance/policy/lease.py`) is refused with the `snapshot-stale` reason. That
+refusal **names its own remedy** — refresh the board — and for a long time
+nothing ran the remedy: the same directive came back every watch cycle, could
+never be claimed, and repeated for ever. A fail-closed refusal is only half a
+control.
+
+The trigger contract is the other half, and it has three parts:
+
+1. **One refresh, bounded.** On `snapshot-stale` the consumer performs
+exactly one board refresh (`governance.dispatch.snapshot.refresh`, the same
+verb `dispatch snapshot --from-github` runs), inside a bounded window
+(`TRIGGER_WINDOW_SECONDS`, 60s — a `gh` that hangs must not hang the loop). A
+refused network, a failing `gh` and an expired window are all first-class
+outcomes, never an unhandled crash.
+2. **Park, do not re-dispatch.** If the refresh does not clear the staleness the
+directive is PARKED in the deferred queue (`<fleet>/parked/<directive>.json`) and
+`channel watch` will not return it until freshness returns. A parked directive is
+never refreshed a second time, which is what makes "exactly one refresh" true
+rather than "one per cycle".
+3. **Report the transition once,** naming the snapshot's `generated_at` and the
+threshold it tripped, so the operator reads the board's age instead of a refusal
+repeated every cycle.
+
+**A park is not a dead letter.** The runaway guard's dead letter (issue #723)
+retires an order for ever and *moves* it out of the inbox; a park keeps the
+operator's live order in the inbox and records only the hold, because the work is
+waiting on the board rather than on the operator. Freshness returning releases a
+parked directive with **no operator action** — `channel watch` unparks it as it
+drains the mailbox. The two compose: the park holds the directive and the runaway
+guard still counts the attempt, so neither the park nor the attempt budget can be
+bypassed.
+
+The verbs are `governance/dispatch/cli.py trigger --directive <id>` (the
+consumer's entry point, exit 0 = dispatchable, 1 = the park holds it) and
+`refresh_or_park(...)` in `governance/dispatch/snapshot.py` (the library seam the
+loop calls). `scripts/check-board-gate.sh` is the gate of record: it provokes the
+stale case against a real scratch fleet, counts the refresh attempts, and treats
+a directive that is re-dispatched after a park as a failure.
+
+## 9. Provenance
 
 The vocabulary and role separation in this contract are harvested, not invented
 (GR-10); every source is recorded in

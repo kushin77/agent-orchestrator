@@ -120,8 +120,11 @@ def test_contract_declares_a2a_as_the_primary_control_plane():
             f"the primary-control-plane subsection must declare '{invariant}'"
         )
     # The declaration is a subsection: §2's table and the numbering above stay put.
-    assert "### 7.1" in text and "## 8. Provenance" in text
-    assert text.index("### 7.1") < text.index("## 8. Provenance")
+    # Provenance is §9, not §8: §7.1 added no section, but issue #727's board-trigger
+    # section below it did — the property under test is that §7.1 precedes the
+    # terminal Provenance section, so only the digit moves.
+    assert "### 7.1" in text and "## 9. Provenance" in text
+    assert text.index("### 7.1") < text.index("## 9. Provenance")
 
 
 def test_the_readme_runbook_defers_to_the_contract():

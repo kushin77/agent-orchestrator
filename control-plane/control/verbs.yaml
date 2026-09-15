@@ -609,6 +609,17 @@ verbs:
     exposed: true
     refusals: [401, 403, 503]
 
+  - id: board.trigger
+    source: governance/dispatch/cli.py
+    local: trigger
+    effect_class: hold
+    capability: board:admin
+    audit: board.trigger
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: "Stale-snapshot trigger (#727): performs the ONE bounded board refresh the `snapshot-stale` refusal names as its remedy, and PARKS the directive in the deferred queue when that refresh does not clear the staleness. hold, not read: the act writes the park marker at `<fleet>/parked/<directive>.json` (and unpark deletes it when freshness returns), which is a reversible suspension of a unit — exactly what `hold` declares, and what `board.snapshot` (the same ONE refresh, its other entry point) already declares. Not `read`: the parking write must be recorded with an audit action, which a read-class verb may not declare. Not `stop`: the order is never retired — the park holds the operator's live directive and is released automatically, whereas a dead-letter moves it out of the inbox for ever. Carries 409 in addition to the 401/403/503 scaffold: a directive the deferred queue already parks is the same 'already in flight' state a duplicate claim refuses."
+
   # -- governance/reconcile/cli.py: session reconciliation -------------------
   - id: recover.status
     source: governance/reconcile/cli.py
