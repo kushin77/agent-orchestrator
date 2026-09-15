@@ -83,6 +83,34 @@ mechanism that enforces it.
    mechanical form of "did this copy actually land?" — it answers a question a
    shell `cp` silently does not.
 
+## Naming a scratch directory — the form the gate accepts (#804)
+
+The marker scan in `scripts/check-docs.sh` (the `docs-lint` check) reads every
+`*.sh`, `*.py` and `*.go`, so the form *this* document recommends has to be a
+form that scan accepts. It is the canonical `mktemp` template, with the trailing
+run of X:
+
+```bash
+dir="$(mktemp -d /tmp/<name>.XXXXXX)" || exit 2
+```
+
+Issue [#804](https://github.com/kushin77/agent-orchestrator/issues/804) measured
+the opposite. The scan's token branch ended in a trailing word boundary and had
+no leading one, so it matched the *tail* of any run of three or more X — and
+`mktemp` requires a template ending in at least three. Every `mktemp` template
+therefore failed `docs-lint`, with a message that names a marker rather than a
+placeholder, so the flag read as a real defect and the apparent fix was to
+delete the template; the lane that hit it worked around the gate with
+`python3 -c 'tempfile.mkdtemp()'`. Not a defect of the author and not a defect
+of the gate's *intent* — the pattern was missing a boundary, and it now has one.
+
+**Use six X, not three.** A run of exactly three X is still refused: token for
+token it is the standalone marker the gate must still refuse (`# XXX: fix`), so
+the pattern cannot tell the two apart. A template with four or more X is
+unambiguous and accepted, and six is canonical. This boundary is measured, not
+assumed: `bash scripts/check-docs.sh --self-test` prints it on every run, and
+`scripts/check-marker-scan.sh` provokes both halves against the shipped scanner.
+
 ## Using it
 
 ```bash

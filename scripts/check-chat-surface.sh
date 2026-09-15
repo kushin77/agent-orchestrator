@@ -510,8 +510,12 @@ fi
 # The pattern is assembled from parts because this file is itself a shell file
 # and the repository's own marker gate (scripts/check-docs.sh) scans every
 # ``*.sh`` — a gate that spelled the markers literally would fail its own gate.
+# The token branch carries a LEADING word boundary (#804): with only a trailing
+# one it matched the tail of any run of three or more X, so the canonical
+# `mktemp -d /tmp/<name>.XXXXXX` template failed this check in `gateway/chat`
+# for a defect that is not an unfinished marker at all.
 echo "== no leftovers =="
-markers="(TO""DO|FIX""ME|HA""CK|XX""X)\\b"
+markers="(TO""DO|FIX""ME|HA""CK)\\b|\\bXX""X\\b"
 if grep -rInE "$markers" gateway/chat >/dev/null 2>&1; then
   problem "unfinished marker(s) in gateway/chat:"
   grep -rInE "$markers" gateway/chat >&2
