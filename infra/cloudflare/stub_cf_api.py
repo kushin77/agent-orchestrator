@@ -57,6 +57,14 @@ EXISTING_ACCESS_APPS: list[dict] = [
     {"id": "stub-app-1", "domain": "stub-estate.example.test", "type": "self_hosted"}
 ]
 
+#: The tunnel list the route's provision step reads. It reports one EXISTING
+#: tunnel, so a dry-run provision plans a REUSE rather than a create -- the
+#: create branch (an empty list) is what the pure `tunnel_id_from_list` probe
+#: covers, and the fail-closed read is provoked in the gate too.
+EXISTING_TUNNELS: list[dict] = [
+    {"id": "stub-tunnel", "name": "stub-tunnel"},
+]
+
 
 class Handler(BaseHTTPRequestHandler):
     """Serves the canned reads; refuses everything that would mutate."""
@@ -118,6 +126,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if "/cfd_tunnel/" in path and path.endswith("/configurations"):
             self._ok({"config": {"ingress": list(CURRENT_INGRESS)}})
+            return
+        if path.endswith("/cfd_tunnel"):
+            # The tunnel list read the provision step makes (find-or-create by
+            # name). It reports one existing tunnel so a dry-run plans a reuse.
+            self._ok(list(EXISTING_TUNNELS))
             return
         if path.endswith("/dns_records"):
             name = parts.query.removeprefix("name=") if parts.query else ""

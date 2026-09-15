@@ -712,4 +712,67 @@ including why the hostname is useless without the Access app and why a service
 token is what makes it headless.
 
 ---
+
+## 16. shared-services Cloudflare tunnel module (issue #785) — PATTERN, ported
+
+| Field | Value |
+|---|---|
+| Source repo | `kushin77/shared-services` |
+| Source path | `infra/modules/cloudflare-tunnel/` (`main.tf`, `provision-tunnel.sh`, `variables.tf`, `outputs.tf`) and `scripts/publish-origin.py` |
+| License | **none declared** — the repository is **private** and carries no licence file |
+| Owner | the **same owner** as this repo (a first-party estate, not a third party) |
+| Verdict | **PATTERN** — the *shape* is the asset; the implementation is tied to that estate |
+| Ported to | `infra/cloudflare/provision.py` + the `--provision` / `--connector` stages of `infra/cloudflare/ao-ssh-access.sh`, gated by `scripts/check-ao-ssh-access.sh` |
+
+**The pattern.** The remote-SSH route was split across two repos: this repo's
+`infra/cloudflare/` did the publish half (merge + CNAME + Access + verify, #771)
+but *assumed the tunnel existed* and deployed *no connector*, while
+shared-services' `infra/modules/cloudflare-tunnel/` (a rush job, #1171) did the
+provision half — find-or-create the tunnel by name, deploy dual-node `cloudflared`
+connectors — and carried its own second, independent ingress merge
+(`scripts/publish-origin.py --merge-only`) with a documented full-replace landmine
+history (#4063) and comma-bookkeeping bugs. Issue #785 closes the split: the
+provision + connector pattern is ported here, and the merge stays the single
+mutation-proved `infra/cloudflare/ingress.py`, so there is **one** merge and one
+coherent, vendorable module.
+
+**What was harvested (the pattern, not the code):**
+
+| Upstream shape | Ported here |
+|---|---|
+| find-or-create by name: `GET /cfd_tunnel?name=…` → reuse the id, else `POST /cfd_tunnel` | `provision.tunnel_id_from_list` (idempotent) + the `--provision` stage; an empty list authorises a create, anything unreadable is refused |
+| fail-closed read: "I could not read the live config" is a refusal, never "empty" | `tunnel_id_from_list` raises `ValueError` on a non-success/mis-shaped list; a new tunnel is seeded with one catch-all via `provision.initial_tunnel_config` |
+| dual-node connector: `docker pull` + `docker rm -f` + `docker run --restart unless-stopped`, token from Vault | `provision.connector_deploy_lines` (idempotent, token-free template) + the `--connector` stage; the tunnel token arrives from the environment (`AO_SSH_CONNECTOR_TOKEN`), sourced by the operator from Vault or GCP Secret Manager |
+
+**No code was copied.** The source is a private, unlicensed repository owned by
+the same owner, so nothing in it may be copied verbatim. The pattern was
+reimplemented here in this repo's conventions — its own pure-function split, its
+own refusal semantics (a named refusal per missing identifier rather than a
+defaulted value), its own dry-run-by-default posture and its own gate. No
+paragraph, comment or identifier was carried across, and nothing was vendored:
+`vendor/` is untouched, no submodule was added and no source file was cloned into
+the tree.
+
+**What we changed, and why.**
+
+| Upstream | Here | Why |
+|---|---|---|
+| the ingress merge lived in `publish-origin.py --merge-only` — a **second** implementation | the merge stays the single `infra/cloudflare/ingress.py` (pure, mutation-proved); `publish-origin.py` is superseded by this module and shared-services should vendor it rather than keep its own | two merges drift; one is the point of the whole route |
+| token posture: Vault (`TF_VAR_*` + a `vault-env.sh` loader) | environment-first (`CF_API_TOKEN` or GSM for the API token; `AO_SSH_CONNECTOR_TOKEN` for the connector), with **both** Vault and GSM documented as the operator's upstream source | GR-6, and this repo has no Vault dependency to borrow; shared-services can source the same env vars from Vault without rework |
+| apply by default (Terraform `null_resource` local-exec/remote-exec) | **dry run is the default**; `--apply` mutates and refuses while the surface flag is OFF, and the connector deploy is an operator act | GR-5: new infrastructure ships OFF and is promoted by a reviewed change |
+| provisioning logic inline in a shell script + Terraform `inline` blocks | provisioning + connector logic is a **pure module** (`provision.py`) with its own suite, and the gate **mutation-proves** it against a neutered copy (fail-open read, non-idempotent deploy) | one definition, unit-testable, and a gate that can genuinely fail |
+
+**Retirement note for shared-services.** `scripts/publish-origin.py` and the
+ingress half of `infra/modules/cloudflare-tunnel/provision-tunnel.sh` are now
+superseded by this repo's `infra/cloudflare/` module. When shared-services vendors
+it (per the owner directive behind #785), it should retire `publish-origin.py`'s
+`--merge-only` path and point its `provision-tunnel.sh` at the vendored
+`infra/cloudflare/ingress.py` + `provision.py`, so the fleet has exactly one
+merge implementation. That retirement is a shared-services change (filed there,
+not edited here — GR: never edit another repo's files).
+
+**See also.** `docs/OPERATOR-ACCESS.md` §6 documents the full end-to-end flow
+(provision → publish → connector), including the Vault and GSM secret sourcing.
+
+---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*

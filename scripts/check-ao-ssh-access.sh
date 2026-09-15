@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-ao-ssh-access.sh — the remote operator SSH route (issue #771).
+# check-ao-ssh-access.sh — the remote operator SSH route (issues #771, #785).
 #
 # THE DEFECT THIS EXISTS FOR
 #   Publishing a hostname through a remotely-managed Cloudflare Tunnel means
@@ -7,7 +7,10 @@
 #   rule" call. A blind replacement therefore deletes every other hostname the
 #   tunnel serves -- a deploy that is an outage, and one that reports success.
 #   That merge is the property worth a gate, and it is the property a "helpful"
-#   refactor breaks silently.
+#   refactor breaks silently. Issue #785 widened the route to own the provision
+#   and connector halves too, so the gate now also provokes the two properties
+#   those halves add: find-or-create must be idempotent and fail-closed, and the
+#   connector deploy must converge and never embed a token.
 #
 # WHAT IS MEASURED (each provoked, and each named)
 #   (a) a DRY RUN performs NO mutating request. The route is driven against
@@ -27,6 +30,18 @@
 #       record instead of passing vacuously. The real module is proven
 #       byte-identical afterwards, and the probe proves it imported the tree
 #       under test.
+#   (f) the provision + connector path, MUTATION-PROVED the same way: a probe
+#       names every property (find-or-create reuses by id, an empty list
+#       authorises a create, an unreadable list is refused, a new tunnel is
+#       seeded with one catch-all, the connector deploy is idempotent,
+#       token-free and `--restart unless-stopped`). TWO neutered copies must
+#       then fail BY NAME: a fail-open read (unreadable treated as empty) and a
+#       non-idempotent deploy (no `docker rm -f`). The real module is proven
+#       byte-identical afterwards.
+#   (g) the `--provision` and `--connector` DRY RUNS, driven against the stub:
+#       each sends no mutating request, the provision run really reads the
+#       tunnel list and plans a REUSE (never a create), and the connector run
+#       prints the idempotent deploy per host with no token literal.
 #   (c) no Cloudflare account id, zone id, tunnel id, operator email or token is
 #       hardcoded: the route's files are scanned (no 32-hex account id, no UUID
 #       tunnel id, no unmarked email, no literal bearer token, and no
@@ -62,13 +77,15 @@ cd "$root" || exit 2
 surface="remote_ssh_access"
 script_rel="infra/cloudflare/ao-ssh-access.sh"
 ingress_rel="infra/cloudflare/ingress.py"
+provision_rel="infra/cloudflare/provision.py"
 stub_rel="infra/cloudflare/stub_cf_api.py"
 registry_rel="infra/feature-flags/registry.yaml"
 suite="infra/cloudflare"
 
 for required in \
-  "$script_rel" "$ingress_rel" "$stub_rel" "$registry_rel" \
-  "$suite/tests/conftest.py" "$suite/tests/test_ingress.py"
+  "$script_rel" "$ingress_rel" "$provision_rel" "$stub_rel" "$registry_rel" \
+  "$suite/tests/conftest.py" "$suite/tests/test_ingress.py" \
+  "$suite/tests/test_provision.py"
 do
   if [ ! -f "$required" ]; then
     echo "check-ao-ssh-access: FAIL — $required is missing" >&2
@@ -356,11 +373,227 @@ else
   problem "the mutation proof changed the real ${ingress_rel} (${real_sha_before:0:12} -> ${real_sha_after:0:12})"
 fi
 
+# ── (f) the provision + connector path, mutation-proved ────────────────────
+echo "== provision + connector: idempotent, fail-closed, token-free (mutation-proved) =="
+
+cat > "$work/provision-probe.py" <<'PROBE'
+"""Name every property the provision + connector path owes the route (#785).
+
+The tree under test arrives as argv[1]. Bytecode writing is disabled and every
+`__pycache__` under it is purged first, then the import is PROVEN to have
+resolved inside that tree — the same discipline as the merge probe, so a cached
+or mis-resolved module cannot make a mutation invisible.
+"""
+
+import shutil
+import sys
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+root = Path(sys.argv[1]).resolve()
+for cache in root.rglob("__pycache__"):
+    shutil.rmtree(cache, ignore_errors=True)
+sys.path.insert(0, str(root))
+
+from infra.cloudflare import provision  # noqa: E402
+
+TID = "stub-tunnel-id-1234"
+failures: list[str] = []
+
+
+def check(name: str, ok: bool, detail: str = "") -> None:
+    if ok:
+        print("OK    %s" % name)
+    else:
+        failures.append(name)
+        print("FAIL  %s %s" % (name, detail))
+
+
+if not Path(provision.__file__).resolve().is_relative_to(root):
+    print("FAIL  probe-import-root imported %s, not the tree under test %s"
+          % (provision.__file__, root))
+    raise SystemExit(1)
+
+# find-or-create: an existing tunnel is reused, an empty list authorises a create.
+check("reuse-existing",
+      provision.tunnel_id_from_list({"success": True, "result": [{"id": TID}]}) == TID,
+      "=> an existing tunnel was not reused by id")
+check("empty-authorizes-create",
+      provision.tunnel_id_from_list({"success": True, "result": []}) == "",
+      "=> an empty list did not authorise a create")
+
+# fail-closed read: anything unreadable is refused, never "no tunnel exists".
+fail_closed_ok = True
+for bad in (
+    {"success": False, "errors": [{"message": "denied"}]},
+    {"success": True, "result": None},
+    {"success": True, "result": [{"name": "no-id"}]},
+    "not-an-object",
+):
+    try:
+        provision.tunnel_id_from_list(bad)
+        fail_closed_ok = False
+    except ValueError:
+        pass
+check("fail-closed-read", fail_closed_ok,
+      "=> an unreadable tunnel list was not refused")
+
+# a new tunnel is seeded with exactly one catch-all, so the merge has a rule to
+# land before and the tunnel never sits on an unreadably-empty config.
+check("seed-catch-all",
+      provision.initial_tunnel_config()
+      == {"config": {"ingress": [{"service": "http_status:404"}]}},
+      "=> the seed config is not exactly one catch-all")
+
+# the connector deploy converges (rm -f before run) and never embeds a token.
+lines = provision.connector_deploy_lines("ao-tunnel", "cloudflare/cloudflared:2026.7.2")
+run = next((line for line in lines if line.startswith("docker run")), "")
+check("connector-idempotent",
+      any("docker rm -f" in line and "|| true" in line for line in lines),
+      "=> the deploy carries no docker rm -f, so a re-run would collide")
+check("connector-token-free",
+      "-e TUNNEL_TOKEN" in run and "TUNNEL_TOKEN=" not in run,
+      "=> the deploy embeds a token literal: %r" % (run,))
+check("connector-restart", "--restart unless-stopped" in run, "=> %r" % (run,))
+check("connector-name-normalised",
+      provision.connector_container_name("ao-tunnel", ["ssh.example.test"])
+      == "ao-tunnel-ssh-example-test",
+      "=> the container name is not normalised")
+
+if failures:
+    print("the provision path lost %d propert(y/ies): %s"
+          % (len(failures), ", ".join(failures)))
+    raise SystemExit(1)
+raise SystemExit(0)
+PROBE
+
+real_sha_before_p="$(sha256sum "$provision_rel" | awk '{print $1}')"
+
+if python3 "$work/provision-probe.py" "$root" > "$work/f-real.out" 2>&1; then
+  note "the provision + connector logic is idempotent, fail-closed and token-free ($(grep -c '^OK ' "$work/f-real.out") propert(y/ies) proven)"
+else
+  problem "the provision probe FAILED on the real module: $(grep -m3 '^FAIL ' "$work/f-real.out" | tr '\n' ' ')"
+fi
+
+# mutant 1: neuter the read to treat "unreadable" as "no tunnel" (fail-open).
+mutant_p="$work/mutant-p"
+mkdir -p "$mutant_p/infra/cloudflare"
+cp "$provision_rel" "$mutant_p/infra/cloudflare/provision.py"
+cat >> "$mutant_p/infra/cloudflare/provision.py" <<'MUTANT'
+
+
+def tunnel_id_from_list(document):  # MUTANT: unreadable == no tunnel (fail-open)
+    return ""
+MUTANT
+
+mutant_out_p="$(python3 "$work/provision-probe.py" "$mutant_p" 2>&1)"
+mutant_rc_p=$?
+if [ "$mutant_rc_p" -eq 0 ]; then
+  problem "the provision mutation (fail-open read) was NOT detected: the probe passes on the mutant, so this gate is vacuous"
+elif grep -qF 'FAIL  fail-closed-read' <<<"$mutant_out_p"; then
+  note "mutation-proved: neutering the read to treat unreadable as empty fails the probe BY NAME (fail-closed-read)"
+else
+  problem "the provision mutation was detected but not by name (expected 'FAIL  fail-closed-read'): $(grep -m2 '^FAIL ' <<<"$mutant_out_p" | tr '\n' ' ')"
+fi
+
+# mutant 2: drop the `docker rm -f` from the deploy (breaks idempotency).
+mutant_c="$work/mutant-c"
+mkdir -p "$mutant_c/infra/cloudflare"
+cp "$provision_rel" "$mutant_c/infra/cloudflare/provision.py"
+cat >> "$mutant_c/infra/cloudflare/provision.py" <<'MUTANT'
+
+
+def connector_deploy_lines(container, image, network="bridge"):  # MUTANT: no rm -f
+    return [
+        "docker pull %s" % image,
+        "docker run -d --name %s --network %s --restart unless-stopped "
+        "-e TUNNEL_TOKEN %s tunnel --no-autoupdate run" % (container, network, image),
+    ]
+MUTANT
+
+mutant_out_c="$(python3 "$work/provision-probe.py" "$mutant_c" 2>&1)"
+mutant_rc_c=$?
+if [ "$mutant_rc_c" -eq 0 ]; then
+  problem "the connector mutation (non-idempotent deploy) was NOT detected: the probe passes on the mutant, so this gate is vacuous"
+elif grep -qF 'FAIL  connector-idempotent' <<<"$mutant_out_c"; then
+  note "mutation-proved: dropping the docker rm -f fails the probe BY NAME (connector-idempotent)"
+else
+  problem "the connector mutation was detected but not by name (expected 'FAIL  connector-idempotent'): $(grep -m2 '^FAIL ' <<<"$mutant_out_c" | tr '\n' ' ')"
+fi
+
+real_sha_after_p="$(sha256sum "$provision_rel" | awk '{print $1}')"
+if [ "$real_sha_before_p" = "$real_sha_after_p" ]; then
+  note "the real ${provision_rel} is byte-identical after the mutation proofs (sha256 ${real_sha_before_p:0:12})"
+else
+  problem "the provision mutation proofs changed the real ${provision_rel} (${real_sha_before_p:0:12} -> ${real_sha_after_p:0:12})"
+fi
+
+# ── (g) the provision + connector dry runs, driven against the stub ────────
+echo "== provision + connector dry runs mutates nothing and names the plan =="
+
+: > "$stub_log"
+CF_TUNNEL_NAME=stub-tunnel bash "$script_rel" --dry-run --provision > "$work/g.out" 2>&1
+g_rc=$?
+if [ "$g_rc" -ne 0 ]; then
+  problem "the --provision dry run exited ${g_rc}, expected 0: $(tail -n 3 "$work/g.out" | tr '\n' ' ')"
+else
+  note "the --provision dry run exits 0 against the stub"
+fi
+if grep -q '^MUTATING ' "$stub_log"; then
+  problem "the --provision dry run sent a mutating request: $(grep -m1 '^MUTATING ' "$stub_log")"
+else
+  note "the --provision dry run sent NO mutating request ($(grep -c '^GET ' "$stub_log") read(s) recorded)"
+fi
+if grep -q 'cfd_tunnel?name=' "$stub_log"; then
+  note "control: the provision dry run really read the tunnel list, so 'find-or-create' is not vacuous"
+else
+  problem "the provision dry run never read the tunnel list: the find-or-create probe is vacuous"
+fi
+if grep -qF 'reusing the existing tunnel stub-tunnel' "$work/g.out"; then
+  note "the provision dry run planned a REUSE of the existing tunnel (idempotent, no create)"
+else
+  problem "the provision dry run did not plan a reuse of the existing tunnel: $(grep -m2 'reus\|creat' "$work/g.out" | tr '\n' ' ')"
+fi
+
+: > "$stub_log"
+AO_SSH_CONNECTOR_HOSTS="192.0.2.31" AO_SSH_CONNECTOR_USER="op" \
+  bash "$script_rel" --dry-run --connector > "$work/h.out" 2>&1
+h_rc=$?
+if [ "$h_rc" -ne 0 ]; then
+  problem "the --connector dry run exited ${h_rc}, expected 0: $(tail -n 3 "$work/h.out" | tr '\n' ' ')"
+else
+  note "the --connector dry run exits 0 against the stub"
+fi
+if grep -q '^MUTATING ' "$stub_log"; then
+  problem "the --connector dry run sent a mutating request: $(grep -m1 '^MUTATING ' "$stub_log")"
+else
+  note "the --connector dry run sent NO mutating request"
+fi
+if grep -qF 'docker pull cloudflare/cloudflared:2026.7.2' "$work/h.out" \
+  && grep -q 'docker rm -f' "$work/h.out" \
+  && grep -qF 'docker run -d --name ao-tunnel-ssh-example-test' "$work/h.out" \
+  && grep -qF -- '--restart unless-stopped' "$work/h.out"; then
+  note "the connector dry run prints the idempotent deploy (pull, rm -f, run --restart unless-stopped)"
+else
+  problem "the connector dry run did not print the idempotent deploy plan"
+fi
+if grep -qF 'TUNNEL_TOKEN=' "$work/h.out"; then
+  problem "the connector plan embeds a token literal"
+else
+  note "the connector plan embeds no token (the token arrives from the environment at apply time only)"
+fi
+if grep -qF 'host 192.0.2.31: would run' "$work/h.out"; then
+  note "the connector dry run names the host and plans (never executes) the deploy"
+else
+  problem "the connector dry run did not plan per-host: $(grep -m2 'host ' "$work/h.out" | tr '\n' ' ')"
+fi
+
 # ── (c) no identifier, email or token is hardcoded ──────────────────────────
 echo "== no estate identifier, email or token is hardcoded =="
 
-scanned=("$script_rel" "$ingress_rel" "$stub_rel" \
+scanned=("$script_rel" "$ingress_rel" "$provision_rel" "$stub_rel" \
   "$suite/tests/conftest.py" "$suite/tests/test_ingress.py" \
+  "$suite/tests/test_provision.py" \
   "scripts/check-ao-ssh-access.sh")
 
 hex_hits="$(grep -nE '[0-9a-f]{32}' "${scanned[@]}" 2>/dev/null || true)"
@@ -402,7 +635,9 @@ else
 fi
 
 for name in CF_ACCOUNT_ID CF_ZONE_ID CF_TUNNEL_ID CF_API_TOKEN \
-  AO_SSH_HOSTNAME AO_SSH_ORIGIN_HOST AO_SSH_ACCESS_EMAILS
+  CF_TUNNEL_NAME \
+  AO_SSH_HOSTNAME AO_SSH_ORIGIN_HOST AO_SSH_ACCESS_EMAILS \
+  AO_SSH_CONNECTOR_HOSTS AO_SSH_CONNECTOR_USER AO_SSH_CONNECTOR_TOKEN
 do
   if grep -qF "$name" "$script_rel"; then
     :
@@ -410,7 +645,7 @@ do
     problem "the route script never names ${name}: that identifier is not read from the environment"
   fi
 done
-note "the seven environment names the route needs are all read from the environment"
+note "the eleven environment names the route needs are all read from the environment"
 
 bearer_hits="$(grep -nE 'Authorization: Bearer' "$script_rel" 2>/dev/null | grep -vF 'Bearer ${CF_TOKEN}' || true)"
 if [ -z "$bearer_hits" ]; then
@@ -598,5 +833,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-ao-ssh-access: FAIL (${fail} violation(s))" >&2
   exit 1
 fi
-echo "check-ao-ssh-access: OK — a dry run mutates nothing, the merge never drops a live rule (mutation-proved), no estate identifier or token is in the tree, and --apply refuses while the surface ships OFF"
+echo "check-ao-ssh-access: OK — a dry run mutates nothing, the merge never drops a live rule (mutation-proved), the provision + connector path is idempotent, fail-closed and token-free (mutation-proved), no estate identifier or token is in the tree, and --apply refuses while the surface ships OFF"
 exit 0
