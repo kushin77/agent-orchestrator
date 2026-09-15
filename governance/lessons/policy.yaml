@@ -23,5 +23,28 @@ board:
         Requiring an RCA for the rule that requires RCAs is circular, and the
         label describes the work the issue does, not an incident it records.
 
+    # `area:incident-response` is an AREA label: it says the work is in the
+    # incident-response area, not that the issue *records* an incident. The
+    # monitoring-plane set carries it for that reason, is closed, and has no
+    # incident to attach an RCA to. Measured 2026-09-14: these three were the
+    # only thing keeping `make verify` red on `master`, so every lane in the
+    # fleet was blocked on a finding it could not fix — the false-positive-
+    # baked-into-a-hard-rule failure this file's header warns about.
+    # The structural fix (a dedicated record label, so an area can never
+    # manufacture an incident) is #766; these entries retire with it.
+    - ref: "#494"
+      reason: >-
+        EPIC: consume the fleet monitoring plane — an observability epic, closed,
+        carrying the area label because that is the area the work is in. It
+        records no incident and has no RCA to attach.
+    - ref: "#495"
+      reason: >-
+        Decision record: the telemetry-exposition authority split (ADR-0022) — a
+        decision, not an incident record; the area label describes the area.
+    - ref: "#497"
+      reason: >-
+        Publish the telemetry pillar as a scrapeable surface — a closed feature
+        in the incident-response *area*, not an incident record.
+
 # An RCA that is never re-read is a document, not a practice.
 review_cadence_days: 180
