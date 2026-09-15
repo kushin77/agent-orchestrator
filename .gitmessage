@@ -1,6 +1,51 @@
 # agent-orchestrator commit message template (issue #5).
 # Enable with:  git config commit.template .gitmessage
 # Lines starting with '#' are stripped from the final message.
+#
+# EVERY COMMIT REFERENCES ITS ISSUE (AGENTS.md golden rule 1 / GR-2). The
+# trailer layout is a POSITION RULE, NOT A PRESENCE RULE: the layout below is
+# the one scripts/check-pr-contract.sh (issue #288) actually enforces, quoted
+# from that script's own parser:
+#
+#   * The ticket reference is `Refs kushin77/agent-orchestrator#<n>`, on its own
+#     line, in the TRAILING TRAILER BLOCK: the last paragraph(s) whose every
+#     line is a `Token: value` line, a continuation line, or the reference line
+#     itself. A `Token: value` line matches `^[A-Za-z][A-Za-z0-9_-]*:[ \t]*\S`.
+#   * The reference itself is matched by the python regex
+#     `Refs:?\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+`, so this repo's
+#     colon-less form (above) and git's own colon form (`Refs: kushin77/...`)
+#     are both accepted. `git interpret-trailers --parse` alone would refuse the
+#     colon-less form — it recognises only the colon form — which is why the
+#     block is parsed by position instead.
+#   * A mention in the SUBJECT IS NOT A TRAILER. The three refusals, by name:
+#     `commit-ref-only-in-subject` (in the subject only),
+#     `commit-ref-outside-the-trailer-block` (in a prose paragraph only), and
+#     `commit-missing-ticket-trailer` (no reference at all). A bare substring
+#     test accepts the first two, which is exactly the defect (#287) that this
+#     position rule closes.
+#   * A bare `---------` line is the separator GitHub inserts when it composes a
+#     squash-merge message. It is transparent to the walk-back — the trailing
+#     block continues past it — and prose is not (issue #522).
+#   * Keep numeric references out of these `#` comment lines. git strips them
+#     only under the default `strip` cleanup (the editor path); under
+#     `git commit -F` / `--cleanup=whitespace` a surviving comment is prose, and
+#     a numeric reference inside it is refused as
+#     `commit-ref-outside-the-trailer-block`. The `<issue>` / `<n>` placeholders
+#     below are chosen so they can never match.
+#
+# THE PR BODY carries the rest of the contract (checked at PR time — the PR body
+# is read, not the commit message):
+#   * `Closes #<n>` on its own line (`^Closes[[:space:]]+#[0-9]+`);
+#   * a FILLED-IN `AI-assistance: <runtime> (<mode>)` line, matched as
+#     `^AI-assistance:[[:space:]]*[^<[:space:]][^(]*\([^)]*\)[[:space:]]*$` —
+#     the `<runtime>` placeholder is refused, so an untouched template can never
+#     pass as a declaration;
+#   * a `## Pre-existing red` section holding either an explicit `None` or a
+#     `Reproduce:` line naming a command in backticks, followed by a fenced
+#     output block.
+#
+# Measured 2026-09-14: `git config commit.template` is unset on this machine
+# (rc 1), so this file is advisory until you enable it with the command above.
 
 <type>(<scope>): <short summary>
 # imperative, <= 72 chars. Types: feat / fix / refactor / docs / chore / test.
@@ -10,8 +55,4 @@
 <what: the change>
 
 Refs kushin77/agent-orchestrator#<issue>
-# Every commit references its issue (GR-2).
-# Example:  Refs kushin77/agent-orchestrator#5
-
 AI-assistance: <runtime> (<mode>)
-# Example:  AI-assistance: Copilot (Relentless, flash/LOW)
