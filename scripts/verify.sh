@@ -59,9 +59,30 @@ checks=(
   'gate-coverage|bash scripts/check-gate-coverage.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
+  'epic-focus|bash scripts/check-epic-focus.sh'
   'fleet-channel|bash scripts/check-fleet-channel.sh'
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'fleet-runbook|bash scripts/check-fleet-runbook.sh'
+  # runner-preflight (issue #733): the fleet could not spawn a single subagent
+  # because the loop inherited cron's minimal PATH, and it failed per directive
+  # per cycle (a runaway amplifier). The check names the resolution, the hold and
+  # the CANNOT-ASSESS timeout semantics, drives the REAL loop in a scratch tree
+  # with the runner off PATH and off HOME (exactly one escalation, nothing
+  # dispatched, the queue held), and mutation-proves it with two mutants of the
+  # real loop — the preflight neutralised, and the hold removed.
+  'runner-preflight|bash scripts/check-fleet-runner-preflight.sh'
+  # fleet-drift (issue #739, AO-GR-25): the code-drift detector compared the
+  # running loop's commit to the *shared checkout's* HEAD, so when the checkout
+  # was itself behind, both sides were the same stale commit and a loop running
+  # pre-fix code reported `healthy` — the control that exists to catch a merged
+  # fix never reaching the fleet could not fire. It also failed open: `head !=
+  # "unknown"` made an unreadable HEAD read as healthy. The check proves drift is
+  # measured against origin/master (the measured case: running == local, !=
+  # remote ⇒ drifted), that an unreadable baseline is CANNOT-ASSESS and exit 2,
+  # that the operator line names both commits, and mutation-proves it with two
+  # mutants of the real classifier — the local-HEAD baseline restored, and the
+  # fail-open guard restored.
+  'fleet-drift|bash scripts/check-fleet-drift.sh'
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'

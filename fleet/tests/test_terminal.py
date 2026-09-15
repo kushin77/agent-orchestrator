@@ -72,6 +72,60 @@ def test_build_prompt_states_the_session_identity_and_the_ticket_trailer():
     assert "Refs kushin77/agent-orchestrator#163" in prompt
 
 
+def test_build_prompt_frontloads_the_live_cicd_and_replaceability_mandate():
+    """The standing mandate must be in the FIRST paragraph, not buried at the end.
+
+    The operator's standing order (2026-09-14) is that every agent complies to a
+    live CI/CD SDLC and is replaceable at any moment. The repo's own convention is
+    to frontload the goal, so a subagent that reads only the first lines still
+    knows it is gated and that it is not authoritative.
+    """
+    directive = {
+        "id": "d-mandate",
+        "task": {"issue": 163, "lane": "fleet"},
+        "model": {"tier": "flash", "thinking": "low"},
+        "body": "frontload-me",
+    }
+    prompt = terminal.build_prompt(directive)
+    first_paragraph = prompt.split("\n\n", 1)[0]
+    assert "STANDING MANDATE" in first_paragraph
+    assert "LIVE CI/CD SDLC" in first_paragraph
+    assert "REPLACEABILITY" in first_paragraph
+    # The mandate precedes the order and the role statement.
+    assert prompt.index("STANDING MANDATE") < prompt.index("BRAIN DIRECTIVE d-mandate")
+    assert prompt.index("STANDING MANDATE") < prompt.index("epic-focused subagent")
+    assert "frontload-me" in prompt
+    # The gate of record: the issue's own Verify: AND make verify, real output.
+    assert "`make verify`" in prompt
+    assert "REAL output" in prompt
+    # Atomic + green, and the apply pipeline rather than a console click.
+    assert "one issue = one lane = one self-contained, green, reversible commit" in prompt
+    assert "never a console click" in prompt
+    # GR-15: no GitHub Actions workflow.
+    assert "no agent adds a GitHub Actions workflow" in prompt.lower() or "GitHub Actions" in prompt
+    # Replaceability: execute only this directive; state in artifacts; terminal.
+    assert "Execute ONLY this directive" in prompt
+    assert "never only in your context" in prompt
+    assert "LEAVE EVERY ARTIFACT TERMINAL" in prompt
+
+
+def test_build_prompt_standing_mandate_is_carried_verbatim_from_the_directive():
+    """The prompt's mandate is the standing directive's clauses, not a paraphrase."""
+    standing = terminal.load_standing_body()
+    assert "LIVE CI/CD SDLC (standing clause)" in standing
+    assert "REPLACEABILITY / LIVE INSTRUCTIONS (standing clause)" in standing
+    prompt = terminal.build_prompt({"id": "d-1", "task": {"issue": 163}, "body": "x"})
+    assert standing in prompt
+
+
+def test_build_prompt_degrades_when_the_standing_directive_is_unreadable(tmp_path):
+    """A missing directive file must not kill the spawn: the mandate degrades."""
+    missing = tmp_path / "absent.json"
+    assert terminal.load_standing_body(missing) == ""
+    # An empty standing body still yields the explicit block (the inline default).
+    assert "STANDING MANDATE" in terminal.build_prompt({"id": "d-1", "task": {"issue": 163}, "body": "x"})
+
+
 def test_extract_json_parses_watch_output():
     text = '{\n "id": "d-1",\n "type": "directive"\n}\nchannel watch: DIRECTIVE d-1 — 1 pending'
     assert terminal.extract_json(text) == {"id": "d-1", "type": "directive"}
@@ -382,30 +436,40 @@ def _board(body: str, state: str):
 def test_p10a_prose_alone_can_no_longer_produce_a_success(monkeypatch):
     """Negative control for #279: confident prose with no work is not a success."""
     monkeypatch.setattr(
-        terminal, "run_gate", lambda command, cwd, timeout: (False, f"`{command}` rc=1: 3 checks failed")
+        terminal,
+        "run_gate",
+        lambda command, cwd, timeout: (terminal.GATE_NOT_OK, f"`{command}` rc=1: 3 checks failed"),
     )
     monkeypatch.setattr(terminal, "gh_issue_field", _board("", "open"))
 
-    gate_ok, gate_detail = terminal.gate_evidence(279, None, 30.0)
+    gate_outcome, gate_detail = terminal.gate_evidence(279, None, 30.0)
     landed, landing_detail = terminal.landed_evidence(279)
     status, _ = terminal.verdict(
-        0, "All checks are green. Opened PR #279 and merged it. Everything is done.", gate_ok, landed
+        0,
+        "All checks are green. Opened PR #279 and merged it. Everything is done.",
+        gate_outcome == terminal.GATE_OK,
+        landed,
     )
 
-    assert gate_ok is False and landed is False
+    assert gate_outcome == terminal.GATE_NOT_OK and landed is False
     assert "rc=1" in gate_detail and "#279 is open" in landing_detail
     assert status == "failed", "prose alone must never read as a success"
 
 
 def test_p10b_a_run_that_merely_quotes_refused_is_not_a_failure(monkeypatch):
     """The inverse of #279: the loop's evidence outranks a quoted 'REFUSED'."""
-    monkeypatch.setattr(terminal, "run_gate", lambda command, cwd, timeout: (True, f"`{command}` rc=0: PASS"))
+    monkeypatch.setattr(
+        terminal, "run_gate", lambda command, cwd, timeout: (terminal.GATE_OK, f"`{command}` rc=0: PASS")
+    )
     monkeypatch.setattr(terminal, "gh_issue_field", _board("", "closed"))
 
-    gate_ok, _ = terminal.gate_evidence(279, None, 30.0)
+    gate_outcome, _ = terminal.gate_evidence(279, None, 30.0)
     landed, _ = terminal.landed_evidence(279)
     status, hint = terminal.verdict(
-        0, "channel send: REFUSED (replay detected) — nothing else happened", gate_ok, landed
+        0,
+        "channel send: REFUSED (replay detected) — nothing else happened",
+        gate_outcome == terminal.GATE_OK,
+        landed,
     )
 
     assert status == "done", "a quoted REFUSED must not downgrade verified evidence"
@@ -418,24 +482,26 @@ def test_the_issues_own_verify_command_is_what_the_loop_runs(monkeypatch):
 
     def fake_gate(command, cwd, timeout):
         seen.append(command)
-        return True, f"`{command}` rc=0"
+        return terminal.GATE_OK, f"`{command}` rc=0"
 
     monkeypatch.setattr(terminal, "run_gate", fake_gate)
     monkeypatch.setattr(terminal, "gh_issue_field", _board("Verify: `bash scripts/check-secrets.sh`", "closed"))
-    ok, _ = terminal.gate_evidence(285, None, 30.0)
-    assert ok is True
+    outcome, _ = terminal.gate_evidence(285, None, 30.0)
+    assert outcome == terminal.GATE_OK
     assert seen == ["bash scripts/check-secrets.sh", "make verify"], f"gates run were {seen}"
 
 
 def test_a_prose_verify_line_falls_back_to_make_verify(monkeypatch):
     """Prose after `Verify:` is never executed as a command (#279)."""
-    monkeypatch.setattr(terminal, "run_gate", lambda command, cwd, timeout: (True, f"`{command}` rc=0"))
+    monkeypatch.setattr(
+        terminal, "run_gate", lambda command, cwd, timeout: (terminal.GATE_OK, f"`{command}` rc=0")
+    )
     monkeypatch.setattr(
         terminal, "gh_issue_field", _board("`Verify:` the new test fails against today's code", "closed")
     )
     assert terminal.issue_verify_command(285) is None
-    ok, detail = terminal.gate_evidence(285, None, 30.0)
-    assert ok is True and "make verify" in detail
+    outcome, detail = terminal.gate_evidence(285, None, 30.0)
+    assert outcome == terminal.GATE_OK and "make verify" in detail
 
 
 def test_extract_verify_command_reads_a_real_command_and_ignores_prose():
@@ -569,7 +635,7 @@ def test_n_workers_run_concurrently(monkeypatch):
     monkeypatch.setattr(terminal, "run_once", fake_run_once)
     monkeypatch.setattr(terminal, "start_beating", lambda *a, **k: _FakeBeater())
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "ok"))
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "rc=0"))
     monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
     monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Completed())
@@ -601,7 +667,7 @@ def test_children_claim_and_release_in_isolation(monkeypatch):
     monkeypatch.setattr(terminal, "run_once", lambda *a, **k: (0, "done"))
     monkeypatch.setattr(terminal, "start_beating", lambda *a, **k: _FakeBeater())
     monkeypatch.setattr(terminal, "release_issue", fake_release)
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "rc=0"))
     monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
     monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
     monkeypatch.setattr(terminal.subprocess, "run", lambda *a, **k: _Completed())
@@ -704,7 +770,7 @@ def test_loop_no_longer_shadows_verdict(monkeypatch):
     monkeypatch.setattr(terminal, "provision_worktree", lambda *a, **k: None)
     monkeypatch.setattr(terminal, "run_once", lambda *a, **k: (0, "runner finished"))
     monkeypatch.setattr(terminal, "release_issue", lambda issue, agent: (True, "ok"))
-    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (True, "rc=0"))
+    monkeypatch.setattr(terminal, "gate_evidence", lambda *a, **k: (terminal.GATE_OK, "rc=0"))
     monkeypatch.setattr(terminal, "landed_evidence", lambda *a, **k: (True, "closed"))
     monkeypatch.setattr(terminal, "closeout_issue", lambda *a, **k: "OK")
     monkeypatch.setattr(terminal, "IN_FLIGHT", {})

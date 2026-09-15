@@ -24,6 +24,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -41,6 +42,24 @@ import singleton
 import telemetry
 
 ROOT = Path(__file__).resolve().parent.parent
+#: The standing directive (`fleet/directive.json`) — "the DSv4FNone order, in code".
+#: Every subagent prompt carries its standing clauses verbatim rather than a
+#: paraphrase, so the mandate travels with the order and cannot drift from it.
+DIRECTIVE_PATH = ROOT / "fleet" / "directive.json"
+
+
+def load_standing_body(path: Path | None = None) -> str:
+    """The standing directive's body, or '' when it cannot be read.
+
+    The prompt frontload must survive a directive file that is missing or
+    malformed — the dispatch itself is more important than the preamble — so a
+    read failure degrades to the inline default in `build_prompt` instead of
+    killing the spawn.
+    """
+    try:
+        return str(json.loads((path or DIRECTIVE_PATH).read_text(encoding="utf-8")).get("body") or "")
+    except (OSError, json.JSONDecodeError):
+        return ""
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 #: The institutional lane provisioner: mints the session identity before each spawn.
 ISOLATION_CLI = str(ROOT / "governance" / "isolation" / "cli.py")
@@ -85,7 +104,10 @@ TIER_RUNNERS: dict[str, dict[str, str]] = {
 }
 
 #: The base runner command when the operator passes none. The tier does not
-#: replace it — it selects the model that command is invoked with.
+#: replace it — it selects the model that command is invoked with. ``FLEET_RUNNER``
+#: (documented in ``fleet/README.md`` and, until #733, read by nothing) sets the same
+#: default, so an operator can point the fleet at an absolute runner path from the
+#: environment cron gives it.
 DEFAULT_RUNNER = "claude -p"
 
 #: The exit code a refused dispatch reports (EX_CONFIG: the order cannot be
@@ -273,6 +295,14 @@ def build_prompt(
     which branch it is on cannot keep its commits traceable to the ticket, so the
     id, the branch and the required trailer are stated rather than assumed.
 
+    The mandate comes FIRST. The standing directive's live-CI/CD-SDLC and
+    replaceability clauses are frontloaded ahead of the order itself, because a
+    subagent that reads only the first lines must still know that it is gated
+    (real `Verify:` + `make verify` output is the evidence), that its commit must
+    be atomic and green, and that it may be replaced at any moment — so it
+    executes only this directive, keeps every fact it needs in artifacts, and
+    leaves every artifact terminal.
+
     The prompt also carries a CONTEXT PACK (#220) — the issue's title, body and
     acceptance criteria, its lane and its own ``Verify:`` clause, plus the lessons
     a previous lane already paid for — so the subagent does not have to rediscover
@@ -289,6 +319,34 @@ def build_prompt(
     identity = env or {}
     session = identity.get("AO_SESSION_ID", "")
     branch = identity.get("AO_BRANCH", "")
+    standing = load_standing_body() or (
+        "LIVE CI/CD SDLC: run the issue's own `Verify:` command AND `make verify`; their REAL output "
+        "is the only evidence; one issue = one lane = one self-contained green commit. "
+        "REPLACEABILITY: the brain may replace you or frontload new instructions at any moment — "
+        "execute ONLY this directive, keep every fact that matters in artifacts (issue, branch, "
+        "claim ledger, board), and leave every artifact terminal."
+    )
+    mandate = (
+        "STANDING MANDATE — LIVE CI/CD SDLC + REPLACEABILITY (read this first; it is the operator's "
+        "standing order as carried in fleet/directive.json):\n"
+        f"{standing}\n"
+        "What that means for THIS run, in order:\n"
+        f"a. GATE OF RECORD: run issue #{issue}'s own `Verify:` command AND `make verify`, and quote "
+        "their REAL output. Unverified work is not done, and neither command may be skipped or "
+        "reported from memory.\n"
+        "b. ATOMIC + GREEN: one issue = one lane = one self-contained, green, reversible commit; a "
+        "perfected (green-verified) commit reaches production on merge through the declared apply "
+        "pipeline — never a hand-carried deploy and never a console click.\n"
+        "c. NEVER MERGE FAILING WORK and never add a GitHub Actions workflow (GR-15 — automation is "
+        "code-native `make` targets run by the ops runner and cron).\n"
+        "d. REPLACEABLE, NOT AUTHORITATIVE: the brain may replace you or frontload new instructions "
+        "at any moment. Execute ONLY this directive — do not self-escalate scope, pick your own "
+        "issue, or re-plan the board.\n"
+        "e. STATE LIVES IN ARTIFACTS: anything a replacement needs must live in the issue, the "
+        "branch, the claim ledger or the board — never only in your context.\n"
+        "f. LEAVE EVERY ARTIFACT TERMINAL: PR merged at green evidence, source branch deleted, claim "
+        "released, directive consumed, issue closed with evidence. Strand nothing.\n\n"
+    )
     where = (
         f"Your worktree is {worktree} (branch {branch or worktree.name}). Work ONLY there — never in the "
         "shared checkout, which other lanes are using.\n"
@@ -307,6 +365,7 @@ def build_prompt(
     )
     context_block = render_context_pack(pack) if pack else ""
     return (
+        f"{mandate}"
         "You are an epic-focused subagent in the kushin77/agent-orchestrator fleet, "
         "steered by the brain through the sister session. "
         f"{where}{who}\n"
@@ -334,14 +393,64 @@ def build_prompt(
 
 def build_command(
     directive: dict,
-    runner: str,
+    runner: str | list[str],
     agent_id: str,
     worktree: Path | None = None,
     env: dict[str, str] | None = None,
     context: dict | None = None,
 ) -> list[str]:
-    """Runner must accept the prompt as its final argument (e.g. `claude -p`)."""
-    return shlex.split(runner) + [build_prompt(directive, agent_id, worktree, env, context)]
+    """Runner must accept the prompt as its final argument (e.g. `claude -p`).
+
+    ``runner`` is either the documented string form or an argv already resolved by
+    :func:`resolve_runner` — re-splitting a resolved path through ``shlex`` would
+    break a legitimate install path that contains a space.
+    """
+    argv = list(runner) if isinstance(runner, (list, tuple)) else shlex.split(runner)
+    return argv + [build_prompt(directive, agent_id, worktree, env, context)]
+
+
+def resolve_runner(runner: str) -> tuple[list[str] | None, str]:
+    """Resolve a runner command to an absolute argv, or say why it cannot be.
+
+    The documented form is ``--runner "claude -p"``: only ``argv[0]`` is the
+    executable and the rest is that runner's own vocabulary, passed through
+    untouched. A runner that already names a path is used exactly as given — an
+    operator who writes a file means that file.
+
+    Resolution is explicit here rather than inherited from the shell because the
+    loop is cron's child and inherits cron's minimal PATH (#733: ``~/.local/bin``
+    was not on it, so every directive died with ``FileNotFoundError: 'claude'``).
+    The directories searched are declared once in ``fleet/runtime.py`` so the
+    preflight and this belt cannot drift apart.
+    """
+    argv = shlex.split(runner)
+    if not argv:
+        return None, "the runner command is empty"
+    executable = argv[0]
+    if os.sep in executable:
+        if os.access(executable, os.X_OK):
+            return argv, ""
+        return None, f"'{executable}' is not an executable file"
+    search = runtime.runner_search_path()
+    found = shutil.which(executable, path=os.pathsep.join(search))
+    if found:
+        return [found, *argv[1:]], ""
+    return None, f"'{executable}' is not on PATH (searched: {os.pathsep.join(search)})"
+
+
+def preflight(runner: str) -> tuple[bool, str]:
+    """Can this loop spawn at all? Resolved BEFORE the loop reads the inbox (#733).
+
+    Returns ``(True, the resolved executable)`` or ``(False, one actionable line)``.
+    It runs every cycle rather than once at startup: a loop that only checked at
+    startup would keep the queue held after the runner was installed, and a check
+    that only ran at dispatch time failed once per directive per cycle — the
+    runaway amplifier this replaces.
+    """
+    argv, problem = resolve_runner(runner)
+    if problem:
+        return False, f"runner unresolvable: {problem}"
+    return True, f"runner resolved: {argv[0]}"
 
 
 def start_session_beat(env: dict | None, pid: int) -> object | None:
@@ -451,6 +560,15 @@ def run_once(
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
         return 0, f"DRY-RUN (not executed) in {cwd}"
+    # Resolve the executable in code, not by inheriting whatever PATH happened to
+    # start this loop (#733): argv[0] is handed to the child as an ABSOLUTE path,
+    # so the spawn cannot fail on a PATH the fleet does not control. The loop's
+    # preflight has already refused the queue when this cannot resolve; this is the
+    # belt for a runner that vanished mid-flight.
+    resolved, problem = resolve_runner(command[0])
+    if problem:
+        return 127, f"runner could not start in {cwd}: {problem}"
+    command[0] = resolved[0]
     try:
         child = subprocess.Popen(
             command,
@@ -462,8 +580,10 @@ def run_once(
             stderr=subprocess.STDOUT,
             text=True,
             # The FinOps block is exported LAST: it is the authority the operator
-            # asked for, the lane environment carries identity.
-            env={**os.environ, **(env or {}), **dict(dispatch.get("env") or {})},
+            # asked for, the lane environment carries identity. PATH comes from
+            # `runtime.runner_env`, so the runner's own directory is on the child's
+            # PATH and anything the runner resolves by name still resolves for it.
+            env={**runtime.runner_env(), **(env or {}), **dict(dispatch.get("env") or {})},
         )
     except OSError as exc:
         return 127, f"runner could not start in {cwd}: {exc}"
@@ -716,6 +836,14 @@ def directive_issue(directive: dict) -> int | None:
 REPO = "kushin77/agent-orchestrator"
 #: The gate of record, run by the loop itself — never inferred from model prose.
 GATE_OF_RECORD = "make verify"
+#: The gate vocabulary (``guardrails/honesty``): a gate either assessed the work or
+#: it did not. CANNOT-ASSESS is never a pass and never a failure of the work.
+#: Measured (#733): the loop's 1800s ``make verify`` on a loaded box raised
+#: ``TimeoutExpired``, which was reported as a gate FAILURE and re-dispatched the
+#: directive every cycle — a timeout is the loop not knowing, not the work failing.
+GATE_OK = "OK"
+GATE_NOT_OK = "NOT-OK"
+GATE_CANNOT_ASSESS = "CANNOT-ASSESS"
 #: A ``Verify:`` line is only executed when it is command-shaped: its first token
 #: must be an executable the fleet can run. Issue bodies mix real commands with
 #: prose ("Verify: the new test fails against today's code"), and running a
@@ -1067,23 +1195,38 @@ def live_issue_body(issue: int) -> str | None:
     return gh_issue_field(issue, ".body")
 
 
-def run_gate(command: str, cwd: str, timeout: float) -> tuple[bool, str]:
-    """Run one gate the loop owns; its exit code — not the prose — is the signal."""
+def run_gate(command: str, cwd: str, timeout: float) -> tuple[str, str]:
+    """Run one gate the loop owns; its exit code — not the prose — is the signal.
+
+    Returns ``(outcome, detail)`` with the outcome in the honesty vocabulary. A
+    gate that ran out of time, or could not run at all, attested nothing: it is
+    CANNOT-ASSESS, so it can neither pass the run nor be escalated as a failure.
+    """
     try:
         done = subprocess.run(
             ["bash", "-lc", command], cwd=cwd, capture_output=True, text=True, timeout=timeout
         )
+    except subprocess.TimeoutExpired:
+        return GATE_CANNOT_ASSESS, (
+            f"`{command}` timed out after {timeout}s — CANNOT-ASSESS: a gate that ran out of time "
+            "attested nothing, so this is neither a pass nor a failure of the work"
+        )
     except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"`{command}` could not run ({exc})"
+        return GATE_CANNOT_ASSESS, f"`{command}` could not run ({exc}) — CANNOT-ASSESS"
     tail = ((done.stdout or "") + (done.stderr or "")).strip()[-300:]
-    return done.returncode == 0, f"`{command}` rc={done.returncode}: {tail or 'no output'}"
+    if done.returncode == 0:
+        return GATE_OK, f"`{command}` rc=0: {tail or 'no output'}"
+    return GATE_NOT_OK, f"`{command}` rc={done.returncode}: {tail or 'no output'}"
 
 
-def gate_evidence(issue: int, worktree: Path | None, timeout: float) -> tuple[bool, str]:
+def gate_evidence(issue: int, worktree: Path | None, timeout: float) -> tuple[str, str]:
     """Run the gates the loop checks itself: the issue's Verify: and ``make verify``.
 
     The runner's own text is never consulted here — a run that only *says* it
-    verified the work cannot make either gate exit 0.
+    verified the work cannot make either gate exit 0. The aggregate is fail-closed
+    exactly as ``guardrails/honesty`` aggregates: any NOT-OK makes the answer
+    NOT-OK; otherwise any CANNOT-ASSESS keeps it from reading OK. So a timed-out
+    gate of record is reported as CANNOT-ASSESS, and the run is never ``done``.
     """
     cwd = str(worktree) if worktree is not None else str(ROOT)
     declared = issue_verify_command(issue)
@@ -1091,12 +1234,29 @@ def gate_evidence(issue: int, worktree: Path | None, timeout: float) -> tuple[bo
     if GATE_OF_RECORD not in commands:
         commands.append(GATE_OF_RECORD)
     pieces = [f"issue Verify: `{declared}`" if declared else "issue declares no runnable Verify: command"]
-    ok = True
+    outcomes = []
     for command in commands:
-        passed, detail = run_gate(command, cwd, timeout)
+        outcome, detail = run_gate(command, cwd, timeout)
+        outcomes.append(outcome)
         pieces.append(detail)
-        ok = ok and passed
-    return ok, " | ".join(pieces)
+    if GATE_NOT_OK in outcomes:
+        return GATE_NOT_OK, " | ".join(pieces)
+    if GATE_CANNOT_ASSESS in outcomes:
+        return GATE_CANNOT_ASSESS, " | ".join(pieces)
+    return GATE_OK, " | ".join(pieces)
+
+
+def escalation_severity(rc: int, gate_outcome: str) -> str:
+    """How loudly a failed run is escalated: ``critical`` only for a real failure.
+
+    A gate the loop could not assess — a timeout, an unrunnable gate — is
+    CANNOT-ASSESS and is escalated at ``warn``: at ``critical`` it read as a gate
+    failure and the directive was re-dispatched every cycle (#733). The run is
+    still not ``done``; only the alarm changes.
+    """
+    if rc != 0 or gate_outcome == GATE_NOT_OK:
+        return "critical"
+    return "warn"
 
 
 def landed_evidence(issue: int) -> tuple[bool, str]:
@@ -1608,6 +1768,77 @@ def set_flag(path: Path, on: bool) -> None:
             pass
 
 
+#: The preflight's once-per-condition escalation (#733): a loop that re-reads the
+#: inbox every cycle must say this once, not once per directive per cycle.
+RUNNER_PREFLIGHT_ID = "runner-preflight"
+#: Records the queue hold THIS loop took for an unresolvable runner, together with
+#: the stamp it wrote into `.fleet/paused`, so the hold can be released when the
+#: runner resolves — and never releases an operator's pause.
+RUNNER_HOLD = runtime.FLEET_DIR / "runner-hold.json"
+
+
+def read_runner_hold() -> dict:
+    try:
+        record = json.loads(RUNNER_HOLD.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return record if isinstance(record, dict) else {}
+
+
+def _flag_stamp() -> str:
+    try:
+        return PAUSED.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def hold_queue_for_runner(detail: str) -> bool:
+    """Hold the queue because no runner can be spawned; True when first held.
+
+    The hold IS `.fleet/paused`, deliberately: `work_held` then holds exactly the
+    WORK while every control is still read, because a loop that stopped reading its
+    inbox could not be resumed (the measured failure `work_held` documents). We
+    record the stamp we wrote, so the hold is *ours* — an operator's pause is never
+    released by the preflight, and ours is released the moment the runner resolves.
+    """
+    record = read_runner_hold()
+    stamp = str(record.get("stamp") or "")
+    if stamp and paused() and _flag_stamp() == stamp:
+        return False
+    if paused():
+        # Somebody else paused: the work is already held; change nothing.
+        return False
+    set_flag(PAUSED, True)
+    stamp = f"runner-preflight {_now()} {os.getpid()}"
+    PAUSED.write_text(stamp + "\n", encoding="utf-8")
+    RUNNER_HOLD.parent.mkdir(parents=True, exist_ok=True)
+    tmp = RUNNER_HOLD.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"stamp": stamp, "detail": detail}) + "\n", encoding="utf-8")
+    tmp.replace(RUNNER_HOLD)
+    return True
+
+
+def release_runner_hold() -> str:
+    """Clear a queue hold this loop took; never an operator's pause.
+
+    Returns the line to print when one was released, or "" when there was nothing
+    of ours to release (an operator who ran `resume` leaves no flag; a pause they
+    set themselves carries their own stamp and is left alone).
+    """
+    record = read_runner_hold()
+    if not record:
+        return ""
+    stamp = str(record.get("stamp") or "")
+    try:
+        RUNNER_HOLD.unlink()
+    except OSError:
+        pass
+    if not stamp or not paused() or _flag_stamp() != stamp:
+        return ""
+    set_flag(PAUSED, False)
+    return "runner resolvable again — queue hold released"
+
+
 def apply_control(action: str, directive: dict, agent_id: str) -> str:
     """Translate a control action into a verdict the loop acts on.
 
@@ -1771,6 +2002,13 @@ def loop(args: argparse.Namespace) -> int:
     commit = subprocess.run(
         ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
     ).stdout.strip() or "unknown"
+    # Resolve the runner BEFORE the loop reads the inbox (#733): a fleet that cannot
+    # spawn says so once and holds, rather than failing once per directive per cycle.
+    runner_ok, runner_detail = preflight(args.runner)
+    if runner_ok:
+        print(f"[terminal] preflight OK — {runner_detail}", flush=True)
+    else:
+        print(f"[terminal] PREFLIGHT FAILED — {runner_detail}", flush=True)
 
     def run_worker(
         directive: dict,
@@ -1803,15 +2041,22 @@ def loop(args: argparse.Namespace) -> int:
         # The verdict comes from evidence the loop runs itself — the issue's own
         # Verify: command, `make verify`, and the real board state — never from
         # the runner's prose (#279).
-        gate_ok, gate_detail = gate_evidence(issue, worktree, args.timeout)
+        gate_outcome, gate_detail = gate_evidence(issue, worktree, args.timeout)
+        gate_ok = gate_outcome == GATE_OK
         # "The PR is merged" is not "the item is closed": at this point the branch,
         # the claim, the directive and the lane are still live. Close them out and
         # carry the verdict, so a partial close is visible. Only a run whose gates
         # passed is worth closing out.
-        closeout = closeout_issue(issue) if (rc == 0 and gate_ok) else "SKIPPED (gates did not pass)"
+        closeout = closeout_issue(issue) if (rc == 0 and gate_ok) else f"SKIPPED (gate {gate_outcome})"
         landed, landing_detail = landed_evidence(issue)
         run_status, prose_hint = verdict(rc, output, gate_ok, landed)
-        tail = f"{tail} | {gate_detail} | {landing_detail} | close-out: {closeout} | prose-hint: {prose_hint}"
+        # `run_status` stays in telemetry's own vocabulary (started/done/failed —
+        # fleet/telemetry.py), so a run the loop could not assess is recorded
+        # `failed`, never `done`, with CANNOT-ASSESS named in the detail.
+        tail = (
+            f"{tail} | gate-outcome: {gate_outcome} | {gate_detail} | {landing_detail} | "
+            f"close-out: {closeout} | prose-hint: {prose_hint}"
+        )
         record_run(
             directive_id, issue, agent_id, run_status, run_started_at, _now(), tail[:200],
             dispatch=dispatch,
@@ -1832,9 +2077,13 @@ def loop(args: argparse.Namespace) -> int:
             # (#723), and the K-th failure retires the order to the dead-letter
             # store instead of re-dispatching it for ever.
             guard_retire(directive_id, issue, f"run did not land: {run_status} (rc={rc})")
-            # The runner's exit code picks the severity; the *evidence* decides
-            # whether this is a success at all. Prose no longer picks either.
-            severity = "warn" if rc == 0 else "critical"
+            # The runner's exit code and a *genuinely failed* gate pick the
+            # severity; the *evidence* decides whether this is a success at all.
+            # A gate the loop could not assess (a timeout, an unrunnable gate) is
+            # reported as CANNOT-ASSESS at `warn` — never at `critical`, because a
+            # critical verdict on a gate that attested nothing is what re-dispatched
+            # the directive every cycle (#733).
+            severity = escalation_severity(rc, gate_outcome)
             subprocess.run(
                 ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
                  "--severity", severity, "--body", tail[:2000]],
@@ -1864,6 +2113,35 @@ def loop(args: argparse.Namespace) -> int:
             write_heartbeat("stopped", started_at=started_at, commit=commit)
             print("[terminal] control:stop — stopping the loop cleanly", flush=True)
             return 0
+        # The runner preflight (#733), BEFORE this cycle reads the inbox. An
+        # unresolvable runner cannot be fixed by re-reading a directive, so the
+        # queue is HELD (one escalation) instead of every directive failing and
+        # escalating critical — the runaway amplifier this replaces. The hold is a
+        # pause, so controls still arrive: `resume` is readable, and the hold is
+        # released automatically once the runner resolves.
+        runner_ok, runner_detail = preflight(args.runner)
+        if runner_ok:
+            released = release_runner_hold()
+            if released:
+                print(f"[terminal] {released}", flush=True)
+        else:
+            if hold_queue_for_runner(runner_detail):
+                print(
+                    f"[terminal] PREFLIGHT FAILED — {runner_detail} — queue held, no directive "
+                    "dispatched (one escalation, not one per directive)",
+                    flush=True,
+                )
+            report_once(
+                RUNNER_PREFLIGHT_ID,
+                key=f"runner-unresolvable:{runner_detail}",
+                message_type="escalate",
+                body=f"{runner_detail} — the fleet cannot spawn a subagent, so the queue is held and no "
+                "directive is dispatched. Fix: install the runner on PATH, or start the loop with "
+                "`--runner <absolute path>` (the FLEET_RUNNER environment variable does the same). "
+                "Reported once — not once per directive per cycle.",
+            )
+            if args.once:
+                return 1
         if paused():
             write_heartbeat("paused", started_at=started_at, commit=commit, runs=active)
         else:
@@ -2231,9 +2509,11 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="run the never-idle loop")
     run.add_argument(
         "--runner",
-        default=DEFAULT_RUNNER,
-        help="the base runner command; the directive's FinOps tier selects the model it is "
-        "invoked with (--model <tier model>) and is exported to the child environment (#218)",
+        default=os.environ.get("FLEET_RUNNER") or DEFAULT_RUNNER,
+        help="the base runner command (FLEET_RUNNER sets the same default); the directive's "
+        "FinOps tier selects the model it is invoked with (--model <tier model>) and is "
+        "exported to the child environment (#218). It is resolved to an absolute path at "
+        "startup and on every cycle (#733), so it does not have to be on an inherited PATH.",
     )
     run.add_argument("--watch-timeout", type=float, default=30.0)
     run.add_argument("--timeout", type=float, default=1800.0)

@@ -43,13 +43,17 @@ from governance.policy import lease  # noqa: E402
 import runtime  # noqa: E402
 
 import order
+import focus
+import pool
 from model import (
     ALLOWED_CLAIM_REASONS,
+    REASON_ACTIVE_EPIC_CHILD,
     REASON_BLOCKED,
     REASON_BRAIN_DIRECTED,
     REASON_CHILD_OF_CLAIM,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
+    REASON_OUT_OF_EPIC_POOLED,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_UNKNOWN_ISSUE,
     ClaimEvent,
@@ -324,6 +328,37 @@ def _load_brain_directive(directive_id: str, issue_number: int) -> dict:
     return data
 
 
+def _resolve_focus(focus_path: Path | str | None) -> Path | str:
+    """Resolve the focus path at CALL time, never as a frozen default argument.
+
+    ``focus.DEFAULT_PATH`` is a module constant that a caller (or a test) may
+    repoint; a default argument would have captured its value at import and kept
+    judging against the stale file while appearing to honour the override.
+    """
+    return focus.DEFAULT_PATH if focus_path is None else focus_path
+
+
+def drain_pool_when_no_focus(
+    snapshot: Snapshot,
+    focus_path: Path | str | None = None,
+    pool_path: Path | str = pool.POOL_PATH,
+) -> list[int]:
+    """Drain the out-of-epic pool when the resolver returns ``None`` (#707, F6).
+
+    "The pool empties when the focus does" is only true if something empties it.
+    The resolver returning ``None`` means no epic is driving, so nothing can be
+    out-of-epic: every parked issue is un-parked, and the returned numbers are the
+    evidence of what left. A caller that wants a human-readable line uses
+    ``pool.drain_and_report``.
+
+    Called on the claim path (every claim re-checks the focus) and exposed on the
+    focus CLI, so the board-drain is driven by the same resolver that pools it.
+    """
+    if focus.active(snapshot, _resolve_focus(focus_path)) is not None:
+        return []
+    return pool.drain(pool_path)
+
+
 def claim(
     issue_number: int,
     agent: str,
@@ -337,9 +372,20 @@ def claim(
     now: datetime | None = None,
     directive_id: str = "",
     stale_minutes: int = DEFAULT_STALENESS_MINUTES,
+    focus_path: Path | str | None = None,
+    pool_path: Path | str = pool.POOL_PATH,
 ) -> ClaimEvent:
-    """Claim an issue after checking order. Raises ClaimRefused when it is not the next step."""
+    """Claim an issue after checking order. Raises ClaimRefused when it is not the next step.
+
+    ``focus_path``/``pool_path`` keep the epic-focus edges resolvable offline
+    against fixtures: the focus decides eligibility, the pool records the deferral
+    (#707 lane F6). When the resolver returns ``None`` — no active epic — an
+    out-of-epic refusal cannot happen, so any pool left over from a previous focus
+    is DRAINED here and reported, never silently carried forward.
+    """
+    focus_path = _resolve_focus(focus_path)
     moment = now or datetime.now(timezone.utc)
+    drain_pool_when_no_focus(snapshot, focus_path, pool_path)
     events = read_ledger(ledger)
     live = active_claims(events, moment)
     latest = replay(events).get(issue_number)
@@ -390,8 +436,15 @@ def claim(
             active_claims=frozenset(number for number, holder in live.items() if holder.agent == agent),
             agent_history=frozenset(history),
             claimed_by_others=others,
+            focus_path=focus_path,
         )
         if not verdict.eligible:
+            # Epic focus (#707, lane F6): out-of-epic work is parked, not dropped.
+            # The refusal still stands — this only records WHY the issue is
+            # waiting, so the pool is a decision log and the issue can be found
+            # again. A drain (focus == None) is what takes it back out.
+            if verdict.reason == REASON_OUT_OF_EPIC_POOLED:
+                pool.note(issue_number, pool.REASON_OUT_OF_EPIC, path=pool_path)
             raise ClaimRefused(verdict.reason, verdict.detail)
 
     if not _acquire_lock(issue_number, lock_dir, takeover=takeover):
@@ -444,7 +497,12 @@ def release(
 # --- audit ------------------------------------------------------------------
 
 
-def audit(events: list[ClaimEvent], snapshot: Snapshot, now: datetime | None = None) -> list[str]:
+def audit(
+    events: list[ClaimEvent],
+    snapshot: Snapshot,
+    now: datetime | None = None,
+    focus_path: Path | str | None = None,
+) -> list[str]:
     """Replay the ledger against the snapshot; return every structural problem.
 
     The audit re-derives the *time-stable* invariants: record schema, declared
@@ -455,6 +513,7 @@ def audit(events: list[ClaimEvent], snapshot: Snapshot, now: datetime | None = N
     """
     problems: list[str] = []
     moment = now or datetime.now(timezone.utc)
+    focus_path = _resolve_focus(focus_path)
     holder: dict[int, ClaimEvent] = {}
 
     for index, event in enumerate(events):
@@ -467,7 +526,7 @@ def audit(events: list[ClaimEvent], snapshot: Snapshot, now: datetime | None = N
                     "(single-claim lock violated)"
                 )
             problems.extend(
-                f"{where}: {problem}" for problem in _claim_problems(event, events, snapshot)
+                f"{where}: {problem}" for problem in _claim_problems(event, events, snapshot, focus_path)
             )
             holder[event.issue] = event
         elif event.event == "release":
@@ -503,7 +562,12 @@ def _claimed_at(event: ClaimEvent, fallback: datetime) -> datetime:
         return fallback
 
 
-def _claim_problems(event: ClaimEvent, events: list[ClaimEvent], snapshot: Snapshot) -> list[str]:
+def _claim_problems(
+    event: ClaimEvent,
+    events: list[ClaimEvent],
+    snapshot: Snapshot,
+    focus_path: Path | str | None = None,
+) -> list[str]:
     """Structural problems with one claim record (schema-valid but unjustified).
 
     Time-aware by necessity: this replays *history* against *present* truth, so a
@@ -513,6 +577,7 @@ def _claim_problems(event: ClaimEvent, events: list[ClaimEvent], snapshot: Snaps
     claimed it.
     """
     problems: list[str] = []
+    focus_path = _resolve_focus(focus_path)
     issue = snapshot.get(event.issue)
     if issue is None:
         return [f"#{event.issue}: claimed but absent from the snapshot"]
@@ -593,6 +658,47 @@ def _claim_problems(event: ClaimEvent, events: list[ClaimEvent], snapshot: Snaps
                     f"#{event.issue}: reason 'next-in-milestone' but the frontier of {issue.milestone!r} "
                     f"is {frontier_text}"
                 )
+    elif event.reason == REASON_ACTIVE_EPIC_CHILD:
+        problems.extend(_active_epic_child_problems(event, issue, snapshot, focus_path))
+    return problems
+
+
+def _active_epic_child_problems(
+    event: ClaimEvent,
+    issue: Issue,
+    snapshot: Snapshot,
+    focus_path: Path | str,
+) -> list[str]:
+    """Justify an ``active-epic-child`` claim: the parent IS the active epic (#707).
+
+    Epic focus is an *additive* chain edge, so it must be held to the same bar as
+    every other reason: the parent must exist in the snapshot, still be open, be
+    an epic, and be the epic the fleet is currently driving. Anything else is an
+    unjustified claim and is reported, never silently accepted.
+    """
+    problems: list[str] = []
+    if issue.parent is None:
+        problems.append(f"#{event.issue}: reason 'active-epic-child' but the issue declares no Parent: edge")
+        return problems
+    parent = snapshot.get(issue.parent)
+    if parent is None:
+        problems.append(
+            f"#{event.issue}: reason 'active-epic-child' but parent #{issue.parent} is absent from the snapshot"
+        )
+        return problems
+    if parent.closed:
+        problems.append(f"#{event.issue}: reason 'active-epic-child' but parent #{issue.parent} is closed")
+        return problems
+    if not parent.is_epic:
+        problems.append(f"#{event.issue}: reason 'active-epic-child' but parent #{issue.parent} is not an epic")
+        return problems
+    active = focus.active(snapshot, focus_path)
+    if active is None or active.number != issue.parent:
+        active_text = f"#{active.number}" if active is not None else "none"
+        problems.append(
+            f"#{event.issue}: reason 'active-epic-child' but #{issue.parent} is not the active epic "
+            f"(active epic: {active_text})"
+        )
     return problems
 
 
@@ -639,6 +745,7 @@ def audit_ledger(
     path: Path | str = DEFAULT_CLAIMS_DIR,
     snapshot: Snapshot | None = None,
     now: datetime | None = None,
+    focus_path: Path | str | None = None,
 ) -> list[str]:
     """Audit the full ledger (legacy file + claims directory) against the snapshot.
 
@@ -646,6 +753,7 @@ def audit_ledger(
     names them instead of crashing — the same contract as ``audit_text``, but
     over both storage forms in temporal order.
     """
+    focus_path = _resolve_focus(focus_path)
     problems: list[str] = []
     events: list[ClaimEvent] = []
     target = Path(path)
@@ -663,11 +771,16 @@ def audit_ledger(
         if target.is_dir():
             events.extend(_collect_dir_events(target, problems))
     if snapshot is not None:
-        problems.extend(audit(events, snapshot, now))
+        problems.extend(audit(events, snapshot, now, focus_path))
     return problems
 
 
-def audit_text(text: str, snapshot: Snapshot, now: datetime | None = None) -> list[str]:
+def audit_text(
+    text: str,
+    snapshot: Snapshot,
+    now: datetime | None = None,
+    focus_path: Path | str | None = None,
+) -> list[str]:
     """Audit raw ledger text (the gate path): malformed lines become problems."""
     problems: list[str] = []
     events: list[ClaimEvent] = []
@@ -678,7 +791,7 @@ def audit_text(text: str, snapshot: Snapshot, now: datetime | None = None) -> li
             events.append(parse_claim_event(json.loads(line), where=f"claims.jsonl:{lineno}"))
         except (json.JSONDecodeError, ValueError) as exc:
             problems.append(f"claims.jsonl:{lineno}: malformed record ({exc})")
-    problems.extend(audit(events, snapshot, now))
+    problems.extend(audit(events, snapshot, now, focus_path))
     return problems
 
 
@@ -702,6 +815,9 @@ def control_snapshot(now: datetime | None = None) -> Snapshot:
                    closed_at=later.strftime("%Y-%m-%dT%H:%M:%SZ")),
         609: Issue(609, "closed earlier", state="closed", milestone="CONTROL",
                    closed_at=earlier.strftime("%Y-%m-%dT%H:%M:%SZ")),
+        610: Issue(610, "child of the active epic", milestone="CONTROL", parent=607),
+        611: Issue(611, "a second epic", milestone="CONTROL", labels=("type:epic",)),
+        612: Issue(612, "child of the non-active epic", milestone="CONTROL", parent=611),
     }
     return Snapshot(
         generated_at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -780,6 +896,9 @@ def self_control(now: datetime | None = None) -> list[str]:
     expect_rejected("epic", [record(607, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("blocked", [record(602, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("closed", [record(604, REASON_NEXT_IN_MILESTONE)])
+    # Epic focus (#707): the edge must name the ACTIVE epic, not just any parent.
+    expect_clean("active-epic-child", [record(610, REASON_ACTIVE_EPIC_CHILD)])
+    expect_rejected("out-of-epic-child", [record(612, REASON_ACTIVE_EPIC_CHILD)])
     expect_clean("claim-before-closure", [record(608, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("claim-after-closure", [record(609, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("unsupported-reason", [record(601, "because-i-felt-like-it")])

@@ -108,6 +108,12 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/definitions/artifactEntry" }
+        },
+        "skill": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/skillEntry" },
+          "description": "Skill artifacts bundled by this pack (issue #640, workbook-9 Skill Studio). A skill is a first-class artifact: it is independently versioned, carries mandatory eval evidence, and installs/upgrades/rolls back on its own. Unlike the other artifact types a skill entry embeds its own metadata (skillId/skillVersion/skillCategory/skillLifecycle) plus the closed `evalEvidence` block."
         }
       }
     },
@@ -158,8 +164,27 @@
     },
     "artifactType": {
       "type": "string",
-      "enum": ["profile", "persona", "prompt", "policy", "tool"],
+      "enum": ["profile", "persona", "prompt", "policy", "tool", "skill"],
       "description": "Closed artifact types a pack may bundle. Keep in sync with pack-catalog.yaml artifactTypes (validate.py parity gate enforces it)."
+    },
+    "skillCategoryId": {
+      "type": "string",
+      "enum": [
+        "code-authoring",
+        "code-review",
+        "testing",
+        "analysis",
+        "data",
+        "operations",
+        "security",
+        "communication"
+      ],
+      "description": "Closed Skill Studio category vocabulary (issue #640). Keep in sync with pack-catalog.yaml skillCategories (validate.py parity gate enforces it). This is the dimension the catalog is searchable by."
+    },
+    "skillLifecycleState": {
+      "type": "string",
+      "enum": ["draft", "tested", "published", "deprecated"],
+      "description": "Skill Studio lifecycle (issue #640): author (draft) -> test (tested) -> publish (published) -> deprecated. Only 'published' skills are installable; publish REQUIRES green eval evidence. Keep in sync with pack-catalog.yaml skillLifecycleStates (validate.py parity gate enforces it)."
     },
     "lifecycleState": {
       "type": "string",
@@ -202,6 +227,106 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
           "description": "Hex sha256 of the decoded data bytes."
+        }
+      }
+    },
+    "skillEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "skillId",
+        "skillVersion",
+        "skillCategory",
+        "skillLifecycle",
+        "evalEvidence",
+        "data",
+        "sha256"
+      ],
+      "description": "One bundled skill artifact (issue #640). A skill is a first-class pack artifact: it carries its own identity + SemVer, a closed Skill Studio category the catalog is searchable by, its author->test->publish lifecycle state, and MANDATORY eval evidence. The publisher refuses a skill whose evalEvidence is absent, unevaluated, or not green (registry/packs/skills.py, consuming registry/prompts/evals.py).",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9@./_:-]+$",
+          "minLength": 1,
+          "description": "Artifact reference for the materialized skill file (e.g. codemod@1.0.0)."
+        },
+        "skillId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Stable skill id (kebab-case), independent of the owning pack id."
+        },
+        "skillVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "SemVer X.Y.Z of THIS skill revision. Skill-level install/upgrade/rollback is keyed on (skillId, skillVersion)."
+        },
+        "skillCategory": {
+          "$ref": "#/definitions/skillCategoryId",
+          "description": "Closed Skill Studio category — the catalog is searchable by this."
+        },
+        "skillLifecycle": {
+          "$ref": "#/definitions/skillLifecycleState",
+          "description": "Author -> test -> publish lifecycle state of this skill revision. Only 'published' is installable."
+        },
+        "evalEvidence": {
+          "$ref": "#/definitions/skillEvalEvidence",
+          "description": "Regression-eval evidence for this skill (MANDATORY). Publish is refused without it."
+        },
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Base64-encoded skill content (self-contained bundle)."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hex sha256 of the decoded data bytes."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional human-readable skill description."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Free-form search tags for the skill catalog."
+        }
+      }
+    },
+    "skillEvalEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["harness", "evalId", "cases", "passed", "failed"],
+      "description": "Regression-eval evidence attached to a skill revision (issue #640). Shape consumed from the workbook-8 harness (registry/prompts/evals.py): a skill's eval evidence names the harness, the eval id it was scored under, and the case counts. The publish gate refuses evidence unless cases > 0 AND failed == 0 (an unevaluated skill is never publishable, and neither is a failing one).",
+      "properties": {
+        "harness": {
+          "type": "string",
+          "const": "registry/prompts/evals.py",
+          "description": "The eval harness that produced this evidence. Exactly the workbook-8 harness path — packs consume it, never reimplement it."
+        },
+        "evalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9@._-]+$",
+          "minLength": 1,
+          "description": "The eval id the skill was scored under; matches an EvalCase.prompt_id in the cases file (e.g. skill-codemod@v1)."
+        },
+        "cases": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of eval cases that scored this skill. Zero means UNEVALUATED and is refused by publish."
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Eval cases that passed."
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Eval cases that failed. Non-zero means the evidence is not green and publish is refused."
         }
       }
     }

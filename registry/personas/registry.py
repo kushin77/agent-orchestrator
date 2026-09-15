@@ -33,6 +33,7 @@ Usage (from the repo root):
 
     python3 registry/personas/registry.py status
     python3 registry/personas/registry.py validate cards/security-sme.yaml
+    python3 registry/personas/registry.py org-chart
     python3 registry/personas/registry.py resolve security-sme
     python3 registry/personas/registry.py resolve coder --tenant acme
     python3 registry/personas/registry.py publish orchestrator
@@ -61,11 +62,22 @@ CARDS_DIR = PKG_DIR / "cards"
 VERSIONS_DIR = PKG_DIR / "versions"
 MANIFEST_PATH = VERSIONS_DIR / "manifest.yaml"
 CARD_SCHEMA_PATH = PKG_DIR / "persona-card.schema.json"
+ORG_CHART_PATH = PKG_DIR / "org-chart.yaml"
+ORG_CHART_SCHEMA_PATH = PKG_DIR / "org-chart.schema.json"
 PROFILE_SCHEMA_PATH = REGISTRY_DIR / "profiles" / "agent-profile.schema.json"
 CATALOG_PATH = REGISTRY_DIR / "profiles" / "catalog.yaml"
 
 _MANIFEST_SCHEMA = "persona-manifest/v1"
+_ORG_CHART_SCHEMA = "persona-org-chart/v1"
 _PLATFORM_TENANT = "platform"
+# The chart principal (issue #632): the human board the root role reports to.
+# It sits OUTSIDE the agent org, so it is never a persona id and never resolves.
+_CHART_PRINCIPAL = "board"
+# Closed heartbeat vocabulary (issue #632). Mirrors persona-card.schema.json;
+# the fail-closed membership check in validate_card() consumes it.
+_HEARTBEAT_SCHEDULES = frozenset(
+    {"hourly", "every-30m", "every-15m", "daily", "event", "webhook"}
+)
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
@@ -95,6 +107,15 @@ class AlreadyPublishedError(PersonaError):
 
 class InvalidCardError(PersonaError):
     """Raised when a persona card fails schema or catalog validation."""
+
+
+class InvalidOrgChartError(PersonaError):
+    """Raised when an org-chart declaration is malformed or unresolved.
+
+    Covers the two refusal invariants of issue #632: an edge whose reportsTo
+    target is not a resolvable platform persona, and a chart that does not have
+    exactly one root.
+    """
 
 
 # --------------------------------------------------------------------------- #
@@ -214,6 +235,28 @@ def validate_card(
             f"weekly_spend_ceiling must be a non-negative number (got {ceiling!r})"
         )
 
+    # Org-chart fields (issue #632): optional (backwards-compatible — the 25
+    # pre-existing cards stay valid unchanged), but when present they must be
+    # sound fail-closed. The JSON Schema already closes the enums; membership
+    # against the LIVE persona library is checked by validate_org_chart().
+    reports_to = card.get("reportsTo")
+    if reports_to is not None and not _ID_RE.match(reports_to):
+        raise InvalidCardError(
+            f"reportsTo must be a persona id or {_CHART_PRINCIPAL!r} (got {reports_to!r})"
+        )
+    cap = card.get("monthlyBudgetCapUsd")
+    if cap is not None and (
+        isinstance(cap, bool) or not isinstance(cap, (int, float)) or cap < 0
+    ):
+        raise InvalidCardError(
+            f"monthlyBudgetCapUsd must be a non-negative number (got {cap!r})"
+        )
+    heartbeat = card.get("heartbeatSchedule")
+    if heartbeat is not None and heartbeat not in _HEARTBEAT_SCHEDULES:
+        raise InvalidCardError(
+            f"unknown heartbeatSchedule {heartbeat!r} (not a platform cadence)"
+        )
+
 
 def _check_members(card: Dict[str, Any], field: str, allowed: set) -> None:
     for value in card.get(field, []):
@@ -221,6 +264,158 @@ def _check_members(card: Dict[str, Any], field: str, allowed: set) -> None:
             raise InvalidCardError(
                 f"unknown {field} entry {value!r} (not in platform catalog)"
             )
+
+
+# --------------------------------------------------------------------------- #
+# org-chart declaration (issue #632: reporting edges, one root, resolvable edges)
+# --------------------------------------------------------------------------- #
+
+
+def load_org_chart_schema() -> Dict[str, Any]:
+    if not ORG_CHART_SCHEMA_PATH.exists():
+        raise InvalidOrgChartError(
+            f"org-chart schema not found at {ORG_CHART_SCHEMA_PATH}"
+        )
+    return _load_json(ORG_CHART_SCHEMA_PATH)
+
+
+def load_org_chart(path: Optional[Path] = None) -> Dict[str, Any]:
+    """Load the org-chart declaration (schema-validated)."""
+    path = Path(path) if path else ORG_CHART_PATH
+    if not path.exists():
+        raise InvalidOrgChartError(f"org chart not found at {path}")
+    try:
+        with path.open(encoding="utf-8") as fh:
+            chart = yaml.safe_load(fh) or {}
+    except yaml.YAMLError as exc:
+        raise InvalidOrgChartError(f"{path}: invalid YAML: {exc}") from exc
+    if not isinstance(chart, dict):
+        raise InvalidOrgChartError(f"{path}: org chart must be a YAML mapping")
+    try:
+        jsonschema.validate(instance=chart, schema=load_org_chart_schema())
+    except jsonschema.ValidationError as exc:
+        raise InvalidOrgChartError(
+            f"org chart invalid against org-chart.schema.json: {exc.message}"
+        ) from exc
+    if chart.get("orgChartSchema") != _ORG_CHART_SCHEMA:
+        raise InvalidOrgChartError(
+            f"{path}: unknown orgChartSchema {chart.get('orgChartSchema')!r} "
+            f"(expected {_ORG_CHART_SCHEMA!r})"
+        )
+    return chart
+
+
+def validate_org_chart(
+    chart: Dict[str, Any],
+    cards: Optional[Dict[Tuple[str, str], Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Validate an org chart against the persona library (fail closed).
+
+    Enforces, beyond the JSON Schema, the structural invariants of issue #632:
+
+    - **exactly one root**: exactly one role declares ``reportsTo: <principal>``,
+      and it must be the role named by ``root``. Zero or two+ roots is refused
+      ("a second root" is the acceptance-criteria mutation).
+    - **every edge resolves**: each node's ``reportsTo`` is either the chart
+      principal (root only) or an id that is a node of this chart AND resolves
+      as a real platform persona in ``cards/``. An unresolvable edge is refused.
+    - **the edge agrees with the card**: the node's tier / monthly cap /
+      heartbeat must equal the bound card's values, so the chart and the card
+      can never silently drift (mirrors the card/catalog two-layer rule).
+    - **acyclic + connected**: every node reaches the root by following its
+      edges (a reporting line that loops or dangles is refused).
+
+    Returns the chart on success; raises InvalidOrgChartError on the first
+    violation.
+    """
+    cards = cards if cards is not None else PersonaRegistry().discover()
+    tenant = chart.get("tenant", _PLATFORM_TENANT)
+    principal = chart.get("principal", _CHART_PRINCIPAL)
+    root = chart.get("root")
+    nodes: Dict[str, Dict[str, Any]] = {}
+
+    for node in chart.get("roles", []):
+        nid = node.get("id")
+        if nid in nodes:
+            raise InvalidOrgChartError(f"duplicate org-chart role {nid!r}")
+        nodes[nid] = node
+
+    if root not in nodes:
+        raise InvalidOrgChartError(
+            f"declared root {root!r} is not a role in this org chart"
+        )
+
+    # A node's reporting target must resolve to a platform persona (tenant-first
+    # with the documented platform fallback), or be the principal for the root.
+    def _resolves(target: str) -> bool:
+        if (tenant, target) in cards:
+            return True
+        return (_PLATFORM_TENANT, target) in cards
+
+    roots = []
+    for nid, node in nodes.items():
+        target = node.get("reportsTo")
+        if target == principal:
+            roots.append(nid)
+        elif target in nodes:
+            pass  # intra-chart edge; resolvability checked against cards below
+        elif not _resolves(target):
+            raise InvalidOrgChartError(
+                f"org-chart edge {nid} -> {target!r} does not resolve to a "
+                "platform persona"
+            )
+
+        # The edge must reference a persona that actually resolves, whether it
+        # is an intra-chart edge or an edge out of the chart.
+        if target != principal and not _resolves(target):
+            raise InvalidOrgChartError(
+                f"org-chart edge {nid} -> {target!r} does not resolve to a "
+                "platform persona"
+            )
+
+        card = cards.get((tenant, target)) or cards.get((_PLATFORM_TENANT, target))
+        bound = cards.get((tenant, nid)) or cards.get((_PLATFORM_TENANT, nid))
+        if bound is None:
+            raise InvalidOrgChartError(
+                f"org-chart role {nid!r} does not resolve to a platform persona"
+            )
+        for field in ("defaultModelTier", "monthlyBudgetCapUsd", "heartbeatSchedule"):
+            if field in node and node[field] != bound.get(field):
+                raise InvalidOrgChartError(
+                    f"org-chart role {nid!r} declares {field}={node[field]!r} but "
+                    f"its card declares {bound.get(field)!r} (chart and card must agree)"
+                )
+
+    if len(roots) != 1:
+        raise InvalidOrgChartError(
+            f"org chart must have exactly one root (role reporting to "
+            f"{principal!r}); found {len(roots)}: {sorted(roots)}"
+        )
+    if roots[0] != root:
+        raise InvalidOrgChartError(
+            f"declared root {root!r} does not report to {principal!r}; "
+            f"{roots[0]!r} does"
+        )
+
+    # Every node must reach the root by following its reporting line.
+    for nid in nodes:
+        seen = set()
+        cur = nid
+        while cur != principal:
+            if cur in seen:
+                raise InvalidOrgChartError(
+                    f"org-chart reporting line from {nid!r} does not reach "
+                    f"{principal!r} (cycle or dangling edge at {cur!r})"
+                )
+            seen.add(cur)
+            node = nodes.get(cur)
+            if node is None:
+                raise InvalidOrgChartError(
+                    f"org-chart reporting line from {nid!r} leaves the chart at "
+                    f"{cur!r} without reaching {principal!r}"
+                )
+            cur = node.get("reportsTo")
+    return chart
 
 
 def card_from_yaml(path: Path) -> Dict[str, Any]:
@@ -529,6 +724,20 @@ def _print_status(registry: PersonaRegistry) -> int:
         summary["postures"][card["posture"]] = (
             summary["postures"].get(card["posture"], 0) + 1
         )
+    # Org chart (issue #632): report the declared reporting line, but never let a
+    # broken chart hide the library - validate it fail-closed and surface it.
+    try:
+        chart = load_org_chart()
+        validate_org_chart(chart, cards=cards)
+        summary["orgChart"] = {
+            "id": chart["id"],
+            "version": chart["version"],
+            "root": chart["root"],
+            "principal": chart["principal"],
+            "roles": [n["id"] for n in chart["roles"]],
+        }
+    except PersonaError as exc:
+        summary["orgChart"] = {"error": str(exc)}
     print(json.dumps(summary, indent=2, sort_keys=True))
     for (tenant, persona) in sorted(cards):
         status = registry.lifecycle_status(tenant, persona) or "draft"
@@ -551,6 +760,25 @@ def _cmd_validate(paths: List[str]) -> int:
             print(f"FAIL  {raw}: {exc}", file=sys.stderr)
             failed += 1
     return 1 if failed else 0
+
+
+def _cmd_org_chart(path: Optional[str]) -> int:
+    """Validate the org-chart declaration against the live persona library."""
+    try:
+        chart = load_org_chart(Path(path) if path else None)
+        validate_org_chart(chart)
+    except PersonaError as exc:
+        print(f"FAIL  org chart: {exc}", file=sys.stderr)
+        return 1
+    edges = ", ".join(
+        f"{n['id']}->{n['reportsTo']}" for n in chart["roles"]
+    )
+    print(
+        f"OK    org chart {chart['tenant']}/{chart['id']} v{chart['version']} "
+        f"(root={chart['root']}, principal={chart['principal']}, "
+        f"{len(chart['roles'])} roles) [{edges}]"
+    )
+    return 0
 
 
 def _require_persona(args: argparse.Namespace) -> Tuple[str, str]:
@@ -581,6 +809,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     sub.add_parser("publish-all", help="publish every discovered persona (seed step)")
 
+    p_org = sub.add_parser(
+        "org-chart", help="validate the org-chart declaration (edges + single root)"
+    )
+    p_org.add_argument("--path", default=None)
+
     args = parser.parse_args(argv)
     registry = PersonaRegistry()
 
@@ -589,6 +822,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _print_status(registry)
         if args.command == "validate":
             return _cmd_validate(args.paths)
+        if args.command == "org-chart":
+            return _cmd_org_chart(args.path)
         if args.command == "resolve":
             tenant, persona = _require_persona(args)
             card = registry.resolve(tenant, persona)

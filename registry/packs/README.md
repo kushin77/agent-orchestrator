@@ -43,7 +43,7 @@ can never drift.
 | `lifecycle` | `planned|live|paused|retired` | State of this pack snapshot in the registry. |
 | `description`, `tags` | string, string[] | Catalog search surface. |
 | `dependencies` | `[{id, version}]` | Pack-to-pack pins (catalog crossref source). |
-| `contents` | object | Contents manifest: bundled artifacts grouped by closed artifact type (`profile`/`persona`/`prompt`/`policy`/`tool`); each entry is `{ref, data, sha256}` — self-contained base64 `data` with a pinned `sha256` so install + drift detection are mechanical and offline. |
+| `contents` | object | Contents manifest: bundled artifacts grouped by closed artifact type (`profile`/`persona`/`prompt`/`policy`/`tool`/`skill`); each entry is `{ref, data, sha256}` — self-contained base64 `data` with a pinned `sha256` so install + drift detection are mechanical and offline. A `skill` entry carries its own identity + `evalEvidence` (see below). |
 | `attestation` | object | Publisher signature (`kid`, `alg: PS256`, `signedAt`, `signature`) over the pack's canonical JSON (every field except `signature`). |
 
 ## Tree layout
@@ -58,6 +58,7 @@ registry/packs/
 ├── attestation.py             # PS256 sign/verify; fail-closed without cryptography
 ├── pack_events.py             # append-only hash-chained pack event log
 ├── registry.py                # PackRegistry: publish + lifecycle + catalog + consumption
+├── skills.py                  # Skill Studio: skill artifacts, eval-gated publish, skill-level ops (#640)
 ├── installer.py               # tenant install/upgrade: signature + drift + rollback (#44 seam)
 ├── validate.py                # offline gate: releases + ledger + parity + attestation + self-test
 ├── releases/                  # published immutable pack snapshots (signed)
@@ -71,6 +72,7 @@ registry/packs/
     ├── test_attestation.py    # signing/verification + fail-closed negatives
     ├── test_registry.py       # publish + lifecycle + catalog/crossref + consumption
     ├── test_installer.py      # install/upgrade/drift/rollback negatives + sync seam
+    ├── test_skills.py         # Skill Studio: eval-gated publish + skill-level rollback (#640)
     └── test_validate.py       # coverage + ledger tamper negatives + self-test
 ```
 
@@ -172,6 +174,87 @@ desired pack set (phase 8, issue #44). This tree owns the primitives;
 #44 engine consumes on each reconcile tick. The engine itself (scheduling,
 reconciliation policy, drift re-check cadence) is out of scope here and will
 land with issue #44, driving this contract.
+
+## Skill Studio: skill-level pack granularity (#640, workbook-9)
+
+A pack bundles a *set* of artifacts. A **skill** is the narrower unit: one
+authored capability with its own identity, its own SemVer and its own
+lifecycle, which a tenant installs, upgrades and rolls back **on its own**
+without disturbing the pack's other artifacts.
+
+[`skills.py`](skills.py) owns that dimension (`SkillStudio`). A skill is a
+first-class pack artifact type — it has its own slot in `contents` and its own
+closed category vocabulary in [`pack-catalog.yaml`](pack-catalog.yaml)
+(`skillCategories`), which is what makes the catalog searchable by skill.
+
+### The skill artifact
+
+A `contents.skill` entry carries its own metadata on top of the shared
+`{ref, data, sha256}` shape:
+
+| Field | Meaning |
+|---|---|
+| `skillId` | Stable kebab-case skill id, independent of the owning pack. |
+| `skillVersion` | SemVer of this skill revision. Skill-level ops key on `(skillId, skillVersion)`. |
+| `skillCategory` | Closed Skill Studio category (the catalog's skill search facet). |
+| `skillLifecycle` | `draft` -> `tested` -> `published` -> `deprecated`. |
+| `evalEvidence` | **Mandatory** regression-eval evidence (see below). |
+
+### Author -> test -> publish, and why publish cannot be faked
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft: author
+    draft --> tested: test (eval evidence attached)
+    tested --> published: publish (REQUIRES green evidence)
+    published --> deprecated: deprecate
+    deprecated --> [*]: terminal
+```
+
+`publish` **requires eval evidence**, and the evidence is not trusted on its
+word: the verdict is the workbook-8 harness's own. The gate refuses publish
+when the skill
+
+- has **no evidence** (never tested),
+- has evidence with **zero cases** (UNEVALUATED — an unevaluated skill is
+  never publishable), or
+- has evidence with **any failing case**,
+
+and it then re-derives the verdict through
+[`../prompts/evals.py`](../prompts/evals.py)::`require_ok` over the skill's own
+eval id, so a hand-written "green" block that no harness produced is still
+refused. The eval harness is **consumed, never reimplemented** — a skill's
+cases live in a cases file shaped exactly like the workbook-8 one, and the
+harness's own `EvalCase.prompt_id` is the join key. The gate **fails closed**:
+if the harness cannot be imported, publish is refused rather than allowed with
+the gate silently absent.
+
+`validate.py` enforces the same evidence rule **code-natively** over every
+`contents.skill` entry in a release, so an unevaluated or failing skill cannot
+ship inside a pack even if it never went through `SkillStudio`. The parity gate
+extends to the skill vocabulary (`skillCategories`, `skillLifecycleStates`), so
+schema and catalog cannot drift.
+
+### Skill-level install / upgrade / rollback + search
+
+- `search_skills(category=…, text=…, published_only=…)` — the catalog browsed
+  **by skill**; `catalog_by_skill()` projects a pack's bundled skills into
+  skill rows, and `skill_categories()` exposes the closed facet.
+- `install(tenant, skillId, version)` — only a `published` skill installs, and
+  only when a signed pack bundles it: the signature, content-rehash, drift and
+  rollback engine is the pack [`Installer`](installer.py)'s, never a parallel
+  implementation. The skill materializes into its **own**
+  `skills/<skillId>/<skillVersion>/` tree, so a skill-level upgrade never
+  touches the pack's sibling artifacts.
+- `upgrade(...)` / `rollback(tenant, skillId)` — rollback restores the
+  previous skill version (content re-materialized from that revision's pinned
+  sha256, active pointer repointed, `rollback` event appended).
+- `verify_installed(tenant, skillId)` — post-install drift detection for the
+  skill's own tree.
+
+```bash
+python3 -m pytest registry/packs/tests -q     # includes the Skill Studio suite
+```
 
 ## Validation
 

@@ -1,0 +1,13 @@
+{
+  "canonical": {
+    "id": "csuite-coo",
+    "version": "1.0.0"
+  },
+  "mirrors": {
+    ".cursorrules": "7db28e38fc4228f23eba9ba1106bd5bf88e3292b9b06cf70b7750f1a0890fe9a",
+    "AGENTS.md": "6179778a6beb32fc31d29e5472df03b8515d83c77528c19eb4f954cc7c5309c8",
+    "CLAUDE.md": "8de48e614efc4230e8ff1cc0792a135d436f48d9d0c5c56d92f2716065e7fa44",
+    "copilot-instructions.md": "0b66109c941cbe1977788bafe9154d492fbaecfb32c2043712153f987b1166d2"
+  },
+  "schema": "ao.instructions.distribution/v1"
+}

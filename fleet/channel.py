@@ -902,18 +902,101 @@ def cmd_send(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def head_commit() -> str:
-    """The current HEAD sha — what a freshly started loop would be running."""
+def _rev_parse(revision: str) -> str | None:
+    """`git rev-parse --short <revision>` in this checkout; None when unreadable.
+
+    Shared by `head_commit` and `remote_head_commit` so both agree on what
+    "unreadable" means. The distinction the two callers draw is *which*
+    revision they name, and that distinction is the whole of #739.
+    """
     try:
         result = subprocess.run(
-            ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+            ["git", "-C", str(ROOT), "rev-parse", "--short", revision],
             capture_output=True,
             text=True,
             timeout=10,
         )
     except (OSError, subprocess.SubprocessError):
-        return "unknown"
-    return result.stdout.strip() or "unknown"
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def head_commit() -> str:
+    """The LOCAL working-tree HEAD sha — what a freshly started loop would be running.
+
+    Local, and deliberately so: this is the commit a loop started *here and now*
+    would execute, which is the right question for "will a respawn pick up my
+    fix?". It is the **wrong** baseline for drift detection — the local checkout
+    is frequently itself the stale side (#739), so comparing a loop's commit to
+    this can compare stale-to-stale and report `healthy` for a loop running
+    pre-fix code. Drift is measured against `remote_head_commit`.
+    """
+    return _rev_parse("HEAD") or "unknown"
+
+
+def remote_head_commit(revision: str = "origin/master") -> str:
+    """The `origin/master` sha — the drift baseline, or "unknown".
+
+    This is the honest baseline for "is the running and `remote` in sync?": the
+    local checkout may be behind (or ahead of) `origin/master` at any moment,
+    and a lane running old code is exactly the situation drift detection exists
+    to catch (#739, AO-GR-25).
+
+    **Tradeoff, deliberate: this reads the already-fetched remote-tracking ref
+    and never fetches.** A watchdog tick runs every 2 minutes under cron, and a
+    `git fetch` per tick would add network latency to a pass that is otherwise
+    local, fail behind a proxy, and — worst — turn an unreachable remote into
+    either a slowed fleet watchdog or, if the failure were swallowed, a silently
+    disabled control. Reading `refs/remotes/origin/master` costs nothing and
+    cannot fail open. The *refresh* is the lane's job: every lane fetches before
+    it cuts a worktree (and `governance/isolation ... --fetch`), so the ref
+    tracks the remote as closely as the fleet actually pulls. The staleness of
+    this ref is therefore bounded by "how recently a lane fetched", and it is
+    named in the watchdog line so an operator can see which two commits were
+    compared. A ref that cannot be read yields "unknown", which the caller MUST
+    treat as CANNOT-ASSESS — never as healthy.
+    """
+    return _rev_parse(revision) or "unknown"
+
+
+#: Drift classes, deliberately a superset of the rung states in fleet/watchdog.py
+#: (`missing`/`stale`/`drifted`/`healthy`) so a single classifier answers both
+#: "is there a live loop?" and "is it running current code?".
+DRIFT_OK = "ok"
+DRIFT_DRIFTED = "drifted"
+DRIFT_CANNOT_ASSESS = "cannot-assess"
+
+
+def classify_drift(running: str, baseline: str, baseline_name: str = "origin/master") -> tuple[str, str]:
+    """Classify a running loop's commit against the drift baseline. Never fails open.
+
+    Tri-state contract (the repo's gate convention — see `EXIT_OK` /
+    `EXIT_NOT_OK` / `EXIT_CANNOT_ASSESS`):
+
+      * `DRIFT_OK`          — both commits known and equal; the loop runs current code.
+      * `DRIFT_DRIFTED`     — both known and different; the loop runs stale (or
+                              unreleased) code and must be respawned.
+      * `DRIFT_CANNOT_ASSESS` — either side unreadable. This is the fail-closed
+                              branch: the previous rule was `if baseline != "unknown"
+                              and running != baseline`, which read an unreadable
+                              baseline as *healthy* and silently disabled drift
+                              detection entirely (#739, AO-GR-25). "I cannot see
+                              the baseline" is not "there is no drift".
+
+    Returns `(state, reason)`; the reason always names both commits so a reader can
+    audit the comparison rather than trust the verdict.
+    """
+    known_running = running not in ("", "unknown")
+    known_baseline = baseline not in ("", "unknown")
+    if not known_baseline:
+        return DRIFT_CANNOT_ASSESS, f"no readable {baseline_name} baseline ({baseline_name} unreadable)"
+    if not known_running:
+        return DRIFT_CANNOT_ASSESS, f"loop reports no commit, cannot compare against {baseline_name} {baseline}"
+    if running == baseline:
+        return DRIFT_OK, f"running {running} = {baseline_name} {baseline}"
+    return DRIFT_DRIFTED, f"running {running}, {baseline_name} {baseline}"
 
 
 def read_heartbeat() -> dict | None:
@@ -984,20 +1067,31 @@ def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -
         return False
     verdict = "live" if age <= STALE_HEARTBEAT_SECONDS else f"STALE ({int(age)}s since last beat)"
     running = str(beat.get("commit", "unknown"))
-    current = head_commit()
+    # Drift is measured against the REMOTE baseline, never the local checkout —
+    # the local checkout can be (and in this fleet routinely is) the stale side
+    # (#739, AO-GR-25). Comparing to `head_commit()` made a loop on pre-fix code
+    # read as current whenever the checkout was also behind.
+    baseline = remote_head_commit()
+    drift_state, drift_reason = classify_drift(running, baseline)
     print(f"{name}: {verdict} — pid {beat.get('pid', '?')}, state {state}, last beat {int(age)}s ago")
-    print(f"{name}: running commit {running} | HEAD {current}")
-    drifted = current != "unknown" and running != current
-    if drifted:
+    print(f"{name}: running commit {running} | origin/master {baseline}")
+    if drift_state == DRIFT_DRIFTED:
         print(
-            f"{name}: CODE DRIFT — it is running {running}, not HEAD {current}; merged fixes are not "
-            f"live. Restart: {start_cmd}"
+            f"{name}: CODE DRIFT — it is running {running}, not origin/master {baseline}; merged "
+            f"fixes are not live. Restart: {start_cmd}"
         )
-    finding = capability_finding(name, beat, current)
+    elif drift_state == DRIFT_CANNOT_ASSESS:
+        # Fail-closed: an unreadable baseline is not evidence of health. The old
+        # rule returned True here, which is how an unreadable HEAD silently
+        # disabled drift detection entirely.
+        print(f"{name}: CANNOT ASSESS DRIFT — {drift_reason}")
+    # The capability declaration is read from the commit the loop is *running*,
+    # so it still keys off `running`; the baseline only decides drift.
+    finding = capability_finding(name, beat, running)
     print(capability_line(finding))
     return (
         age <= STALE_HEARTBEAT_SECONDS
-        and not drifted
+        and drift_state == DRIFT_OK
         and finding.kind not in (KIND_CAPABILITY_STALE, KIND_UNKNOWN)
     )
 

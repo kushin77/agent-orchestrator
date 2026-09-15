@@ -78,7 +78,17 @@ HEALTHY = "healthy"
 MISSING = "missing"
 STALE = "stale"
 DRIFTED = "drifted"
-RUNG_STATES = (MISSING, STALE, DRIFTED, HEALTHY)
+#: The fail-closed state (#739, AO-GR-25): the drift comparison could not be
+#: made — an unreadable `origin/master` baseline, or a loop that reports no
+#: commit. Distinct from `HEALTHY` on purpose: "I cannot see the baseline" is not
+#: "there is no drift". Distinct from `DRIFTED` too, because the remedy differs —
+#: a drifted rung needs a respawn, an unassessable one needs the remote ref
+#: looked at first. It maps to the repo's exit-code 2 (CANNOT-ASSESS).
+CANNOT_ASSESS = "cannot-assess"
+RUNG_STATES = (MISSING, STALE, DRIFTED, CANNOT_ASSESS, HEALTHY)
+#: Rung states that mean the rung is NOT healthy. `CANNOT_ASSESS` belongs here:
+#: the watchdog still acts (it cannot certify the rung), it just says so.
+UNHEALTHY_STATES = (MISSING, STALE, DRIFTED, CANNOT_ASSESS)
 
 
 def rung_log(name: str) -> Path:
@@ -109,6 +119,12 @@ def spawn(name: str, command: list[str]) -> subprocess.Popen:
     The parent closes its copy of the handle as soon as the child holds its own:
     the log stays open for the child's lifetime without leaking a descriptor into
     a watchdog that exits a moment later.
+
+    The environment is passed explicitly — ``runtime.runner_env()``, the same PATH
+    the executor resolves its runner against. The watchdog is cron's own child, so
+    without this the whole chain (watchdog -> launcher -> loop -> subagent)
+    inherits cron's minimal PATH: measured 2026-09-14 (#733), the sister could not
+    spawn a single subagent because ``~/.local/bin`` was not on it.
     """
     handle = open_log(name)
     try:
@@ -117,6 +133,7 @@ def spawn(name: str, command: list[str]) -> subprocess.Popen:
             cwd=ROOT,
             stdout=handle,
             stderr=subprocess.STDOUT,
+            env=runtime.runner_env(),
         )
     finally:
         handle.close()
@@ -168,8 +185,20 @@ def run_in_flight() -> bool:
     return False
 
 
-def decide(pid: int | None, beat: dict | None, head: str) -> tuple[str, str]:
-    """Classify a rung: missing / stale / drifted / healthy, with a reason."""
+def decide(pid: int | None, beat: dict | None, baseline: str, baseline_name: str = "origin/master") -> tuple[str, str]:
+    """Classify a rung: missing / stale / cannot-assess / drifted / healthy.
+
+    `baseline` is the **remote** commit (`origin/master`), never the local
+    checkout's HEAD. The local checkout is routinely the stale side in this
+    fleet, so comparing to it made the comparison *stale-to-stale*: the loop's
+    own start commit read back as the baseline it was judged against, so a loop
+    executing pre-fix code reported `healthy` (#739, AO-GR-25).
+
+    Fail-closed by construction: an unreadable baseline is CANNOT-ASSESS, never
+    healthy. The previous rule — `if head != "unknown" and running != head` —
+    read an unreadable HEAD as *healthy*, which silently disabled drift
+    detection entirely instead of reporting that it could not run.
+    """
     if pid is None:
         return MISSING, "no loop process"
     if beat is None:
@@ -180,8 +209,11 @@ def decide(pid: int | None, beat: dict | None, head: str) -> tuple[str, str]:
     if age > channel.STALE_HEARTBEAT_SECONDS:
         return STALE, f"last beat {int(age)}s ago"
     running = str(beat.get("commit", "unknown"))
-    if head != "unknown" and running != head:
-        return DRIFTED, f"running {running}, HEAD {head}"
+    drift_state, reason = channel.classify_drift(running, baseline, baseline_name)
+    if drift_state == channel.DRIFT_DRIFTED:
+        return DRIFTED, reason
+    if drift_state == channel.DRIFT_CANNOT_ASSESS:
+        return CANNOT_ASSESS, reason
     return HEALTHY, ""
 
 
@@ -238,8 +270,7 @@ def respawn(
     if pid is not None:
         try:
             os.kill(pid, signal.SIGTERM)
-        except OSError:
-            pass
+        except OSError:            pass
         deadline = time.time() + 15
         while process_alive(pid) and time.time() < deadline:
             time.sleep(0.5)
@@ -255,7 +286,15 @@ def respawn(
     return rung_came_up(pattern, pid, window=window, settle=settle)
 
 
-def rung_action(name: str, pattern: str, script: str, beat_path: Path, force: bool, head: str) -> str:
+def rung_action(
+    name: str,
+    pattern: str,
+    script: str,
+    beat_path: Path,
+    force: bool,
+    baseline: str,
+    baseline_name: str = "origin/master",
+) -> str:
     """One rung, one decision: what did the watchdog do about it — and what is it missing?
 
     Issue #319: the commit comparison (`decide`) is joined by the capability
@@ -263,17 +302,29 @@ def rung_action(name: str, pattern: str, script: str, beat_path: Path, force: bo
     WHICH control is absent instead of only "drifted". A rung that is *current*
     and still missing a declared capability is reported too — and NOT respawned,
     because restarting a build that never had the capability cannot fix it.
+
+    Issue #739: the healthy line names BOTH commits — the one the loop is running
+    and the `origin/master` baseline it was judged against — so an operator can
+    audit the comparison instead of trusting the verdict. A comparison against a
+    baseline that is stale, or against the local checkout, is invisible in a bare
+    `healthy`.
     """
     pid = loop_pid(pattern)
     beat = read_beat(beat_path)
-    state, reason = decide(pid, beat, head)
+    state, reason = decide(pid, beat, baseline, baseline_name)
+    running = str((beat or {}).get("commit", "unknown"))
+    verbatim = f"running {running}, {baseline_name} {baseline}"
     if force:
         state, reason = "forced", "operator asked to respawn"
-    capability = channel.capability_line(channel.capability_finding(name, beat, head))
+    capability = channel.capability_line(channel.capability_finding(name, beat, running))
     if state == HEALTHY:
-        return f"{name}: healthy | {capability}"
+        return f"{name}: healthy ({verbatim}) | {capability}"
     if state == DRIFTED and name == "sister" and run_in_flight():
         return f"{name}: drifted ({reason}) but a run is in flight — left alone | {capability}"
+    # CANNOT_ASSESS respawns too: the watchdog cannot certify the rung, and a
+    # respawn is the only action that can restore a readable comparison. It is
+    # reported with its reason so the operator sees WHY it could not be judged —
+    # never silently folded into `healthy`.
     ok = respawn(pattern, script, name)
     return f"{name}: {state} ({reason}) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
 
@@ -297,19 +348,33 @@ def start_monitor(*, window: float | None = None, settle: float | None = None) -
 
 
 def watchdog_once(force: bool = False) -> int:
-    """One pass over both loops plus the monitor; 0 (ok/respawned) or 1 (failure).
+    """One pass over both loops plus the monitor.
 
-    A pass fails on `RESPAWN FAILED` and on `CAPABILITY STALE`: a rung that does
-    not implement a capability the repository declares is a silently absent
-    control, and it is the one finding no respawn can repair (issue #319).
+    Tri-state, per the repo's gate convention (`channel.EXIT_*`):
+
+      * **0 OK** — every rung healthy and judgeable (a respawn that succeeded
+        counts: the state was repaired).
+      * **1 NOT-OK** — a definite failure: `RESPAWN FAILED`, or a
+        `CAPABILITY STALE` rung, which is a silently absent control and the one
+        finding no respawn can repair (issue #319).
+      * **2 CANNOT-ASSESS** — a rung's drift could not be judged at all because
+        the `origin/master` baseline was unreadable. Never folded into 0: the
+        whole defect this replaced was a control that reported `healthy` for a
+        comparison it could not actually make (#739, AO-GR-25).
+
+    A NOT-OK verdict outranks CANNOT-ASSESS: a known failure is reported as the
+    failure it is, and the unassessable rung is still named on its own line.
     """
-    head = channel.head_commit()
+    baseline = channel.remote_head_commit()
     failed = False
+    unassessable = False
     for name, pattern, script, beat_path in RUNGS:
-        line = rung_action(name, pattern, script, beat_path, force, head)
+        line = rung_action(name, pattern, script, beat_path, force, baseline)
         print(f"[watchdog] {line}", flush=True)
         if "FAILED" in line or "CAPABILITY STALE" in line:
             failed = True
+        if f": {CANNOT_ASSESS} (" in line:
+            unassessable = True
     # Third rung: the monitor is a resident poller with no run-in-flight concern
     # and no code-drift concept, so a missing process is always restarted and a
     # present one is left alone.
@@ -320,7 +385,11 @@ def watchdog_once(force: bool = False) -> int:
             failed = True
     else:
         print("[watchdog] monitor: healthy", flush=True)
-    return 1 if failed else 0
+    if failed:
+        return channel.EXIT_NOT_OK
+    if unassessable:
+        return channel.EXIT_CANNOT_ASSESS
+    return channel.EXIT_OK
 
 
 def beat_path(rung: str) -> Path:
@@ -333,15 +402,18 @@ def cmd_capabilities(args: argparse.Namespace) -> int:
 
     Reads the rung's own beat — it never writes one — so the report measures the
     live fleet instead of declaring a capability set on its behalf. `--beat`
-    reads a synthetic beat and `--head` pins the comparison commit, which is how
-    the runbook gate provokes each of the three cases and requires it to be
+    reads a synthetic beat and `--commit` pins the **running** commit the rung's
+    capability declaration is read from — the commit against which a capability
+    set is judged, which is NOT the drift baseline (`origin/master`, above) and is
+    deliberately named differently so the two cannot be confused (#739). This is
+    how the runbook gate provokes each of the three cases and requires it to be
     reported (a check that cannot fail is a formality, GR-12).
     """
     rungs = args.rung or [name for name, _pattern, _script, _beat in RUNGS]
     if args.beat and len(rungs) != 1:
         print("watchdog capabilities: --beat needs exactly one --rung", file=sys.stderr)
-        return 2
-    head = args.head or channel.head_commit()
+        return channel.EXIT_CANNOT_ASSESS
+    head = args.commit or channel.head_commit()
     findings = []
     for rung in rungs:
         path = Path(args.beat) if args.beat else beat_path(rung)
@@ -391,7 +463,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="a rung (repeatable; default: every supervised rung)",
     )
     caps.add_argument("--beat", help="read this beat instead of the live one (needs exactly one --rung)")
-    caps.add_argument("--head", help="compare against this commit instead of HEAD (the gate pins a sha)")
+    caps.add_argument("--commit", help="read the capability declaration at this running commit instead of HEAD (the gate pins a sha)")
     caps.add_argument("--json", action="store_true", help="machine-readable output")
     caps.set_defaults(func=cmd_capabilities)
     return parser

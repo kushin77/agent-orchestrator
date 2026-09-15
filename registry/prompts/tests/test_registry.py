@@ -40,6 +40,26 @@ def _tmp_registry(tmp_path: Path) -> PromptRegistry:
     return PromptRegistry(root=root)
 
 
+def _add_eval_case(reg: PromptRegistry, prompt_id: str) -> None:
+    """Give a synthetic module a green regression-eval case.
+
+    ``publish`` runs the regression-eval gate (issue #639), so a test-only
+    module needs its own case before it can be frozen. The case is written into
+    the scratch tree's own ``evals/eval-cases.yaml``.
+    """
+    cases = reg.root / "evals" / "eval-cases.yaml"
+    data = yaml.safe_load(cases.read_text(encoding="utf-8")) or {}
+    data.setdefault("cases", []).append(
+        {
+            "caseId": f"{prompt_id}-only",
+            "promptId": prompt_id,
+            "expected": ["ok"],
+            "observed": ["ok"],
+        }
+    )
+    cases.write_text(yaml.safe_dump(data, sort_keys=True), encoding="utf-8")
+
+
 # ---------------------------------------------------------------- schema
 @pytest.mark.parametrize("module_file", SEED_MODULES)
 def test_seed_modules_validate_against_schema(module_file: str) -> None:
@@ -77,6 +97,9 @@ def test_publish_twice_fails(tmp_path: Path) -> None:
             "description": "test-only module for immutability coverage",
         }
     )
+    # Publishing also runs the regression-eval gate (issue #639), so this
+    # synthetic module carries a green case of its own.
+    _add_eval_case(reg, "translate@v1")
     reg.publish("translate", "v1")
     with pytest.raises(VersionAlreadyPublishedError):
         reg.publish("translate", "v1")

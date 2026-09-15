@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """``governance/pmo/cli.py`` — the PMO layer's machine surface (issue #403).
 
-Five subcommands, each a **derived query over the ticket graph** (ADR-0014,
+Six subcommands, each a **derived query over the ticket graph** (ADR-0014,
 issue #401) — never a store, never a second source of ``status``:
 
 ```bash
@@ -10,6 +10,7 @@ python3 governance/pmo/cli.py lanes   # owner × lane occupancy
 python3 governance/pmo/cli.py report  # tickets by goal / status / owner
 python3 governance/pmo/cli.py raid    # R / A / I / D + dependency edges
 python3 governance/pmo/cli.py aging   # what has been waiting, tiered
+python3 governance/pmo/cli.py gates   # review-gate state + escalation rung (#635)
 ```
 
 Every subcommand runs **offline** over the committed projection and exits

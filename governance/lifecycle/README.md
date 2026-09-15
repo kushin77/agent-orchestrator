@@ -49,6 +49,7 @@ and the gate can require that each one has been provoked.
 | `CLOSING_EVIDENCE_MISSING` | A summary is not evidence. |
 | `ISSUE_NOT_CLOSED` | The change landed but the item is still on the board. Closing the issue *is* a closure step, which is why applicability is keyed on whether the change landed, never on the issue already being closed. |
 | `CHILD_NOT_CLOSED` | An epic was closed while a declared child is still open. "Declared" is mechanical — a child whose body's first line is `Parent: #<n>` naming the epic, the same marker `dispatch/snapshot.py` parses into `Issue.parent` — never a hand list. (Subject: an epic's child set, not an item.) |
+| `EPIC_CHILD_MARKER_MISSING` | An epic is checked against a child whose edge to it **cannot be established** — a supplied child declaring no `Parent: #<n>` marker at all — so it can be shown neither closed nor open. `CHILD_NOT_CLOSED` can only fail on children the audit managed to tie to the epic, so without this rule "no children found" would read as "every child is terminal" and an epic could close over a child the audit never saw. A child naming a *different* parent is decidable (it belongs to that parent) and is therefore neither declared nor reported. (Subject: an epic's child set, not an item.) |
 | `FILING_LABELS_MISSING` | An open, milestoned item declares no `class:` label, so the conformance gate cannot hold it to a rung. |
 | `QUARANTINE_STALE` | A legacy excuse outlived the issue tracking it. (Subject: the baseline, not an item.) |
 

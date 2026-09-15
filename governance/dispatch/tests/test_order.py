@@ -1,9 +1,18 @@
-"""Eligibility rules for claim-time issue ordering (issue #157)."""
+"""Eligibility rules for claim-time issue ordering (issue #157).
+
+The shared ``focused`` fixture supplies an offline ``.board/focus.json`` pinning
+a given epic; the autouse ``no_ambient_focus`` fixture means a test that does not
+ask for one sees NO active focus (lane F6 / #721).
+"""
 
 from __future__ import annotations
 
+import json
+
+import focus
 import order
 from model import (
+    REASON_ACTIVE_EPIC_CHILD,
     REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
     REASON_CHILD_OF_CLAIM,
@@ -11,6 +20,7 @@ from model import (
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
     REASON_NO_CHAIN_EDGE,
+    REASON_OUT_OF_EPIC_POOLED,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_UNKNOWN_ISSUE,
     Issue,
@@ -50,7 +60,16 @@ def test_frontier_skips_an_open_epic(snapshot):
 
 
 def test_an_epic_is_never_a_claim_target(snapshot):
-    verdict = order.eligible(snapshot, 600)
+    """An OPEN epic is refused as unworkable; a closed one is simply closed."""
+    board = Snapshot(
+        generated_at=snapshot.generated_at,
+        source=snapshot.source,
+        issues={
+            **{n: i for n, i in snapshot.issues.items() if n != 600},
+            600: Issue(600, "epic of the milestone", milestone="M24", labels=("type:epic",)),
+        },
+    )
+    verdict = order.eligible(board, 600)
     assert verdict.eligible is False
     assert verdict.reason == REASON_EPIC_NOT_WORKABLE
 
@@ -201,3 +220,208 @@ def test_frontier_is_never_a_blocked_issue(snapshot):
     assert frontier is not None
     assert frontier.number == 601
     assert snapshot.blockers_open(frontier) == []
+
+
+# --- #717: the active epic is a chain edge (epic focus #707) -----------------
+
+
+def _epic_board() -> Snapshot:
+    """#600 is the pinned epic with child #607; #609 is an unrelated epic with #608."""
+    issues = {
+        600: Issue(600, "the active epic", milestone="M25", labels=("type:epic",)),
+        601: Issue(601, "frontier", milestone="M25"),
+        607: Issue(607, "child of the active epic", milestone="M99", parent=600),
+        608: Issue(608, "child of another epic", milestone="M99", parent=609),
+        609: Issue(609, "another epic", milestone="M99", labels=("type:epic",)),
+    }
+    return Snapshot(generated_at="2026-09-13T12:00:00Z", source="test", issues=issues)
+
+
+def test_child_of_the_active_epic_is_eligible(focused):
+    verdict = order.eligible(_epic_board(), 607, focus_path=focused(600))
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_ACTIVE_EPIC_CHILD
+    assert "#600" in verdict.detail
+
+
+def test_child_of_a_non_active_epic_is_still_refused(focused):
+    """Another epic's child is out-of-epic while our focus is active (#721)."""
+    verdict = order.eligible(_epic_board(), 608, focus_path=focused(600))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_OUT_OF_EPIC_POOLED
+
+
+def test_a_non_active_epic_child_is_out_of_order_without_a_focus(tmp_path):
+    """With no active epic, another epic's child is refused as scavenging."""
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            number: (issue if not issue.is_epic else Issue(number, issue.title, state="closed", labels=issue.labels))
+            for number, issue in _epic_board().issues.items()
+        },
+    )
+    verdict = order.eligible(board, 608, focus_path=tmp_path / "absent.json")
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_NO_CHAIN_EDGE
+
+
+def test_an_unrelated_open_board_item_is_still_refused(focused, snapshot):
+    """Regression: epic focus adds an edge, it does not open the board."""
+    verdict = order.eligible(snapshot, 603, focus_path=focused(600))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_NO_CHAIN_EDGE
+
+
+def test_child_of_a_held_epic_is_child_of_claim_not_active_epic_child(focused):
+    """Precedence: the agent's own held parent still wins (child-of-claim first)."""
+    verdict = order.eligible(
+        _epic_board(), 607, active_claims=frozenset({600}), focus_path=focused(600)
+    )
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_CHILD_OF_CLAIM
+
+
+def test_a_blocked_active_epic_child_is_still_refused(focused):
+    """The new edge never bypasses a blocker."""
+    issues = dict(_epic_board().issues)
+    issues[607] = Issue(607, "child, blocked", milestone="M99", parent=600, blocked_by=(699,))
+    board = Snapshot(generated_at="2026-09-13T12:00:00Z", source="test", issues=issues)
+    verdict = order.eligible(board, 607, focus_path=focused(600))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_BLOCKED
+
+
+# --- #721: out-of-epic work is pooled, never dispatched on the frontier -------
+
+
+def _pooled_board() -> Snapshot:
+    """#900 is the epic; #901 is its child; #902/#903/#904 are outside it.
+
+    #903 is the lowest-numbered open issue in M25, so a frontier-only rule would
+    hand it out — which is precisely the incoherence epic focus exists to prevent.
+    """
+    issues = {
+        900: Issue(900, "the active epic", milestone="M25", labels=("type:epic",)),
+        901: Issue(901, "child of the epic", milestone="M25", parent=900),
+        902: Issue(902, "outside the epic", milestone="M25"),
+        903: Issue(903, "outside, and the lowest open number", milestone="M25"),
+        904: Issue(904, "child of another epic", milestone="M25", parent=905),
+        905: Issue(905, "another epic", milestone="M25", labels=("type:epic",)),
+        906: Issue(906, "a second epic", milestone="M25", labels=("type:epic",)),
+    }
+    return Snapshot(generated_at="2026-09-13T12:00:00Z", source="test", issues=issues)
+
+
+def test_an_out_of_epic_issue_is_refused_while_a_focus_is_active(focused):
+    verdict = order.eligible(_pooled_board(), 902, focus_path=focused(900))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_OUT_OF_EPIC_POOLED
+    assert "#902" in verdict.detail and "900" in verdict.detail
+
+
+def test_an_out_of_epic_issue_is_never_dispatched_on_the_milestone_frontier(focused):
+    """The regression that matters: out-of-epic work is refused even at the frontier.
+
+    The out-of-epic check must sit BEFORE the frontier branch. If it sat after,
+    the frontier would hand out another epic's work and the focus would be
+    decorative. The epic's own children are parked in another milestone (M99), as
+    a real epic's children are, so the M25 frontier really is out-of-epic work.
+    """
+    issues = dict(_pooled_board().issues)
+    issues[901] = Issue(901, "child of the epic, another milestone", milestone="M99", parent=900)
+    board = Snapshot(generated_at="2026-09-13T12:00:00Z", source="test", issues=issues)
+
+    frontier = order.frontier(board, "M25")
+    assert frontier is not None and frontier.number == 902, "premise: #902 IS the frontier"
+
+    verdict = order.eligible(board, 902, focus_path=focused(900))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_OUT_OF_EPIC_POOLED
+
+    # ...and the epic's own child is eligible even though it is not the frontier.
+    child = order.eligible(board, 901, focus_path=focused(900))
+    assert child.eligible is True
+    assert child.reason == REASON_ACTIVE_EPIC_CHILD
+
+
+def test_a_child_of_another_epic_is_pooled_not_dispatched(focused):
+    """Another epic's child is out-of-epic too — its parent edge is not our edge."""
+    verdict = order.eligible(_pooled_board(), 904, focus_path=focused(900))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_OUT_OF_EPIC_POOLED
+
+
+def test_the_active_epics_own_child_is_still_eligible(focused):
+    """The refusal contrasts with the child edge, it does not replace it."""
+    verdict = order.eligible(_pooled_board(), 901, focus_path=focused(900))
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_ACTIVE_EPIC_CHILD
+
+
+def test_nothing_is_pooled_when_no_focus_resolves(tmp_path):
+    """No active epic -> the pool branch is inert and normal ordering resumes.
+
+    ``focus.active`` falls back to the lowest open workable epic, so "no focus"
+    means the BOARD has no such epic — close them all. Then #902, which is the
+    lowest-numbered open unblocked issue in M25, is the frontier and is eligible.
+    """
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            number: (issue if not issue.is_epic else Issue(number, issue.title, state="closed", labels=issue.labels))
+            for number, issue in _pooled_board().issues.items()
+            if issue.parent is None
+        },
+    )
+    absent = tmp_path / "absent.json"
+    assert focus.active(board, absent) is None
+    verdict = order.eligible(board, 902, focus_path=absent)
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_NEXT_IN_MILESTONE
+
+
+def test_a_focus_pinning_a_non_epic_does_not_pool_anything(focused):
+    """A non-epic pin is not an active focus, so the fallback epic still applies."""
+    verdict = order.eligible(_pooled_board(), 903, focus_path=focused(902))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_OUT_OF_EPIC_POOLED
+
+
+def test_the_default_focus_does_not_pool_when_the_board_has_no_workable_epic(tmp_path, snapshot):
+    """The pool branch needs an ACTIVE epic; with none it must not fire.
+
+    ``focus.active`` falls back to the lowest open workable epic when nothing is
+    pinned, so "no focus" is a board property, not a file property: close the only
+    epic and the branch is inert.
+    """
+    no_epics = Snapshot(
+        generated_at=snapshot.generated_at,
+        source=snapshot.source,
+        issues={n: i for n, i in snapshot.issues.items() if not i.is_epic},
+    )
+    assert focus.active(no_epics, tmp_path / "absent.json") is None
+    verdict = order.eligible(no_epics, 601, focus_path=tmp_path / "absent.json")
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_NEXT_IN_MILESTONE
+
+
+def test_a_board_with_no_epic_pools_nothing(snapshot):
+    """No epic -> no focus -> the pool branch never fires, so the rule is unchanged."""
+    no_epics = Snapshot(
+        generated_at=snapshot.generated_at,
+        source=snapshot.source,
+        issues={n: i for n, i in snapshot.issues.items() if not i.is_epic},
+    )
+    verdict = order.eligible(no_epics, 601)
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_NEXT_IN_MILESTONE
+
+
+def test_eligible_is_pure(focused, snapshot):
+    """The pool branch must not make `eligible` mutate anything (it is a predicate)."""
+    before = json.dumps(snapshot.to_json(), sort_keys=True)
+    order.eligible(snapshot, 603, focus_path=focused(600))
+    order.eligible(snapshot, 601, focus_path=focused(600))
+    assert json.dumps(snapshot.to_json(), sort_keys=True) == before

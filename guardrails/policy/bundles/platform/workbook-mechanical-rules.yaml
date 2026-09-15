@@ -1,0 +1,167 @@
+# guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml
+# Mechanical-enforcement policy entries for the five workbook rules (issue #636).
+#
+# Source: the enterprise workbook's Tab 3 mechanical enforcement rules, derived
+# from the C-suite responsibility column of the org chart (issue #614, gap
+# analysis issue #631):
+#
+#   CEO — "goal decomposition into tickets"        -> frontload vector memory
+#   CTO — "automated draw.io diagram generation"   -> draw.io MCP diagramming
+#   COO — "external state machine sync"            -> external-state caching
+#   CFO — "deterministic Python script execution"  -> zero-token arithmetic
+#   CMO — "GoHighLevel webhook management"         -> webhook caching
+#
+# Each rule is a NAMED policy id with MECHANICAL enforcement semantics: the
+# gate decides on a boolean that a producer actually publishes, and a policy
+# can only ever BLOCK or (for the allow-list shapes) contribute its default.
+# A rule whose decision depends on prose would be a formality (AO-GR-4) —
+# there is no review, wording or "should" anywhere in the decision path.
+#
+# Two enforcement shapes, both mechanically decidable:
+#
+#   * REFUSE   — a deny-list gate. `workbook-frontloaded: true` (positive
+#                evidence that a vector memory was frontloaded) BLOCKs the
+#                prefetch. Fresh prefetch (`false`) falls through to the
+#                policy default (log).
+#   * CACHE    — an allow-list gate: `default: block`, and ONE rule that fires
+#                a LOG decision when the producer declares the value cacheable.
+#                A cacheable value is allowed; anything else (not cacheable, or
+#                the attribute absent at all) fails closed to BLOCK. This makes
+#                BOTH workbook readings mechanical: "cache this" allows it,
+#                "do not cache this yet" and "we have no idea" both refuse.
+#
+# Every gate attribute is read from the merged evaluation context (the payload
+# a caller already holds). A required attribute that is ABSENT is not a silent
+# pass: the missing path raises inside condition evaluation and the engine
+# fails closed to BLOCK with the error attached to the evidence.
+#
+# Each policy is gated behind its own registered control, all of which ship
+# OFF (AO-GR-6): nothing here enforces until an operator deliberately flips a
+# control ON. See ../controls.yaml and ../README.md.
+
+policies:
+  # ------------------------------------------------------------------ #
+  # 1. CEO — frontload vector memory for goal decomposition.
+  #    A prefetch that frontloads a vector memory is refused; the fix is to
+  #    decompose against the tenant's declared goal/objective context.
+  # ------------------------------------------------------------------ #
+  - id: workbook-vector-memory-frontload
+    version: 1
+    name: Workbook rule — vector-memory frontload
+    description: >-
+      Refuses a goal/objective prefetch that frontloads a vector memory
+      instead of decomposing against declared context (CEO goal
+      decomposition into tickets).
+    default: log
+    controls:
+      - workbook-vector-memory-frontload
+    rules:
+      - id: refuse-frontloaded-vector-memory
+        actions:
+          - workbook.prefetch
+        decision: block
+        reason: >-
+          vector-memory frontload refused — prefetch frontloaded a vector
+          memory ({prefetch.frontloaded}); decompose goal decomposition
+          against declared context instead
+        condition:
+          path: prefetch.frontloaded
+          op: eq
+          value: true
+
+  # ------------------------------------------------------------------ #
+  # 2. CTO — draw.io MCP diagramming.
+  # ------------------------------------------------------------------ #
+  - id: workbook-drawio-mcp-diagramming
+    version: 1
+    name: Workbook rule — draw.io MCP diagramming
+    description: >-
+      Allows a draw.io diagram step only when the producer declares the MCP
+      tool list cacheable; anything else refuses (CTO automated diagram
+      generation).
+    default: block
+    controls:
+      - workbook-drawio-mcp-diagramming
+    rules:
+      - id: allow-cacheable-mcp-tool-list
+        actions:
+          - workbook.drawio
+        decision: log
+        reason: "draw.io MCP tool list is cacheable ({drawio.mcp_tool_list_cacheable})"
+        condition:
+          path: drawio.mcp_tool_list_cacheable
+          op: eq
+          value: true
+
+  # ------------------------------------------------------------------ #
+  # 3. COO — external-state machine sync.
+  # ------------------------------------------------------------------ #
+  - id: workbook-external-state-caching
+    version: 1
+    name: Workbook rule — external-state caching
+    description: >-
+      Allows an external-state sync only when the producer declares the state
+      snapshot cacheable; anything else refuses (COO external state machine
+      sync).
+    default: block
+    controls:
+      - workbook-external-state-caching
+    rules:
+      - id: allow-cacheable-external-state
+        actions:
+          - workbook.external_state
+        decision: log
+        reason: "external state snapshot is cacheable ({external_state.cacheable})"
+        condition:
+          path: external_state.cacheable
+          op: eq
+          value: true
+
+  # ------------------------------------------------------------------ #
+  # 4. CFO — zero-token arithmetic.
+  # ------------------------------------------------------------------ #
+  - id: workbook-zero-token-arithmetic
+    version: 1
+    name: Workbook rule — zero-token arithmetic
+    description: >-
+      Allows a cost/arithmetic step only when the producer declares the
+      deterministic (zero-token) result cacheable; anything else refuses
+      (CFO deterministic Python cost analysis).
+    default: block
+    controls:
+      - workbook-zero-token-arithmetic
+    rules:
+      - id: allow-cacheable-arithmetic-result
+        actions:
+          - workbook.arithmetic
+        decision: log
+        reason: >-
+          arithmetic result is cacheable ({arithmetic.cacheable}) —
+          deterministic, zero tokens
+        condition:
+          path: arithmetic.cacheable
+          op: eq
+          value: true
+
+  # ------------------------------------------------------------------ #
+  # 5. CMO — webhook caching.
+  # ------------------------------------------------------------------ #
+  - id: workbook-webhook-caching
+    version: 1
+    name: Workbook rule — webhook caching
+    description: >-
+      Allows an inbound webhook only when the producer declares the payload
+      cacheable; anything else refuses (CMO GoHighLevel webhook management).
+    default: block
+    controls:
+      - workbook-webhook-caching
+    rules:
+      - id: allow-cacheable-webhook-payload
+        actions:
+          - workbook.webhook
+        decision: log
+        reason: "webhook payload is cacheable ({webhook.cacheable})"
+        condition:
+          path: webhook.cacheable
+          op: eq
+          value: true

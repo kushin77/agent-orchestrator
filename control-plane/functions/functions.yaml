@@ -175,6 +175,28 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng, Manager]
 
+  - id: FOCUS
+    title: "Focus — the one active epic, its open children and the pooled set"
+    kind: view
+    endpoints: [board/focus]
+    parameters: []
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: POOL
+    title: "Pool — out-of-epic work parked while one epic is in focus"
+    kind: view
+    endpoints: [board/pool]
+    parameters: []
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
   - id: WAVES
     title: "Waves — the wave plan and whether the next item is eligible"
     kind: panel

@@ -31,11 +31,24 @@ def _valid_controls_doc() -> dict:
 
 
 def test_shipped_controls_all_default_off(shipped_controls):
-    assert len(shipped_controls) == 3
+    assert len(shipped_controls) == 8
     assert shipped_controls.active_ids() == ()
     for control in shipped_controls.all():
         assert control.enabled is False  # AO-GR-6: new controls ship OFF
-        assert control.id in ("model-call-budget", "tool-use-guard", "data-egress-guard")
+    # the three issue-#26 platform controls
+    assert {
+        "model-call-budget",
+        "tool-use-guard",
+        "data-egress-guard",
+    } <= set(shipped_controls.ids())
+    # the five workbook mechanical-rule controls (issue #636)
+    assert {
+        "workbook-vector-memory-frontload",
+        "workbook-drawio-mcp-diagramming",
+        "workbook-external-state-caching",
+        "workbook-zero-token-arithmetic",
+        "workbook-webhook-caching",
+    } <= set(shipped_controls.ids())
 
 
 def test_registry_loads_from_mapping():
@@ -97,7 +110,7 @@ def test_schema_rejects_bad_registry_shapes():
 
 
 def test_registry_loads_shipped_yaml_from_disk(shipped_controls):
-    assert len(shipped_controls.ids()) == 3
+    assert len(shipped_controls.ids()) == 8
 
 
 def test_unknown_control_id_is_absent():

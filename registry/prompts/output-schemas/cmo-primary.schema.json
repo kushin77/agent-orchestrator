@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/cmo-primary.schema.json",
+  "title": "CmoPrimaryOutput",
+  "description": "Output contract for the cmo-primary prompt module (workbook-8, source workbook issue #614 Tab 3). `webhooks` records the cache-key deduplication decision enforced by policy workbook-webhook-caching; `templates` records the registered-template injection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "webhooks",
+    "templates",
+    "campaign",
+    "summary"
+  ],
+  "properties": {
+    "webhooks": {
+      "type": "array",
+      "description": "Per-delivery cache decision. A `replay: true` entry is a duplicate cache key and must not re-execute its automation.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "cacheKey",
+          "replay"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "cacheKey": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "replay": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "templates": {
+      "type": "array",
+      "description": "Registered template blocks injected with campaign variables; never a one-off authored message.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template",
+          "rendered"
+        ],
+        "properties": {
+          "template": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "rendered": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "channel"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "email",
+            "sms",
+            "social",
+            "webhook"
+          ]
+        }
+      },
+      "description": "The campaign every outbound action in this response is scoped to."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One-paragraph campaign summary."
+    }
+  }
+}

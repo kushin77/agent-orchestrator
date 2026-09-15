@@ -30,11 +30,15 @@ REASON_CHILD_OF_CLAIM = "child-of-claim"
 REASON_SUCCESSOR_OF_CLAIM = "successor-of-claim"
 REASON_NEXT_IN_MILESTONE = "next-in-milestone"
 REASON_BRAIN_DIRECTED = "brain-directed"
+# A child of the ACTIVE epic (epic focus, issue #707): stricter than the
+# milestone frontier, it is a chain edge to the epic the fleet is driving.
+REASON_ACTIVE_EPIC_CHILD = "active-epic-child"
 ALLOWED_CLAIM_REASONS = (
     REASON_CHILD_OF_CLAIM,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_NEXT_IN_MILESTONE,
     REASON_BRAIN_DIRECTED,
+    REASON_ACTIVE_EPIC_CHILD,
 )
 
 # Reasons a claim is refused.
@@ -44,6 +48,11 @@ REASON_BLOCKED = "blocked"
 REASON_ALREADY_CLAIMED = "already-claimed"
 REASON_NO_CHAIN_EDGE = "no-chain-edge"
 REASON_EPIC_NOT_WORKABLE = "epic-not-workable"
+# Epic focus (#707): the issue is outside the active epic, so while a focus is
+# active the fleet does not dispatch it. Distinct from `no-chain-edge` because
+# the issue is not being rejected as scavenging — it is being WAITING, and it is
+# parked in `.board/pool.jsonl` so it is never silently dropped.
+REASON_OUT_OF_EPIC_POOLED = "out-of-epic-pooled"
 
 CLAIM_EVENTS = ("claim", "release", "take-over", "reap")
 

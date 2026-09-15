@@ -49,3 +49,65 @@ controls:
     implemented_by:
       - guardrails/policy/bundles/platform/data-egress.yaml
     since: "issue #26"
+
+  # ------------------------------------------------------------------------ #
+  # Workbook mechanical-rule controls (issue #636).  One per mechanical
+  # enforcement rule derived from the enterprise workbook's C-suite org chart
+  # (issue #614 / gap analysis #631); each gates exactly one policy in
+  # bundles/platform/workbook-mechanical-rules.yaml.  All ship OFF.
+  # ------------------------------------------------------------------------ #
+  - id: workbook-vector-memory-frontload
+    name: Workbook rule — vector-memory frontload
+    description: >-
+      Activates the workbook-vector-memory-frontload policy: a goal/
+      objective prefetch that frontloads a vector memory is refused
+      (prefetch.frontloaded == true -> BLOCK).
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml
+    since: "issue #636"
+  - id: workbook-drawio-mcp-diagramming
+    name: Workbook rule — draw.io MCP diagramming
+    description: >-
+      Activates the workbook-drawio-mcp-diagramming policy: a draw.io
+      diagram step is allowed only when the producer declares its MCP tool
+      list cacheable; anything else refuses.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml
+    since: "issue #636"
+  - id: workbook-external-state-caching
+    name: Workbook rule — external-state caching
+    description: >-
+      Activates the workbook-external-state-caching policy: an external-state
+      sync is allowed only when the producer declares the state snapshot
+      cacheable; anything else refuses.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml
+    since: "issue #636"
+  - id: workbook-zero-token-arithmetic
+    name: Workbook rule — zero-token arithmetic
+    description: >-
+      Activates the workbook-zero-token-arithmetic policy: a cost/arithmetic
+      step is allowed only when the producer declares the deterministic
+      (zero-token) result cacheable; anything else refuses.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml
+    since: "issue #636"
+  - id: workbook-webhook-caching
+    name: Workbook rule — webhook caching
+    description: >-
+      Activates the workbook-webhook-caching policy: an inbound webhook is
+      allowed only when the producer declares the payload cacheable;
+      anything else refuses.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml
+    since: "issue #636"

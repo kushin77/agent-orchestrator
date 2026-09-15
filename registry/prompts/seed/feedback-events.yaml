@@ -6,6 +6,11 @@
 # when true but not predicted. The feedback.py report aggregates these into
 # per-prompt-version FP/FN metrics. The classify-route v2 events show the
 # disambiguation edit reducing the FP/FN volume observed on v1.
+#
+# The C-suite block at the end carries the same treatment for the five workbook
+# Master AI Prompt Templates published by issue #639 (source workbook #614 Tab
+# 3): every C-suite module is labeled with the mechanical rule it enforces, so
+# its FP/FN volume is visible in the same report as the phase-1 task types.
 events:
   - promptId: classify-route@v1
     caseId: case-0001
@@ -95,3 +100,69 @@ events:
     caseId: review-0006
     predicted: [request_changes]
     truth: [approve]
+  # ------------------------------------------------------------------ C-suite
+  # Production outcome events for the five workbook Master AI Prompt Templates
+  # (issue #639, work item workbook-8; source workbook issue #614 Tab 3). Each
+  # event is one evaluated call of the published C-suite module, labeled with
+  # the rule that module mechanically enforces, so the C-suite modules carry
+  # live FP/FN metrics in the same loop as the phase-1 task types.
+  - promptId: ceo-primary@v1
+    caseId: ceo-0001
+    predicted: [tickets-decomposed, memory-frontloaded]
+    truth: [tickets-decomposed, memory-frontloaded]
+  - promptId: ceo-primary@v1
+    caseId: ceo-0002
+    predicted: [tickets-decomposed, memory-frontloaded]
+    truth: [tickets-decomposed, memory-frontloaded]
+  - promptId: ceo-primary@v1
+    caseId: ceo-0003
+    predicted: [tickets-decomposed]
+    truth: [tickets-decomposed, memory-frontloaded]
+  - promptId: cto-primary@v1
+    caseId: cto-0001
+    predicted: [diagram-declared, ast-map-used]
+    truth: [diagram-declared, ast-map-used]
+  - promptId: cto-primary@v1
+    caseId: cto-0002
+    predicted: [diagram-declared, ast-map-used]
+    truth: [diagram-declared, ast-map-used]
+  - promptId: cto-primary@v1
+    caseId: cto-0003
+    predicted: [ast-map-used]
+    truth: [diagram-declared, ast-map-used]
+  - promptId: coo-primary@v1
+    caseId: coo-0001
+    predicted: [state-cached, delta-ingested]
+    truth: [state-cached, delta-ingested]
+  - promptId: coo-primary@v1
+    caseId: coo-0002
+    predicted: [state-cached, delta-ingested]
+    truth: [state-cached, delta-ingested]
+  - promptId: coo-primary@v1
+    caseId: coo-0003
+    predicted: [state-cached]
+    truth: [state-cached, delta-ingested]
+  - promptId: cfo-primary@v1
+    caseId: cfo-0001
+    predicted: [script-executed, zero-token-arithmetic]
+    truth: [script-executed, zero-token-arithmetic]
+  - promptId: cfo-primary@v1
+    caseId: cfo-0002
+    predicted: [script-executed, zero-token-arithmetic]
+    truth: [script-executed, zero-token-arithmetic]
+  - promptId: cfo-primary@v1
+    caseId: cfo-0003
+    predicted: [script-executed]
+    truth: [script-executed, zero-token-arithmetic]
+  - promptId: cmo-primary@v1
+    caseId: cmo-0001
+    predicted: [cache-key-checked, template-injected]
+    truth: [cache-key-checked, template-injected]
+  - promptId: cmo-primary@v1
+    caseId: cmo-0002
+    predicted: [cache-key-checked, template-injected]
+    truth: [cache-key-checked, template-injected]
+  - promptId: cmo-primary@v1
+    caseId: cmo-0003
+    predicted: [template-injected]
+    truth: [cache-key-checked, template-injected]

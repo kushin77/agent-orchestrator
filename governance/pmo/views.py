@@ -1,4 +1,4 @@
-"""The five PMO views — derived queries over the ticket graph (issue #403).
+"""The PMO views — derived queries over the ticket graph (issue #403).
 
 CMR's doctrine (``vendor/CMR/docs/PROGRAM-MANAGEMENT.md``) names five PMO
 abilities and a surface ``fleet/pmo.sh {deps,lanes,report,raid,aging}``. Here
@@ -13,6 +13,8 @@ view                    derived from
 ``raid``                R = live risks, A = assumptions, I = incident-kind,
                         D = decision-kind + dependency edges
 ``aging``               ticket timestamps + status age, tiered
+``gates``               per-task review-gate state + the escalation rung it
+                        reached (issue #635, workbook-4)
 ======================  ==================================================
 
 Every view returns a :class:`View` whose ``document`` is a deterministic,
@@ -569,6 +571,161 @@ def _tier(days: float) -> str | None:
     return None
 
 
+# --- gates ------------------------------------------------------------------
+
+#: The board label that carries a task's *review-gate* verdict (issue #635).
+#: The label vocabulary is the board's own; the view derives gate state from it
+#: plus the ticket's ``status`` — never from a second store of ``status``.
+GATE_LABEL_PREFIX = "review-gate:"
+
+#: The declared escalation rungs (mirrors ``governance/merge/gates`` ordering):
+#: a blocked task escalates COO (pacing) then CEO (board escalation), and the
+#: chain terminates.  Declared here as data so the view can report the rung a
+#: task reached without importing the merge package (the PMO reads the graph).
+ESCALATION_RUNGS: tuple[str, ...] = ("COO", "CEO")
+
+#: Ticket ``status`` values that mean "the gate is in play".
+GATE_OPEN_STATUSES = ("in-review", "done")
+GATE_CLOSED_STATUSES = ("blocked",)
+
+
+def _gate_label(labels: tuple[str, ...]) -> str:
+    for label in labels:
+        if label.startswith(GATE_LABEL_PREFIX):
+            return label[len(GATE_LABEL_PREFIX) :]
+    return ""
+
+
+def gates(graph: Graph) -> View:
+    """The review-gate state of every task, plus the escalation rung it reached.
+
+    This is the workbook-4 acceptance criterion "``governance/pmo`` views surface
+    the gate state per task", expressed as a *derivation* over facts the graph
+    already carries:
+
+    * the ticket's ``status`` (the claim ledger's verdict — the one writer of
+      ``status``) tells whether the gate is **open** (``in-review`` / ``done``),
+      **closed** (``blocked``), or **pending** (in flight, not yet reviewed);
+    * the board issue's ``review-gate:<verdict>`` label carries the *verdict*
+      the review produced (``open`` / ``red`` / ``self-review`` / ...), when one
+      has been recorded;
+    * the ``review-escalation:<rung>`` label carries the C-suite rung a closed
+      gate reached.
+
+    The findings are the reasons this view is NOT-OK, and they are the same
+    shape as every other view's: a **closed gate on a task the graph reports as
+    done** (work that closed with a red gate — the exact failure the acceptance
+    criteria forbid), a **done task that is subject to the gate but records no
+    verdict** (a close nobody can evidence), and a **closed gate with no
+    escalation rung, or a rung the chain does not name** (the declared chain is
+    COO → CEO and it terminates).
+
+    Adoption is explicit: the gate contract applies to a task that carries a
+    ``review-gate:*`` or ``review-escalation:*`` label.  A legacy close that
+    predates the gate carries neither and is reported as gate state (``pending``)
+    rather than failed — a view that fails on all history is not a view.
+    """
+    findings: list[Finding] = []
+    rows: list[dict[str, Any]] = []
+    for ticket in sorted(graph.tickets):
+        status = graph.status(ticket)
+        labels = graph.labels_for(ticket)
+        verdict = _gate_label(labels)
+        escalation = ""
+        for label in labels:
+            if label.startswith("review-escalation:"):
+                escalation = label[len("review-escalation:") :]
+        # The recorded verdict label is authoritative when present — it is the
+        # review's own finding — and the ticket ``status`` is the fallback for a
+        # task that has not recorded one yet.  Order matters: ``done``/``in-review``
+        # are open *statuses*, but a task can be done and still carry a red
+        # verdict, and that contradiction is exactly what this view must surface.
+        if verdict in ("red", "closed", "rejected"):
+            state = "closed"
+        elif verdict == "open":
+            state = "open"
+        elif status in GATE_OPEN_STATUSES:
+            state = "open"
+        elif status in GATE_CLOSED_STATUSES:
+            state = "closed"
+        else:
+            state = "pending"
+        closed = graph.is_closed(ticket)
+        rows.append(
+            {
+                "ticket": ticket,
+                "status": status,
+                "gate": state,
+                "verdict": verdict,
+                "escalation": escalation,
+                "owner": graph.owner(ticket),
+            }
+        )
+        # a task the graph reports done, whose gate reads closed, is work that
+        # closed through a red gate — the failure mode the lifecycle forbids
+        if closed and state == "closed":
+            findings.append(
+                Finding(
+                    "gate-closed-but-done",
+                    ticket,
+                    "the task is done but its review gate reads closed "
+                    "(a red gate can never yield a closed task)",
+                )
+            )
+        # a done task with no recorded verdict closed without evidence *when the
+        # task is subject to the gate*.  Adoption is declared by a label: the
+        # gate contract (issue #635) applies to tasks the fleet has opted in
+        # (a ``review-gate:*`` label, or an escalation label).  A legacy close
+        # that predates the gate carries neither, and reporting it would be a
+        # finding about history, not about the gate — hundreds of false FAILs
+        # are noise, and a view that always fails is not a view.
+        gate_scoped = (
+            verdict != ""
+            or escalation != ""
+            or any(label.startswith("review-escalation:") for label in labels)
+        )
+        if closed and gate_scoped and not verdict:
+            findings.append(
+                Finding(
+                    "gate-verdict-missing",
+                    ticket,
+                    "the task is done and is subject to the review gate, but "
+                    "records no review-gate verdict "
+                    "(a close must name the verdict that opened the gate)",
+                )
+            )
+        # an escalation past the terminal rung cannot be true
+        if escalation and escalation not in ESCALATION_RUNGS:
+            findings.append(
+                Finding(
+                    "gate-escalation-unrunged",
+                    ticket,
+                    f"the task names escalation rung {escalation!r}, which is "
+                    f"not one of {', '.join(ESCALATION_RUNGS)} "
+                    "(the declared chain terminates at the last rung)",
+                )
+            )
+        # a closed gate must name the rung it escalated to (COO -> CEO)
+        if state == "closed" and not escalation:
+            findings.append(
+                Finding(
+                    "gate-escalation-missing",
+                    ticket,
+                    "the review gate is closed but the task names no "
+                    "escalation rung (a blocked task escalates COO -> CEO)",
+                )
+            )
+
+    document = {
+        "view": "gates",
+        "clock": graph.clock,
+        "tickets": sorted(graph.tickets),
+        "rungs": list(ESCALATION_RUNGS),
+        "gates": rows,
+    }
+    return View("gates", graph.clock, document, findings)
+
+
 # --- registry ---------------------------------------------------------------
 
 VIEWS = {
@@ -577,4 +734,5 @@ VIEWS = {
     "report": report,
     "raid": raid,
     "aging": aging,
+    "gates": gates,
 }

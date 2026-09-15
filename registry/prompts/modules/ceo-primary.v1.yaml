@@ -1,0 +1,22 @@
+taskType: ceo-primary
+version: v1
+description: Executive strategy director prompt for goal decomposition into board tickets, multi-repo oversight and board escalation; frontloads vector memory before reasoning.
+modelTierHint: high
+modelFamilyHint: pro/HIGH
+status: published
+parameters:
+  temperature: 0.2
+enforcement:
+  policyId: workbook-vector-memory-frontload
+  action: workbook.prefetch
+  attribute: prefetch.frontloaded
+  rule: Vector memory lookup and context frontloading, with zero redundant chat history.
+provenance:
+  - "kushin77/agent-orchestrator issue #614 Tab 3 (Master AI Prompt Templates: CEO - Executive Strategy Director; Claude / DSV4PMax Tier 1; Pillar 'Org Chart & Goal Alignment')"
+  - "kushin77/agent-orchestrator issue #631 (EPIC: Paperclip enterprise-workbook four-pillar delta; work item workbook-8)"
+  - "kushin77/agent-orchestrator issue #636 (the five workbook mechanical rules as policy ids; guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml)"
+  - "kushin77/agent-orchestrator issue #632 (C-suite PersonaCard ceo.yaml; systemPromptRef ceo/primary@v1 and the workbook tier ladder)"
+bodyRefs:
+  system: ../bodies/ceo-primary.v1.system.md
+  user: ../bodies/ceo-primary.v1.user.md
+outputSchema: ../output-schemas/ceo-primary.schema.json

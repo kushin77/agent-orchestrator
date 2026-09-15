@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:org-chart.schema:v1",
+  "title": "OrgChart",
+  "description": "Declarative agent org chart (issue #632, workbook-1; EPIC #631 Pillar 2 'Org Chart for Agents'; source workbook rows issue #614 Tab 1). It declares the five C-suite roles, their reporting edges, the single root and the per-role FinOps/heartbeat governance the platform enforces. Every edge must reference a persona that actually resolves in registry/personas/cards/, so the org chart can never drift from the persona library: registry/personas/registry.py validate_org_chart() fails an unresolvable edge or a second root. The declaration is data — a tenant extends the chart by adding its own org-chart.yaml; the schema and the validator are shared.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["orgChartSchema", "id", "tenant", "version", "principal", "root", "roles"],
+  "properties": {
+    "orgChartSchema": {
+      "type": "string",
+      "const": "persona-org-chart/v1",
+      "description": "Schema tag for this declaration (mirrors the persona-manifest/v1 ledger tag). A reader refuses a chart whose tag it does not know."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Stable org-chart id (e.g. platform-csuite)."
+    },
+    "tenant": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The tenant that owns this org chart. 'platform' is the platform-default chart; any other value is a tenant chart (same tenancy rule as persona cards)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "SemVer of this chart declaration (X.Y.Z)."
+    },
+    "principal": {
+      "type": "string",
+      "minLength": 1,
+      "const": "board",
+      "description": "The principal OUTSIDE the agent org at its head — the reporting target of the single root role. It is deliberately NOT a persona: the board is a human principal, so it cannot be dispatched and must not resolve to a card."
+    },
+    "root": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The single root role id of the org chart (e.g. ceo). Exactly one role may declare reportsTo: board, and that role must be this one; registry.validate_org_chart() refuses a second root or a root that is not the declared one."
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The roles of the org chart, one per node. Each entry binds a persona id to its reporting edge and its governance (tier, monthly cap, heartbeat).",
+      "items": { "$ref": "#/definitions/roleNode" }
+    }
+  },
+  "definitions": {
+    "roleNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "reportsTo"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "The persona id this node binds (must equal a resolvable platform persona id, and the card's reportsTo must agree with this edge)."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable role title from the workbook row (e.g. 'Executive Strategy Director')."
+        },
+        "reportsTo": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "The reporting target of this edge: either the chart principal ('board', allowed only for the root role) or another persona id that must itself be a node in this chart AND resolve as a platform persona. An unresolvable edge is refused."
+        },
+        "defaultModelTier": {
+          "type": "string",
+          "enum": ["LOW", "MED", "HIGH", "MAX"],
+          "description": "Closed platform tier for this role (must agree with the bound card's defaultModelTier)."
+        },
+        "monthlyBudgetCapUsd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Monthly budget cap in USD for this role (must agree with the bound card's monthlyBudgetCapUsd). A negative cap is refused."
+        },
+        "heartbeatSchedule": {
+          "type": "string",
+          "enum": ["hourly", "every-30m", "every-15m", "daily", "event", "webhook"],
+          "description": "Heartbeat cadence for this role (must agree with the bound card's heartbeatSchedule)."
+        }
+      }
+    }
+  }
+}

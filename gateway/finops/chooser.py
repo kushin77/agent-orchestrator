@@ -37,10 +37,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from budget import BudgetAction, BudgetBlocked, BudgetDecision, BudgetEnforcer
+from budget import (
+    BudgetAction,
+    BudgetBlocked,
+    BudgetDecision,
+    BudgetEnforcer,
+    RoleBudgetBlocked,
+    RoleBudgetEnforcer,
+)
 from complexity import DifficultyScore, DifficultyScorer
 from loader import ModelSpec, TaskClass, TierTable, ValidationError
-from metering import CallRecord, MeteringSink, NoopMeteringSink
+from metering import CallRecord, MeteringSink, NoopMeteringSink, RefusalRecord
 
 # Default assumed tokens per routed call when the caller does not provide one.
 DEFAULT_TOKENS_PER_CALL = 4000
@@ -75,6 +82,12 @@ class Choice:
     budget_action: str = "allow"
     warning: Optional[str] = None
     reasons: List[str] = field(default_factory=list)
+    # Per-role cap attribution (issue #633). ``role_id`` is the persona the call
+    # was dispatched for; the cap fields are populated only when a per-role
+    # ceiling applied to the decision.
+    role_id: Optional[str] = None
+    role_cap_usd: Optional[float] = None
+    role_pct_used: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -89,6 +102,9 @@ class Choice:
             "budget_action": self.budget_action,
             "warning": self.warning,
             "reasons": list(self.reasons),
+            "role_id": self.role_id,
+            "role_cap_usd": self.role_cap_usd,
+            "role_pct_used": self.role_pct_used,
         }
 
 
@@ -107,6 +123,7 @@ class ModelChooser:
         sink: Optional[MeteringSink] = None,
         health: HealthSignal = None,
         tokens_per_call: int = DEFAULT_TOKENS_PER_CALL,
+        role_enforcer: Optional[RoleBudgetEnforcer] = None,
     ) -> None:
         self.table = table
         self.scorer = scorer or DifficultyScorer()
@@ -114,6 +131,15 @@ class ModelChooser:
         self.sink = sink if sink is not None else NoopMeteringSink()
         self.health = health
         self.tokens_per_call = tokens_per_call
+        # Per-role cap axis (issue #633). Explicit ``role_enforcer`` wins; else
+        # reuse the one the budget enforcer carries (load_budgets attaches it),
+        # so a single ``load_budgets()`` wires both axes over one ledger.
+        if role_enforcer is not None:
+            self.role_enforcer = role_enforcer
+        elif budget_enforcer is not None:
+            self.role_enforcer = budget_enforcer.roles
+        else:
+            self.role_enforcer = None
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -262,6 +288,17 @@ class ModelChooser:
             model = healthy[0]  # cheapest healthy candidate
             est = table.estimate_cost(model, tokens)
 
+            # Per-role cap first (issue #633): the narrower ceiling is the one
+            # that must not be crossed, and a role at its cap refuses spend
+            # even when the tenant overall is well inside its own budget. The
+            # check is deterministic arithmetic — no model call, no tokens.
+            role_decision = self._check_role_budget(agent_id, tenant_id, est)
+            if role_decision is not None and role_decision.action is BudgetAction.STOP:
+                self._record_role_refusal(
+                    agent_id, tenant_id, cls.name, tier_key, model, est, role_decision
+                )
+                raise RoleBudgetBlocked(agent_id, tenant_id, role_decision)
+
             decision = self._check_budget(tenant_id, est)
             if decision.action is BudgetAction.STOP:
                 raise BudgetBlocked(tenant_id, decision.action.value, decision.reason)
@@ -280,6 +317,24 @@ class ModelChooser:
                     f"tenant {tenant_id} at {decision.pct_used}% of budget "
                     f"({decision.reason})"
                 )
+            role_id: Optional[str] = None
+            role_cap_usd: Optional[float] = None
+            role_pct_used: Optional[float] = None
+            if role_decision is not None:
+                role_id = agent_id
+                role_cap_usd = role_decision.budget_usd
+                role_pct_used = role_decision.pct_used
+                if role_decision.action in (BudgetAction.WARN, BudgetAction.FALLBACK):
+                    role_warning = (
+                        f"role {agent_id} at {role_decision.pct_used}% of its "
+                        f"${role_decision.budget_usd:.2f} monthly cap "
+                        f"({role_decision.reason})"
+                    )
+                    warning = f"{warning}; {role_warning}" if warning else role_warning
+                reasons.append(
+                    f"role-cap:{agent_id}: {role_decision.action.value} at "
+                    f"{role_decision.pct_used}% of ${role_decision.budget_usd:.2f}"
+                )
 
             choice = Choice(
                 task_class=cls.name,
@@ -292,9 +347,91 @@ class ModelChooser:
                 budget_action=decision.action.value,
                 warning=warning,
                 reasons=list(reasons),
+                role_id=role_id,
+                role_cap_usd=role_cap_usd,
+                role_pct_used=role_pct_used,
             )
             self._record(choice)
             return choice
+
+    def _check_role_budget(
+        self, role_id: str, tenant_id: str, estimated_cost_usd: float
+    ) -> Optional[BudgetDecision]:
+        """Pre-flight per-role cap check; ``None`` when no role cap applies.
+
+        Resolves the role in the tenant's own scope first and falls back to the
+        platform-default declaration (the same tenancy rule the registry uses),
+        and never spends a token: the decision is arithmetic over the ledger.
+        """
+        if self.role_enforcer is None:
+            return None
+        decision = self.role_enforcer.check(role_id, estimated_cost_usd, tenant=tenant_id)
+        if decision is None and tenant_id != "platform":
+            decision = self.role_enforcer.check(
+                role_id, estimated_cost_usd, tenant="platform"
+            )
+        return decision
+
+    def _record_role_refusal(
+        self,
+        role_id: str,
+        tenant_id: str,
+        task_class: str,
+        tier: str,
+        model: ModelSpec,
+        est: float,
+        decision: BudgetDecision,
+    ) -> None:
+        """Meter a per-role cap refusal (a refusal is a decision, not a drop)."""
+        record = RefusalRecord(
+            tenant_id=tenant_id,
+            agent_id=role_id,
+            task_class=task_class,
+            tier=tier,
+            model=model.id,
+            provider=model.provider,
+            estimated_cost_usd=est,
+            budget_action=decision.action.value,
+            reason=decision.reason,
+            cap_usd=decision.budget_usd,
+            pct_used=decision.pct_used,
+            scope="role",
+            role_id=role_id,
+        )
+        self.sink.record(record)
+
+    def _record_tenant_refusal(
+        self,
+        agent_id: str,
+        tenant_id: str,
+        task_class: str,
+        tier: str,
+        model: ModelSpec,
+        est: float,
+        decision: BudgetDecision,
+    ) -> None:
+        """Meter a tenant-budget refusal (same contract as the role refusal).
+
+        Not wired into ``_select``: the tenant path's long-standing contract
+        (issue #17) is that a blocked call emits NO record at all, which
+        ``tests/test_metering.py::test_blocked_call_emits_no_record`` pins. The
+        per-role axis (issue #633) is the one that meters its refusals.
+        """
+        record = RefusalRecord(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            task_class=task_class,
+            tier=tier,
+            model=model.id,
+            provider=model.provider,
+            estimated_cost_usd=est,
+            budget_action=decision.action.value,
+            reason=decision.reason,
+            cap_usd=decision.budget_usd,
+            pct_used=decision.pct_used,
+            scope="tenant",
+        )
+        self.sink.record(record)
 
     def _check_budget(self, tenant_id: str, estimated_cost_usd: float) -> BudgetDecision:
         """Pre-flight budget check; no enforcer means always allow."""
@@ -331,5 +468,8 @@ class ModelChooser:
             budget_action=choice.budget_action,
             complexity=choice.complexity,
             reasons=list(choice.reasons),
+            role_id=choice.role_id,
+            role_cap_usd=choice.role_cap_usd,
+            role_pct_used=choice.role_pct_used,
         )
         self.sink.record(record)

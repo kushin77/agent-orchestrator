@@ -1,4 +1,9 @@
-"""Claim records, the single-claim lock, TTL recovery and the ledger audit (issue #157)."""
+"""Claim records, the single-claim lock, TTL recovery and the ledger audit (issue #157).
+
+The autouse ``no_ambient_focus`` fixture pins "no active focus" for every test, so
+a test that does not ask for one is unaffected by the epic-focus rules (lane F6 /
+#721); ``focused`` supplies an explicit pin.
+"""
 
 from __future__ import annotations
 
@@ -6,13 +11,18 @@ import json
 from datetime import timedelta
 
 import claims
+import focus
+import order
+import pool
 import pytest
 from model import (
+    REASON_ACTIVE_EPIC_CHILD,
     REASON_BLOCKED,
     REASON_BRAIN_DIRECTED,
     REASON_CHILD_OF_CLAIM,
     REASON_NO_CHAIN_EDGE,
     REASON_NEXT_IN_MILESTONE,
+    REASON_OUT_OF_EPIC_POOLED,
     Issue,
     Snapshot,
 )
@@ -355,3 +365,304 @@ def test_audit_flags_a_reap_that_names_no_agent(snapshot, base_time):
     events = [claims.ClaimEvent(event="reap", issue=601, agent="brain", at=moment)]
     problems = claims.audit(events, snapshot, base_time)
     assert any("does not name the reaped agent" in problem for problem in problems)
+
+
+# --- #717: the active epic is a chain edge (epic focus #707) -----------------
+
+
+def _epic_snapshot() -> Snapshot:
+    """#707 is the epic; #710 is its child, #712 is a child of the other epic #713."""
+    return Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            707: Issue(707, "the active epic", labels=("type:epic",)),
+            710: Issue(710, "child of the active epic", parent=707),
+            712: Issue(712, "child of another epic", parent=713),
+            713: Issue(713, "another epic", labels=("type:epic",)),
+        },
+    )
+
+
+def test_audit_accepts_a_claim_on_a_child_of_the_active_epic(tmp_path, focused, base_time):
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [
+        claims.ClaimEvent(event="claim", issue=710, agent="agent-a", at=moment, reason=REASON_ACTIVE_EPIC_CHILD)
+    ]
+    assert claims.audit(events, _epic_snapshot(), base_time, focused(707)) == []
+
+
+def test_audit_rejects_active_epic_child_on_another_epics_child(tmp_path, focused, base_time):
+    moment = base_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    events = [
+        claims.ClaimEvent(event="claim", issue=712, agent="agent-a", at=moment, reason=REASON_ACTIVE_EPIC_CHILD)
+    ]
+    problems = claims.audit(events, _epic_snapshot(), base_time, focused(707))
+    assert any("not the active epic" in problem for problem in problems)
+
+
+def test_claim_grants_active_epic_child_when_the_parent_is_the_active_epic(tmp_path, focused, base_time):
+    event = claims.claim(
+        710,
+        "agent-a",
+        "epic",
+        _epic_snapshot(),
+        ledger=tmp_path / "claims.jsonl",
+        lock_dir=tmp_path / "locks",
+        now=base_time,
+        focus_path=focused(707),
+    )
+    assert event.reason == REASON_ACTIVE_EPIC_CHILD
+
+
+def test_claim_still_refuses_an_unrelated_board_item(tmp_path, focused, snapshot, base_time):
+    """Regression: the epic edge is additive, never a relaxation."""
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            603,
+            "agent-a",
+            "governance",
+            snapshot,
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            focus_path=focused(600),
+        )
+    assert excinfo.value.reason == REASON_NO_CHAIN_EDGE
+
+
+# --- #721: out-of-epic work is pooled, never dropped -------------------------
+
+
+def _pool_board() -> Snapshot:
+    """#900 epic, #901 its child, #902/#903 outside it (lane F6 / #721)."""
+    return Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            900: Issue(900, "the active epic", milestone="M25", labels=("type:epic",)),
+            901: Issue(901, "child of the epic", milestone="M99", parent=900),
+            902: Issue(902, "outside the epic", milestone="M25"),
+            903: Issue(903, "outside, lowest open number", milestone="M25"),
+        },
+    )
+
+
+def test_claim_parks_an_out_of_epic_issue_and_still_refuses(tmp_path, focused, pool_rail, base_time):
+    """The refusal stands AND the deferral is recorded — parked, not dropped."""
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            902,
+            "agent-a",
+            "fleet",
+            _pool_board(),
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            focus_path=focused(900),
+            pool_path=pool_rail,
+        )
+
+    assert excinfo.value.reason == REASON_OUT_OF_EPIC_POOLED
+    records = pool.read(pool_rail)
+    assert [r.issue for r in records] == [902]
+    assert records[0].reason == "out-of-epic"
+    assert records[0].at
+    assert not claims.lock_path(902, tmp_path / "locks").exists()
+
+
+def test_a_refusal_that_is_not_out_of_epic_parks_nothing(tmp_path, focused, pool_rail, base_time):
+    """The pool records ONE reason. A blocked claim is not deferred work."""
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            **_pool_board().issues,
+            901: Issue(901, "child, blocked", milestone="M25", parent=900, blocked_by=(999,)),
+        },
+    )
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            901,
+            "agent-a",
+            "fleet",
+            board,
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            focus_path=focused(900),
+            pool_path=pool_rail,
+        )
+
+    assert excinfo.value.reason == REASON_BLOCKED
+    assert pool.read(pool_rail) == []
+
+
+def test_an_out_of_epic_issue_is_parked_once_per_attempt(tmp_path, focused, pool_rail, base_time):
+    """Two refusals are two records — the rail is an append-only decision log."""
+    for _ in range(2):
+        with pytest.raises(claims.ClaimRefused):
+            claims.claim(
+                902,
+                "agent-a",
+                "fleet",
+                _pool_board(),
+                ledger=tmp_path / "claims.jsonl",
+                lock_dir=tmp_path / "locks",
+                now=base_time,
+                focus_path=focused(900),
+                pool_path=pool_rail,
+            )
+    assert pool.numbers(pool_rail) == [902]
+    assert len(pool.read(pool_rail)) == 2
+
+
+def test_the_pool_drains_when_the_resolver_returns_none(tmp_path, focused, pool_rail, base_time):
+    """focus == None: the parked work comes back, and the drain REPORTS it.
+
+    ``focus.active`` falls back to the lowest open workable epic, so "no focus"
+    means the BOARD has no workable epic — close them. The drained numbers are the
+    evidence that the parked work was released rather than dropped.
+    """
+    pool.note(902, "out-of-epic", at="2026-09-13T00:00:00Z", path=pool_rail)
+    pool.note(903, "out-of-epic", at="2026-09-13T00:00:01Z", path=pool_rail)
+
+    # Both epics closed -> no active focus. #902 is then the M25 frontier, so the
+    # claim that was refused while the epic was active now proceeds.
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            900: Issue(900, "the active epic", state="closed", milestone="M25", labels=("type:epic",)),
+            902: Issue(902, "outside the epic", milestone="M25"),
+            903: Issue(903, "outside, lowest open number", milestone="M25"),
+        },
+    )
+    assert focus.active(board, focused(900)) is None
+
+    frontier = order.frontier(board, "M25")
+    assert frontier is not None and frontier.number == 902, "premise: #902 IS the frontier"
+
+    event = claims.claim(
+        902,
+        "agent-a",
+        "fleet",
+        board,
+        ledger=tmp_path / "claims.jsonl",
+        lock_dir=tmp_path / "locks",
+        now=base_time,
+        focus_path=focused(900),
+        pool_path=pool_rail,
+    )
+
+    assert event.reason == REASON_NEXT_IN_MILESTONE
+    assert pool.numbers(pool_rail) == [], "the pool must be empty once the focus is gone"
+
+
+def test_a_pool_is_untouched_while_a_focus_is_active(tmp_path, focused, pool_rail, base_time):
+    """The drain is conditional: an active focus keeps its parked work parked."""
+    pool.note(902, "out-of-epic", at="2026-09-13T00:00:00Z", path=pool_rail)
+
+    claims.claim(
+        901,
+        "agent-a",
+        "fleet",
+        _pool_board(),
+        ledger=tmp_path / "claims.jsonl",
+        lock_dir=tmp_path / "locks",
+        now=base_time,
+        focus_path=focused(900),
+        pool_path=pool_rail,
+    )
+    assert pool.numbers(pool_rail) == [902]
+
+
+def test_drain_pool_when_no_focus_is_the_shared_helper(tmp_path, focused, pool_rail):
+    """The drain is one named function, so the brain and the CLI cannot diverge."""
+    pool.note(902, "out-of-epic", at="2026-09-13T00:00:00Z", path=pool_rail)
+
+    no_epic = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            number: (
+                issue
+                if not issue.is_epic
+                else Issue(number, issue.title, state="closed", milestone=issue.milestone, labels=issue.labels)
+            )
+            for number, issue in _pool_board().issues.items()
+        },
+    )
+    assert claims.drain_pool_when_no_focus(no_epic, focused(900), pool_rail) == [902]
+    assert pool.numbers(pool_rail) == []
+
+    pool.note(903, "out-of-epic", at="2026-09-13T00:00:02Z", path=pool_rail)
+    assert claims.drain_pool_when_no_focus(_pool_board(), focused(900), pool_rail) == []
+    assert pool.numbers(pool_rail) == [903]
+
+
+def test_a_directive_promotes_an_out_of_epic_blocker_just_in_time(
+    tmp_path, monkeypatch, focused, pool_rail, base_time
+):
+    """#721 acceptance: the EXISTING `claim --directive` path promotes pooled work.
+
+    An active-epic child declares `Blocked-by: #902`; #902 is out-of-epic, so it is
+    pooled while a focus is active. The brain names it in a directive and the claim
+    succeeds with `brain-directed` — no new authorisation mechanism is invented,
+    and the directive path bypasses `eligible()` entirely.
+    """
+    sent = tmp_path / "sent"
+    monkeypatch.setattr(claims, "SENT_DIR", sent)
+    _write_directive(sent, "d-promote", 902)
+
+    board = _pool_board()
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        claims.claim(
+            902,
+            "subagent-x",
+            "fleet",
+            board,
+            ledger=tmp_path / "claims.jsonl",
+            lock_dir=tmp_path / "locks",
+            now=base_time,
+            focus_path=focused(900),
+            pool_path=pool_rail,
+        )
+    assert excinfo.value.reason == REASON_OUT_OF_EPIC_POOLED
+    assert pool.numbers(pool_rail) == [902], "premise: the blocker really was pooled first"
+
+    event = claims.claim(
+        902,
+        "subagent-x",
+        "fleet",
+        board,
+        ledger=tmp_path / "claims.jsonl",
+        lock_dir=tmp_path / "locks",
+        now=base_time,
+        directive_id="d-promote",
+        focus_path=focused(900),
+        pool_path=pool_rail,
+    )
+
+    assert event.reason == REASON_BRAIN_DIRECTED
+    assert event.directive_id == "d-promote"
+    assert event.directive_from == "brain"
+
+
+def test_an_active_epic_child_may_declare_a_pooled_issue_as_its_blocker(tmp_path, focused):
+    """The promotion chain is readable off the board: child --Blocked-by--> pooled."""
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            900: Issue(900, "the active epic", labels=("type:epic",)),
+            901: Issue(901, "child, waiting on out-of-epic work", parent=900, blocked_by=(902,)),
+            902: Issue(902, "outside the epic"),
+        },
+    )
+    verdict = order.eligible(board, 901, focus_path=focused(900))
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_BLOCKED
+    assert "#902" in verdict.detail
+    # ...and the blocker it waits on is exactly what the pool holds.
+    assert [i.number for i in focus.pooled(board, 900)] == [902]

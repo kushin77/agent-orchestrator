@@ -62,6 +62,7 @@ sys.path.insert(0, str(ROOT / "fleet"))
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
 import channel  # noqa: E402
+import decompose_policy  # noqa: E402
 import routing  # noqa: E402
 import runtime  # noqa: E402
 import singleton  # noqa: E402
@@ -72,6 +73,7 @@ import singleton  # noqa: E402
 # are flat sibling imports, so they go on the path first (see `_conformance` for
 # how the conformance seam's own flat `model` is kept separate).
 import claims  # noqa: E402
+import focus as focus_mod  # noqa: E402
 import order  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 
@@ -571,6 +573,178 @@ def file_child_issue(title: str, body: str, declaring: dict) -> int:
     return gh_issue_create(title, body)
 
 
+# -- the micro-decomposition POLICY (epic #707 lane F4 / issue #719) -----------
+# The brain could already *file* a decomposition; what it could not do was refuse
+# one that was not a decomposition at all. What follows are the board FACTS the
+# policy needs — the rule itself is pure and offline (`fleet/decompose_policy.py`)
+# — and every guard runs BEFORE the first `gh issue create`, so a refused wave
+# files nothing and therefore has nothing to repair afterwards.
+FOCUS_PATH = ROOT / ".board" / "focus.json"
+BOARD_PATH = ROOT / ".board" / "snapshot.json"
+
+
+def resolve_active_epic() -> tuple[int | None, str]:
+    """``(the ACTIVE epic, the reason when there is none)``.
+
+    Children are bound to the epic the fleet is actually driving (lane F1's
+    ``governance/dispatch/focus.py``), never to whichever number the order happens
+    to name: filing a child against a closed epic — or against nothing — is the
+    orphan the single-epic focus exists to prevent. Offline: the committed board
+    snapshot plus the pinned focus, both read from the repo root so the answer does
+    not depend on the brain's working directory.
+    """
+    try:
+        board = snapshot_mod.load(BOARD_PATH)
+    except (OSError, ValueError) as exc:
+        return None, f"the committed board snapshot {BOARD_PATH} is unreadable: {exc}"
+    try:
+        epic = focus_mod.active(board, FOCUS_PATH)
+    except focus_mod.FocusInvalid as exc:
+        return None, f"the board focus is unreadable: {exc}"
+    if epic is None:
+        return None, (
+            f"the board has no active epic (nothing pinned in {FOCUS_PATH} and no workable "
+            "open epic) — children are never filed against nothing"
+        )
+    return epic.number, ""
+
+
+def _pinned_wave_cap() -> int | None:
+    """The focus's own ``wave_cap``, or ``None`` when the focus is absent/broken."""
+    try:
+        focus = focus_mod.load(FOCUS_PATH)
+    except focus_mod.FocusInvalid:
+        return None
+    return focus.wave_cap if focus is not None else None
+
+
+# -- the epic-close ADVANCE (epic #707 lane F5 / issue #720) --------------------
+# The brain could already decompose the ACTIVE epic into micro-children (F4/#719);
+# what it could not do was *leave* an epic. A pinned focus outlives the epic it
+# pins — `focus.resolve` falls back to the lowest workable epic only when the
+# pinned one has closed — so nothing moved the pin, and a fleet that finished 707
+# would keep resolving 707 forever. Advancing is therefore a decision, and it is
+# PURE: no clock, no network, no filesystem. The snapshot and the focus come in,
+# the next focus or None comes out, so the rule is provable in a unit test rather
+# than asserted in a docstring. The board read lives in `advance_epic_focus`.
+ADVANCE = "advance"
+NO_EPIC = "no-epic"
+BOARD_COMPLETE = "board-complete"
+
+
+def advance_focus(
+    snapshot: object,
+    focus: "focus_mod.Focus | None",
+    *,
+    reason: str = ADVANCE,
+) -> "focus_mod.Focus | None":
+    """The focus to pin after an epic closed — the next resolvable epic, or None.
+
+    ``reason`` labels why the question is being asked (``advance`` after an epic
+    closed, ``no-epic`` when a tick found none pinned). It never changes the
+    resolution — every rule below is reached irrespective of it — and the caller
+    carries it into the note it reports, so the pin keeps the reason it moved.
+
+    Three rules, in order:
+
+    1. **Nothing pinned.** Resolve from scratch: the pool is the only work the
+       fleet can see (there is no active epic to exclude), so a workable epic or a
+       non-empty pool means carry on; with neither, there is nothing to focus on
+       and the board is complete.
+    2. **The pinned epic is still open.** The focus does not move on its own — not
+       even when no child is open *right now*. The snapshot the brain holds has
+       already been measured with an empty child set at a legitimate moment (#719's
+       seam was tested exactly there), so advancing on "no open children today"
+       would drop an epic mid-flight. The advance is driven by the epic's CLOSURE,
+       never by an empty wave.
+    3. **The pinned epic is gone** (closed, or no longer an epic) — the reason this
+       was called. Resolve the next epic; the closing epic is excluded explicitly,
+       because a snapshot read before the board is refreshed still shows it open
+       and "advance" must not re-pin what just closed. No next epic but a waiting
+       pool means the focus holds no active epic and the pool is drained; neither
+       means the board is complete.
+    """
+    if focus is None:
+        epic = focus_mod.resolve(snapshot, pinned=None)
+        if epic is not None:
+            return focus_mod.Focus.pinned(epic.number)
+        return focus_mod.Focus.pinned(None) if focus_mod.pooled(snapshot, None) else None
+
+    current = focus_mod.resolve(snapshot, pinned=focus.active_epic)
+    if current is not None and current.number == focus.active_epic:
+        return focus
+
+    nxt = focus_mod.resolve(snapshot, pinned=None)
+    if nxt is not None and nxt.number != focus.active_epic:
+        return focus_mod.Focus.pinned(nxt.number)
+
+    # No workable epic left. Keep the pool rather than abandoning it: a pooled
+    # issue is never silently dropped (#718/#720).
+    pool = focus_mod.pooled(snapshot, focus.active_epic)
+    if pool:
+        return focus_mod.Focus(active_epic=None, activated_at=focus.activated_at,
+                               wave_cap=focus.wave_cap, max_agents=focus.max_agents,
+                               pooled=tuple(issue.number for issue in pool))
+    return None
+
+
+def advance_epic_focus() -> tuple[bool, str]:
+    """Advance the pinned focus off the epic that closed, and report what moved.
+
+    The effectful half of the epic-close advance: read the committed board and the
+    pinned focus, decide with the pure ``advance_focus``, and write the new pin (or
+    report ``board-complete``). Offline — the committed snapshot is the board — and
+    a focus that is already complete is reported, not rewritten, so a tick that
+    changes nothing does not churn the file.
+    """
+    try:
+        board = snapshot_mod.load(BOARD_PATH)
+    except (OSError, ValueError) as exc:
+        return False, f"the committed board snapshot {BOARD_PATH} is unreadable: {exc}"
+    try:
+        focus = focus_mod.load(FOCUS_PATH)
+    except focus_mod.FocusInvalid as exc:
+        return False, f"the board focus is unreadable: {exc}"
+    reason = ADVANCE if focus is not None else NO_EPIC
+    nxt = advance_focus(board, focus, reason=reason)
+    pinned = focus.active_epic if focus is not None else None
+    if nxt is None:
+        if pinned is None:
+            return True, f"{BOARD_COMPLETE} — no workable epic and the pool is empty; nothing is pinned"
+        return True, (
+            f"{BOARD_COMPLETE} — #{pinned} closed, no workable epic remains and the pool is empty; "
+            "the board is complete"
+        )
+    if focus is not None and nxt == focus:
+        return True, f"the focus stays on #{nxt.active_epic} (still open); the board has not moved"
+    focus_mod.save(nxt, FOCUS_PATH)
+    if nxt.active_epic is None:
+        return True, (
+            f"advanced off #{pinned}: no workable epic remains, so the focus holds no active epic "
+            f"and the pool ({len(nxt.pooled)} waiting) is what there is to drain"
+        )
+    if pinned is None:
+        return True, f"pinned the focus to #{nxt.active_epic} — no epic was activated before"
+    return True, f"advanced the focus from #{pinned} to #{nxt.active_epic}; the new pin is written"
+
+
+def open_board_index() -> list[tuple[int, str, str, str]]:
+    """The OPEN issues a duplicate is refused against: ``(number, title, lane, verify)``.
+
+    The committed snapshot stores titles and no bodies, so the lane and the
+    ``Verify:`` line are empty here and the title carries the identity; the policy
+    still compares lane + ``Verify:`` whenever a caller has them (the live board
+    does). An unreadable snapshot yields an EMPTY index rather than an exception —
+    the sizing rule and the cap still bind, and the intra-wave duplicate guard
+    still catches a child filed twice in one spec.
+    """
+    try:
+        board = snapshot_mod.load(BOARD_PATH)
+    except (OSError, ValueError):
+        return []
+    return [(issue.number, issue.title, "", "") for issue in board.open_issues()]
+
+
 def decompose_problem(spec: object) -> str | None:
     """Why this decomposition spec cannot be filed, or None when it is well formed.
 
@@ -602,22 +776,58 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
     issues (the pmo-sme discipline), filed with a `Parent: #N` marker so the chain
     gate recognises them, and the ready wave is dispatched immediately — the brain
     prepares the next waves in advance instead of waiting for the parent.
+
+    The wave is bound to the ACTIVE epic and must pass the micro-decomposition
+    policy first (epic #707 lane F4 / issue #719): a child is filed only when it is
+    sized as a micro-child (1 lane, 1 runnable `Verify:`, 1 criterion, a non-empty
+    `Files:` set), it is not already open on the board, and the wave is within the
+    cap. Every guard runs BEFORE the first `gh issue create`, so a refused wave
+    files nothing at all.
     """
     spec = (order.get("task") or {}).get("decompose")
     problem = decompose_problem(spec)
     if problem:
         return False, problem
-    parent = int(spec["parent_issue"])
+
+    epic, reason = resolve_active_epic()
+    if epic is None:
+        return False, f"REFUSED — {reason}; no child was filed and nothing was dispatched"
+    named = int(spec["parent_issue"])
+    if named != epic:
+        return False, (
+            f"REFUSED — this order decomposes #{named}, but the ACTIVE epic is #{epic}: children "
+            "are bound to the epic the fleet is driving (epic #707 single-epic focus), so nothing "
+            f"was filed. Re-issue against #{epic}, or move the focus first."
+        )
+
+    try:
+        cap = decompose_policy.effective_cap(focus_wave_cap=_pinned_wave_cap())
+    except ValueError as exc:
+        return False, f"REFUSED — {exc}; the wave cap is not defaulted silently, so no child was filed"
+    problems = decompose_policy.wave_problems(spec["children"], open_issues=open_board_index(), cap=cap)
+    if problems:
+        return False, (
+            "REFUSED — the wave violates the micro-decomposition policy: "
+            + "; ".join(problems)
+            + " — no child was filed"
+        )
+
+    parent = epic
     WAVES.mkdir(parents=True, exist_ok=True)
     plan = {"parent": parent, "children": [], "dispatched": []}
     for index, child in enumerate(spec["children"]):
         title = str(child.get("title", "")).strip()
-        lane = str(child.get("lane", "fleet"))
-        verify = str(child.get("verify", ""))
-        files = ", ".join(child.get("files", []))
+        # The policy has already proved there is exactly one of each; reading them
+        # back through it (rather than re-parsing the spec here) keeps the one
+        # definition of "the lane/verify/criterion of this child".
+        lane = decompose_policy.lanes(child)[0]
+        verify = decompose_policy.verify_lines(child)[0]
+        criterion = decompose_policy.criteria(child)[0]
+        files = ", ".join(decompose_policy.files(child))
         body = (
             f"Parent: #{parent}\n\n"
             f"Lane: {lane}\n\nFiles: {files}\n\nVerify: `{verify}`\n\n"
+            f"Criterion: {criterion}\n\n"
             f"Micro-task {index} of #{parent} (decomposed by the brain, pmo-sme discipline)."
         )
         # Whatever this child does not declare is derived from the conformance
@@ -1048,6 +1258,15 @@ def loop(args: argparse.Namespace) -> int:
             advanced = advance_waves()
             if advanced:
                 print(wave_line(advanced), flush=True)
+            # The epic-close advance (epic #707 lane F5/#720). It runs on the idle
+            # path, after the wave advance, because that is the only tick that runs
+            # without an order: when the fleet is finished, moving to the next epic
+            # is the work. A focus that is still open reports the same thing every
+            # tick — "the board has not moved" — and is NOT rewritten, so the idle
+            # path stays quiet instead of churning `.board/focus.json`.
+            moved, note = advance_epic_focus()
+            if not moved or (BOARD_COMPLETE in note or "has not moved" not in note):
+                print(f"[brain] {note}", flush=True)
             ready = advance_ready()
             if ready:
                 print(wave_line(ready), flush=True)

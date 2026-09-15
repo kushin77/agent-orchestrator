@@ -27,6 +27,21 @@ from .model import (
 )
 
 
+#: Ticket-lifecycle event kinds (issue #634, ``core.tickets``).  They are
+#: workflow-level markers — never step events — so the projection records them
+#: verbatim; the tenant *ticket* state machine lives in ``core.tickets``.
+_TICKET_EVENT_KINDS = frozenset(
+    {
+        EventKind.ENGINEER_TASK_CREATED,
+        EventKind.ENGINEER_TASK_CLOSED,
+        EventKind.PLAN_DECOMPOSED,
+        EventKind.TICKET_DISPATCHED,
+        EventKind.TICKET_EXECUTED,
+        EventKind.TICKET_REVIEWED,
+    }
+)
+
+
 @dataclass
 class StepExecutionState:
     """Projected state of one step within a workflow."""
@@ -123,6 +138,13 @@ class WorkflowExecution:
         elif kind is EventKind.COMPENSATION_BEGAN:
             self.rollback_in_progress = True
             self.failed_step_id = record.payload.get("failed_step_id")
+            self.events.append(record)
+        elif kind in _TICKET_EVENT_KINDS:
+            # Tenant ticket lifecycle events (issue #634, ``core.tickets``).
+            # They are workflow-level markers carrying tenant scope, not step
+            # events: they are projected verbatim and the ticket state machine
+            # lives in ``core.tickets`` (``tickets/runtime.py``).  Treating
+            # them as step events would raise "unknown step None".
             self.events.append(record)
         else:
             self._apply_step_event(kind, record)

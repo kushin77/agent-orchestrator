@@ -258,8 +258,33 @@ bash fleet/terminal.sh         # sister: never-idle loop (watch -> run -> report
 The sister loop (`fleet/terminal.py`) is code-native: it watches `.fleet/inbox`
 forever, runs one subagent per directive with the agent CLI (`--runner "claude
 -p"` by default; `--dry-run` prints the command), reports the result, and
-escalates any failure. An empty inbox is just another poll cycle — it never
+escaluates any failure. An empty inbox is just another poll cycle — it never
 idles out. `FLEET_RUNNER` overrides the runner.
+
+### The runner preflight (issue #733)
+
+The loop resolves its runner **in code**, before it reads the inbox, every cycle:
+`resolve_runner` looks the executable up on PATH and then in the documented
+per-user install directories (`~/.local/bin`, `~/bin`, `~/.claude/local`, …,
+derived from HOME — `fleet/runtime.py`), and `argv[0]` is handed to the child as
+an **absolute** path. This is not belt-and-braces: the loop is cron's child and
+inherits cron's minimal PATH, and the measured failure was the fleet being unable
+to spawn a single subagent because `~/.local/bin` was not on it.
+
+The same environment is passed explicitly at spawn (`fleet/watchdog.py`), so the
+whole chain — cron → watchdog → launcher → loop → subagent — sees one PATH.
+
+An unresolvable runner is a **startup condition, not a per-directive failure**:
+the loop escalates **once**, holds the queue via `.fleet/paused` (so every control
+is still read — the hold is released automatically the moment the runner
+resolves), and dispatches nothing. The hold is recorded in
+`.fleet/runner-hold.json`, so the preflight never releases a pause an operator
+set.
+
+A gate the loop could not assess is **CANNOT-ASSESS**, never a failure of the
+work: a timed-out `make verify` (the gate of record's budget is 1800s) is reported
+as CANNOT-ASSESS at `warn`, because escalating it `critical` is what re-dispatched
+the directive every cycle.
 
 ## Log into the live session
 
@@ -345,6 +370,16 @@ python3 fleet/report.py            # the human-readable report
 python3 fleet/report.py --json     # the same report, typed and structured
 ```
 
+Above the sections the report prints the **active epic** block — the one epic the
+fleet is focused on (`.board/focus.json`, `governance/dispatch/focus.py`): the
+epic number, its per-epic progress as children `closed/total`, the pooled queue of
+open non-epic work outside it, and the effective agent count the focus declares.
+`max_agents: 0` is labelled **the pool** rather than resolved into a number — the
+capacity formula belongs to dispatch (lane F3/#718), not to the report. The block
+is built by a pure function over an injected board snapshot and focus, so it is
+asserted from a fixture (`fleet/tests/test_report_epic.py`) with no fleet and no
+network.
+
 Four sections, in dependency order, each item carrying its issue, its lane and an
 **evidence pointer** — a run id, a claim, the child's own `Verify:` command, or the
 closing record:
@@ -359,8 +394,9 @@ closing record:
 It reads only state the fleet already writes — the wave plans plus child issue
 states, the live claims the dispatch ledger folds (`governance/dispatch/cli.py
 status` prints the same set), the in-flight run markers under `.fleet/runs/`, the
-recent `.fleet/slog.jsonl` outcomes, and the board milestone/frontier through the
-same `governance/dispatch/order.py` rule the claim gate enforces. **It is
+recent `.fleet/slog.jsonl` outcomes, the board milestone/frontier through the
+same `governance/dispatch/order.py` rule the claim gate enforces, and the pinned
+focus (`.board/focus.json`) the active-epic block resolves. **It is
 read-only:** it never writes `.fleet/`, never claims, releases or reaps, and can
 never change a dispatch decision.
 
@@ -431,6 +467,50 @@ line owns the brain/sister/monitor rungs. Every N minutes it runs
 loop rung, restarts the **monitor** when it is missing, and does nothing when
 the fleet is healthy — so a tick is cheap and idempotent. A run in flight is
 never restarted just to update code (the one rule the watchdog never breaks).
+
+### What "drifted" is measured against (AO-GR-25, issue #739)
+
+The baseline is **`origin/master`** — never the shared checkout's HEAD. This
+matters more than it sounds. The shared checkout is routinely *behind* (it is
+wherever a human or a lane last left it), so comparing a loop's commit to it can
+compare **stale-to-stale**: the loop's own start commit reads back as the
+baseline it is judged against, and a loop executing pre-fix code reports
+`healthy`. That was measured on 2026-09-14 — the sister loop (pid 17797, started
+19:18Z) ran code from before a fix that merged at ~23:00Z, and the watchdog
+logged `sister: healthy` on every tick.
+
+Two consequences worth knowing:
+
+* **`origin/master` here is the already-fetched remote-tracking ref — the
+  watchdog does not fetch.** A tick runs every 2 minutes; a fetch per tick would
+  put the network on the critical path of a pass that is otherwise local, and
+  would have to either slow the fleet or swallow its own failure. Reading
+  `refs/remotes/origin/master` costs nothing and cannot fail open. The ref is
+  refreshed by the lanes: every lane fetches before it cuts a worktree, so it
+  tracks the remote as closely as the fleet actually pulls. The tradeoff is that
+  a fix merged **after** the last fetch is invisible until the next one — which is
+  exactly why the watchdog line prints the baseline it used, so an operator can
+  see how far behind the comparison is rather than trusting a bare `healthy`.
+
+* **An unreadable baseline is `cannot-assess`, and the pass exits 2.** It is
+  never folded into `healthy`. The pre-#739 rule was guarded by
+  `head != "unknown"`, so an unreadable HEAD *silently disabled drift detection
+  entirely* — a control that fails open, which is worse than no control.
+
+```
+[watchdog] brain: healthy (running 47a068b, origin/master 47a068b)
+[watchdog] sister: drifted (running 592b132, origin/master 47a068b) — respawned
+[watchdog] monitor: healthy
+```
+
+Exit codes are the repo's tri-state: **0** every rung healthy, **1** a definite
+failure (`RESPAWN FAILED`, or a `CAPABILITY STALE` rung), **2** CANNOT-ASSESS —
+no readable baseline, so the comparison could not be made. A known failure
+outranks an unassessable one.
+
+`bash scripts/check-fleet-drift.sh` proves all of this against the real
+classifier (a mutation-proof pair restores the local-HEAD baseline and the
+fail-open guard, and requires each to be caught).
 
 Every rung it respawns is started detached with stdout+stderr appended to
 `.fleet/<rung>.log` — the capture the `brain`, `sister` and `monitor` windows of
@@ -545,3 +625,61 @@ The check validates `fleet/directive.json` against the contract and runs the
 channel's own mutants (unknown message type, bad tier, bad thinking, missing
 role, a sister-issued directive) — each mutant must be refused, so the check
 cannot pass vacuously.
+
+```bash
+bash scripts/check-fleet-runner-preflight.sh   # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
+```
+
+The runner preflight is gated the same way (#733): the declarations are asserted
+by name, the preflight call site is asserted to *precede* the inbox read, and the
+REAL loop is driven in an isolated scratch tree with three queued directives and a
+runner that is on neither PATH nor HOME — exactly one escalation, nothing
+dispatched, the queue held, the work left pending. Two mutants of the real loop
+(the preflight neutralised, the hold removed) must each be **detected**, so a
+regression cannot pass by looking right.
+
+## Restarting a rung: which signal, and why it matters (AO-GR-27)
+
+Both loops install handlers for **`SIGTERM` and `SIGINT` only**
+(`fleet/terminal.py:1036`, `fleet/brain.py:262`, `fleet/monitor.py:178`). Those
+are *clean* stops: the signal handler releases the in-flight claim and takes its
+subagent down with it, so the restart suppresses a duplicate rather than
+stranding work.
+
+**`SIGHUP` is NOT handled.** On Linux its default action is to **terminate the
+process immediately**, so `kill -HUP <pid>` bypasses the handler, the claim
+release and the child teardown entirely. It is therefore *worse* than
+`SIGTERM` — it is an abrupt kill wearing the costume of a graceful reload. It
+also does not do what a `HUP` usually means: neither loop re-reads config or
+re-execs on it.
+
+```bash
+# The clean restart (the recommended one):
+kill -TERM "$(pgrep -f 'fleet/terminal.py run')"
+
+# For comparison, a LIVE self-upgrade without any restart at all:
+python3 fleet/channel.py send ...   # a `refresh` control pulls, gates,
+                                    # then re-execs the loop with the new code
+```
+
+`refresh` is the right tool when the goal is "pick up merged code": the loop
+pulls, runs `make verify`, and re-executes itself with the new code. Use
+`SIGTERM` when you specifically want the rung to stop and let the watchdog bring
+it back.
+
+> **A merged fix does not reach a running loop by itself.** The loop runs the
+> code it started with, and the watchdog only replaces it when it is missing,
+> stale, or **drifted from `origin/master`** (AO-GR-25). If a fix is merged and
+> the fleet is still behaving like the old one, compare the running rung's commit
+> against `origin/master` before assuming the fix did not work — and remember the
+> watchdog's baseline is the **fetched** `origin/master`, so fetch before you
+> compare or you will be reading a stale ref too.
+
+```bash
+# What is the running loop actually executing, and what is the baseline?
+python3 -c "import sys;sys.path.insert(0,'fleet');import channel;print(channel.head_commit(), channel.remote_head_commit())"
+tail -3 .fleet/watchdog.log   # the last pass names both commits per rung
+
+# Force the loop onto current code without a restart: it pulls, gates, re-execs.
+python3 fleet/channel.py send ... # a `refresh` control
+```

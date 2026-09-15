@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T20:02:35Z",
+  "generated_at": "2026-09-14T22:47:55Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1097,80 +1097,94 @@
     {
       "number": 125,
       "title": "EPIC: CMR vendor compliance remediation backlog (all violators)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
+      "labels": [
+        "type:epic"
+      ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T02:58:26Z"
     },
     {
       "number": 126,
       "title": "CMR vendor compliance gap: saas-rbac",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T21:09:21Z"
     },
     {
       "number": 127,
       "title": "CMR vendor compliance gap: github-workflow",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T21:09:23Z"
     },
     {
       "number": 128,
       "title": "CMR vendor compliance gap: shared-temporal",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T21:09:24Z"
     },
     {
       "number": 129,
       "title": "CMR vendor compliance gap: Shared_Integrations",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T21:35:41Z"
     },
     {
       "number": 130,
       "title": "CMR vendor compliance gap: shared-frontend",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-13T21:55:31Z"
     },
     {
       "number": 131,
       "title": "CMR vendor compliance gap: shared-governance",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T22:20:48Z"
     },
     {
       "number": 132,
       "title": "CMR vendor compliance gap: shared-services",
       "state": "OPEN",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
       "closed_at": ""
     },
@@ -1179,55 +1193,65 @@
       "title": "CMR vendor compliance gap: googleworkspace",
       "state": "OPEN",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
       "closed_at": ""
     },
     {
       "number": 134,
       "title": "CMR vendor compliance gap: SharedFeatures",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T21:17:29Z"
     },
     {
       "number": 135,
       "title": "CMR vendor compliance gap: ERP-CRM",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T20:45:35Z"
     },
     {
       "number": 136,
       "title": "CMR vendor compliance gap: code-indexing",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T21:09:26Z"
     },
     {
       "number": 137,
       "title": "CMR vendor compliance gap: diagrams",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 125,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T20:32:46Z"
     },
     {
       "number": 138,
       "title": "EPIC-XX: CMR/GDC Enterprise Knowledge Indexing & Cross-Reference Spine",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:knowledge-index",
@@ -1239,7 +1263,7 @@
       ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T03:11:18Z"
     },
     {
       "number": 139,
@@ -1319,6 +1343,7 @@
         "area:board",
         "class:elite",
         "gdc:enterprise",
+        "pillar:governance",
         "priority:P0",
         "type:governance"
       ],
@@ -1331,7 +1356,7 @@
     {
       "number": 144,
       "title": "EPIC: Per-Repo Agent Fleet \u2014 Personal CTO Engineering Team with Enterprise Roll-up",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:fleet",
@@ -1343,12 +1368,12 @@
       ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T04:35:22Z"
     },
     {
       "number": 145,
       "title": "Cannibalize mature agent-profile / SME / persona code into the registry",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:agent-profiles",
@@ -1358,14 +1383,14 @@
         "source:cannibalized",
         "type:feature"
       ],
-      "parent": null,
+      "parent": 144,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T04:24:19Z"
     },
     {
       "number": 146,
       "title": "Ship the per-repo agent fleet template (fleet-composition-as-template)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:fleet",
@@ -1374,14 +1399,14 @@
         "priority:P1",
         "type:feature"
       ],
-      "parent": null,
+      "parent": 144,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T03:56:28Z"
     },
     {
       "number": 147,
       "title": "Port the CTO overlay as a per-repo drop-in governance layer",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:cto-overlay",
@@ -1391,9 +1416,9 @@
         "source:cannibalized",
         "type:feature"
       ],
-      "parent": null,
+      "parent": 144,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T03:28:45Z"
     },
     {
       "number": 148,
@@ -1415,7 +1440,7 @@
     {
       "number": 149,
       "title": "Port SME-squad routing + capability/route/tier FinOps configs into the gateway",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:fleet",
@@ -1425,30 +1450,31 @@
         "source:cannibalized",
         "type:feature"
       ],
-      "parent": null,
+      "parent": 144,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T03:56:32Z"
     },
     {
       "number": 150,
       "title": "Enforce repo separation, admin rights, and end-to-end issue closure",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:board",
         "class:elite",
         "gdc:enterprise",
+        "pillar:governance",
         "priority:P0",
         "type:governance"
       ],
-      "parent": null,
+      "parent": 144,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T03:28:49Z"
     },
     {
       "number": 151,
       "title": "Provide the enterprise/GDC roll-up \u2014 tenant hierarchy and org aggregate view",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:board",
@@ -1457,9 +1483,9 @@
         "priority:P1",
         "type:feature"
       ],
-      "parent": null,
+      "parent": 144,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T03:28:52Z"
     },
     {
       "number": 152,
@@ -1520,6 +1546,7 @@
       "labels": [
         "area:session-fleet",
         "class:elite",
+        "epic:session-fleet",
         "gdc:enterprise",
         "phase:8-autonomous-ops",
         "pillar:autonomous-ops",
@@ -1572,6 +1599,7 @@
       "labels": [
         "area:session-fleet",
         "class:enterprise",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
         "priority:P1",
         "type:feature"
@@ -1589,6 +1617,7 @@
         "area:fleet",
         "area:session-fleet",
         "class:enterprise",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
         "priority:P1",
         "type:feature"
@@ -1606,6 +1635,7 @@
         "area:board",
         "area:session-fleet",
         "class:enterprise",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
         "priority:P1",
         "type:feature"
@@ -1622,6 +1652,7 @@
       "labels": [
         "area:session-fleet",
         "class:elite",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
         "priority:P0",
         "type:governance"
@@ -1650,7 +1681,7 @@
     {
       "number": 170,
       "title": "Harden the claim gate: snapshot staleness check + conflict-free claim storage",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:board",
@@ -1661,7 +1692,7 @@
       ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T01:08:09Z"
     },
     {
       "number": 171,
@@ -1685,18 +1716,19 @@
     {
       "number": 174,
       "title": "Assign class labels to the six issues with declared-vs-actual conformance mismatches",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
         "class:enterprise",
+        "epic:session-fleet",
         "pillar:governance",
         "priority:P2",
         "type:governance"
       ],
-      "parent": null,
+      "parent": 160,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T19:51:56Z"
     },
     {
       "number": 175,
@@ -1740,7 +1772,7 @@
     {
       "number": 180,
       "title": "Lessons from first live steering + enterprise-scale hardening register",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:session-fleet",
@@ -1752,12 +1784,12 @@
       ],
       "parent": 160,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T03:54:55Z"
     },
     {
       "number": 181,
       "title": "Sync waves with the deepseek and code-indexing modules: bidirectional capability feedback loop",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:knowledge-index",
@@ -1772,7 +1804,7 @@
       "blocked_by": [
         180
       ],
-      "closed_at": ""
+      "closed_at": "2026-09-14T04:01:17Z"
     },
     {
       "number": 184,
@@ -1834,68 +1866,68 @@
     {
       "number": 218,
       "title": "fleet terminal: honour the FinOps block \u2014 tier/thinking must select the real runner",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "type:feature"
       ],
-      "parent": null,
+      "parent": 160,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T16:58:02Z"
     },
     {
       "number": 219,
       "title": "fleet terminal: per-run telemetry (duration, tier, model, rc, PR) aligned with fleet metering",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "type:feature"
       ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T00:38:07Z"
     },
     {
       "number": 220,
       "title": "fleet terminal: dispatch a context pack (issue, lane, acceptance, prior lessons) not just an order string",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "type:feature"
       ],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T02:25:02Z"
     },
     {
       "number": 232,
       "title": "fleet/telemetry.py: per-run record schema + JSONL append helper",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": 219,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-13T21:48:41Z"
     },
     {
       "number": 233,
       "title": "Wire per-run telemetry into fleet/terminal.py run path",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": 219,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-13T22:08:15Z"
     },
     {
       "number": 234,
       "title": "Telemetry summary verb + gitignore for .fleet/telemetry.jsonl",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": 219,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T00:37:43Z"
     },
     {
       "number": 237,
@@ -1910,30 +1942,32 @@
     {
       "number": 239,
       "title": "Mechanical execution layer \u2014 concept/intent (no containers yet)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T02:24:53Z"
     },
     {
       "number": 240,
       "title": "Cannibalize leaderboard worker-fleet hardening patterns (cannibalization index #8)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-14T02:24:52Z"
     },
     {
       "number": 241,
       "title": "Generated-cron reconciler (leaderboard pattern, later)",
       "state": "OPEN",
       "milestone": "",
-      "labels": [],
-      "parent": null,
+      "labels": [
+        "epic:session-fleet"
+      ],
+      "parent": 160,
       "blocked_by": [],
       "closed_at": ""
     },
@@ -1950,22 +1984,1709 @@
     {
       "number": 244,
       "title": "fleet: subagent prompt must merge its own green PR and close the issue",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
-      "closed_at": ""
+      "closed_at": "2026-09-13T21:38:11Z"
     },
     {
       "number": 245,
       "title": "Track the fleet progress monitor as a third watchdog rung (durable, auto-start)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
+      "closed_at": "2026-09-13T21:27:21Z"
+    },
+    {
+      "number": 248,
+      "title": "Board reconciliation: release stale #143 claim, refresh snapshot",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:32:22Z"
+    },
+    {
+      "number": 249,
+      "title": "Attach the operator's enterprise instruction stack to fleet directives (brain KB)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:32:24Z"
+    },
+    {
+      "number": 251,
+      "title": "Attach the operator's enterprise instruction stack to fleet directives (brain KB)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:45:15Z"
+    },
+    {
+      "number": 253,
+      "title": "EPIC: Five-agent team (ollama/paperclip/hermes/deepseek/claude) e2e \u2014 visible in ai.purebliss.app, shared-frontend fully implemented",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:04:54Z"
+    },
+    {
+      "number": 254,
+      "title": "Register the five-agent team (ollama/paperclip/hermes/deepseek/claude): profiles, personas, purebliss-team pack",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 253,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:01:48Z"
+    },
+    {
+      "number": 255,
+      "title": "Route the five-agent team: provider adapters + routing + claude/anthropic catalog entry",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 253,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:53:01Z"
+    },
+    {
+      "number": 256,
+      "title": "Render the five-agent team in the web UI (purebliss team view)",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 253,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:47:29Z"
+    },
+    {
+      "number": 257,
+      "title": "E2E golden path across all five agents (multi-provider) + negative controls",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 253,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:47:57Z"
+    },
+    {
+      "number": 258,
+      "title": "Serve the web UI at ai.purebliss.app (flag-gated OFF, IaC declarations)",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 253,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:47:47Z"
+    },
+    {
+      "number": 259,
+      "title": "shared-frontend module fully implemented e2e (agent ecosystem web UI + compliance gap #130)",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 253,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T21:54:13Z"
+    },
+    {
+      "number": 263,
+      "title": "[fleet-task] Institutional lane isolation: session identity minted per issue, own worktree, own commit signature",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "enhancement",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:01:04Z"
+    },
+    {
+      "number": 265,
+      "title": "Fleet live console: capture rung output, meaningful brain context, dashboard, and log into the live session",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:05:02Z"
+    },
+    {
+      "number": 269,
+      "title": "[fleet-task] End-to-end GitHub lifecycle: every work item closes hygienically, all artifacts terminal",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:27:37Z"
+    },
+    {
+      "number": 271,
+      "title": "EPIC: ai.purebliss.app login must be shared-frontend proper (one front door)",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:40:39Z"
+    },
+    {
+      "number": 272,
+      "title": "Portal login must be shared-frontend proper: consume the OS auth-gate session, delete the private login form",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 271,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:20:00Z"
+    },
+    {
+      "number": 273,
+      "title": "Serve ai.purebliss.app through the shared-frontend auth gate + shell (proper login as the front door)",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 271,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:35:55Z"
+    },
+    {
+      "number": 274,
+      "title": "fleet/brain.py: no graceful stop or heartbeat during work \u2014 a stale beat kills the brain mid-order and can re-dispatch it",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:05:03Z"
+    },
+    {
+      "number": 275,
+      "title": "fleet/brain.py: a decompose order without parent_issue raises KeyError and kills the brain loop",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:05:03Z"
+    },
+    {
+      "number": 276,
+      "title": "fleet/watchdog.py: respawn is reported without verification and a spawn failure crashes the pass (RESPAWN FAILED unreachable)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:35:02Z"
+    },
+    {
+      "number": 277,
+      "title": "fleet/health.py: never probes the brain \u2014 reports healthy while the middle rung is dead",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:35:02Z"
+    },
+    {
+      "number": 278,
+      "title": "fleet/channel.py: cmd_order's anti-replay check can never fire (identical operator order accepted twice)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:05:04Z"
+    },
+    {
+      "number": 279,
+      "title": "fleet/terminal.py: run success is decided by substring-matching the model's prose, not by verification evidence",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:47:27Z"
+    },
+    {
+      "number": 280,
+      "title": "fleet/: .fleet/ grows unbounded \u2014 no rotation or pruning for mailboxes, slog.jsonl or rung logs",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "enhancement"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:12:16Z"
+    },
+    {
+      "number": 281,
+      "title": "fleet/terminal.py: graceful stop logs a spurious release FAILED because the claim is released twice",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:47:27Z"
+    },
+    {
+      "number": 284,
+      "title": "fleet isolation guard is inert: the conftest guard tests are never collected and cannot pass",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P1",
+        "testing",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:17:11Z"
+    },
+    {
+      "number": 285,
+      "title": "fleet/terminal.py record_run does not survive a write failure, contrary to its own docstring",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P2",
+        "testing",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:47:27Z"
+    },
+    {
+      "number": 286,
+      "title": "test_loop_wires_record_run_into_the_run_path is a source-text grep, not a behavioural test",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P2",
+        "testing",
+        "type:task"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T16:36:24Z"
+    },
+    {
+      "number": 287,
+      "title": "lane audit accepts a ticket ref on the subject line, and real lanes are never audited",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "epic:session-fleet",
+        "priority:P2",
+        "process",
+        "type:task"
+      ],
+      "parent": 160,
+      "blocked_by": [],
       "closed_at": ""
+    },
+    {
+      "number": 288,
+      "title": "PR-body and commit-trailer obligations have no template and no gate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P2",
+        "process",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T01:01:58Z"
+    },
+    {
+      "number": 292,
+      "title": "[fleet-task] Close-out audits the refreshed item, not the stale pre-close snapshot",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:37:53Z"
+    },
+    {
+      "number": 294,
+      "title": "[fleet-task] Audit scope: items the process owns, not every PR-bearing issue",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:44:32Z"
+    },
+    {
+      "number": 297,
+      "title": "[fleet-task] Quarantine tracking states: honour the tracker in any casing",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T22:49:14Z"
+    },
+    {
+      "number": 299,
+      "title": "EPIC: Fleet \u2194 Hermes/Paperclip alignment roadmap",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:decision",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:50:09Z"
+    },
+    {
+      "number": 300,
+      "title": "Dispatch by capability: the brain consults the registry personas (hermes\u2192code/test/PR @ MED; paperclip\u2192research/docs/reporting @ LOW)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 299,
+      "blocked_by": [
+        274
+      ],
+      "closed_at": "2026-09-13T23:46:13Z"
+    },
+    {
+      "number": 301,
+      "title": "Cannibalize hermes-agents routing/tiering/escalation into fleet dispatch (provenance GR-10)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:task"
+      ],
+      "parent": 299,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:46:13Z"
+    },
+    {
+      "number": 302,
+      "title": "Cannibalize paperclip planning/status-report patterns into the fleet reporting surface",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "source:cannibalized",
+        "type:task"
+      ],
+      "parent": 299,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:45:41Z"
+    },
+    {
+      "number": 303,
+      "title": "Land ADR-0012: Hermes/Paperclip ownership boundary for the fleet",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 299,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:01:21Z"
+    },
+    {
+      "number": 304,
+      "title": "[fleet-task] Reconcile orphaned sessions: per-session heartbeat, TTL sweep, worktree/branch teardown, lock release",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:22:13Z"
+    },
+    {
+      "number": 309,
+      "title": "governance/isolation: the ticket-trailer rule is a substring test, and landed lanes are never audited (#287 follow-up)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "epic:session-fleet"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:56:37Z"
+    },
+    {
+      "number": 310,
+      "title": "fleet/terminal.py: loop() shadows the module-level verdict(), so a work directive crashes before its outcome record",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:52:11Z"
+    },
+    {
+      "number": 311,
+      "title": "Wire scripts/check-pr-contract.sh into the PR-time merge contract and a landed-history audit (#288 follow-up)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:46:11Z"
+    },
+    {
+      "number": 312,
+      "title": "governance/lessons: 'incident-labelled issue #141 was closed with no RCA record' keeps make gate red on master",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:34:34Z"
+    },
+    {
+      "number": 313,
+      "title": "EPIC: ai.purebliss.app is its own webui \u2014 the OS is an addon (like other tenants), not the destination",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:18:41Z"
+    },
+    {
+      "number": 315,
+      "title": "shared-frontend: per-origin portal identity + expose the OS as an addon module",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 313,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:45:55Z"
+    },
+    {
+      "number": 316,
+      "title": "shared-services: declare the os-ai portal identity (its own webui, OS as an addon) + verify live",
+      "state": "CLOSED",
+      "milestone": "Shared-Frontend Portal + UI",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 313,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:18:39Z"
+    },
+    {
+      "number": 317,
+      "title": "ADR-0012 amendment: record the Hermes runtime fork explicitly (map the policy, do not couple the runtime)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 299,
+      "blocked_by": [],
+      "closed_at": "2026-09-13T23:29:41Z"
+    },
+    {
+      "number": 319,
+      "title": "[fleet-task] Capability drift: a running rung must report capabilities it does not implement",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T03:03:08Z"
+    },
+    {
+      "number": 320,
+      "title": "[fleet-task] Enforce declaring labels at the issue-filing path, not after the fact",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:43:21Z"
+    },
+    {
+      "number": 321,
+      "title": "[fleet-task] Reconciler and lifecycle findings must reach the board, not only a log",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:41:53Z"
+    },
+    {
+      "number": 322,
+      "title": "[fleet-task] One declared policy for every fleet lease and TTL, with its ordering constraints",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:25:06Z"
+    },
+    {
+      "number": 323,
+      "title": "[fleet-task] Unified fleet-state projection across lanes, sessions, claims and journals",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T03:02:58Z"
+    },
+    {
+      "number": 326,
+      "title": "fleet test reads the live GitHub board: test_decompose_..._only_wave_1 is red on master (and rewrites .board/snapshot.json)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:04:41Z"
+    },
+    {
+      "number": 327,
+      "title": "make verify (gate of record) runs no pytest: a red declared suite can sit on master undetected",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:04:41Z"
+    },
+    {
+      "number": 329,
+      "title": "Board-drain wave plan (regenerating)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:09:01Z"
+    },
+    {
+      "number": 330,
+      "title": "[fleet-task] fleet dashboard: monitor heartbeat missing + enterprise console TUI + web SPoG gap analysis",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:session-fleet"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:27:03Z"
+    },
+    {
+      "number": 331,
+      "title": "[fleet-task] Web single-pane-of-glass: fleet-state projection server + streaming API",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:session-fleet"
+      ],
+      "parent": 323,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:24:57Z"
+    },
+    {
+      "number": 332,
+      "title": "[fleet-task] Web single-pane-of-glass: browser dashboard with filters, timelines, and the org roll-up (#151)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:session-fleet"
+      ],
+      "parent": 323,
+      "blocked_by": [
+        331
+      ],
+      "closed_at": "2026-09-14T02:43:25Z"
+    },
+    {
+      "number": 333,
+      "title": "[fleet-task] Web single-pane-of-glass: access control + tenant scoping for the live dashboard",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:session-fleet"
+      ],
+      "parent": 323,
+      "blocked_by": [
+        331
+      ],
+      "closed_at": "2026-09-14T03:31:24Z"
+    },
+    {
+      "number": 334,
+      "title": "gateway: registry fallback shadows the proxy routing chain (four-provider path)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T00:26:43Z"
+    },
+    {
+      "number": 337,
+      "title": "gateway: hermes and ollama team pins are unreachable \u2014 no routed task requires their capability",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:09:15Z"
+    },
+    {
+      "number": 338,
+      "title": "EPIC: Unified agent single pane of glass \u2014 six agents (paperclip/hermes/deepseek/ollama/claude/copilot), full e2e",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T18:11:06Z"
+    },
+    {
+      "number": 339,
+      "title": "P0: Live data bridge \u2014 serve registry/gateway/telemetry/guardrail state; shell consumes at runtime",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:11:24Z"
+    },
+    {
+      "number": 340,
+      "title": "P0: Copilot \u2014 register the 6th agent end-to-end (profile, persona, provider, rate card, team, e2e)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:33:38Z"
+    },
+    {
+      "number": 341,
+      "title": "P0: FinOps single-pane reports \u2014 live cost/budget/usage per agent + spend alerts",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:19:33Z"
+    },
+    {
+      "number": 342,
+      "title": "P0: Ops/health/SLO surface \u2014 agent status, alert severity state machine, latency/error dashboards",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:19:35Z"
+    },
+    {
+      "number": 343,
+      "title": "P0: E2E policy/guardrail controls in the shell (real toggles, default-OFF, audited)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T05:00:35Z"
+    },
+    {
+      "number": 344,
+      "title": "P1: Agent catalog UX \u2014 per-agent entity pages, search/facet filters, per-agent tab strip",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:59:59Z"
+    },
+    {
+      "number": 345,
+      "title": "P1: Live/streaming feed \u2014 SSE real-time request/event/session across all six agents",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:19:37Z"
+    },
+    {
+      "number": 346,
+      "title": "P1: One shared agent-identity schema + parity gate (kill TeamAgent vs AgentProfile drift)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T05:03:09Z"
+    },
+    {
+      "number": 347,
+      "title": "P1: Audit surface in the shell (tamper-evident, filterable, read-only)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T05:19:35Z"
+    },
+    {
+      "number": 348,
+      "title": "P1: Admin portal reads the live registry/telemetry (de-seed the demo ConsoleState)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:43:30Z"
+    },
+    {
+      "number": 349,
+      "title": "P2: Gateway provider catalog completeness \u2014 one module entry per provider + parity gate",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:37:36Z"
+    },
+    {
+      "number": 350,
+      "title": "P2: Adopt the portal-surfaces feature-flag feed (unblock Settings\u2192Modules; CMR#708)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T03:56:57Z"
+    },
+    {
+      "number": 351,
+      "title": "P2: Declare per-surface target class + enforce the elite/enterprise conformance gate",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T05:05:19Z"
+    },
+    {
+      "number": 358,
+      "title": "Board attack plan (milestone\u2192epic\u2192class)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "pillar:governance",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:47:45Z"
+    },
+    {
+      "number": 359,
+      "title": "EPIC: Adopt paperclip.ing (MIT) as the ai.purebliss.app agent-management surface \u2014 fork/cannibalize, don't rebuild",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:34:16Z"
+    },
+    {
+      "number": 360,
+      "title": "EPIC: Session experience \u2014 a second sister fleet owns tmux/dashboard/docker-session UX e2e",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "type:epic"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:45:22Z"
+    },
+    {
+      "number": 361,
+      "title": "Namespaced fleet runtime: AO_FLEET_DIR + AO_FLEET_SESSION so a second sister fleet can run alongside (EPIC #360 child)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T01:28:44Z"
+    },
+    {
+      "number": 363,
+      "title": "Claim gate directive validation reads the namespaced fleet sent dir (fix fleet-2 claim regression from #361)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T01:38:37Z"
+    },
+    {
+      "number": 365,
+      "title": "Namespaced fleet runtime (FLEET_NS) so a second sister fleet can run alongside",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 360,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T18:22:51Z"
+    },
+    {
+      "number": 366,
+      "title": "P0: Fleet crash-loop / code-drift DEADLOCK \u2014 watchdog never respawns a drifted crash-looping loop, and a crashed run re-dispatches its directive forever",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "epic:session-fleet"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 367,
+      "title": "Wire live agent logs, KB access and mid-run steering over the A2A transport (non-stop live debug)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "epic:session-fleet"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:48:49Z"
+    },
+    {
+      "number": 368,
+      "title": "Paperclip.ing gap analysis \u2014 fleet primitives vs the reference agent-management product (provenance GR-10)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:cannibalized",
+        "type:task"
+      ],
+      "parent": 359,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:27:35Z"
+    },
+    {
+      "number": 369,
+      "title": "Repoint the SPoG milestone (#338-#351, #331/#332/#333) at a paperclip.ing fork/embed",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 359,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:31:55Z"
+    },
+    {
+      "number": 370,
+      "title": "Decision: embed-vs-fork-vs-CLI for paperclip.ing + freeze the integration seam (heartbeat/ticket/budget contracts)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 359,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:29:34Z"
+    },
+    {
+      "number": 375,
+      "title": "P0: hermes/paperclip/ollama unreachable \u2014 no shared-services fallback rung; a local-provider outage is a deal-breaker instead of a bounded degradation",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:model-gateway",
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:30:56Z"
+    },
+    {
+      "number": 382,
+      "title": "Board hygiene: give every open issue its epic Parent: edge (attribution sweep)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "pillar:governance",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T02:45:41Z"
+    },
+    {
+      "number": 384,
+      "title": "Cross-reference spine: typed relationships + cmr-refs marker convention, enforced (EPIC #138 DoD gap)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 138,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T03:08:11Z"
+    },
+    {
+      "number": 388,
+      "title": "P2: wire the cross-repo boundary detector into make verify (offline snapshot body + quarantine baseline)",
+      "state": "CLOSED",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:04:10Z"
+    },
+    {
+      "number": 399,
+      "title": "EPIC: Paperclip ticket as the single join node \u2014 lessons register \u2194 PMO \u2194 tasks \u2194 agents (elite integration)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T18:11:03Z"
+    },
+    {
+      "number": 400,
+      "title": "Decision: the paperclip ticket is the single join node + freeze ticket-hub contract v2 (facets, authority, receipt, lesson facet)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 399,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:43:35Z"
+    },
+    {
+      "number": 401,
+      "title": "Ticket projection builder \u2014 deterministic, rebuildable ticket graph from board + claims + lessons + receipts",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 399,
+      "blocked_by": [
+        400
+      ],
+      "closed_at": "2026-09-14T12:52:38Z"
+    },
+    {
+      "number": 402,
+      "title": "Lessons register \u2192 ticket facets: one ledger, SUGGEST addressable, generic crossref edges",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:lessons",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 399,
+      "blocked_by": [
+        400
+      ],
+      "closed_at": "2026-09-14T05:19:05Z"
+    },
+    {
+      "number": 403,
+      "title": "PMO rollup + RAID as derived views over the ticket graph (report/lanes/raid/aging/deps)",
+      "state": "CLOSED",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:board",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 399,
+      "blocked_by": [
+        401
+      ],
+      "closed_at": "2026-09-14T14:02:49Z"
+    },
+    {
+      "number": 409,
+      "title": "EPIC: Paperclip boundary adoption \u2014 stand the upstream CLI up and wire the seam end-to-end",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T14:49:17Z"
+    },
+    {
+      "number": 410,
+      "title": "EPIC: Paperclip parity adapters \u2014 six thin adapters onto the frozen ticket contract",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T14:33:58Z"
+    },
+    {
+      "number": 411,
+      "title": "Stand up the upstream paperclip CLI self-hosted beside the control plane (flag-gated OFF)",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 409,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:11:19Z"
+    },
+    {
+      "number": 412,
+      "title": "Cross-boundary auth for the paperclip seam \u2014 agent key/JWT mint+verify, board token adapter, run-id bridge",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:6-identity-rbac",
+        "pillar:identity-rbac",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 409,
+      "blocked_by": [
+        411
+      ],
+      "closed_at": "2026-09-14T13:38:25Z"
+    },
+    {
+      "number": 413,
+      "title": "Project the fleet over paperclip's HTTP surface \u2014 /api/health, /api/openapi.json, company-scoped routes, error taxonomy",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 409,
+      "blocked_by": [
+        339,
+        412
+      ],
+      "closed_at": "2026-09-14T13:58:40Z"
+    },
+    {
+      "number": 414,
+      "title": "Heartbeat adapter \u2014 synthesize wake.cause, wake.delta and outcome from rung activity (\u00a75.1\u2013\u00a75.3)",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 410,
+      "blocked_by": [
+        400
+      ],
+      "closed_at": "2026-09-14T12:52:32Z"
+    },
+    {
+      "number": 415,
+      "title": "Budget adapter \u2014 agent/team/project scope, currency, boolean hard stop and per-task receipts (\u00a75.7\u2013\u00a75.10)",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 410,
+      "blocked_by": [
+        400,
+        401
+      ],
+      "closed_at": "2026-09-14T13:06:08Z"
+    },
+    {
+      "number": 416,
+      "title": "Approvals as a projected resource \u2014 hire, top-up and override mapped to directive + claim",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 410,
+      "blocked_by": [
+        400
+      ],
+      "closed_at": "2026-09-14T05:20:29Z"
+    },
+    {
+      "number": 417,
+      "title": "Per-agent secret vault primitive \u2014 GSM-backed, never upstream's store as source of truth",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 410,
+      "blocked_by": [
+        400
+      ],
+      "closed_at": "2026-09-14T05:20:34Z"
+    },
+    {
+      "number": 418,
+      "title": "Routines \u2014 expose fleet/cron.py schedules as projected routine objects",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 410,
+      "blocked_by": [
+        400,
+        403
+      ],
+      "closed_at": "2026-09-14T14:18:04Z"
+    },
+    {
+      "number": 419,
+      "title": "Skills, plugins and MCP \u2014 a SKILL.md registry and the MCP tool projection",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 410,
+      "blocked_by": [
+        400
+      ],
+      "closed_at": "2026-09-14T05:20:39Z"
+    },
+    {
+      "number": 420,
+      "title": "Wire the paperclip boundary and adapter gates into the gate of record",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:0-foundations",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 410,
+      "blocked_by": [
+        401,
+        403,
+        411,
+        412,
+        413,
+        414,
+        415,
+        416,
+        417,
+        418,
+        419
+      ],
+      "closed_at": "2026-09-14T14:18:12Z"
+    },
+    {
+      "number": 422,
+      "title": "EPIC: Peer-module integration \u2014 paperclip / hermes / deepseek / ollama (cross-repo gap register)",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:25:56Z"
+    },
+    {
+      "number": 423,
+      "title": "Parent-side sub-module admission \u2014 publish and gate the contract the four peers are declaring against",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 422,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:50:12Z"
+    },
+    {
+      "number": 424,
+      "title": "Cross-repo lessons sync \u2014 one ledger, or a declared adapter (re-files #181 gap 6)",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:lessons",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 422,
+      "blocked_by": [
+        402
+      ],
+      "closed_at": "2026-09-14T13:06:02Z"
+    },
+    {
+      "number": 425,
+      "title": "Metering/budget schema parity across the boundary \u2014 one receipt shape before ours is frozen",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 422,
+      "blocked_by": [
+        415
+      ],
+      "closed_at": "2026-09-14T13:18:14Z"
+    },
+    {
+      "number": 426,
+      "title": "Routing seam: a reusable tier-routing package vs gateway/sme-routing \u2014 one authority (ADR-0015)",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 422,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:53:47Z"
+    },
+    {
+      "number": 427,
+      "title": "Bidirectional sync owner \u2014 a scheduled peer-board triage that files direction issues with provenance",
+      "state": "CLOSED",
+      "milestone": "M28 - Peer-module integration (paperclip / hermes / deepseek / ollama)",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:automation"
+      ],
+      "parent": 422,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:50:17Z"
+    },
+    {
+      "number": 428,
+      "title": "P0: Paperclip.ing integration adapter \u2014 the ai.purebliss.app serving layer via paperclip (ADR-0013), EPIC #338",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:feature"
+      ],
+      "parent": 338,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T04:40:12Z"
     },
     {
       "number": 445,
@@ -1985,7 +3706,6 @@
       "blocked_by": [
         423
       ],
-      "cross_refs": [],
       "closed_at": "2026-09-14T17:09:22Z"
     },
     {
@@ -2006,8 +3726,564 @@
       "blocked_by": [
         445
       ],
-      "cross_refs": [],
       "closed_at": "2026-09-14T17:12:47Z"
+    },
+    {
+      "number": 448,
+      "title": "Adapter module already landed at integrations/paperclip/** \u2014 re-point the boundary/adapters lanes and gate against a second module",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 409,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:06:30Z"
+    },
+    {
+      "number": 457,
+      "title": "Reconcile the two paperclip boundary modules \u2014 paperclip/adapters/** (EPIC #410) vs integrations/paperclip/** (#428)",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:23:48Z"
+    },
+    {
+      "number": 461,
+      "title": "EPIC: Diagrams blueprint on the paperclip operator surface \u2014 the live-state SSOT drives decisions and task completion",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T14:49:15Z"
+    },
+    {
+      "number": 462,
+      "title": "EPIC: Diagrams capability for the fleet \u2014 the capability register, the vendor direction set, and our consumer half",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:40:29Z"
+    },
+    {
+      "number": 463,
+      "title": "Decision: the diagrams blueprint's authority on the operator surface + the ticket-evidence contract (ADR-0016)",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 461,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:59:02Z"
+    },
+    {
+      "number": 464,
+      "title": "Declare this repo's diagrams SSOT membership \u2014 architecture.yaml + the gdc-manifest diagrams.blueprint pin + a gate",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 461,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T13:50:53Z"
+    },
+    {
+      "number": 465,
+      "title": "The diagrams projection adapter \u2014 integrations/paperclip/diagrams.py on the frozen transport",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 461,
+      "blocked_by": [
+        463
+      ],
+      "closed_at": "2026-09-14T14:12:04Z"
+    },
+    {
+      "number": 466,
+      "title": "Wire the diagrams declaration + projection gates into the gate of record",
+      "state": "CLOSED",
+      "milestone": "M27 - Paperclip boundary & parity adoption",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 461,
+      "blocked_by": [
+        420,
+        464,
+        465
+      ],
+      "closed_at": "2026-09-14T14:36:35Z"
+    },
+    {
+      "number": 467,
+      "title": "The diagrams capability register \u2014 what \"fully capable\" means, grounded against the vendor board",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 462,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:07:33Z"
+    },
+    {
+      "number": 468,
+      "title": "Track the diagrams capability direction set to completion \u2014 vendor issue state \u2192 register status",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 462,
+      "blocked_by": [
+        467
+      ],
+      "closed_at": "2026-09-14T15:21:16Z"
+    },
+    {
+      "number": 469,
+      "title": "Enforce the diagrams capability register \u2014 a gate that fails by name on an unowned or unreferenced row",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 462,
+      "blocked_by": [
+        467
+      ],
+      "closed_at": "2026-09-14T15:21:19Z"
+    },
+    {
+      "number": 472,
+      "title": "EPIC: Consume the canonical codeidx index \u2014 the org-wide symbol SSOT on the agent surface, closing the two cross-repo lessons this repo was sent",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T14:44:13Z"
+    },
+    {
+      "number": 473,
+      "title": "EPIC: code-indexing capability for the fleet \u2014 the capability register, the vendor direction set, and our consumer half",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:40:32Z"
+    },
+    {
+      "number": 474,
+      "title": "Decision: the two-index authority split + the no-re-derivation rule (ADR-0017)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 472,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T14:16:50Z"
+    },
+    {
+      "number": 475,
+      "title": "Carry the GR-17 mandatory indexer surface \u2014 root .mcp.json + a gate asserting it and the pin",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 472,
+      "blocked_by": [
+        464
+      ],
+      "closed_at": "2026-09-14T14:17:02Z"
+    },
+    {
+      "number": 476,
+      "title": "Converge gateway/mcp on the real codeidx backend \u2014 a flag-gated proxy, the declared graph only where no index exists",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:model-gateway",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 472,
+      "blocked_by": [
+        474
+      ],
+      "closed_at": "2026-09-14T14:35:44Z"
+    },
+    {
+      "number": 477,
+      "title": "Consume a pre-fetched codeidx context-pack in assemble_prefix \u2014 collapse the re-derived static prefix",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:state-machine",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 472,
+      "blocked_by": [
+        474
+      ],
+      "closed_at": "2026-09-14T14:35:47Z"
+    },
+    {
+      "number": 478,
+      "title": "The code-indexing capability register \u2014 what \"fully capable\" means, grounded against the vendor board",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 473,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:07:37Z"
+    },
+    {
+      "number": 479,
+      "title": "Track the codeidx capability direction set to completion \u2014 vendor issue state \u2192 register status",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 473,
+      "blocked_by": [
+        478
+      ],
+      "closed_at": "2026-09-14T15:21:23Z"
+    },
+    {
+      "number": 480,
+      "title": "Enforce the codeidx capability register \u2014 a gate that fails by name on an unowned or unreferenced row",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 473,
+      "blocked_by": [
+        478
+      ],
+      "closed_at": "2026-09-14T15:21:27Z"
+    },
+    {
+      "number": 481,
+      "title": "Wire the codeidx surface, backend and context-pack gates into the gate of record",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 472,
+      "blocked_by": [
+        466,
+        475,
+        476,
+        477
+      ],
+      "closed_at": "2026-09-14T14:41:32Z"
+    },
+    {
+      "number": 488,
+      "title": "A single 14.8 GB scratch log filled this machine's tmpfs (100%) \u2014 add the scratch-space guard + codify the driver discipline",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:54:42Z"
+    },
+    {
+      "number": 494,
+      "title": "EPIC: Consume the fleet monitoring plane \u2014 publish this control plane's telemetry, declare the integration, and track the vendor direction set",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:incident-response",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:26:29Z"
+    },
+    {
+      "number": 495,
+      "title": "Decision: the telemetry-exposition authority split + the no-second-dashboard rule (ADR-0022)",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:incident-response",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 494,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T14:50:45Z"
+    },
+    {
+      "number": 496,
+      "title": "Declare this repo's monitoring integration and observability surface \u2014 module.json integrations[] + docs/OBSERVABILITY.md + a gate",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 494,
+      "blocked_by": [
+        495
+      ],
+      "closed_at": "2026-09-14T15:09:29Z"
+    },
+    {
+      "number": 497,
+      "title": "Publish the telemetry pillar as a scrapeable exposition surface \u2014 a flag-gated metrics export over the SLO + budget + metering feeds",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:incident-response",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 494,
+      "blocked_by": [
+        495
+      ],
+      "closed_at": "2026-09-14T15:09:34Z"
+    },
+    {
+      "number": 498,
+      "title": "Publish the fleet-health signals to the monitoring plane \u2014 heartbeat, orphan-sweep and watchdog verdicts as monitoring events",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 494,
+      "blocked_by": [
+        495
+      ],
+      "closed_at": "2026-09-14T15:09:40Z"
+    },
+    {
+      "number": 499,
+      "title": "Wire the monitoring exposition + declaration gates into the gate of record",
+      "state": "CLOSED",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 494,
+      "blocked_by": [
+        420,
+        496,
+        497,
+        498
+      ],
+      "closed_at": "2026-09-14T15:22:02Z"
+    },
+    {
+      "number": 500,
+      "title": "EPIC: Enterprise chat in the Single Pane of Glass \u2014 a gateway-authoritative conversational surface grounded in the enterprise e2e (OpenWebUI \u00d7 Ollama)",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:16:55Z"
+    },
+    {
+      "number": 501,
+      "title": "Decision: the conversational surface \u2014 gateway-authoritative chat with a swappable client (ADR claimed at implementation time)",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:governance",
+        "priority:P1",
+        "source:decision",
+        "type:task"
+      ],
+      "parent": 500,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:20:22Z"
     },
     {
       "number": 502,
@@ -2027,8 +4303,298 @@
       "blocked_by": [
         501
       ],
-      "cross_refs": [],
       "closed_at": "2026-09-14T16:25:03Z"
+    },
+    {
+      "number": 503,
+      "title": "Chat serving surface: OpenAI- and Ollama-compatible endpoints on the gateway, flag-gated OFF",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T16:00:38Z"
+    },
+    {
+      "number": 504,
+      "title": "Chat grounding: the read-only enterprise tool family + the citations envelope",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T15:20:26Z"
+    },
+    {
+      "number": 505,
+      "title": "Chat identity: scoped (tenant, agent, conversation) credentials and structural tenant isolation",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "phase:6-identity-rbac",
+        "pillar:identity-rbac",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T15:20:31Z"
+    },
+    {
+      "number": 506,
+      "title": "Chat FinOps: per-turn attribution, budget caps and prompt-cache accounting",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T15:20:35Z"
+    },
+    {
+      "number": 507,
+      "title": "Chat guardrails: DLP egress, inbound re-validation and retrieval-injection defense",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T15:20:39Z"
+    },
+    {
+      "number": 508,
+      "title": "Chat experience: streaming, citations and honest degradation in the portal",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T15:20:42Z"
+    },
+    {
+      "number": 509,
+      "title": "Chat quality: the eval harness, prompt modules and the feedback loop",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T15:20:46Z"
+    },
+    {
+      "number": 511,
+      "title": "Chat shell-mount integration: the mount/bridge/auth contract and the vendor direction set",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T16:31:36Z"
+    },
+    {
+      "number": 512,
+      "title": "Chat shell-mount integration: the mount/bridge/auth contract and the vendor direction set",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T16:20:20Z"
+    },
+    {
+      "number": 513,
+      "title": "Chat conversation state: the transcript store, retention and the GDPR data-subject surface",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:3-state-machine",
+        "pillar:state-machine",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T17:03:48Z"
+    },
+    {
+      "number": 514,
+      "title": "Chat accessibility & responsive behaviour: keyboard, live regions, reduced motion and mobile",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T16:50:01Z"
+    },
+    {
+      "number": 515,
+      "title": "Chat design tokens: extend the --os- token twin for the conversational components (CSS+JSON parity)",
+      "state": "CLOSED",
+      "milestone": "M30 - Enterprise chat in the Single Pane of Glass (OpenWebUI \u00d7 portal \u00d7 Ollama)",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 500,
+      "blocked_by": [
+        501,
+        502
+      ],
+      "closed_at": "2026-09-14T16:38:11Z"
+    },
+    {
+      "number": 516,
+      "title": "Reclaim this machine's unreclaimed /tmp worktree pile (30 registered, 20 with vanished directories) and refuse new lane worktrees on tmpfs",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T18:01:16Z"
+    },
+    {
+      "number": 517,
+      "title": "governance/conformance: file --declare silently drops declared companion labels (pillar/phase) instead of passing or refusing them",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "bug",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T16:47:30Z"
+    },
+    {
+      "number": 522,
+      "title": "governance(pr-contract): a squash-merged PR can land the Refs trailer outside the trailing block, failing --landed",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T16:30:50Z"
     },
     {
       "number": 524,
@@ -2044,8 +4610,139 @@
       ],
       "parent": null,
       "blocked_by": [],
-      "cross_refs": [],
       "closed_at": "2026-09-14T15:58:10Z"
+    },
+    {
+      "number": 525,
+      "title": "Wire the e2e capstone suite into the gate of record \u2014 the Definition-of-Done proof is currently unconditional",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 524,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:27:14Z"
+    },
+    {
+      "number": 526,
+      "title": "Gate-coverage detector \u2014 fail by name when a declared suite or delivered check script is invoked by no gate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 524,
+      "blocked_by": [
+        525
+      ],
+      "closed_at": "2026-09-14T15:52:46Z"
+    },
+    {
+      "number": 545,
+      "title": "Wire the capability-register gates and trackers into the gate of record",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 462,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:35:56Z"
+    },
+    {
+      "number": 546,
+      "title": "Give the diagrams register its #461 mapping section so rule 6 is live, not inert",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 462,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:36:28Z"
+    },
+    {
+      "number": 551,
+      "title": "EPIC: Remote control command center CLI \u2014 a reachable, identified, audited control channel for the fleet",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:command-center",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:44:17Z"
+    },
+    {
+      "number": 552,
+      "title": "RC-1: ADR \u2014 the remote control transport and the authority split",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T15:56:17Z"
+    },
+    {
+      "number": 553,
+      "title": "RC-2: The control-verb vocabulary \u2014 one closed declaration",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        552
+      ],
+      "closed_at": "2026-09-14T16:33:04Z"
+    },
+    {
+      "number": 554,
+      "title": "RC-3: The control API (server half, flag-gated OFF)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        552,
+        553
+      ],
+      "closed_at": "2026-09-14T17:07:26Z"
     },
     {
       "number": 555,
@@ -2065,13 +4762,74 @@
       "blocked_by": [
         554
       ],
-      "cross_refs": [],
       "closed_at": "2026-09-14T17:52:33Z"
+    },
+    {
+      "number": 556,
+      "title": "RC-5: The remote command center CLI (client half)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        554,
+        555
+      ],
+      "closed_at": "2026-09-14T18:25:38Z"
+    },
+    {
+      "number": 557,
+      "title": "RC-6: The upstream control-verb mapping \u2014 a mapping, never authority",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        553
+      ],
+      "closed_at": "2026-09-14T17:07:20Z"
+    },
+    {
+      "number": 558,
+      "title": "RC-7: The seam doc's mismatch list gains the control rows",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        552,
+        557
+      ],
+      "closed_at": "2026-09-14T17:42:27Z"
     },
     {
       "number": 559,
       "title": "RC-8: Gate wiring + docs index \u2014 sole writer of the shared build files",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -2091,7 +4849,1999 @@
         556,
         557
       ],
-      "cross_refs": [],
+      "closed_at": "2026-09-14T20:32:15Z"
+    },
+    {
+      "number": 563,
+      "title": "RC-9: ADR \u2014 retire tmux as the control plane: the supervision and live-view substrate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [
+        552
+      ],
+      "closed_at": "2026-09-14T17:07:32Z"
+    },
+    {
+      "number": 565,
+      "title": "RC-10: The cockpit function registry \u2014 panels, views and commands declared once",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        563
+      ],
+      "closed_at": "2026-09-14T18:25:45Z"
+    },
+    {
+      "number": 566,
+      "title": "RC-11: The terminal cockpit \u2014 the Bloomberg-grade AI console for IT/CTO to analyst",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:command-center",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 551,
+      "blocked_by": [
+        554,
+        555,
+        565
+      ],
+      "closed_at": "2026-09-14T20:23:22Z"
+    },
+    {
+      "number": 567,
+      "title": "Stray-issue wave: 6 lanes dispatched (#522 #517 #309 #286 #218 #174) \u2014 Tier-2 triage pending",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:07:54Z"
+    },
+    {
+      "number": 568,
+      "title": "Wire check-chat-surface.sh into the gate of record \u2014 master is RED (gate-coverage fails by name)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 500,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T16:19:10Z"
+    },
+    {
+      "number": 578,
+      "title": "Pin the FinOps runnner selection and the refusal path with a mutation-proved test (follow-up to #218)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:16:11Z"
+    },
+    {
+      "number": 579,
+      "title": "The chat serving surface's own suite (gateway/chat/tests, 50 tests) runs in no gate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 500,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T17:10:22Z"
+    },
+    {
+      "number": 590,
+      "title": "Raise the M28 surfaces (module registry + module brief) to enterprise class and declare them in the surface registry",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 422,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T18:27:49Z"
+    },
+    {
+      "number": 591,
+      "title": "Evidence: give the module-registry surface its enterprise-class artifacts (schema, controls, audit)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 590,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T18:13:55Z"
+    },
+    {
+      "number": 592,
+      "title": "Evidence: give the module-brief surface its enterprise-class artifacts (schema, controls, audit)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 590,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T18:14:04Z"
+    },
+    {
+      "number": 603,
+      "title": "The gate-coverage baseline cannot enforce its own 'never grandfathered' rule \u2014 a lane can mute the detector for its own new check, and the rows go stale in a file no lane owns",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:09:40Z"
+    },
+    {
+      "number": 605,
+      "title": "[fleet-task] governance/lifecycle: an epic can close completed while its declared children are open \u2014 and no invariant can express it",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:session-fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 269,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:00:16Z"
+    },
+    {
+      "number": 606,
+      "title": "ai.purebliss.app is legacy in production: SPoG code is on master but never deployed (image placeholder + flags OFF + apply trigger disabled)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:03:17Z"
+    },
+    {
+      "number": 607,
+      "title": "EPIC: bring the developed fleet single-pane-of-glass + live surfaces to production at ai.purebliss.app",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 608,
+      "title": "Git Templates",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:50:24Z"
+    },
+    {
+      "number": 609,
+      "title": "Git Templates",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T19:56:56Z"
+    },
+    {
+      "number": 612,
+      "title": "ERP module",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:39:51Z"
+    },
+    {
+      "number": 613,
+      "title": "[lifecycle] DIRECTIVE_NOT_CONSUMED \u2014 #606",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:04:36Z"
+    },
+    {
+      "number": 614,
+      "title": "updated enterprise workbook",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:50:29Z"
+    },
+    {
+      "number": 616,
+      "title": "EPIC: Git-ecosystem templates & governance \u2014 class/pattern/template/env/clobber/RCA/orphan gaps (issue #608)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 617,
+      "title": "RC-12: Wire the real web-surface image into Terraform (gap 1, flag-gated)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:35:09Z"
+    },
+    {
+      "number": 618,
+      "title": "RC-13: Go-live readiness audit \u2014 rollout checks + apply route negative controls",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T20:41:13Z"
+    },
+    {
+      "number": 619,
+      "title": "RC-14: Owner-approved go-live run \u2014 phase 0 + phase 7 promotions",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 620,
+      "title": "Declare git-ecosystem surfaces in the surface-class table (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 621,
+      "title": "Shell-patterns doctrine + enforcement gate (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 622,
+      "title": "Issue forms: epic + bug templates with gate coverage (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 623,
+      "title": "Commit contract: .gitmessage trailer layout + PR template epic-edge note (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 624,
+      "title": "Git-config boilerplate: .gitattributes + commit.template bootstrap gate (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 625,
+      "title": "Clobber-prevention gate: runtime-state dirs stay ignored (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 626,
+      "title": "Register git-ecosystem artifacts in the knowledge indexer (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 627,
+      "title": "Canonical git/env variable registry doc (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 628,
+      "title": "Reconcile hardening: worktree/branch audit vs the claims ledger (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 629,
+      "title": "Docs index gate: every tracked docs/*.md is indexed (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 630,
+      "title": "Wire the git-ecosystem gates into make verify (EPIC #616)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [
+        621,
+        624,
+        625
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 631,
+      "title": "EPIC: close the Paperclip enterprise-workbook four-pillar delta e2e \u2014 C-suite org chart, agentic task manager, skill studio, agentic OS (issue #614)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 632,
+      "title": "workbook-1 \u00b7 registry: C-suite persona cards + org-chart declaration (reports-to, budget caps, heartbeat schedules)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 633,
+      "title": "workbook-2 \u00b7 gateway: per-role monthly budget caps (CEO 300 / CTO 250 / COO 100 / CFO 50 / CMO 200)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        632
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 634,
+      "title": "workbook-3 \u00b7 engine: tenant-facing agentic task manager \u2014 board \u2192 decomposition \u2192 durable execution",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:3-state-machine",
+        "pillar:state-machine",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 635,
+      "title": "workbook-4 \u00b7 governance: review gates + C-suite escalation on the task lifecycle",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        634
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 636,
+      "title": "workbook-5 \u00b7 guardrails: sandbox runtime enablement + policy entries for the five workbook mechanical rules",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:4-guardrails-security",
+        "pillar:guardrails-security",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 637,
+      "title": "workbook-6 \u00b7 telemetry: per-role heartbeat health + budget burn alerts and chargeback",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        632,
+        633
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 638,
+      "title": "workbook-7 \u00b7 identity: role-based boundaries for the five C-suite roles + org-wide skill isolation",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:6-identity-rbac",
+        "pillar:identity-rbac",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        632
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 639,
+      "title": "workbook-8 \u00b7 registry: the five Master AI Prompt Templates as published prompt modules + regression evals",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        632,
+        636
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 640,
+      "title": "workbook-9 \u00b7 registry: Skill Studio backend \u2014 skill-level pack granularity, author \u2192 test \u2192 publish",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:1-agent-registry",
+        "pillar:registry-profiling",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        639
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 641,
+      "title": "workbook-10 \u00b7 gateway: outbound MCP server management (draw.io) \u2014 registry, health, authz",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:2-model-gateway",
+        "pillar:model-gateway",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        639
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 642,
+      "title": "workbook-11 \u00b7 portal: org-chart, skill-studio and task-board surfaces \u2014 flag-gated OFF",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        632,
+        637,
+        640
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 643,
+      "title": "workbook-12 \u00b7 control-plane: instruction-layer mirrors for the five C-suite personas",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:enterprise",
+        "epic:enterprise-workbook",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        632,
+        639
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 644,
+      "title": "workbook-13 \u00b7 infra: feature flags + Cloud Build wiring \u2014 everything ships OFF",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:enterprise-workbook",
+        "class:iac",
+        "epic:enterprise-workbook",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": 631,
+      "blocked_by": [
+        641,
+        642
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 645,
+      "title": "EPIC: ERP module \u2014 indexer-fed enterprise integration of the ERPNext feature surface (e2e-mandatory, ordered by #612)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": 4,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 646,
+      "title": "ERP-01: Module foundation \u2014 integrations/erp skeleton, manifest, indexer data contract",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 647,
+      "title": "ERP-02: Core document model \u2014 ERPNext doctype surface as schemas + workflow data",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 648,
+      "title": "ERP-03: Transactional spine \u2014 selling to stock to accounting closed loop",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [
+        647
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 649,
+      "title": "ERP-04: Procurement + manufacturing \u2014 RFQ/PO/receipts, BOM, work orders",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [
+        647
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 650,
+      "title": "ERP-05: CRM, projects, quality + support documents and flows",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 651,
+      "title": "ERP-06: REST API + OpenAPI surface over the indexer-fed model",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [
+        647
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 652,
+      "title": "ERP-07: Portal frontend integration \u2014 module surfaces behind the erp-module flag",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [
+        651
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 653,
+      "title": "ERP-08: Tenant RBAC + guardrail scoping for ERP data",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:6-identity-rbac",
+        "pillar:identity-rbac",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [
+        646
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 654,
+      "title": "ERP-09: FinOps metering + usage telemetry for ERP operations",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [
+        647
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 655,
+      "title": "ERP-10: Enterprise e2e \u2014 cannibalized ERPNext e2e patterns, mandatory module stage",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:enterprise",
+        "epic:erp-module",
+        "gdc:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 645,
+      "blocked_by": [
+        651,
+        652,
+        653
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 665,
+      "title": "EPIC: ERPNext & DeepSeek FinOps \u2014 token-optimal subscription engine from CRM hook to ledger (operator mandate)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 666,
+      "title": "PF-1: Current-state money map \u2014 subscription flows + manual reconciliation points",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:10:37Z"
+    },
+    {
+      "number": 667,
+      "title": "PF-2: DeepSeek token-flow baseline + CRM conversion-hook inventory",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:10:41Z"
+    },
+    {
+      "number": 668,
+      "title": "PF-3: SaaS metrics current state \u2014 MRR/ARR, cloud burn, invoicing bottlenecks + silo map",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:10:45Z"
+    },
+    {
+      "number": 669,
+      "title": "PF-4: ADR \u2014 ERPNext as financial system of record + localized AI inference",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:10:48Z"
+    },
+    {
+      "number": 670,
+      "title": "PF-5: DeepSeek API prefix templates for maximum cache-hit tokens",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:10:51Z"
+    },
+    {
+      "number": 671,
+      "title": "PF-6: CRM\u2192ERPNext webhook bridges (conversion events \u2192 accounting modules)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 672,
+      "title": "PF-7: Localized MCP response-filtering layer (trim before context)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:10:55Z"
+    },
+    {
+      "number": 673,
+      "title": "PF-8: Cache-efficiency audit \u2014 hit vs miss tokens vs ERPNext billing queries",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:10:58Z"
+    },
+    {
+      "number": 674,
+      "title": "PF-9: Sliding-window memory rules \u2014 eliminate redundant context processing",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:11:02Z"
+    },
+    {
+      "number": 675,
+      "title": "PF-10: E2E sandbox simulation \u2014 sign-up \u2192 ERPNext billing \u2192 revenue recognition",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 676,
+      "title": "PF-11: Compliance audit + journal-posting edge cases (latency, discrepancies, security)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:erp-finops",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:11:06Z"
+    },
+    {
+      "number": 677,
+      "title": "control-verbs registry drift: #367 added log/follow/kb/steer without declaring them \u2014 gate of record is red",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:14:49Z"
+    },
+    {
+      "number": 678,
+      "title": "[lifecycle] DIRECTIVE_NOT_CONSUMED \u2014 #608",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:09:17Z"
+    },
+    {
+      "number": 680,
+      "title": "Shared_Integrations: resolve the 14 Dependabot alerts surfaced by onboarding (dependency overhaul)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "epic:vendor-compliance"
+      ],
+      "parent": 129,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:33:11Z"
+    },
+    {
+      "number": 690,
+      "title": "make verify RED: #367 added follow/kb/log/steer to fleet/channel.py without wiring the control-verb registry",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:21:37Z"
+    },
+    {
+      "number": 691,
+      "title": "[lifecycle] DIRECTIVE_NOT_CONSUMED \u2014 #677",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T21:26:23Z"
+    },
+    {
+      "number": 692,
+      "title": "A2A: terminal-loop refusal handling \u2014 self-heal snapshot, dead-letter terminal refusals, bounded backoff",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "pillar:autonomous-ops",
+        "type:task"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 693,
+      "title": "A2A: directive provenance \u2014 brain refuses dispatch for an already-closed issue",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "pillar:autonomous-ops",
+        "type:task"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 694,
+      "title": "A2A: orphan-claim auto-reconcile \u2014 loop invokes reconcile sweep, not 'escalate pending'",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "pillar:autonomous-ops",
+        "type:task"
+      ],
+      "parent": 160,
+      "blocked_by": [
+        304
+      ],
+      "closed_at": ""
+    },
+    {
+      "number": 695,
+      "title": "A2A: queue liveness health signal \u2014 inbox depth / oldest-directive age / wedge count",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "pillar:observability-finops",
+        "type:task"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 696,
+      "title": "EPIC: eliminate the cross-agent waiting bottleneck \u2014 contract-first, self-wiring, never-idle dispatch",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 697,
+      "title": "DG-1: Contract-first parallelization \u2014 freeze an interface before parallel consumers",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:dispatch-governance",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 696,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T22:44:26Z"
+    },
+    {
+      "number": 698,
+      "title": "DG-2: Self-wiring shared build files \u2014 end the #559 sole-writer serialization",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:dispatch-governance",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 696,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 699,
+      "title": "DG-3: Branch-stacking / speculative execution against upstream HEAD",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:dispatch-governance",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 696,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 700,
+      "title": "DG-4: Policy-based approval tiers \u2014 auto-approve the safe 90%",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:dispatch-governance",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 696,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T22:44:33Z"
+    },
+    {
+      "number": 701,
+      "title": "DG-5: Completion-triggered auto-scheduler \u2014 never idle without a serial brain",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:dispatch-governance",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 696,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T22:44:41Z"
+    },
+    {
+      "number": 702,
+      "title": "DG-6: Finer-grained ownership + TTL reaping \u2014 stop a slow neighbor blocking the chain",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:dispatch-governance",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 696,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 703,
+      "title": "CMR vendor compliance gap: shared-frontend \u2014 mandatory --os- design-token twin + gdc-manifest pin, templated to tenant/org/domain",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "epic:vendor-compliance",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 125,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T22:11:25Z"
+    },
+    {
+      "number": 705,
+      "title": "[lifecycle] VERIFY_EVIDENCE_MISSING \u2014 #612",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": "2026-09-14T22:00:50Z"
+    },
+    {
+      "number": 706,
+      "title": "EPIC: Port the fleet's cron automation into a shared-services container (dev -> dual-run -> cutover)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 707,
+      "title": "EPIC: single-epic-focused BAU - micro-decompose, max-agents, advance-to-closure",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 708,
+      "title": "EPIC: Fleet runaway prevention & governance controls - A2A arbitration, gate admission, board triggers, infra-limit guards",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 709,
+      "title": "fleet-cron: container image + entrypoint (dev-first, builds locally) [D1]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 710,
+      "title": "fleet-cron: dev-first local run with jobs in dry-run [D2]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 711,
+      "title": "fleet-cron: state volumes + secrets wiring (flag-gated OFF) [D3]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 712,
+      "title": "fleet-cron: healthcheck + structured logging + restart policy [D4]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 713,
+      "title": "fleet-cron: single-writer lease (parity prerequisite) [D5]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 714,
+      "title": "fleet-cron: dual-run parity harness + evidence [D6]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 715,
+      "title": "fleet-cron: cutover runbook, rollback + decommission [D7]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 716,
+      "title": "epic-focus: active-epic resolver + .board/focus.json + cli [F1]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 717,
+      "title": "epic-focus: admit a child of the ACTIVE epic as a new claim reason [F2]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 718,
+      "title": "epic-focus: max-agents as the default pool (capacity-gated) [F3]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 719,
+      "title": "epic-focus: micro-issue decomposition policy + anti-explosion guards [F4]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 720,
+      "title": "epic-focus: epic-close -> advance (+ epic-completeness invariant, closes #605) [F5]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 721,
+      "title": "epic-focus: out-of-epic pooling + a-la-carte blocker escape hatch [F6]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 722,
+      "title": "epic-focus: operator surface (report / console projection) [F7]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 707,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 723,
+      "title": "P0 runaway guard: attempt cap + backoff + dead-letter [G1]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 724,
+      "title": "gate admission control: one composite gate per worktree + box-wide cap [G2]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 725,
+      "title": "composite-gate coverage: an unwired check fails by name [G3]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 726,
+      "title": "A2A dispatch arbitration: prove issue -> epic -> lane ownership [G4]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 727,
+      "title": "board triggers: refresh-or-park on a stale snapshot [G5]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 728,
+      "title": "runaway + queue-liveness latching alarm [G6]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 729,
+      "title": "infra-limit guard + record the episode in the canonical ledger [G7]",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "phase:8-autonomous-ops",
+        "pillar:governance",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 708,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 730,
+      "title": "portal go-live: supply the auth-gate env from Secret Manager (JWKS mirror + ROOT_ADMIN_EMAILS)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 731,
+      "title": "portal go-live: reconcile & cut ai.purebliss.app over (Cloudflare vs GCP)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 732,
+      "title": "portal: documented offline dev run (stopgap, NOT the production surface)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "closed_at": ""
+    },
+    {
+      "number": 733,
+      "title": "P0: the fleet cannot spawn any subagent \u2014 its runner ('claude') is unresolvable from cron's PATH, and it fails per-directive-per-cycle",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
       "closed_at": ""
     }
   ]

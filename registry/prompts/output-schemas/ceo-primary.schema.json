@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kushin77/agent-orchestrator/registry/prompts/output-schemas/ceo-primary.schema.json",
+  "title": "CeoPrimaryOutput",
+  "description": "Output contract for the ceo-primary prompt module (workbook-8, source workbook issue #614 Tab 3). The model must return exactly this JSON shape. `memoriesUsed` is the record of the frontloaded vector-memory lookup enforced by policy workbook-vector-memory-frontload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "goal",
+    "tickets",
+    "memoriesUsed",
+    "escalations",
+    "summary"
+  ],
+  "properties": {
+    "goal": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "The strategic goal restated in one sentence."
+    },
+    "tickets": {
+      "type": "array",
+      "description": "The goal decomposed into independently verifiable board tickets.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "lane",
+          "verification"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "lane": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "string",
+            "description": "The command that decides whether the ticket is done."
+          }
+        }
+      }
+    },
+    "memoriesUsed": {
+      "type": "array",
+      "description": "The frontloaded vector-memory lookup result. An empty list means no retrieval was performed; every entry names the context it supplied.",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "escalations": {
+      "type": "array",
+      "description": "Items addressed to the board or the founder. The board is a principal, never an agent to impersonate.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "reason"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "enum": [
+              "board",
+              "founder"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One-paragraph decomposition summary for the board."
+    }
+  }
+}

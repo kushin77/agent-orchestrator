@@ -98,6 +98,43 @@
       "type": "string",
       "minLength": 1,
       "description": "Reference (relative path from the module file's directory) to the JSON Schema that the model output must satisfy."
+    },
+    "enforcement": {
+      "type": "object",
+      "description": "The mechanical enforcement rule this module's prompt makes observable. A workbook Master AI Prompt Template names the workbook-5 policy id (guardrails/policy) that gates the action and the gate attribute the producer publishes; the field is the machine-checkable pairing between the prompt and its guardrail, declared here rather than in prose.",
+      "additionalProperties": false,
+      "required": [
+        "policyId",
+        "action",
+        "attribute"
+      ],
+      "properties": {
+        "policyId": {
+          "type": "string",
+          "description": "The guardrails/policy policy id this module's rule maps to."
+        },
+        "action": {
+          "type": "string",
+          "description": "The action the policy evaluates, e.g. 'workbook.prefetch'."
+        },
+        "attribute": {
+          "type": "string",
+          "description": "The boolean path the producer publishes and the policy compares, e.g. 'prefetch.frontloaded'."
+        },
+        "rule": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "The workbook's wording of the mechanical rule, in one sentence."
+        }
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "description": "Provenance records (GR-10): where the module's content came from. A harvested or adapted asset names its source; the module never copies proprietary text verbatim.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   }
 }

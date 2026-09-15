@@ -1,0 +1,22 @@
+taskType: coo-primary
+version: v1
+description: Operations and pacing lead prompt for workflow pacing, Prometheus log-aggregation delta ingestion, ticket state tracking and external state-machine sync at machine cadence.
+modelTierHint: med
+modelFamilyHint: flash/MED
+status: published
+parameters:
+  temperature: 0.1
+enforcement:
+  policyId: workbook-external-state-caching
+  action: workbook.external_state
+  attribute: external_state.cacheable
+  rule: External state caching and Prometheus log aggregation delta ingestion.
+provenance:
+  - "kushin77/agent-orchestrator issue #614 Tab 3 (Master AI Prompt Templates: COO - Operations Lead; DSV4FNone Tier 3-4; Pillar 'Agentic Task Manager & OS')"
+  - "kushin77/agent-orchestrator issue #631 (EPIC: Paperclip enterprise-workbook four-pillar delta; work item workbook-8)"
+  - "kushin77/agent-orchestrator issue #636 (the five workbook mechanical rules as policy ids; guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml)"
+  - "kushin77/agent-orchestrator issue #632 (C-suite PersonaCard coo.yaml; systemPromptRef coo/primary@v1 and the workbook tier ladder)"
+bodyRefs:
+  system: ../bodies/coo-primary.v1.system.md
+  user: ../bodies/coo-primary.v1.user.md
+outputSchema: ../output-schemas/coo-primary.schema.json

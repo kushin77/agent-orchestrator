@@ -169,7 +169,7 @@ for name, beat in beats.items():
 PY
 
 report() { # report <case> <beat>
-  python3 fleet/watchdog.py capabilities --rung sister --beat "$2" --head "$head_sha"
+  python3 fleet/watchdog.py capabilities --rung sister --beat "$2" --commit "$head_sha"
 }
 
 require_text() { # require_text <case> <text> <haystack>

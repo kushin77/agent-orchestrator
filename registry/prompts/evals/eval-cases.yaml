@@ -1,0 +1,59 @@
+# Regression-eval cases for the C-suite prompt modules (issue #639,
+# work item workbook-8; source workbook issue #614 Tab 3).
+#
+# The harness in evals.py turns each case into a feedback.Outcome: `expected`
+# becomes the ground-truth label set and `observed` the label set the module's
+# output contained, so a case whose observed labels differ from the expected
+# ones is a false positive / false negative and FAILS the case.
+#
+# Every CEO case carries two labels because the CEO module holds the
+# workbook's *mirror-image* rule: the frontloaded-memory declaration is
+# required output, exactly the fact policy workbook-vector-memory-frontload
+# reads at the guardrail layer.
+#
+# `ao-empty@v1` is a deliberately FAILING candidate and has no module
+# definition. It never declares the frontloaded-memory lookup, so
+# `memory-frontloaded` is a false negative on its case. It is the fixture that
+# proves the publish gate refuses a module with failing evals (a control that
+# cannot fail is a formality). It is never published.
+
+cases:
+  # ------------------------------------------------------------ CEO (rule 1)
+  # Both CEO cases exercise the module's mirror-image rule: an output that
+  # decomposes the goal but omits the frontloaded-memory declaration is a false
+  # negative on `memory-frontloaded`. That negative is what policy
+  # workbook-vector-memory-frontload refuses at the guardrail layer, so the
+  # module is only publishable once its own output satisfies it.
+  - caseId: ceo-decompose-goal
+    promptId: ceo-primary@v1
+    expected: [tickets-decomposed, memory-frontloaded]
+    observed: [tickets-decomposed, memory-frontloaded]
+  # ------------------------------------------------------------ CTO (rule 2)
+  - caseId: cto-architecture-with-diagram
+    promptId: cto-primary@v1
+    expected: [diagram-declared, ast-map-used]
+    observed: [diagram-declared, ast-map-used]
+  # ------------------------------------------------------------ COO (rule 3)
+  - caseId: coo-state-sync
+    promptId: coo-primary@v1
+    expected: [state-cached, delta-ingested]
+    observed: [state-cached, delta-ingested]
+  # ------------------------------------------------------------ CFO (rule 4)
+  - caseId: cfo-deterministic-script
+    promptId: cfo-primary@v1
+    expected: [script-executed, zero-token-arithmetic]
+    observed: [script-executed, zero-token-arithmetic]
+  # ------------------------------------------------------------ CMO (rule 5)
+  - caseId: cmo-webhook-dedup
+    promptId: cmo-primary@v1
+    expected: [cache-key-checked, template-injected]
+    observed: [cache-key-checked, template-injected]
+
+candidates:
+  # A failing candidate held here (not under `cases`) because it has no module
+  # definition: it exists purely to exercise the publish gate's refusal path.
+  - caseId: ao-empty-frontload-dropped
+    promptId: ao-empty@v1
+    description: candidate that answers like the CEO but omits the frontloaded vector-memory lookup
+    expected: [tickets-decomposed, memory-frontloaded]
+    observed: [tickets-decomposed]
