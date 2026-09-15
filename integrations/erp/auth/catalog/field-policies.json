@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "sales-margin-hidden-from-sales-user",
+      "kind": "sales-invoice",
+      "field": "gross-margin",
+      "effect": "block",
+      "read": false,
+      "write": false,
+      "roles": ["Sales User"],
+      "reason": "margin is a finance figure; a selling role may neither read it nor set it"
+    },
+    {
+      "id": "item-valuation-hidden-from-stock-user",
+      "kind": "item-master",
+      "field": "valuation-rate",
+      "effect": "block",
+      "read": false,
+      "write": false,
+      "roles": ["Stock User"],
+      "reason": "valuation is a finance figure; a stock role may neither read it nor set it"
+    },
+    {
+      "id": "supplier-bank-reference-write-only",
+      "kind": "purchase-order",
+      "field": "supplier-bank-reference",
+      "effect": "block",
+      "read": false,
+      "write": true,
+      "roles": ["Purchase User"],
+      "reason": "a payment reference may be supplied but must not be read back by the role that supplied it"
+    },
+    {
+      "id": "credit-limit-read-only",
+      "kind": "sales-order",
+      "field": "credit-limit",
+      "effect": "block",
+      "read": true,
+      "write": false,
+      "roles": [],
+      "reason": "the credit limit is set by the finance process, never typed onto an order"
+    },
+    {
+      "id": "discount-needs-finance-review",
+      "kind": "sales-invoice",
+      "field": "discount-percent",
+      "effect": "warn",
+      "read": true,
+      "write": true,
+      "roles": [],
+      "reason": "a discount is allowed and recorded, but finance reviews invoices that carry one"
+    }
+  ]
+}

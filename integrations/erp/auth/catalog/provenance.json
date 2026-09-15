@@ -1,0 +1,20 @@
+{
+  "schema": "erp.auth.provenance/v1",
+  "upstream": "frappe/erpnext",
+  "license": "GPL-3.0",
+  "mode": "pattern-only",
+  "harvests": [
+    {
+      "shape": "role-permission table (role, doctype, permission type, permlevel)",
+      "upstreamPath": "frappe/erpnext — the DocType permission model (role + permission type + permlevel)",
+      "mode": "pattern-only",
+      "builtInstead": "integrations/erp/auth/catalog/roles.json and roles.RoleMap: the same table shape, with each grant re-expressed as an identity/rbac resource:action string and validated against that contract rather than against a local permission language"
+    },
+    {
+      "shape": "field-level permissions (a permlevel that withholds a field from a role)",
+      "upstreamPath": "frappe/erpnext — field-level permissions via permlevel",
+      "mode": "pattern-only",
+      "builtInstead": "integrations/erp/auth/policies.py and catalog/field-policies.json, where a rule either enforces (withholds read or write) or advises, and its effect must be a word from guardrails/policy's DecisionLevel vocabulary"
+    }
+  ]
+}
