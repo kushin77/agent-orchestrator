@@ -18,6 +18,9 @@ BEFORE OPENING
      output in "Pre-existing red". An unproven claim of a pre-existing failure
      is treated as this PR's failure (#236 asserted one; #267/#268 reproduced
      theirs — the standard to aim at).
+
+  4. If this PR closes a child issue of an epic, the issue body carries
+     `Parent: #<epic>` so the dispatch chain can resolve the child.
 -->
 
 ## Closes
