@@ -472,4 +472,27 @@ surfaces:
       deployment cannot accidentally start with a live sandbox. Own `tf_flag`
       rather than `enable_guardrails`: the kill switch for tool execution is
       independent of the guardrails service flag.
+  operator_terminal:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      The operator terminal (issue #774): the browser IT-terminal behind the
+      existing SSO session — one link, `GET /console`, that opens the live fleet
+      projection (rungs, heartbeat health, board/focus/pool/claims, directives in
+      flight) and a steer panel of the closed control-verb vocabulary. It invents
+      no login, no second projection and no second control path: the read half is
+      the existing `GET /api/fleet/*` projection (surfaces.fleet_projection) and
+      the write half is the existing `POST /api/control/*` control family
+      (surfaces.remote_control), each consumed over the caller's own
+      `os-session-token` with the effect-class/capability check the registry
+      declares. The flag is checked BEFORE AuthN, so while it is off `/console`
+      and its view answer 404 `feature_disabled` — an unpromoted surface is
+      absent, not merely unauthorised (the `chat` / `live_bridge` precedent). A
+      steer action is refused without the required capability and every allowed
+      action lands on the existing audit rail. Promotion = a reviewed go-live
+      that flips this flag (and independently promotes `fleet_projection` and
+      `remote_control` for the two halves it composes), runs `make verify` +
+      `terraform plan`, then applies via the deployer SA.
 

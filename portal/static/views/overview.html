@@ -38,6 +38,21 @@
             text: data.paused ? "paused" : data.subscriptionStatus
           }));
         var stats = data.stats;
+        // The operator terminal (issue #774) — one click into the live fleet
+        // view behind this same SSO session. A card, not a shell edit: the
+        // operator's way in sits beside the tenant's own numbers.
+        app.appendChild(CP.el("div", { class: "card" },
+          CP.el("a", { href: "/views/console.html", style: "text-decoration:none;color:inherit" },
+            CP.el("div", { class: "spread" },
+              CP.el("div",
+                CP.el("h3", { text: "Operator terminal" }),
+                CP.el("div", { class: "hint",
+                  text: "Open the operator console →" })
+              ),
+              CP.el("span", { class: "badge info", text: "▣ open" })
+            )
+          )
+        ));
         var card = CP.el("div", { class: "card" },
           CP.el("div", { class: "grid stats" },
             stat("Agents", stats.agents, stats.teams.join(" · ")),
