@@ -44,8 +44,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 #: The one implementation of the trailing-trailer predicate (issue #288).
 PREDICATE_SCRIPT = REPO_ROOT / "scripts" / "check-pr-contract.sh"
 
-#: ``  FAIL  <finding>:<sha12>`` — the shape ``report()`` writes to stderr.
-_FINDING_RE = re.compile(r"^\s*FAIL\s+(?P<code>[a-z][a-z0-9-]*):(?P<sha>[0-9a-f]{7,40})\s*$")
+#: ``  FAIL  <finding>:<commit>`` — the shape ``report()`` writes to stderr. The
+#: commit field is whatever the predicate printed, and that is deliberately not
+#: required to be 12 hex: for the enforcement boundary the predicate truncates the
+#: ``--enforcement-gate`` argument it was given, so a caller that passes a rev
+#: expression (``8b97ab6^``, as the boundary controls in this suite do) gets that
+#: expression back. Requiring hex here dropped the boundary finding silently, and
+#: the over-strict parse is exactly how a "no parseable finding" guard ends up
+#: mistaking a real verdict for an unreadable one (measured: it made the
+#: real-commit control on `8b97ab6` fail after the guard was added, issue #287).
+_FINDING_RE = re.compile(r"^\s*FAIL\s+(?P<code>[a-z][a-z0-9-]*):(?P<sha>[^\s:]+)\s*$")
 
 #: Findings about the grandfathered region rather than about the commit itself.
 _BOUNDARY_PREFIX = "enforcement-gate-"
@@ -91,6 +99,24 @@ def _run(args: list[str], cwd: Path | str) -> subprocess.CompletedProcess:
         raise PredicateUnavailable(f"the shared predicate did not complete: {exc}") from exc
 
 
+def findings_in(output: str) -> list[tuple[str, str]]:
+    """Every ``(code, sha12)`` finding the predicate printed in ``output``.
+
+    The predicate reports findings as ``  FAIL  <code>:<sha12>`` on stderr, and
+    that shape is the whole contract this adapter reads; nothing here re-derives
+    the trailer rule, it only parses the verdict the one implementation printed.
+    A caller that needs the per-commit verdict of a whole range (see
+    :mod:`governance.isolation.landed`) needs the commit each finding belongs to,
+    which ``named_findings`` discards.
+    """
+    found: list[tuple[str, str]] = []
+    for line in output.splitlines():
+        match = _FINDING_RE.match(line)
+        if match is not None:
+            found.append((match.group("code"), match.group("sha")))
+    return found
+
+
 def named_findings(output: str, sha: str = "") -> list[str]:
     """The predicate's findings, as ``<code>`` (filtered to ``sha`` when given).
 
@@ -99,14 +125,10 @@ def named_findings(output: str, sha: str = "") -> list[str]:
     """
     short = sha[:12]
     found: list[str] = []
-    for line in output.splitlines():
-        match = _FINDING_RE.match(line)
-        if match is None:
-            continue
-        code = match.group("code")
+    for code, finding_sha in findings_in(output):
         if sha and code.startswith(_BOUNDARY_PREFIX):
             continue
-        if sha and not match.group("sha").startswith(short):
+        if sha and not finding_sha.startswith(short):
             continue
         found.append(code)
     return found
@@ -129,6 +151,24 @@ def classify_commit(repo: Path | str, sha: str) -> str | None:
         detail = (result.stderr.strip() or result.stdout.strip()).splitlines()
         raise PredicateUnavailable(
             f"CANNOT-ASSESS for {sha[:12]}: {detail[-1] if detail else 'no output from the shared predicate'}"
+        )
+    if result.returncode != 0 and not findings_in(result.stderr):
+        # A non-zero predicate that printed no finding this adapter can parse at
+        # all is a verdict it cannot attribute — a changed output shape, a crash.
+        # Returning None here would report the commit as clean, which is the
+        # fail-open direction: unproven is not clean (GR-12). Measured by mutation
+        # while proving ``scripts/check-isolation-landed.sh``: making the finding
+        # parser drop everything turned a non-compliant lane audit green until
+        # this branch existed.
+        #
+        # Findings that exist but belong to the enforcement BOUNDARY are the
+        # different, legitimate case handled below by falling through: the
+        # predicate is describing the grandfathered region, and the commit under
+        # test is clean.
+        detail = (result.stderr.strip() or result.stdout.strip()).splitlines()
+        raise PredicateUnavailable(
+            f"the shared predicate exited {result.returncode} for {sha[:12]} without naming a finding: "
+            f"{detail[-1] if detail else 'no output'}"
         )
     return None
 

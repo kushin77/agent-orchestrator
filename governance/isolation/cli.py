@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lane isolation command line — mint, provision, export, audit, close (#263).
+"""Lane isolation command line — mint, provision, export, audit, landed, close (#263).
 
 Typical use, from the execution loop:
 
@@ -7,8 +7,12 @@ Typical use, from the execution loop:
     eval "$(python3 governance/isolation/cli.py env --issue 263 --agent copilot-brain)"
     python3 governance/isolation/cli.py audit --all
     python3 governance/isolation/cli.py landed --commit <sha>      # real landed history
+    python3 governance/isolation/cli.py enforce --range HEAD      # enforced over real history
 
 Exit-code contract (repo tri-state convention): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+An audit that assessed nothing is CANNOT-ASSESS, never OK: ``audit`` with no lane
+records and ``enforce`` with no commits in range both report that they could not
+assess the rule rather than reporting it satisfied (issue #287, GR-12).
 """
 
 from __future__ import annotations
@@ -28,6 +32,13 @@ from governance.isolation.identity import (  # noqa: E402
     SessionIdentity,
     mint,
 )
+from governance.isolation.landed import (  # noqa: E402
+    BASELINE_PATH,
+    DEFAULT_RANGE,
+    EXIT_CODES,
+    VERDICT_OK,
+    assess,
+)
 from governance.isolation.trailer import (  # noqa: E402
     PredicateUnavailable,
     classify_commit,
@@ -42,6 +53,7 @@ from governance.isolation.worktree import (  # noqa: E402
     main_repo_root,
     provision,
     read_record,
+    record_dir,
     write_record,
 )
 
@@ -124,8 +136,17 @@ def cmd_audit(args: argparse.Namespace) -> int:
         results = audit_all(main)
 
     if not results:
-        print("session-isolation: OK (no lanes provisioned)")
-        return EXIT_OK
+        # An empty audit is not a pass (issue #287): with no lane records there is
+        # nothing to re-derive, so the honest answer is CANNOT-ASSESS. Reporting OK
+        # here is exactly the vacuous green the no-false-green doctrine rejects —
+        # and it is indistinguishable from a machine where lanes were never
+        # provisioned, which is the failure the rule exists to catch.
+        print(
+            f"session-isolation: CANNOT-ASSESS — no lane records under {record_dir(main)}, so no lane "
+            "was audited; an empty audit is not a pass",
+            file=sys.stderr,
+        )
+        return EXIT_CANNOT_ASSESS
 
     failed = 0
     for session_id, problems in sorted(results.items()):
@@ -214,6 +235,27 @@ def cmd_landed(args: argparse.Namespace) -> int:
     return EXIT_NOT_OK
 
 
+def cmd_enforce(args: argparse.Namespace) -> int:
+    """Enforce the ticket-trailer rule over landed history, with recorded legacy.
+
+    ``landed`` answers "what does the shared predicate say about this history";
+    ``enforce`` answers "does this history satisfy the rule, given the legacy that
+    was measured before the rule existed" — the surface issue #287 found missing.
+    The quarantine is keyed by commit and can only shrink: a recorded entry that
+    now complies is a failure, and an entry outside the range leaves the rule
+    unproven rather than satisfied.
+    """
+    main = Path(args.main)
+    if not main.exists():
+        print(f"enforce: CANNOT-ASSESS — {main} does not exist", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    result = assess(main, args.range_, args.baseline, args.gate)
+    stream = sys.stderr if result.verdict != VERDICT_OK else sys.stdout
+    for line in result.lines():
+        print(line, file=stream)
+    return EXIT_CODES[result.verdict]
+
+
 def cmd_close(args: argparse.Namespace) -> int:
     """Remove a lane's worktree — never discarding uncommitted work silently."""
     main = Path(args.main)
@@ -283,6 +325,25 @@ def build_parser() -> argparse.ArgumentParser:
     landed_cmd.add_argument("--range", dest="range_", default="HEAD", help="the landed range to re-check (default HEAD)")
     landed_cmd.add_argument("--gate", default="", help="the enforcement boundary commit (default: the shared gate's own)")
     landed_cmd.set_defaults(func=cmd_landed)
+
+    enforce_cmd = sub.add_parser(
+        "enforce",
+        help="enforce the ticket-trailer rule over landed history against recorded legacy (#287)",
+    )
+    enforce_cmd.add_argument("--main", default=default_main(), help="the repository whose landed history is enforced")
+    enforce_cmd.add_argument(
+        "--range",
+        dest="range_",
+        default=DEFAULT_RANGE,
+        help=f"the landed range to enforce over (default {DEFAULT_RANGE}: everything reachable from the branch)",
+    )
+    enforce_cmd.add_argument(
+        "--baseline",
+        default=str(BASELINE_PATH),
+        help="the recorded-legacy baseline (default: governance/isolation/landed-baseline.json)",
+    )
+    enforce_cmd.add_argument("--gate", default="", help="the enforcement boundary commit (default: the shared gate's own)")
+    enforce_cmd.set_defaults(func=cmd_enforce)
 
     close_cmd = sub.add_parser("close", help="remove a lane worktree")
     close_cmd.add_argument("--session", required=True)
