@@ -1,0 +1,34 @@
+{
+  "$id": "https://kushin77.example/agent-orchestrator/erp/auth/field-policy.schema.json",
+  "title": "ERP field-level policy declarations (ERP-08, issue #653)",
+  "description": "A rule either enforces (withholds read or write, effect block) or advises (withholds neither, effect warn/log). The schema fixes the shape; policies.load refuses the two contradictory combinations by name, because a schema cannot express 'block iff it withholds'.",
+  "type": "object",
+  "required": ["version", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "field", "effect", "read", "write", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "field": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "effect": {"enum": ["block", "log", "warn"]},
+          "read": {"type": "boolean"},
+          "write": {"type": "boolean"},
+          "roles": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9 -]*$"}
+          },
+          "reason": {"type": "string", "pattern": "^\\S"}
+        }
+      }
+    }
+  }
+}

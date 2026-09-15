@@ -1,0 +1,29 @@
+{
+  "$id": "https://kushin77.example/agent-orchestrator/erp/auth/provenance.schema.json",
+  "title": "ERP auth harvest provenance (GR-10, ERP-08 issue #653)",
+  "description": "The GR-10 record for every shape harvested from an upstream project. Upstream ERPNext is GPL-3.0 and is a pattern source only, so mode 'code-copied' is refused by provenance.load — the schema declares the mode vocabulary, the loader enforces which modes are legal.",
+  "type": "object",
+  "required": ["schema", "upstream", "license", "mode", "harvests"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"type": "string", "pattern": "^erp\\.auth\\.provenance/v[0-9]+$"},
+    "upstream": {"type": "string", "pattern": "^\\S"},
+    "license": {"enum": ["GPL-3.0", "MIT", "Apache-2.0", "BSD-3-Clause"]},
+    "mode": {"enum": ["pattern-only", "code-copied"]},
+    "harvests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["shape", "upstreamPath", "mode", "builtInstead"],
+        "additionalProperties": false,
+        "properties": {
+          "shape": {"type": "string", "pattern": "^\\S"},
+          "upstreamPath": {"type": "string", "pattern": "^\\S"},
+          "mode": {"enum": ["pattern-only", "code-copied"]},
+          "builtInstead": {"type": "string", "pattern": "^\\S"}
+        }
+      }
+    }
+  }
+}

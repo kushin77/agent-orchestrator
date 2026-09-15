@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "kinds": [
+    "delivery-note",
+    "item-master",
+    "journal-entry",
+    "payment-entry",
+    "purchase-invoice",
+    "purchase-order",
+    "purchase-receipt",
+    "quotation",
+    "sales-invoice",
+    "sales-order",
+    "stock-entry",
+    "warehouse"
+  ],
+  "roles": {
+    "Accounts Manager": [
+      {"kind": "journal-entry", "action": "*", "permlevel": 0},
+      {"kind": "payment-entry", "action": "*", "permlevel": 0},
+      {"kind": "purchase-invoice", "action": "*", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "*", "permlevel": 0}
+    ],
+    "Accounts User": [
+      {"kind": "journal-entry", "action": "create", "permlevel": 0},
+      {"kind": "journal-entry", "action": "read", "permlevel": 0},
+      {"kind": "journal-entry", "action": "write", "permlevel": 0},
+      {"kind": "payment-entry", "action": "create", "permlevel": 0},
+      {"kind": "payment-entry", "action": "read", "permlevel": 0},
+      {"kind": "payment-entry", "action": "write", "permlevel": 0},
+      {"kind": "purchase-invoice", "action": "read", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "read", "permlevel": 0}
+    ],
+    "Auditor": [
+      {"kind": "delivery-note", "action": "read", "permlevel": 0},
+      {"kind": "item-master", "action": "read", "permlevel": 0},
+      {"kind": "journal-entry", "action": "read", "permlevel": 0},
+      {"kind": "payment-entry", "action": "read", "permlevel": 0},
+      {"kind": "purchase-invoice", "action": "read", "permlevel": 0},
+      {"kind": "purchase-order", "action": "read", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "read", "permlevel": 0},
+      {"kind": "quotation", "action": "read", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "read", "permlevel": 0},
+      {"kind": "sales-order", "action": "read", "permlevel": 0},
+      {"kind": "stock-entry", "action": "read", "permlevel": 0},
+      {"kind": "warehouse", "action": "read", "permlevel": 0}
+    ],
+    "Purchase Manager": [
+      {"kind": "item-master", "action": "read", "permlevel": 0},
+      {"kind": "purchase-invoice", "action": "*", "permlevel": 0},
+      {"kind": "purchase-order", "action": "*", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "read", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "submit", "permlevel": 0},
+      {"kind": "warehouse", "action": "read", "permlevel": 0}
+    ],
+    "Purchase User": [
+      {"kind": "item-master", "action": "read", "permlevel": 0},
+      {"kind": "purchase-order", "action": "create", "permlevel": 0},
+      {"kind": "purchase-order", "action": "read", "permlevel": 0},
+      {"kind": "purchase-order", "action": "write", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "create", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "read", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "write", "permlevel": 0}
+    ],
+    "Sales Manager": [
+      {"kind": "delivery-note", "action": "*", "permlevel": 0},
+      {"kind": "item-master", "action": "read", "permlevel": 0},
+      {"kind": "quotation", "action": "*", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "submit", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "cancel", "permlevel": 0},
+      {"kind": "sales-order", "action": "*", "permlevel": 0},
+      {"kind": "warehouse", "action": "read", "permlevel": 0}
+    ],
+    "Sales User": [
+      {"kind": "delivery-note", "action": "create", "permlevel": 0},
+      {"kind": "delivery-note", "action": "read", "permlevel": 0},
+      {"kind": "delivery-note", "action": "write", "permlevel": 0},
+      {"kind": "item-master", "action": "read", "permlevel": 0},
+      {"kind": "quotation", "action": "create", "permlevel": 0},
+      {"kind": "quotation", "action": "read", "permlevel": 0},
+      {"kind": "quotation", "action": "write", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "create", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "read", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "write", "permlevel": 0},
+      {"kind": "sales-order", "action": "create", "permlevel": 0},
+      {"kind": "sales-order", "action": "read", "permlevel": 0},
+      {"kind": "sales-order", "action": "write", "permlevel": 0},
+      {"kind": "warehouse", "action": "read", "permlevel": 0}
+    ],
+    "Stock Manager": [
+      {"kind": "delivery-note", "action": "submit", "permlevel": 0},
+      {"kind": "item-master", "action": "*", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "submit", "permlevel": 0},
+      {"kind": "stock-entry", "action": "*", "permlevel": 0},
+      {"kind": "warehouse", "action": "*", "permlevel": 0}
+    ],
+    "Stock User": [
+      {"kind": "delivery-note", "action": "read", "permlevel": 0},
+      {"kind": "item-master", "action": "create", "permlevel": 0},
+      {"kind": "item-master", "action": "read", "permlevel": 0},
+      {"kind": "item-master", "action": "write", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "read", "permlevel": 0},
+      {"kind": "stock-entry", "action": "create", "permlevel": 0},
+      {"kind": "stock-entry", "action": "read", "permlevel": 0},
+      {"kind": "stock-entry", "action": "write", "permlevel": 0},
+      {"kind": "warehouse", "action": "read", "permlevel": 0}
+    ],
+    "System Manager": [
+      {"kind": "delivery-note", "action": "*", "permlevel": 0},
+      {"kind": "item-master", "action": "*", "permlevel": 0},
+      {"kind": "journal-entry", "action": "*", "permlevel": 0},
+      {"kind": "payment-entry", "action": "*", "permlevel": 0},
+      {"kind": "purchase-invoice", "action": "*", "permlevel": 0},
+      {"kind": "purchase-order", "action": "*", "permlevel": 0},
+      {"kind": "purchase-receipt", "action": "*", "permlevel": 0},
+      {"kind": "quotation", "action": "*", "permlevel": 0},
+      {"kind": "sales-invoice", "action": "*", "permlevel": 0},
+      {"kind": "sales-order", "action": "*", "permlevel": 0},
+      {"kind": "stock-entry", "action": "*", "permlevel": 0},
+      {"kind": "warehouse", "action": "*", "permlevel": 0}
+    ]
+  }
+}
