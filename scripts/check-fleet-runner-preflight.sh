@@ -367,9 +367,20 @@ mutant_case() { # mutant_case <label> <expression> <proof>
   observe "$label" "$tree" "$fleetdir" once
 }
 
+# The runner gate is TWO ORDERED checks since #841 — does the runner RESOLVE, and
+# can it HONOUR the model (`fleet/runners.py`) — and either one alone holds the queue
+# by design. This mutant therefore removes the MECHANISM (both halves) rather than one
+# half: a mutant that removes one half leaves the invariant intact, which is defence in
+# depth working as intended, and demanding that it break would be asserting an
+# implementation detail instead of the invariant. Removing both is the regression a
+# future change could actually make, and the invariant must catch that one.
+#
+# The proof proves the #841 half landed; the preflight half proves itself — if THAT
+# substitution had not applied, `runner_ok` would still be False and the queue would
+# still be held, so this mutant would go undetected and fail the gate.
 mutant_case "mutant-preflight" \
-  's|^        runner_ok, runner_detail = preflight(args.runner)$|        runner_ok, runner_detail = True, ""|' \
-  'runner_ok, runner_detail = True, ""'
+  's|^        runner_ok, runner_detail = preflight(args.runner)$|        runner_ok, runner_detail = True, ""|;s|^        capability_problem = runners.unhonourable(args.runner) if runner_ok else ""$|        capability_problem = ""|' \
+  'capability_problem = ""'
 mutant_case "mutant-hold" \
   's|^            if hold_queue_for_runner(runner_detail):$|            if False:  # mutant: no hold|' \
   'if False:  # mutant: no hold'

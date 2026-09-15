@@ -299,6 +299,55 @@ work: a timed-out `make verify` (the gate of record's budget is 1800s) is report
 as CANNOT-ASSESS at `warn`, because escalating it `critical` is what re-dispatched
 the directive every cycle.
 
+### The runner capability contract (issue #841)
+
+Resolving the runner is only half the question. A runner is a **(binary, argv shape,
+model vocabulary, required environment)** quadruple, and a dispatch can be honoured
+only when all four agree — `fleet/runners.py` is where that is declared and checked.
+
+Measured 2026-09-15 (`master` @ `dd8cbfc`): the loop asked whether `claude` resolved
+(it did) and never whether it could honour `deepseek-v4-flash` (it could not), so
+every subagent run died about ten seconds after it started:
+
+    [claude-code:unrecognized_model] {"model":"deepseek-v4-flash","query_source":"sdk"}
+    .fleet/runs/*.log: 192 model-rejection lines, 40 status=failed, 0 status=ok
+
+`deepseek-v4-flash` is DeepSeek's own model id and `claude` knows only its own
+aliases and `claude-*` names; the BYOK environment that reconciles the two was
+unset, and nothing said so. Three of the four parts were individually fine and the
+dispatch still could not work — while the watchdog reported both rungs healthy.
+
+Two profiles are declared:
+
+| profile | binary | model switch | requires |
+|---|---|---|---|
+| `claude-byok` (default) | `claude` | `--model` | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
+| `deepseek-native` | `deepseek` | `-m` | nothing — it carries its own credential config |
+
+The profile is inferred from `argv[0]`'s basename. An operator whose runner is a
+wrapper — or who wants a non-default profile — names it:
+
+```bash
+FLEET_RUNNER_PROFILE=claude-byok   # which contract this command line implements
+FLEET_RUNNER=deepseek              # and/or which runner to use
+```
+
+A runner that cannot honour the dispatch is a **startup condition, exactly like an
+unresolvable one**: the loop escalates **once**, holds the queue, and dispatches
+nothing — rather than dispatching a directive that dies and is only recorded as
+`status=failed` in a run log. The two checks are ordered (resolve, then capability)
+and either one alone holds the queue.
+
+What the check can and cannot prove: it is offline and cheap, so it proves the
+**declared contract is satisfied** — a required variable that is unset is refused
+**by name**, with the remedy in the message. Whether an endpoint actually accepts a
+model id is a network question it deliberately does not ask, and `make verify` must
+not need the network.
+
+> `deepseek-native` is declared, not recommended: the contract is proven here, but
+> that this runner completes a *lane's* work (tools, edits, a PR) is **unproven** and
+> is not asserted. A real dispatch is what would prove it.
+
 ## Log into the live session
 
 `live` (alias `attach`) is the operator's way in: it starts only the rungs that
@@ -741,6 +790,23 @@ runner that is on neither PATH nor HOME — exactly one escalation, nothing
 dispatched, the queue held, the work left pending. Two mutants of the real loop
 (the preflight neutralised, the hold removed) must each be **detected**, so a
 regression cannot pass by looking right.
+
+The runner gate is two ordered checks since #841 (does it resolve, then can it
+honour the model), so the preflight mutant removes **both** halves rather than one:
+either half alone holds the queue by design, and a mutant that removes one half
+leaves the invariant intact.
+
+```bash
+bash scripts/check-runner-capability.sh   # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
+```
+
+The capability contract is gated the same way (#841): the suite runs, the BEHAVIOUR
+is probed **both ways** — an unwired pairing is refused and the refusal is required
+to name every missing variable, and the same runner with its environment present is
+required to be allowed (a check that refuses unconditionally would pass the first
+probe and prove nothing) — and the check must be able to fail: `unhonourable` is
+mutated to always allow, the mutant is asserted to have **landed** by content hash,
+the probe must notice it, and the source is restored byte-for-byte afterwards.
 
 ## Restarting a rung: which signal, and why it matters (AO-GR-27)
 

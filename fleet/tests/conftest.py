@@ -146,6 +146,39 @@ def resolvable_default_runner(tmp_path, monkeypatch):
     return binary
 
 
+#: The environment the default runner profile DECLARES it needs (`fleet/runners.py`,
+#: profile `claude-byok`, #841).
+BYOK_ENVIRONMENT = ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN")
+
+
+@pytest.fixture(autouse=True)
+def byok_runner_environment(monkeypatch):
+    """Satisfy the default runner profile's declared environment for every test.
+
+    Same reason as ``resolvable_default_runner`` above, one question later: the 
+    loop no longer only asks whether its runner *resolves*, it asks whether that
+    runner can *honour* the model it is about to be given (#841). A suite that
+    drives the run path must therefore supply the environment a BYOK-wired box has,
+    or it would be measuring the refusal instead of the path.
+
+    The VALUES are never read — ``fleet/runners.py`` asks only whether each name is
+    set, which is the whole of what it can honestly check offline — so these are
+    placeholders and no credential is involved. A test that wants the refusal asks
+    for it by clearing them (``monkeypatch.delenv(...)``), which is how the 
+    negative controls are written.
+
+    ``FLEET_RUNNER_PROFILE`` is set for the same reason: several tests drive the run
+    path with a no-op stand-in (``/usr/bin/true``), and a stand-in's *filename* cannot
+    say which runner it stands for. Naming the profile is exactly what the refusal
+    asks an operator with a wrapper to do, so the suite does it rather than weakening
+    the refusal for everyone.
+    """
+    for name in BYOK_ENVIRONMENT:
+        monkeypatch.setenv(name, "conftest-placeholder-not-a-credential")
+    monkeypatch.setenv("FLEET_RUNNER_PROFILE", "claude-byok")
+    return BYOK_ENVIRONMENT
+
+
 #: The probe the guard writes and then looks for. It deliberately carries a
 #: non-ASCII character: ``channel._slog`` serialises with ``json.dumps``'
 #: default ``ensure_ascii=True``, so on disk the probe is escaped and a raw
