@@ -40,13 +40,19 @@ regenerates the catalogue.
 | Kind | Source | Owner |
 |------|--------|-------|
 | `golden-rules` | `GOLDEN-RULES.md`, `docs/GOLDEN-RULES.md` | platform-governance |
-| `governance` | `AGENTS.md`, `CONTRIBUTING.md`, `RELEASING.md`, `SECURITY.md`, `docs/GOVERNANCE.md`, … | platform-governance / governance-pmo |
+| `governance` | `AGENTS.md`, `CONTRIBUTING.md`, `RELEASING.md`, `SECURITY.md`, `docs/GOVERNANCE.md`, `docs/GIT-TEMPLATES-GAP-ANALYSIS.md`, … | platform-governance / governance-pmo |
 | `architecture` | `docs/ARCHITECTURE.md`, `docs/QA-GATE.md`, `docs/spikes/*.md` | architecture |
 | `adr` | `docs/decision-records/ADR-*.md` | architecture |
 | `policy` | `guardrails/policy/controls.yaml`, bundles, schemas | security |
-| `pattern-template` | `docs/decision-records/template.md`, `registry/**/*.schema.json`, consumer-repo scaffold | platform |
+| `pattern-template` | `docs/decision-records/template.md`, `registry/**/*.schema.json`, consumer-repo scaffold, `.github/ISSUE_TEMPLATE/**`, `.github/PULL_REQUEST_TEMPLATE.md`, `.gitmessage` | platform / platform-governance |
 | `issue-metadata` | `.board/snapshot.json` — one item per issue | governance-pmo |
 | `lessons`, `rca` | `vendor/CMR` (CMR hub) | governance-pmo |
+
+Two git-ecosystem sources are declared but not yet present —
+`docs/SHELL-PATTERNS.md` (lane #621) and `docs/GIT-ENV-VARIABLES.md` (lane
+#627) — so they are registered `required=False` and join the index on the build
+after their lane lands, with no second edit to
+[`sources.py`](sources.py).
 
 ## Provenance
 

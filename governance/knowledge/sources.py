@@ -94,6 +94,56 @@ SOURCE_SPECS: Tuple[SourceSpec, ...] = (
         _OWNER_PLATFORM,
         note="consumer-repo scaffold instructions",
     ),
+    # -- git ecosystem (issue #626, epic #616) ------------------------------
+    # The git surfaces a lane actually copies from: the forms an issue is filed
+    # against, the merge contract a PR carries, the commit-message template, and
+    # the two docs that govern them. Measured unregistered before this change
+    # (issue #608 item 5), so a query for the templates found nothing.
+    SourceSpec(
+        KIND_PATTERN_TEMPLATE,
+        ".github/ISSUE_TEMPLATE/**",
+        _OWNER_GOVERNANCE,
+        note="issue forms: the contract a new issue is filed against",
+    ),
+    SourceSpec(
+        KIND_PATTERN_TEMPLATE,
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        _OWNER_GOVERNANCE,
+        note="the merge contract scripts/check-pr-contract.sh parses",
+    ),
+    SourceSpec(
+        KIND_PATTERN_TEMPLATE,
+        ".gitmessage",
+        _OWNER_GOVERNANCE,
+        note="commit-message template (issue #5)",
+    ),
+    SourceSpec(
+        KIND_GOVERNANCE,
+        "docs/GIT-TEMPLATES-GAP-ANALYSIS.md",
+        _OWNER_PMO,
+        note="git-ecosystem surface inventory; maps each measured gap to one lane",
+    ),
+    # The next two are declared optional rather than required, and that is a
+    # measured decision, not a guess: neither artifact exists as this entry was
+    # written (measured on origin/master 3a44f27 — sibling lanes #621 and #627
+    # carry them and had not landed), and a required source that matches no file
+    # fails the gate by name. Declaring the glob now means the owning lane's
+    # merge is indexed by the next build with no second edit here; requiring the
+    # file would instead fail the gate on work this lane does not owe.
+    SourceSpec(
+        KIND_PATTERN_TEMPLATE,
+        "docs/SHELL-PATTERNS.md",
+        _OWNER_PLATFORM,
+        required=False,
+        note="shell-pattern doctrine; pending lane #621",
+    ),
+    SourceSpec(
+        KIND_GOVERNANCE,
+        "docs/GIT-ENV-VARIABLES.md",
+        _OWNER_GOVERNANCE,
+        required=False,
+        note="session environment contract registry; pending lane #627",
+    ),
     # -- issue metadata (from the committed board snapshot) -----------------
     SourceSpec(
         KIND_ISSUE_METADATA,
