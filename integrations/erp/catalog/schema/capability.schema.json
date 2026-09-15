@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp-capabilities.schema/v1",
+  "title": "ao.erp-capabilities/v1 — the ERP capability list (frozen, issue #646)",
+  "description": "The catalogue's capability list: one entry per upstream capability family, each with the call made on it (cannibalize our own surface, or build new), the pillar that owns it and the epic children that deliver it. The capability ids are the module's family vocabulary — a document declares which family it belongs to, and the validator refuses a family that is not declared here. Every object is closed (`additionalProperties: false`).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "module", "epic", "capabilities", "provenance"],
+  "properties": {
+    "schema": { "const": "ao.erp-capabilities/v1" },
+    "module": { "const": "erp" },
+    "epic": { "type": "integer" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "upstream_feature", "call", "pillar", "child_issues"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The family id a document's `family` field must name."
+          },
+          "name": { "type": "string" },
+          "upstream_feature": {
+            "type": "string",
+            "description": "The upstream capability this family derives its pattern from (a reading reference, never code)."
+          },
+          "call": {
+            "enum": ["cannibalize", "build"],
+            "description": "The cannibalize-vs-build call for the family."
+          },
+          "pillar": {
+            "type": "string",
+            "description": "The pillar that owns the family; must be declared in module-map.json."
+          },
+          "child_issues": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "integer" },
+            "description": "The epic children that deliver the family; each must be declared in module-map.json."
+          }
+        }
+      }
+    },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upstream",
+        "license",
+        "pattern_source_only",
+        "code_copied",
+        "retrieved",
+        "source_doc"
+      ],
+      "properties": {
+        "upstream": { "type": "string" },
+        "license": { "type": "string" },
+        "pattern_source_only": { "const": true },
+        "code_copied": { "const": false },
+        "retrieved": { "type": "string" },
+        "source_doc": { "type": "string" }
+      }
+    }
+  }
+}

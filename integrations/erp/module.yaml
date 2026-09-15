@@ -1,0 +1,84 @@
+# integrations/erp/module.yaml — the ERP module manifest (EPIC #645, issue #646).
+#
+# The manifest is the module's DECLARATION: that it is mandatory, that it ships
+# flag-gated OFF until a reviewed go-live (GR-5), that every datum it knows is
+# served by the knowledge indexer, and which indexer globs serve it. It declares
+# no domain fact of its own — `catalogue` points at the one store and
+# `indexer_sources` names the globs the knowledge index carries it under, so the
+# module holds a pointer to its knowledge, never a copy of it.
+#
+# scripts/check-erp-module.sh holds this file to four things, and can fail on
+# each: the shape below is validated against
+# catalogue/schema/integration-module.schema.json by the repository's own
+# stdlib subset validator (which refuses to run a schema that uses a keyword it
+# cannot enforce, so this schema cannot become a decoration); every glob below
+# must be registered VERBATIM in governance/knowledge/sources.py, so "the module
+# is indexer-fed" cannot outrun the indexer; every catalogue path must exist;
+# and no domain fact may be restated on the declaration surface (this file, the
+# module README, the source registry) — the facts live in the catalogue, and
+# restating one here fails the gate by name.
+
+schema: ao.integration-module/v1
+id: erp
+name: ERP
+
+# Where the module lives, and how it is governed. `mandatory: true` is the
+# module's admission; `data_source: indexer` is the contract that every datum it
+# carries is reached through governance/knowledge/, not read from a file of its
+# own.
+path: integrations/erp
+mandatory: true
+data_source: indexer
+epic: 645
+issue: 646
+
+# The module's own switch, OFF until a reviewed go-live promotes it (GR-5): no
+# part of the module is tenant-visible while it is off. The central promotion
+# row (infra/feature-flags/registry.yaml) is deliberately not added here — that
+# file's rows gate a *running* surface and infra/terraform/variables.tf is kept
+# in lock-step with it by scripts/check-feature-flags.py, so the row lands with
+# the surface that becomes reachable (ERP-07, #652), not with this foundation,
+# which ships no runtime at all.
+features:
+  - id: erp-module
+    default: off
+    description: >-
+      The ERP module as a whole: on only after a reviewed go-live flips it.
+
+# The catalogue — the module's single store of domain facts. Paths are relative
+# to `root`, and every one of them must exist (a pointer that resolves to
+# nothing is how a module becomes a promise).
+catalogue:
+  root: integrations/erp/catalog
+  module_map: module-map.json
+  capabilities: capabilities.json
+  documents: documents
+  schema: schema
+
+# The indexer sources that serve the module. Declared here AND carried by the
+# indexer, never one without the other: each glob must appear verbatim in
+# governance/knowledge/sources.py, and at least one must be a glob under
+# `catalogue.root`, so a manifest cannot claim to be indexer-fed while the
+# indexer serves none of it.
+indexer_sources:
+  - kind: architecture
+    glob: integrations/erp/README.md
+  - kind: pattern-template
+    glob: integrations/erp/module.yaml
+  - kind: pattern-template
+    glob: integrations/erp/catalog/**/*.json
+  - kind: governance
+    glob: docs/ERP-MODULE-GAP-ANALYSIS.md
+
+# GR-10 provenance for everything the catalogue declares. Upstream is a PATTERN
+# SOURCE ONLY: no upstream code is copied and no upstream repository is
+# vendored (a reading clone lives under .research/, which is gitignored). Every
+# catalogue file must carry this same declaration, and the gate refuses one that
+# disagrees with it — one declaration, no second copy to drift.
+provenance:
+  upstream: frappe/erpnext
+  license: GPL-3.0
+  pattern_source_only: true
+  code_copied: false
+  retrieved: "2026-09-14"
+  source_doc: docs/ERP-MODULE-GAP-ANALYSIS.md

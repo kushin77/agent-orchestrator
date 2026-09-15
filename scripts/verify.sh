@@ -470,6 +470,19 @@ checks=(
   # real in a fresh worktree rather than being recorded as CANNOT-ASSESS.
   'ao-ssh-access|bash scripts/check-ao-ssh-access.sh'
   'pytest-cloudflare|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q infra/cloudflare/tests'
+  # erp-module (EPIC #645, issue #646): the ERP module's foundation. Two claims
+  # that read green while they rot -- that every datum the module knows is served
+  # by the knowledge indexer, and that no second store of ERP domain facts
+  # exists -- are made measurable here. The manifest's frozen schema constrains
+  # `mandatory: true`, the flag's OFF default and `data_source: indexer`; every
+  # catalogue file is schema-validated with provenance identical to the
+  # manifest's one declaration; every cross-reference resolves; every declared
+  # indexer glob is registered verbatim; a fact restated on the declaration
+  # surface is refused by name; and a query for a declared document type must
+  # return the CATALOGUE FILE that declares it. Every refusal is written as a
+  # provocation in the suite this check runs, and a clean copy must be refused
+  # nothing, so no rule in it is a formality.
+  'erp-module|bash scripts/check-erp-module.sh'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------

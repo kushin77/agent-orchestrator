@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp-module-map.schema/v1",
+  "title": "ao.erp-module-map/v1 — the ERP module map (frozen, issue #646)",
+  "description": "The catalogue's module map: which pillars the module binds to, and which of the epic's children build which part. It is a POINTER list by design — a child is named by its issue number and its short id, never by a restatement of its scope, because the scope prose lives in docs/ERP-MODULE-GAP-ANALYSIS.md and a second copy of it here would be the second knowledge store this module exists to refuse. Every object is closed (`additionalProperties: false`).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "module", "epic", "issue", "pillars", "children", "provenance"],
+  "properties": {
+    "schema": { "const": "ao.erp-module-map/v1" },
+    "module": { "const": "erp" },
+    "epic": { "type": "integer" },
+    "issue": { "type": "integer" },
+    "pillars": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The product pillars the module binds to. `path` is a real directory in this repository, so a map cannot name a pillar that does not exist.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "role"],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "role": { "type": "string" }
+        }
+      }
+    },
+    "children": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The epic's children, by issue number and short id. Every document's `owning_issue` must be one of these.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["issue", "name"],
+        "properties": {
+          "issue": { "type": "integer" },
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upstream",
+        "license",
+        "pattern_source_only",
+        "code_copied",
+        "retrieved",
+        "source_doc"
+      ],
+      "properties": {
+        "upstream": { "type": "string" },
+        "license": { "type": "string" },
+        "pattern_source_only": { "const": true },
+        "code_copied": { "const": false },
+        "retrieved": { "type": "string" },
+        "source_doc": { "type": "string" }
+      }
+    }
+  }
+}

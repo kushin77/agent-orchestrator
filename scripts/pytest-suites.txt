@@ -126,3 +126,10 @@ gateway/chat
 # warns on it and scripts/gate-coverage-baseline.txt never grandfathers a newly
 # declared one. It is named by scripts/verify.sh (`pytest-cloudflare`).
 infra/cloudflare
+# EPIC #645 (issue #646): the ERP module foundation. The suite provokes every
+# refusal the module's validator can make -- against a scratch copy of the
+# declaration, never the lane's own files -- and requires each one BY NAME, with
+# a clean copy refused nothing. It is named from inside
+# scripts/check-erp-module.sh (the gate of record runs it, so the suite is
+# covered rather than only declared).
+integrations/erp/catalog

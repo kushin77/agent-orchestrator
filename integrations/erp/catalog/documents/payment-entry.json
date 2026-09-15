@@ -1,0 +1,21 @@
+{
+  "schema": "ao.erp-document/v1",
+  "id": "payment-entry",
+  "name": "Payment Entry",
+  "family": "accounting",
+  "owning_issue": 648,
+  "upstream": {
+    "repo": "frappe/erpnext",
+    "doctype": "Payment Entry",
+    "license": "GPL-3.0",
+    "pattern_source_only": true
+  },
+  "provenance": {
+    "upstream": "frappe/erpnext",
+    "license": "GPL-3.0",
+    "pattern_source_only": true,
+    "code_copied": false,
+    "retrieved": "2026-09-14",
+    "source_doc": "docs/ERP-MODULE-GAP-ANALYSIS.md"
+  }
+}

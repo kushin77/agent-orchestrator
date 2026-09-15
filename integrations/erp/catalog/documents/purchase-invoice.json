@@ -1,0 +1,21 @@
+{
+  "schema": "ao.erp-document/v1",
+  "id": "purchase-invoice",
+  "name": "Purchase Invoice",
+  "family": "buying",
+  "owning_issue": 649,
+  "upstream": {
+    "repo": "frappe/erpnext",
+    "doctype": "Purchase Invoice",
+    "license": "GPL-3.0",
+    "pattern_source_only": true
+  },
+  "provenance": {
+    "upstream": "frappe/erpnext",
+    "license": "GPL-3.0",
+    "pattern_source_only": true,
+    "code_copied": false,
+    "retrieved": "2026-09-14",
+    "source_doc": "docs/ERP-MODULE-GAP-ANALYSIS.md"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "schema": "ao.erp-capabilities/v1",
+  "module": "erp",
+  "epic": 645,
+  "capabilities": [
+    {
+      "id": "selling",
+      "name": "Selling",
+      "upstream_feature": "Selling",
+      "call": "cannibalize",
+      "pillar": "engine",
+      "child_issues": [647, 648]
+    },
+    {
+      "id": "buying",
+      "name": "Buying",
+      "upstream_feature": "Buying / procurement",
+      "call": "cannibalize",
+      "pillar": "engine",
+      "child_issues": [647, 649]
+    },
+    {
+      "id": "stock",
+      "name": "Stock",
+      "upstream_feature": "Stock / inventory",
+      "call": "build",
+      "pillar": "engine",
+      "child_issues": [647, 648]
+    },
+    {
+      "id": "accounting",
+      "name": "Accounting",
+      "upstream_feature": "Accounting & finance",
+      "call": "build",
+      "pillar": "telemetry",
+      "child_issues": [648, 654]
+    },
+    {
+      "id": "assets",
+      "name": "Fixed Assets",
+      "upstream_feature": "Fixed assets",
+      "call": "build",
+      "pillar": "engine",
+      "child_issues": [649]
+    },
+    {
+      "id": "manufacturing",
+      "name": "Manufacturing",
+      "upstream_feature": "Manufacturing",
+      "call": "build",
+      "pillar": "engine",
+      "child_issues": [649]
+    },
+    {
+      "id": "crm",
+      "name": "CRM",
+      "upstream_feature": "CRM",
+      "call": "cannibalize",
+      "pillar": "portal",
+      "child_issues": [650]
+    },
+    {
+      "id": "projects",
+      "name": "Projects",
+      "upstream_feature": "Projects",
+      "call": "cannibalize",
+      "pillar": "engine",
+      "child_issues": [650]
+    },
+    {
+      "id": "quality",
+      "name": "Quality",
+      "upstream_feature": "Quality",
+      "call": "build",
+      "pillar": "engine",
+      "child_issues": [650]
+    },
+    {
+      "id": "support",
+      "name": "Support",
+      "upstream_feature": "Support / helpdesk",
+      "call": "cannibalize",
+      "pillar": "engine",
+      "child_issues": [650]
+    },
+    {
+      "id": "platform",
+      "name": "Platform",
+      "upstream_feature": "Platform capabilities",
+      "call": "cannibalize",
+      "pillar": "control-plane",
+      "child_issues": [646, 651, 652, 653]
+    },
+    {
+      "id": "localization",
+      "name": "Localization",
+      "upstream_feature": "Localization / multi-company / multi-currency",
+      "call": "build",
+      "pillar": "identity",
+      "child_issues": [648]
+    }
+  ],
+  "provenance": {
+    "upstream": "frappe/erpnext",
+    "license": "GPL-3.0",
+    "pattern_source_only": true,
+    "code_copied": false,
+    "retrieved": "2026-09-14",
+    "source_doc": "docs/ERP-MODULE-GAP-ANALYSIS.md"
+  }
+}
