@@ -1,0 +1,46 @@
+# Delivery note lifecycle — ERP-02 core document model (issue #647).
+#
+# Fulfilment: the delivery moves stock when it is submitted, and it is complete
+# when the goods are away. Cancellation stays reachable from both live states,
+# which is the shape the transactional spine (ERP-03, #648) reverses against.
+schema: erp.workflow/v1
+workflow: delivery-note-lifecycle
+document: delivery-note
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: Submitted
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Delivered
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Cancelled
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Submit
+  - action: complete
+    from: submitted
+    to: completed
+    label: Mark Delivered
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Cancel

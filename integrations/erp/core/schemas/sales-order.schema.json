@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/sales-order.schema.json",
+  "title": "Sales Order — a confirmed customer commitment",
+  "description": "A sales order is what a quotation becomes once the customer commits: it carries a delivery commitment date and, once submitted, it is the document the delivery note is fulfilled against. The state enum is parity-locked to workflows/sales-order.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "party",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "sales-order"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "document.schema.json#/$defs/isoDate"
+    },
+    "delivery_date": {
+      "$ref": "document.schema.json#/$defs/isoDate",
+      "description": "The delivery commitment the fulfilment documents are measured against."
+    },
+    "party": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "Link to the customer party."
+    },
+    "quotation": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The quotation this order was raised from, when it was. Optional: an order may be raised directly."
+    },
+    "po_reference": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "The customer's own purchase-order reference, printed on our documents."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "document.schema.json#/$defs/transactionLine"
+      }
+    },
+    "taxes": {
+      "type": "array",
+      "items": {
+        "$ref": "document.schema.json#/$defs/taxLine"
+      }
+    },
+    "net_total": {
+      "$ref": "document.schema.json#/$defs/money"
+    },
+    "total": {
+      "$ref": "document.schema.json#/$defs/money"
+    }
+  },
+  "x-erp-document": "sales-order",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/selling/doctype/sales_order",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Sales Order",
+    "harvest": [
+      "the sales order field surface (delivery_date, po_reference, quotation link, taxes, totals)",
+      "the forward link from an order to the quotation that produced it",
+      "the state set the selling cycle drives an order through"
+    ],
+    "note": "Field and lifecycle shapes from the upstream sales order doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

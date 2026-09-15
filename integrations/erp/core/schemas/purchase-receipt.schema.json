@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/purchase-receipt.schema.json",
+  "title": "Purchase Receipt — the stock-committing buying document",
+  "description": "A purchase receipt records goods arriving against a purchase order: the buying cycle's point of stock commitment. against_purchase_order is required for the same reason the delivery note requires its order — a receipt with no commitment behind it is a stock adjustment, which the model expresses as a stock-entry instead.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "supplier",
+    "against_purchase_order",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "purchase-receipt"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "document.schema.json#/$defs/isoDate"
+    },
+    "supplier": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "against_purchase_order": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The purchase order this receipt fulfils. Required: the receipt exists to satisfy a commitment."
+    },
+    "warehouse": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The default receiving warehouse; a line may override it."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "document.schema.json#/$defs/transactionLine"
+      }
+    },
+    "total": {
+      "$ref": "document.schema.json#/$defs/money",
+      "description": "The received value, which the purchase invoice is raised against."
+    }
+  },
+  "x-erp-document": "purchase-receipt",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/stock/doctype/purchase_receipt",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Purchase Receipt",
+    "harvest": [
+      "the purchase receipt field surface (supplier, against purchase order, warehouse, received lines)",
+      "the fulfilment link from a receipt back to the order it satisfies",
+      "receipt as the buying cycle's point of stock commitment"
+    ],
+    "note": "Field and lifecycle shapes from the upstream purchase receipt doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

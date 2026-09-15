@@ -1,0 +1,46 @@
+# Purchase order lifecycle — ERP-02 core document model (issue #647).
+#
+# The buying cycle's mirror of the sales order: the commitment is to a supplier
+# and the terminal state is reached when the goods are received, so `complete`
+# is labelled Mark Received.
+schema: erp.workflow/v1
+workflow: purchase-order-lifecycle
+document: purchase-order
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: Submitted
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Received
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Cancelled
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Submit
+  - action: complete
+    from: submitted
+    to: completed
+    label: Mark Received
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Cancel

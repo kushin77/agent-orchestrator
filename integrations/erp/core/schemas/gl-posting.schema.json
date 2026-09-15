@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/gl-posting.schema.json",
+  "title": "GL Posting — a balanced double entry",
+  "description": "The general-ledger document every accounting-committing family derives. Two invariants hold it together. The first is expressible in the schema and is enforced here: every line carries exactly one non-zero side, so a row is either a debit or a credit and never both or neither (the oneOf below). The second is a sum over the instance — total debits equal total credits — which JSON Schema cannot express, so the model enforces it as a declared family rule and refuses an unbalanced posting by name.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "posting_date",
+    "voucher_type",
+    "voucher_id",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "gl-posting"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "posting_date": {
+      "$ref": "document.schema.json#/$defs/isoDate",
+      "description": "The accounting date. The ledger a posting lands in is decided by this field, never by when the posting was written."
+    },
+    "voucher_type": {
+      "enum": ["sales-invoice", "purchase-invoice", "stock-entry", "journal-entry", "payment"],
+      "description": "The document family this posting was derived from. Closed so a posting cannot cite a source the model cannot resolve."
+    },
+    "voucher_id": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The source document this posting is the ledger image of. Together with voucher_type it is the posting's provenance back into the transactional spine."
+    },
+    "remarks": {
+      "$ref": "document.schema.json#/$defs/label"
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["account"],
+        "properties": {
+          "account": {
+            "$ref": "document.schema.json#/$defs/identifier",
+            "description": "The ledger account the row posts to."
+          },
+          "debit": {
+            "$ref": "document.schema.json#/$defs/money"
+          },
+          "credit": {
+            "$ref": "document.schema.json#/$defs/money"
+          },
+          "cost_center": {
+            "$ref": "document.schema.json#/$defs/identifier"
+          }
+        },
+        "oneOf": [
+          {
+            "required": ["debit"],
+            "properties": {"debit": {"exclusiveMinimum": 0}}
+          },
+          {
+            "required": ["credit"],
+            "properties": {"credit": {"exclusiveMinimum": 0}}
+          }
+        ]
+      },
+      "description": "At least two rows: a double entry needs both sides. Each row is exactly one of a debit or a credit."
+    }
+  },
+  "x-erp-document": "gl-posting",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/accounts/doctype/gl_entry",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "GL Entry",
+    "harvest": [
+      "the ledger row shape (account, debit, credit, cost center, posting date)",
+      "the voucher back-reference (voucher type and voucher id) that ties a ledger row to the document it images",
+      "double-entry as the invariant that makes a posting balanced or refused"
+    ],
+    "note": "Field shapes from the upstream ledger doctype, re-expressed as one posting document with an explicit balance rule. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

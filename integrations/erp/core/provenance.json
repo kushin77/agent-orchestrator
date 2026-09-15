@@ -1,0 +1,89 @@
+{
+  "schema": "erp.core/provenance-v1",
+  "issue": "kushin77/agent-orchestrator#647",
+  "title": "ERP core document model — harvest provenance",
+  "upstream": {
+    "repo": "frappe/erpnext",
+    "license": "GPL-3.0",
+    "mode": "pattern-only",
+    "boundary": "The upstream is a PATTERN SOURCE and nothing else. No upstream file was read into this repository, and no upstream code, schema, migration or text is copied, vendored, translated or generated into it. What is carried across is the doctype surface as an idea: field names, field kinds, links between doctypes, the closed docstatus vocabulary (0 draft / 1 submitted / 2 cancelled) and the state/transition shape of a document lifecycle. GPL-3.0 is why: a copy would bind this repository, a pattern does not.",
+    "recorded_by": "GR-10 (provenance) — harvested assets record repo, path and licence."
+  },
+  "schemas": {
+    "document.schema.json": {
+      "doctype": null,
+      "path": "erpnext/**/doctype/*/*.json",
+      "harvest": "field shapes shared across doctypes, the docstatus vocabulary, the child-table row shape"
+    },
+    "party.schema.json": {
+      "doctype": "Customer / Supplier",
+      "path": "erpnext/{selling,buying}/doctype/{customer,supplier}",
+      "harvest": "party field surface; two doctypes collapsed into one family with a closed party_type discriminant"
+    },
+    "item.schema.json": {
+      "doctype": "Item",
+      "path": "erpnext/stock/doctype/item",
+      "harvest": "item master field surface; the is_stock_item flag that gates stock commitment"
+    },
+    "quotation.schema.json": {
+      "doctype": "Quotation",
+      "path": "erpnext/selling/doctype/quotation",
+      "harvest": "quotation field surface; parent/child header-lines-taxes shape; docstatus lifecycle"
+    },
+    "sales-order.schema.json": {
+      "doctype": "Sales Order",
+      "path": "erpnext/selling/doctype/sales_order",
+      "harvest": "sales order field surface; the forward link from an order to its quotation"
+    },
+    "delivery-note.schema.json": {
+      "doctype": "Delivery Note",
+      "path": "erpnext/stock/doctype/delivery_note",
+      "harvest": "delivery note field surface; the fulfilment link back to the order; delivery as the point of stock commitment"
+    },
+    "sales-invoice.schema.json": {
+      "doctype": "Sales Invoice",
+      "path": "erpnext/accounts/doctype/sales_invoice",
+      "harvest": "sales invoice field surface; the separation of transaction date from posting date; invoicing as the point of ledger commitment"
+    },
+    "purchase-order.schema.json": {
+      "doctype": "Purchase Order",
+      "path": "erpnext/buying/doctype/purchase_order",
+      "harvest": "purchase order field surface; the buying convention of naming the party field for its side"
+    },
+    "purchase-receipt.schema.json": {
+      "doctype": "Purchase Receipt",
+      "path": "erpnext/stock/doctype/purchase_receipt",
+      "harvest": "purchase receipt field surface; the fulfilment link back to the purchase order"
+    },
+    "stock-entry.schema.json": {
+      "doctype": "Stock Entry",
+      "path": "erpnext/stock/doctype/stock_entry",
+      "harvest": "stock entry field surface; the purpose vocabulary that selects which warehouses a movement must name"
+    },
+    "gl-posting.schema.json": {
+      "doctype": "GL Entry",
+      "path": "erpnext/accounts/doctype/gl_entry",
+      "harvest": "ledger row shape; the voucher back-reference; double entry as a balance invariant"
+    },
+    "workflow.schema.json": {
+      "doctype": null,
+      "path": "erpnext/**/doctype/*/*.json (workflow field definitions)",
+      "harvest": "a lifecycle as states plus named transitions, each state carrying the docstatus it corresponds to"
+    }
+  },
+  "workflows": {
+    "quotation.yaml": "erpnext/selling/doctype/quotation",
+    "sales-order.yaml": "erpnext/selling/doctype/sales_order",
+    "delivery-note.yaml": "erpnext/stock/doctype/delivery_note",
+    "sales-invoice.yaml": "erpnext/accounts/doctype/sales_invoice",
+    "purchase-order.yaml": "erpnext/buying/doctype/purchase_order",
+    "purchase-receipt.yaml": "erpnext/stock/doctype/purchase_receipt",
+    "stock-entry.yaml": "erpnext/stock/doctype/stock_entry",
+    "gl-posting.yaml": "erpnext/accounts/doctype/gl_entry"
+  },
+  "notes": [
+    "Every entry names the upstream doctype surface the shapes came from, so a reviewer can check the claim rather than trust it.",
+    "The workflows are ours: the upstream drives its doctypes from server-side scripts, and this model deliberately expresses the same lifecycles as data the durable execution engine consumes (integrations/erp/core/workflow.py).",
+    "A path is recorded as the upstream doctype location, not as a file that was read — the boundary above is the whole point of the record."
+  ]
+}

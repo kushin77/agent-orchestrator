@@ -1,0 +1,48 @@
+# GL posting lifecycle — ERP-02 core document model (issue #647).
+#
+# The ledger document. A posting is drafted, then submitted (which is the
+# moment the balances move), then marked posted once the period is closed. A
+# submitted posting is immutable in the accounting sense, so the only way out of
+# `submitted` that is not settlement is cancellation — and cancelling a posting
+# is the reversal entry the ledger expects, never a silent deletion.
+schema: erp.workflow/v1
+workflow: gl-posting-lifecycle
+document: gl-posting
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: Submitted
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Posted
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Reversed
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Submit
+  - action: complete
+    from: submitted
+    to: completed
+    label: Mark Posted
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Reverse

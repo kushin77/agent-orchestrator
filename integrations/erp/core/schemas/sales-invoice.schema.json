@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/sales-invoice.schema.json",
+  "title": "Sales Invoice — the accounting-committing selling document",
+  "description": "A sales invoice is where the selling cycle commits the general ledger: it carries its own posting date (distinct from the transaction date, because the accounting period an invoice lands in is a decision, not a consequence of when the sale happened) and it is the document a GL posting is derived from. The state enum is parity-locked to workflows/sales-invoice.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "posting_date",
+    "party",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "sales-invoice"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "document.schema.json#/$defs/isoDate"
+    },
+    "posting_date": {
+      "$ref": "document.schema.json#/$defs/isoDate",
+      "description": "The accounting date, which selects the period and therefore the ledger the invoice lands in. Required and deliberately separate from transaction_date: a document posted late is normal, a document posted into the wrong period is a correction."
+    },
+    "due_date": {
+      "$ref": "document.schema.json#/$defs/isoDate",
+      "description": "The payment due date the ageing report measures against."
+    },
+    "party": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "against_delivery_note": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The delivery note this invoice bills, when the invoice is raised against a fulfilment rather than directly."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "document.schema.json#/$defs/transactionLine"
+      }
+    },
+    "taxes": {
+      "type": "array",
+      "items": {
+        "$ref": "document.schema.json#/$defs/taxLine"
+      }
+    },
+    "net_total": {
+      "$ref": "document.schema.json#/$defs/money"
+    },
+    "total": {
+      "$ref": "document.schema.json#/$defs/money"
+    },
+    "outstanding_amount": {
+      "$ref": "document.schema.json#/$defs/money",
+      "description": "The unpaid remainder. Absent on a draft invoice, where nothing has been posted yet."
+    }
+  },
+  "x-erp-document": "sales-invoice",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/accounts/doctype/sales_invoice",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Sales Invoice",
+    "harvest": [
+      "the sales invoice field surface (posting_date, due_date, against delivery note, outstanding amount)",
+      "the separation of transaction date from posting date",
+      "invoicing as the point where the selling cycle commits the general ledger"
+    ],
+    "note": "Field and lifecycle shapes from the upstream sales invoice doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

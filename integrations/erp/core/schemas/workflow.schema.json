@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/workflow.schema.json",
+  "title": "ERP workflow data — the state/transition document shape",
+  "description": "The meta-schema every file under workflows/ validates against. A workflow here is data, not engine code: it declares the states a document family moves through and the named actions that move it, and the durable execution engine consumes it without owning it. This schema is a meta-schema rather than a document family — it declares no x-erp-document — so it has no lifecycle of its own. It deliberately does not pin the state NAMES: those belong to each document family, and pinning them here would make the meta-schema the place a doctype had to be edited. The structural invariants a schema cannot express (a unique initial state, no outgoing transition from a terminal state, reachability) are refused by names in integrations/erp/core/workflow.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workflow", "document", "initial", "states", "transitions"],
+  "properties": {
+    "schema": {
+      "const": "erp.workflow/v1",
+      "description": "The workflow data dialect. Optional for a caller building the document in memory; every shipped file declares it."
+    },
+    "workflow": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The workflow's own identifier, unique across the model."
+    },
+    "document": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The document family this lifecycle belongs to. This is the join key: the asset gate requires a schema declaring x-erp-document equal to it, and a schema declaring x-erp-lifecycle requires a workflow declaring it."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The workflow data revision. Bumping it is how a lifecycle change is made visible rather than silent."
+    },
+    "initial": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The state a new document starts in. It must be declared in states and must carry docstatus 0 — the draft — which workflow.py enforces."
+    },
+    "states": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "docstatus"],
+        "properties": {
+          "name": {
+            "$ref": "document.schema.json#/$defs/identifier",
+            "description": "The state name. The lifecycle schema's state enum is the set of these, enforced as a parity invariant."
+          },
+          "docstatus": {
+            "$ref": "document.schema.json#/$defs/docstatus",
+            "description": "The document status this state corresponds to, from the closed upstream vocabulary."
+          },
+          "label": {
+            "$ref": "document.schema.json#/$defs/label",
+            "description": "The display name a portal renders. Defaults to the state name."
+          },
+          "terminal": {
+            "type": "boolean",
+            "description": "Whether the state ends the lifecycle. A terminal state may have no outgoing transition — workflow.py refuses one."
+          }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "from", "to"],
+        "properties": {
+          "action": {
+            "$ref": "document.schema.json#/$defs/identifier",
+            "description": "The named action a caller invokes. At most one transition may leave a given state on a given action: two would make the next state undecidable, and workflow.py refuses that."
+          },
+          "from": {
+            "$ref": "document.schema.json#/$defs/identifier"
+          },
+          "to": {
+            "$ref": "document.schema.json#/$defs/identifier"
+          },
+          "label": {
+            "$ref": "document.schema.json#/$defs/label"
+          }
+        }
+      }
+    }
+  },
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "upstream_doctype": "Workflow",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/**/doctype/*/*.json (workflow field definitions)",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "harvest": [
+      "a document lifecycle expressed as states plus named transitions, rather than as engine code",
+      "each state carrying the docstatus it corresponds to",
+      "terminal states as a declared property rather than an absent transition"
+    ],
+    "note": "The workflow definition shape, re-expressed as our own data dialect consumed by the durable execution engine. No upstream file was read into this repository; no upstream code, schema or text is copied or vendored."
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/purchase-order.schema.json",
+  "title": "Purchase Order — a commitment to a supplier",
+  "description": "The buying cycle's mirror of the sales order: a commitment made to a supplier, fulfilled by a purchase receipt. The field names follow the buying side's convention (supplier, expected_delivery) rather than reusing the selling names, because the two cycles are read by different people and the upstream surface keeps them distinct.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "supplier",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "purchase-order"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "document.schema.json#/$defs/isoDate"
+    },
+    "expected_delivery": {
+      "$ref": "document.schema.json#/$defs/isoDate",
+      "description": "The date the supplier is expected to deliver against, which the receipt is measured against."
+    },
+    "supplier": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "Link to the supplier party. Named 'supplier' rather than 'party' so the buying documents read the way the buying cycle speaks."
+    },
+    "supplier_quotation": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The supplier quotation this order was raised from, when it was."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "document.schema.json#/$defs/transactionLine"
+      }
+    },
+    "taxes": {
+      "type": "array",
+      "items": {
+        "$ref": "document.schema.json#/$defs/taxLine"
+      }
+    },
+    "net_total": {
+      "$ref": "document.schema.json#/$defs/money"
+    },
+    "total": {
+      "$ref": "document.schema.json#/$defs/money"
+    }
+  },
+  "x-erp-document": "purchase-order",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/buying/doctype/purchase_order",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Purchase Order",
+    "harvest": [
+      "the purchase order field surface (supplier, expected_delivery, supplier quotation link, taxes, totals)",
+      "the buying convention of naming the party field for the side of the trade",
+      "the state set the buying cycle drives an order through"
+    ],
+    "note": "Field and lifecycle shapes from the upstream purchase order doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

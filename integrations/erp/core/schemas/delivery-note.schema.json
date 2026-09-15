@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/core/schemas/delivery-note.schema.json",
+  "title": "Delivery Note — the stock-committing selling document",
+  "description": "A delivery note records goods leaving a warehouse against an order. It is the document where the selling cycle touches stock, which is why against_sales_order is required: a delivery that fulfils no order is a stock adjustment, and the model has stock-entry for that. The stock half of the transactional spine (ERP-03, #648) reads this document to decide what the stock ledger receives.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "party",
+    "against_sales_order",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "delivery-note"
+    },
+    "id": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "document.schema.json#/$defs/isoDate"
+    },
+    "party": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "Link to the customer the goods are delivered to."
+    },
+    "against_sales_order": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The sales order this delivery fulfils. Required: fulfilment is the document's reason to exist, and a stock movement with no commitment behind it belongs to stock-entry instead."
+    },
+    "warehouse": {
+      "$ref": "document.schema.json#/$defs/identifier",
+      "description": "The default source warehouse; a line may override it."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "document.schema.json#/$defs/transactionLine"
+      },
+      "description": "The delivered lines. Each line's warehouse names the stock the movement is taken from."
+    },
+    "total": {
+      "$ref": "document.schema.json#/$defs/money",
+      "description": "The delivered value, which the invoice is raised against."
+    }
+  },
+  "x-erp-document": "delivery-note",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#647",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/stock/doctype/delivery_note",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Delivery Note",
+    "harvest": [
+      "the delivery note field surface (against sales order, warehouse, delivered lines)",
+      "the fulfilment link from a delivery back to the order it satisfies",
+      "delivery as the point where the selling cycle commits stock"
+    ],
+    "note": "Field and lifecycle shapes from the upstream delivery note doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}
