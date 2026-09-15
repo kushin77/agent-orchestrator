@@ -57,6 +57,47 @@ def test_the_shared_predicate_classifies_position(lane, repo: Path, message: str
     assert classify_commit(lane.worktree, head(lane.worktree)) == expected
 
 
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        # #835 — the paragraph the landing path composes: GitHub's colon-less
+        # auto-close keyword, the assistant line and the reference in ONE
+        # trailing paragraph. Accepted: by position it is a trailer paragraph,
+        # and the reference is a line of it.
+        (
+            "do the work\n\nCloses #835\nAI-assistance: Copilot (Relentless)\n"
+            "Refs kushin77/agent-orchestrator#835",
+            None,
+        ),
+        # The rest of GitHub's close vocabulary is the same kind of line.
+        ("do the work\n\nFixes #835\nRefs kushin77/agent-orchestrator#835", None),
+        ("do the work\n\nResolves #835\nRefs kushin77/agent-orchestrator#835", None),
+        # …but the widened vocabulary is not a second rule: the reference is
+        # still REQUIRED to be a line of the trailing block, so a closing
+        # keyword standing alone is a MISSING trailer, never a passing one.
+        ("do the work\n\nCloses #835", "commit-missing-ticket-trailer"),
+        # …and a genuinely `other` trailing paragraph still ends the block, so a
+        # reference above it is still outside it: the position rule is intact.
+        (
+            "do the work\n\nRefs kushin77/agent-orchestrator#835\n\nCloses #835 and then prose",
+            "commit-ref-outside-the-trailer-block",
+        ),
+        # A keyword line with prose on it is prose, not a trailer line.
+        (
+            "do the work\n\nRefs kushin77/agent-orchestrator#835 — see the notes for the rest",
+            "commit-ref-outside-the-trailer-block",
+        ),
+    ],
+)
+def test_the_auto_close_keyword_is_a_trailer_line_not_a_substitute_for_the_reference(
+    lane, repo: Path, message: str, expected: str | None
+):
+    """#835: the landing path's own paragraph classes clean, while the position
+    rule and the reference requirement are both unchanged."""
+    commit(lane.worktree, "work.txt", message)
+    assert classify_commit(lane.worktree, head(lane.worktree)) == expected
+
+
 def test_a_real_trailing_trailer_passes_the_shared_predicate(lane, repo: Path):
     commit(lane.worktree, "work.txt", "do the work", trailer=lane.trailer)
     assert classify_commit(lane.worktree, head(lane.worktree)) is None

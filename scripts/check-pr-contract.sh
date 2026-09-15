@@ -19,10 +19,22 @@
 # WHAT IT CHECKS  (body file + commit range)
 #   * every non-merge commit in the range carries the ticket reference in its
 #     TRAILING TRAILER BLOCK — the last paragraph(s) whose every line is a
-#     `Token: value` line, a continuation, or the reference line itself. A
-#     reference in the subject, or buried in an earlier prose paragraph, is
-#     refused by name. (A plain substring test accepts both — that is defect
-#     #287 in the lane audit; this gate must not repeat it.)
+#     `Token: value` line, a continuation, the reference line itself, or GitHub's
+#     own bare auto-close keyword (`Closes #<n>` / `Fixes #<n>` / `Resolves
+#     #<n>`). A reference in the subject, or buried in an earlier prose
+#     paragraph, is refused by name. (A plain substring test accepts both — that
+#     is defect #287 in the lane audit; this gate must not repeat it.)
+#     The auto-close keyword is recognised because the landing path composes it:
+#     `gh pr merge --squash` over a body whose last paragraph is `Closes #<n>`
+#     produces a trailing paragraph holding the keyword, the assistant line and
+#     the reference together. By position that IS a trailer paragraph, and
+#     GitHub's keyword has no colon, so refusing it made the rule disagree with
+#     the tool that produces the artifact. Measured (#835): that one shape was 8
+#     of the 12 `commit-ref-outside-the-trailer-block` commits in the landed
+#     baseline, and accepting it shrank the baseline from 14 entries to 6. The
+#     POSITION rule is unchanged: the block still ends at the first paragraph
+#     that is not entirely trailer lines, and the reference is still REQUIRED to
+#     be a line of it.
 #     A bare `---------` separator line is a boundary *inside* that block, not
 #     the end of it: the fleet's landing path (`gh pr merge --squash`, GitHub
 #     composing the message) inserts one and appends its own `Co-authored-by:`
@@ -163,11 +175,30 @@ if current:
     paragraphs.append(current)
 
 
+# GitHub's auto-close vocabulary as a bare, colon-less line: `Closes #509`,
+# `Fixes #7`, `Resolves #12`. The landing path composes exactly this shape --
+# `gh pr merge --squash` over a body whose last paragraph is `Closes #<n>` -- and
+# by position that paragraph IS a trailer paragraph; GitHub's keyword simply has
+# no colon, so before #835 the paragraph was classified `other`, the walk-back
+# stopped on it, and the reference line sharing the paragraph was reported
+# `commit-ref-outside-the-trailer-block`. Measured: that single shape accounted
+# for 8 of the 12 `commit-ref-outside-the-trailer-block` entries in the landed
+# baseline; the 4 that remain are a reference line separated from the trailing
+# block by prose, which is still refused by name. The POSITION rule is
+# unchanged: the block still ends at the first paragraph that is not entirely
+# trailer lines, and the reference is still REQUIRED to be a line of it -- a
+# paragraph holding only a closing keyword is a missing trailer, never a trailer
+# (selftest case 2f).
+closing_re = re.compile(r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]+#[0-9]+", re.IGNORECASE)
+
+
 def is_trailer_line(line: str) -> bool:
-    """A `Token: value` line, a continuation line, or the reference line."""
+    """A `Token: value` line, a continuation, the reference, or a close keyword."""
     if ref_re.fullmatch(line.strip()):
         return True
     if line[:1] in (" ", "\t"):
+        return True
+    if closing_re.fullmatch(line.strip()):
         return True
     return bool(re.match(r"^[A-Za-z][A-Za-z0-9_-]*:[ \t]*\S", line))
 
@@ -556,6 +587,63 @@ MD
     printf '  OK    a prose reference below a separator is still refused by name\n'
   else
     printf '  FAIL  a separator let a prose-only reference through\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 2e. the shape the landing path composes (#835): GitHub's colon-less
+  #     auto-close keyword, the assistant line and the reference share ONE
+  #     trailing paragraph. It is a trailer paragraph by position, so it must be
+  #     ACCEPTED — before the fix the keyword line had no colon, the paragraph
+  #     was classified `other`, and the reference inside it was refused.
+  printf 'g.txt\n' >"$scratch/g.txt"
+  git -C "$scratch" add g.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "a commit whose closing keyword shares the trailer paragraph" \
+    -m "Closes #835
+AI-assistance: Copilot (Relentless)
+Refs kushin77/agent-orchestrator#835" >/dev/null 2>&1
+  g_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(run_checks "$good_body" "${g_sha}^..$g_sha" 2>&1)"
+  if [ $? -eq 0 ] && printf '%s' "$out" | grep -qF "check-pr-contract: OK"; then
+    printf '  OK    a bare `Closes #<n>` shares the trailer paragraph\n'
+  else
+    printf '  FAIL  a bare `Closes #<n>` broke the trailer paragraph\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 2f. …and the widened vocabulary is not a second rule: the reference is still
+  #     REQUIRED to be a line of the block, so a closing keyword standing alone
+  #     is a MISSING trailer, never a passing one.
+  printf 'h.txt\n' >"$scratch/h.txt"
+  git -C "$scratch" add h.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "a commit whose only ticket evidence is a closing keyword" \
+    -m "Closes #835" >/dev/null 2>&1
+  h_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(run_checks "$good_body" "${h_sha}^..$h_sha" 2>&1)"
+  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "commit-missing-ticket-trailer"; then
+    printf '  OK    a closing keyword without the reference is still refused\n'
+  else
+    printf '  FAIL  a closing keyword was accepted as the ticket evidence\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 2g. a genuinely `other` trailing paragraph still ends the block: a keyword
+  #     line is a trailer line, but a line that is neither a keyword, a
+  #     `Token: value` line, nor a continuation is not — widening the vocabulary
+  #     must not let prose in.
+  printf 'i.txt\n' >"$scratch/i.txt"
+  git -C "$scratch" add i.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "a commit whose trailing paragraph is not a trailer paragraph" \
+    -m "Refs kushin77/agent-orchestrator#835" \
+    -m "Closes #835 and then a line of prose" >/dev/null 2>&1
+  i_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(run_checks "$good_body" "${i_sha}^..$i_sha" 2>&1)"
+  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "commit-ref-outside-the-trailer-block"; then
+    printf '  OK    a prose paragraph below the trailer is still refused by name\n'
+  else
+    printf '  FAIL  prose below the trailer was accepted\n%s\n' "$out" >&2
     ok=1
   fi
 
