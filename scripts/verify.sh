@@ -68,6 +68,19 @@ checks=(
   # CANNOT-ASSESS (exit 2), never a pass -- found by mutation, not by review: the
   # first version printed "not a pass" and then exited 0.
   'branch-protection|bash scripts/check-branch-protection.sh'
+  # gate-status (epic #803 P0-2, ADR-0028): GitHub's required status checks are
+  # the only mechanism that makes a merge impossible without green evidence, and
+  # producing one normally needs the GitHub Actions that GR-15 bans. ADR-0028
+  # resolves that with a commit STATUS posted by the code-native runner -- no
+  # Actions, no App, no check-run (proven: context=ao/gate-probe posted and read
+  # back on master). This check proves the rc -> status mapping offline and
+  # without writing anything: the mapping is exhaustive, the three gate outcomes
+  # stay DISTINGUISHABLE, an unknown outcome is REFUSED rather than defaulted,
+  # and CANNOT-ASSESS is published as `error` -- never as a pass, which is the
+  # false-green class of #739. Requiring the context in branch protection is a
+  # SEPARATE deliberate step: requiring one that nothing posts yet would block
+  # every merge (#724: an inert control whose own gate could not see it).
+  'gate-status|bash scripts/check-gate-status.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'epic-focus|bash scripts/check-epic-focus.sh'
