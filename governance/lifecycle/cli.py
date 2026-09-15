@@ -397,7 +397,33 @@ def cmd_close(args: argparse.Namespace) -> int:
     )
     print(describe(result))
     _print_board_reports(result.board_reports)
+    _advance_focus_if_epic_closed(item, result)
     return EXIT_OK if result.ok else EXIT_NOT_OK
+
+
+def _advance_focus_if_epic_closed(item: dict, result: CloseOutResult) -> None:
+    """Move the epic pin off an epic that just closed (epic #707, lane F5/#720).
+
+    The epic-close ADVANCE is the one action a completed epic owes the board: a
+    pinned focus outlives the epic it pins, so without this a fleet that finished
+    an epic would keep resolving it forever. It runs only after a *successful*
+    close of an item that is actually an epic, and it is reported either way -- a
+    focus that could not be advanced is NOT-OK, never a silent pass. The decision
+    itself is the brain's pure ``advance_focus``; this is only the trigger.
+    """
+    labels = item.get("labels") or []
+    if "type:epic" not in labels or not result.ok:
+        return
+    try:
+        import fleet.brain as brain  # noqa: PLC0415 — keeps the CLI import-light
+    except ImportError as exc:  # pragma: no cover — the fleet package always ships
+        print(f"focus: NOT-OK — the epic advance is unavailable ({exc})", file=sys.stderr)
+        return
+    moved, note = brain.advance_epic_focus()
+    print(f"focus: {'OK' if moved else 'NOT-OK'} — {note}")
+    if not moved:
+        return
+    print(f"focus: advanced off #{item.get('issue')} (epic closed)")
 
 
 def cmd_collect(args: argparse.Namespace) -> int:

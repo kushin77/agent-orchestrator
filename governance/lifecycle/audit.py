@@ -109,8 +109,8 @@ def declared_parent(body: str) -> int | None:
     return numbers[0] if numbers else None
 
 
-def _declared_children(item: dict) -> list[dict]:
-    """The children whose body declares this item as parent, from the supplied set.
+def _declared_children(item: dict) -> tuple[list[dict], list[dict]]:
+    """Split a supplied child set into ``(this epic's children, unverifiable ones)``.
 
     The child-set fact arrives as *input* — a supplied child set on the item,
     never a live board read — and a child belongs to this epic only when its own
@@ -121,13 +121,26 @@ def _declared_children(item: dict) -> list[dict]:
     directory is on ``sys.path``). Reading the marker rather than guessing by
     adjacency is what keeps a child that names a *different* parent from either
     provoking or excusing this epic.
+
+    The second list is the part that used to be dropped. A child whose body
+    declares **no** marker at all is neither this epic's child nor another
+    epic's — the edge simply cannot be established — and the audit's job is to
+    report that, not to read "no children found" as "all children closed". A
+    child naming a *different* parent is decidable and belongs to that parent,
+    so it is neither declared here nor reported: the marker was read, not
+    guessed, and certainty about a different edge is not a missing edge
+    (``CHILD_WRONG_PARENT`` stays a passing control in the gate).
     """
     parent = int(item.get("issue") or 0)
     declared: list[dict] = []
+    unmatched: list[dict] = []
     for child in item.get("children") or []:
-        if declared_parent(str(child.get("body") or "")) == parent:
+        child_parent = declared_parent(str(child.get("body") or ""))
+        if child_parent == parent:
             declared.append(child)
-    return declared
+        elif child_parent is None:
+            unmatched.append(child)
+    return declared, unmatched
 
 
 def _closure_findings(item: dict) -> list[Finding]:
@@ -201,7 +214,7 @@ def _closure_findings(item: dict) -> list[Finding]:
             )
         )
 
-    for child in _declared_children(item):
+    for child in _declared_children(item)[0]:
         if str(child.get("state") or "").lower() != "closed":
             problems.append(
                 Finding(
@@ -210,6 +223,19 @@ def _closure_findings(item: dict) -> list[Finding]:
                     f"declared child #{child.get('number')} is {child.get('state') or 'open'}, not closed",
                 )
             )
+
+    # "No children found" is not "all children closed" (#720). A supplied child the
+    # audit cannot tie to this epic - no marker in its body at all - is REPORTED:
+    # silently passing it would let an epic close over a child the audit never saw.
+    for child in _declared_children(item)[1]:
+        problems.append(
+            Finding(
+                "EPIC_CHILD_MARKER_MISSING",
+                subject,
+                f"supplied child #{child.get('number')} declares no parent marker, so its edge to "
+                "this epic cannot be established - not counted as terminal",
+            )
+        )
 
     return problems
 

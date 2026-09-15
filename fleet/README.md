@@ -370,6 +370,16 @@ python3 fleet/report.py            # the human-readable report
 python3 fleet/report.py --json     # the same report, typed and structured
 ```
 
+Above the sections the report prints the **active epic** block — the one epic the
+fleet is focused on (`.board/focus.json`, `governance/dispatch/focus.py`): the
+epic number, its per-epic progress as children `closed/total`, the pooled queue of
+open non-epic work outside it, and the effective agent count the focus declares.
+`max_agents: 0` is labelled **the pool** rather than resolved into a number — the
+capacity formula belongs to dispatch (lane F3/#718), not to the report. The block
+is built by a pure function over an injected board snapshot and focus, so it is
+asserted from a fixture (`fleet/tests/test_report_epic.py`) with no fleet and no
+network.
+
 Four sections, in dependency order, each item carrying its issue, its lane and an
 **evidence pointer** — a run id, a claim, the child's own `Verify:` command, or the
 closing record:
@@ -384,8 +394,9 @@ closing record:
 It reads only state the fleet already writes — the wave plans plus child issue
 states, the live claims the dispatch ledger folds (`governance/dispatch/cli.py
 status` prints the same set), the in-flight run markers under `.fleet/runs/`, the
-recent `.fleet/slog.jsonl` outcomes, and the board milestone/frontier through the
-same `governance/dispatch/order.py` rule the claim gate enforces. **It is
+recent `.fleet/slog.jsonl` outcomes, the board milestone/frontier through the
+same `governance/dispatch/order.py` rule the claim gate enforces, and the pinned
+focus (`.board/focus.json`) the active-epic block resolves. **It is
 read-only:** it never writes `.fleet/`, never claims, releases or reaps, and can
 never change a dispatch decision.
 
