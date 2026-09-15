@@ -21,13 +21,17 @@
 # Omitting the obvious settings is a decision, not an oversight:
 #
 #   required_status_checks: null
-#     No CI exists that could satisfy a required check — GitHub Actions is
-#     banned fleet-wide by GR-15, and Actions is only one of the ways to post a
+#     No CI exists that satisfies a required check — GitHub Actions is banned
+#     fleet-wide by GR-15, and Actions is only one of the ways to post a
 #     check-run. Requiring a check that nothing produces would deadlock every
-#     merge in the repository. The question "how does a code-native gate become a
-#     REQUIRED check with Actions banned?" is open and belongs in an ADR, not in
-#     a workaround (see #803 P0-2). Until it is answered, requiring checks would
-#     be worse than not requiring them.
+#     merge in the repository. **ADR-0028 answers the question** (the gate is
+#     published as a commit status by the code-native runner, no Actions), and
+#     the context it will require is declared under `required_status_contexts`
+#     below. It is deliberately NOT in `protection` yet: the poster must be
+#     observed posting a real status first. Requiring a context before anything
+#     writes it is the #724 defect — an inert control whose own gate could not
+#     see that it was inert — and here it would be worse, because it would block
+#     every merge instead of merely doing nothing.
 #
 #   required_pull_request_reviews: null
 #     Requiring a human review would break the autonomous-merge doctrine
@@ -61,3 +65,16 @@ protection:
   required_conversation_resolution: false
   lock_branch: false
   block_creations: false
+
+# ADR-0028 — the status context the gate of record publishes, and which branch
+# protection will require ONCE `scripts/gate-status.sh` has been observed posting
+# a real status from the runner.
+#
+# This key is OUTSIDE `protection` on purpose, so `scripts/branch-protection.sh
+# apply` does NOT require it: the declaration is the intent, the application is a
+# separate deliberate step. `scripts/check-gate-status.sh` asserts that this
+# context and the one the poster writes are the same STRING — two names for one
+# control is how a required check becomes permanently unsatisfiable (protection
+# would wait for a context nothing ever writes).
+required_status_contexts:
+  - ao/gate-of-record
