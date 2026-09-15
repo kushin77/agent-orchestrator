@@ -8,7 +8,7 @@ fleet can actually do:
 
     fleet/control.py            18 verbs
     fleet/channel.py            13 verbs
-    governance/dispatch/cli.py   8 verbs
+    governance/dispatch/cli.py   9 verbs
     governance/reconcile/cli.py  5 verbs
     governance/lifecycle/cli.py  4 verbs
 
@@ -66,7 +66,7 @@ SOURCES: dict[str, set[str]] = {
     },
     "governance/dispatch/cli.py": {
         "audit", "eligible", "claim", "release", "status", "held", "reap",
-        "snapshot", "focus",
+        "snapshot", "focus", "pool",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
     "governance/lifecycle/cli.py": {"audit", "status", "close", "collect"},

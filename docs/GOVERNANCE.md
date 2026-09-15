@@ -184,6 +184,16 @@ free-form board queue.
   dependency edge: that epic's open children are the next valid steps. This is
   *stricter* than the milestone frontier, never a relaxation — an item with no
   such edge is still refused `no-chain-edge`.
+- **Rule 7: out-of-epic work is parked, not dispatched.** While a focus is
+  active, an issue outside the active epic is REFUSED `out-of-epic-pooled` even
+  when it is otherwise the milestone frontier — a frontier that interleaves
+  several epics is the incoherence the focus exists to prevent. The refusal is
+  recorded in `.board/pool.jsonl` (`reason: out-of-epic`, timestamped), so
+  deferred work is parked rather than dropped. Work named in a `Blocked-by:` of an
+  active-epic child is promoted just-in-time through the *existing*
+  `claim --directive <id>` path (`brain-directed`); no new authorisation
+  mechanism is invented. When the resolver returns `None` (no workable epic) the
+  pool drains and reports what left it.
 
 This prevents "issue scavenging" and ensures the board behaves like a governed
 execution plan instead of a generic kanban.
@@ -198,7 +208,8 @@ enforced by code:
   board snapshot (`.board/snapshot.json`) and writes the claim to the append-only
   ledger (`.board/claims.jsonl`) with the reason it was accepted.
 - **Refusal reasons.** `unknown-issue`, `issue-closed`, `blocked`,
-  `already-claimed`, `epic-not-workable` and `no-chain-edge` (kanban
+  `already-claimed`, `epic-not-workable`, `out-of-epic-pooled` (outside the
+  active epic — see rule 7) and `no-chain-edge` (kanban
   scavenging). The last one is the rule in action: a visible board item that is
   not the next step is not work.
 - **Brain directives are chain edges.** A claim may carry `--directive <id>`;
@@ -209,6 +220,10 @@ enforced by code:
   the additive reason `active-epic-child`. The audit re-derives the edge — the
   issue must declare a `Parent:` naming an open epic that IS the active epic —
   and reports the claim otherwise, so the reason cannot be abused.
+- **Out-of-epic work is pooled.** An out-of-epic refusal appends
+  `.board/pool.jsonl`; `governance/dispatch/cli.py pool` shows it and the pool's
+  own self-control proves a malformed line is rejected and a drain reports what
+  it drained (a silent drop is the failure the pool exists to prevent).
 - **Single claim.** An in-flight issue is locked; a second agent's claim fails
   loudly. A claim whose TTL elapsed may be taken over, so a dead agent cannot
   wedge the chain.

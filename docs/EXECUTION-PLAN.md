@@ -132,6 +132,14 @@ queue is executed in chronological, dependency-aware order.
    children are claimable under the additive reason `active-epic-child`. This
    tightens the milestone frontier rather than opening the board — an item with
    no such edge is still refused `no-chain-edge`.
+7. **Out-of-epic work is parked, not dispatched.** While a focus is active, work
+   outside the active epic is refused `out-of-epic-pooled` — even as the
+   milestone frontier, because a frontier that interleaves epics is exactly the
+   incoherence the focus removes. The deferral is recorded in
+   `.board/pool.jsonl`, so it is parked rather than dropped; a `Blocked-by:`
+   blocker of an active-epic child is promoted just-in-time through the existing
+   `claim --directive` path, and the pool drains (reporting what it drained) once
+   no epic is workable.
 
 This is a governance rule, not an optimization preference. Any agent that
 starts choosing issues ad hoc is violating the repo's execution contract.
