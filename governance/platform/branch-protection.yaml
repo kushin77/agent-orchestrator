@@ -1,0 +1,63 @@
+# Declared branch protection for the default branch — the platform-level
+# enforcement of the gate of record (issue #803, P0-3; issue #6's promise).
+#
+# WHY THIS FILE EXISTS
+# `AGENTS.md` said "`master` is protected by convention" and "Branch protection
+# as code ships with issue #6". Measured 2026-09-15:
+#     gh api repos/kushin77/agent-orchestrator/branches/master/protection
+#     {"message":"Branch not protected", ..., "status":404}
+# Neither was true. The gate of record (`make verify`, 128 checks, provably able
+# to fail) was not required by the platform, and any process could push straight
+# to the default branch. A rule that lives only in a doc is advisory; only a
+# platform-enforced control is binding.
+#
+# The protection was then applied by an OPERATOR API call to close the exposure.
+# That is itself a GR-5 breach — infrastructure is declared, never clicked — and
+# it is not reproducible: a fork, a restore or a second repo diverges silently.
+# This file is that declaration, and `scripts/branch-protection.sh` is the thing
+# that makes it reproducible and keeps it honest.
+#
+# WHAT IS DELIBERATELY *NOT* REQUIRED, AND WHY
+# Omitting the obvious settings is a decision, not an oversight:
+#
+#   required_status_checks: null
+#     No CI exists that could satisfy a required check — GitHub Actions is
+#     banned fleet-wide by GR-15, and Actions is only one of the ways to post a
+#     check-run. Requiring a check that nothing produces would deadlock every
+#     merge in the repository. The question "how does a code-native gate become a
+#     REQUIRED check with Actions banned?" is open and belongs in an ADR, not in
+#     a workaround (see #803 P0-2). Until it is answered, requiring checks would
+#     be worse than not requiring them.
+#
+#   required_pull_request_reviews: null
+#     Requiring a human review would break the autonomous-merge doctrine
+#     (`AGENTS.md` rule 10): in this fleet verification replaces the reviewer, and
+#     an agent merges its own PR only after green evidence. Encoding the opposite
+#     here would make the declared policy contradict the operating model.
+#
+# So this policy encodes the protection that is both correct TODAY and
+# consistent with the doctrine: history is linear, force-pushes and deletions are
+# refused, and the default branch cannot be removed.
+
+schema: ao.branch-protection/v1
+repo: kushin77/agent-orchestrator
+branch: master
+
+# Exactly the fields the GitHub protection API returns, so `verify` can diff the
+# declared state against the live state without a translation layer inventing
+# differences of its own.
+protection:
+  required_linear_history: true
+  allow_force_pushes: false
+  allow_deletions: false
+  # Not enforced on admins: the operator must remain able to intervene on a
+  # wedged fleet (the documented operator role), and `enforce_admins: true` would
+  # remove the only override point the operating model names.
+  enforce_admins: false
+  required_signatures: false
+  required_status_checks: null
+  required_pull_request_reviews: null
+  restrictions: null
+  required_conversation_resolution: false
+  lock_branch: false
+  block_creations: false

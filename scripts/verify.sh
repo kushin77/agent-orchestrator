@@ -57,6 +57,17 @@ checks=(
   # and the list cannot rot into a fiction. It is registered here deliberately:
   # this array is explicit, so the detector is itself inert until it is named.
   'gate-coverage|bash scripts/check-gate-coverage.sh'
+  # branch-protection (epic #803, P0-3): the platform-level enforcement of the
+  # gate of record. Measured 2026-09-15: `master` was NOT protected (the API
+  # answered 404) while `AGENTS.md` claimed it was "protected by convention" and
+  # that branch protection as code "ships with issue #6". The gate of record was
+  # excellent and no platform control required anyone to run it. This check
+  # compares the LIVE protection against the DECLARED policy and is PROVOKED
+  # offline (a matching fixture must pass; removed protection must be caught and
+  # named; an unprotected branch must be caught). An unobservable live state is
+  # CANNOT-ASSESS (exit 2), never a pass -- found by mutation, not by review: the
+  # first version printed "not a pass" and then exited 0.
+  'branch-protection|bash scripts/check-branch-protection.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'epic-focus|bash scripts/check-epic-focus.sh'
