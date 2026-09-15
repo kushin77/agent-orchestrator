@@ -255,6 +255,53 @@ and the gate runs **before** AuthN, so an unpromoted view is absent rather than
 merely unauthorised. `e2e/workbook11_portal.py` probes all three over the real
 app.
 
+## The console surface's readiness + rollback (issue #802)
+
+The console declares a liveness route (`GET /api/healthz`) and, since #802, a
+**readiness** route of its own: `GET /api/healthz/ready`, on the same health
+route family — one rail, no second dashboard (ADR-0022).
+
+```bash
+curl -s localhost:8787/api/healthz/ready
+# {"data": {"service": "portal-console", "state": "ready", "surfaces": {}}}
+```
+
+Readiness is computed by `portal/server/surface_health.py` from each console
+surface's declaration, any engaged rollback, the artifacts it serves and the
+declarations its steer half consumes, and it is a **four-state** reading, never a
+boolean: `off` (unpromoted or rolled back — nothing to serve), `ready`,
+`not-ready` (promoted but a declared dependency is gone: the surface answers
+while unable to serve) and `cannot-assess` (the declaration or the rollback
+overlay could not be read). `cannot-assess` is never reported as `ready`, and it
+answers **503**, like `not-ready`.
+
+The route names a surface exactly when that surface exists for a reader — it is
+promoted, or it was promoted and has been rolled back. An unpromoted surface is
+not named, for the same reason `/console` answers `404 feature_disabled` while
+its flag is off: an unpromoted surface is *absent*, not merely unauthorised, so
+a probe cannot enumerate what does not exist yet.
+
+**The rollback.** `infra/rollout/` (issue #45) owns promotion; issue #802 added
+the withdrawal. `infra/rollout/surface_guard.py` reads the readiness signal and,
+when it fails, rolls the surface's flag to `off` through the rollout engine
+(audited, hash-chained) **and** engages the runtime overlay
+`portal/server/surface_state.py` — a document under `.rollout/` that
+`portal/server/fleet.py::read_surface_default` consults *before* the registry
+(env seam `AO_SURFACE_STATE`). A withdrawn surface therefore reads `off` without
+touching the declaration, and the withdrawal survives a restart because it is
+the document the reader consults rather than an in-process toggle.
+
+The overlay reaches the **portal** surfaces, i.e. every route family that reads
+its declaration through `portal/server/fleet.py`. Two sibling pillars keep their
+own copies of that fail-closed reader (`gateway/chat/flags.py`,
+`telemetry/observability/exposition.py`) and are not covered by a rollback
+engaged here; the duplication is reported, not silently widened.
+
+The overlay fails closed in one direction only, and deliberately: an **absent**
+document means no rollback is engaged (the declaration stands), while a document
+that exists and **cannot be read** is treated as a rollback in force — a kill
+switch nobody can read must never be assumed to be off duty.
+
 ## Verification (2026-09-08)
 
 - `python3 -m pytest portal/tests -q -p no:cacheprovider` → **{count} passed**

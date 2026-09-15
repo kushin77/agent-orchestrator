@@ -82,6 +82,18 @@ flags:
     stage: "off"
     rollout_pct: 0
     targeted: []
+  # The AgentConsole (issue #802, child of EPIC #800). The registry row declares
+  # WHAT is gated; this row is what makes the surface **withdrawable**. Measured:
+  # the engine refuses a flag this file does not carry (`unknown flag
+  # 'surfaces.operator_terminal' (not declared in rollout state)`), so without it
+  # a promoted console could be taken dark only by hand — the health-failure
+  # rollback anchor (infra/rollout/surface_guard.py) would have nothing to drive,
+  # and `check_rollout.py`'s parity keeps this row lock-stepped with the
+  # registry's own `surfaces` section so the two declarations cannot drift.
+  surfaces.operator_terminal:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
   rollout.pipeline:
     stage: "off"
     rollout_pct: 0

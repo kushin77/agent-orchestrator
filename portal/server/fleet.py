@@ -26,15 +26,25 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
+from portal.server import surface_state
+
 #: The registry surface key that gates this endpoint family.
 FLEET_SURFACE = "fleet_projection"
 #: The flag declaration read at boot (repo-root relative).
 REGISTRY_RELATIVE = Path("infra") / "feature-flags" / "registry.yaml"
+#: Explicit argument -> this environment variable -> :data:`REGISTRY_RELATIVE`.
+#: The same resolution the runtime stores use (``portal/server/surface_state.py``
+#: for the rollback overlay, ``portal/server/control_audit.py`` for its rails), so
+#: a probe can drive the REAL application against a fixture declaration built
+#: from the committed one without copying the tree, and a deployment can point
+#: the console at a mounted declaration.
+REGISTRY_ENV = "AO_SURFACE_REGISTRY"
 #: The SSE event name each pushed frame carries.
 SSE_EVENT = "snapshot"
 #: Seconds between heartbeat polls on the push channel.
@@ -44,46 +54,91 @@ DEFAULT_POLL_SECONDS = 1.0
 _CONSOLE_MODULE_NAME = "ao_fleet_console"
 
 
-def read_surface_default(
+def read_registry_surfaces(
     repo_root: Path | str,
     *,
     registry_path: Optional[Path | str] = None,
-    surface: str = FLEET_SURFACE,
-) -> str:
-    """The registry's declared default for ``surface`` ("on" or "off").
+) -> Optional[dict[str, Any]]:
+    """The registry's whole ``surfaces`` mapping — or ``None`` = CANNOT-ASSESS.
 
-    Fails closed: a missing registry, an unreadable/invalid document, a missing
-    ``surfaces`` section, or a missing entry all read as ``"off"``. Only an
-    explicit ``default: on`` (or boolean ``True``) turns the surface on, so the
-    surface cannot ship enabled by accident.
+    ``None`` means the declaration could not be read at all: the registry is
+    missing, unreadable, not a mapping, or carries no ``surfaces`` mapping. A
+    *readable* registry with no entry for a named surface is a different answer —
+    the caller receives a mapping and finds the surface absent, which reads as
+    ``off`` (an absent declaration is not an enabled surface). Keeping the two
+    apart is what lets a readiness signal report CANNOT-ASSESS instead of
+    inventing ``off`` for a file it never managed to read (#802).
     """
     path = (
         Path(registry_path)
         if registry_path is not None
-        else Path(repo_root) / REGISTRY_RELATIVE
+        else Path(os.environ.get(REGISTRY_ENV) or Path(repo_root) / REGISTRY_RELATIVE)
     )
     # PyYAML is the repo's accepted stdlib+PyYAML stack. A missing PyYAML is a
     # fail-closed "off", never an enabled surface.
     try:
         import yaml
     except ImportError:
-        return "off"
+        return None
     try:
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return "off"
+    except (OSError, ValueError, yaml.YAMLError):
+        # yaml.YAMLError is NOT a ValueError: a malformed document raises
+        # ParserError/ScannerError, so without it a corrupt declaration crashed
+        # the reader instead of failing closed (measured while building #802's
+        # readiness signal, which must report CANNOT-ASSESS for exactly this
+        # document rather than propagate a parse error out of a health route).
+        return None
     if not isinstance(document, dict):
-        return "off"
+        return None
     surfaces = document.get("surfaces")
     if not isinstance(surfaces, dict):
-        return "off"
-    entry = surfaces.get(surface)
+        return None
+    return surfaces
+
+
+def declares_on(entry: Any) -> bool:
+    """True only when ``entry`` *explicitly* promotes the surface.
+
+    An explicit ``default: on`` (or boolean ``True``) and nothing else: a
+    missing, falsy or unrecognised ``default`` is not a promotion, so the surface
+    cannot ship enabled by accident.
+    """
     if not isinstance(entry, dict):
-        return "off"
+        return False
     default = entry.get("default")
-    if default is True or (isinstance(default, str) and default.strip().lower() == "on"):
-        return "on"
-    return "off"
+    return default is True or (
+        isinstance(default, str) and default.strip().lower() == "on"
+    )
+
+
+def read_surface_default(
+    repo_root: Path | str,
+    *,
+    registry_path: Optional[Path | str] = None,
+    surface: str = FLEET_SURFACE,
+    overlay_path: Optional[Path | str] = None,
+) -> str:
+    """A surface's EFFECTIVE default: an engaged rollback beats the declaration.
+
+    The rollback half of the rollout contract (#802). A runtime rollback engaged
+    by the rollout anchor (``portal.server.surface_state``) reads as ``"off"``
+    even while the registry still declares the surface on — one atomic file
+    write takes a promoted surface dark, with no deploy and no commit. An
+    *unreadable* rollback document is ``"off"`` too: a kill switch nobody can
+    read must never be assumed to be disengaged.
+
+    Then the declaration decides, and it fails closed: a missing registry, an
+    unreadable/invalid document, a missing ``surfaces`` section, or a missing
+    entry all read as ``"off"``. Only an explicit ``default: on`` (or boolean
+    ``True``) turns the surface on.
+    """
+    if surface_state.is_rolled_back(repo_root, surface, path=overlay_path):
+        return "off"
+    surfaces = read_registry_surfaces(repo_root, registry_path=registry_path)
+    if surfaces is None:
+        return "off"
+    return "on" if declares_on(surfaces.get(surface)) else "off"
 
 
 def surface_enabled(

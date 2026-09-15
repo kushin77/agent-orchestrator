@@ -40,6 +40,12 @@ from portal.server.controls import (
 )
 from portal.server.finops import FinOpsReports
 from portal.server.fleet import FleetProjection, surface_enabled
+from portal.server.surface_health import (
+    SURFACE_CANNOT_ASSESS,
+    SURFACE_NOT_READY,
+    SURFACE_READY,
+    console_readiness,
+)
 from portal.server.live_feed import MAX_REPLAY_LIMIT, LiveFeed
 from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
@@ -366,6 +372,51 @@ class ConsoleApplication:
             headers=[("Location", AUTH_GATE_LOGIN_PATH)],
         )
 
+    def _readiness(self) -> Response:
+        """The console surfaces' own readiness signal (issue #802).
+
+        Honest by construction: the states come from
+        ``portal.server.surface_health``, which reads each surface's declaration,
+        any engaged runtime rollback, and the artifacts that surface needs.
+
+        Two rules, and they are about *who may be named*:
+
+        * a surface is named exactly when it exists for a reader — it is
+          promoted, or it was promoted and has since been rolled back. An
+          unpromoted surface is absent, not merely unauthorised, so a probe
+          cannot enumerate what does not exist yet (the ``/console`` doctrine);
+        * the aggregate state still refuses to call the console ready when a
+          surface could not be assessed or is promoted-but-broken: 503, never a
+          cheerful 200 — and ``cannot-assess`` needs no name to be honest.
+        """
+        reports = console_readiness(self.repo_root, static_dir=self.static_dir)
+        named = [report for report in reports if report.promoted or report.rolled_back]
+        if any(report.state == SURFACE_CANNOT_ASSESS for report in reports):
+            state, status = SURFACE_CANNOT_ASSESS, 503
+        elif any(report.state == SURFACE_NOT_READY for report in named):
+            state, status = SURFACE_NOT_READY, 503
+        else:
+            state, status = SURFACE_READY, 200
+        return Response(
+            status=status,
+            is_json=True,
+            payload={
+                "ok": status == 200,
+                "status": status,
+                "requestId": _request_id(),
+                "data": {
+                    "service": "portal-console",
+                    "state": state,
+                    "surfaces": {
+                        report.surface: report.as_dict()
+                        for report in named
+                        if report.state != SURFACE_CANNOT_ASSESS
+                    },
+                },
+                "error": None,
+            },
+        )
+
     def _is_static(self, path: str) -> bool:
         segments = path.strip("/").split("/")
         return bool(segments) and segments[0] in {
@@ -405,6 +456,14 @@ class ConsoleApplication:
         # credential of its own, so it has no login/relay/JWKS surface
         if parts == ["healthz"] and method == "GET":
             return self._ok({"status": "ok", "service": "portal-console"})
+
+        # The console's own READINESS rail (issue #802), on the health route it
+        # already exposes — never a second dashboard (ADR-0022). It reports the
+        # surfaces this console serves, so an unpromoted surface is not named
+        # here either (absent, not merely unauthorised — the `/console` doctrine),
+        # and a state that cannot be assessed answers 503 rather than "ready".
+        if parts == ["healthz", "ready"] and method == "GET":
+            return self._readiness()
 
         # The fleet projection surface ships feature-flag-gated OFF (GR-5), and
         # the gate is checked BEFORE authN so an unpromoted surface is invisible

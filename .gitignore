@@ -36,6 +36,11 @@ node_modules/
 .verify/
 governance/board/violations.jsonl
 
+# Runtime surface state: the rollback overlay the console's surface reader
+# consults (issue #802) is host state — an engaged rollback belongs to the
+# running deployment, never to a commit.
+.rollout/
+
 # Claim locks are runtime state (the claim ledger itself is tracked evidence)
 .board/locks/
 
