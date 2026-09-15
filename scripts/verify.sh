@@ -74,6 +74,18 @@ checks=(
   # shipped modules, and strips each surface from a copy of the doc in turn — so
   # a surface that stops being named cannot pass silently.
   'operator-access|bash scripts/check-operator-access.sh'
+  # operator-terminal (issue #774): the browser IT-terminal behind the SSO
+  # session — one link (`/console`) that composes the fleet projection (read)
+  # and the closed control-verb family (steer) behind the caller's own
+  # os-session-token. The check proves the flag gate runs BEFORE AuthN (404
+  # feature_disabled while surfaces.operator_terminal is off), the one link
+  # reuses the session (unauthenticated -> /auth/login, authenticated -> the
+  # view), the read half is served offline from a redirected runtime, and the
+  # steer half is the closed vocabulary — an out-of-vocabulary action is
+  # refused 422, a caller without the capability is refused 403 with no audit,
+  # and an allowed steer lands on the audit rail. The flag gate is
+  # mutation-proved (flipping the flag to "on" makes the reader say "on").
+  'operator-terminal|bash scripts/check-operator-terminal.sh'
   # runner-preflight (issue #733): the fleet could not spawn a single subagent
   # because the loop inherited cron's minimal PATH, and it failed per directive
   # per cycle (a runaway amplifier). The check names the resolution, the hold and

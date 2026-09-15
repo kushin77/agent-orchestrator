@@ -39,6 +39,11 @@
   ];
   var NAV_GLOBAL = [
     { id: "tenants", label: "Tenants", icon: "▦" },
+    // The operator terminal (issue #774) is the browser IT-terminal behind
+    // this same SSO session — a live fleet projection plus the closed control-
+    // verb steer panel. Like Tenants and Fleet it is an enterprise/org-level
+    // view, so it takes no ?tenant= and its crumb is its own label.
+    { id: "console", label: "Console", icon: "▣" },
     // The fleet single-pane-of-glass (issue #332) is an enterprise/org-level
     // view like Tenants: it is not scoped to one tenant, so it takes no
     // ?tenant= and its crumb is its own label.

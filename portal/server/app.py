@@ -39,7 +39,7 @@ from portal.server.controls import (
     build_control_policy_map,
 )
 from portal.server.finops import FinOpsReports
-from portal.server.fleet import FleetProjection
+from portal.server.fleet import FleetProjection, surface_enabled
 from portal.server.live_feed import MAX_REPLAY_LIMIT, LiveFeed
 from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
@@ -67,6 +67,14 @@ _CONTENT_TYPES = {
     ".webmanifest": "application/manifest+json",
     ".md": "text/markdown; charset=utf-8",
 }
+
+#: The registry surface key that gates the operator terminal (issue #774).
+OPERATOR_TERMINAL_SURFACE = "operator_terminal"
+#: The documents that belong to the operator terminal. Gated BEFORE AuthN, like
+#: the chat surface: while the flag is off the view (and its script) answer 404
+#: ``feature_disabled`` so an unauthenticated probe cannot tell the surface
+#: exists (the ``CHAT_ASSETS`` precedent).
+OPERATOR_TERMINAL_ASSETS: tuple[str, ...] = ("views/console.html", "js/operator.js")
 
 
 class ApiError(Exception):
@@ -133,6 +141,7 @@ class ConsoleApplication:
         org_chart_view: Optional[OrgChartView] = None,
         skill_studio_surface: Optional[SkillStudioSurface] = None,
         task_board_surface: Optional[TaskBoardSurface] = None,
+        operator_terminal_enabled: Optional[bool] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -214,6 +223,18 @@ class ConsoleApplication:
             if task_board_surface is not None
             else TaskBoardSurface(repo_root=self.repo_root)
         )
+        # The operator terminal (issue #774) — feature-flag-gated OFF. It
+        # composes the fleet projection (read) and the remote control family
+        # (steer); this flag gates the route + view only, and the two halves
+        # keep their own flags. Read through the same fail-closed reader every
+        # other surface uses.
+        self.operator_terminal_enabled = (
+            operator_terminal_enabled
+            if operator_terminal_enabled is not None
+            else surface_enabled(
+                self.repo_root, surface=OPERATOR_TERMINAL_SURFACE
+            )
+        )
 
     # -- request pipeline ---------------------------------------------------
     def handle(
@@ -232,6 +253,10 @@ class ConsoleApplication:
         try:
             if path == "/" or path == "/index.html":
                 return self._index(cookies)
+            # The operator terminal's one link (issue #774): `/console` opens
+            # the live fleet view behind the same session. Flag-gated inside.
+            if path == "/console":
+                return self._console(cookies)
             # The conversational surface's own documents (issue #508) are
             # *absent* — not refused — while the surface is unpromoted. The
             # flag is checked here, before any session work, so an
@@ -242,6 +267,15 @@ class ConsoleApplication:
                     "feature_disabled",
                     "the chat surface is feature-flag-gated OFF "
                     "(infra/feature-flags/registry.yaml surfaces.chat)",
+                )
+            # The operator terminal's documents ship the same way (issue #774):
+            # *absent* while unpromoted, before any session work.
+            if not self.operator_terminal_enabled and path.strip("/") in OPERATOR_TERMINAL_ASSETS:
+                raise ApiError(
+                    404,
+                    "feature_disabled",
+                    "the operator terminal is feature-flag-gated OFF "
+                    "(infra/feature-flags/registry.yaml surfaces.operator_terminal)",
                 )
             if self._is_static(path):
                 return self._serve_static(path)
@@ -292,6 +326,38 @@ class ConsoleApplication:
                     is_json=False,
                     payload="",
                     headers=[("Location", "/views/shell.html")],
+                )
+            except Exception:  # noqa: BLE001 - a refused session reaches the gate
+                pass
+        return Response(
+            status=302, is_json=False, payload="",
+            headers=[("Location", AUTH_GATE_LOGIN_PATH)],
+        )
+
+    def _console(self, cookies: dict[str, str]) -> Response:
+        """The operator terminal's one link (issue #774): ``GET /console``.
+
+        Flag-gated **before** AuthN — an unpromoted surface is absent, not
+        merely unauthorised — then the same session pipeline as the front door:
+        a verified ``os-session-token`` opens the view, anything else reaches
+        the OS auth gate. No login of its own is invented here.
+        """
+        if not self.operator_terminal_enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the operator terminal is feature-flag-gated OFF "
+                "(infra/feature-flags/registry.yaml surfaces.operator_terminal)",
+            )
+        token = cookies.get(SESSION_COOKIE)
+        if token:
+            try:
+                self.sso.verify(token)
+                return Response(
+                    status=302,
+                    is_json=False,
+                    payload="",
+                    headers=[("Location", "/views/console.html")],
                 )
             except Exception:  # noqa: BLE001 - a refused session reaches the gate
                 pass

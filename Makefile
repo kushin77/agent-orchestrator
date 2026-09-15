@@ -30,7 +30,7 @@ issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-ru
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety \
         remediation remediation-scan remediation-dispatch \
-        control-verbs control-audit control-functions cockpit operator console operator-access
+        control-verbs control-audit control-functions cockpit operator console operator-access operator-terminal
 
 .DEFAULT_GOAL := help
 
@@ -168,7 +168,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal
 	@echo ""
 	@echo "lint: OK"
 
@@ -608,6 +608,16 @@ operator-access:
 ## Offline: the stub binds loopback and no Cloudflare call is ever made.
 ao-ssh-access:
 	@bash scripts/check-ao-ssh-access.sh
+## operator-terminal — the browser IT-terminal behind the SSO session (issue
+## #774): one link (`/console`) that composes the fleet projection (read) and
+## the closed control-verb family (steer) behind the caller's own
+## os-session-token. Ships flag-gated OFF (surfaces.operator_terminal), so while
+## the flag is off `/console` answers 404 feature_disabled before AuthN. The
+## check proves the flag gate, the session reuse, the offline read half and the
+## closed steer half (out-of-vocabulary refused, capability-less refused with no
+## audit, allowed steer audited) — each provoked, so it cannot pass vacuously.
+operator-terminal:
+	@bash scripts/check-operator-terminal.sh
 
 ## cockpit — the terminal cockpit (RC-11 #566): one frame, then exit. A client
 ## of the RC-3 API and the authenticated SSE streams that renders only what the
