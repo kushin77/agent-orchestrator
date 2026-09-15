@@ -90,6 +90,65 @@ workflow file and nothing to click (GR-15, GR-5).
 6. **A dry run writes nothing at all** — no remote change and no local file, so
    "changes nothing" is a property a control can check by looking, not a promise.
 
+## Pre-existing reds: attributed by measurement, never by a claim
+
+**The defect this closes.** `scripts/merge-gate.sh run`'s `tests` signal runs
+`scripts/run-pytest-suites.sh`, and that sweep is **red on clean `origin/master`
+itself** — measured on `37f87f9`: 81 passed, **6 failed**
+(`governance/modules`, `governance/conformance`, `governance/lessons`,
+`integrations/paperclip`, `integrations/paperclip/reporting`, `telemetry/chat`).
+A signal no lane can satisfy is a driver that can land nothing, which is why the
+previous landing needed a human to merge by hand.
+
+**The route taken — and why.** The repo already has a *declaration* surface for
+this: the `## Pre-existing red` section of the PR body, enforced at PR time by
+`scripts/check-pr-contract.sh`. That mechanism requires a `Reproduce:` line and a
+fenced output block, and its enforcement is a **shape** test — a PR body cannot
+be executed, so it cannot distinguish a real reproduction from a fabricated one.
+It is therefore *consumed* (this driver writes that section in exactly that
+shape, and the gate proves `check-pr-contract.sh` accepts it), but it is
+deliberately **not** what grants a waiver: "it fails upstream", asserted by hand,
+is a claim. The grant is a measurement.
+
+**The measurement.** `governance/landing/attribution.py` compares the lane's
+failing-suite set against the *same* sweep run on clean `origin/master`, taken in
+a scratch git worktree and recorded with its provenance (the rev, the commit, when,
+and the command — the record and its `measured_sha` must agree or it reads as
+malformed). This is the provenanced-baseline discipline of
+`scripts/gate-coverage-baseline.txt` (#603/#698), deliberately *not* a committed
+row list a lane could extend: because the baseline is keyed by the commit it was
+measured at, staleness is structural rather than a promise. A recorded baseline
+can be supplied instead of measuring one (`--baseline` /
+`AO_LAND_BASELINE_RECORD`) — that changes where the measurement comes from, never
+whether there is one.
+
+**The posture — conservative in five ways.**
+
+1. The contract's **own per-signal record** (`.verify/merge-attestation.json`,
+the `checks` array) is read **first**. A red with no such record is unattributable
+— attributing it would be a guess about *which* signal failed.
+2. **`tests` must be the only red signal.** A red `verify` — the gate of record —
+is never attributed, whatever the sweep says. The remaining codes are re-scored
+through the contract's *own* aggregation (`governance/merge/gate.py`), never
+re-decided here.
+3. A suite that fails **here** and **passes on clean master** is lane-caused and
+refuses, **by name**.
+4. A suite with **no verdict** (a timeout) is never attributable, and there is no
+grandfathering list: a suite the baseline does not report as failing is refused
+immediately.
+5. No baseline, an unreadable one, or a sweep record naming **another commit** is
+CANNOT-ASSESS — never a grant.
+
+The attributed suites are **named** in the landing output, in the run record
+(`.verify/landing-<n>.json`) and in the PR body's `## Pre-existing red` section.
+Nothing is dropped silently, and nothing is waived that was not measured.
+
+```bash
+# attribute this lane's reds against a freshly measured clean master
+python3 -m governance.landing.attribution measure --root . --rev origin/master
+python3 -m governance.landing.attribution status  --root . --commit "$(git rev-parse HEAD)"
+```
+
 ## Tree layout
 
 ```text
@@ -97,6 +156,7 @@ governance/landing/
 ├── README.md      # this contract
 ├── evidence.py    # read + judge the merge attestation (the named gaps)
 ├── verdict.py     # the ONE seam that loads and consults governance/merge
+├── attribution.py # pre-existing suite reds, measured against clean master
 ├── ports.py       # the effects: git/gh/contract/closure (real + recording)
 ├── engine.py      # the ordered landing: order, refusals, idempotence, report
 ├── cli.py         # tri-state CLI; dry run by default
@@ -128,7 +188,19 @@ CLI — and provokes, in the open:
 * a contract that writes a **stale** attestation is refused at the merge
   boundary, after the push and the PR, with nothing merged;
 * a dry run leaves the lane's tree and file listing byte-identical, and writes no
-  file anywhere.
+  file anywhere;
+* the **attribution is a measurement**: the same lane and the same baseline give
+  opposite verdicts for a suite that fails on both and for one that fails only in
+  the lane, and the gate **provokes both constant mutants** — rewriting the
+  comparison to always-grant and to always-refuse each changes the answer, with
+  the mutated module's `__file__` proven to be the scratch copy, so neither
+  rewrite can pass;
+* the driver **lands** a lane whose contract is red only on measured pre-existing
+  suites, **refuses by name** a lane-caused suite, and **still refuses** when the
+  gate of record is red — through the real driver over the fixture stubs;
+* the PR body's declaration is accepted by the repo's **own**
+  `scripts/check-pr-contract.sh`, run against the fixture lane — so the existing
+  mechanism is consumed rather than duplicated.
 
 Non-vacuity: the five pre-flight cases share **one untouched lane** and differ
 only in the attestation file handed to `--attestation`; the gate asserts the tree
@@ -139,6 +211,21 @@ prose. No control ever touches a real repository, and none performs a real merge
 
 ## Known boundaries (reported, not hidden)
 
+* **A red that lives in the WORKING TREE, not in the commit.** The lane-caused
+  refusal is deliberately *by the letter*: a suite that fails here and passes on
+  clean master refuses, whatever the cause. The driver never decides on its own
+  that a red "does not count" — that is the property that must not be traded
+  away, and it reports rather than adjudicates. Measured on this lane (#764,
+  `7691d8b`): `portal` fails in the lane worktree and **passes in a fresh
+  `git worktree` checked out at the very same commit** (357 passed, against 356
+  passed + 1 failed in the lane; 402 pass on `origin/master`). The cause is
+  `portal/tests/test_live_registry_telemetry.py::_seed`, which selects a seed with
+  `next(_SEEDS.glob(f"{profile_id}.*.yaml"))` — **filesystem order** — while the
+  loader takes the highest revision: with two published `paperclip` revisions the
+  verdict is decided by the order the directory happens to hold, and that order
+  differs between a long-lived lane worktree and a fresh checkout. So the driver
+  refused this lane, by name, and the remedy belongs to that file's owner — not
+  to a waiver here.
 * **Closure inside a lane worktree.** `governance/lifecycle/cli.py close`
   resolves its scope from the *shared* checkout's registries, so in a dispatched
   lane it answers `CANNOT-ASSESS — #<n> is outside the audit scope`. The driver

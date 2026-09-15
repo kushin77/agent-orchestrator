@@ -36,6 +36,20 @@
 #   9. dry run writes NOTHING: the lane's file listing is identical before and
 #      after, and the pre-flight evidence the driver judges is a file the fixture
 #      owns (so cases 2-6 share one untouched lane and differ only in evidence).
+#  10. the attribution is a MEASUREMENT, in both directions and in the open: a
+#      suite failing in the lane AND on clean master is attributed by name and
+#      landed; the same lane against a baseline that passes it is REFUSED by
+#      name; a suite absent from the baseline is refused (no grandfathering); a
+#      red `verify` is refused even though every suite red is pre-existing; and a
+#      red with no measured baseline is CANNOT-ASSESS, never a grant.
+#  11. the comparison cannot be a constant: the gate PROVOKES both rewrites
+#      (always-grant, always-refuse) against a scratch copy of the module and
+#      requires each to change the answer, asserting the mutated module's
+#      `__file__` so a vacuous import cannot fake it.
+#  12. the driver consumes it end to end over the stubs — landing the
+#      attributable lane, refusing the lane-caused one, refusing the red
+#      `verify`, and declaring the measured red in the PR body in the shape the
+#      repo's OWN scripts/check-pr-contract.sh accepts (consumed, not duplicated).
 #
 # NON-VACUITY
 #   Cases 2-6 run the SAME argv against the SAME untouched lane, and differ only
@@ -57,7 +71,6 @@ cd "$root" || exit 2
 cli="governance/landing/cli.py"
 entry="scripts/land-lane.sh"
 makefile="Makefile"
-
 FAILED=0
 fail() { printf '  FAIL  %s\n' "$*" >&2; FAILED=$((FAILED + 1)); }
 ok() { printf '  ok    %s\n' "$*"; }
@@ -196,6 +209,25 @@ case "${CONTRACT_MODE:-green}" in
 esac
 printf '{"gate":"merge-gate","result":"%s","exit_code":%s,"commit":"%s","branch":"issue-764","timestamp":"fixture"}\n' \
   "$result" "$rc" "$commit" > "$lane/.verify/merge-attestation.json"
+# The real contract writes its OWN per-signal record (the `checks` array). The
+# attribution reads it to decide which red may be re-scored — so the fixture can
+# ask for it with CONTRACT_SIGNALS="verify=0,drift=0,tests=1,...".
+if [ -n "${CONTRACT_SIGNALS:-}" ]; then
+  python3 - "$lane/.verify/merge-attestation.json" "$CONTRACT_SIGNALS" <<'PY'
+import json
+import sys
+
+path, spec = sys.argv[1], sys.argv[2]
+payload = json.load(open(path, encoding="utf-8"))
+payload["checks"] = [
+    {"name": name, "rc": int(rc), "status": "OK" if int(rc) == 0 else "NOT-OK"}
+    for name, _, rc in (part.partition("=") for part in spec.split(","))
+]
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(payload, handle)
+    handle.write("\n")
+PY
+fi
 exit "$rc"
 STUB
 }
@@ -262,6 +294,66 @@ attest() { # <file> <result> <rc> <commit-json>
   mkdir -p "$(dirname "$1")"
   printf '{"gate":"merge-gate","result":"%s","exit_code":%s,"commit":%s,"branch":"issue-764","timestamp":"fixture"}\n' \
     "$2" "$3" "$4" > "$1"
+}
+
+# A sweep record in the exact shape scripts/run-pytest-suites.sh writes (#29).
+# Rows are <suite>=<STATUS> pairs, so a control states its failing set literally.
+sweep() { # <file> <sha> <suite=STATUS>…
+  python3 - "$1" "$2" "${@:3}" <<'PY'
+import json
+import sys
+
+out, sha, rows = sys.argv[1], sys.argv[2], sys.argv[3:]
+suites = []
+for row in rows:
+    name, _, status = row.partition("=")
+    suites.append({"suite": name, "status": status, "rc": 0 if status == "OK" else 1, "detail": ""})
+with open(out, "w", encoding="utf-8") as handle:
+    json.dump(
+        {
+            "gate": "pytest-suites",
+            "sha": sha,
+            "declared": len(suites),
+            "auto_registered": 0,
+            "passed": 0,
+            "failed": 0,
+            "no_verdict": 0,
+            "suites": suites,
+        },
+        handle,
+    )
+    handle.write("\n")
+PY
+}
+
+# A merge attestation carrying the contract's own per-signal record (#29).
+attest_signals() { # <file> <commit> <verify> <drift> <tests> <negative> <policy>
+  python3 - "$@" <<'PY'
+import json
+import sys
+
+out, commit, *rest = sys.argv[1:]
+names = ("verify", "drift", "tests", "negative-controls", "policy-schema")
+codes = [int(value) for value in rest]
+rc = 1 if any(codes) else 0
+with open(out, "w", encoding="utf-8") as handle:
+    json.dump(
+        {
+            "gate": "merge-gate",
+            "result": "NOT-OK" if rc else "PASS",
+            "exit_code": rc,
+            "commit": commit,
+            "branch": "issue-764",
+            "timestamp": "fixture",
+            "checks": [
+                {"name": name, "rc": code, "status": "OK" if code == 0 else "NOT-OK"}
+                for name, code in zip(names, codes)
+            ],
+        },
+        handle,
+    )
+    handle.write("\n")
+PY
 }
 
 run_driver() { # <out-file> <lane> <args…>  -> rc in $?
@@ -447,11 +539,295 @@ else
 fi
 unset CONTRACT_MODE
 
+# --- 9. the wiring: the driver CONSUMES the attribution ----------------------
+echo "== check-landing: pre-existing suite reds are attributed by measurement =="
+attr_module="governance/landing/attribution.py"
+cli_dir="governance/landing"
+if [ -f "$attr_module" ]; then
+  ok "the attribution module exists ($attr_module)"
+else
+  fail "$attr_module is missing — the driver has no way to measure a pre-existing red"
+fi
+# Structural half of the wiring proof. The #724 lesson is exact here: a control
+# that only drives the attribution CLI cannot see that the DRIVER never calls it,
+# and a control that only reads the driver cannot see that the CLI is inert. Both
+# halves are asserted, and the functional half is below.
+if grep -q 'from governance.landing import attribution as attribution_mod' "$cli_dir/engine.py"; then
+  ok "the driver imports the attribution module (not a look-alike)"
+else
+  fail "governance/landing/engine.py does not import the attribution module — a measurement nobody runs is not a gate"
+fi
+if grep -q '"attribution"' "$cli_dir/engine.py" && grep -q 'pre_existing' "$cli_dir/engine.py"; then
+  ok "the driver records the attributed set on the result (pre_existing), so it cannot be dropped silently"
+else
+  fail "the driver does not carry the attributed suite names in its result"
+fi
+if grep -q '"--baseline"' "$cli_dir/cli.py" && grep -q 'AO_LAND_BASELINE_RECORD' "$attr_module"; then
+  ok "a recorded baseline can be supplied (--baseline / AO_LAND_BASELINE_RECORD) and is measured otherwise"
+else
+  fail "there is no seam to supply a recorded baseline, so the controls could not stay offline"
+fi
+
+# --- 10. the attribution, both directions, in the open -----------------------
+# A lane, its origin and its stubs; its commit carries the lane's ticket trailer
+# so the contract's own body check can be run against the body the driver writes.
+at="$work/pre-existing"
+lane_new "$at"
+export PATH="$at/bin:$PATH"
+git -C "$at/lane" -c user.name=landing-fixture -c user.email=land@example.invalid commit --amend -qm \
+  "feat(landing): fixture lane commit
+
+Refs kushin77/agent-orchestrator#764"
+at_head="$(lane_head "$at")"
+mkdir -p "$at/lane/.verify"
+# The lane's own sweep: two suites red. The baselines differ ONLY in which of
+# them is red on clean master — so the verdict must differ, and a comparison
+# replaced by a constant cannot produce both answers.
+sweep "$at/lane/.verify/test-results.json" "$at_head" "governance/modules=FAIL" "telemetry/chat=FAIL" "portal=OK"
+sweep "$at/master-agrees.json" "$at_head" "governance/modules=FAIL" "telemetry/chat=FAIL" "portal=OK"
+sweep "$at/master-passes-chat.json" "$at_head" "governance/modules=FAIL" "portal=OK"
+sweep "$at/master-plus-new.json" "$at_head" "governance/modules=FAIL" "telemetry/chat=FAIL" "portal=OK"
+
+attest_signals "$at/lane/.verify/merge-attestation.json" "$at_head" 0 0 1 0 0
+
+attribution_run() { # <out> <baseline>
+  python3 -m governance.landing.attribution status --root "$at/lane" --commit "$at_head" \
+    --baseline "$2" --json > "$1" 2>&1
+  echo $?
+}
+
+out="$work/attrib-attributable.json"
+rc="$(attribution_run "$out" "$at/master-agrees.json")"
+if [ "$rc" = "0" ] && grep -q '"grant": true' "$out" && grep -q 'governance/modules' "$out" \
+   && grep -q 'telemetry/chat' "$out"; then
+  ok "attributable: the lane's two reds are BOTH failing on clean master — granted, and both NAMED (rc 0)"
+else
+  fail "attributable: expected a grant naming both suites (rc=$rc): $(head -c 400 "$out")"
+fi
+if grep -q '"lane_caused": \[\]' "$out"; then
+  ok "attributable: nothing is named lane-caused, so the grant is not a blanket waiver"
+else
+  fail "attributable: the grant names a lane-caused suite"
+fi
+
+out="$work/attrib-lane-caused.json"
+rc="$(attribution_run "$out" "$at/master-passes-chat.json")"
+if [ "$rc" = "1" ] && grep -q '"grant": false' "$out" && grep -q '"lane_caused": \[' "$out" \
+   && grep -q 'telemetry/chat' "$out"; then
+  ok "LANE-CAUSED: a suite that fails here and PASSES on clean master is REFUSED BY NAME (rc 1)"
+else
+  fail "lane-caused: expected a named refusal (rc=$rc): $(head -c 400 "$out")"
+fi
+if grep -q 'governance/modules' "$out"; then
+  ok "lane-caused: the pre-existing red is still reported alongside the refusal (never silently dropped)"
+else
+  fail "lane-caused: the refusal dropped the pre-existing red from its report"
+fi
+
+out="$work/attrib-new-suite.json"
+# A suite the lane fails that the baseline does not even report -> not grandfathered.
+sweep "$at/lane-new.json" "$at_head" "governance/modules=FAIL" "governance/landing=FAIL"
+python3 -m governance.landing.attribution status --root "$at/lane" --commit "$at_head" \
+  --lane-record "$at/lane-new.json" --baseline "$at/master-agrees.json" --json > "$out" 2>&1
+rc=$?
+if [ "$rc" = "1" ] && grep -q 'governance/landing' "$out" && grep -q '"grant": false' "$out"; then
+  ok "no grandfathering: a NEW failing suite absent from the baseline is refused immediately (rc 1)"
+else
+  fail "no grandfathering: a newly failing suite was absorbed (rc=$rc): $(head -c 400 "$out")"
+fi
+
+out="$work/attrib-red-verify.json"
+attest_signals "$at/att-red-verify.json" "$at_head" 1 0 1 0 0
+cp "$at/att-red-verify.json" "$at/lane/.verify/merge-attestation.json"
+rc="$(attribution_run "$out" "$at/master-agrees.json")"
+if [ "$rc" = "1" ] && grep -q 'verify' "$out"; then
+  ok "the gate of record stays strict: a red verify is refused even though every suite red is pre-existing (rc 1)"
+else
+  fail "red verify: expected a refusal naming verify (rc=$rc): $(head -c 400 "$out")"
+fi
+if grep -q 'master-agrees.json' "$out"; then
+  fail "red verify: a sweep was consulted for a signal that is never attributable"
+else
+  ok "red verify: refused from the contract's own signal record, before any sweep was read"
+fi
+
+out="$work/attrib-no-baseline.json"
+attest_signals "$at/lane/.verify/merge-attestation.json" "$at_head" 0 0 1 0 0
+python3 -m governance.landing.attribution status --root "$at/lane" --commit "$at_head" \
+  --baseline "$at/no-such-baseline.json" --json > "$out" 2>&1
+rc=$?
+if [ "$rc" = "2" ] && grep -q '"grant": false' "$out"; then
+  ok "a red with no measured baseline is CANNOT-ASSESS (rc 2), never a grant"
+else
+  fail "no baseline: expected CANNOT-ASSESS (rc=$rc): $(head -c 400 "$out")"
+fi
+
+# --- 11. the comparison is a measurement, provoked ---------------------------
+# The strongest form of "not a claim" is a MUTANT: replace the comparison with a
+# constant and require the control above to change its answer. Both constant
+# directions are provoked, so neither an always-grant nor an always-refuse
+# rewrite can survive, and the module under test is proven by __file__ to be the
+# mutant copy rather than the real one (a vacuous import would fake this).
+prove_mutant() { # <name> <python-replacement-src> <python-replacement-dst> <baseline> <expected-rc> <expected-rc-mutant>
+  local name="$1" src="$2" dst="$3" baseline="$4" want="$5" mutant_want="$6"
+  local mut="$work/mutant-$name"
+  mkdir -p "$mut/governance/landing" "$mut/governance/merge"
+  cp "$cli_dir/__init__.py" "$cli_dir/attribution.py" "$cli_dir/evidence.py" "$mut/governance/landing/"
+  cp governance/merge/gate.py "$mut/governance/merge/"
+  if ! python3 - "$mut/governance/landing/attribution.py" "$src" "$dst" <<'PY'
+import sys
+
+path, src, dst = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path, encoding="utf-8").read()
+if text.count(src) != 1:
+    print(f"the mutation target appears {text.count(src)} times, not once", file=sys.stderr)
+    raise SystemExit(1)
+open(path, "w", encoding="utf-8").write(text.replace(src, dst))
+PY
+  then
+    fail "$name: the mutation could not be applied — the control is inert"
+    return
+  fi
+  local resolved
+  resolved="$(cd "$work" && PYTHONPATH="$mut" python3 -c 'import governance.landing.attribution as a; print(a.__file__)')"
+  if [ "${resolved#"$mut"}" = "$resolved" ]; then
+    fail "$name: the mutated module did not resolve under $mut (got $resolved) — the control would be vacuous"
+    return
+  fi
+  local out="$work/mutant-$name.json" rc
+  # (1) the UNMUTATED module, on exactly the fixture the mutant will see: the
+  # answer the control claims. Asserted, not assumed — otherwise "the mutant
+  # changed the answer" is unfalsifiable.
+  python3 -m governance.landing.attribution status --root "$at/lane" --commit "$at_head" \
+    --baseline "$baseline" --json > "$out.real" 2>&1
+  rc=$?
+  if [ "$rc" != "$want" ]; then
+    fail "$name: the unmutated module answered rc=$rc, expected rc=$want — the control's premise is wrong"
+    return
+  fi
+  # (2) the mutant, resolved from the scratch tree (proven by __file__ above).
+  (cd "$work" && PYTHONPATH="$mut" python3 "$mut/governance/landing/attribution.py" status \
+     --root "$at/lane" --commit "$at_head" --baseline "$baseline" --json) > "$out" 2>&1
+  rc=$?
+  if [ "$rc" = "$mutant_want" ]; then
+    ok "$name: the same lane + the same baseline give rc $want unmutated and rc $rc mutated — the verdict is read from the baseline, not asserted"
+  else
+    fail "$name: expected the mutant to answer rc=$mutant_want, got rc=$rc ($(head -c 200 "$out"))"
+  fi
+}
+
+# rewrite the comparison to "everything is attributable" (a constant grant)
+prove_mutant constant-grant \
+  'lane_caused = tuple(sorted(lane.failures() - baseline.failures()))' \
+  'lane_caused = tuple()' \
+  "$at/master-passes-chat.json" 1 0
+
+# rewrite the comparison to "nothing can pass" (a constant refuse)
+prove_mutant constant-refuse \
+  'lane_caused = tuple(sorted(lane.failures() - baseline.failures()))' \
+  'lane_caused = tuple(sorted(lane.failures()))' \
+  "$at/master-agrees.json" 0 1
+
+# --- 12. the driver consumes it, end to end ---------------------------------
+export GH_PR_HEAD="$at_head"
+rm -f "$at/lane/.verify/merge-attestation.json"
+export CONTRACT_MODE=red
+export CONTRACT_SIGNALS="verify=0,drift=0,tests=1,negative-controls=0,policy-schema=0"
+: > "$EVENTS"
+AO_LAND_APPLY=1 bash "$entry" --issue 764 --root "$at/lane" --baseline "$at/master-agrees.json" \
+  > "$work/out-attributed.txt" 2>&1; attr_rc=$?
+if [ "$attr_rc" -eq 0 ] && grep -q 'landing: MERGED' "$work/out-attributed.txt"; then
+  ok "the driver LANDS a lane whose contract is red only on measured pre-existing suites (rc 0, MERGED)"
+else
+  fail "attributed landing: rc=$attr_rc (expected 0): $(tail -c 500 "$work/out-attributed.txt")"
+fi
+if grep -q 'pre-existing red (measured on clean master' "$work/out-attributed.txt" \
+   && grep -q 'governance/modules' "$work/out-attributed.txt"; then
+  ok "the attributed suites are REPORTED BY NAME in the landing output"
+else
+  fail "the landing output does not name the pre-existing reds"
+fi
+body="$at/lane/.verify/landing-764-pr-body.md"
+if [ -f "$body" ] && grep -qE '^Reproduce:[[:space:]]*`[^`]+`' "$body" && grep -q '^```' "$body" \
+   && grep -q 'governance/modules' "$body"; then
+  ok "the PR body DECLARES the red in the repo's own '## Pre-existing red' shape (a Reproduce: line + a fenced block)"
+else
+  fail "the PR body does not declare the pre-existing red in the contract's shape"
+fi
+# ...and the repo's EXISTING mechanism accepts that declaration: the real
+# check-pr-contract gate is run against the body the driver wrote.
+if bash scripts/check-pr-contract.sh --body-file "$body" --range master..issue-764 --repo "$at/lane" \
+     > "$work/out-pr-contract.txt" 2>&1; then
+  ok "check-pr-contract ACCEPTS the driver's declaration (the existing mechanism is consumed, not replaced)"
+else
+  fail "check-pr-contract refused the driver's own PR body: $(tail -c 300 "$work/out-pr-contract.txt")"
+fi
+
+# the lane-caused direction: the SAME lane, a baseline that passes one of them.
+rm -f "$at/lane/.verify/merge-attestation.json"
+: > "$EVENTS"
+AO_LAND_APPLY=1 bash "$entry" --issue 764 --root "$at/lane" --baseline "$at/master-passes-chat.json" \
+  > "$work/out-lane-caused.txt" 2>&1; caused_rc=$?
+if [ "$caused_rc" -eq 1 ] && grep -q 'telemetry/chat' "$work/out-lane-caused.txt"; then
+  ok "the driver REFUSES a lane-caused suite BY NAME (rc 1)"
+else
+  fail "lane-caused landing: rc=$caused_rc (expected 1): $(tail -c 500 "$work/out-lane-caused.txt")"
+fi
+if [ "$(event_count 'gh pr-merge')" = "0" ]; then
+  ok "lane-caused: nothing was merged, although the contract's red was otherwise attributable"
+else
+  fail "lane-caused: the driver merged past a lane-caused failure"
+fi
+
+# the gate-of-record direction: a red verify refuses even with the same baseline.
+rm -f "$at/lane/.verify/merge-attestation.json"
+export CONTRACT_SIGNALS="verify=1,drift=0,tests=1,negative-controls=0,policy-schema=0"
+: > "$EVENTS"
+AO_LAND_APPLY=1 bash "$entry" --issue 764 --root "$at/lane" --baseline "$at/master-agrees.json" \
+  > "$work/out-red-verify.txt" 2>&1; verify_rc=$?
+if [ "$verify_rc" -eq 1 ] && grep -q 'verify' "$work/out-red-verify.txt"; then
+  ok "the driver REFUSES when the gate of record is red, however pre-existing the suite reds are (rc 1)"
+else
+  fail "red verify through the driver: rc=$verify_rc (expected 1): $(tail -c 500 "$work/out-red-verify.txt")"
+fi
+if [ "$(event_count 'gh pr-merge')" = "0" ]; then
+  ok "red verify: nothing was merged"
+else
+  fail "red verify: the driver merged past a red gate of record"
+fi
+
+# the dry run: the SAME lane, granted, with nothing remote changing.
+rm -f "$at/lane/.verify/landing-764-report.md" "$at/lane/.verify/landing-764.json"
+export CONTRACT_SIGNALS="verify=0,drift=0,tests=1,negative-controls=0,policy-schema=0"
+attest_signals "$at/lane/.verify/merge-attestation.json" "$at_head" 0 0 1 0 0
+before_listing="$(lane_listing "$at")"
+: > "$EVENTS"
+run_driver "$work/out-attributed-dry.txt" "$at/lane" --baseline "$at/master-agrees.json"; dry_rc=$?
+if [ "$dry_rc" -eq 0 ] && grep -q 'DRY RUN — the lane is grantable' "$work/out-attributed-dry.txt"; then
+  ok "a dry run on the same attributable red is GRANTABLE (rc 0) — the pre-flight path measures too, it does not guess"
+else
+  fail "attributed dry run: rc=$dry_rc (expected 0): $(tail -c 400 "$work/out-attributed-dry.txt")"
+fi
+if [ "$(event_count 'gh pr-create')" = "0" ] && [ "$(event_count 'gh pr-merge')" = "0" ] \
+   && [ "$(event_count 'contract')" = "0" ] && [ "$(event_count 'lifecycle')" = "0" ]; then
+  ok "attributed dry run: no PR was created, nothing was merged, no contract ran, no closure ran"
+else
+  fail "attributed dry run: a mutating call happened: $(grep -E 'gh pr-create|gh pr-merge|contract|lifecycle' "$EVENTS" | tr '\n' ' ')"
+fi
+# NB: the earlier refusals happen AFTER their push, so the origin legitimately
+# holds this branch; what a dry run must not do is change the LANE.
+if [ "$(lane_listing "$at")" = "$before_listing" ]; then
+  ok "attributed dry run: the lane's file listing is unchanged (a dry run wrote nothing)"
+else
+  fail "attributed dry run: the lane listing changed"
+fi
+unset CONTRACT_MODE CONTRACT_SIGNALS GH_PR_HEAD
+
 # --- summary (a red run names its count; a green run says what it proved) ----
 if [ "$FAILED" -gt 0 ]; then
   printf 'check-landing: FAIL (%s finding(s)) — scratch kept at %s\n' "$FAILED" "$work" >&2
   exit 1
 fi
 rm -rf "$work"
-echo "check-landing: OK — the landing driver refuses a lane without green commit-named evidence (and grants one with it), lands in order over the fixture, is idempotent on a terminal lane, and defaults to a dry run that writes nothing"
+echo "check-landing: OK — the landing driver refuses a lane without green commit-named evidence (and grants one with it), lands in order over the fixture, is idempotent on a terminal lane, and defaults to a dry run that writes nothing; it attributes pre-existing suite reds ONLY by measuring them against clean master — naming what is pre-existing, refusing a lane-caused suite by name, keeping the gate of record strict, grandfathering nothing, and failing both constant mutants of that comparison"
 exit 0

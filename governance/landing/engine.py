@@ -36,10 +36,11 @@ Exit-code contract (the repo's honesty tri-state, issue #28): 0 OK /
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional, Sequence
 
+from governance.landing import attribution as attribution_mod
 from governance.landing import evidence as evidence_mod
 from governance.landing import verdict as verdict_mod
 from governance.landing.evidence import Attestation, Gap, evidence_gap, read_attestation
@@ -93,6 +94,18 @@ class LandingRequest:
     attestation_file: Optional[Path] = None
     apply: bool = False
     owner_carve_out: bool = True
+    #: A *recorded* clean-master sweep to attribute against. When unset the
+    #: attribution measures one (a scratch worktree of ``origin/master``), which
+    #: is the production path; a recorded baseline is how the controls stay
+    #: offline and deterministic. Never a prose claim, whichever way it arrives.
+    baseline_file: Optional[Path] = None
+    #: The lane's own sweep record; defaults to ``<root>/.verify/test-results.json``.
+    lane_record_file: Optional[Path] = None
+    #: The rev the baseline is measured at (default: clean ``origin/master``).
+    baseline_rev: str = ""
+
+    def resolved_baseline_rev(self) -> str:
+        return self.baseline_rev or attribution_mod.DEFAULT_BASELINE_REV
 
     def resolved_branch(self) -> str:
         return self.branch or f"issue-{self.issue}"
@@ -133,6 +146,12 @@ class LandingResult:
     lifecycle_rc: Optional[int] = None
     report_path: str = ""
     rc: int = EXIT_OK
+    #: The failing suites MEASURED to be failing on clean master too, by name.
+    #: Empty unless an attribution was performed and granted — and never dropped
+    #: from the record when it is not empty (the "never silently" rule).
+    pre_existing: tuple = ()
+    #: The full attribution record (the measurement's own account of itself).
+    attribution: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -156,6 +175,8 @@ class LandingResult:
             "steps": [step.as_dict() for step in self.steps],
             "lifecycle_rc": self.lifecycle_rc,
             "report_path": self.report_path,
+            "pre_existing": list(self.pre_existing),
+            "attribution": self.attribution,
             "exit_code": self.rc,
         }
 
@@ -226,11 +247,47 @@ class LandingEngine:
                 "",
                 "## Pre-existing red",
                 "",
-                "None — no failing gate is claimed to be pre-existing.",
-                "",
             ]
         )
+        lines.extend(self._pre_existing_section(result))
         return "\n".join(lines)
+
+    def _pre_existing_section(self, result: LandingResult) -> list:
+        """The ``## Pre-existing red`` declaration, in the shape the contract enforces.
+
+        ``scripts/check-pr-contract.sh`` requires this section to be either an
+        explicit ``None`` or a reproduction: a ``Reproduce:`` line naming a
+        command in backticks, followed by a fenced block. So the *declaration* is
+        the repo's existing mechanism, consumed rather than replaced — and what
+        stands behind it is the measurement this driver ran, named as such. When
+        nothing was attributed the section says ``None``, which is the honest
+        answer rather than a claim of cleanliness in general.
+        """
+        if not result.pre_existing:
+            return [
+                "None — no failing suite is claimed to be pre-existing. A red ``verify``, ``drift``,\n",
+                "``negative-controls``, ``policy-schema`` or ``pr-contract`` signal is never attributed, and\n",
+                "neither is a suite that fails in this lane and passes on clean master.\n",
+                "",
+            ]
+        attribution = result.attribution or {}
+        lane = (attribution.get("lane") or {}).get("source") or f"<lane>/{attribution_mod.SWEEP_REL}"
+        baseline = (attribution.get("baseline") or {}).get("source") or self.request.resolved_baseline_rev()
+        lines = [
+            "Attributed by measurement, not by claim: the lane's failing set was compared against the same\n",
+            "sweep run on clean master, and each suite below fails in BOTH. A suite that fails here and\n",
+            "passes on clean master is refused by name instead.\n",
+            "",
+            f"Reproduce: `{attribution_mod.SWEEP_COMMAND_TEXT}` (in the lane, and on clean master)\n",
+            "",
+            "```",
+            f"lane sweep:     {lane}",
+            f"master sweep:   {baseline}",
+            "failing in both: " + ", ".join(result.pre_existing),
+            "```",
+            "",
+        ]
+        return lines
 
     # -- the landing -----------------------------------------------------------
 
@@ -269,6 +326,31 @@ class LandingEngine:
         attestation = read_attestation(req.evidence_path())
         result.attestation = attestation
         gap = evidence_gap(attestation, result.commit)
+
+        # A RED pre-flight attestation is measured before it is refused: if the
+        # contract's own per-signal record exists and the only red signal is
+        # `tests`, and every failing suite is measured failing on clean master
+        # too, the red is pre-existing and does not block. Anything else — a red
+        # `verify`, an unattributable suite, a record this driver cannot read —
+        # leaves the gap exactly as it was, and the refusal below stands.
+        if gap is not None and gap.code == evidence_mod.GAP_NOT_GREEN:
+            attributed = self._attribute(result)
+            if attributed is not None:
+                result.attribution = attributed.as_dict()
+                result.steps.append(
+                    Step(
+                        "attribution",
+                        PERFORMED if attributed.grant else REFUSED,
+                        attributed.summary,
+                    )
+                )
+                if attributed.grant:
+                    result.pre_existing = attributed.pre_existing
+                    # Only the *verdict* is explained by the measurement; the
+                    # commit-naming rule is re-applied below and still binds.
+                    attestation = replace(attestation, rc=0)
+                    gap = evidence_gap(attestation, result.commit)
+
         verdict = self._consult_verdict(result, attestation, existing)
         result.verdict = verdict.as_dict()
 
@@ -293,6 +375,27 @@ class LandingEngine:
         return self._plan_only(result, gap)
 
     # -- verdict consultation --------------------------------------------------
+
+    def _attribute(self, result: LandingResult, *, contract_record: bool = True):
+        """Measure this lane's suite reds against clean master (see attribution.py).
+
+        ``contract_record=False`` measures only the suite half — the part a
+        declaration can honestly state before the contract has re-run. Returns
+        ``None`` only when the attribution module itself is unreachable — which is
+        CANNOT-ASSESS for the caller, never a grant.
+        """
+        req = self.request
+        measure = attribution_mod.attribute_contract if contract_record else attribution_mod.attribute_lane
+        try:
+            return measure(
+                req.root,
+                commit=result.commit,
+                lane_record=req.lane_record_file,
+                baseline_file=req.baseline_file,
+                baseline_rev=req.resolved_baseline_rev(),
+            )
+        except Exception:  # noqa: BLE001 - an unreachable measurement is never a grant
+            return None
 
     def _consult_verdict(
         self, result: LandingResult, attestation: Attestation, pr: Optional[PullRequest]
@@ -404,6 +507,16 @@ class LandingEngine:
     def _apply(self, result: LandingResult, existing: Optional[PullRequest]) -> LandingResult:
         """Perform the landing, in the contract's own order."""
         req = self.request
+        # The PR body declares the pre-existing reds, and it is written before the
+        # contract re-runs at the boundary — so measure the *suite* half now, from
+        # the lane's own sweep record. This grants nothing (a grant needs the
+        # contract's per-signal record); it only stops the declaration from saying
+        # "None" about reds the driver can already measure.
+        if not result.pre_existing:
+            declaration = self._attribute(result, contract_record=False)
+            if declaration is not None and declaration.pre_existing:
+                result.pre_existing = declaration.pre_existing
+                result.attribution = declaration.as_dict()
         try:
             published = self._push(result)
             pr = self._open_pr(result, existing, published)
@@ -419,14 +532,26 @@ class LandingEngine:
         )
         for line in contract.tail(12).splitlines():
             result.steps.append(Step("contract", PERFORMED if contract.rc == 0 else FAILED, line))
+        attributed = None
         if contract.rc != 0:
-            result.refusal_code = "pre-merge-contract-failed"
-            result.refusal = (
-                f"the pre-merge contract returned rc={contract.rc} — a red (or unassessable) contract "
-                "never merges (no-false-green)"
-            )
-            result.rc = _normalise_rc(contract.rc)
-            return self._journal(result)
+            # The contract's red is measured before it is refused, exactly as at
+            # the pre-flight: a red that is entirely suite reds measured failing
+            # on clean master is not this lane's failure. Every other red — the
+            # gate of record included — still refuses.
+            attributed = self._attribute(result)
+            if attributed is not None:
+                result.attribution = attributed.as_dict()
+            if attributed is None or not attributed.grant:
+                detail = attributed.summary if attributed is not None else "the attribution could not be measured"
+                result.refusal_code = "pre-merge-contract-failed"
+                result.refusal = (
+                    f"the pre-merge contract returned rc={contract.rc} and its red is NOT attributable to clean "
+                    f"master ({detail}) — a red (or unassessable) contract never merges (no-false-green)"
+                )
+                result.rc = _normalise_rc(contract.rc)
+                return self._journal(result)
+            result.pre_existing = attributed.pre_existing
+            result.steps.append(Step("attribution", PERFORMED, attributed.summary))
 
         # Defense in depth: read the evidence the contract just wrote, and the
         # commit the pull request actually points at, and re-consult the verdict.
@@ -441,6 +566,11 @@ class LandingEngine:
         landing_commit = (head_pr.head if head_pr is not None and head_pr.head else result.commit)
         fresh = read_attestation(req.contract_evidence_path())
         result.attestation = fresh
+        if attributed is not None and attributed.grant:
+            # The freshly written attestation is red for suites the measurement
+            # already established are failing on clean master. Only its verdict
+            # is explained; the commit it names must still be this commit.
+            fresh = replace(fresh, rc=0)
         gap = evidence_gap(fresh, landing_commit)
         if gap is not None:
             result.steps.append(Step("inspect", REFUSED, str(gap)))
@@ -577,6 +707,14 @@ def describe(result: LandingResult) -> str:
         for reason in verdict["reasons"]:
             lines.append(f"    blocked: {reason}")
         lines.append(f"    rule: {verdict['source']}")
+    # Named, never silently dropped: a pre-existing red is reported wherever the
+    # landing is reported, so the record carries it whether or not it blocked.
+    if result.pre_existing:
+        lines.append(
+            f"  pre-existing red (measured on clean master, not this lane): {', '.join(result.pre_existing)}"
+        )
+    if result.attribution and not result.pre_existing and not result.attribution.get("grant"):
+        lines.append(f"  attribution: {result.attribution.get('code')} — {result.attribution.get('summary')}")
     for step in result.steps:
         lines.append(f"  {step.action:<17} {step.outcome:<9} {step.detail}")
     if result.terminal:

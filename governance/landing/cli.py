@@ -87,6 +87,9 @@ def cmd_land(args: argparse.Namespace) -> int:
         attestation_file=Path(args.attestation).resolve() if args.attestation else None,
         apply=bool(args.apply or os.environ.get("AO_LAND_APPLY") == "1"),
         owner_carve_out=not args.no_owner_carve_out,
+        baseline_file=Path(args.baseline).resolve() if args.baseline else None,
+        lane_record_file=Path(args.lane_record).resolve() if args.lane_record else None,
+        baseline_rev=args.baseline_rev or "",
     )
     reads = GitHubOps(root, base=request.base)
     ops = reads if request.apply else RecordingOps(reads=reads)
@@ -121,6 +124,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="disable the owner autonomous-merge carve-out (a self-merge is then refused by governance/merge's rule)",
     )
     land_cmd.add_argument("--json", action="store_true", help="emit the landing record as JSON")
+    land_cmd.add_argument(
+        "--baseline",
+        default="",
+        help=(
+            "a recorded clean-master sweep to attribute pre-existing suite reds against "
+            "(default: measure origin/master; or set AO_LAND_BASELINE_RECORD)"
+        ),
+    )
+    land_cmd.add_argument(
+        "--lane-record",
+        default="",
+        help="the lane's own sweep record (default: <root>/.verify/test-results.json)",
+    )
+    land_cmd.add_argument(
+        "--baseline-rev",
+        default="",
+        help="the rev the baseline is measured at (default: origin/master)",
+    )
     land_cmd.set_defaults(func=cmd_land)
     return parser
 
