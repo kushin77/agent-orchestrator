@@ -17,6 +17,7 @@ Usage (from the repo root):
         --approval ID --actor deployer-sa [--canary-health-ok] [--gradual-complete]
     python3 -m infra.rollout.cli canary FLAG --health-ok false
     python3 -m infra.rollout.cli rollback FLAG --reason canary_health_failure
+    python3 -m infra.rollout.cli surface-health SURFACE [--clear] [--json]
     python3 -m infra.rollout.cli validate-approval FLAG STAGE ID --actor X --approvals-dir DIR
     python3 -m infra.rollout.cli demo          # end-to-end offline demo
     python3 -m infra.rollout.cli validate      # validate the declarative files
@@ -166,6 +167,42 @@ def cmd_rollback(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_surface_health(root: Path, args: argparse.Namespace) -> int:
+    """Drive a console surface's rollback anchor (issue #802).
+
+    Delegates to ``infra/rollout/surface_guard.py`` — one implementation, this
+    pipeline-facing entry point — so the automated path and the operator run
+    exactly the same reconcile: the surface's own readiness signal decides, a
+    failed reading rolls the flag to OFF (audited) **and** engages the runtime
+    overlay, and an unreadable reading rolls nothing back.
+    """
+    from infra.rollout import surface_guard
+
+    try:
+        if args.clear:
+            cleared = surface_guard.clear(root, args.surface, overlay_path=args.overlay)
+            print(
+                f"surface {args.surface}: rollback "
+                f"{'disengaged' if cleared else 'was not engaged'}"
+            )
+            return 0
+        outcome = surface_guard.reconcile(
+            root,
+            args.surface,
+            overlay_path=args.overlay,
+            static_dir=args.static_dir,
+            rollout_state_path=args.rollout_state,
+            audit_path=args.audit_log,
+            state_out=args.state_out,
+            actor=args.actor,
+        )
+    except ValueError as exc:  # an undeclared surface, or an unreadable overlay
+        print(f"surface-health: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return 2
+    print(surface_guard.report(outcome, args.json))
+    return outcome.exit_code
+
+
 def cmd_validate_approval(root: Path, args: argparse.Namespace) -> int:
     ledger = ApprovalLedger.load_dir(args.approvals_dir)
     try:
@@ -310,6 +347,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--actor", default="deployer-sa")
     p.add_argument("--state-out", default=None)
     p.set_defaults(func=cmd_rollback)
+
+    p = sub.add_parser(
+        "surface-health",
+        help="read a console surface's readiness and roll it back when it fails",
+    )
+    add_root(p)
+    p.add_argument("surface", nargs="?", default="operator_terminal")
+    p.add_argument("--clear", action="store_true", help="disengage an engaged rollback")
+    p.add_argument("--overlay", default=None, help="an alternate rollback overlay")
+    p.add_argument("--static-dir", default=None, help="the console's static root")
+    p.add_argument("--rollout-state", default=None, help="an alternate rollout state")
+    p.add_argument("--audit-log", default=None, help="where the rollback audit is appended")
+    p.add_argument("--state-out", default=None, help="write the transitioned rollout state")
+    p.add_argument("--actor", default="surface-health-monitor")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_surface_health)
 
     p = sub.add_parser("validate-approval", help="fail-closed approval check for the pipeline")
     add_root(p)

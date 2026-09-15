@@ -104,6 +104,17 @@ def check_registry_parity(state_flags: list, registry: object) -> list:
         elif prefix == "ci_cd":
             if key not in ci_cd:
                 errors.append(f"registry parity: flag '{flag}' has no registry ci_cd entry '{key}'")
+        elif prefix == "surfaces":
+            # A `surfaces.*` flag gates a route family inside a service (issue
+            # #802: the console). Its lock-step partner is the registry's own
+            # `surfaces` section, not `services` — and without this branch the
+            # parity rule rejected the prefix outright, which would have made
+            # adding a surfaces row impossible rather than checked.
+            surfaces = registry.get("surfaces")
+            if not isinstance(surfaces, dict):
+                errors.append("registry parity: the registry declares no surfaces section")
+            elif key not in surfaces:
+                errors.append(f"registry parity: flag '{flag}' has no registry surface '{key}'")
         elif prefix == "rollout":
             continue  # rollout-native flags are owned by this lane
         else:
@@ -223,6 +234,18 @@ def _probes() -> list:
     def parity_probe():
         return check_registry_parity(["services.nope", "ci_cd.verify_trigger"], bad_registry)
 
+    def surface_parity_probe():
+        """A `surfaces.*` state flag with no registry surface must fail BY NAME.
+
+        The probe insists on the SURFACE branch's own message: a checker that
+        merely rejected the prefix would also return "some error" and would not
+        be asserting the lock-step this lane added, so it would pass vacuously.
+        """
+        errors = check_registry_parity(["surfaces.nope"], _load(REGISTRY))
+        if any("has no registry surface 'nope'" in error for error in errors):
+            return errors[:1]
+        return [f"the surfaces parity branch did not fire: {errors!r}"]
+
     def trigger_probe():
         return check_triggers(bad_trigger_dir)
 
@@ -232,6 +255,7 @@ def _probes() -> list:
         ("rollout-state rejects default-ON flag", state_probe),
         ("go-live-plan rejects partial phase coverage", plan_probe),
         ("registry parity rejects unknown service flag", parity_probe),
+        ("registry parity checks a surfaces flag against the surfaces section", surface_parity_probe),
         ("cloudbuild requires disabled rollout triggers", trigger_probe),
     ]
 

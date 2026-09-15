@@ -36,6 +36,7 @@ itself still lands as a PR → gate → merge.
 | `model.py` | Pure domain: stages, adjacency, audience, gates, rollback decision. |
 | `engine.py` | Promotion/rollback engine, approvals, hash-chained audit log. |
 | `cli.py` | Offline CLI the Cloud Build pipeline invokes (`python3 -m infra.rollout.cli`). |
+| `surface_guard.py` | The console surface's **rollback anchor** (issue #802): reads the surface's own readiness and withdraws it when the reading fails. |
 | `checks/check_rollout.py` | Honest offline gate (all checks can fail; `--self-test`). |
 | `tests/` | Pytest suite (stage model, default-OFF, gate, gradual, rollback, audit, plan, gate). |
 
@@ -91,6 +92,59 @@ terraform, rollout state), and one flag can never widen more than its own
 surface — `mcp_outbound` still needs the per-server `enabled` and the caller's
 capability, `sandbox_runtime` still needs a runtime that exists, and the three
 portal views are independent of each other and of `enable_portal`.
+
+## The surface rollback anchor (issue #802)
+
+A promotion pipeline is half a contract. `surfaces.<name>` in the registry says
+what is gated and this pipeline says how it is promoted, but until #802 nothing
+connected a **promoted** surface to its own health: the console surface
+(`surfaces.operator_terminal`) could be promoted and withheld only by hand.
+
+`surface_guard.py` is the other half. It reads the surface's own readiness
+signal (``portal/server/surface_health.py``: promoted? an engaged rollback? the
+artifacts it serves, and the declarations its steer half consumes?) and acts on
+it:
+
+```bash
+python3 -m infra.rollout.cli surface-health operator_terminal          # 0 healthy · 1 rolled back · 2 cannot assess
+python3 -m infra.rollout.cli surface-health operator_terminal --json
+python3 -m infra.rollout.cli surface-health operator_terminal --clear  # the reversible half
+```
+
+A failed reading withdraws the surface at **both** layers, because either alone
+is a half-truth:
+
+1. **the rollout layer** — the flag is rolled to the stage model's declared
+   rollback target (`off`) through `RolloutEngine.observe_health`, which appends
+   a hash-chained audit record (`--audit-log`, or the engine's in-memory log);
+2. **the runtime layer** — the rollback overlay of
+   `portal/server/surface_state.py` is engaged, so the surface's *reader*
+   resolves `off` **now** while the committed registry still declares it promoted.
+
+Three rules the anchor holds, each measurable:
+
+* **an unreadable reading is not a failure.** `cannot-assess` rolls **nothing**
+  back and exits 2 — acting on a signal nobody could read would fabricate a
+  health failure — and it is never reported healthy either.
+* **a healthy surface is left alone** (the model returns "no move" for a healthy
+  observation), so an anchor that always rolled back would fail its gate, not a
+  production surface.
+* **drift is named, not hidden.** `validate_rollout_state_doc` refuses a state
+  document carrying a flag that is not `off`, so the committed
+  `rollout-state.yaml` **cannot record an exposure** — it records the
+  *withdrawal*. A surface that is served while its rollout row reads `off` is
+  therefore normal, and the anchor names that disagreement in its report rather
+  than pretending the row was the source of the exposure.
+
+Without the `surfaces.operator_terminal` row in `rollout-state.yaml` the engine
+refuses the flag by name (`unknown flag ... (not declared in rollout state)`), so
+adding the row is what makes the surface promotable *and* withdrawable;
+`check_rollout.py` keeps that row lock-stepped with the registry's own
+`surfaces` section. The provoked proofs live in the console's gate of record,
+`scripts/check-operator-terminal.sh` (§h): a promoted fixture is withdrawn and
+the surface answers 404 while the registry still says `on`, a healthy reading is
+left alone, an unreadable declaration withdraws nothing, and neutering the
+overlay writer makes the acceptance probe fail by name.
 
 ## The only promotion path (no console)
 

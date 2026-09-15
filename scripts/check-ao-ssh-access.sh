@@ -62,6 +62,13 @@
 #       gate (`scripts/check-feature-flags.py`, consumed rather than
 #       re-implemented) passes with it, `infra/cloudflare` is a declared pytest
 #       suite, and the Makefile both runs this check and lists it under `lint`.
+#   (h) the Access allow-policy is never published EMPTY (issue #802, re-verify
+#       of the security control). Two inputs are provoked -- the variable unset
+#       and a list that holds no address at all -- and each must be refused BY
+#       NAME, with the stub's log EMPTY so "refused" cannot mean "refused after
+#       opening the door". The control is the same command with a real address,
+#       which must NOT print the refusal: without it, a route that refused
+#       everything would satisfy the probe.
 #
 # The route is never driven against a real estate: the stub binds 127.0.0.1 and
 # everything here is offline.
@@ -676,11 +683,18 @@ scratch="$work/scratch-root"
 mkdir -p "$scratch/infra/cloudflare" "$scratch/infra/feature-flags" \
   "$scratch/portal/server"
 # Exactly what the route script imports: itself, the pure module, and the
-# fail-closed surface reader it consumes from the portal package. `portal/`
-# itself is a PEP-420 namespace package (no __init__.py), so one is copied only
-# when a checkout actually has one -- a hard requirement here would break the
-# scratch tree on the layout the repo really uses.
-for rel in "$script_rel" "$ingress_rel" portal/server/__init__.py portal/server/fleet.py; do
+# fail-closed surface reader it consumes from the portal package — plus what
+# that reader imports in turn (`portal/server/surface_state.py`, issue #802's
+# rollback overlay). The list is load-bearing and it FAILS QUIETLY: with
+# `surface_state` missing the reader raised ImportError, the route reported
+# "the feature-flag registry could not be read ... treated as off", the OFF
+# refusal still passed, and the ON control went vacuous — which is why the ON
+# control and the allowlist probes below exist. `portal/` itself is a PEP-420
+# namespace package (no __init__.py), so one is copied only when a checkout
+# actually has one -- a hard requirement here would break the scratch tree on
+# the layout the repo really uses.
+for rel in "$script_rel" "$ingress_rel" portal/server/__init__.py \
+  portal/server/fleet.py portal/server/surface_state.py; do
   mkdir -p "$scratch/$(dirname "$rel")"
   if ! cp "$rel" "$scratch/$rel"; then
     problem "the scratch tree could not copy ${rel}: the flag probe cannot drive the route"
@@ -754,6 +768,52 @@ else
     else
       note "control: with the surface ON the same command gets past the flag and DOES attempt the mutation (the stub refused it, as designed)"
     fi
+  fi
+fi
+
+# ── (h) the Access allow-policy is never published empty (issue #802) ──────
+echo "== the Access allow-policy is never published empty =="
+
+# Driven in the scratch tree whose fixture registry has the surface ON, so the
+# refusal under test is the allowlist's own and not the flag gate's (the (d)
+# control above proved that tree really gets past the flag).
+if ! python3 "$work/set-flag.py" "$registry_rel" "$fixture" "$surface" on 2>"$work/h-flag.out"; then
+  problem "the ON fixture registry could not be rebuilt for the allowlist probe: $(tail -n 2 "$work/h-flag.out" | tr '\n' ' ')"
+else
+  : > "$stub_log"
+  ( cd "$scratch" && AO_SSH_ACCESS_EMAILS="" bash infra/cloudflare/ao-ssh-access.sh --apply ) > "$work/h-unset.out" 2>&1
+  h_unset_rc=$?
+  if [ "$h_unset_rc" -eq 1 ] && grep -qF "AO_SSH_ACCESS_EMAILS" "$work/h-unset.out" \
+    && grep -qF "allow-policy" "$work/h-unset.out"; then
+    note "no allowlist at all is refused by name (rc=1, naming AO_SSH_ACCESS_EMAILS and its allow-policy)"
+  else
+    problem "an unset AO_SSH_ACCESS_EMAILS was not refused by name (rc=${h_unset_rc}): $(tail -n 2 "$work/h-unset.out" | tr '\n' ' ')"
+  fi
+
+  : > "$stub_log"
+  ( cd "$scratch" && AO_SSH_ACCESS_EMAILS=" , , " bash infra/cloudflare/ao-ssh-access.sh --apply ) > "$work/h-empty.out" 2>&1
+  h_empty_rc=$?
+  if [ "$h_empty_rc" -eq 1 ] && grep -qF "lists no address" "$work/h-empty.out" \
+    && grep -qF "empty policy" "$work/h-empty.out"; then
+    note "a list holding no ADDRESS is refused by name (rc=1: an Access app with an empty policy is not a door worth publishing)"
+  else
+    problem "an address-less allowlist was not refused by name (rc=${h_empty_rc}): $(tail -n 2 "$work/h-empty.out" | tr '\n' ' ')"
+  fi
+
+  if [ -s "$stub_log" ]; then
+    problem "an allowlist refusal opened the door first: $(grep -c . "$stub_log") request(s) were sent"
+  else
+    note "neither allowlist refusal sent ANY request (the stub's log is empty)"
+  fi
+
+  # The control: a real address must NOT be refused by either check. Without
+  # this, a route that always refused the allowlist would pass both probes.
+  : > "$stub_log"
+  ( cd "$scratch" && AO_SSH_ACCESS_EMAILS="operator@example.invalid" bash infra/cloudflare/ao-ssh-access.sh --apply ) > "$work/h-real.out" 2>&1
+  if grep -qF "lists no address" "$work/h-real.out" || grep -qF "AO_SSH_ACCESS_EMAILS is not set" "$work/h-real.out"; then
+    problem "a real allowlist was refused by the allowlist checks: the empty-policy refusal above proves nothing"
+  else
+    note "control: the same command with a real address is not refused by the allowlist checks (it goes on to the API)"
   fi
 fi
 

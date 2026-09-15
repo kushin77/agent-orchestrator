@@ -81,6 +81,12 @@ phases:
         go_live_stage: full
       - flag: services.task_board
         go_live_stage: full
+      # The AgentConsole (issue #802) is a `surfaces.*` flag rather than a
+      # `services.*` one: it gates a route family inside the portal deployable
+      # and has no terraform variable of its own. It is planned here because the
+      # rollout state carries it, and the plan must resolve every flag it names.
+      - flag: surfaces.operator_terminal
+        go_live_stage: full
   "8":
     name: autonomous operations and governance
     note: This rollout pipeline (dogfooded first) and merge governance.
