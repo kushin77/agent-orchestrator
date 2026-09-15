@@ -1,0 +1,241 @@
+{
+  "schema": "ao.erp-ops-catalog/v1",
+  "lane": "erp-ops",
+  "owning_issue": 649,
+  "epic": 645,
+  "module": "erp",
+  "flag": {
+    "id": "erp-module",
+    "default": "off"
+  },
+  "currency": "EUR",
+  "kinds": [
+    {
+      "id": "rfq",
+      "family": "buying",
+      "source": "local",
+      "lifecycle": "rfq-lifecycle",
+      "role": "a supplier request for quotation: the buying cycle's price discovery"
+    },
+    {
+      "id": "purchase-order",
+      "family": "buying",
+      "source": "core",
+      "lifecycle": "purchase-order-lifecycle",
+      "role": "the commitment made to a supplier, from ERP-02"
+    },
+    {
+      "id": "purchase-receipt",
+      "family": "buying",
+      "source": "core",
+      "lifecycle": "purchase-receipt-lifecycle",
+      "role": "goods arriving against an order, from ERP-02"
+    },
+    {
+      "id": "purchase-invoice",
+      "family": "buying",
+      "source": "local",
+      "lifecycle": "purchase-invoice-lifecycle",
+      "role": "the supplier's bill, raised against the receipt it settles"
+    },
+    {
+      "id": "subcontracting-note",
+      "family": "buying",
+      "source": "local",
+      "lifecycle": "subcontracting-note-lifecycle",
+      "role": "material issued to a subcontractor against a purchase order"
+    },
+    {
+      "id": "bom",
+      "family": "manufacturing",
+      "source": "local",
+      "lifecycle": "bom-lifecycle",
+      "role": "a bill of materials: what a produced item is made of"
+    },
+    {
+      "id": "work-order",
+      "family": "manufacturing",
+      "source": "local",
+      "lifecycle": "work-order-lifecycle",
+      "role": "a production order that consumes a bill of materials once"
+    },
+    {
+      "id": "production-plan",
+      "family": "manufacturing",
+      "source": "local",
+      "lifecycle": "production-plan-lifecycle",
+      "role": "a dated run of planned output raised into work orders"
+    },
+    {
+      "id": "stock-entry",
+      "family": "stock",
+      "source": "core",
+      "lifecycle": "stock-entry-lifecycle",
+      "role": "a stock movement, from ERP-02"
+    },
+    {
+      "id": "gl-posting",
+      "family": "accounting",
+      "source": "core",
+      "lifecycle": "gl-posting-lifecycle",
+      "role": "a balanced double entry, from ERP-02"
+    },
+    {
+      "id": "item",
+      "family": "master",
+      "source": "core",
+      "lifecycle": null,
+      "role": "the item master every transaction line links to, from ERP-02"
+    },
+    {
+      "id": "party",
+      "family": "master",
+      "source": "core",
+      "lifecycle": null,
+      "role": "the supplier/customer master, from ERP-02"
+    }
+  ],
+  "vocabularies": {
+    "purchase-cycle": [
+      "rfq",
+      "purchase-order",
+      "purchase-receipt",
+      "purchase-invoice"
+    ],
+    "stock-purposes": [
+      "material_receipt",
+      "material_issue",
+      "material_transfer",
+      "manufacture"
+    ],
+    "voucher-types": [
+      "sales-invoice",
+      "purchase-invoice",
+      "stock-entry",
+      "journal-entry",
+      "payment"
+    ],
+    "party-types": [
+      "customer",
+      "supplier"
+    ]
+  },
+  "stock_effects": {
+    "material_receipt": {
+      "to_warehouse": 1
+    },
+    "material_issue": {
+      "from_warehouse": -1
+    },
+    "material_transfer": {
+      "from_warehouse": -1,
+      "to_warehouse": 1
+    },
+    "manufacture": {
+      "to_warehouse": 1
+    }
+  },
+  "stock_warehouses": {
+    "material_receipt": [
+      "to_warehouse"
+    ],
+    "material_issue": [
+      "from_warehouse"
+    ],
+    "material_transfer": [
+      "from_warehouse",
+      "to_warehouse"
+    ],
+    "manufacture": [
+      "from_warehouse",
+      "to_warehouse"
+    ]
+  },
+  "postings": [
+    {
+      "key": "purchase-receipt",
+      "document": "purchase-receipt",
+      "purpose": "material_receipt",
+      "voucher_type": "stock-entry",
+      "gl": [
+        {
+          "account": "STOCK-IN-HAND",
+          "side": "debit",
+          "basis": "total"
+        },
+        {
+          "account": "STOCK-RECEIVED-NOT-BILLED",
+          "side": "credit",
+          "basis": "total"
+        }
+      ]
+    },
+    {
+      "key": "purchase-invoice",
+      "document": "purchase-invoice",
+      "purpose": null,
+      "voucher_type": "purchase-invoice",
+      "gl": [
+        {
+          "account": "STOCK-RECEIVED-NOT-BILLED",
+          "side": "debit",
+          "basis": "net_total"
+        },
+        {
+          "account": "INPUT-TAX",
+          "side": "debit",
+          "basis": "taxes"
+        },
+        {
+          "account": "ACCOUNTS-PAYABLE",
+          "side": "credit",
+          "basis": "total"
+        }
+      ]
+    },
+    {
+      "key": "material-issue",
+      "document": "stock-entry",
+      "purpose": "material_issue",
+      "voucher_type": "stock-entry",
+      "gl": [
+        {
+          "account": "WORK-IN-PROCESS",
+          "side": "debit",
+          "basis": "total"
+        },
+        {
+          "account": "STOCK-IN-HAND",
+          "side": "credit",
+          "basis": "total"
+        }
+      ]
+    },
+    {
+      "key": "manufacture",
+      "document": "stock-entry",
+      "purpose": "manufacture",
+      "voucher_type": "stock-entry",
+      "gl": [
+        {
+          "account": "STOCK-IN-HAND",
+          "side": "debit",
+          "basis": "total"
+        },
+        {
+          "account": "WORK-IN-PROCESS",
+          "side": "credit",
+          "basis": "total"
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "upstream": "frappe/erpnext",
+    "license": "GPL-3.0",
+    "pattern_source_only": true,
+    "code_copied": false,
+    "retrieved": "2026-09-15",
+    "source_doc": "docs/ERP-MODULE-GAP-ANALYSIS.md"
+  }
+}

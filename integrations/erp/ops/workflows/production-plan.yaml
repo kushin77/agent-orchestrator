@@ -1,0 +1,48 @@
+# Production plan lifecycle — ERP-04 manufacturing (issue #649).
+#
+# A plan is submitted when it is decided and completed when it has been raised
+# into work orders. It moves no stock in either direction: running a plan
+# creates work orders, and it is their completion that moves stock. Keeping the
+# plan out of the stock path is what lets a planner be planned against without
+# a warehouse being touched.
+schema: erp.workflow/v1
+workflow: production-plan-lifecycle
+document: production-plan
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: Decided
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Raised
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Cancelled
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Decide
+  - action: complete
+    from: submitted
+    to: completed
+    label: Mark Raised
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Cancel

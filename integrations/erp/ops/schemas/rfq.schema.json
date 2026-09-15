@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/ops/schemas/rfq.schema.json",
+  "title": "Request for Quotation — a supplier invitation to quote",
+  "description": "Price discovery, not a commitment: an RFQ names the suppliers it invites and the items it wants quoted, and it is the buying cycle's first step. Its lines carry an OPTIONAL rate, because a line is unpriced until the supplier has answered; the conversion to a purchase order is what requires the rate, and it refuses a line that never got one. The field shapes it composes are ERP-02's: the identifier, label, quantity and rate definitions are $ref'd out of integrations/erp/core/schemas/document.schema.json rather than restated, so a quantity or a currency code means one thing across the whole module.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "suppliers",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "rfq"
+    },
+    "id": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/isoDate"
+    },
+    "valid_till": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/isoDate",
+      "description": "The date the invitation lapses. Absent means no declared expiry."
+    },
+    "suppliers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+      },
+      "description": "The suppliers invited to quote. At least one: an invitation nobody received is not a request."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_code", "qty"],
+        "properties": {
+          "item_code": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+          },
+          "description": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/label"
+          },
+          "qty": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/quantity"
+          },
+          "rate": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/rate",
+            "description": "The supplier's quoted rate, carried once the quotation returns. Optional here and required at conversion — a priced order cannot be built from an unpriced line."
+          }
+        }
+      }
+    },
+    "remarks": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/label"
+    }
+  },
+  "x-erp-document": "rfq",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#649",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/buying/doctype/request_for_quotation",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Request for Quotation",
+    "harvest": [
+      "the request-for-quotation field surface (invited suppliers, item lines, validity)",
+      "an invitation to quote as a document distinct from the order it may become"
+    ],
+    "note": "Field and lifecycle shapes from the upstream request-for-quotation doctype, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

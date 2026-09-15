@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/ops/schemas/work-order.schema.json",
+  "title": "Work Order — a production order that consumes a BOM once",
+  "description": "A work order is the only document in this lane whose completion moves stock twice: the components leave the source warehouse and the produced item enters the target one. It cites the BOM it consumes rather than copying its component list, so a corrected BOM corrects every order raised from it — and item is required to agree with the BOM's output item, because an order that produces something other than its bill describes is a different order than the one declared.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "bom",
+    "item",
+    "quantity",
+    "from_warehouse",
+    "to_warehouse"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "work-order"
+    },
+    "id": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "transaction_date": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/isoDate"
+    },
+    "bom": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The bill of materials consumed. Cited, never copied: the order reads the components at completion."
+    },
+    "item": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The item produced. Must equal the BOM's output item — checked at completion and refused by name."
+    },
+    "quantity": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/quantity",
+      "description": "How much to produce. Drives the explosion: each component's quantity is scaled by quantity/BOM.quantity."
+    },
+    "from_warehouse": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "Where the components come from."
+    },
+    "to_warehouse": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "Where the produced item goes."
+    },
+    "produced_quantity": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/quantity",
+      "description": "Written when the order completes: what was actually produced, which is the quantity the stock ledger receives."
+    },
+    "remarks": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/label"
+    }
+  },
+  "x-erp-document": "work-order",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#649",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/manufacturing/doctype/work_order",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Work Order",
+    "harvest": [
+      "the work order field surface (bom link, produced item, quantity, source and target warehouse)",
+      "completion as the point where components are consumed and output is received"
+    ],
+    "note": "Field and lifecycle shapes from the upstream work order doctype, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

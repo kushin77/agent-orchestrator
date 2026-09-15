@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/ops/schemas/production-plan.schema.json",
+  "title": "Production Plan — a dated run of intended output",
+  "description": "A plan is intent, not movement: it names what is to be produced and how much, and it moves no stock at all. Its entries are what `run_plan` raises into work orders, each against the submitted bill of materials for that entry's item — which is why an entry names an item and a quantity and deliberately not a BOM id, so the plan does not pin a bill of materials revision it did not choose.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "transaction_date",
+    "entries"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "production-plan"
+    },
+    "id": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "transaction_date": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/isoDate"
+    },
+    "from_warehouse": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The default source warehouse for the work orders the plan raises; an entry may override it."
+    },
+    "to_warehouse": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The default target warehouse for the work orders the plan raises; an entry may override it."
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item", "quantity"],
+        "properties": {
+          "item": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+          },
+          "quantity": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/quantity"
+          },
+          "from_warehouse": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+          },
+          "to_warehouse": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+          }
+        }
+      },
+      "description": "The planned output. At least one entry: a plan that plans nothing is not a plan."
+    },
+    "remarks": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/label"
+    }
+  },
+  "x-erp-document": "production-plan",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#649",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/manufacturing/doctype/production_plan",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Production Plan",
+    "harvest": [
+      "the production plan field surface (planned entries of item and quantity for a date)",
+      "a plan as intent that is raised into orders rather than a movement of stock"
+    ],
+    "note": "Field and lifecycle shapes from the upstream production plan doctype, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

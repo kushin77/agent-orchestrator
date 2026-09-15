@@ -1,0 +1,49 @@
+# Work order lifecycle — ERP-04 manufacturing (issue #649).
+#
+# `complete` is terminal, and that is the whole point: a work order consumes its
+# bill of materials exactly once. A completed order has no outgoing transition,
+# so a second completion is refused twice over — by this lane's own named rule
+# (`work-order-already-completed`, which says which order and what state it is
+# in) and, behind it, by the state machine, which has no `complete` action from
+# `completed` to offer.
+schema: erp.workflow/v1
+workflow: work-order-lifecycle
+document: work-order
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: In Progress
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Completed
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Cancelled
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Start
+  - action: complete
+    from: submitted
+    to: completed
+    label: Complete
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Cancel
