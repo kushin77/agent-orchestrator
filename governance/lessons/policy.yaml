@@ -1,50 +1,30 @@
-# RCA + lessons enforcement policy (issue #141)
+# RCA + lessons enforcement policy (issue #141, scope re-cut by issue #766)
 #
-# What counts as an incident-labelled issue on the board, how long an RCA may go
-# without review, and which issues carry the incident-response label as *process*
-# work rather than as an incident.
+# Which board issues RECORD an incident (so the ledger must account for them),
+# and how long an RCA may go without review.
 #
-# Every exemption carries the reason it exists, and the gate reports it on every
-# run (`board-incident-exempt`), so an exemption is visible rather than silent.
-# The alternative — a hard rule with a false positive baked in — turns the gate
-# red for a reason no lane can fix, which is the false-green failure mode this
-# module exists to prevent (see governance/lessons/rca/RCA-0001-*).
+# There are no exemptions, on purpose. This file used to carry an `exemptions:`
+# list with one entry per issue that happened to hold the incident label — #141,
+# then #494/#495/#497 — which made every holder exempt and the rule unable to
+# fail. That is the failure this module exists to prevent, inverted.
+#
+# The scope declaration is the LABEL: an issue that records no incident simply
+# does not carry it. The loader refuses two things by name, so the defect cannot
+# come back as a YAML edit:
+#   * an `area:` label as `incident_label` — an area says where the work lives,
+#     not that the issue records an incident;
+#   * any `board.exemptions` key at all.
+# See governance/lessons/negative_control.py, which provokes both refusals.
 
 schema: cmr.lessons/policy-v1
 
 board:
-  # The label that marks an issue as an incident or policy failure.
-  incident_label: area:incident-response
-
-  exemptions:
-    - ref: "#141"
-      reason: >-
-        Enforce RCA and lessons capture — the issue that installs this process.
-        Requiring an RCA for the rule that requires RCAs is circular, and the
-        label describes the work the issue does, not an incident it records.
-
-    # `area:incident-response` is an AREA label: it says the work is in the
-    # incident-response area, not that the issue *records* an incident. The
-    # monitoring-plane set carries it for that reason, is closed, and has no
-    # incident to attach an RCA to. Measured 2026-09-14: these three were the
-    # only thing keeping `make verify` red on `master`, so every lane in the
-    # fleet was blocked on a finding it could not fix — the false-positive-
-    # baked-into-a-hard-rule failure this file's header warns about.
-    # The structural fix (a dedicated record label, so an area can never
-    # manufacture an incident) is #766; these entries retire with it.
-    - ref: "#494"
-      reason: >-
-        EPIC: consume the fleet monitoring plane — an observability epic, closed,
-        carrying the area label because that is the area the work is in. It
-        records no incident and has no RCA to attach.
-    - ref: "#495"
-      reason: >-
-        Decision record: the telemetry-exposition authority split (ADR-0022) — a
-        decision, not an incident record; the area label describes the area.
-    - ref: "#497"
-      reason: >-
-        Publish the telemetry pillar as a scrapeable surface — a closed feature
-        in the incident-response *area*, not an incident record.
+  # The RECORD label: an issue that carries it *records* an incident, so an
+  # `INC-*` line whose origin is that issue must exist in the ledger. It is
+  # deliberately not an `area:` label: `area:incident-response` says where the
+  # work lives, and keying this rule on it turned #141, #494, #495 and #497 —
+  # all work items, none of them an incident — into findings.
+  incident_label: incident
 
 # An RCA that is never re-read is a document, not a practice.
 review_cadence_days: 180
