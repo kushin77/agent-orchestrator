@@ -16,7 +16,11 @@ Two deliberate splits:
   merged is journalled under ``.fleet/lifecycle/<issue>.json``, so the audit reads
   facts it can re-check rather than a snapshot that silently ages.
 
-Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. The third value is load
+bearing: a close-out whose verification could not be *assessed* (the gate was
+parked at its box-wide cap, its permit store was unusable, or it was killed by a
+signal) is rc 2 and never rc 0 or rc 1 — nothing was measured, so neither a pass
+nor a failure may be reported (#840).
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.lifecycle import directive  # noqa: E402
+from governance.lifecycle import directive, gate  # noqa: E402
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
 from governance.lifecycle.closeout import CloseOutResult, closeout, describe  # noqa: E402
 from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
@@ -74,6 +78,26 @@ def _print_board_reports(reports: list) -> None:
 def _git(*args: str) -> str:
     result = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True)
     return result.stdout if result.returncode == 0 else ""
+
+
+def _gate_attempt(worktree: Path) -> gate.GateAttempt:
+    """Run the repo gate once in ``worktree`` and report what it said, unraised.
+
+    ``subprocess`` directly rather than the ``_run`` helper, because the whole point
+    is that a non-zero exit is *data*: an admission refusal means the gate never
+    started, and raising every non-zero code into one generic handler is what made a
+    parked run read as a failed verification (#840).
+
+    ``stderr`` is folded into ``stdout`` **in the child** so the transcript keeps its
+    real order: the gate prints a failing run's verdict to stderr and each check's
+    output through ``tee`` to stdout, so appending one stream to the other afterwards
+    would put the verdict before the lines it follows — and the verdict is read from
+    the end.
+    """
+    result = subprocess.run(
+        ["make", "verify"], cwd=str(worktree), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    return gate.GateAttempt(exit_code=result.returncode, output=result.stdout or "")
 
 
 def _gh(*args: str) -> list | dict:
@@ -315,7 +339,23 @@ class GhOps:
         return str((payload.get("mergeCommit") or {}).get("oid", ""))
 
     def record_verification(self, issue: int, commit: str) -> str:
-        """Re-run the repo gate in the lane and journal the attestation it writes."""
+        """Re-run the repo gate in the lane and journal the attestation it writes.
+
+        The exit code is read through ``governance.lifecycle.gate``, whose closed
+        table is the only place that decision lives: a park (10/11), an unusable
+        permit store (12), the gate's own CANNOT-ASSESS (2) and a signal are all
+        *absences of a result*, and are raised as ``gate.CannotAssess`` so the
+        close-out reports CANNOT-ASSESS instead of filing a missing verification
+        nobody measured (#840). A genuine failure (rc 1) is still a failure, and
+        still leaves the item's evidence missing.
+
+        A run that did not happen writes **no journal**. ``.fleet/lifecycle``'s
+        presence is another module's landing record — ``governance/reconcile``
+        reads a journal file as "this issue's work landed" — so writing one for a
+        parked run would let capacity be read as a landing, the substitution
+        golden rule 17 forbids. The attempts are recorded where close-out prints
+        them instead; nothing carries them as evidence.
+        """
         lane = _lane_records(self.root).get(issue)
         if not lane or not lane.get("present"):
             raise RuntimeError(f"no lane worktree for #{issue}; the verified tree no longer exists")
@@ -323,9 +363,16 @@ class GhOps:
         head = self._run(["git", "-C", str(worktree), "rev-parse", "HEAD"])
         if commit and head != commit:
             raise RuntimeError(f"lane head {head[:12]} is not the verified commit {commit[:12]}")
-        self._run(["make", "verify"], cwd=worktree)
-        write_journal(issue, {"verify": {"ok": True, "commit": head}}, self.root)
-        return f"verify green at {head[:12]}"
+        run = gate.run_gate(lambda: _gate_attempt(worktree))
+        if run.admitted:
+            write_journal(issue, {"verify": {"ok": True, "commit": head}}, self.root)
+            return f"verify green at {head[:12]}"
+        if run.cannot_assess:
+            raise gate.CannotAssess(run.verdict, run.detail(), run.remediation())
+        raise RuntimeError(
+            f"{run.detail()} — the gate ran against {head[:12]} and reported a failure, "
+            "so the item has no green verification"
+        )
 
     def delete_branch(self, branch: str) -> str:
         self._run(["git", "-C", str(self.root), "push", "origin", "--delete", branch])
@@ -408,6 +455,12 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_close(args: argparse.Namespace) -> int:
+    """Drive an item to hygiene; the verdict decides the exit code.
+
+    Three outcomes, three codes: OK (0), NOT-OK (1) when an invariant is measured
+    broken, and CANNOT-ASSESS (2) when nothing is known broken but something could
+    not be measured — a parked verification is the case this exists for (#840).
+    """
     record = collect_from_github()
     item = next((entry for entry in record["items"] if entry["issue"] == args.issue), None)
     if item is None:
@@ -419,6 +472,8 @@ def cmd_close(args: argparse.Namespace) -> int:
     print(describe(result))
     _print_board_reports(result.board_reports)
     _advance_focus_if_epic_closed(item, result)
+    if result.cannot_assess:
+        return EXIT_CANNOT_ASSESS
     return EXIT_OK if result.ok else EXIT_NOT_OK
 
 
