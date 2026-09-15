@@ -1,0 +1,74 @@
+# Shrink-only legacy record for the piped-`grep -q` idiom (#852).
+#
+# Format: <count><TAB><path>, highest count first. A comment cannot run, so
+# comment lines here are not counted as occurrences.
+#
+# WHY these are recorded rather than fixed: `grep -q` exits on its first match,
+# the producer is then killed by SIGPIPE, and `set -o pipefail` promotes that
+# 141 to the status of the whole pipeline -- so a report larger than the 64 KiB
+# pipe buffer reports ABSENT for text that is PRESENT. Negated that is a false
+# red; positive the control is skipped and the check fails OPEN.
+#
+# Recording is an EXPLICIT REVIEWED ACT and is never automatic: a new occurrence
+# is refused by name first. Fixing one is always welcome -- delete or lower its
+# line and re-run with --record. Lowering the record is the only change that
+# does not need a review of the code it describes.
+#
+# scripts/check-verdict-contains.sh records 3, and none of them is a verdict
+# test: one is the provocation in section 1, which must exist for that control
+# to be able to fail, and two are the planted fixture in section 3 -- one of
+# which is the line that is SUPPOSED to read as a comment (it begins with a
+# quote, so the counter sees it, which is the conservative direction).
+# measured: 2026-09-15T23:55:56Z -- 115 site(s) in 52 file(s)
+15	scripts/check-pr-contract.sh
+11	scripts/check-paperclip-skills.sh
+8	scripts/check-module-registry.sh
+6	scripts/check-paperclip-secrets.sh
+4	scripts/check-paperclip-diagrams.sh
+3	scripts/check-conformance.sh
+3	scripts/check-control-functions.sh
+3	scripts/check-guardrail-controls.sh
+3	scripts/check-isolation-landed.sh
+3	scripts/check-paperclip-openapi.sh
+3	scripts/check-verdict-contains.sh
+2	scripts/check-agent-identity-parity.sh
+2	scripts/check-audit-read-model.sh
+2	scripts/check-chat-eval.sh
+2	scripts/check-chat-guardrails.sh
+2	scripts/check-cpapi-spec-drift.sh
+2	scripts/check-gate-status.sh
+2	scripts/check-gateway-catalog-parity.sh
+2	scripts/check-module-brief.sh
+2	scripts/check-paperclip-auth.sh
+2	scripts/check-paperclip-canonical-module.sh
+2	scripts/check-paperclip-integration-adapter.sh
+2	scripts/check-paperclip-integration.sh
+1	scripts/check-ao-ssh-access.sh
+1	scripts/check-chat-finops.sh
+1	scripts/check-chat-identity.sh
+1	scripts/check-codeidx-backend.sh
+1	scripts/check-context-pack-consumption.sh
+1	scripts/check-control-audit.sh
+1	scripts/check-control-verbs.sh
+1	scripts/check-cross-reference.sh
+1	scripts/check-finops-chooser.sh
+1	scripts/check-issue-template.sh
+1	scripts/check-metering-parity.sh
+1	scripts/check-module-admission.sh
+1	scripts/check-monitoring-declaration.sh
+1	scripts/check-no-actions.sh
+1	scripts/check-paperclip-budget.sh
+1	scripts/check-paperclip-deploy.sh
+1	scripts/check-paperclip-routines.sh
+1	scripts/check-pmo-rollup.sh
+1	scripts/check-policy-schema.sh
+1	scripts/check-routing-seam.sh
+1	scripts/check-runaway-guard.sh
+1	scripts/check-secrets.sh
+1	scripts/check-shared-frontend-onboarding.sh
+1	scripts/check-surface-class.sh
+1	scripts/check-ticket-projection.sh
+1	scripts/qa-loop.sh
+1	scripts/run-pytest-suites.sh
+1	scripts/track-codeidx-capabilities.sh
+1	scripts/verify.sh

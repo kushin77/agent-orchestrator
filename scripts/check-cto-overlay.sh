@@ -27,6 +27,19 @@
 # Usage: bash scripts/check-cto-overlay.sh
 set -uo pipefail
 
+# Every "does this report contain this string?" test below is bash-native (#852).
+# `printf '%s' "$out" | grep -qF -- "$s"` is NOT the same test: `grep -q` exits on
+# its first match, SIGPIPE then kills the producer, and `set -o pipefail` promotes
+# that 141 to the status of the whole pipeline — so a *large* report reports
+# ABSENT for text that is PRESENT. Negated, that is a false red; positive, the
+# control silently stops controlling and the check fails OPEN.
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
 
@@ -176,7 +189,7 @@ printf '#!/usr/bin/env bash\nif [ 1 -eq 1 ]; then\n  echo "unterminated\n' > "$f
 )
 broken_out="$(python3 "$engine" run --root "$fixture" --tier standard 2>&1)"
 broken_rc=$?
-if [ "$broken_rc" -ne 0 ] && printf '%s' "$broken_out" | grep -q 'PROBE-BROKEN.sh'; then
+if [ "$broken_rc" -ne 0 ] && contains "$broken_out" 'PROBE-BROKEN.sh'; then
   echo "  OK    probe 2 (negative control): a planted defect exits $broken_rc and names the file"
 else
   echo "  FAIL  probe 2 (negative control): planted defect exited $broken_rc" >&2
@@ -196,7 +209,7 @@ open(path, "w", encoding="utf-8").write(yaml.safe_dump(document, sort_keys=False
 PY
 config_out="$(python3 "$engine" run --root "$fixture" --tier standard 2>&1)"
 config_rc=$?
-if [ "$config_rc" -eq 2 ] && printf '%s' "$config_out" | grep -q 'CANNOT-ASSESS'; then
+if [ "$config_rc" -eq 2 ] && contains "$config_out" 'CANNOT-ASSESS'; then
   echo "  OK    probe 3 (schema control): a dropped non-negotiable signal exits 2"
 else
   echo "  FAIL  probe 3 (schema control): expected exit 2, observed $config_rc" >&2

@@ -26,6 +26,19 @@
 #
 set -uo pipefail
 
+# Every "does this report contain this string?" test below is bash-native (#852).
+# `printf '%s' "$body" | grep -qF -- "$s"` is NOT the same test: `grep -q` exits on
+# its first match, SIGPIPE then kills the producer, and `set -o pipefail` promotes
+# that 141 to the status of the whole pipeline — so a *large* body reports ABSENT
+# for text that is PRESENT. Negated, that is a false red; positive, the control
+# silently stops controlling and the check fails OPEN.
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
 
 SPINE="$ROOT/docs/GOLDEN-RULES.md"
@@ -67,7 +80,7 @@ check_rule() {
   ' "$SPINE")"
   local missing=""
   for part in '**Rule.**' '**Why.**' '**Verify.**'; do
-    printf '%s' "$body" | grep -qF -- "$part" || missing="$missing ${part}"
+    contains "$body" "$part" || missing="$missing ${part}"
   done
   if [ -n "$missing" ]; then
     bad "$id is present but incomplete (missing:$missing)"
@@ -102,7 +115,7 @@ check_provenance() {
     found && /^### AO-GR-/ { exit }
     found { print }
   ' "$SPINE")"
-  if printf '%s' "$body" | grep -qF -- "$ref"; then
+  if contains "$body" "$ref"; then
     ok "$rule records its provenance ($ref)"
     return 0
   fi
