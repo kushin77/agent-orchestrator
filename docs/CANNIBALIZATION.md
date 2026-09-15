@@ -666,4 +666,50 @@ therefore **defined by this repo** (`registry/profiles/agent-profile.schema.json
 `docs/REGISTRY-PROVENANCE.md`.
 
 ---
+
+## 15. shared-services SSH-over-Cloudflare-Tunnel route (issue #771) — PATTERN, ported
+
+| Field | Value |
+|---|---|
+| Source repo | `kushin77/shared-services` |
+| Source path | `scripts/deploy-ssh-tunnel-access.sh` (247 lines) |
+| License | **none declared** — the repository is **private** and carries no licence file |
+| Owner | the **same owner** as this repo (a first-party estate, not a third party) |
+| Verdict | **PATTERN** — the *shape* is the asset; the implementation is tied to that estate |
+| Ported to | `infra/cloudflare/ingress.py` + `infra/cloudflare/ao-ssh-access.sh`, gated by `scripts/check-ao-ssh-access.sh` |
+| Register | `surfaces.remote_ssh_access` in `infra/feature-flags/registry.yaml`, ships **OFF** (GR-5) |
+
+**The pattern.** A hostname is published through an *existing* remotely-managed
+Cloudflare Tunnel by merging one `ssh://<origin>:22` rule into the tunnel's live
+`config.ingress` and writing the merged array back — **never** a blind
+replacement, which would delete the tunnel's other live rules. Then a proxied
+CNAME to `<tunnel id>.cfargotunnel.com`, then a Cloudflare Access self-hosted
+application plus an allow-policy so the hostname is not an unauthenticated public
+door to sshd, then a verification pass.
+
+**No code was copied.** The source is a private, unlicensed repository owned by
+the same owner, so nothing in it may be copied verbatim. The pattern was
+reimplemented here, in this repo's conventions: its own comments, its own
+refusal semantics (a named refusal per missing identifier rather than a defaulted
+value), its own pure-function split, its own tests and its own gate. No
+paragraph, comment or identifier was carried across, and nothing was vendored:
+`vendor/` is untouched, no submodule was added and no source file was cloned into
+the tree.
+
+**What we changed, and why.**
+
+| Upstream | Here | Why |
+|---|---|---|
+| `CF_ACCOUNT_ID` / `CF_ZONE_ID` / the tunnel id / the access emails default to the estate's own values | every identifier and the email allow-list come from the **environment**, and a missing one is **refused by name** | a default in this repo would point the run at another estate; the upstream values are that estate's and are not in this tree at all |
+| Vault, then GSM, then env for the API token | env (`CF_API_TOKEN`) or GCP Secret Manager (`AO_CF_TOKEN_SECRET` + `AO_GCP_SECRET_PROJECT`); never a file, never git | GR-6, and this repo has no Vault dependency to borrow |
+| apply by default | **dry run is the default**; `--apply` mutates and refuses while the surface flag is OFF | GR-5: new infrastructure ships OFF and is promoted by a reviewed change, not by a default |
+| the merge lived in a shell heredoc | the merge is a **pure function** with its own suite, and the gate **mutation-proves** it against a neutered copy | one definition, unit-testable, and a gate that can genuinely fail |
+| Access could be skipped (`--no-access`) | Access is **always** ensured | a hostname without an Access app is an unauthenticated public door to sshd, which is not a supported posture |
+| run directly by whoever held the token | the live apply is documented as an **operator act**, and the route ships OFF | it changes an estate this repo does not own |
+
+**See also.** `docs/OPERATOR-ACCESS.md` §6 documents the route end to end,
+including why the hostname is useless without the Access app and why a service
+token is what makes it headless.
+
+---
 *End of index. Raw evidence: `.research/reports/` (24 reports, gitignored).*

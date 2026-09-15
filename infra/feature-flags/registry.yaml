@@ -373,6 +373,24 @@ surfaces:
       the flag is off the client refuses to start with the named FLAG_OFF
       condition, and every panel whose own surface flag is off renders the
       disabled condition naming that flag.
+  remote_ssh_access:
+    default: off
+    promoted: false
+    service: control-plane
+    description: >
+      Remote operator SSH route (issue #771): publish one hostname that reaches
+      the host's sshd through the existing Cloudflare Tunnel, with a Cloudflare
+      Access self-hosted application and allow-policy in front of it, so an
+      operator with no shell on the box reaches it without opening port 22 to
+      the internet. The declaration covers the ROUTE, not a listener in this
+      repo: `infra/cloudflare/ao-ssh-access.sh` publishes it, is dry-run by
+      default, and refuses `--apply` while this flag is off, so nothing is
+      applied before a reviewed go-live (GR-5). Account, zone, tunnel and the
+      email allowlist come from the environment (a missing one is refused by
+      name rather than defaulted) and the API token from the environment or GCP
+      Secret Manager only (GR-6). This is the transport half of the
+      operator-access gap: reaching the fleet console still needs the auth-gate
+      JWKS mirror (#763 / #730).
 
   # --- Workbook surfaces (issue #644, workbook-13) ------------------------
   #

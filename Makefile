@@ -168,7 +168,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access
 	@echo ""
 	@echo "lint: OK"
 
@@ -599,6 +599,15 @@ control-functions:
 ## the gate must notice, so it cannot pass vacuously.
 operator-access:
 	@bash scripts/check-operator-access.sh
+
+## ao-ssh-access — the remote operator SSH route (issue #771): the ingress merge
+## must never drop a live rule (mutation-proved against a neutered copy), a dry
+## run must send no mutating request (driven against a read-only stub), no estate
+## identifier, email or token may be hardcoded (a missing id is refused by name),
+## and `--apply` must refuse while the surface ships flag-gated OFF (GR-5).
+## Offline: the stub binds loopback and no Cloudflare call is ever made.
+ao-ssh-access:
+	@bash scripts/check-ao-ssh-access.sh
 
 ## cockpit — the terminal cockpit (RC-11 #566): one frame, then exit. A client
 ## of the RC-3 API and the authenticated SSE streams that renders only what the

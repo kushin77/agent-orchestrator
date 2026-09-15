@@ -24,6 +24,7 @@ records what is **not** reachable today.
 | steer a running fleet (pause, poke, halt, refresh) | override terminal (steer) | `python3 fleet/control.py <verb>` | shell on the box |
 | start / stop the rungs | override terminal (lifecycle) | `python3 fleet/control.py start` / `stop` / `restart` | shell on the box |
 | browse the fleet from a browser, from anywhere | browser console | `make console` | shell on the box to start it; a browser to use it |
+| **get a shell on the box from anywhere** | remote route (SSH over the Cloudflare Tunnel) | `infra/cloudflare/ao-ssh-access.sh` then `ssh <user>@<the hostname>` | the route published (§6, flag-gated OFF) **and** an Access service token to make it headless |
 | **control** the fleet from outside the box | — | **not reachable today** (see [limits](#what-an-operator-with-no-shell-on-the-box-can-and-cannot-do)) | — |
 
 ## 1. The A2A control channel — the PRIMARY control plane
@@ -249,6 +250,117 @@ So: the fleet is **ordered** from a shell on the box (the primary control plane,
 §4), and **steered** from the override terminal (§2). A remote operator's path is
 the console — read-only until the remote control API is promoted.
 
+§6 adds the *transport* that removes the first of those needs — a shell on the
+box — without changing any of the above: it publishes the host's SSH through the
+Cloudflare Tunnel, so the shell the other sections assume can itself be reached
+from anywhere. It is a route to the *host*, not to the fleet console.
+
+## 6. From outside the box — SSH over the Cloudflare Tunnel
+
+Sections 1–5 all start from a shell on the host, or from a browser that can
+reach a console somebody with a shell already started. This section is the
+**transport** that removes that first need: the host's own sshd is published
+through the **existing** Cloudflare Tunnel with **Cloudflare Access** in front
+of it, so an operator reaches the host from anywhere without opening port 22 to
+the internet.
+
+```bash
+ssh <user>@<the published hostname>
+```
+
+The route is declared by [`../infra/cloudflare/ao-ssh-access.sh`](../infra/cloudflare/ao-ssh-access.sh)
+(issue #771). It is four steps, and only the first has interesting logic:
+
+1. **Merge an `ssh://<origin>:<port>` rule into the tunnel's live ingress
+   configuration.** The Cloudflare API has no "add one rule" call: the tunnel's
+   whole `config.ingress` array is rewritten, so a blind replacement would
+   delete every *other* hostname the tunnel serves — an outage that reports
+   success. The merge is therefore a pure function,
+   [`../infra/cloudflare/ingress.py`](../infra/cloudflare/ingress.py): the rule
+   for the target hostname is updated in place, a new one lands immediately
+   before the trailing catch-all, and every unrelated rule comes back untouched.
+2. **Upsert the proxied CNAME** `<hostname>` → `<tunnel id>.cfargotunnel.com`
+   (update the record that already carries the name, else create it).
+3. **Ensure the Cloudflare Access self-hosted application** for the hostname,
+   plus an allow-policy listing the operator emails.
+4. **Verify** the rule is present in the live configuration, and that the name
+   resolves (A/AAAA).
+
+### The hostname is useless without the Access app
+
+Step 3 is not a nicety. A tunnel hostname published without an Access
+application is an **unauthenticated public door to sshd** — it is a route into
+the host for anyone who learns the name. That is why the script always ensures
+the application *and* its allow-policy, and why there is deliberately no flag to
+skip step 3: a published hostname without Access is not a supported posture, it
+is the thing this route exists to avoid.
+
+### Headless needs a service token
+
+The Access application gives you the **interactive** flow: a browser, a
+one-time-PIN, a cached login. That is enough to be let in, and it is not enough
+to be *headless* — a script, a CI job or an editor cannot answer a PIN prompt.
+A Cloudflare Access **service token** (plus the client-side wrapper that presents
+it) is what makes
+
+```bash
+ssh <user>@<the published hostname>
+```
+
+connect with no browser and no cached login. The token is a separate, deliberate
+operator act on the same Access application.
+
+### What it reads from the environment
+
+| Variable | Meaning |
+|---|---|
+| `CF_ACCOUNT_ID` | the Cloudflare account that owns the tunnel |
+| `CF_ZONE_ID` | the zone that holds the published hostname |
+| `CF_TUNNEL_ID` | the tunnel that serves the hostname |
+| `AO_SSH_HOSTNAME` | the public hostname to publish |
+| `AO_SSH_ORIGIN_HOST` | the host (or address) the tunnel reaches sshd on |
+| `AO_SSH_ORIGIN_PORT` | the sshd port (default `22`) |
+| `AO_SSH_ACCESS_EMAILS` | comma-separated operator emails for the allow-policy |
+| `AO_SSH_ACCESS_SESSION_DURATION` | the Access session lifetime (default `24h`) |
+| `CF_API_TOKEN` | the API token, **or** the two Secret Manager variables below |
+| `AO_CF_TOKEN_SECRET` / `AO_GCP_SECRET_PROJECT` | the GCP Secret Manager secret and project holding that token |
+| `AO_CF_API_BASE` | the API base URL — a seam for offline dry runs, never needed live |
+
+Every identifier comes from the environment and a missing one is **refused by
+name**: there is no default to fall back on, because a default would silently
+point the run at somebody else's estate. The token is read from the environment
+or from GCP Secret Manager — never from a file, never from git (GR-6).
+
+### Dry run first, then apply
+
+```bash
+infra/cloudflare/ao-ssh-access.sh              # dry run (the default)
+infra/cloudflare/ao-ssh-access.sh --apply      # mutate
+```
+
+The dry run reads the live configuration and prints the **exact merged ingress
+it would send** — every rule, in order, including the ones it is not touching —
+so its output is evidence rather than a promise. It sends no mutating request at
+all.
+
+`--apply` refuses while the route's feature flag is OFF
+(`surfaces.remote_ssh_access` in
+[`../infra/feature-flags/registry.yaml`](../infra/feature-flags/registry.yaml),
+OFF as delivered — check it before you start, and note that promotion is a
+reviewed change, not an environment variable). The apply itself is an **operator
+act**: it changes an estate this repo does not own, which is exactly the kind of
+change an agent must not make.
+
+### What this does not do
+
+It reaches the **host**, not the fleet console. The console still refuses every
+session until the auth-gate JWKS mirror is configured (issues #763 / #730), so
+this section is the transport half of the operator-access gap and not the whole
+path: once you have the shell, sections 1–3 are what you run in it.
+
+The route is proved offline — no estate, no credentials, no Cloudflare call — by
+[`../scripts/check-ao-ssh-access.sh`](../scripts/check-ao-ssh-access.sh).
+
 ## See also
 
 - [`../fleet/CONTRACT.md`](../fleet/CONTRACT.md) §7.1 — A2A is the PRIMARY
@@ -259,3 +371,8 @@ the console — read-only until the remote control API is promoted.
   measured inventory of every control surface, and the remote-control EPIC.
 - [`../docs/decision-records/ADR-0011-session-fleet-transport.md`](decision-records/ADR-0011-session-fleet-transport.md)
   — why the transport is what it is.
+- [`../infra/cloudflare/ao-ssh-access.sh`](../infra/cloudflare/ao-ssh-access.sh) —
+  the remote route itself (§6): the four steps, dry-run by default, flag-gated OFF.
+- [`../scripts/check-ao-ssh-access.sh`](../scripts/check-ao-ssh-access.sh) — the
+  gate that proves the route: a dry run mutates nothing, the merge never drops a
+  live rule (mutation-proved), and no estate identifier is in the tree.

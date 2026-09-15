@@ -374,6 +374,20 @@ checks=(
   'pytest-control-cli|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/cli/tests'
   'pytest-control-functions|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/functions/tests'
   'pytest-cockpit|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q control-plane/cockpit/tests'
+  # Issue #771 (the remote operator SSH route, GR-5): two registrations for one
+  # lane. `ao-ssh-access` is the route's gate -- the ingress merge must never
+  # drop a live rule (mutation-proved against a neutered copy), a dry run must
+  # send no mutating request (driven against a read-only stub), no estate
+  # identifier or token may be in the tree, and `--apply` must refuse while the
+  # surface is OFF. `pytest-cloudflare` is its suite: a suite declared in
+  # scripts/pytest-suites.txt that no gate NAMES is refused by
+  # check-gate-coverage, which never grandfathers a newly declared one, so it
+  # gets its own row (the `pytest-control` precedent) rather than being named
+  # only from inside the check. Both are offline and deterministic -- the stub
+  # binds 127.0.0.1 and no Cloudflare call happens anywhere -- so they RUN for
+  # real in a fresh worktree rather than being recorded as CANNOT-ASSESS.
+  'ao-ssh-access|bash scripts/check-ao-ssh-access.sh'
+  'pytest-cloudflare|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q infra/cloudflare/tests'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------
