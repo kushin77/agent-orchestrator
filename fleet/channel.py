@@ -99,11 +99,21 @@ CONTROL_ACTIONS = (
     "kill",
     "halt",
     "override",
+    # Dead-lettering by protocol (issue #754). `drop` retires a NAMED directive
+    # to the terminal mailbox through the same implementation the automatic
+    # budget-exhaustion path uses; `dead-letter` reads the mailbox back. They
+    # exist because the alternative — an operator or peer `mv`-ing a file out of
+    # `.fleet/inbox/` while the loop reads it — races the reader, loses the
+    # attempt history, bypasses the channel and cannot be done by an agent at all.
+    "drop",
+    "dead-letter",
 )
 # Controls that act on the loop process itself rather than on the work queue.
 PROCESS_CONTROLS = ("refresh", "restart", "stop", "kill", "halt")
 # Control actions whose whole point is to re-dispatch a named issue.
 TASK_CONTROLS = ("override",)
+# Control actions that must name the directive they act on (not their own id).
+DIRECTIVE_CONTROLS = ("drop",)
 MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
 # Order kinds (schema v1, additive): `work` needs an issue; the others are
@@ -568,6 +578,17 @@ def validate(message: dict) -> list[str]:
             problems.append(f"control must be one of {', '.join(CONTROL_ACTIONS)}")
         if control in TASK_CONTROLS and not (message.get("task") or {}).get("issue"):
             problems.append(f"control '{control}' must name the task.issue it overrides")
+        if control in DIRECTIVE_CONTROLS:
+            # `drop` acts on a NAMED directive, and the target is a filename
+            # component — so it must be present and a safe mailbox name, or the
+            # control cannot be honoured (and must be reported, never a no-op).
+            target = (message.get("task") or {}).get("directive")
+            if not isinstance(target, str) or not target.strip():
+                problems.append(f"control '{control}' must name the task.directive it acts on")
+            elif not DIRECTIVE_ID_RE.fullmatch(target.strip()):
+                problems.append(
+                    f"control '{control}' names a directive that is not a safe mailbox name"
+                )
     model = message.get("model")
     if model is not None:
         if not isinstance(model, dict):
@@ -589,8 +610,16 @@ def validate(message: dict) -> list[str]:
             # A decompose order carries task.decompose (a micro-task plan) instead of
             # an issue; like a non-work kind, it needs no issue of its own.
             carries_decompose = isinstance(task.get("decompose"), dict) and bool(task["decompose"].get("children"))
-            if kind not in NON_WORK_KINDS and not carries_decompose and (
-                not isinstance(issue, int) or isinstance(issue, bool) or issue < 1
+            # A `drop` control names the DIRECTIVE it retires, not an issue of its
+            # own (issue #754): the target order already carries the issue, and
+            # demanding a second, possibly different one here would be a way to
+            # dead-letter the wrong thing while the transport called it valid.
+            carries_directive_control = message.get("control") in DIRECTIVE_CONTROLS
+            if (
+                kind not in NON_WORK_KINDS
+                and not carries_decompose
+                and not carries_directive_control
+                and (not isinstance(issue, int) or isinstance(issue, bool) or issue < 1)
             ):
                 problems.append("task.issue must be a positive integer")
             for field in ("epic",):

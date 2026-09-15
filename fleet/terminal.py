@@ -1713,29 +1713,79 @@ def guard_retire(directive_id: str, issue: int, reason: str) -> bool:
             ),
         )
         return False
-    target = runaway.dead_letter(directive_id, reason, base=guard_base())
+    # The SAME retire path the operator/A2A `control:drop` verb uses (issue
+    # #754): one implementation, two callers. Only `dropped_by` differs — the
+    # automatic path names the guard, the verb names the sender — so the two
+    # records cannot drift in shape.
+    return drop_directive(
+        directive_id,
+        issue,
+        reason,
+        dropped_by="runaway-guard",
+        report=(
+            f"#{issue} DEAD-LETTERED after {record.attempts} attempt(s) (cap {record.cap}) — "
+            f"{reason}."
+        ),
+    )
+
+
+def drop_directive(
+    directive_id: str,
+    issue: int | None,
+    reason: str,
+    *,
+    dropped_by: str,
+    report: str | None = None,
+) -> bool:
+    """Retire one directive to the dead-letter mailbox — the ONE implementation.
+
+    Two callers need this and they must not diverge (issue #754, an acceptance
+    criterion): the automatic path (:func:`guard_retire`, budget exhausted) and
+    the A2A/operator ``control:drop`` verb (a peer says the order is dead). Both
+    come here, so the durable record, the reason and the ``dropped_by`` label are
+    produced by one function and the shape is identical by construction.
+
+    Returns True when the order is now terminal. The caller is responsible for
+    the *envelope* — this function retires the work; it does not consume the
+    control message that asked for it.
+    """
+    target = runaway.dead_letter(
+        directive_id, reason, base=guard_base(), dropped_by=dropped_by
+    )
     print(
-        f"[terminal] #{issue} DEAD-LETTERED after {record.attempts} attempt(s) — {reason}",
+        f"[terminal] directive {directive_id} DEAD-LETTERED by {dropped_by} — {reason}",
         file=sys.stderr,
         flush=True,
     )
     stream_run_event(
-        directive_id, f"DEAD-LETTERED after {record.attempts} attempt(s): {reason}"
+        directive_id, f"DEAD-LETTERED by {dropped_by}: {reason}"
     )
-    report_once(
-        directive_id,
-        key=f"dead-letter:{record.attempts}",
-        message_type="escalate",
-        severity="critical",
-        body=(
-            f"#{issue} DEAD-LETTERED after {record.attempts} attempt(s) (cap {record.cap}) — "
-            f"{reason}. The order was moved to {target} and will never be dispatched again. "
-            f"Inspect it with `python3 fleet/runaway.py show --directive {directive_id}`, then "
-            f"re-order it, or re-arm the budget with `python3 fleet/runaway.py rearm --directive "
-            f"{directive_id}` once the cause is fixed."
-        ),
-    )
+    if report:
+        report_once(
+            directive_id,
+            key=f"dead-letter:{dropped_by}:{reason}",
+            message_type="escalate",
+            severity="critical",
+            body=(
+                f"{report} The order was moved to {target} and will never be dispatched again. "
+                f"Inspect it with `python3 fleet/runaway.py dead-letter --directive {directive_id}`, "
+                f"then re-order it, or re-arm the budget with `python3 fleet/runaway.py rearm "
+                f"--directive {directive_id}` once the cause is fixed."
+            ),
+        )
     return True
+
+
+def dead_letter_inventory() -> list[dict]:
+    """Every retired directive's normalised record, newest first (the list verb).
+
+    Reads through ``runaway.record_shape`` rather than the raw files so the
+    answer an operator gets from the verb is the same shape the store writes,
+    whether the drop came from the guard or from a peer's ``control:drop``.
+    """
+    state = runaway.inventory(guard_base())
+    records = [runaway.record_shape(guard_base(), name) for name in state["dead_letters"]]
+    return sorted(records, key=lambda record: str(record.get("ts") or ""), reverse=True)
 
 
 # --- controls (the operator's levers, relayed by the brain) -------------------
@@ -1845,6 +1895,8 @@ def apply_control(action: str, directive: dict, agent_id: str) -> str:
     * ``continue`` — handled here; keep going.
     * ``dispatch-override`` — an operator override: skip the held-check (the
       caller already reaped the holder) and dispatch this directive.
+    * ``drop`` — retire the named directive to the dead-letter mailbox (#754).
+    * ``dead-letter`` — list the mailbox (a read, handled here).
     * ``stop`` / ``kill`` / ``halt`` / ``restart`` / ``refresh`` — act on the
       process.
     """
@@ -1866,12 +1918,35 @@ def apply_control(action: str, directive: dict, agent_id: str) -> str:
         return "continue"
     if action == "override":
         return "dispatch-override"
+    if action == "drop":
+        return "drop"
+    if action == "dead-letter":
+        return "list-dead-letter"
     if action in ("refresh", "restart", "halt"):
         return action
     # Anything else cannot be handled by this build; the caller escalates ONCE and
     # consumes it. Measured: a control the loop did not understand stayed in the
     # inbox and was re-read every cycle, escalating hundreds of times a second.
     return "unknown"
+
+
+def control_target_directive_id(directive: dict) -> str | None:
+    """The directive a control acts ON, which is not the control's own id (#754).
+
+    `control:drop` says "retire THAT order"; the message carrying the order has
+    its own id, and confusing the two would dead-letter the control itself and
+    leave the wedged directive in place — a silent no-op that looks like success.
+    The target travels in ``task.directive`` (the same place `override` keeps its
+    target issue), and it must be a safe mailbox name because it becomes a
+    filename.
+    """
+    task = directive.get("task") or {}
+    target = task.get("directive")
+    if not isinstance(target, str) or not target.strip():
+        return None
+    if not channel.DIRECTIVE_ID_RE.fullmatch(target.strip()):
+        return None
+    return target.strip()
 
 
 def write_heartbeat(
@@ -2300,6 +2375,75 @@ def loop(args: argparse.Namespace) -> int:
                     )
                     print(f"[terminal] override reap rc={reap.returncode}: {reap.stdout.strip()[:120]}", flush=True)
                 override = True
+            elif control_outcome == "drop":
+                # Issue #754: a peer (or the operator, relaying through the brain)
+                # says a named directive is dead. Retire it through the SAME
+                # implementation the automatic path uses, consume the control, and
+                # ACK naming what was dropped — a control that silently did nothing
+                # is indistinguishable from a dead loop.
+                target = control_target_directive_id(directive)
+                if target is None:
+                    # A drop that names no target cannot be honoured, and saying so
+                    # is mandatory: an unacked/unsupported control is a reported
+                    # failure, never a silent no-op (the #754 acceptance criterion).
+                    subprocess.run(
+                        ["python3", CHANNEL, "escalate", "--from", "sister", "--correlation", directive_id,
+                         "--severity", "warn",
+                         "--body",
+                         "control:drop named no directive (task.directive) — refused, not silently "
+                         "ignored; nothing was dead-lettered"],
+                        cwd=ROOT,
+                    )
+                    handled(directive_id)
+                    if args.once:
+                        return 1
+                    continue
+                reason = str((directive.get("task") or {}).get("reason") or "dropped by control:drop")
+                sender = str(directive.get("from") or "brain")
+                target_issue = directive_issue(directive) or 0
+                drop_directive(
+                    target,
+                    target_issue,
+                    reason,
+                    dropped_by=sender,
+                    report=f"control:drop retired directive {target} on instruction from {sender}.",
+                )
+                handled(directive_id)
+                subprocess.run(
+                    ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                     "--type", "ack",
+                     "--body", f"control:drop — {target} dead-lettered (reason: {reason}); it will never be dispatched again"],
+                    cwd=ROOT,
+                )
+                print(f"[terminal] control:drop — {target} dead-lettered", flush=True)
+                if args.once:
+                    return 0
+                continue
+            elif control_outcome == "list-dead-letter":
+                # A read: answer with the mailbox and consume, so the loop never
+                # re-reads it. The mailbox is listed by verb, never by an operator
+                # walking the runtime directory.
+                records = dead_letter_inventory()
+                body = (
+                    "dead-letter mailbox is empty"
+                    if not records
+                    else "dead-lettered: "
+                    + "; ".join(
+                        f"{record.get('id')} issue={record.get('issue')} attempts={record.get('attempts')} "
+                        f"by={record.get('dropped_by')} reason={record.get('reason')}"
+                        for record in records
+                    )
+                )
+                handled(directive_id)
+                subprocess.run(
+                    ["python3", CHANNEL, "report", "--from", "sister", "--correlation", directive_id,
+                     "--type", "ack", "--body", body[:2000]],
+                    cwd=ROOT,
+                )
+                print(f"[terminal] control:dead-letter — {len(records)} record(s)", flush=True)
+                if args.once:
+                    return 0
+                continue
             else:
                 # pause / resume / stop: the flag is set; ack and carry on.
                 subprocess.run(

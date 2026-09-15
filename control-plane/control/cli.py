@@ -6,9 +6,9 @@ schema declares, and — the part that matters — cross-references the four CLI
 files that own the local levers, so the registry cannot drift from what the
 fleet can actually do:
 
-    fleet/control.py            18 verbs
-    fleet/channel.py            13 verbs
-    governance/dispatch/cli.py   9 verbs
+    fleet/control.py            20 verbs
+    fleet/channel.py            17 verbs
+    governance/dispatch/cli.py  10 verbs
     governance/reconcile/cli.py  5 verbs
     governance/lifecycle/cli.py  4 verbs
 
@@ -51,13 +51,17 @@ SELF_SOURCE = "control-plane/control/verbs.yaml"
 
 # file -> the canonical local verbs this file MUST keep providing. This is the
 # anti-vacuity FLOOR, not a closed set: a canonical verb that vanishes from BOTH
-# the surface and the registry is refused. A producer adds a verb only by landing
-# the matching verbs.yaml entry first (contract-first) — never by editing this map.
+# the surface and the registry is refused. A producer adds a verb by landing the
+# matching verbs.yaml entry first (contract-first) and adding the local name here
+# in the same change — the floor is asserted for EXACT equality with the lever
+# (`test_reader_finds_exactly_the_expected_verbs`), so a name missing from this
+# map fails the suite even when the registry declares it, and a name added here
+# without a registry entry fails `validate`. Neither edit alone is sufficient.
 SOURCES: dict[str, set[str]] = {
     "fleet/control.py": {
         "start", "status", "refresh", "update", "poke", "pause", "resume",
-        "stop", "kill", "restart", "halt", "override", "debug", "watch",
-        "health", "cron", "live", "attach",
+        "stop", "kill", "restart", "halt", "override", "drop", "dead-letter",
+        "debug", "watch", "health", "cron", "live", "attach",
     },
     "fleet/channel.py": {
         "verify", "send", "status", "report", "wait", "watch", "escalate",

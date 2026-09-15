@@ -30,6 +30,8 @@
     "RESTART": {"outcome": "ok", "rows": ["rung restarted"], "receipt": "cmd_8f21ca"},
     "HALT": {"outcome": "ok", "rows": ["fleet halted"], "receipt": "cmd_8f21cb"},
     "OVERRIDE": {"outcome": "ok", "rows": ["override recorded against #565"], "receipt": "cmd_8f21cc"},
+    "DROP": {"outcome": "ok", "rows": ["directive d-wedged dead-lettered (reason: its work already landed)"], "receipt": "cmd_8f21d5"},
+    "DEADLETTER": {"outcome": "ok", "rows": ["1 dead-lettered: d-wedged issue=754 attempts=5 by=runaway-guard"]},
     "SEND": {"outcome": "ok", "rows": ["steering message queued"], "receipt": "cmd_8f21cd"},
     "ORDER": {"outcome": "ok", "rows": ["order queued to the brain"], "receipt": "cmd_8f21ce"},
     "ESCALATE": {"outcome": "ok", "rows": ["escalation sent at warn"], "receipt": "cmd_8f21cf"},

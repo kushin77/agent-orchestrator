@@ -463,6 +463,31 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO]
 
+  - id: DROP
+    title: "Dead-letter a wedged directive by protocol"
+    kind: command
+    endpoints: [fleet/drop]
+    parameters:
+      - {name: directive, type: string, required: true, default: null}
+      - {name: reason, type: string, required: false, default: null}
+    scope: {capability: fleet:operate, level: org, tenant: platform}
+    effect_class: irreversible
+    audit: fleet.drop
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+
+  - id: DEADLETTER
+    title: "Inspect the dead-letter mailbox"
+    kind: view
+    endpoints: [fleet/dead-letter]
+    parameters:
+      - {name: directive, type: string, required: false, default: null}
+    scope: {capability: fleet:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
   # -- steering commands ----------------------------------------------------
   - id: SEND
     title: "Send a steering message"

@@ -113,6 +113,15 @@ checks=(
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'
+  # dead-letter (issue #754): the runaway guard (#723) retires a directive the
+  # LOOP can prove is unrunnable; a peer agent or an operator must be able to say
+  # so OVER THE CONTROL CHANNEL, not by `mv`-ing an order out of `.fleet/inbox/`
+  # while the loop reads it. This check drives `control:drop` against the real
+  # tree and proves the two callers — the automatic path and the verb — write the
+  # SAME record shape from one implementation, with a negative control that an
+  # undropped directive is still returned. Two mutants (the dropper removed, the
+  # order left in the inbox) must each be refused BY NAME.
+  'dead-letter|bash scripts/check-dead-letter.sh'
   'lease-policy|bash scripts/check-lease-policy.sh'
   'fleet-state|bash scripts/check-fleet-state.sh'
   'paperclip-gap-analysis|bash scripts/check-paperclip-gap-analysis.sh'
