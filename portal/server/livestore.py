@@ -12,6 +12,13 @@ telemetry — never hardcoded demo rows (issue #348):
   (the immutable AgentProfile seeds). A reference to a profile the registry
   does not publish **fails closed**: the console can never project an agent
   the registry does not know.
+  Which *revision* of a profile is live is decided in exactly one place,
+  :func:`resolve_seed_path` — the highest published version, in semantic
+  order. ``Path.glob`` yields the directory's *filesystem* (``scandir``) order,
+  which differs between checkouts of the same commit, so a caller that picked
+  the first match — or restated the rule for itself — compares the projection
+  against an arbitrary revision and goes red on a correct build depending only
+  on where the checkout lives (issue #794, #642 before it).
 * :class:`TelemetrySnapshot` reads the telemetry lane's artifacts —
   ``telemetry/budgets/config/policies.yaml`` (per-tenant cost/token budgets),
   ``telemetry/metering/config/budgets.yaml`` (per-tenant daily token limits),
@@ -26,9 +33,8 @@ Everything here is read-only and pure; nothing writes to the consumed stores.
 
 from __future__ import annotations
 
-import glob
 import json
-import os
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -54,6 +60,108 @@ class TelemetryUnavailableError(RuntimeError):
 # --------------------------------------------------------------------------- #
 # Registry
 # --------------------------------------------------------------------------- #
+# -- seed resolution: the ONE rule for "which revision of a profile is live" -- #
+#: The published seed filename grammar, ``<id>.<version>.yaml``. The registry
+#: lane owns the grammar (``registry/profiles/validate.py``: ``SEED_FILE_RE`` /
+#: ``VERSION_RE``); this mirrors it rather than reaching into a sibling lane's
+#: script module, and the resolver's tests pin the two to each other.
+SEED_SUFFIX = ".yaml"
+
+#: ``<id>.<version>.yaml`` with the registry's own id and version alphabets. The
+#: version must be matched, never split on ``"."``: ``1.10.0`` has two dots in
+#: it, and taking the last component reads it as ``"0"`` — which silently
+#: degrades the revision comparison to the filename tiebreak.
+SEED_FILENAME_RE = re.compile(
+    r"^(?P<id>[a-z][a-z0-9-]*)\."
+    r"(?P<version>[0-9]+\.[0-9]+\.[0-9]+)"
+    + re.escape(SEED_SUFFIX)
+    + r"$"
+)
+
+#: A published semantic version, exactly as the registry's validator defines it.
+SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+
+#: The order of one published revision: semver rank, numeric version, version.
+RevisionKey = tuple[int, tuple[int, int, int], str]
+
+
+def seed_version(filename: str) -> str:
+    """The ``<version>`` component of a ``<id>.<version>.yaml`` seed filename."""
+    match = SEED_FILENAME_RE.match(filename)
+    if match:
+        return match.group("version")
+    # Not a published filename — the registry's validator refuses those, so this
+    # is defensive: take the last dot-separated component, which keeps the order
+    # below total whatever is on disk.
+    stem = filename[: -len(SEED_SUFFIX)] if filename.endswith(SEED_SUFFIX) else filename
+    return stem.rpartition(".")[2]
+
+
+def revision_key(version: str) -> RevisionKey:
+    """A total order over versions in which the **highest revision is last**.
+
+    Semantic order, never the lexicographic order of the filename: ``1.10.0``
+    outranks ``1.9.0``, which plain string order has backwards (``"9" > "1"``).
+    A version that is not semantic ``X.Y.Z`` — the registry's validator refuses
+    those on a real seed, so this is defensive — sorts *below* every semantic
+    one and is ordered among its peers by the version string. The order is
+    therefore total: no two callers can disagree, and neither can two
+    directories whose entries were written in a different order.
+    """
+    if SEMVER_RE.match(version):
+        major, minor, patch = (int(part) for part in version.split("."))
+        return (1, (major, minor, patch), version)
+    return (0, (0, 0, 0), version)
+
+
+def seed_selection_key(path: Path) -> tuple[RevisionKey, str]:
+    """The **single** ordering rule over seed paths: revision, then filename.
+
+    :func:`resolve_seed_path` and :meth:`RegistrySnapshot._load_seeds` both
+    select the *greatest* path under this key, so the live revision of a
+    profile is decided in one place. The filename is the final tiebreak, which
+    makes the key total — two files publishing the same revision still resolve
+    to the same one whichever way the directory is read.
+    """
+    return (revision_key(seed_version(path.name)), path.name)
+
+
+def seed_paths(
+    seeds_dir: Path | str, pattern: str = f"*{SEED_SUFFIX}"
+) -> tuple[Path, ...]:
+    """Every seed under ``seeds_dir`` matching ``pattern``, revision-ascending.
+
+    Sorted by :func:`seed_selection_key`, so the sequence is a function of the
+    files present and never of the order ``Path.glob`` happened to yield them
+    in (``scandir`` order differs between checkouts of the same commit).
+    """
+    found = sorted(Path(seeds_dir).glob(pattern), key=seed_selection_key)
+    return tuple(found)
+
+
+def resolve_seed_path(profile_id: str, seeds_dir: Path | str) -> Path:
+    """The seed the live registry resolves for ``profile_id``: **highest revision**.
+
+    This is the registry's own rule — of every published revision of a profile
+    (``registry/profiles/seeds/<id>.<version>.yaml``), the highest is live — and
+    it is the ONE resolver the console and its tests share. Callers must not
+    restate it: a second copy (``next(glob(...))``, or ``sorted(glob(...))[-1]``,
+    which is *string* order where this is *semantic* order) is exactly how the
+    roster test drifted from the code under test and went red on a correct
+    build in a long-lived worktree (issue #794, #642 before it).
+
+    Raises :class:`RegistryDriftError` when the registry publishes no such
+    profile, so a caller fails closed rather than asserting against nothing.
+    """
+    seeds = Path(seeds_dir)
+    candidates = seed_paths(seeds, f"{profile_id}.*{SEED_SUFFIX}")
+    if not candidates:
+        raise RegistryDriftError(
+            f"no AgentProfile seed for {profile_id!r} under {seeds}"
+        )
+    return max(candidates, key=seed_selection_key)
+
+
 @dataclass(frozen=True)
 class RegistryProfile:
     """A frozen AgentProfile seed reduced to the fields the console projects.
@@ -108,12 +216,25 @@ class RegistrySnapshot:
         return ladder
 
     def _load_seeds(self, seeds_dir: Path) -> dict[str, RegistryProfile]:
-        profiles: dict[str, RegistryProfile] = {}
-        for path in sorted(glob.glob(os.path.join(str(seeds_dir), "*.yaml"))):
-            data = self._load_yaml(Path(path))
+        # Read every seed once, group the paths by the id the seed declares, and
+        # let the shared rule pick each profile's live revision: the HIGHEST
+        # published one (``seed_selection_key``). Selecting through one rule —
+        # rather than trusting the order the directory happens to be written in
+        # — is what makes the projection (and every test that reads it) a
+        # function of the registry alone, not of where the checkout lives.
+        parsed: dict[Path, Any] = {}
+        by_id: dict[str, list[Path]] = {}
+        for path in seed_paths(seeds_dir):
+            data = self._load_yaml(path)
+            parsed[path] = data
             profile_id = str(data.get("id") or "")
-            if not profile_id:
-                continue
+            if profile_id:
+                by_id.setdefault(profile_id, []).append(path)
+
+        profiles: dict[str, RegistryProfile] = {}
+        for profile_id, candidates in by_id.items():
+            path = max(candidates, key=seed_selection_key)
+            data = parsed[path]
             tier = str(data.get("defaultModelTier") or "")
             capabilities = tuple(str(cap) for cap in (data.get("capabilitySet") or ()))
             if not capabilities:

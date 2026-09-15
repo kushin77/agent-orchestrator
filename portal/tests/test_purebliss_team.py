@@ -21,6 +21,8 @@ from __future__ import annotations
 import yaml
 from conftest import REPO_ROOT, login_as
 
+from portal.server.livestore import resolve_seed_path
+
 PUREBLISS_AGENTS = {"ollama", "paperclip", "hermes", "deepseek", "claude"}
 
 #: The closed tier -> model ladder the registry declares (catalog.yaml).
@@ -32,16 +34,15 @@ def _registry_tier_model(agent_profile: str) -> str:
     """The model the live registry resolves for a profile (via catalog.yaml).
 
     ``RegistrySnapshot`` resolves the highest published version of a profile
-    (``paperclip`` publishes 1.0.0 and 1.1.0), so the seed is picked the same
-    way: ``Path.glob`` yields filesystem order, which would make this helper
-    depend on how the checkout created the seeds directory rather than on the
-    registry's own rule.
+    (``paperclip`` publishes 1.0.0 and 1.1.0), so the seed is picked by the
+    loader's own resolver rather than by a second copy of that rule: restating
+    it — ``next(glob())`` (filesystem order) or ``sorted(glob())[-1]`` (string
+    order) — ties this helper to how the checkout created the seeds directory
+    instead of to the registry (issue #794, #642 before it).
     """
     ladder = yaml.safe_load(_CATALOG.read_text(encoding="utf-8"))["tiers"]
-    seed_paths = sorted(_SEEDS.glob(f"{agent_profile}.*.yaml"))
-    assert seed_paths, f"no AgentProfile seed for {agent_profile!r}"
     tier = yaml.safe_load(
-        seed_paths[-1].read_text(encoding="utf-8")
+        resolve_seed_path(agent_profile, _SEEDS).read_text(encoding="utf-8")
     )["defaultModelTier"]
     return ladder[tier]["model"]
 
