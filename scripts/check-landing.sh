@@ -95,7 +95,13 @@ export EVENTS
 # PATH entry) from a caller would silently change what the stub answers, and a
 # control that reads its answer from the caller's shell proves nothing — the
 # shape of an exported AO_FLEET_DIR that reds five sibling tests in any worktree.
-unset GH_PR_STATE GH_MERGE_COMMIT GH_PR_HEAD CONTRACT_MODE
+# AO_LAND_APPLY belongs here for the same reason, and is the sharpest case: the
+# driver is invoked as `AO_LAND_APPLY=1` in production, so that is exactly the
+# variable set when this check runs inside the contract's own verify. Inheriting
+# it turned every dry-run control below into an apply run — rc 0 where 1 or 2 was
+# required, mutating calls recorded, no plan printed — and so reddened the gate
+# of record for the very lane that added it.
+unset GH_PR_STATE GH_MERGE_COMMIT GH_PR_HEAD CONTRACT_MODE AO_LAND_APPLY
 
 # --- 1. static assertions ----------------------------------------------------
 echo "== check-landing: the declared, code-native path =="
@@ -358,7 +364,17 @@ PY
 
 run_driver() { # <out-file> <lane> <args…>  -> rc in $?
   local out="$1" lane="$2"; shift 2
-  python3 "$cli" land --issue 764 --root "$lane" "$@" > "$out" 2>&1
+  # Every caller is a DRY-RUN scenario, so the apply opt-in is stripped for the
+  # child whether or not the caller's shell exported it (see the hygiene note
+  # above). The mode is then asserted on the banner: a run that reaches `land:`
+  # and is not a dry run is a wrong-mode run, and saying so once beats the six
+  # confusing downstream failures it causes (#764).
+  env -u AO_LAND_APPLY python3 "$cli" land --issue 764 --root "$lane" "$@" > "$out" 2>&1
+  local rc=$?
+  if grep -q '^land: ' "$out" && ! grep -q 'mode=DRY RUN' "$out"; then
+    fail "wrong mode: expected a dry run — $(grep -m1 '^land: ' "$out")"
+  fi
+  return "$rc"
 }
 
 assert_named() { # <out-file> <code> <case>
