@@ -24,6 +24,7 @@ from chat_fixtures import (
     token_of,
     with_grounding,
 )
+from chat_stream_probe import assess, content_of, enforce
 
 from gateway.chat import contract
 from gateway.chat.errors import ChatSurfaceError, SurfaceDisabled
@@ -204,19 +205,35 @@ def test_stream_yields_incremental_then_terminal_frames(
 
 
 def test_stream_content_matches_the_single_body(rigged, body, credential, grounding):
-    rigged.script(grounded_payload())
+    """The streamed deltas spell the same answer the single body carries.
+
+    A frame that is a REFUSAL is not a content mismatch: the turn was not
+    served, so the run is re-measured once and reported CANNOT-ASSESS rather
+    than failed, naming the refusal (issue #843).  A content that was measured
+    and differs is a FAIL at once, so a genuine regression still fails.
+    """
+    token = token_of(credential)
     wire = with_grounding(dict(body, stream=True), grounding)
-    single = rigged.surface.completions(wire, token=token_of(credential))
-    rigged.script(grounded_payload())
-    frames = list(rigged.surface.completions_stream(wire, token=token_of(credential)))
-    streamed = "".join(
-        json.loads(frame[len("data:") :].strip())["choices"][0]["delta"].get(
-            "content", ""
+
+    def attempt() -> str:
+        rigged.script(grounded_payload())
+        single = rigged.surface.completions(wire, token=token)
+        rigged.script(grounded_payload())
+        frames = list(rigged.surface.completions_stream(wire, token=token))
+        assert frames[-1] == contract.SSE_DONE, "the stream did not end with the sentinel"
+        streamed = content_of(frames, sentinel=contract.SSE_DONE)
+        assert streamed == single["choices"][0]["message"]["content"], (
+            "the streamed deltas do not spell the answer the single body carries"
         )
-        for frame in frames
-        if frame != contract.SSE_DONE
+        return streamed
+
+    verdict = assess(attempt)
+    enforce(
+        verdict,
+        label="test_stream_content_matches_the_single_body",
+        skip=pytest.skip,
+        fail=pytest.fail,
     )
-    assert streamed == single["choices"][0]["message"]["content"]
 
 
 def test_streamed_refusal_is_a_terminal_error_frame(rigged, body):
