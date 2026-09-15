@@ -22,6 +22,13 @@ and skips when the invariant already holds. The result is never success by
 assertion — the executor re-derives the findings afterwards and reports ``ok``
 only when the set is empty. A partial close reports the steps it could not
 finish, which is exactly what the caller needs to act on.
+
+The verdict is a **tri-state**, because a step can end in a way that is *neither a
+pass nor a failure*: the gate was parked at its box-wide permit cap, its permit
+store could not be trusted, or it was killed by a signal. Nothing was measured in
+any of those cases, and reporting one as a broken invariant asserts a fact nobody
+measured (#840). An unassessed step therefore yields ``CANNOT-ASSESS`` — never
+``NOT-OK``, and never ``OK``.
 """
 
 from __future__ import annotations
@@ -30,6 +37,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
 from governance.lifecycle.audit import Finding, audit_item
+from governance.lifecycle.gate import UNASSESSED_VERDICTS, CannotAssess
 from governance.lifecycle.model import owes_closure
 from governance.lifecycle.report import (
     BoardReport,
@@ -37,10 +45,20 @@ from governance.lifecycle.report import (
     board_report_findings,
 )
 
-#: How a step ended.
+#: How a step ended: performed, skipped, failed — or one of the unassessed
+#: verdicts (``parked``/``unassessed``), which are a step's own outcome rather than
+#: a failure of it.
 PERFORMED = "performed"
 SKIPPED = "skipped"
 FAILED = "failed"
+
+#: The invariant a parked verification leaves unmeasured (#840).
+VERIFY_INVARIANT = "VERIFY_EVIDENCE_MISSING"
+
+#: The three verdicts close-out can reach.
+OK = "ok"
+NOT_OK = "not-ok"
+CANNOT_ASSESS = "cannot-assess"
 
 
 class CloseOutOps(Protocol):
@@ -50,7 +68,13 @@ class CloseOutOps(Protocol):
         """Squash-merge the pull request; return the merge commit."""
 
     def record_verification(self, issue: int, commit: str) -> str:
-        """Record a green verification attestation naming ``commit``."""
+        """Record a green verification attestation naming ``commit``.
+
+        Raises ``governance.lifecycle.gate.CannotAssess`` — and *not* a generic
+        error — when the gate produced no verification result at all (it was parked,
+        its permit store was unusable, or it was killed by a signal), so the executor
+        can report that outcome as unassessed instead of as a failure (#840).
+        """
 
     def delete_branch(self, branch: str) -> str:
         """Delete the remote source branch."""
@@ -90,23 +114,75 @@ class Step:
     detail: str = ""
 
 
+@dataclass(frozen=True)
+class Unassessed:
+    """Something close-out could not assess, and what clears it.
+
+    Deliberately not a ``Finding``. A finding asserts a fact — "this invariant is
+    broken" — and is filed on the board as a defect; an unassessed rule asserts the
+    *absence* of the fact required to decide it (the gate never ran, so whether a
+    green attestation exists is unknown). Reporting the second as the first is the
+    defect of #840, so they are different types with different verdicts rather than
+    two shades of the same message.
+    """
+
+    action: str
+    code: str = ""
+    subject: str = ""
+    detail: str = ""
+    remediation: str = ""
+
+    def __str__(self) -> str:
+        head = "  ".join(part for part in (self.code, self.subject) if part) or self.action
+        return f"{head}  {self.detail}"
+
+
 @dataclass
 class CloseOutResult:
-    """What close-out did, and what is still broken afterwards."""
+    """What close-out did, and what is still broken (or unmeasured) afterwards."""
 
     issue: int
     steps: list[Step] = field(default_factory=list)
     remaining: list[Finding] = field(default_factory=list)
+    not_assessed: list[Unassessed] = field(default_factory=list)
     board_reports: list[BoardReport] = field(default_factory=list)
+
+    @property
+    def verdict(self) -> str:
+        """``ok`` / ``not-ok`` / ``cannot-assess``, *derived* from what remains.
+
+        A known-broken invariant outranks an unmeasured one: if something is
+        measurably broken the item is NOT-OK whatever else could not be measured,
+        and the unassessed entries are still printed beside it.
+        """
+        if self.remaining:
+            return NOT_OK
+        if self.not_assessed:
+            return CANNOT_ASSESS
+        return OK
 
     @property
     def ok(self) -> bool:
         """Success is the *absence of findings*, never the absence of exceptions."""
-        return not self.remaining
+        return self.verdict == OK
+
+    @property
+    def cannot_assess(self) -> bool:
+        """True when nothing is known broken and something could not be measured.
+
+        The caller's exit code depends on this: a parked close-out is rc 2, never
+        rc 0 (a pass it did not measure) and never rc 1 (a failure it did not
+        measure).
+        """
+        return self.verdict == CANNOT_ASSESS
 
     @property
     def failed_steps(self) -> list[Step]:
         return [step for step in self.steps if step.outcome == FAILED]
+
+    @property
+    def unassessed_steps(self) -> list[Step]:
+        return [step for step in self.steps if step.outcome in UNASSESSED_VERDICTS]
 
 
 def _run(result: CloseOutResult, action: str, op: Callable[[], str], needed: bool) -> bool:
@@ -115,12 +191,25 @@ def _run(result: CloseOutResult, action: str, op: Callable[[], str], needed: boo
     A failing step must not abort the remaining ones: the point of close-out is to
     finish everything it can and report the rest, not to stop at the first
     obstacle and leave the other artifacts dangling.
+
+    An unassessed step is caught *before* the generic handler, because it is not a
+    failure and must not be recorded as one: since #840 a step can end ``parked``
+    (the gate was refused a permit and ran nothing) or ``unassessed`` (its permit
+    store could not be trusted, or it was killed by a signal). Those carry their
+    own outcome and land in ``not_assessed``, so the report can say CANNOT-ASSESS
+    instead of a failure nobody measured.
     """
     if not needed:
         result.steps.append(Step(action, SKIPPED, "already satisfied"))
         return True
     try:
         detail = op()
+    except CannotAssess as exc:
+        result.steps.append(Step(action, exc.verdict, exc.detail[:300]))
+        result.not_assessed.append(
+            Unassessed(action=action, detail=exc.detail, remediation=exc.remediation)
+        )
+        return False
     except Exception as exc:  # noqa: BLE001 - the outcome is data, not a crash
         result.steps.append(Step(action, FAILED, f"{type(exc).__name__}: {exc}"[:300]))
         return False
@@ -218,12 +307,59 @@ def closeout(
     # port and re-derive from its *fresh* facts. The pre-close item is stale once
     # the effects above have run; auditing it would report a successful close as
     # NOT-OK.
-    result.remaining = audit_item(ops.refresh(item))
+    fresh = ops.refresh(item)
+    result.remaining = audit_item(fresh)
+    verification = next((step for step in result.steps if step.action == "record-verification"), None)
+    if verification is not None and verification.outcome in UNASSESSED_VERDICTS:
+        _retire_unmeasured_verification(result, fresh, verification)
     return _finish(result, reporter, apply)
 
 
+def _retire_unmeasured_verification(result: CloseOutResult, fresh: dict, step: Step) -> None:
+    """A verification the gate never measured is *unassessed*, not missing (#840).
+
+    ``audit`` is offline by design and reads only the item, so it cannot know that
+    the gate was refused a permit; where the verification invariant fired for
+    exactly that reason, the finding asserted something nobody measured. It is
+    retired from ``remaining`` and the invariant is carried in ``not_assessed``
+    instead, which changes the verdict to CANNOT-ASSESS and files nothing on the
+    board — a defect report generated by capacity is a false report.
+
+    Two shapes are deliberately **not** retired, because a gate that never ran does
+    not explain either: an attestation that is recorded and names the wrong commit
+    is a measured mismatch, and an item that records no verified head commit at all
+    is broken for a reason no gate run could fix.
+    """
+    verify = fresh.get("verify") or {}
+    head = str((fresh.get("pr") or {}).get("head_commit") or "")
+    if verify.get("ok") or not head:
+        return
+    retired = [finding for finding in result.remaining if finding.code == VERIFY_INVARIANT]
+    if not retired:
+        return
+    result.remaining = [finding for finding in result.remaining if finding.code != VERIFY_INVARIANT]
+    gate_record = next((record for record in result.not_assessed if record.action == step.action), None)
+    result.not_assessed.append(
+        Unassessed(
+            action=step.action,
+            code=VERIFY_INVARIANT,
+            subject=f"#{result.issue}",
+            detail=(
+                f"no attestation is recorded and the gate was {step.outcome}, so whether the "
+                "verified head commit is green is unmeasured, not missing"
+            ),
+            remediation=gate_record.remediation if gate_record else "",
+        )
+    )
+
+
 def _finish(result: CloseOutResult, reporter: BoardReporter | None, apply: bool) -> CloseOutResult:
-    """Surface any remaining findings on the board, then return the result."""
+    """Surface any remaining findings on the board, then return the result.
+
+    Only *findings* are filed. An unassessed rule is not filed, on purpose: the
+    board is for defects, and a capacity condition is not one. The verdict the
+    caller receives says CANNOT-ASSESS instead.
+    """
     if reporter is not None and result.remaining:
         result.board_reports = board_report_findings(result.remaining, reporter, apply=apply)
     return result
@@ -234,11 +370,16 @@ def _default_evidence(issue: int) -> str:
 
 
 def describe(result: CloseOutResult) -> str:
-    """A one-block human summary: what ran, and what is still wrong."""
-    lines = [f"close-out #{result.issue}: {'OK' if result.ok else 'NOT-OK'}"]
+    """A one-block human summary: what ran, what remains, and what was not measured."""
+    verdict = {OK: "OK", NOT_OK: "NOT-OK", CANNOT_ASSESS: "CANNOT-ASSESS"}[result.verdict]
+    lines = [f"close-out #{result.issue}: {verdict}"]
     for step in result.steps:
-        lines.append(f"  {step.outcome:<9} {step.action}: {step.detail}")
+        lines.append(f"  {step.outcome:<11} {step.action}: {step.detail}")
     for finding in result.remaining:
         lines.append(f"  REMAINS  {finding}")
         lines.append(f"           -> {finding.remediation}")
+    for record in result.not_assessed:
+        lines.append(f"  UNASSESSED  {record}")
+        if record.remediation:
+            lines.append(f"           -> {record.remediation}")
     return "\n".join(lines)
