@@ -62,7 +62,7 @@ dependency order. The order is derived from the incident above, not from taste:
 2. **record verification** for that head commit;
 3. **delete the source branch** — which a local squash-merge reliably leaves behind;
 4. **consume the directive** — *before* releasing the claim, because on #263 the
-   still-pending directive was re-executed the moment the claim freed;
+   still-pending directive was re-executed the moment the claim freed (§3.1);
 5. **release the claim**;
 6. **close the issue with evidence** — which only exists once 1–2 have run;
 7. **reclaim the lane last** — so a failure earlier leaves the worktree available
@@ -76,6 +76,41 @@ pre-close item would report a fully successful close as NOT-OK — the inverse o
 the false green this module exists to prevent, and a bug the third end-to-end run
 caught.
 
+### 3.1 The directive's terminal move
+
+Step 4 is owned **here**, not delegated to a mailbox CLI. A brain-minted
+authorisation is written to `.fleet/sent/<id>.json` (the chain edge
+`claim --directive <id>` validates, golden rule 14); *consumed* means the record has
+reached `.fleet/done/`. Until #821 the close-out shelled out to
+`fleet/channel.py consume`, which reads only the **inbox** — a mailbox a brain
+directive never enters — so it answered `nothing to consume` (rc 1) for the very
+artifact the finding named, and every brain-dispatched lane ended in an
+undocumented hand-move. Measured on this box: 118 stranded directives in
+`.fleet/sent/`, none of them retireable by any documented command.
+
+[`directive.py`](directive.py) is now the single owner of the `sent` → `done`
+transition, and its gate is a fact the close-out already holds:
+
+| Condition | Decision |
+|---|---|
+| no record carries the id | refuse by name |
+| the record names no issue | refuse — an authorisation whose subject cannot be established may not be retired |
+| the issue is outside the lifecycle record | refuse — absence is not permission |
+| the ordered change has **not landed** | refuse; the record stays in `sent/`, so live work cannot be retired |
+| the ordered change has landed | move the whole stranded set for that issue into `done/` |
+| a byte-identical file is already in `done/` | remove the duplicate; a *differing* file is refused, never overwritten |
+
+"Landed" is the model's own `owes_closure` (the issue is closed, or its pull
+request is merged), reused rather than restated so the gate and the closure
+invariants cannot drift. It is deliberately **not** "the issue is closed":
+close-out consumes at step 4 and closes the issue at step 7, so that criterion
+would leave the documented path unsatisfiable for every ordered lane — the defect
+class this change removes. A live order is refused by name and stays `sent`.
+
+The whole stranded set for the issue moves in one pass, because the invariant is
+about the *order* being retired; moving one and leaving a sibling pending would
+reproduce the same finding while `sent/` kept growing. Every collision is checked
+before the first move, so a refusal never leaves the mailboxes half-moved.
 ## 4. Auditing, and why it is offline
 
 `cli.py collect` reaches GitHub; `cli.py audit` never does. The rules are asserted

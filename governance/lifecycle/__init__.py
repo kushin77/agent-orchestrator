@@ -2,8 +2,8 @@
 
 ``governance/isolation`` guarantees a lane *opens* correctly; this package covers
 the other half — the **close**. See ``README.md`` for the contract, ``model.py``
-for the invariants, ``audit.py`` for what is broken, and ``closeout.py`` for how
-it gets fixed.
+for the invariants, ``audit.py`` for what is broken, ``closeout.py`` for how it
+gets fixed, and ``directive.py`` for the authorisation directive's terminal move.
 """
 
 from __future__ import annotations
