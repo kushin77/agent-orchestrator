@@ -141,3 +141,12 @@ integrations/erp/catalog
 # denies. Named from inside scripts/check-erp-auth.sh, which also drives a
 # mutant with the tenant gate disabled and requires it to be refused by name.
 integrations/erp/auth
+# Issue #793 — the spawn envelope. The suite proves that every required field of
+# the envelope is refused BY NAME, that the loop's prompt IS the envelope's
+# rendering (exact equality, so a paraphrase cannot pass), that a malformed
+# envelope refuses the spawn before any child exists, and that "a run in flight"
+# is the run marker's own evidence. Declared here AND named from inside
+# scripts/check-spawn-envelope.sh, which is itself wired into scripts/verify.sh —
+# a declared-but-unnamed suite is refused by check-gate-coverage, which never
+# grandfathers a newly declared one.
+governance/spawn

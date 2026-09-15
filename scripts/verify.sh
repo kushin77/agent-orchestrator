@@ -224,6 +224,18 @@ checks=(
   # distinction removed — each required to diverge on a probe whose value must
   # change (a happy-path assertion cannot pass it).
   'watchdog-bounded|bash scripts/check-watchdog-bounded.sh'
+  # spawn-envelope (issue #793): governance is DECLARED in governance/** but was
+  # not ENFORCED AT SPAWN — the remote path inlined it as prompt prose nothing
+  # could check, and the local path shared none of it, so one lane ran 26 gates
+  # in one worktree while every other lane ran exactly one, and the fleet's own
+  # liveness evidence contradicted itself. This check requires the envelope to be
+  # a PRECONDITION: every required field is provoked missing and refused BY NAME
+  # with its own exit code (78), the local path is driven for real against its own
+  # board (admitted, and refused when its claim is absent), the fleet prompt must
+  # EQUAL the envelope's rendering, run_in_flight() must decide on the run
+  # marker's own evidence, and the one-gate bound is provoked with a real second
+  # gate (AO-GR-22).
+  'spawn-envelope|bash scripts/check-spawn-envelope.sh'
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'

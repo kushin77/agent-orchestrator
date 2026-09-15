@@ -298,10 +298,63 @@ STUB
   chmod +x "$home/.local/bin/claude-733-probe" || return 1
   env -C "$root" HOME="$home" PATH=/usr/bin:/bin AO_FLEET_DIR="$work/fleet-spawn" \
     PYTHONDONTWRITEBYTECODE=1 python3 - > "$log" 2>&1 <<'PY'
+import os
 import sys
 
 sys.path.insert(0, "fleet")
+sys.path.insert(0, ".")
 import terminal  # noqa: E402
+from governance.spawn import sources  # noqa: E402
+
+# The spawn envelope is a PRECONDITION (#793): a probe that drives the run path
+# supplies one, so this check keeps measuring the RUNNER (resolve it off PATH,
+# spawn it, record its argv) instead of measuring the refusal. The sources are
+# injected rather than read, so the probe stays offline and does not depend on
+# this box's board, claim ledger or gate permits.
+_WORKTREE = os.getcwd()
+_AGENT = "subagent-733"
+sources.collect = lambda **_: {
+    "issue": 900001,
+    "lane": "fleet",
+    "worktree": _WORKTREE,
+    "session": {
+        "id": "checkrunnerpreflight01",
+        "issue": "900001",
+        "agent": _AGENT,
+        "lane": "fleet",
+        "branch": "issue-900001",
+        "worktree": _WORKTREE,
+        "repo_slug": "kushin77/agent-orchestrator",
+        "author_name": f"agent-{_AGENT}",
+        "author_email": f"agent+{_AGENT}@agents.invalid",
+    },
+    "trailer": "Refs kushin77/agent-orchestrator#900001",
+    "claim": {"owner": _AGENT, "state": "claim", "lane": "fleet", "at": "2026-09-15T00:00:00Z"},
+    "focus": {"epic": 160, "source": "pinned-focus", "pinned_epic": 160, "wave_cap": 12, "max_agents": 0},
+    "capacity": {
+        "effective": 1,
+        "binding": "disjoint",
+        "assessed": True,
+        "bounds": [],
+        "problems": [],
+        "permit": {
+            "store": "/tmp/check-fleet-runner-preflight-gates",
+            "worktree_key": "checkrunnerpreflight",
+            "lock": "/tmp/check-fleet-runner-preflight-gates/checkrunnerpreflight.lock",
+            "max_concurrent": 4,
+        },
+    },
+    "budget": {"attempts": 0, "cap": 5, "state": "pending", "next_attempt_at": None},
+    "gate": {
+        "of_record": "make verify",
+        "bound": "at most one composite gate per worktree, bounded box-wide (AO-GR-22)",
+        "entry": "scripts/gate-lock.sh",
+        "max_concurrent": 4,
+        "ttl_seconds": 900,
+    },
+    "verify": {"command": "make verify", "source": "gate-of-record"},
+    "spawn": {"path": "fleet", "agent": _AGENT, "directive": "d-733-spawn"},
+}
 
 rc, output = terminal.run_once(
     {"id": "d-733-spawn", "task": {"kind": "work", "issue": 900001, "lane": "fleet"}},
