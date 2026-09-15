@@ -224,26 +224,44 @@ def apply_stock(
 
     The new ledger is built first and returned only when nothing went negative,
     so a refused movement cannot leave a partially-applied ledger behind.
+
+    A **single-sided** movement (a receipt, an issue, a manufacture) honours the
+    warehouse named on each line, falling back to the document's own: a
+    sub-assembly is produced into one warehouse and consumed from it, which is
+    not necessarily where its parent's other components live. A **two-sided**
+    movement (a transfer) refuses a per-line warehouse, because there the line's
+    warehouse would be ambiguous between the source and the destination — and an
+    ambiguity that resolves silently is worse than a refusal.
     """
     purpose = entry.get("purpose")
     effects = stock_effect(catalog, purpose)
+    lines = list(entry.get("lines", []))
+    overridden = [line for line in lines if line.get("warehouse")]
+    if len(effects) > 1 and overridden:
+        raise Refused(
+            "invalid-value",
+            f"{entry.get('id')}: a {purpose} moves between two named warehouses, so "
+            f"the per-line warehouse on {overridden[0].get('item_code')!r} would be "
+            "ambiguous between them",
+        )
     ledger: Dict[str, Dict[str, float]] = {
         warehouse: dict(bucket) for warehouse, bucket in stock.items()
     }
     for field, sign in sorted(effects.items()):
-        warehouse = entry.get(field)
-        if warehouse is None:
+        default = entry.get(field)
+        if default is None:
             raise Refused(
                 "invalid-value", f"{entry.get('id')}: a {purpose} names no {field}"
             )
-        bucket = ledger.setdefault(warehouse, {})
-        for line in entry.get("lines", []):
+        for line in lines:
             item_code = line.get("item_code")
             if item_code not in items:
                 raise Refused(
                     "unknown-item",
                     f"{entry.get('id')}: {item_code!r} is not in the item master",
                 )
+            warehouse = line.get("warehouse") or default
+            bucket = ledger.setdefault(warehouse, {})
             bucket[item_code] = round(
                 bucket.get(item_code, 0.0) + sign * float(line.get("qty", 0) or 0), 6
             )

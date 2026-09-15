@@ -70,7 +70,11 @@ def test_the_finished_good_lands_in_the_finished_warehouse(
     model: Model, catalog: Catalog
 ) -> None:
     transcript = flows.golden_path(model, catalog)
-    assert transcript["workspace"]["stock"][flows.FINISHED_WAREHOUSE]["FG-1"] == 4.0
+    stock = transcript["workspace"]["stock"]
+    assert stock[flows.FINISHED_WAREHOUSE]["FG-1"] == 4.0
+    # Ten sub-assemblies were produced and four consumed as sub-assemblies, so
+    # six remain: the build consumes the sub-assembly, not its raw material.
+    assert stock[flows.FINISHED_WAREHOUSE]["SUB-1"] == 6.0
 
 
 def test_the_rail_re_derives(model: Model, catalog: Catalog) -> None:

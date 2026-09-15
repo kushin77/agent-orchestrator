@@ -372,12 +372,16 @@ def provocations() -> Tuple[Provocation, ...]:
         )
 
     def work_order_already_completed() -> None:
+        # BOM-SUB-1 consumes only raw material the cycle has already bought, so
+        # the FIRST completion succeeds and the second is the thing being
+        # provoked — a provocation that failed on stock would be asserting the
+        # wrong refusal.
         space = _boms(_cycle())
         order = manufacturing.raise_work_order(
             space,
             wo_id="WO-0001",
-            bom_id="BOM-FG-1",
-            quantity=4,
+            bom_id="BOM-SUB-1",
+            quantity=10,
             at=flows.T["wo_fg"],
             from_warehouse=flows.RAW_WAREHOUSE,
             to_warehouse=flows.FINISHED_WAREHOUSE,
@@ -394,7 +398,7 @@ def provocations() -> Tuple[Provocation, ...]:
         order = manufacturing.raise_work_order(
             space,
             wo_id="WO-0001",
-            bom_id="BOM-FG-1",
+            bom_id="BOM-SUB-1",
             quantity=1000,
             at=flows.T["wo_fg"],
             from_warehouse=flows.RAW_WAREHOUSE,

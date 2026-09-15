@@ -59,6 +59,10 @@
           },
           "rate": {
             "$ref": "../../core/schemas/document.schema.json#/$defs/rate"
+          },
+          "warehouse": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+            "description": "The warehouse this component is issued from. A sub-assembly is produced into one warehouse and consumed from it, which is not always the warehouse its parent's other components come from — so the source is declared per component and the work order's from_warehouse is only the default."
           }
         }
       },

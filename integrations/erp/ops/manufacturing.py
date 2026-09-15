@@ -49,6 +49,7 @@ __all__ = [
     "activate_bom",
     "bom_for",
     "complete_work_order",
+    "components_of",
     "define_bom",
     "explode",
     "plan_production",
@@ -201,6 +202,45 @@ def explode(
     return {code: required[code] for code in sorted(required)}
 
 
+def components_of(
+    bom: Mapping[str, Any], *, quantity: float
+) -> List[Dict[str, Any]]:
+    """The bill's **direct** components, scaled to ``quantity``.
+
+    One level, not the full explosion, and the distinction is the difference
+    between a correct ledger and a double count. A work order consumes what its
+    own bill declares: a component that is itself produced is consumed *as
+    itself*, and the order that makes it is a separate piece of work — which is
+    exactly what :func:`explode` exists to find when planning. Back-flushing the
+    expanded leaves here would consume the sub-assembly's raw material a second
+    time and leave the sub-assembly itself produced and never used.
+
+    So ``explode`` is the planning walk (what the whole build needs from raw
+    material) and this is the consuming list, and the completion records both.
+    A component's declared ``warehouse`` is carried through, because a
+    sub-assembly is produced into one warehouse and consumed from it, which is
+    not necessarily where its parent's other components come from.
+    """
+    base = float(bom.get("quantity") or 0)
+    if base <= 0:
+        raise Refused(
+            "invalid-value",
+            f"bom {bom.get('id')}: quantity must be positive, got {bom.get('quantity')!r}",
+        )
+    factor = float(quantity) / base
+    lines: List[Dict[str, Any]] = []
+    for component in bom.get("components", []):
+        qty = round(float(component["qty"]) * factor, 6)
+        if qty <= 0:
+            continue
+        line: Dict[str, Any] = {"item_code": component["item_code"], "qty": qty}
+        warehouse = component.get("warehouse")
+        if isinstance(warehouse, str) and warehouse.strip():
+            line["warehouse"] = warehouse
+        lines.append(line)
+    return sorted(lines, key=lambda entry: entry["item_code"])
+
+
 def raise_work_order(
     space: Workspace,
     *,
@@ -279,15 +319,18 @@ def complete_work_order(
         )
 
     quantity = float(work_order["quantity"])
-    required = explode(space, bom, quantity=quantity)
+    consumed = components_of(bom, quantity=quantity)
+    planned = explode(space, bom, quantity=quantity)
     space.rail = space.rail.append(
         at=at,
         actor=actor,
         action=ACTION_EXPLODE,
         document=wo_id,
         detail=(
-            f"bom {bom['id']} exploded for {quantity:g} {work_order['item']}: "
-            + ", ".join(f"{code} x {qty:g}" for code, qty in sorted(required.items()))
+            f"bom {bom['id']} for {quantity:g} {work_order['item']}: consumes "
+            + ", ".join(f"{line['item_code']} x {line['qty']:g}" for line in consumed)
+            + " | explodes to "
+            + ", ".join(f"{code} x {qty:g}" for code, qty in sorted(planned.items()))
         ),
     )
 
@@ -300,12 +343,10 @@ def complete_work_order(
         currency=space.catalog.currency,
         lines=[
             {
-                "item_code": code,
-                "qty": qty,
-                "warehouse": work_order["from_warehouse"],
-                "valuation_rate": _valuation(space, code),
+                **line,
+                "valuation_rate": _valuation(space, line["item_code"]),
             }
-            for code, qty in sorted(required.items())
+            for line in consumed
         ],
         where=f"work order {wo_id} issue",
     )

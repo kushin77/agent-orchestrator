@@ -81,6 +81,44 @@ def test_the_stock_effects_are_what_the_catalogue_declares(catalog: Catalog) -> 
     assert catalog.stock_effect("manufacture") == {"to_warehouse": 1}
 
 
+def test_a_single_sided_movement_honours_the_line_warehouse(catalog: Catalog) -> None:
+    """A component's own warehouse overrides the order's default."""
+    entry = {
+        "id": "STE-1",
+        "purpose": "material_issue",
+        "from_warehouse": "WH-RAW",
+        "lines": [
+            {"item_code": "RAW-A", "qty": 1},
+            {"item_code": "SUB-1", "qty": 2, "warehouse": "WH-FG"},
+        ],
+    }
+    moved = ledger.apply_stock(
+        catalog,
+        {"WH-RAW": {"RAW-A": 3.0}, "WH-FG": {"SUB-1": 5.0}},
+        entry,
+        items={"RAW-A": {}, "SUB-1": {}},
+    )
+    assert moved == {"WH-RAW": {"RAW-A": 2.0}, "WH-FG": {"SUB-1": 3.0}}
+
+
+def test_a_two_sided_movement_refuses_a_line_warehouse(catalog: Catalog) -> None:
+    """A transfer's line warehouse would be ambiguous between source and target."""
+    entry = {
+        "id": "STE-1",
+        "purpose": "material_transfer",
+        "from_warehouse": "WH-A",
+        "to_warehouse": "WH-B",
+        "lines": [{"item_code": "RAW-A", "qty": 1, "warehouse": "WH-C"}],
+    }
+    assert_refused(
+        lambda: ledger.apply_stock(
+            catalog, {"WH-A": {"RAW-A": 5.0}}, entry, items={"RAW-A": {}}
+        ),
+        "invalid-value",
+        needle="ambiguous",
+    )
+
+
 def test_a_movement_moves_stock_both_ways(catalog: Catalog) -> None:
     entry = {
         "id": "STE-1",

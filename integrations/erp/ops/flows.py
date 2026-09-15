@@ -202,7 +202,10 @@ def golden_path(
         item="FG-1",
         quantity=1,
         components=[
-            {"item_code": "SUB-1", "qty": 1},
+            # The sub-assembly is produced INTO the finished-goods warehouse by
+            # its own work order and consumed FROM there, so the component names
+            # that warehouse rather than falling back to the order's default.
+            {"item_code": "SUB-1", "qty": 1, "warehouse": FINISHED_WAREHOUSE},
             {"item_code": "RAW-B", "qty": 3},
         ],
         at=T["bom"],

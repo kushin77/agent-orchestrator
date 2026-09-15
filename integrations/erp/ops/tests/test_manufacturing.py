@@ -48,7 +48,16 @@ def stocked(space: Workspace) -> Workspace:
     )
     for bom_id, item, components in (
         ("BOM-SUB-1", "SUB-1", [{"item_code": "RAW-A", "qty": 2}, {"item_code": "RAW-B", "qty": 1}]),
-        ("BOM-FG-1", "FG-1", [{"item_code": "SUB-1", "qty": 1}, {"item_code": "RAW-B", "qty": 3}]),
+        (
+            "BOM-FG-1",
+            "FG-1",
+            [
+                # The sub-assembly is produced INTO the finished-goods warehouse
+                # and consumed FROM it, so the component declares that warehouse.
+                {"item_code": "SUB-1", "qty": 1, "warehouse": flows.FINISHED_WAREHOUSE},
+                {"item_code": "RAW-B", "qty": 3},
+            ],
+        ),
     ):
         manufacturing.define_bom(
             space,
@@ -78,6 +87,60 @@ def work_order(**overrides: Any) -> Dict[str, Any]:
     }
     document.update(overrides)
     return document
+
+
+def test_a_work_order_consumes_its_direct_components(
+    model: Model, space: Workspace
+) -> None:
+    """One level: a sub-assembly is consumed as itself, never back-flushed.
+
+    Back-flushing the expanded leaves would consume the sub-assembly's raw
+    material a second time and leave the sub-assembly produced and never used —
+    which is what this test exists to prevent.
+    """
+    stocked(space)
+    assert manufacturing.components_of(space.get("BOM-FG-1"), quantity=4) == [
+        {"item_code": "RAW-B", "qty": 12.0},
+        {"item_code": "SUB-1", "qty": 4.0, "warehouse": flows.FINISHED_WAREHOUSE},
+    ]
+    assert sorted(
+        manufacturing.explode(space, space.get("BOM-FG-1"), quantity=4)
+    ) == ["RAW-A", "RAW-B"]
+
+
+def test_a_two_level_build_consumes_the_sub_assembly_where_it_lives(
+    model: Model, space: Workspace
+) -> None:
+    """The end-to-end shape: a sub-assembly is made, then consumed as itself."""
+    stocked(space)
+    made = manufacturing.raise_work_order(
+        space,
+        wo_id="WO-SUB",
+        bom_id="BOM-SUB-1",
+        quantity=10,
+        at=flows.T["wo_sub"],
+        from_warehouse=flows.RAW_WAREHOUSE,
+        to_warehouse=flows.FINISHED_WAREHOUSE,
+    )
+    manufacturing.complete_work_order(space, wo_id=made["id"], at=flows.T["wo_sub"])
+    assert space.stock_qty(flows.FINISHED_WAREHOUSE, "SUB-1") == 10.0
+
+    top = manufacturing.raise_work_order(
+        space,
+        wo_id="WO-FG",
+        bom_id="BOM-FG-1",
+        quantity=4,
+        at=flows.T["wo_fg"],
+        from_warehouse=flows.RAW_WAREHOUSE,
+        to_warehouse=flows.FINISHED_WAREHOUSE,
+    )
+    manufacturing.complete_work_order(space, wo_id=top["id"], at=flows.T["wo_fg"])
+
+    # Produced 10 sub-assemblies, consumed 4: 6 remain, not 10.
+    assert space.stock_qty(flows.FINISHED_WAREHOUSE, "SUB-1") == 6.0
+    assert space.stock_qty(flows.FINISHED_WAREHOUSE, "FG-1") == 4.0
+    assert space.gl_imbalance() == 0.0
+    assert "WORK-IN-PROCESS" not in space.gl_balance()
 
 
 def test_a_bill_produces_the_components_it_declares(model: Model, space: Workspace) -> None:

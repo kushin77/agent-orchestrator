@@ -51,8 +51,34 @@ flowchart LR
 | `invoice_order` | The bill is raised against the receipt it settles and posts the payable | `receipt-without-order` (an invoice that cites no receipt of that order) |
 | `define_bom` / `activate_bom` | A bill of materials is written, then put into force | `unknown-item`, `bom-not-submitted` |
 | `explode` | The leaf components a quantity needs — a pure walk, expanding sub-assemblies | `bom-cycle`, `bom-not-submitted`, `invalid-value` |
+| `components_of` | The bill's **direct** components, scaled — the list a work order consumes | `invalid-value` |
 | `plan_production` / `run_plan` | A decided plan is raised, one work order per entry | `unknown-bom` (no active bill for an entry) |
 | `complete_work_order` | Components leave, output arrives, two ledger rows post — **once** | `work-order-already-completed`, `work-order-not-submitted`, `bom-item-mismatch`, `insufficient-stock`, `unknown-work-order` |
+
+### Two different component lists, and why
+
+`explode` and `components_of` are not two implementations of one idea:
+
+* **`explode` is the planning walk.** It answers "what raw material does the whole
+  build need", so a component that is itself produced is expanded further.
+  `run_plan`, a cost estimate and a shortage check all want that answer.
+* **`components_of` is the consuming list.** A work order consumes what *its own*
+  bill declares: a sub-assembly is consumed **as itself**, so this names one
+  level, and a component that is itself produced is consumed rather than
+  back-flushed.
+
+Using the explosion as the issue list would consume the sub-assembly's raw
+material a second time and leave the sub-assembly produced and never used — a
+double count that still sums to zero, which is exactly the kind of defect a
+balanced ledger does not catch. The completion therefore records **both** on the
+rail (what it consumes, and what the whole build explodes to) and issues the
+consuming list.
+
+A component that is produced into one warehouse and consumed from another names
+that warehouse on the bill (`components[].warehouse`), and the single-sided
+material issue then honours it per line; a two-sided transfer refuses a per-line
+warehouse, because there the line's warehouse would be ambiguous between the
+source and the destination.
 
 Reads are pure and writes are audited: `explode` and `run_plan`'s planning half
 change nothing, so a board can be rendered without touching a warehouse; the
