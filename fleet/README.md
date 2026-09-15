@@ -566,9 +566,47 @@ python3 fleet/watchdog.py rearm --rung brain   # clear a parked record after fix
 
 `bash scripts/check-watchdog-bounded.sh` drives the real module: it names both
 cases, fast-forwards a REAL scratch repository, measures the attempt counts, and
-mutation-proves itself with two mutants of the real source (the cap removed, and
-the local-HEAD distinction removed) — each required to diverge on a probe whose
-value must change, with the mutation's landing proved by sha256.
+mutation-proves itself with three mutants of the real source (the cap removed,
+the local-HEAD distinction removed, and the flight discriminator removed) — each
+required to diverge on a probe whose value must change, with the mutation's
+landing proved by sha256.
+
+### What "a run in flight" means (issue #366)
+
+The one rule above — a run in flight is never restarted just to update code — was
+enforced by asking whether a run marker's `pid` was alive. That `pid` is the
+**loop's**, and it outlives the run: `fleet/terminal.py:mark_run` writes it once,
+and the run's own beater then advances `ts` and `child_pid` via `refresh_run`. So
+a crashed run left behind a marker that read as "in flight" for as long as the
+loop lived — measured 2026-09-14, **three markers ~4.5h old, every one with
+`child_pid: null`, all naming the live sister loop's pid**: the sister's drift
+lock was held open on every tick, and the loop ran `592b132` for 6h+ while
+`origin/master` was `84afa90`.
+
+Flight is now the marker's **own evidence**:
+
+* a **live `child_pid`** — the subagent itself, running; or
+* a **`ts` no older than `RUN_STALE_SECONDS`** (120s) — the beater advanced it,
+  which a crashed run cannot do. This is also what protects a run that has only
+  just started, before any child exists (`mark_run` writes `child_pid: null`
+  first).
+
+A marker with no live child and a stale beat is a **crashed run**, and the drift
+remedy **proceeds** through the same bounded path as every other remedy — the
+attempt cap and backoff above still apply, because there is deliberately no
+second, unbounded escape.
+
+A **missing or unparseable** `ts` is judged the same way, and deliberately: both
+writers store an ISO stamp atomically (tmp + rename), so an unreadable `ts` means
+a corrupted or foreign marker that nothing in the fleet will ever advance — and
+counting it as work would restore the very deadlock this removes. The fail-safe
+direction is intact, because a child that is genuinely running is caught by the
+live-child test, which needs no timestamp at all.
+
+Both lines then say **which marker** decided them: the held line names the holder
+(`held by <marker> (live child pid N)`), and the acting line names each crashed
+marker with its child state and age — so a leftover marker can never hold the
+lock invisibly.
 
 ### What "drifted" is measured against (AO-GR-25, issue #739)
 

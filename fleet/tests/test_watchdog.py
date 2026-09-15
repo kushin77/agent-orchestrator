@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -606,6 +607,163 @@ def test_watchdog_once_leaves_a_present_monitor_alone(monkeypatch, capsys):
     )
     assert watchdog.watchdog_once() == 0
     assert "monitor: healthy" in capsys.readouterr().out
+
+
+# --- "a run in flight" is the marker's OWN evidence (#366) --------------------
+#
+# Measured 2026-09-14 on this box: three run markers ~4.5h old, every one with
+# `child_pid: null`, named the LIVE sister loop's pid (`17797`). `run_in_flight()`
+# asked only whether that pid was alive, so it answered True on every tick and the
+# sister's drift remedy was recorded as pending — forever. The sister ran
+# `592b132` for 6h+ while `origin/master` was `84afa90`, executing code that
+# predated five merged fixes, and the watchdog log said so on every tick:
+# `drifted … a run is in flight — left alone`. The discriminator must be what
+# `fleet/terminal.py:refresh_run` actually maintains while a run works — a live
+# child, or a beat the run's own beater advanced.
+
+
+def _marker(directory, name, **fields):
+    """Write one run marker into the redirected RUNS_DIR; return its path."""
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{name}.json"
+    path.write_text(json.dumps(fields), encoding="utf-8")
+    return path
+
+
+def _stamp(seconds_ago):
+    """An ISO beat stamp `seconds_ago` old — the exact form `terminal._now` writes."""
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _dead_pid():
+    """A pid certainly not alive: a child this process has already reaped."""
+    child = subprocess.Popen([sys.executable, "-c", "pass"])
+    child.wait()
+    return child.pid
+
+
+def _drive_sister(monkeypatch, tmp_path, markers=()):
+    """One REAL sister decision over `markers`, with the respawn measured, not performed."""
+    for stale in watchdog.RUNS_DIR.glob("*.json"):
+        stale.unlink()
+    for name, fields in markers:
+        _marker(watchdog.RUNS_DIR, name, **fields)
+    monkeypatch.setenv(watchdog.ENV_RESPAWN_ATTEMPTS, "3")
+    monkeypatch.setenv(watchdog.ENV_RESPAWN_BACKOFF, "60")
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
+    beat = tmp_path / "sister.heartbeat.json"
+    beat.write_text(json.dumps({"pid": 111, "state": "idle", "commit": "old0000", "ts": _stamp(5)}))
+    calls = []
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name="": calls.append(name) or True)
+    watchdog.drift_record_path("sister").unlink(missing_ok=True)
+    line = watchdog.rung_action(
+        "sister", "fleet/terminal.py", "fleet/terminal.sh", beat, False, REMOTE, local_head=LOCAL
+    )
+    return line, calls
+
+
+def test_a_live_child_is_a_run_in_flight():
+    """The one piece of evidence that needs no timestamp: a child that is running."""
+    _marker(watchdog.RUNS_DIR, "run-a", pid=os.getpid(), child_pid=os.getpid(), ts=_stamp(99999))
+    assert watchdog.run_in_flight() is True
+    assert watchdog.flight_verdict()[1].startswith("held by run-a (live child pid")
+
+
+def test_a_crashed_runs_leftover_marker_is_not_in_flight():
+    """The measured box state: the loop's pid alive, no child, a beat nothing advances."""
+    _marker(watchdog.RUNS_DIR, "phantom", pid=os.getpid(), child_pid=None, ts=_stamp(16200))
+    assert watchdog.run_in_flight() is False
+    held, note = watchdog.flight_verdict()
+    assert held is False
+    assert "phantom" in note and "child_pid None" in note and "16200s old" in note
+
+
+def test_a_just_started_run_with_no_child_yet_is_in_flight():
+    """`mark_run` writes `child_pid: null` BEFORE the subagent exists — protect it."""
+    _marker(watchdog.RUNS_DIR, "starting", pid=os.getpid(), child_pid=None, ts=_stamp(2))
+    assert watchdog.run_in_flight() is True
+    assert "fresh beat" in watchdog.flight_verdict()[1]
+
+
+def test_a_dead_child_with_a_stale_beat_is_not_in_flight():
+    _marker(watchdog.RUNS_DIR, "dead", pid=os.getpid(), child_pid=_dead_pid(), ts=_stamp(600))
+    assert watchdog.run_in_flight() is False
+
+
+@pytest.mark.parametrize("ts", [None, "not-a-timestamp", ""])
+def test_an_unreadable_beat_is_not_in_flight_and_names_the_marker(ts):
+    """Decided explicitly, in the ACTING direction, and reported — see `marker_verdict`."""
+    fields = {"pid": os.getpid(), "child_pid": None}
+    if ts is not None:
+        fields["ts"] = ts
+    _marker(watchdog.RUNS_DIR, "torn", **fields)
+    assert watchdog.run_in_flight() is False
+    assert "torn (no readable beat" in watchdog.flight_verdict()[1]
+
+
+def test_a_torn_marker_is_reported_not_silently_ignored():
+    watchdog.RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    (watchdog.RUNS_DIR / "torn.json").write_text("{not json", encoding="utf-8")
+    assert watchdog.run_in_flight() is False
+    assert "torn (unreadable marker)" in watchdog.flight_verdict()[1]
+
+
+def test_one_live_child_holds_the_lock_against_every_phantom(monkeypatch, tmp_path):
+    line, calls = _drive_sister(
+        monkeypatch,
+        tmp_path,
+        markers=[
+            ("phantom", {"pid": os.getpid(), "child_pid": None, "ts": _stamp(16200)}),
+            ("real-run", {"pid": os.getpid(), "child_pid": os.getpid(), "ts": _stamp(99999)}),
+        ],
+    )
+    assert calls == []
+    assert "left alone" in line and "held by real-run (live child pid" in line
+
+
+def test_the_held_line_names_the_marker_that_holds_it(monkeypatch, tmp_path):
+    line, calls = _drive_sister(
+        monkeypatch,
+        tmp_path,
+        markers=[("just-started", {"pid": os.getpid(), "child_pid": None, "ts": _stamp(2)})],
+    )
+    assert calls == []
+    assert "left alone" in line
+    assert "held by just-started (fresh beat" in line
+
+
+def test_the_acting_line_names_the_crashed_marker_the_lock_was_held_for(monkeypatch, tmp_path):
+    """The measured defect, end to end: the remedy must PROCEED — and say why."""
+    line, calls = _drive_sister(
+        monkeypatch,
+        tmp_path,
+        markers=[("phantom", {"pid": os.getpid(), "child_pid": None, "ts": _stamp(16200)})],
+    )
+    assert calls == ["sister"], "a crashed run's leftover must not hold the drift lock"
+    assert "left alone" not in line
+    assert "respawned (attempt 1/3)" in line
+    assert "crashed run marker(s): phantom (child_pid None not alive, beat 16200s old" in line
+
+
+def test_a_beat_just_past_the_window_is_no_longer_a_run(monkeypatch, tmp_path):
+    line, calls = _drive_sister(
+        monkeypatch,
+        tmp_path,
+        markers=[
+            (
+                "cold",
+                {
+                    "pid": os.getpid(),
+                    "child_pid": None,
+                    "ts": _stamp(int(watchdog.RUN_STALE_SECONDS) + 60),
+                },
+            )
+        ],
+    )
+    assert calls == ["sister"]
+    assert "left alone" not in line
 
 
 # --- the crontab manager ------------------------------------------------------

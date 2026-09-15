@@ -45,6 +45,18 @@
 #          which is the measured defect in one line.
 #      A happy-path-only assertion cannot pass this: each mutant has a probe whose
 #      value MUST change, and the check names which value changed.
+#   7. "A run in flight" is the marker's OWN evidence, not a live loop pid (#366),
+#      and it is driven through the REAL `flight_verdict`/`run_in_flight` against
+#      REAL marker files. Every probe above STUBS `run_in_flight`, which is exactly
+#      why the pid-only discriminator was invisible here while it held the live
+#      sister's drift lock open: measured 2026-09-14, three markers ~4.5h old with
+#      `child_pid: null` named the live loop's pid, so the sister was never
+#      respawned and ran `592b132` for 6h+ while `origin/master` was `84afa90`.
+#   8. Every case that decides one of those markers is PROVOKED separately: a live
+#      child (held), a leftover (crashed), a run that has just started and has no
+#      child yet (held), a dead child, a missing or unparseable beat (crashed, and
+#      reported), an unreadable marker (crashed, and named) — plus a third mutant
+#      that restores the pid-only rule and must make the remedy stop acting.
 #
 # Tri-state contract (docs/QA-GATE.md):
 #   0 OK             — every case correct and both mutants caught
@@ -281,6 +293,130 @@ if mode == "ff":
     print(f"ff_detail={detail[:160]}")
     sys.exit(0)
 
+if mode == "flight":
+    # Issue #366: drive the REAL marker judgement against REAL marker files. That
+    # is the point of this mode — the probes above stub `run_in_flight`, which is
+    # precisely why a pid-only discriminator stayed invisible while it held the
+    # live sister's drift lock open for hours.
+    import json
+    import os
+    import subprocess
+    from datetime import datetime, timedelta, timezone
+
+    def stamp(seconds_ago):
+        return (datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+    def dead_pid():
+        """A pid certainly not alive: a child this process has already reaped."""
+        child = subprocess.Popen([sys.executable, "-c", "pass"])
+        child.wait()
+        return child.pid
+
+    runs = watchdog.RUNS_DIR
+
+    def only(name, **fields):
+        """Leave exactly ONE marker in RUNS_DIR, and report the judgement on it."""
+        runs.mkdir(parents=True, exist_ok=True)
+        for path in runs.glob("*.json"):
+            path.unlink()
+        (runs / f"{name}.json").write_text(json.dumps(fields), encoding="utf-8")
+        held, note = watchdog.flight_verdict()
+        return ("held" if held else "crashed"), note
+
+    live = os.getpid()
+    print(f"F_run_stale_seconds={int(watchdog.RUN_STALE_SECONDS)}")
+
+    # 1. a live child is work in progress, whatever its beat says
+    verdict, detail = only("live-child", pid=live, child_pid=live, ts=stamp(99999))
+    print(f"F1_live_child={verdict}")
+    print("F1_names_marker=" + ("yes" if "live-child" in detail else "no"))
+
+    # 2. the measured box shape: the loop's pid alive, no child, a beat nothing advances
+    verdict, detail = only("phantom", pid=live, child_pid=None, ts=stamp(16200))
+    print(f"F2_dead_leftover={verdict}")
+    print("F2_names_marker=" + ("yes" if "phantom" in detail else "no"))
+    print(
+        "F2_reports_child_and_age="
+        + ("yes" if ("child_pid None" in detail and "16200s old" in detail) else "no")
+    )
+
+    # 3. `mark_run` writes child_pid: null BEFORE the subagent exists
+    verdict, _ = only("starting", pid=live, child_pid=None, ts=stamp(2))
+    print(f"F3_fresh_beat_no_child={verdict}")
+
+    # 4. a dead child with a stale beat is not work
+    verdict, _ = only("dead-child", pid=live, child_pid=dead_pid(), ts=stamp(600))
+    print(f"F4_dead_child={verdict}")
+
+    # 5. no readable beat — decided explicitly, and reported
+    verdict, detail = only("no-beat", pid=live, child_pid=None)
+    print(f"F5_missing_beat={verdict}")
+    print("F5_says_why=" + ("yes" if "no readable beat" in detail else "no"))
+    verdict, _ = only("bad-beat", pid=live, child_pid=None, ts="not-a-timestamp")
+    print(f"F6_unparseable_beat={verdict}")
+
+    # 6. an unreadable marker is judged, and named — never silently dropped
+    for path in runs.glob("*.json"):
+        path.unlink()
+    (runs / "torn.json").write_text("{not json", encoding="utf-8")
+    held, note = watchdog.flight_verdict()
+    print("F7_torn_marker=" + ("held" if held else "crashed"))
+    print("F7_names_it=" + ("yes" if "torn (unreadable marker)" in note else "no"))
+
+    # --- the sister's DECISION, with the real `run_in_flight` ------------------
+    rung_beat = watchdog.FLEET_DIR / "sister.heartbeat.json"
+    rung_beat.parent.mkdir(parents=True, exist_ok=True)
+
+    def sister_decision():
+        rung_beat.write_text(
+            json.dumps({"pid": 111, "state": "idle", "commit": "old0000", "ts": stamp(5)}),
+            encoding="utf-8",
+        )
+        watchdog.drift_record_path("sister").unlink(missing_ok=True)
+        if watchdog.escalation_dir().exists():
+            for path in watchdog.escalation_dir().glob("*.json"):
+                path.unlink()
+        calls = []
+        watchdog.loop_pid = lambda pattern: 111
+        watchdog.respawn = lambda pattern, script, name="": calls.append(name) or True
+        watchdog.fast_forward_checkout = lambda root=None, remote="origin/master": (
+            False,
+            "local111",
+            "refused",
+        )
+        line = watchdog.rung_action(
+            "sister",
+            "fleet/terminal.py",
+            "fleet/terminal.sh",
+            rung_beat,
+            False,
+            "remote99",
+            local_head="local111",
+        )
+        return line, calls
+
+    only("phantom", pid=live, child_pid=None, ts=stamp(16200))
+    line, calls = sister_decision()
+    print(f"G_crashed_marker_respawn_calls={len(calls)}")
+    print("G_left_alone=" + ("yes" if "left alone" in line else "no"))
+    print("G_names_the_marker=" + ("yes" if "phantom" in line else "no"))
+    print(f"G_line={line}")
+
+    only("live-child", pid=live, child_pid=live, ts=stamp(99999))
+    line, calls = sister_decision()
+    print(f"H_live_child_respawn_calls={len(calls)}")
+    print("H_left_alone=" + ("yes" if "left alone" in line else "no"))
+    print("H_names_the_marker=" + ("yes" if "held by live-child" in line else "no"))
+
+    only("starting", pid=live, child_pid=None, ts=stamp(2))
+    line, calls = sister_decision()
+    print(f"I_fresh_beat_respawn_calls={len(calls)}")
+    print("I_left_alone=" + ("yes" if "left alone" in line else "no"))
+
+    sys.exit(0)
+
 print(f"UNKNOWN-MODE {mode}", file=sys.stderr)
 sys.exit(9)
 DRIVER
@@ -361,7 +497,44 @@ expect "$real_out" D_completion_respawn_calls "1" "then acted on once the run co
 expect "$real_out" E_config_rc "2" "an unusable attempt cap returns CANNOT-ASSESS, not 0"
 expect "$real_out" E_config_names_var "yes" "and names the knob it refused"
 
-# --- 2. the remedy against a REAL git checkout -------------------------------
+# --- 2. "a run in flight" is the marker's OWN evidence (issue #366) -----------
+echo "== the run markers: a crashed run's leftover must not hold the drift lock =="
+flight_out="$work/flight.out"
+run_driver "$ROOT" "$work/state-flight" flight "$flight_out"
+flight_rc=$?
+if [ "$flight_rc" -eq 9 ]; then
+  echo "check-watchdog-bounded: CANNOT-ASSESS — the probe imported code outside the tree under test" >&2
+  exit 2
+fi
+if [ "$flight_rc" -ne 0 ]; then
+  bad "the flight probe could not run against the real tree (rc=$flight_rc)"
+  sed -n '1,20p' "$flight_out" | sed 's/^/    /'
+else
+  info "$(grep -c . "$flight_out") flight measurements (the real marker files, nothing stubbed)"
+fi
+
+expect "$flight_out" F1_live_child "held" "a marker with a live child is a run in flight"
+expect "$flight_out" F1_names_marker "yes" "and the hold names the marker that holds it"
+expect "$flight_out" F2_dead_leftover "crashed" "a leftover (loop pid alive, no child, dead beat) is NOT"
+expect "$flight_out" F2_names_marker "yes" "the crashed marker is NAMED — it cannot hold the lock invisibly"
+expect "$flight_out" F2_reports_child_and_age "yes" "with its child state and its age"
+expect "$flight_out" F3_fresh_beat_no_child "held" "a run that just started has no child yet — never restarted"
+expect "$flight_out" F4_dead_child "crashed" "a dead child with a stale beat is not work"
+expect "$flight_out" F5_missing_beat "crashed" "a missing beat is decided in the ACTING direction"
+expect "$flight_out" F5_says_why "yes" "and the decision is reported, not silent"
+expect "$flight_out" F6_unparseable_beat "crashed" "an unparseable beat takes the same decision"
+expect "$flight_out" F7_torn_marker "crashed" "an unreadable marker is judged, never dropped"
+expect "$flight_out" F7_names_it "yes" "and it is named too"
+expect "$flight_out" G_crashed_marker_respawn_calls "1" "so the drift remedy PROCEEDS for a crashed marker"
+expect "$flight_out" G_left_alone "no" "and is no longer reported as left alone"
+expect "$flight_out" G_names_the_marker "yes" "and the acting line names the crashed marker"
+expect "$flight_out" H_live_child_respawn_calls "0" "a live child still stops the remedy — the safety rule holds"
+expect "$flight_out" H_left_alone "yes" "reported as before"
+expect "$flight_out" H_names_the_marker "yes" "and the held line names its holder"
+expect "$flight_out" I_fresh_beat_respawn_calls "0" "a fresh beat protects a starting run"
+expect "$flight_out" I_left_alone "yes" "so a starting run is never restarted to update code"
+
+# --- 3. the remedy against a REAL git checkout -------------------------------
 echo "== the fast-forward remedy (a real repository, no network) =="
 git_id=(-c user.email=agent773@agents.invalid -c user.name=agent773)
 origin="$work/origin.git"
@@ -402,7 +575,7 @@ else
   bad "a diverged checkout was not refused (measured: $(tr '\n' ' ' < "$ff_out"))"
 fi
 
-# --- 3. the mutation proof ----------------------------------------------------
+# --- 4. the mutation proof ----------------------------------------------------
 copy_tree() { # copy_tree <dest>
   mkdir -p "$1" || return 1
   local part
@@ -419,8 +592,8 @@ copy_tree() { # copy_tree <dest>
 
 sha_of() { python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"; }
 
-mutant_probe() { # mutant_probe <name> <mutated-file> <before-sha> <out> <expectation...>
-  local name="$1" file="$2" before="$3" out="$4"
+mutant_probe() { # mutant_probe <name> <mutated-file> <before-sha> <out> [driver-mode]
+  local name="$1" file="$2" before="$3" out="$4" mode="${5:-drift}"
   local after
   after="$(sha_of "$file")"
   if [ "$after" = "$before" ]; then
@@ -432,7 +605,7 @@ mutant_probe() { # mutant_probe <name> <mutated-file> <before-sha> <out> <expect
     bad "$name: the mutated file carries no MUTANT marker — the edit is not identifiable"
     return
   fi
-  run_driver "$mutant_tree" "$work/state-$name" drift "$out"
+  run_driver "$mutant_tree" "$work/state-$name" "$mode" "$out"
   if [ "$?" -eq 9 ]; then
     bad "$name: the probe imported code outside the mutant tree (vacuous control)"
     return
@@ -520,10 +693,52 @@ else
   fi
 fi
 
+# --- M3: the flight discriminator removed (the measured defect, #366) ---------
+echo "== mutant 3: a live loop pid counts as a run in flight again =="
+mutant_tree="$work/mutant-flight"
+copy_tree "$mutant_tree" || {
+  echo "check-watchdog-bounded: CANNOT-ASSESS — cannot copy the tree for the mutant" >&2
+  exit 2
+}
+before="$(sha_of "$mutant_tree/fleet/watchdog.py")"
+python3 - "$mutant_tree/fleet/watchdog.py" <<'MUTATE'
+"""Restore the #366 defect: stop consulting the beat age, so a crashed run's
+4.5h-old leftover marker reads as 'a run in flight' and holds the drift lock."""
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+source = path.read_text(encoding="utf-8")
+needle = "    if age <= RUN_STALE_SECONDS:"
+if needle not in source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+mutant = source.replace(needle, "    if True:  # MUTANT: the beat age is not consulted", 1)
+if mutant == source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+path.write_text(mutant, encoding="utf-8")
+print("MUTATED")
+MUTATE
+if [ "$?" -ne 0 ]; then
+  bad "the flight mutation could not be constructed (the discriminator moved)"
+else
+  m3_out="$work/mutant-flight.out"
+  mutant_probe "M3" "$mutant_tree/fleet/watchdog.py" "$before" "$m3_out" flight
+  m3_leftover="$(kv "$m3_out" F2_dead_leftover)"
+  m3_left="$(kv "$m3_out" G_left_alone)"
+  m3_respawn="$(kv "$m3_out" G_crashed_marker_respawn_calls)"
+  if [ "$m3_leftover" = "held" ] && [ "$m3_left" = "yes" ] && [ "$m3_respawn" = "0" ]; then
+    ok "M3 caught: the 4.5h-old leftover reads 'held' and the remedy stops acting (respawn=$m3_respawn)"
+  else
+    bad "M3 survived: the stale marker no longer holds the lock (F2=$m3_leftover left_alone=$m3_left respawn=$m3_respawn)"
+  fi
+fi
+
 # --- verdict ------------------------------------------------------------------
 if [ "$fail" -ne 0 ]; then
   echo "check-watchdog-bounded: FAIL — the watchdog's remedy is not provably bounded" >&2
   exit 1
 fi
-echo "check-watchdog-bounded: OK — the drift remedy is named, bounded, escalated once and parked; two mutants of the real source are caught"
+echo "check-watchdog-bounded: OK — the drift remedy is named, bounded, escalated once and parked; a crashed run's leftover no longer holds the lock; three mutants of the real source are caught"
 exit 0
