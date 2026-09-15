@@ -2338,11 +2338,13 @@ def loop(args: argparse.Namespace) -> int:
         # pause, so controls still arrive: `resume` is readable, and the hold is
         # released automatically once the runner resolves.
         runner_ok, runner_detail = preflight(args.runner)
-        if runner_ok:
-            released = release_runner_hold()
-            if released:
-                print(f"[terminal] {released}", flush=True)
-        else:
+        # NOTHING IS RELEASED HERE. This branch used to release the hold on this one
+        # condition, and since #841 the hold is ALSO taken for a capability failure — so
+        # the two sites released and re-took it every cycle and `.fleet/sister.log`
+        # alternated "queue held" with "runner resolvable again — queue hold released",
+        # a line asserting the opposite of the truth, forever (#845). The release lives
+        # below now, on the CONJUNCTION: resolves AND can honour the model.
+        if not runner_ok:
             if hold_queue_for_runner(runner_detail):
                 print(
                     f"[terminal] PREFLIGHT FAILED — {runner_detail} — queue held, no directive "
@@ -2395,8 +2397,11 @@ def loop(args: argparse.Namespace) -> int:
             if args.once:
                 return 1
         elif runner_ok:
-            # A runner that resolved AND can honour the dispatch: release a hold this loop
-            # took earlier, and only ever this loop's own (see `release_runner_hold`).
+            # The ONE release site. A hold is taken for EITHER condition above (the runner
+            # does not resolve, or it cannot honour the model) and released only when
+            # NEITHER holds — one predicate for the pair, so the two cannot contradict each
+            # other in the same log (#845). `release_runner_hold` still refuses to touch an
+            # operator's own pause, whatever this decides.
             released = release_runner_hold()
             if released:
                 print(f"[terminal] {released}", flush=True)
