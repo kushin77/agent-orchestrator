@@ -205,6 +205,54 @@ is the machine that runs (§0), and no validation rule that existed before
   `kb` answers only from the recorded catalogue and is CANNOT-ASSESS when it is
   missing — never an invented answer.
 
+### 7.1 A2A is the PRIMARY control plane — not a fallback
+
+§7 called the live verbs an "extension". The word was wrong, and it is the word
+that would let a later lane treat the channel as optional. The A2A steering
+channel — the mailbox of §5 plus the live verbs of §7 — **is the fleet's
+PRIMARY control plane**: the operator orders the brain, the brain issues
+directives, and every other path to an agent is subordinate to it. "Extension"
+describes the *verbs* §7 added, never the *status* of the channel that carries
+them. This subsection adds no verb of its own: §2's vocabulary stays exactly
+six, and no section above is renumbered.
+
+The rules below are normative, and they are what "primary" means here:
+
+1. **A directive is the only authorisation for work.** Work happens because the
+   brain issued a directive for it — an issue, a lane, a FinOps block. A chat
+   message, an issue comment, a verbal hand-off and a lane's own reading of the
+   board are *not* authorisations; a lane that starts work without one has
+   invented its own authorisation, and the claim ledger refuses it (GR-20).
+   Ordering is the same rule seen from the operator's side: to start work is to
+   `order` the brain, and the brain is what turns the order into a directive.
+2. **The sister is a dumb terminal.** The fleet brain runs DeepSeek v4.1 Flash
+   with thinking effort **off** (DSv4FNone) and executes only the directives it
+   is handed: it drains `.fleet/inbox`, spawns epic-focused subagents per
+   directive, and reports. It never picks its own work, never re-plans the
+   board, and never widens its own scope — that is the whole of its agency, and
+   it is none.
+3. **The à-la-carte reachability invariant.** Every agent is reachable on any
+   operator or brain reason, at any moment: the operator orders the brain, and
+   the brain addresses whichever agent it needs (§1b). No agent is out of band,
+   and none is reachable only through a side door — work is never driven
+   "manually" around the channel, because a channel that can reach some agents
+   but not others is not a control plane, it is a preference.
+4. **The brain remains the only issuer.** Only the brain issues directives (the
+   trust model in §4). A directive may **supersede** an earlier directive for
+   the same issue by its `supersedes` field or by naming that directive's id —
+   never by silent overwrite — so the order of orders is recorded in artifacts
+   rather than reconstructed from memory.
+5. **Any agent is replaceable, and the artifacts are the state.** An agent may
+   be replaced, or have new instructions frontloaded, at any moment. All state
+   that matters lives in ARTIFACTS — the issue, the branch, the claim ledger,
+   the board, the directive — never only in an agent's context, so a
+   replacement resumes from the artifacts alone. Rules 1–4 are what a
+   replacement inherits; rule 5 is why it can inherit them at all.
+
+**The operator's way in is documented.** Which surface reaches which rung, the
+exact command for each, and what works with no shell on the box versus what
+does not: [`../docs/OPERATOR-ACCESS.md`](../docs/OPERATOR-ACCESS.md).
+
 ## 8. Provenance
 
 The vocabulary and role separation in this contract are harvested, not invented

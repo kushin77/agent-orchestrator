@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Callable
 
 import runtime
+import runaway
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -1139,6 +1140,13 @@ def cmd_status(args: argparse.Namespace) -> int:
             f"inbox: {len(abandoned)} directive(s) older than the declared directive lifetime "
             f"({int(DIRECTIVE_LIFETIME_SECONDS)}s) — abandoned, not queued"
         )
+    guard = runaway.inventory(FLEET_DIR)
+    if guard["counters"] or guard["dead_letters"]:
+        print(
+            f"runaway: {len(guard['counters'])} directive(s) carrying an attempt budget | "
+            f"{len(guard['dead_letters'])} dead-lettered (never dispatched again; "
+            "`python3 fleet/runaway.py show --directive <id>`)"
+        )
     brain_ok = report_rung("brain", BRAIN_HEARTBEAT, "fleet/brain.py", "bash fleet/brain.sh")
     sister_ok = report_rung("sister", HEARTBEAT, "fleet/terminal.py", "bash fleet/terminal.sh")
     return EXIT_OK if (brain_ok and sister_ok) else EXIT_NOT_OK
@@ -1290,12 +1298,18 @@ def consume_directive(message_id: str) -> bool:
 
     Reporting the result IS the completion, so the inbox count is always the
     number of outstanding orders — a directive that was answered is gone.
+
+    The directive's runaway-guard counter is dropped with it (issue #723): the
+    order is finished, so its budget is history. The TERMINAL artifact of a
+    retired directive is deliberately NOT dropped — a dead letter is evidence,
+    and the guard keeps it until an operator re-arms the directive by name.
     """
     source = INBOX / f"{message_id}.json"
     if not source.exists():
         return False
     DONE.mkdir(parents=True, exist_ok=True)
     source.replace(DONE / source.name)
+    runaway.forget(message_id, base=INBOX.parent)
     return True
 
 
@@ -1471,12 +1485,28 @@ def cmd_watch(args: argparse.Namespace) -> int:
     dispatched but not yet consumed, so a pool of N concurrent workers can keep
     draining the inbox past the directives still in flight instead of re-reading
     the oldest one forever.
+
+    The runaway guard (issue #723) filters on the same seam: a directive whose
+    order was RETIRED to ``<fleet>/dead-letter/`` is never returned again, and
+    one whose exponential backoff has not elapsed is held — still in the inbox,
+    still the operator's record that the work was ordered, but not dispatched
+    early. That is what stops a refused or crashed order from being re-read every
+    cycle, without the loop sleeping on it.
     """
     INBOX.mkdir(parents=True, exist_ok=True)
     skip = set(getattr(args, "skip", None) or [])
+    guard_base = INBOX.parent
     deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
     while True:
-        pending = [path for path in ordered_by_time(INBOX) if path.stem not in skip]
+        held: list[str] = []
+        pending = []
+        for path in ordered_by_time(INBOX):
+            if path.stem in skip:
+                continue
+            if not runaway.dispatchable(path.stem, base=guard_base):
+                held.append(path.stem)
+                continue
+            pending.append(path)
         if pending:
             try:
                 message = json.loads(pending[0].read_text(encoding="utf-8"))
@@ -1487,7 +1517,8 @@ def cmd_watch(args: argparse.Namespace) -> int:
             print(f"channel watch: DIRECTIVE {message.get('id')} — {len(pending)} pending")
             return EXIT_OK
         if deadline is not None and time.monotonic() >= deadline:
-            print(f"channel watch: IDLE — no directive within {args.timeout_seconds}s", file=sys.stderr)
+            held_note = f" — {len(held)} held by the runaway guard (backoff or dead-letter)" if held else ""
+            print(f"channel watch: IDLE — no directive within {args.timeout_seconds}s{held_note}", file=sys.stderr)
             return EXIT_NOT_OK
         nap = args.interval
         if deadline is not None:
