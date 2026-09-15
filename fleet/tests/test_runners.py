@@ -275,3 +275,39 @@ def test_a_wired_runner_leaves_the_loop_free_to_work(monkeypatch):
     assert not [command for command in calls if "escalate" in command], (
         "and there is nothing to escalate"
     )
+
+
+def test_the_hold_does_not_flap_when_the_runner_resolves_but_cannot_honour(
+    monkeypatch, no_byok, capsys
+):
+    """The release predicate is the CONJUNCTION, not resolvability alone (#845).
+
+    Measured live, minutes after #841 merged: the preflight released the hold on
+    *resolvability* while the capability check took it again in the same cycle, so
+    ``.fleet/sister.log`` alternated forever between
+
+        RUNNER CANNOT HONOUR A DISPATCH — … — queue held, no directive dispatched
+        runner resolvable again — queue hold released
+
+    The second line asserts the opposite of the truth — the runner still cannot honour a
+    dispatch — and it was printed every cycle. The work stayed held (the capability hold is
+    taken after the release, and the cycle checks `paused()` afterwards), so what this pins is
+    the SIGNAL: one predicate for the hold and its release, or the surface lies.
+    """
+    calls: list[list[str]] = []
+
+    _drive_loop(monkeypatch, calls, KNOWN_RUNNER)
+    _drive_loop(monkeypatch, calls, KNOWN_RUNNER)
+
+    out = capsys.readouterr().out
+    assert "queue hold released" not in out, (
+        "the hold was released while the runner still cannot honour a dispatch — "
+        f"the two sites are fighting again:\n{out}"
+    )
+    assert terminal.paused() is True, (
+        "the queue must STAY held across cycles when the runner cannot honour a dispatch"
+    )
+    escalations = [command for command in calls if "escalate" in command]
+    assert len(escalations) == 1, (
+        f"holding across cycles must not re-escalate: got {len(escalations)}"
+    )
