@@ -1,6 +1,6 @@
 # Reconcile — a dead session leaves a clean workspace
 
-> **Status:** institutional · **Issue:** #304 · **Gate:**
+> **Status:** institutional · **Issues:** #304, #628 · **Gate:**
 > [`scripts/check-reconcile.sh`](../../scripts/check-reconcile.sh) (`make verify`)
 > · **Rule:** `AGENTS.md` golden rule 17
 
@@ -61,6 +61,7 @@ That is what makes this a worker rather than a one-shot cleanup.
 
 ```bash
 python3 governance/reconcile/cli.py status                        # who is alive
+python3 governance/reconcile/cli.py status --disk                 # + the disk audit (#628)
 python3 governance/reconcile/cli.py sweep --ttl-minutes 15        # dry run
 python3 governance/reconcile/cli.py sweep --ttl-minutes 15 --apply
 python3 governance/reconcile/cli.py watch --interval-seconds 60 --apply
@@ -84,7 +85,61 @@ The bookkeeping steps (`forget-lane`, `release-claim`, `clear-heartbeat`) are
 asserted by `governance/reconcile/tests`, since a scratch repository has no
 `governance/` of its own to call.
 
-## 6. Board reporting
+## 6. Disk audit — every artifact must be explained (#628)
+
+Sections 1–3 all start from a session that **beat**. A lane that never beat is
+therefore invisible to them: not "missed" but *unseen*. Measured on this
+workstation (2026-09-14), `git worktree list` held **118** worktrees, **41 of them
+for closed issues**, while `.fleet/sessions/` held no beats and the claim ledger
+held no live claim — and `status` printed `0 session(s), 0 orphan(s)` and exited
+OK. Absence of evidence was read as absence of orphans: a fail-open audit.
+
+`governance/reconcile/cli.py status --disk` closes that by enumerating the
+**disk** instead. Every `git worktree list` entry — except the primary checkout,
+which is the repository itself and so cannot be orphaned — and every local
+`issue-*` branch is an *artifact*, and every artifact must be explained by at
+least one of:
+
+| Evidence | Where it comes from |
+|---|---|
+| a **session beat** | `.fleet/sessions/<id>.json` names its worktree, its branch or its issue |
+| a **claim record** | a live claim on the issue, from `.board/claims/` + `.board/claims.jsonl` |
+| the **landing history** | `.fleet/lifecycle/<issue>.json`, journalled by `governance/lifecycle`'s close-out once an item's work landed |
+
+An artifact no record explains is **reported by name**.
+
+**The audit removes nothing.** It has no `apply`, it calls no destructive
+operation, and the `AuditOps` port it reads through has no such method for it to
+call (`test_the_port_has_no_removal_method_at_all` asserts that structurally).
+Reclaiming stays `sweep`'s job under the three-way rule of §3, which is unchanged:
+the worker still never trades unmerged work for an unlocked issue. The audit only
+makes the lanes `sweep` structurally cannot see visible and named, so a human — or
+a later sweep, once a real beat exists — can act on them.
+
+Its exit contract is the one that matters most, because the defect was a *wrong
+OK*: `0` only when the state was read and every artifact was explained, `1` when
+an artifact is unmatched, and **`2` CANNOT-ASSESS** when the state could not be
+read — an unreadable `git`, an empty worktree listing (a repository always has at
+least its own), a corrupt session beat, a corrupt claim record or a corrupt
+journal. An audit that cannot tell "no orphans" from "could not look" reports the
+second, never the first.
+
+```bash
+$ python3 governance/reconcile/cli.py status --disk
+reconcile-audit (/path/to/repo): 434 artifact(s) — matched=40, unmatched=393, exempt=1
+  unmatched worktree /home/akushnir/ao-worktrees/ao-142-58950fde
+      no session beat, claim record or landing record names it
+reconcile-status: 0 session(s), 0 orphan(s)
+```
+
+It is an option on the existing `status` verb rather than a verb of its own **on
+purpose**: a new CLI verb is a surface change that the control-plane verb registry
+gates (`control-plane/control/verbs.yaml`, contract-first), and that contract
+belongs to its own lane. The audit is a read-only addition to a report that
+already exists, so it is declared as one — and `status` without `--disk` behaves
+exactly as before.
+
+## 7. Board reporting
 
 A finding must reach the board, not only a log line. A `shelved`, `failed` or
 `suspect` outcome files a GitHub issue carrying the named violation and its

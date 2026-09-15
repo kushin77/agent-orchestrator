@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from governance.reconcile.audit import AuditUnavailable  # noqa: E402
 from governance.reconcile.heartbeat import (  # noqa: E402
     RUNNING,
     Session,
@@ -115,6 +116,52 @@ class FakeOps:
     def clear_session(self, session_id: str) -> str:
         self._record("clear-heartbeat")
         return "cleared"
+
+
+class FakeAuditOps:
+    """The audit's read port, answered from memory (issue #628).
+
+    Read-only by construction, like the real port's audit half: there is nothing
+    here to remove a worktree or to unlock an issue with, which is how the
+    "reports but never removes" invariant is asserted rather than assumed.
+    """
+
+    def __init__(
+        self,
+        *,
+        worktrees: tuple = (),
+        branches: tuple[str, ...] = (),
+        claims: dict[int, str] | None = None,
+        landed: set[int] | None = None,
+        fail: tuple[str, ...] = (),
+    ) -> None:
+        self.worktrees = list(worktrees)
+        self.branches = list(branches)
+        self.claims = dict(claims or {})
+        self.landed = set(landed or {})
+        self.fail = set(fail)
+        self.calls: list[str] = []
+
+    def _record(self, name: str):
+        self.calls.append(name)
+        if name in self.fail:
+            raise AuditUnavailable(f"{name} refused by the fixture")
+
+    def list_worktrees(self):
+        self._record("list_worktrees")
+        return list(self.worktrees)
+
+    def list_local_branches(self):
+        self._record("list_local_branches")
+        return list(self.branches)
+
+    def active_claims(self):
+        self._record("active_claims")
+        return dict(self.claims)
+
+    def landed_issues(self):
+        self._record("landed_issues")
+        return set(self.landed)
 
 
 @pytest.fixture
