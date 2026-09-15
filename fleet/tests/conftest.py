@@ -186,6 +186,105 @@ def byok_runner_environment(monkeypatch):
 PROBE = "isolation probe — this must never reach the live fleet log"
 
 
+def spawn_source_stub(tmp_path: Path):
+    """A complete envelope source set, derived from whatever the caller supplied.
+
+    Since #793 a spawn that cannot present a well-formed envelope is REFUSED —
+    that is the whole point of the change — so a suite that drives the loop must
+    supply one, exactly as the loop does by claiming the issue and provisioning
+    the lane before it builds a prompt. This stub injects the SOURCES (the claim
+    ledger, the board, the gate permit, the budget) rather than reading them, so
+    the suite stays offline and no test depends on the box's board or on the
+    lane's own claim existing.
+
+    Everything the caller passes is honoured — the issue, the lane, the worktree,
+    the minted `AO_*` environment — so a test that asserts the prompt names
+    `#163` still sees `#163`. A test that wants the REFUSAL patches
+    `governance.spawn.sources.collect` itself (or drops a field from this stub's
+    return value), which is how the negative controls are written.
+    """
+
+    def stub(**kwargs):
+        issue = kwargs.get("issue")
+        lane = kwargs.get("lane") or "test-lane"
+        env = dict(kwargs.get("env") or {})
+        agent = kwargs.get("agent_id") or env.get("AO_AGENT_ID") or "test-agent"
+        worktree = str(kwargs.get("worktree") or env.get("AO_WORKTREE") or tmp_path / "lane-wt")
+        branch = env.get("AO_BRANCH") or f"issue-{issue}"
+        session_id = env.get("AO_SESSION_ID") or "testsession0001"
+        permit_store = tmp_path / "gate-store"
+        return {
+            "issue": issue,
+            "lane": lane,
+            "worktree": worktree,
+            "session": {
+                "id": session_id,
+                "issue": str(issue),
+                "agent": agent,
+                "lane": lane,
+                "branch": branch,
+                "worktree": worktree,
+                "repo_slug": "kushin77/agent-orchestrator",
+                "author_name": f"agent-{agent}",
+                "author_email": f"agent+{agent}@agents.invalid",
+            },
+            "trailer": f"Refs kushin77/agent-orchestrator#{issue}",
+            "claim": {"owner": agent, "state": "claim", "lane": lane, "at": "2026-09-15T00:00:00Z"},
+            "focus": {
+                "epic": 160,
+                "source": "pinned-focus",
+                "pinned_epic": 160,
+                "wave_cap": 12,
+                "max_agents": 0,
+            },
+            "capacity": {
+                "effective": 1,
+                "binding": "disjoint",
+                "assessed": True,
+                "bounds": [{"name": "pool", "limit": 10, "why": "conftest stub"}],
+                "problems": [],
+                "permit": {
+                    "store": str(permit_store),
+                    "worktree_key": "conftest-stub-key",
+                    "lock": str(permit_store / "worktrees" / "conftest-stub-key.lock"),
+                    "max_concurrent": 4,
+                },
+            },
+            "budget": {"attempts": 0, "cap": 5, "state": "pending", "next_attempt_at": None},
+            "gate": {
+                "of_record": "make verify",
+                "bound": "at most one composite gate per worktree, bounded box-wide (AO-GR-22)",
+                "entry": "scripts/gate-lock.sh",
+                "max_concurrent": 4,
+                "ttl_seconds": 900,
+            },
+            "verify": {"command": "make verify", "source": "gate-of-record"},
+            "spawn": {
+                "path": kwargs.get("path") or "fleet",
+                "agent": agent,
+                "directive": str(kwargs.get("directive_id") or ""),
+            },
+        }
+
+    return stub
+
+
+@pytest.fixture(autouse=True)
+def complete_spawn_envelope(tmp_path, monkeypatch):
+    """Give every fleet test a complete spawn envelope (#793).
+
+    Same posture as the two fixtures above: the suite drives the real run path,
+    so it must satisfy the precondition that path now has. A spawn without a
+    well-formed envelope is REFUSED by design, and `governance/spawn/tests` is
+    where that refusal and its per-field provocations are proven — here the stub
+    exists so the OTHER fleet behaviour (prompts, runners, streaming, finops)
+    keeps being measured instead of the refusal.
+    """
+    spawn_sources = importlib.import_module("governance.spawn.sources")
+    monkeypatch.setattr(spawn_sources, "collect", spawn_source_stub(tmp_path))
+    return tmp_path
+
+
 def live_fleet_dir() -> Path:
     """The REAL `.fleet/` at the repository root — what must stay untouched.
 

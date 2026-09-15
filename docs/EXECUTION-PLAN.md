@@ -334,3 +334,57 @@ needed for that case. Do not clear a `HELD` lock to "unblock" a run: that is the
 bound doing its job, and the honest response is to wait for the holder or to
 raise `AO_GATE_MAX_CONCURRENT` — never to disable the lock.
 
+
+## 10. The spawn envelope (issue #793)
+
+`governance/**` is a large, well-tested surface — claim ledger, lane isolation,
+lifecycle close-out, reconcile, runaway guard, capacity, and the gate admission
+control of §9 — and **none of it was applied by the act of spawning**. The
+remote path inlined governance as *prompt prose* inside
+`fleet/terminal.py::build_prompt`, where nothing could check that a spawn had
+carried it; the local path (a session subagent) shared none of it. The measured
+consequence: **nine worktrees running a gate, eight of them running exactly one,
+and one running twenty-six.** AO-GR-22 held for eight lanes and failed silently
+for the ninth, because a rule that lives only in a document cannot refuse
+anything.
+
+**The rule of this section: a spawn carries one envelope, produced by one
+producer, and a spawn that cannot present it is refused.**
+
+* `governance/spawn/` is the single producer. `model.py` defines the versioned
+  document (`spawn-envelope/v1`) and its validation; `sources.py` reads each
+  field from the institution that OWNS it (the claim ledger, the minted session
+  identity, the issue's epic, the capacity bound and gate permit, the attempt
+  budget, the issue's own `Verify:` clause); `render.py` holds the ONE copy of
+  the spawn prose; `liveness.py` decides whether a run is in flight.
+* **Both spawn paths consume it.** `fleet/terminal.py::build_prompt` renders the
+  document instead of restating governance, and `governance/spawn/cli.py open`
+  produces the *same* document for a locally spawned subagent — so the two
+  regimes converge by construction rather than by convention.
+* **Refusal is a precondition, not a warning.** An envelope that cannot be
+  validated is refused by name, fail-closed, with exit code **78** — deliberately
+  outside the 0/1/2 tri-state, so nothing can read a refused spawn as a pass, a
+  failure, or a skip. The loop refuses the spawn *before* any child exists.
+* **A run in flight is the marker's own evidence.** `child_pid` that is alive, or
+  a beat the run's own beater advanced — never the loop's pid, which outlives
+  every run it dispatches. A heartbeat saying `idle` beside a live child is a
+  **reported** contradiction, never a silent win for the marker.
+
+The fields are fixed and versioned: `issue`, `lane`, `worktree`, `session`,
+`trailer`, `claim`, `focus`, `capacity` (with the gate permit), `budget`, `gate`,
+`verify`. Adding one is a schema version bump; omitting one is a refusal.
+
+`scripts/check-spawn-envelope.sh` is wired into the gate of record by
+`scripts/verify.sh`, so `scripts/check-gate-coverage.sh` reports it as invoked
+rather than as an `uninvoked` artifact. It proves the wiring structurally *and*
+by provocation: every required field is removed one at a time and must be refused
+BY NAME; the local path is driven for real against a scratch root with its own
+board and claim (admitted, then refused when the claim is absent); the fleet
+prompt must EQUAL the envelope's rendering, byte for byte; a malformed envelope
+must refuse the loop's spawn with its own exit code; `run_in_flight()` must not
+hold the lock on a crashed run's leftover marker; and **the one-gate bound is
+provoked with a real second gate** in the worktree the envelope names.
+
+`governance/spawn/README.md` is the module's own contract; the suite
+`governance/spawn/tests` is declared in `scripts/pytest-suites.txt` and named
+from inside the check, so it is covered rather than merely declared.

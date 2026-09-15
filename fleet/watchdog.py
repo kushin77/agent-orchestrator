@@ -80,6 +80,8 @@ sys.path.insert(0, str(ROOT / "fleet"))
 import channel  # noqa: E402
 import runtime  # noqa: E402
 
+from governance.spawn import liveness as spawn_liveness  # noqa: E402  (#793)
+
 RUNGS = (
     ("brain", "fleet/brain.py", "fleet/brain.sh", channel.BRAIN_HEARTBEAT),
     ("sister", "fleet/terminal.py", "fleet/terminal.sh", channel.HEARTBEAT),
@@ -386,14 +388,34 @@ def read_beat(path: Path) -> dict | None:
 
 
 def run_in_flight() -> bool:
-    """True when a run marker names a loop pid that is still alive."""
-    if not RUNS_DIR.exists():
-        return False
-    for path in RUNS_DIR.glob("*.json"):
-        record = read_beat(path)
-        if record and process_alive(record.get("pid")):
-            return True
-    return False
+    """True when a run marker's OWN evidence says a run is in flight (#793).
+
+    The marker's ``pid`` is the **loop's**, and a loop outlives every run it
+    dispatches, so asking whether that pid was alive answered True for a crashed
+    run's leftover marker as long as the loop lived. Measured 2026-09-14: four
+    markers ~5.6h old, every one with ``child_pid: null``, each naming the live
+    sister loop — the drift lock was held open on every tick, the sister's own
+    heartbeat (``state: idle``, ``runs: 0``) was ignored for that decision, and
+    the rung stayed on pre-#723 code with no attempt budget.
+
+    Flight is therefore the marker's own evidence: a live ``child_pid``, or a
+    ``ts`` the run's own beater advanced (`governance/spawn/liveness.py`).
+    """
+    held, _ = spawn_liveness.runs_in_flight(RUNS_DIR)
+    return held
+
+
+def flight_evidence() -> str:
+    """What the markers say about flight — for the HELD line, never the decision.
+
+    The decision stays `run_in_flight()`, which the bounded-remedy gate and the
+    test suite replace wholesale in order to drive a busy rung deterministically.
+    This only supplies the sentence: NAMING the marker that holds the lock is what
+    makes a held line checkable, instead of an assertion that "a run is in flight"
+    the reader cannot audit (#793).
+    """
+    held, note = spawn_liveness.runs_in_flight(RUNS_DIR)
+    return note if held else "a run is in flight"
 
 
 def decide(
@@ -751,7 +773,7 @@ def rung_action(
     if state in (DRIFTED, CHECKOUT_BEHIND) and name == "sister" and run_in_flight():
         record_pending(name, state, reason, running, baseline, baseline_name, local_head, moment)
         return (
-            f"{name}: {state} ({reason}) — recorded as pending drift, a run is in flight — left alone "
+            f"{name}: {state} ({reason}) — recorded as pending drift, {flight_evidence()} — left alone "
             f"until it completes, then acted on | {capability}"
         )
     # CANNOT_ASSESS respawns too: the watchdog cannot certify the rung, and a
@@ -835,6 +857,12 @@ def watchdog_once(force: bool = False) -> int:
     for name, pattern, script, beat_path in RUNGS:
         line = rung_action(name, pattern, script, beat_path, force, baseline, local_head=local)
         print(f"[watchdog] {line}", flush=True)
+        disagreement = spawn_liveness.contradiction(read_beat(beat_path), RUNS_DIR)
+        if disagreement:
+            # Reported on EVERY pass, not only when a rung is drifting: two
+            # artifacts of the fleet that disagree are a finding in their own
+            # right, and before #793 the marker silently won the argument.
+            print(f"[watchdog] {name}: {disagreement}", flush=True)
         if "FAILED" in line or "CAPABILITY STALE" in line:
             failed = True
         if "ESCALATED ONCE" in line or "PARKED" in line or "DRIFT UNRESOLVED" in line:

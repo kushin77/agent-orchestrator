@@ -44,6 +44,11 @@ import singleton
 import telemetry
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from governance import spawn  # noqa: E402  (the spawn envelope, issue #793)
+
 #: The standing directive (`fleet/directive.json`) — "the DSv4FNone order, in code".
 #: Every subagent prompt carries its standing clauses verbatim rather than a
 #: paraphrase, so the mandate travels with the order and cannot drift from it.
@@ -298,6 +303,44 @@ def extract_json(text: str) -> dict:
     return {}
 
 
+def build_envelope(
+    directive: dict,
+    agent_id: str = "subagent",
+    worktree: Path | None = None,
+    env: dict[str, str] | None = None,
+    context: dict | None = None,
+) -> dict:
+    """The spawn envelope for one directive: every governance fact, in one document.
+
+    Before #793 the governance a fleet subagent obeyed was PROSE inlined into the
+    prompt, where nothing could check that a spawn had carried it, and a locally
+    spawned subagent shared none of it. The envelope is produced by
+    `governance/spawn` — the SAME producer the local path calls — so the two
+    regimes converge by construction, and a document missing a required field is
+    refused by name before any child exists.
+
+    Only facts this loop already holds are supplied; everything else (the claim,
+    the issue's epic, the capacity permit, the attempt budget, the issue's own
+    `Verify:` clause) is read from the institution that OWNS it, so the envelope
+    cannot state something the ledger does not.
+    """
+    task = directive.get("task") or {}
+    identity = dict(env or {})
+    pack = context if isinstance(context, dict) else {}
+    return spawn.produce(
+        issue=task.get("issue"),
+        lane=task.get("lane") or "",
+        agent_id=agent_id,
+        path="fleet",
+        directive_id=str(directive.get("id") or ""),
+        env=identity,
+        worktree=str(worktree) if worktree is not None else str(identity.get("AO_WORKTREE") or ""),
+        body=str(pack.get("body") or ""),
+        files=spawn.sources.worktree_files(task.get("files")),
+        root=ROOT,
+    )
+
+
 def build_prompt(
     directive: dict,
     agent_id: str = "subagent",
@@ -305,7 +348,16 @@ def build_prompt(
     env: dict[str, str] | None = None,
     context: dict | None = None,
 ) -> str:
-    """The subagent prompt: one issue, one worktree, one session identity.
+    """The subagent prompt: one issue, one worktree, one session identity, one envelope.
+
+    The prompt CONSUMES the spawn envelope (#793) instead of restating governance.
+    It used to inline the standing mandate, the identity, the trailer and the
+    lane discipline as prose written out here — so the guarantee was "somebody
+    remembered to write it into this string", nothing checked that a spawn had
+    carried it, and the locally spawned path shared none of it. Now
+    `governance/spawn` is the ONE producer of that text, the same document governs
+    both spawn paths, and an envelope that cannot be validated raises
+    `spawn.EnvelopeRefused` rather than being spawned with a warning.
 
     The claim is *owned by the loop*, not by the subagent: a subagent that died
     mid-task used to leave its claim wedged until the 24h TTL, because nobody
@@ -334,81 +386,19 @@ def build_prompt(
     task = directive.get("task") or {}
     issue = task.get("issue")
     lane = task.get("lane") or ""
-    directive_id = directive.get("id", "")
     model = directive.get("model") or {}
-    body = directive.get("body", "")
-    identity = env or {}
-    session = identity.get("AO_SESSION_ID", "")
-    branch = identity.get("AO_BRANCH", "")
-    standing = load_standing_body() or (
-        "LIVE CI/CD SDLC: run the issue's own `Verify:` command AND `make verify`; their REAL output "
-        "is the only evidence; one issue = one lane = one self-contained green commit. "
-        "REPLACEABILITY: the brain may replace you or frontload new instructions at any moment — "
-        "execute ONLY this directive, keep every fact that matters in artifacts (issue, branch, "
-        "claim ledger, board), and leave every artifact terminal."
-    )
-    mandate = (
-        "STANDING MANDATE — LIVE CI/CD SDLC + REPLACEABILITY (read this first; it is the operator's "
-        "standing order as carried in fleet/directive.json):\n"
-        f"{standing}\n"
-        "What that means for THIS run, in order:\n"
-        f"a. GATE OF RECORD: run issue #{issue}'s own `Verify:` command AND `make verify`, and quote "
-        "their REAL output. Unverified work is not done, and neither command may be skipped or "
-        "reported from memory.\n"
-        "b. ATOMIC + GREEN: one issue = one lane = one self-contained, green, reversible commit; a "
-        "perfected (green-verified) commit reaches production on merge through the declared apply "
-        "pipeline — never a hand-carried deploy and never a console click.\n"
-        "c. NEVER MERGE FAILING WORK and never add a GitHub Actions workflow (GR-15 — automation is "
-        "code-native `make` targets run by the ops runner and cron).\n"
-        "d. REPLACEABLE, NOT AUTHORITATIVE: the brain may replace you or frontload new instructions "
-        "at any moment. Execute ONLY this directive — do not self-escalate scope, pick your own "
-        "issue, or re-plan the board.\n"
-        "e. STATE LIVES IN ARTIFACTS: anything a replacement needs must live in the issue, the "
-        "branch, the claim ledger or the board — never only in your context.\n"
-        "f. LEAVE EVERY ARTIFACT TERMINAL: PR merged at green evidence, source branch deleted, claim "
-        "released, directive consumed, issue closed with evidence. Strand nothing.\n\n"
-    )
-    where = (
-        f"Your worktree is {worktree} (branch {branch or worktree.name}). Work ONLY there — never in the "
-        "shared checkout, which other lanes are using.\n"
-        if worktree is not None
-        else "Work in the repo checkout; disk worktrees under ~/ao-worktrees, never /tmp.\n"
-    )
-    who = (
-        f"Your session identity is {session} (agent {agent_id}) on branch {branch}. Every commit you "
-        f"author MUST carry 'Refs kushin77/agent-orchestrator#{issue}' — the lane audit checks each "
-        "commit, and one that omits it stays a violation even after a later good commit.\n"
-        if session
-        else ""
-    )
     pack = context if isinstance(context, dict) else (
         issue_context(issue, lane) if isinstance(issue, int) else None
     )
-    context_block = render_context_pack(pack) if pack else ""
-    return (
-        f"{mandate}"
-        "You are an epic-focused subagent in the kushin77/agent-orchestrator fleet, "
-        "steered by the brain through the sister session. "
-        f"{where}{who}\n"
-        f"BRAIN DIRECTIVE {directive_id} — model {model.get('tier', 'flash')}/{model.get('thinking', 'none')}:\n{body}\n\n"
-        f"{context_block}"
-        "Do exactly this, nothing else:\n"
-        f"1. Issue #{issue} is ALREADY CLAIMED for you as `{agent_id}` (lane {lane or 'n/a'}) — do NOT "
-        "run claim and do NOT run release; the loop manages the claim around your run.\n"
-        f"2. If a PR for issue #{issue} ALREADY exists, do NOT bail out: check out its branch, run "
-        "`make verify`, and if it is green squash-merge the PR and close the issue. Only implement "
-        "from scratch if no PR exists.\n"
-        f"3. Implement issue #{issue} to completion; open a PR whose body carries 'Closes #{issue}' and "
-        "the ACTUAL 'make verify' output as evidence.\n"
-        f"4. After `make verify` is green and the PR is open, squash-merge it with "
-        "`gh pr merge <number> --squash --delete-branch`, then close the issue. "
-        "NEVER leave a completed PR unmerged or the issue open.\n"
-        "5. Leave every artifact terminal: the loop then runs the lifecycle close-out "
-        "(`governance/lifecycle`) and its verdict travels with your report, so a "
-        "surviving branch, a wedged claim, an unconsumed directive or a lane left "
-        "behind is reported as NOT-OK rather than passing as done.\n"
-        "Return a short report: PR number, verify output summary, files touched, AND the merge result "
-        "(PR number + merged/closed). If anything fails, report the exact error instead of improvising."
+    envelope = build_envelope(directive, agent_id, worktree, env, pack)
+    return spawn.render.prompt(
+        envelope,
+        standing=load_standing_body(),
+        directive_body=str(directive.get("body", "")),
+        directive_id=str(directive.get("id", "")),
+        tier=str(model.get("tier", "flash")),
+        thinking=str(model.get("thinking", "none")),
+        context_block=render_context_pack(pack) if pack else "",
     )
 
 
@@ -574,7 +564,17 @@ def run_once(
         if refusal is not None:
             print(f"[terminal] dispatch REFUSED — {refusal}", file=sys.stderr, flush=True)
             return RC_REFUSED, f"dispatch refused: {refusal}"
-    command = build_command(directive, str(dispatch["runner"]), agent_id, worktree, env, pack)
+    # The spawn envelope is a PRECONDITION, not a suggestion (#793): `build_command`
+    # consumes it, and an envelope that cannot be validated refuses the spawn here
+    # — before any child exists, with its own exit code, naming every field at
+    # fault. Before this, the governance a subagent obeyed was prose in the prompt
+    # and nothing could refuse a spawn that omitted it.
+    try:
+        command = build_command(directive, str(dispatch["runner"]), agent_id, worktree, env, pack)
+    except spawn.EnvelopeRefused as refused:
+        detail = "; ".join(refused.lines())
+        print(f"[terminal] #{directive.get('task', {}).get('issue')} spawn REFUSED — {detail}", file=sys.stderr, flush=True)
+        return RC_REFUSED, f"spawn refused (rc {RC_REFUSED}): {detail}"
     cwd = str(worktree) if worktree is not None else str(ROOT)
     directive_id = str(directive.get("id") or "unknown")
     print(f"[terminal] {finops_line(dispatch)}", flush=True)
@@ -771,6 +771,11 @@ def closeout_issue(issue: int) -> str:
     worktree were all still live — five separate drifts, none of them noticed by
     a gate. Close-out runs here and its verdict travels with the report, so a
     partial close reaches the brain instead of being found later by hand.
+
+    The step itself is `governance/lifecycle` (`LIFECYCLE_CLI` above): it names
+    the closure invariants and drives them in dependency order, reporting what
+    remains rather than a success it cannot evidence. This loop only carries its
+    verdict.
     """
     result = subprocess.run(
         ["python3", LIFECYCLE_CLI, "close", "--issue", str(issue)],
@@ -866,15 +871,9 @@ GATE_OK = "OK"
 GATE_NOT_OK = "NOT-OK"
 GATE_CANNOT_ASSESS = "CANNOT-ASSESS"
 #: A ``Verify:`` line is only executed when it is command-shaped: its first token
-#: must be an executable the fleet can run. Issue bodies mix real commands with
-#: prose ("Verify: the new test fails against today's code"), and running a
-#: sentence as a command would manufacture the false verdict this code removes.
-COMMAND_PREFIXES = frozenset(
-    {
-        "make", "bash", "sh", "python3", "python", "pytest", "node", "npm",
-        "npx", "git", "gh", "go", "cargo", "terraform", "docker",
-    }
-)
+#: must be an executable the fleet can run. The rule itself lives in
+#: `governance/spawn/sources.py` (#793) so the clause the loop RUNS, the clause the
+#: context pack SHOWS and the clause the envelope CARRIES are one implementation.
 
 
 def looks_refused(output: str) -> bool:
@@ -892,24 +891,11 @@ def looks_refused(output: str) -> bool:
 def extract_verify_command(body: str) -> str | None:
     """The issue's own ``Verify:`` command — only when it is command-shaped.
 
-    A body that declares no runnable command (or declares prose) yields None, so
-    the loop falls back to ``make verify`` rather than executing a sentence.
+    One implementation, in the envelope producer (#793): the clause the loop
+    EXECUTES and the clause the spawn envelope CARRIES must not be two readers
+    that can drift, so this delegates rather than restating the rule.
     """
-    match = re.search(r"^[\s>*`-]*Verify:\s*(.*)$", body or "", re.IGNORECASE | re.MULTILINE)
-    if not match:
-        return None
-    candidate = re.sub(r"^[`\s]+|[`\s]+$", "", match.group(1))
-    if not candidate:
-        for line in (body or "")[match.end():].splitlines():
-            candidate = re.sub(r"^[`\s]+|[`\s]+$", "", line)
-            if candidate:
-                break
-    if not candidate or "\n" in candidate:
-        return None
-    first = candidate.split()[0]
-    if first not in COMMAND_PREFIXES and not first.startswith(("./", "/")):
-        return None
-    return candidate
+    return spawn.sources.verify_command(body)
 
 
 def gh_issue_field(issue: int, jq: str) -> str | None:
@@ -973,57 +959,17 @@ def _keywords(text: str) -> set[str]:
     }
 
 
-#: ``Verify:`` on its own line, tolerating the markdown emphasis the issue bodies
-#: actually use (``**Verify:**``) and a quoting backtick around the label.
-_VERIFY_CLAUSE_RE = re.compile(r"^[\s>*_`-]*Verify:\s*(.*)$", re.IGNORECASE | re.MULTILINE)
-
-
-def _first_backtick_span(text: str) -> str | None:
-    """The first non-empty ``` `...` ``` span in `text`, or None.
-
-    The label's own closing backtick (`` `Verify:` ``) forms a blank pair, so a
-    blank pair is skipped rather than returned — which is what lets both
-    `` `Verify:` `cmd` `` and ``**Verify:** `cmd` plus prose`` yield ``cmd``.
-    """
-    index = text.find("`")
-    while index != -1:
-        end = text.find("`", index + 1)
-        if end == -1:
-            return None
-        candidate = text[index + 1:end].strip()
-        if candidate:
-            return candidate
-        index = text.find("`", end + 1)
-    return None
-
-
 def pack_verify_clause(body: str) -> str | None:
     """The issue's own ``Verify:`` clause as TEXT, for the context pack.
 
-    Deliberately more tolerant than :func:`extract_verify_command`, which decides
-    whether a declared value is *runnable* and whose result the loop executes under
-    a shell. Here the clause is only ever *told* to the subagent, so a body that
-    writes ``**Verify:** ...`` or backticks the command and then adds prose still
-    has its clause carried instead of silently dropped.
+    Delegates to the envelope producer (#793) for the same reason as
+    :func:`extract_verify_command`: the clause the pack SHOWS, the clause the
+    envelope CARRIES and the clause the loop RUNS are three views of one rule, and
+    three readers would be three chances to disagree. Here the clause is only ever
+    *told* to the subagent, so it is read tolerantly (``**Verify:** ...`` plus
+    prose still yields its clause).
     """
-    match = _VERIFY_CLAUSE_RE.search(body or "")
-    if not match:
-        return None
-    raw = match.group(1)
-    if not raw.strip():
-        for line in (body or "")[match.end():].splitlines():
-            if line.strip():
-                raw = line
-                break
-    text = raw.strip()
-    if not text:
-        return None
-    span = _first_backtick_span(text)
-    if span:
-        return span
-    text = re.sub(r"^[\s*_`]+", "", text)
-    text = re.sub(r"[\s*_`]+$", "", text)
-    return text or None
+    return spawn.sources.verify_text(body)
 
 
 def snapshot_issue(issue: int, path: Path | str | None = None) -> dict | None:
