@@ -708,3 +708,20 @@ pre-commit:
 	else \
 		echo "pre-commit: not installed (skipped)"; \
 	fi
+
+## land — land ONE issue's lane end to end (issue #764): push -> PR (Closes #<n>,
+## AI-assistance declared) -> pre-merge contract -> merge decision -> squash-merge
+## -> branch delete -> lifecycle close. The code-native path the ops runner and
+## cron drive: no console, no human step, and never a workflow file (GR-15).
+## DRY RUN BY DEFAULT — it prints exactly what it would do and changes nothing
+## remotely; a real landing requires the explicit opt-in AO_LAND_APPLY=1.
+## The merge is refused unless the pre-merge attestation is green AND names the
+## commit being merged (governance/merge decides; scripts/check-landing.sh proves
+## the refusal). Re-running on a landed lane is a no-op that reports the terminal
+## state. Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+##   make land ISSUE=764                     # dry run: show the plan
+##   AO_LAND_APPLY=1 make land ISSUE=764     # land it for real
+land:
+	@bash scripts/land-lane.sh --issue "$(ISSUE)"
+
+.PHONY: land
