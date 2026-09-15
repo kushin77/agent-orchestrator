@@ -15,6 +15,18 @@ cd "$root" || exit 1
 
 fail=0
 
+# The tree the repository owns: tracked files plus untracked-but-not-ignored
+# ones. Gitignored paths are runtime state (`.verify/`, caches, scratch) that no
+# commit records, and a gate must not read them — otherwise its verdict depends
+# on an artifact the repository does not own, and a clean checkout can fail where
+# a dirty one passes. The landing driver's own `.verify/` report reddened this
+# check exactly that way and blocked every automated landing (issue #764).
+# `vendor/` is a pinned submodule, listed by git as a gitlink, so its contents
+# are outside the tree by construction.
+repo_files() {
+  git ls-files --cached --others --exclude-standard -- "$@"
+}
+
 # --- 1. Required foundation + pillar files ---------------------------------
 echo "== foundation files =="
 required=(
@@ -57,11 +69,7 @@ while IFS= read -r md; do
       md_fail=$((md_fail + 1))
     fi
   done < <(grep -oE '\]\([^)]*\)' "$md" | sed -E 's/^\]\((.*)\)$/\1/')
-done < <(find . -type f -name '*.md' \
-  -not -path './.git/*' \
-  -not -path './vendor/*' \
-  -not -path './.research/*' \
-  | LC_ALL=C sort)
+done < <(repo_files '*.md' | LC_ALL=C sort)
 if [ "$md_fail" -ne 0 ]; then
   printf 'markdown links: %s broken link(s)\n' "$md_fail" >&2
   fail=$((fail + md_fail))
@@ -77,16 +85,10 @@ while IFS= read -r f; do
     printf '  FAIL  %s (trailing whitespace)\n' "$f" >&2
     ws_fail=$((ws_fail + 1))
   fi
-done < <(find . -type f \( \
-  -name '*.md' -o -name '*.sh' -o -name '*.py' -o -name '*.yaml' -o \
-  -name '*.yml' -o -name '*.toml' -o -name 'Makefile' -o \
-  -name '.gitmessage' -o -name '.cursorrules' \) \
-  -not -path './.git/*' \
-  -not -path './vendor/*' \
-  -not -path './.research/*' \
-  -not -path './MIGRATION_NOTES.md' \
-  -not -path './VALIDATION.md' \
-  -not -path './.github/*' \
+done < <(repo_files '*.md' '*.sh' '*.py' '*.yaml' '*.yml' '*.toml' \
+  'Makefile' '.gitmessage' '.cursorrules' \
+  ':(exclude)MIGRATION_NOTES.md' ':(exclude)VALIDATION.md' \
+  ':(exclude).github/**' \
   | LC_ALL=C sort)
 if [ "$ws_fail" -ne 0 ]; then
   printf 'trailing whitespace: %s file(s) FAILED\n' "$ws_fail" >&2
@@ -104,11 +106,7 @@ while IFS= read -r f; do
     printf '  FAIL  %s (unfinished marker)\n' "$f" >&2
     mk_fail=$((mk_fail + 1))
   fi
-done < <(find . -type f \( -name '*.sh' -o -name '*.py' -o -name '*.go' \) \
-  -not -path './.git/*' \
-  -not -path './vendor/*' \
-  -not -path './.research/*' \
-  | LC_ALL=C sort)
+done < <(repo_files '*.sh' '*.py' '*.go' | LC_ALL=C sort)
 if [ "$mk_fail" -ne 0 ]; then
   printf 'unfinished markers: %s file(s) FAILED\n' "$mk_fail" >&2
   fail=$((fail + mk_fail))
