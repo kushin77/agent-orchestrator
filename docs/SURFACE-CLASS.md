@@ -18,7 +18,7 @@ vocabulary here is closed and identical to
 [`governance/conformance/model.py`](../governance/conformance/model.py) — the
 suite asserts the two gates cannot drift apart.
 
-## The declared surfaces (measured 2026-09-14, issue #351; scope widened by #590)
+## The declared surfaces (measured 2026-09-14, issue #351; scope widened by #590 and #620)
 
 | Surface | Path | Declared class | Measured class | Why this rung |
 |---|---|---|---|---|
@@ -29,6 +29,12 @@ suite asserts the two gates cannot drift apart.
 | `registry` | `registry` | `faang` | `faang` | Contract, six suites, owned schemas, an append-only event log + pack attestation (audit), a drift control and the parity gate. No live-sync module, so not `elite`. |
 | `module-registry` | `governance/modules` | `faang` | `faang` | The ecosystem module registry (#445, hardened by #591): contract, a suite, an owned schema for the row shape, the declared acceptance policy (`controls.yaml` + `policy.py`, **read by** `registry.py`) and an append-only audit trail of every refusal. Its dedicated gate carries it past `enterprise`; no live-sync module, so not `elite`. |
 | `module-brief` | `integrations/paperclip/reporting` | `faang` | `faang` | The paperclip reporting agent's module brief (#447, hardened by #592): contract, a suite, an owned schema for the artifact, the declared claim-resolution policy (`claim-policy.json` + `policy.py`, **read by** `composer.py`) and an append-only audit trail. Its dedicated gate carries it past `enterprise`; no live-sync module, so not `elite`. |
+| `github` | `.github` | `template` | `template` | The repository's GitHub surface: the issue forms (`.github/ISSUE_TEMPLATE/`), the PR template and `dependabot.yml`. Their substantive gates are `scripts/check-issue-template.sh` and `scripts/check-pr-contract.sh`, but the ladder's `tests` and `contract` evidence is directory-shaped — there is no suite and no `README.md` under the path — so the measured rung is the base one. |
+| `commit-contract` | `.gitmessage` | `template` | `template` | The commit-message contract (issue #5) parsed by `scripts/check-pr-contract.sh`. The path is a single file, so `tests` and `contract` (measured as artifacts *under* the path) cannot exist; the measured rung is the base one. |
+| `dispatch` | `governance/dispatch` | `pattern` | `pattern` | Claim/order/dispatch governance (golden rule 14): contract, a suite and the `scripts/check-chronological-dispatch.sh` gate. It owns no controls/audit/schema artifact, which is what holds it at `pattern`. |
+| `isolation` | `governance/isolation` | `pattern` | `pattern` | Session identity and lane isolation (rule 15): contract, a suite, the `scripts/check-session-isolation.sh` gate and the audit module (`audit.py`) the instrumentation reads. It has `audit` but owns no `controls` or `schema` artifact, so it stops at `pattern`. |
+| `lifecycle` | `governance/lifecycle` | `pattern` | `pattern` | End-to-end closure (rule 16): contract, a suite, the `scripts/check-github-lifecycle.sh` gate and `audit.py`. `controls` and a `*.schema.json` are absent, so the measured rung is `pattern`. |
+| `reconcile` | `governance/reconcile` | `pattern` | `pattern` | Orphan reconciliation (rule 17): contract, a suite and the `scripts/check-reconcile.sh` gate. It owns no audit/control/schema artifact, so the measured rung is `pattern`. |
 
 **Scope widened by [#590](https://github.com/kushin77/agent-orchestrator/issues/590).**
 `surface_roots` named only `portal`, `gateway`, `telemetry` and `registry`, so two
@@ -36,6 +42,20 @@ surfaces this program had just shipped were held to **no class at all** — the 
 never looked at them and reported OK while both sat at `pattern`. The roots
 `governance` and `integrations` are now in scope and both surfaces are declared at
 the rung their evidence **measures**.
+
+**Scope widened by [#620](https://github.com/kushin77/agent-orchestrator/issues/620)
+(EPIC [#616](https://github.com/kushin77/agent-orchestrator/issues/616)).**
+#590 widened the *roots*; the git ecosystem itself still had no row, so the gate
+never looked at `.github/**`, at the commit contract, or at the four
+`governance/` packages this repo's own rules are built on — they were held to
+**no class at all** while the table read green, the same silent-scope failure
+#590 recorded once. They are now declared surfaces at the rung each one's own
+evidence **measures**: `pattern` where a contract, a suite and a gate are all
+present (`governance/dispatch`, `governance/isolation`, `governance/lifecycle`,
+`governance/reconcile`), and the base `template` rung for the two git-ecosystem
+paths whose evidence is a single artifact rather than a directory (`.github`,
+`.gitmessage`). A declared row is enforcement, not documentation: declaring any
+of them one rung above its measurement fails `make surface-class` **by name**.
 
 The declared class is **measured, never aspirational**: a surface is never
 declared above the evidence its own tree shows, because raising one fails the
@@ -117,7 +137,8 @@ be declared or waived by name, so no surface goes unclassified by omission.
 
 ## Related
 
-- Implements issue #351 (parent #338).
+- Implements issue #351 (parent #338); widened to the git-ecosystem surfaces by
+  issue #620 (parent #616, from the gap analysis of issue #608).
 - Complements `scripts/check-conformance.sh` (issue #140, the issue-class gate).
 - The class ladder is declared in `kushin77/CMR` `docs/SOLUTION-CLASSES.md`;
   the ladder's local canonical copy note is
