@@ -679,7 +679,14 @@ class LandingEngine:
         directory = self.request.root / ".verify"
         directory.mkdir(parents=True, exist_ok=True)
         report_path = directory / f"landing-{self.request.issue}-report.md"
-        report_path.write_text(evidence or describe(result), encoding="utf-8")
+        # Trailing whitespace is stripped: this is a plain-text artifact living in
+        # the tree, and an unclean report would redden the doc gate — whose red on
+        # the gate of record is never attributable, so every later landing would
+        # refuse on the driver's own output (issue #764).
+        body = evidence or describe(result)
+        report_path.write_text(
+            "".join(f"{line.rstrip()}\n" for line in body.splitlines()), encoding="utf-8"
+        )
         record_path = directory / f"landing-{self.request.issue}.json"
         record_path.write_text(json.dumps(result.as_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
         result.report_path = str(report_path)
