@@ -85,6 +85,52 @@ variable "enable_chat" {
   default     = false
 }
 
+# --- Workbook-surface flags (issue #644, workbook-13) ------------------------
+#
+# The five surfaces workbook-11/12/5 added own an in-module switch; each also
+# has a row in infra/feature-flags/registry.yaml (services.<name>, kept in
+# lock-step with the variables below by scripts/check-feature-flags.py) and a
+# flag in infra/rollout/rollout-state.yaml (so the rollout pipeline can promote
+# it) that mirrors it.
+#
+# These variables create NO resource — the code ships inside the portal, the
+# gateway or the guardrails service — so they are switches, not deploy targets.
+# They are not inert: infra/cloudbuild/apply.yaml passes each one explicitly to
+# `terraform plan` from its `_ENABLE_*` substitution (all "false" until a
+# reviewed promotion), and the `workbook_surface_flags` output records the
+# rendered posture in the apply log, so "flag promoted, nothing deployed"
+# cannot pass unnoticed.
+
+variable "enable_org_chart" {
+  description = "Serve the org-chart portal view (issue #644, workbook-13). In-module switch: surfaces.org_chart in portal/config/feature-flags.yaml. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
+variable "enable_skill_studio" {
+  description = "Serve the skill-studio portal view (issue #644, workbook-13). In-module switch: surfaces.skill_studio in portal/config/feature-flags.yaml. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
+variable "enable_task_board" {
+  description = "Serve the tenant task board (issue #644, workbook-13). In-module switch: surfaces.task_board in portal/config/feature-flags.yaml. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
+variable "enable_mcp_outbound" {
+  description = "Allow outbound MCP server calls (issue #644, workbook-13). In-module switch: AO_MCP_OUTBOUND_ENABLED in gateway/mcp/outbound.py. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
+variable "enable_sandbox_runtime" {
+  description = "Allow a real sandbox runtime to run (issue #644, workbook-13). In-module switch: SandboxEnablement in guardrails/sandbox/enablement.py. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
 # --- Deployer service account (the ONLY apply route) ------------------------
 
 variable "deployer_enabled" {

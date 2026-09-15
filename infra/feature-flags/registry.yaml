@@ -115,6 +115,95 @@ services:
       services—terraform parity holds for `enable_chat`. Ships invisible: while
       `surfaces.chat` is off the routes answer 404 before AuthN.
 
+  # --- Workbook surfaces (issue #644, workbook-13) ------------------------
+  #
+  # The five surfaces workbook-11/12/5 added to the repo (issue #642's three
+  # portal views, issue #641's outbound MCP servers, issue #636's sandbox
+  # runtime) each own an in-module switch *and* a row here. The row is the
+  # cross-cutting promotion unit: it carries its OWN `enable_*` variable so the
+  # flag the rollout pipeline promotes, the flag the apply pipeline renders and
+  # the flag the code reads are one and the same name (the `services.chat`
+  # precedent). None of the five is a separate deployable process and none
+  # creates a terraform resource: the code ships inside the portal, the gateway
+  # or the guardrails service, and the variable is the switch, not a resource
+  # count. What the row buys is that the switch is *declared* — promotable
+  # through the rollout pipeline (infra/rollout/rollout-state.yaml carries the
+  # matching flag), passed explicitly to terraform by the only apply route
+  # (infra/cloudbuild/apply.yaml), reported by the `workbook_surface_flags`
+  # output, and required by the feature-flag gate's services—terraform parity.
+  # All five default OFF: an unpromoted workbook surface is dark.
+  org_chart:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_org_chart
+    description: >
+      Org-chart portal view (issue #644, workbook-13; surface code added by
+      issue #642): the read-only rendering of the workbook-1 org declaration
+      (registry/personas/org-chart.yaml + the bound cards/*.yaml) joined to the
+      workbook-6 role-health feed, served at GET /api/orgchart/chart and
+      GET /api/orgchart/health by `portal/server/org_chart.py` inside the
+      existing portal deployable. The in-module switch is `surfaces.org_chart`
+      in `portal/config/feature-flags.yaml`, read fail-closed by
+      `portal/server/config_flags.py`; this row is what promotes it.
+  skill_studio:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_skill_studio
+    description: >
+      Skill-studio portal view (issue #644, workbook-13; surface code added by
+      issue #642): the author -> test -> publish workflow of the workbook-9 API
+      over the console's HTTP surface (GET /api/skillstudio/skills,
+      GET /api/skillstudio/skills/<id>,
+      POST /api/skillstudio/author|test|publish), served by
+      `portal/server/skill_studio.py` inside the existing portal deployable. The
+      studio refuses a publish without green eval evidence; this flag only
+      decides whether the workflow is reachable. The in-module switch is
+      `surfaces.skill_studio` in `portal/config/feature-flags.yaml`.
+  task_board:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_task_board
+    description: >
+      Tenant task board (issue #644, workbook-13; surface code added by issue
+      #642): the workbook-3 ticket lifecycle (engine/core/tickets.TicketRuntime)
+      projected per tenant as a replay of the durable event log, served
+      read-only at GET /api/taskboard/tickets and
+      GET /api/taskboard/tickets/<id> by `portal/server/task_board.py` inside the
+      existing portal deployable. The in-module switch is `surfaces.task_board`
+      in `portal/config/feature-flags.yaml`.
+  mcp_outbound:
+    default: off
+    promoted: false
+    phase: 2
+    tf_flag: enable_mcp_outbound
+    description: >
+      Outbound MCP servers (issue #644, workbook-13; surface code added by issue
+      #641): the calls `gateway/mcp/outbound.py` may make to declared remote MCP
+      servers, reached only when the deployment flag AND a server entry's own
+      `enabled` are both on (two decisions, so one flag cannot widen reach
+      alone). The in-module switch is the `AO_MCP_OUTBOUND_ENABLED` environment
+      flag (compiled OFF: an absent or empty value leaves the whole family
+      unreachable), and every seeded registry entry ships OFF as well. No
+      separate process: the client runs inside the gateway deployable.
+  sandbox_runtime:
+    default: off
+    promoted: false
+    phase: 4
+    tf_flag: enable_sandbox_runtime
+    description: >
+      Sandbox runtime enablement (issue #644, workbook-13; surface code added by
+      issue #636): the single declared switch that decides whether
+      `guardrails/sandbox/` may run a real runtime (docker / firecracker) rather
+      than the offline seam. The in-module switch is the ``SandboxEnablement``
+      flag in `guardrails/sandbox/enablement.py` — structurally OFF (a
+      construction with ``enabled=True`` is refused; only ``enable()``, the act a
+      reviewer can see, flips it), reversible via ``disable()``, and it never
+      turns "flag on" into a fabricated execution. Portal-independent by
+      construction: no portal route and no portal flag participates in it.
+
 # Endpoint-level surfaces: a single endpoint family inside a service that is
 # promoted independently of the service flag around it (the service flag alone
 # is not enough — GR-5: a new surface ships OFF until a reviewed go-live).
@@ -284,4 +373,85 @@ surfaces:
       the flag is off the client refuses to start with the named FLAG_OFF
       condition, and every panel whose own surface flag is off renders the
       disabled condition naming that flag.
+
+  # --- Workbook surfaces (issue #644, workbook-13) ------------------------
+  #
+  # Each of the five workbook surfaces is declared here as well as under
+  # `services`, because both statements are true and neither is redundant:
+  # `services` says *who owns the promotion* (its own `enable_*`, the flag the
+  # rollout pipeline and the apply pipeline carry) while `surfaces` says *what
+  # is gated* (the endpoint family, route set or switch a reader will meet in
+  # the code). `service:` records the deployable the code ships inside — the
+  # same shape `surfaces.chat` uses. Every entry defaults OFF (GR-5), and each
+  # names the in-module reader that actually refuses the surface, so the flag is
+  # code-enforced rather than advisory.
+  org_chart:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_org_chart
+    description: >
+      Org-chart view (issue #644, workbook-13; surface code added by issue
+      #642). Routes GET /api/orgchart/chart and GET /api/orgchart/health,
+      served by `portal/server/org_chart.py`. Fail-closed reader:
+      `portal/server/config_flags.py` over
+      `portal/config/feature-flags.yaml` — a missing or unreadable file reads as
+      OFF, so an unpromoted view is absent, never a half-rendered page. Own
+      `tf_flag`, so promoting the org chart neither implies nor requires
+      promoting the other two views or the portal service around them.
+  skill_studio:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_skill_studio
+    description: >
+      Skill-studio view (issue #644, workbook-13; surface code added by issue
+      #642). Routes GET /api/skillstudio/skills,
+      GET /api/skillstudio/skills/<id> and
+      POST /api/skillstudio/author|test|publish, served by
+      `portal/server/skill_studio.py`. Fail-closed reader:
+      `portal/server/config_flags.py`. While off, the author/test/publish
+      workflow is unreachable — and the studio's own gate (no publish without
+      green eval evidence) is what refuses a bad publish once it is on.
+  task_board:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_task_board
+    description: >
+      Tenant task board (issue #644, workbook-13; surface code added by issue
+      #642). Routes GET /api/taskboard/tickets and
+      GET /api/taskboard/tickets/<id>, served by `portal/server/task_board.py`
+      as a read-only projection of the durable ticket event log (a ticket the
+      log does not contain is absent, never invented). Fail-closed reader:
+      `portal/server/config_flags.py`.
+  mcp_outbound:
+    default: off
+    promoted: false
+    service: gateway
+    tf_flag: enable_mcp_outbound
+    description: >
+      Outbound MCP server calls (issue #644, workbook-13; surface code added by
+      issue #641). Not an HTTP route: the egress family of
+      `gateway/mcp/outbound.py`, whose three conditions must all hold before a
+      remote server is dialled (this deployment flag, the server entry's own
+      `enabled`, and the caller's declared capability). Fail-closed reader:
+      `env_outbound_enabled()` in `gateway/mcp/outbound.py`, which treats an
+      absent, empty or unrecognised `AO_MCP_OUTBOUND_ENABLED` as OFF. While off,
+      every server reports `disabled` and nothing is dialled.
+  sandbox_runtime:
+    default: off
+    promoted: false
+    service: guardrails
+    tf_flag: enable_sandbox_runtime
+    description: >
+      Sandbox runtime enablement (issue #644, workbook-13; surface code added by
+      issue #636). Not an endpoint: the declared switch over
+      `guardrails/sandbox/enablement.py`, gating whether a real runtime (docker
+      / firecracker) may run instead of the offline seam. Fail-closed reader:
+      ``SandboxEnablement`` itself — OFF is structural (constructing the flag
+      with ``enabled=True`` is refused) and only ``enable()`` flips it, so a
+      deployment cannot accidentally start with a live sandbox. Own `tf_flag`
+      rather than `enable_guardrails`: the kill switch for tool execution is
+      independent of the guardrails service flag.
 
