@@ -147,17 +147,43 @@ python3 fleet/console.py --once  # one frame, for a script or a log
 ## 4. The browser console (remote-capable) — `make console`
 
 ```bash
-make console                                    # 127.0.0.1:8787 (the default)
-make console CONSOLE_HOST=0.0.0.0 CONSOLE_PORT=8787
-python3 -m portal.server.main --host 127.0.0.1 --port 8787   # the real command
+make -C /path/to/agent-orchestrator console           # 127.0.0.1:8787 (the default)
+bash /path/to/agent-orchestrator/scripts/console.sh   # same thing, no `cd`
 ```
 
-`make console` starts the real server (`python3 -m portal.server.main`, backed by
+`make console` starts the real server (`portal/server/main.py`, backed by
 `portal/server/httpd.py::serve`). It prints the line it is serving:
 
 ```
+console: serving on http://127.0.0.1:8787 (loopback by default; FAILS CLOSED with no JWKS mirror)
 agent-orchestrator console listening on http://127.0.0.1:8787 (static root: ...)
 ```
+
+### 4.1 The working-directory trap (this bit an operator)
+
+`python3 -m portal.server.main` resolves the `portal` package against the
+**current directory**, so it works only when the shell is already at the repo
+root. Run it from `$HOME` and it fails — which reads like a missing module but is
+not:
+
+```console
+$ cd ~ && python3 -m portal.server.main --host 127.0.0.1 --port 8787
+/usr/bin/python3: Error while finding module specification for 'portal.server.main'
+(ModuleNotFoundError: No module named 'portal')
+```
+
+Three ways in, in order of preference — none of them needs you to `cd` first:
+
+```bash
+make -C /path/to/agent-orchestrator console                      # preferred
+bash /path/to/agent-orchestrator/scripts/console.sh              # the same, as a script
+PYTHONPATH=/path/to/agent-orchestrator python3 -m portal.server.main --port 8787
+```
+
+`scripts/console.sh` resolves the repo root from its own path and `exec`s the
+module there, so the command is identical from any working directory. The raw
+`python3 -m` form is shown last on purpose: it is the real command, and it is the
+one that needs `PYTHONPATH` (or a `cd`).
 
 Two facts decide whether this surface is safe, and both are properties of the
 server rather than of this document:

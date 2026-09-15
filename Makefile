@@ -166,8 +166,7 @@ operator:
 ## reverse proxy in front of it is a new infrastructure surface: declared in
 ## code, flag-gated OFF (GR-5), never a console click.
 console:
-	@echo "console: http://$(CONSOLE_HOST):$(CONSOLE_PORT) — loopback by default, and it FAILS CLOSED with no JWKS mirror (PORTAL_AUTH_GATE_JWKS_FILE); see docs/OPERATOR-ACCESS.md §4"
-	@python3 -m portal.server.main --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
+	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
 lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons
 	@echo ""

@@ -48,6 +48,7 @@ doc="docs/OPERATOR-ACCESS.md"
 runbook="fleet/README.md"
 makefile="Makefile"
 operator_sh="scripts/operator.sh"
+console_sh="scripts/console.sh"
 
 for required_file in "$doc" "$runbook" "$makefile" "$operator_sh"; do
   if [ ! -f "$required_file" ]; then
@@ -89,8 +90,9 @@ live=(
   "fails loudly"
 )
 console=(
-  "make console"
-  "python3 -m portal.server.main"
+  "scripts/console.sh"
+  "portal.server.main"
+  "No module named 'portal'"
   "PORTAL_AUTH_GATE_JWKS_FILE"
   "ROOT_ADMIN_EMAILS"
   "fails closed"
@@ -158,10 +160,27 @@ else
   echo "  FAIL  the operator target does not run scripts/operator.sh" >&2
   target_fail=1
 fi
-if grep -qF -- "python3 -m portal.server.main" <<<"$console_recipe"; then
-  echo "  OK    the console target serves the real server (python3 -m portal.server.main)"
+if grep -qF -- "scripts/console.sh" <<<"$console_recipe"; then
+  echo "  OK    the console target runs scripts/console.sh"
 else
-  echo "  FAIL  the console target does not serve python3 -m portal.server.main" >&2
+  echo "  FAIL  the console target does not run scripts/console.sh" >&2
+  target_fail=1
+fi
+# The wrapper must EXEC the real server, and must resolve the repo root from its
+# own path — `python3 -m portal.server.main` alone resolves `portal` against the
+# CURRENT directory and dies with "No module named 'portal'" when the shell is
+# anywhere but the repo root. That is the trap an operator hit; the gate holds
+# both halves so the documented command cannot silently regress.
+if [ -f "$console_sh" ] && grep -qF -- "exec python3 -m portal.server.main" "$console_sh"; then
+  echo "  OK    $console_sh execs the real server (python3 -m portal.server.main)"
+else
+  echo "  FAIL  $console_sh does not exec python3 -m portal.server.main" >&2
+  target_fail=1
+fi
+if [ -f "$console_sh" ] && grep -qF -- 'cd "$root"' "$console_sh"; then
+  echo "  OK    $console_sh resolves the repo root, so it works from any working directory"
+else
+  echo "  FAIL  $console_sh does not resolve the repo root (the No-module-named-portal trap)" >&2
   target_fail=1
 fi
 # The live view has ONE definition: the operator script must delegate to it, not
