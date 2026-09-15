@@ -623,7 +623,13 @@ def test_a_restart_does_not_dispatch_the_same_order_twice(tmp_path, monkeypatch)
     Also pins the *ordering* of the fix — the marker must be on disk before the
     channel is invoked. Moving the write after the send flips the probe to
     `marker-absent` and this test fails.
+
+    The board is stubbed to say `open` for this order's issue, because #693 added
+    a refusal for an issue the committed snapshot reports as CLOSED and this
+    fixture's issue (#5, the repo's first tasks) has long been closed: the subject
+    here is marker ordering, never the board's state.
     """
+    monkeypatch.setattr(brain, "board_issue_state", lambda number: ("open", f"#{number} is open (stubbed)"))
     log = tmp_path / "sends.txt"
     marker = brain.DISPATCH_MARKERS / "4242.json"
     stub = tmp_path / "probe-channel.py"
