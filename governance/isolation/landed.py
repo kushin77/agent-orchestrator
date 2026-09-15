@@ -156,8 +156,12 @@ class Assessment:
             )
         for finding in self.unenforced:
             out.append(
-                f"  FAIL  {finding.code}:{finding.sha} is not recorded legacy — add the trailer in a "
-                f"trailing paragraph, or record the commit in the baseline with its measured finding"
+                f"  FAIL  {finding.code}:{finding.sha} is not recorded legacy — if the commit has "
+                f"not MERGED yet, put the reference in a trailing trailer paragraph and re-push; "
+                f"if it is already landed on a protected branch the message can never be corrected "
+                f"(history is never rewritten), so record it in {BASELINE_PATH.name} by an explicit "
+                f"reviewed commit carrying this measured finding — never automatically, and never "
+                f"to silence a run (#836)"
             )
         for finding in self.quarantined:
             out.append(f"  NOTE  recorded legacy  {finding.code}:{finding.sha}")
