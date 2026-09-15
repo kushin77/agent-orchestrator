@@ -1,0 +1,58 @@
+# Portal surface feature flags — the console's OWN declaration (issue #642).
+#
+# WHY a second declaration exists: `infra/feature-flags/registry.yaml` is the
+# *control-plane service* registry — its `surfaces:` map gates a family of
+# routes on an endpoint, and it is kept in lock-step with
+# `infra/terraform/variables.tf` by `scripts/check-feature-flags.py` (every
+# `enable_*` variable must have a matching `services.<name>` entry, and vice
+# versa). The three surfaces this file governs are **views inside the portal
+# service** — they add no service, no terraform variable and no deploy target,
+# so declaring them in that registry would either need a fabricated `enable_*`
+# variable or break the checker's 1:1 rule. They are declared here instead,
+# beside the code that reads them, and read through the same fail-closed
+# contract the fleet projection uses.
+#
+# Default policy is OFF (GR-5): a surface ships dark until a reviewed go-live
+# flips its `default`. `portal/server/config_flags.py` is the only reader — a
+# missing file, unreadable file, missing `surfaces` section, missing entry, or
+# an entry whose `default` is neither `off`/`false` all read as OFF, so a
+# surface can never be promoted by accident, only by an explicit `on`/`true`.
+schema_version: 1
+
+default_policy: off
+
+surfaces:
+  org_chart:
+    default: off
+    phase: 11
+    description: >
+      Org-chart view (issue #642, workbook-11; EPIC #631 Pillar 2): renders the
+      workbook-1 declaration (registry/personas/org-chart.yaml + the bound
+      cards/*.yaml) as nodes with reports-to edges, the declared budget cap and
+      model tier, joined to the workbook-6 role-health feed
+      (telemetry/role_health.RoleHealthReport) for per-role burn and heartbeat
+      status. Served read-only at GET /api/orgchart/chart and
+      GET /api/orgchart/health. Consumes both declarations verbatim; it
+      restates no cap, tier or cadence.
+  skill_studio:
+    default: off
+    phase: 11
+    description: >
+      Skill-studio UI (issue #642, workbook-11): the author -> test -> publish
+      workflow of the workbook-9 API (registry/packs/skills.SkillStudio) over
+      the console's HTTP surface — list/search authored skills, read one
+      revision's lifecycle and eval evidence, and drive author/test/publish
+      through the studio's own gates (a publish without green eval evidence is
+      refused by the studio, never by this adapter). Served at
+      GET /api/skillstudio/skills, GET /api/skillstudio/skills/<id> and
+      POST /api/skillstudio/author|test|publish. Offline (no network egress).
+  task_board:
+    default: off
+    phase: 11
+    description: >
+      Tenant task board (issue #642, workbook-11): the workbook-3 ticket
+      lifecycle (engine/core/tickets.TicketRuntime) projected per tenant —
+      every ticket row is a replay of the durable event log, never a second
+      store. Served read-only at GET /api/taskboard/tickets and
+      GET /api/taskboard/tickets/<id>. A ticket the log does not contain is
+      absent, not invented.

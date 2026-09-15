@@ -29,10 +29,20 @@ _SEEDS = REPO_ROOT / "registry" / "profiles" / "seeds"
 
 
 def _registry_tier_model(agent_profile: str) -> str:
-    """The model the live registry resolves for a profile (via catalog.yaml)."""
+    """The model the live registry resolves for a profile (via catalog.yaml).
+
+    ``RegistrySnapshot`` resolves the highest published version of a profile
+    (``paperclip`` publishes 1.0.0 and 1.1.0), so the seed is picked the same
+    way: ``Path.glob`` yields filesystem order, which would make this helper
+    depend on how the checkout created the seeds directory rather than on the
+    registry's own rule.
+    """
     ladder = yaml.safe_load(_CATALOG.read_text(encoding="utf-8"))["tiers"]
-    seed = next(_SEEDS.glob(f"{agent_profile}.*.yaml"))
-    tier = yaml.safe_load(seed.read_text(encoding="utf-8"))["defaultModelTier"]
+    seed_paths = sorted(_SEEDS.glob(f"{agent_profile}.*.yaml"))
+    assert seed_paths, f"no AgentProfile seed for {agent_profile!r}"
+    tier = yaml.safe_load(
+        seed_paths[-1].read_text(encoding="utf-8")
+    )["defaultModelTier"]
     return ladder[tier]["model"]
 
 

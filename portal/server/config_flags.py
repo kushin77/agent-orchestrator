@@ -1,0 +1,99 @@
+"""portal.server.config_flags — the portal's own surface-flag reader (issue #642).
+
+WHY this module exists rather than reusing ``portal.server.fleet``: that module
+reads ``infra/feature-flags/registry.yaml``, whose ``surfaces:`` map is the
+*control-plane service* registry. ``scripts/check-feature-flags.py`` keeps that
+file in a strict 1:1 relation with ``infra/terraform/variables.tf`` (every
+``enable_*`` variable has a ``services.<name>`` entry and vice versa), so a
+portal *view* — which adds no service, no terraform variable and no deploy
+target — cannot be declared there without either inventing a variable or
+breaking the checker.
+
+The three workbook-11 surfaces are therefore declared in the portal's own
+``portal/config/feature-flags.yaml`` and read here. The contract is exactly the
+fleet reader's, because the failure mode it guards against is the same one:
+
+* **fail closed.** A missing file, an unreadable file, invalid YAML, a document
+  that is not a mapping, a missing ``surfaces`` section, a missing entry, or an
+  entry whose ``default`` is anything but an explicit ``on``/``true`` all read
+  as ``"off"``. Only an explicit promotion turns a surface on, so no surface can
+  ship enabled because of a typo, a truncated write or an absent file.
+* **the answer is a value, never an exception.** A caller asking whether a
+  surface is on must get ``False`` for every failure, so a boot with a broken
+  config serves a dark console instead of crashing — the same posture the
+  control-plane registry reader takes.
+
+``pyyaml`` is the repo's accepted stack (stdlib + PyYAML). A missing PyYAML is a
+fail-closed ``"off"``, never an enabled surface.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+#: The flag declaration the portal reads at boot (repo-root relative).
+CONFIG_RELATIVE = Path("portal") / "config" / "feature-flags.yaml"
+
+#: Surface keys declared in ``portal/config/feature-flags.yaml`` (issue #642).
+ORG_CHART_SURFACE = "org_chart"
+SKILL_STUDIO_SURFACE = "skill_studio"
+TASK_BOARD_SURFACE = "task_board"
+
+#: Every surface this module knows about, so a test can assert the set is closed.
+DECLARED_SURFACES = frozenset(
+    {ORG_CHART_SURFACE, SKILL_STUDIO_SURFACE, TASK_BOARD_SURFACE}
+)
+
+
+def read_config_default(
+    repo_root: Path | str,
+    *,
+    config_path: Optional[Path | str] = None,
+    surface: str,
+) -> str:
+    """The declared default for ``surface`` — ``"on"`` or ``"off"``.
+
+    Fails closed: every unreadable or non-conforming input reads as ``"off"``.
+    Only ``default: on`` or ``default: true`` returns ``"on"``.
+    """
+    path = (
+        Path(config_path)
+        if config_path is not None
+        else Path(repo_root) / CONFIG_RELATIVE
+    )
+    try:
+        import yaml
+    except ImportError:
+        return "off"
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "off"
+    if not isinstance(document, dict):
+        return "off"
+    surfaces = document.get("surfaces")
+    if not isinstance(surfaces, dict):
+        return "off"
+    entry = surfaces.get(surface)
+    if not isinstance(entry, dict):
+        return "off"
+    default = entry.get("default")
+    if default is True or (
+        isinstance(default, str) and default.strip().lower() == "on"
+    ):
+        return "on"
+    return "off"
+
+
+def surface_enabled(
+    repo_root: Path | str,
+    *,
+    config_path: Optional[Path | str] = None,
+    surface: str,
+) -> bool:
+    """True only when the portal config explicitly promotes ``surface``."""
+    return (
+        read_config_default(repo_root, config_path=config_path, surface=surface)
+        == "on"
+    )
