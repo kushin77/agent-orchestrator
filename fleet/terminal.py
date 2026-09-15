@@ -38,6 +38,7 @@ import capacity
 import channel
 import routing
 import runaway
+import runners
 import runtime
 import singleton
 import telemetry
@@ -215,8 +216,16 @@ def resolve_dispatch(
                 "rather than silently raised: the brain applies this floor before it sends (fleet/brain.py)",
             )
     model = str(entry["model"])
+    # The model switch is the PROFILE's, not a second hard-coded flag (#841). A runner is
+    # a (binary, argv shape, model vocabulary, environment) quadruple, and this map carried
+    # the vocabulary while `DEFAULT_RUNNER`/`FLEET_RUNNER` carried the binary — so the two
+    # could disagree and nothing said so. The native DeepSeek CLI spells the switch `-m`.
+    # `entry["flag"]` stays the fallback; the capability preflight has already refused an
+    # unknown profile by name before we reach here.
+    chosen = runners.profile_for(base_runner or DEFAULT_RUNNER)
+    model_flag = chosen.model_flag if chosen is not None else str(entry["flag"])
     runner = shlex.join(
-        [*shlex.split(base_runner or DEFAULT_RUNNER), str(entry["flag"]), model]
+        [*shlex.split(base_runner or DEFAULT_RUNNER), model_flag, model]
     )
     env = {
         "AO_TIER": str(tier),
@@ -1950,6 +1959,12 @@ def set_flag(path: Path, on: bool) -> None:
 #: The preflight's once-per-condition escalation (#733): a loop that re-reads the
 #: inbox every cycle must say this once, not once per directive per cycle.
 RUNNER_PREFLIGHT_ID = "runner-preflight"
+#: The CAPABILITY preflight's escalation (#841), keyed separately from the one above
+#: because it is a different failure with a different remedy: `runner-preflight` means
+#: the executable is missing (install it), this one means the executable cannot honour
+#: the model (wire its environment, or select another profile). Collapsing them would
+#: make one remedy's message wrong for the other's failure.
+RUNNER_CAPABILITY_ID = "runner-capability"
 #: Records the queue hold THIS loop took for an unresolvable runner, together with
 #: the stamp it wrote into `.fleet/paused`, so the hold can be released when the
 #: runner resolves — and never releases an operator's pause.
@@ -2345,6 +2360,46 @@ def loop(args: argparse.Namespace) -> int:
             )
             if args.once:
                 return 1
+        # The runner CAPABILITY preflight (#841) — the SECOND half of the question above.
+        # `preflight` proves the executable resolves; it never proved the executable could
+        # honour the model, and that gap was measured: with `claude` on PATH and the BYOK
+        # environment unset, `claude -p --model deepseek-v4-flash` resolved and then died in
+        # ~10s with `[claude-code:unrecognized_model]` — 192 such lines, 40 `status=failed`,
+        # 0 `status=ok`, while this loop and the watchdog both reported the fleet healthy.
+        # Same machinery and the same reason as above: a dependency no directive can fix is
+        # HELD and escalated ONCE, never re-tried per directive.
+        # Asked only of a runner that RESOLVED: the two questions are ordered, and an
+        # unresolvable runner has already been reported above. Two separate mistakes were
+        # caught here by `scripts/check-fleet-runner-preflight.sh`, which is why the
+        # ordering is written out rather than folded into one expression: asking the second
+        # question of a runner that does not exist escalated twice for ONE condition, and
+        # releasing the hold on the `elif` path ran for a runner that had not resolved —
+        # which RELEASED the hold the preflight had just taken.
+        capability_problem = runners.unhonourable(args.runner) if runner_ok else ""
+        if capability_problem:
+            if hold_queue_for_runner(capability_problem):
+                print(
+                    f"[terminal] RUNNER CANNOT HONOUR A DISPATCH — {capability_problem} — queue held, "
+                    "no directive dispatched (one escalation, not one per directive)",
+                    flush=True,
+                )
+            report_once(
+                RUNNER_CAPABILITY_ID,
+                key=f"runner-capability:{capability_problem}",
+                message_type="escalate",
+                body=f"{capability_problem} — the fleet can resolve a runner but cannot honour a "
+                "dispatch with it, so the queue is held and no directive is dispatched; until this is "
+                "fixed every dispatch would die with `unrecognized_model` and be recorded as "
+                "`status=failed` in a run log. Reported once — not once per directive per cycle.",
+            )
+            if args.once:
+                return 1
+        elif runner_ok:
+            # A runner that resolved AND can honour the dispatch: release a hold this loop
+            # took earlier, and only ever this loop's own (see `release_runner_hold`).
+            released = release_runner_hold()
+            if released:
+                print(f"[terminal] {released}", flush=True)
         if paused():
             write_heartbeat("paused", started_at=started_at, commit=commit, runs=active)
         else:
