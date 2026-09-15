@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from governance.lifecycle import directive  # noqa: E402
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
 from governance.lifecycle.closeout import CloseOutResult, closeout, describe  # noqa: E402
 from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
@@ -141,17 +142,21 @@ def _lane_records(root: Path | None = None) -> dict[int, dict]:
 
 
 def _directive_for(issue: int, root: Path | None = None) -> dict:
-    """The authorisation directive that dispatched an item, and whether it is consumed."""
+    """The authorisation directive that dispatched an item, and whether it is consumed.
+
+    A **stranded** directive wins over a terminal one for the same issue (#821).
+    The old reader returned the first match in filename order and asked only
+    whether a ``done/`` file happened to share its name, so a lane whose *older*
+    authorisation had already reached ``done`` read as fully consumed while the
+    directive that actually dispatched it stayed in ``.fleet/sent/`` forever —
+    which is why this failure looked intermittent across lanes and was not.
+    ``directive.records`` lists sent before done, so the pending record is the one
+    the invariant is decided on.
+    """
     root = root or ROOT
-    for path in sorted((root / ".fleet" / "sent").glob("*.json")):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if int((payload.get("task") or {}).get("issue") or 0) != issue:
-            continue
-        consumed = (root / ".fleet" / "done" / path.name).exists()
-        return {"id": str(payload.get("id", path.stem)), "state": "done" if consumed else "sent"}
+    for record in directive.records(root):
+        if record.issue == issue:
+            return {"id": record.id, "state": record.state}
     return {}
 
 
@@ -282,8 +287,13 @@ def read_baseline(path: str) -> dict:
 class GhOps:
     """The real effects close-out needs, through ``gh`` and the repo's own CLIs."""
 
-    def __init__(self, root: Path | None = None) -> None:
+    def __init__(self, root: Path | None = None, record: dict | None = None) -> None:
         self.root = root or ROOT
+        #: The lifecycle record the close-out was collected from. The directive's
+        #: terminal move is gated on whether the order's change has landed, and
+        #: that fact comes from the board read that already happened — not from a
+        #: second, possibly different, read of the world (#821).
+        self.record = record
 
     def _run(self, args: list[str], cwd: Path | None = None) -> str:
         result = subprocess.run(args, cwd=str(cwd or self.root), capture_output=True, text=True)
@@ -322,7 +332,18 @@ class GhOps:
         return f"deleted origin/{branch}"
 
     def consume_directive(self, directive_id: str) -> str:
-        return self._run(["python3", str(self.root / "fleet" / "channel.py"), "consume", "--id", directive_id])
+        """Retire the order: the terminal move is the close-out's own (#821).
+
+        This used to shell out to ``fleet/channel.py consume``, which reads only
+        the *inbox* — a mailbox a brain-minted directive never enters — so the step
+        could not reach its terminal state for the artifact it was given, and the
+        remedy the finding named was unreachable by construction. Whether an order
+        is finished is a fact the lifecycle already holds; the move therefore lives
+        in ``governance/lifecycle/directive.py``, refused by name when the ordered
+        change has not landed so it can never retire work still in flight.
+        """
+        record = self.record if self.record is not None else collect_from_github(self.root)
+        return directive.consume(self.root, directive_id, directive.landed_issues(record))
 
     def release_claim(self, issue: int, agent: str) -> str:
         return self._run(
@@ -393,7 +414,7 @@ def cmd_close(args: argparse.Namespace) -> int:
         print(f"close: CANNOT-ASSESS — #{args.issue} is outside the audit scope", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     result: CloseOutResult = closeout(
-        item, GhOps(), evidence=args.evidence, reporter=_reporter(), apply=args.apply
+        item, GhOps(record=record), evidence=args.evidence, reporter=_reporter(), apply=args.apply
     )
     print(describe(result))
     _print_board_reports(result.board_reports)

@@ -87,7 +87,7 @@ INVARIANTS: Tuple[Invariant, ...] = (
     Invariant(
         code="DIRECTIVE_NOT_CONSUMED",
         requires="an authorisation directive that dispatched the item is consumed, not left sent",
-        remediation="consume the directive (`channel.py consume --id <id>`) so the loop cannot re-execute the order",
+        remediation="close the item out (`governance/lifecycle/cli.py close --issue <n>`), which owns the terminal move of the directive from .fleet/sent/ to .fleet/done/, so the loop cannot re-execute the order",
     ),
     Invariant(
         code="LANE_NOT_RECLAIMED",
