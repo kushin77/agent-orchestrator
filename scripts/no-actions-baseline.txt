@@ -1,0 +1,18 @@
+# Deliberate, reasoned exemptions from GR-15 ("no GitHub Actions workflows").
+#
+# GR-15 admits no exception, so this file is EMPTY. It exists because a blanket
+# rule with no declared escape hatch is not a policy — it is an obstacle that
+# gets worked around silently, which is exactly how the repo came to be running
+# `ci-failure-scanner.yml` while its own doctrine forbade it (issue #812).
+#
+# The format is one entry per line: the workflow FILENAME first, then a reason.
+# The reason is not decoration. `scripts/check-no-actions.sh` fails a stale entry
+# by name, so this file cannot rot into a list of exemptions whose workflows are
+# gone — the failure mode that makes an exemption list a fiction.
+#
+# To exempt a workflow it must also survive review: GR-15 is a fleet rule, so an
+# exemption recorded here is a deliberate, visible deviation, not a default.
+#
+#   <filename>  # <why this cannot be code-native>
+#
+# (No entries.)
