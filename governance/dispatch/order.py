@@ -13,6 +13,11 @@ parked in `.board/pool.jsonl`, so the fleet concentrates on one epic without the
 deferred work being lost. The check sits before the milestone frontier, because a
 frontier that hands out another epic's issue is the incoherence focus prevents.
 All of it stays a pure function of the snapshot plus the focus file.
+
+One structural rule belongs here as well as in the A2A arbitration (issue #726):
+an issue whose declared epic is closed is not eligible, because the epic that
+would own the work is gone. Keeping it in the pre-flight means `eligible` and the
+claim-time refusal cannot disagree — the trap this rule exists to close.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from model import (
     REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
     REASON_CHILD_OF_CLAIM,
+    REASON_EPIC_CLOSED,
     REASON_EPIC_NOT_WORKABLE,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
@@ -95,6 +101,17 @@ def eligible(
             False,
             REASON_EPIC_NOT_WORKABLE,
             f"#{issue_number} is an epic: it closes with its children, it is never a claim target",
+        )
+
+    # An issue whose declared epic is closed has no owner to work under: the unit
+    # cannot prove issue -> epic -> lane, so it is refused like any unowned unit.
+    epic = snapshot.get(issue.parent) if issue.parent is not None else None
+    if epic is not None and epic.closed:
+        return Eligibility(
+            issue_number,
+            False,
+            REASON_EPIC_CLOSED,
+            f"#{issue_number} declares Parent #{epic.number}, which is closed",
         )
 
     open_blockers = snapshot.blockers_open(issue)

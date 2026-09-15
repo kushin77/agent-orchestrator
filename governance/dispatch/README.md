@@ -3,7 +3,8 @@
 The chronological-dispatch rule lives in `AGENTS.md` (golden rule 14),
 `docs/GOVERNANCE.md` (section 8) and `docs/EXECUTION-PLAN.md` (section 5), and
 `scripts/check-chronological-dispatch.sh` gates that those documents keep
-declaring it. That is a **declaration** gate.
+declaring it — and (since #726) that the dispatch arbitration actually refuses a
+unit whose issue → epic → lane proof does not hold.
 
 This package is the **behavioural** half. It refuses a claim on an issue that is
 not the next step in the active dependency chain, so the board behaves like an
@@ -22,9 +23,10 @@ An issue is claimable only when one of these holds:
 | `brain-directed` | A brain directive recorded in `.fleet/sent` names exactly this issue (`claim --directive <id>`). The brain is the chain. |
 
 Everything else is refused with a reason: `unknown-issue`, `issue-closed`,
-`blocked`, `already-claimed`, `epic-not-workable`, `out-of-epic-pooled` (outside
-the active epic — parked, see below), or `no-chain-edge` — the last being kanban
-scavenging. Epics are never claim targets: an epic closes with its children.
+`epic-closed`, `blocked`, `already-claimed`, `epic-not-workable`,
+`provenance-mismatch`, `unowned`, `out-of-epic-pooled` (outside the active epic —
+parked, see below), or `no-chain-edge` — the last being kanban scavenging. Epics
+are never claim targets: an epic closes with its children.
 
 ## The out-of-epic pool (#707 lane F6 / #721)
 
@@ -53,11 +55,89 @@ refused `out-of-epic-pooled` **and** a record is appended to
 The rail is runtime state and is gitignored (`.board/pool.jsonl`), like
 `.board/locks/` — the decision log is the branch/PR history.
 
+## A2A dispatch arbitration (#726)
+
+A directive names an issue, but a name is not ownership: nothing bound the issue
+to the epic that owns the work or to the lane that holds it, so a directive could
+be dispatched for a closed issue or under a closed epic, and two lanes could drive
+one issue. A message between agents is only safe if the receiver can prove who
+owns the work, so dispatch **proves issue → epic → lane** and refuses a unit whose
+proof does not hold — naming the evidence it checked.
+
+```bash
+python3 governance/dispatch/cli.py dispatch --issue 726 --agent me --lane governance
+```
+
+`dispatch` is read-only (it takes no claim and writes no ledger entry), so it is
+safe to run before provisioning a lane:
+
+```
+$ python3 governance/dispatch/cli.py dispatch --issue 724 --agent me --lane governance
+{
+  "verdict": "granted",
+  "issue": 724,
+  "agent": "me",
+  "lane": "governance",
+  "epic": 708,
+  "directive_id": "",
+  "provenance": {
+    "issue": 724,
+    "epic": 708,
+    "lane": "governance",
+    "evidence": [
+      ".board/snapshot.json (source kushin77/agent-orchestrator, generated 2026-09-14T18:00:00Z, sha256 1a2b3c4d5e6f) issue #724 state=open parent=#708 milestone=M26",
+      "epic issue #708 state=open milestone=M26",
+      "lane 'governance' named by the dispatch",
+      "directive: none (claimed as part of the active chain)",
+      "ledger .board/claims holds no live claim on #724"
+    ]
+  }
+}
+dispatch granted: #724 -> epic #708 -> lane governance
+```
+
+`claim` runs the same arbitration before it writes, so the refusal cannot be
+sidestepped by calling the mutation directly. Each refusal names what it read:
+
+| Refusal | Refused when | Evidence named |
+|---|---|---|
+| `issue-closed` | the issue is closed in the board | the snapshot (source, generation, digest) and the issue's `state` / `closed_at` |
+| `epic-closed` | the issue declares a `Parent:` edge to a closed epic | the same, for both the issue and the epic |
+| `already-claimed` | a live claim holds the unit (another agent, or another lane) | the holder's agent **and lane**, since when, plus the ledger and lock path |
+| `unowned` | the dispatch and the directive both name no lane | the empty lane and the directive that would have declared one |
+| `provenance-mismatch` | the directive declares an epic or lane the board does not corroborate | the directive file, the declared `task.epic` / `task.lane`, and the board's own edge |
+| `blocked` / `unknown-issue` / `epic-not-workable` | the issue is blocked, absent, or is itself an epic | the snapshot and the issue fields read |
+| `snapshot-stale` | the board is older than `--stale-minutes` (fail closed, exit 2) | the snapshot's age and how to refresh it |
+
+Exit codes stay tri-state: `0` granted, `1` refused, `2` CANNOT-ASSESS (missing or
+stale board). `unowned` applies at the dispatch seam, where a unit no lane owns
+must be refused; the legacy `claim` path keeps its documented empty `--lane`
+default (`fleet/terminal.py` always passes one), so the same arbitration serves
+both without changing the claim contract.
+
+**Provenance is recorded.** A granted arbitration writes an `issue -> epic -> lane`
+record onto the claim — linked to the directive that authorized it — so the
+owner of a unit is readable from the ledger afterwards:
+
+```json
+{"event": "claim", "issue": 726, "agent": "me", "lane": "governance", "reason": "brain-directed",
+ "directive_id": "d-1", "provenance": {"issue": 726, "epic": 708, "lane": "governance",
+ "evidence": ["...the board, the epic, the lane, the directive, the ledger..."]}}
+```
+
+The audit re-derives the provenance invariants from the ledger it reads: a
+recorded provenance must agree with the board's `Parent:` edge and with the claim's
+own lane, and a claim still **live** that was taken by a directive
+(`brain-directed`) must record one. Absence is not judged on settled history:
+records written before #726 carry no provenance, and an audit that retro-blames
+them cannot be green on its own repository.
+
 ## Claim protocol
 
 ```bash
 python3 governance/dispatch/cli.py status                        # active milestone + frontier
 python3 governance/dispatch/cli.py eligible --issue 139 --agent me
+python3 governance/dispatch/cli.py dispatch --issue 139 --agent me --lane knowledge-index
 python3 governance/dispatch/cli.py claim --issue 139 --agent me --lane knowledge-index
 # ...do the work, open the PR...
 python3 governance/dispatch/cli.py release --issue 139 --agent me
@@ -127,23 +207,39 @@ bash scripts/check-issue-claims.sh      # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
 
 The audit re-derives the **time-stable** invariants — record schema, declared
 chain edges, milestone membership, blockers, the single-claim lock, release
-pairing, epics, expired-but-unreleased claims. Strict frontier *ordering* is
-enforced live at claim time by `order.eligible`, because a historical frontier
-cannot be recomputed from today's snapshot.
+pairing, epics, expired-but-unreleased claims, and the recorded provenance. Strict
+frontier *ordering* is enforced live at claim time by `order.eligible`, because a
+historical frontier cannot be recomputed from today's snapshot.
 
 The audit always runs its own mutants first: scavenged claim, blocked claim,
-closed claim, epic claim, duplicate claim, double release, unsupported reason
-and a malformed record must all be **rejected**, while a valid frontier claim
-and a valid child claim must be **accepted**. If the audit cannot fail, the gate
-fails (GR-12 / AO-GR-19: a check that cannot fail is a formality).
+closed claim, epic claim, duplicate claim, double release, unsupported reason,
+provenance the board contradicts, a routed claim that recorded none, and a
+malformed record must all be **rejected**, while a valid frontier claim and a valid
+child claim must be **accepted**. If the audit cannot fail, the gate fails
+(GR-12 / AO-GR-19: a check that cannot fail is a formality).
+
+The **dispatch** refusals are controlled the same way, and by the same `audit`
+run: `arbitration_self_control()` provokes every reason in
+`ARBITRATION_REFUSALS` — each with the evidence it must name — and refuses to pass
+if a reason has no provoked refusal, if a refusal stops quoting its evidence, or if
+a valid unit is no longer granted. The controls run in a temporary directory and
+rebind the sent mailbox only for their own run, so they touch no repository state.
+
+`scripts/check-chronological-dispatch.sh` (the gate named by #726's `Verify:`) is
+this rule's other half: it keeps the *declaration* checks on the contract documents
+and adds a behavioural section that drives the `dispatch` CLI against a fixture
+board in a temp dir — a closed issue, a directive aimed at a closed issue, an open
+issue under a closed epic, a unit another lane holds, an unowned unit and a stale
+board must all be **refused** (naming their evidence), and a dispatchable unit must
+still be **granted with its provenance**.
 
 ## Layout
 
 | File | Role |
 |---|---|
-| `model.py` | Issue / Snapshot / Eligibility / ClaimEvent dataclasses and reason codes |
+| `model.py` | Issue / Snapshot / Eligibility / ClaimEvent / Provenance / Arbitration dataclasses and reason codes |
 | `snapshot.py` | Snapshot build, load, hash, chain-marker parsing, `gh` fetch |
-| `order.py` | Eligibility rules and frontier/milestone resolution |
-| `claims.py` | Ledger (directory + frozen legacy file), single-claim lock, TTL take-over, snapshot-staleness refusal, audit, self-control |
-| `cli.py` | `status` / `eligible` / `claim` / `release` / `snapshot` / `audit` |
-| `tests/` | Eligibility, lock, TTL, audit and anti-formality controls |
+| `order.py` | Eligibility rules (including a closed epic) and frontier/milestone resolution |
+| `claims.py` | Ledger (directory + frozen legacy file), single-claim lock, TTL take-over, snapshot-staleness refusal, A2A arbitration, audit, both self-controls |
+| `cli.py` | `status` / `eligible` / `dispatch` / `claim` / `release` / `held` / `reap` / `snapshot` / `audit` |
+| `tests/` | Eligibility, lock, TTL, audit, arbitration, the CLI refusal seam and the anti-formality controls |

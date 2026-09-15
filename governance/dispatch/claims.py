@@ -16,6 +16,13 @@
   structural violation: malformed record, duplicate active claim, release without
   claim, claim on a closed issue, and a recorded reason the snapshot does not
   justify. ``self_control`` proves the audit can fail (anti-formality).
+* **A2A arbitration** (issue #726) — ``arbitrate`` proves issue -> epic -> lane
+  ownership from *named evidence* before a unit is dispatched, and refuses a
+  closed issue, a closed epic, a unit another lane already holds, an unowned unit
+  or a stale board. ``claim`` runs it, so the refusal bites at the mutation point
+  as well as at the read-only ``dispatch`` seam, and
+  ``arbitration_self_control`` provokes every refusal (a refusal that cannot fire
+  is a formality).
 """
 
 from __future__ import annotations
@@ -25,6 +32,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -47,18 +55,26 @@ import focus
 import pool
 from model import (
     ALLOWED_CLAIM_REASONS,
+    ARBITRATION_REFUSALS,
     REASON_ACTIVE_EPIC_CHILD,
+    REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
     REASON_BRAIN_DIRECTED,
     REASON_CHILD_OF_CLAIM,
+    REASON_EPIC_CLOSED,
+    REASON_EPIC_NOT_WORKABLE,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
     REASON_OUT_OF_EPIC_POOLED,
+    REASON_PROVENANCE_MISMATCH,
+    REASON_SNAPSHOT_STALE,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_UNKNOWN_ISSUE,
+    REASON_UNOWNED,
+    Arbitration,
     ClaimEvent,
-    Eligibility,
     Issue,
+    Provenance,
     Snapshot,
     parse_claim_event,
 )
@@ -359,6 +375,201 @@ def drain_pool_when_no_focus(
     return pool.drain(pool_path)
 
 
+# --- A2A dispatch arbitration (issue #726) -----------------------------------
+#
+# A directive names an issue, but nothing bound it to the epic that owns the work
+# or to the lane that holds it: a directive could be dispatched for a closed issue
+# or under a closed epic, and two directives could drive one issue. Arbitration
+# proves the chain issue -> epic -> lane from evidence it names before a unit is
+# routed, so the receiver can see *who owns this* rather than trusting the sender.
+
+
+def _board_evidence(snapshot: Snapshot, snapshot_path: str = "", snapshot_sha256: str = "") -> str:
+    """Name the board a verdict was judged against (source, generation, digest)."""
+    digest = f", sha256 {snapshot_sha256[:12]}" if snapshot_sha256 else ""
+    where = snapshot_path or "<in-memory snapshot>"
+    return f"{where} (source {snapshot.source or 'unknown'}, generated {snapshot.generated_at or 'unknown'}{digest})"
+
+
+def _issue_evidence(issue: Issue) -> str:
+    """Name the fields of one issue a verdict read, so a refusal can quote them."""
+    fields = [f"issue #{issue.number} state={issue.state or 'unknown'}"]
+    if issue.closed_at:
+        fields.append(f"closed_at={issue.closed_at}")
+    if issue.parent is not None:
+        fields.append(f"parent=#{issue.parent}")
+    if issue.milestone:
+        fields.append(f"milestone={issue.milestone}")
+    if issue.labels:
+        fields.append(f"labels={','.join(issue.labels)}")
+    return " ".join(fields)
+
+
+def _directive_task(directive: dict | None) -> dict:
+    task = (directive or {}).get("task")
+    return task if isinstance(task, dict) else {}
+
+
+def _directive_lane(directive: dict | None) -> str:
+    return str(_directive_task(directive).get("lane") or "")
+
+
+def _directive_epic(directive: dict | None) -> int | None:
+    value = _directive_task(directive).get("epic")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _directive_ref(directive_id: str) -> str:
+    return str(SENT_DIR / f"{directive_id}.json")
+
+
+def arbitrate(
+    issue_number: int,
+    agent: str,
+    lane: str,
+    snapshot: Snapshot,
+    ledger: Path | str = DEFAULT_CLAIMS_DIR,
+    lock_dir: Path | str = DEFAULT_LOCK_DIR,
+    directive_id: str = "",
+    require_lane: bool = False,
+    snapshot_path: str = "",
+    snapshot_sha256: str = "",
+    now: datetime | None = None,
+    stale_minutes: int = DEFAULT_STALENESS_MINUTES,
+) -> Arbitration:
+    """Prove issue -> epic -> lane ownership before a unit is dispatched (#726).
+
+    Returns the granted arbitration, or raises ``ClaimRefused`` naming the reason
+    *and the evidence it checked*: the board snapshot (source, generation, digest)
+    and the issue fields it read, the epic the issue declares, the live claim
+    record and lock that hold a unit, or the directive envelope that declared a
+    provenance the board does not corroborate.
+
+    ``require_lane`` is for the dispatch seam, where a unit no lane owns must be
+    refused. The claim path leaves it off so its documented ``--lane`` default is
+    unchanged: one arbitration serves both, and neither can grant a unit the other
+    would refuse.
+    """
+    moment = now or datetime.now(timezone.utc)
+    board = _board_evidence(snapshot, snapshot_path, snapshot_sha256)
+
+    issue = snapshot.get(issue_number)
+    if issue is None:
+        raise ClaimRefused(REASON_UNKNOWN_ISSUE, f"#{issue_number} is absent from the board — evidence: {board}")
+    if issue.closed:
+        raise ClaimRefused(
+            REASON_ISSUE_CLOSED,
+            f"#{issue_number} is closed — evidence: {board} {_issue_evidence(issue)}",
+        )
+
+    # The epic half of the provenance: an issue whose declared epic is closed has
+    # no owner to work under, so the unit cannot prove issue -> epic -> lane.
+    epic_number = issue.parent
+    epic = snapshot.get(epic_number) if epic_number is not None else None
+    if epic is not None and epic.closed:
+        raise ClaimRefused(
+            REASON_EPIC_CLOSED,
+            f"#{issue_number}'s epic is closed — evidence: {board} {_issue_evidence(issue)}; "
+            f"epic {_issue_evidence(epic)}",
+        )
+    if issue.is_epic:
+        raise ClaimRefused(
+            REASON_EPIC_NOT_WORKABLE,
+            f"#{issue_number} is an epic: it closes with its children and is not a unit of work "
+            f"— evidence: {board} {_issue_evidence(issue)}",
+        )
+
+    open_blockers = snapshot.blockers_open(issue)
+    if open_blockers:
+        listed = ", ".join(f"#{number}" for number in open_blockers)
+        raise ClaimRefused(REASON_BLOCKED, f"#{issue_number} is blocked by {listed} — evidence: {board}")
+
+    # The lane half: a second live claim on a held unit is refused, naming the
+    # holder and the records that prove it.
+    held = active_claims(read_ledger(ledger), moment).get(issue_number)
+    if held is not None:
+        if held.agent == agent:
+            detail = f"{agent} already holds #{issue_number}: release it before dispatching again"
+        else:
+            detail = (
+                f"#{issue_number} is held by another lane: {held.agent} (lane {held.lane or 'unstated'})"
+            )
+        raise ClaimRefused(
+            REASON_ALREADY_CLAIMED,
+            f"{detail}, live since {held.at} (reason {held.reason or 'unstated'}) — evidence: live claim in "
+            f"ledger {ledger} for #{issue_number}, lock {lock_path(issue_number, lock_dir)}",
+        )
+
+    directive: dict | None = None
+    if directive_id:
+        directive = _load_brain_directive(directive_id, issue_number)
+    directive_ref = _directive_ref(directive_id) if directive_id else "<no directive>"
+
+    # A directive's own provenance must be corroborated by the board: a declared
+    # epic or lane the board cannot confirm is an unproven claim of ownership.
+    declared_epic = _directive_epic(directive)
+    if declared_epic is not None and declared_epic != epic_number:
+        recorded = f"#{epic_number}" if epic_number is not None else "no Parent edge"
+        raise ClaimRefused(
+            REASON_PROVENANCE_MISMATCH,
+            f"directive {directive_id} declares epic #{declared_epic} for #{issue_number} but the board records "
+            f"{recorded} — evidence: {directive_ref} task.epic={declared_epic}; {board} {_issue_evidence(issue)}",
+        )
+
+    declared_lane = _directive_lane(directive)
+    if declared_lane and lane.strip() and declared_lane != lane.strip():
+        raise ClaimRefused(
+            REASON_PROVENANCE_MISMATCH,
+            f"directive {directive_id} declares lane {declared_lane!r} but this dispatch names lane {lane!r} "
+            f"— evidence: {directive_ref} task.lane={declared_lane}; requested lane={lane}",
+        )
+
+    claimed_lane = (lane or declared_lane).strip()
+    if require_lane and not claimed_lane:
+        declared = f"; {directive_ref} declares no task.lane" if directive_id else ""
+        raise ClaimRefused(
+            REASON_UNOWNED,
+            f"no lane owns #{issue_number}: the dispatch names no lane and no directive declares one "
+            f"— evidence: requested lane=<empty>{declared}",
+        )
+
+    if is_stale(snapshot, stale_minutes, moment):
+        age = age_minutes(snapshot, moment)
+        raise ClaimRefused(
+            REASON_SNAPSHOT_STALE,
+            f"snapshot is {age:.1f}m old (threshold {stale_minutes}m) — evidence: {board}; "
+            "refresh first: python3 governance/dispatch/cli.py snapshot --from-github",
+        )
+
+    lane_evidence = (
+        f"lane {claimed_lane!r} named by the dispatch"
+        if lane.strip()
+        else f"lane {claimed_lane!r} declared by {directive_ref}"
+    )
+    provenance = Provenance(
+        issue=issue_number,
+        epic=epic_number,
+        lane=claimed_lane,
+        evidence=(
+            f"{board} {_issue_evidence(issue)}",
+            f"epic {_issue_evidence(epic)}" if epic is not None else "epic: the issue declares no Parent edge",
+            lane_evidence,
+            f"directive {directive_ref}" if directive_id else "directive: none (claimed as part of the active chain)",
+            f"ledger {ledger} holds no live claim on #{issue_number}",
+        ),
+    )
+    return Arbitration(
+        issue=issue_number,
+        agent=agent,
+        lane=claimed_lane,
+        epic=epic_number,
+        directive_id=directive_id,
+        provenance=provenance,
+    )
+
+
 def claim(
     issue_number: int,
     agent: str,
@@ -375,7 +586,10 @@ def claim(
     focus_path: Path | str | None = None,
     pool_path: Path | str = pool.POOL_PATH,
 ) -> ClaimEvent:
-    """Claim an issue after checking order. Raises ClaimRefused when it is not the next step.
+    """Claim an issue after arbitrating ownership, then order.
+
+    Raises ``ClaimRefused`` when the unit cannot prove issue -> epic -> lane
+    ownership (#726) or is not the next step in the active chain.
 
     ``focus_path``/``pool_path`` keep the epic-focus edges resolvable offline
     against fixtures: the focus decides eligibility, the pool records the deferral
@@ -391,43 +605,34 @@ def claim(
     latest = replay(events).get(issue_number)
     history = {event.issue for event in events if event.is_claim and event.agent == agent}
 
-    # A live claim blocks anyone else; an expired one may be taken over, so a
-    # dead agent cannot wedge the chain forever.
-    held = live.get(issue_number)
-    takeover = False
-    if held is not None:
-        if held.agent == agent:
-            raise ClaimRefused("already-claimed", f"{agent} already holds #{issue_number} (release it first)")
-        raise ClaimRefused("already-claimed", f"#{issue_number} is held by {held.agent} until its TTL elapses")
-    if latest is not None and is_expired(latest, moment) and latest.agent != agent:
-        takeover = True
+    # Arbitration first: it is the refusal that names the evidence, so a closed
+    # issue, a closed epic, a unit another lane already holds, an unowned unit or a
+    # stale board is refused with the board state it was judged against. A live
+    # claim blocks anyone else; an expired one may be taken over, so a dead agent
+    # cannot wedge the chain forever.
+    arbitration = arbitrate(
+        issue_number,
+        agent,
+        lane,
+        snapshot,
+        ledger=ledger,
+        lock_dir=lock_dir,
+        directive_id=directive_id,
+        snapshot_sha256=snapshot_sha256,
+        now=moment,
+        stale_minutes=stale_minutes,
+    )
+    lane = arbitration.lane
+    takeover = latest is not None and is_expired(latest, moment) and latest.agent != agent
 
-    # A stale snapshot cannot be trusted to judge order: refuse before using it.
-    if is_stale(snapshot, stale_minutes, moment):
-        age = age_minutes(snapshot, moment)
-        raise ClaimRefused(
-            "snapshot-stale",
-            f"snapshot is {age:.1f}m old (threshold {stale_minutes}m) — "
-            "refresh first: python3 governance/dispatch/cli.py snapshot --from-github",
-        )
-
-    # Structural checks hold for every path, directive or not.
-    issue = snapshot.get(issue_number)
-    if issue is None:
-        raise ClaimRefused(REASON_UNKNOWN_ISSUE, f"#{issue_number} is absent from the snapshot")
-    if issue.closed:
-        raise ClaimRefused(REASON_ISSUE_CLOSED, f"#{issue_number} is closed")
-    open_blockers = snapshot.blockers_open(issue)
-    if open_blockers:
-        listed = ", ".join(f"#{number}" for number in open_blockers)
-        raise ClaimRefused(REASON_BLOCKED, f"#{issue_number} is blocked by {listed}")
-
+    # Arbitration already validated the envelope; re-reading it here keeps the
+    # claim's own reason decided from the directive this claim names.
     directive: dict | None = None
     if directive_id:
         directive = _load_brain_directive(directive_id, issue_number)
 
     if directive is not None:
-        verdict = Eligibility(issue_number, True, REASON_BRAIN_DIRECTED, f"brain-directed via {directive_id}")
+        reason = REASON_BRAIN_DIRECTED
     else:
         others = frozenset(number for number, holder in live.items() if holder.agent != agent)
         verdict = order.eligible(
@@ -446,9 +651,13 @@ def claim(
             if verdict.reason == REASON_OUT_OF_EPIC_POOLED:
                 pool.note(issue_number, pool.REASON_OUT_OF_EPIC, path=pool_path)
             raise ClaimRefused(verdict.reason, verdict.detail)
+        reason = verdict.reason
 
     if not _acquire_lock(issue_number, lock_dir, takeover=takeover):
-        raise ClaimRefused("already-claimed", f"#{issue_number} lock is held by another agent")
+        raise ClaimRefused(
+            REASON_ALREADY_CLAIMED,
+            f"#{issue_number} lock {lock_path(issue_number, lock_dir)} is held by another agent",
+        )
 
     event_name = "take-over" if takeover else "claim"
     event = ClaimEvent(
@@ -459,10 +668,11 @@ def claim(
         lane=lane,
         base_commit=base_commit,
         snapshot_sha256=snapshot_sha256,
-        reason=verdict.reason,
+        reason=reason,
         ttl_hours=ttl_hours,
         directive_id=directive_id,
         directive_from="brain" if directive is not None else "",
+        provenance=arbitration.provenance,
     )
     append_event(event, ledger)
     return event
@@ -562,6 +772,40 @@ def _claimed_at(event: ClaimEvent, fallback: datetime) -> datetime:
         return fallback
 
 
+def _still_live(event: ClaimEvent, events: list[ClaimEvent]) -> bool:
+    """Whether no later release/reap settled this claim (its issue is still held)."""
+    return not any(later.event in ("release", "reap") and later.issue == event.issue for later in events)
+
+
+def _provenance_problems(event: ClaimEvent, issue: Issue) -> list[str]:
+    """A recorded provenance must agree with the board and with the claim itself.
+
+    Absence is not judged: pre-#726 records carry none and are frozen history, and
+    the requirement that a dispatched unit *has* a provenance is enforced where it
+    can bite — at dispatch (``arbitration_self_control``) and, for a routed unit,
+    by the ``brain-directed`` check below. A recorded provenance that contradicts
+    the board, though, is wrong however old it is.
+    """
+    recorded = event.provenance
+    if recorded is None:
+        return []
+    problems: list[str] = []
+    if recorded.issue != event.issue:
+        problems.append(f"#{event.issue}: provenance records issue #{recorded.issue}, not the claimed unit")
+    if recorded.epic != issue.parent:
+        recorded_epic = f"#{recorded.epic}" if recorded.epic is not None else "none"
+        board_epic = f"#{issue.parent}" if issue.parent is not None else "none"
+        problems.append(
+            f"#{event.issue}: provenance records epic {recorded_epic} but the board's Parent edge is {board_epic}"
+        )
+    if recorded.lane != event.lane:
+        problems.append(
+            f"#{event.issue}: provenance records lane {recorded.lane or '<unstated>'} "
+            f"but the claim records lane {event.lane or '<unstated>'}"
+        )
+    return problems
+
+
 def _claim_problems(
     event: ClaimEvent,
     events: list[ClaimEvent],
@@ -581,16 +825,14 @@ def _claim_problems(
     issue = snapshot.get(event.issue)
     if issue is None:
         return [f"#{event.issue}: claimed but absent from the snapshot"]
+    problems.extend(_provenance_problems(event, issue))
 
     if issue.closed:
         # Settled unless the claim is still live — a live claim on a closed issue
         # is a real problem; one ended by a release OR a reap is finished history.
         # When the snapshot carries closed_at the judgement is chronological: a
         # claim that predates closure was legitimate at the time.
-        still_live = not any(
-            later.event in ("release", "reap") and later.issue == event.issue
-            for later in events
-        )
+        still_live = _still_live(event, events)
         if still_live:
             if issue.closed_at:
                 try:
@@ -623,6 +865,15 @@ def _claim_problems(
     if event.reason == REASON_BRAIN_DIRECTED:
         if not event.directive_id:
             problems.append(f"#{event.issue}: reason 'brain-directed' but no directive_id is recorded")
+        elif event.provenance is None and _still_live(event, events):
+            # A routed unit is exactly the A2A case: while it is live it must record
+            # which epic and which lane own it, not merely that a directive named it
+            # (#726). A settled record is history — the committed ledger carries
+            # pre-#726 brain-directed claims, and an audit that retro-blames them
+            # cannot be green on its own repository.
+            problems.append(
+                f"#{event.issue}: brain-directed via {event.directive_id} records no issue -> epic -> lane provenance"
+            )
         return problems
 
     earlier = {
@@ -799,7 +1050,10 @@ def control_snapshot(now: datetime | None = None) -> Snapshot:
     """Deterministic fixture the self-control mutants are evaluated against.
 
     Shape: milestone ``CONTROL`` with #601 the frontier, #602 blocked by #603,
-    #603 open and out of order, #604 closed, #605 a child of #601.
+    #603 open and out of order, #604 closed, #605 a child of #601, #607 the active
+    epic, #610 a child of it, #611 a second (non-active) epic with #612 its child,
+    and — for the A2A arbitration controls (#726) — #606 an open child of the
+    closed epic #613, plus #614 as the unit the ledger fixture holds.
     """
     moment = now or datetime.now(timezone.utc)
     later = moment + timedelta(hours=1)
@@ -818,6 +1072,10 @@ def control_snapshot(now: datetime | None = None) -> Snapshot:
         610: Issue(610, "child of the active epic", milestone="CONTROL", parent=607),
         611: Issue(611, "a second epic", milestone="CONTROL", labels=("type:epic",)),
         612: Issue(612, "child of the non-active epic", milestone="CONTROL", parent=611),
+        606: Issue(606, "child of a closed epic", milestone="CONTROL", parent=613),
+        613: Issue(613, "closed epic", state="closed", milestone="CONTROL", labels=("type:epic",),
+                   closed_at=earlier.strftime("%Y-%m-%dT%H:%M:%SZ")),
+        614: Issue(614, "held by another lane", milestone="CONTROL"),
     }
     return Snapshot(
         generated_at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -837,7 +1095,13 @@ def self_control(now: datetime | None = None) -> list[str]:
     snapshot = control_snapshot(moment)
     problems: list[str] = []
 
-    def record(issue: int, reason: str, agent: str = "control-agent", event: str = "claim") -> ClaimEvent:
+    def record(
+        issue: int,
+        reason: str,
+        agent: str = "control-agent",
+        event: str = "claim",
+        provenance: Provenance | None = None,
+    ) -> ClaimEvent:
         return ClaimEvent(
             event=event,
             issue=issue,
@@ -846,6 +1110,7 @@ def self_control(now: datetime | None = None) -> list[str]:
             lane="control",
             reason=reason,
             ttl_hours=DEFAULT_TTL_HOURS,
+            provenance=provenance,
         )
 
     def expect_clean(name: str, events: list[ClaimEvent]) -> None:
@@ -875,6 +1140,7 @@ def self_control(now: datetime | None = None) -> list[str]:
                 ttl_hours=DEFAULT_TTL_HOURS,
                 directive_id="d-1",
                 directive_from="brain",
+                provenance=Provenance(issue=603, lane="control", evidence=("self-control fixture",)),
             )
         ],
     )
@@ -902,6 +1168,43 @@ def self_control(now: datetime | None = None) -> list[str]:
     expect_clean("claim-before-closure", [record(608, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("claim-after-closure", [record(609, REASON_NEXT_IN_MILESTONE)])
     expect_rejected("unsupported-reason", [record(601, "because-i-felt-like-it")])
+    # Provenance mutants (#726): recorded ownership that the board contradicts,
+    # and a routed unit that recorded none.
+    expect_rejected(
+        "provenance-epic-mismatch",
+        [record(601, REASON_NEXT_IN_MILESTONE, provenance=Provenance(issue=601, epic=999, lane="control"))],
+    )
+    expect_rejected(
+        "provenance-lane-mismatch",
+        [record(601, REASON_NEXT_IN_MILESTONE, provenance=Provenance(issue=601, lane="another-lane"))],
+    )
+    expect_rejected(
+        "provenance-issue-mismatch",
+        [record(601, REASON_NEXT_IN_MILESTONE, provenance=Provenance(issue=602, lane="control"))],
+    )
+    expect_rejected(
+        "brain-directed-without-provenance",
+        [
+            ClaimEvent(
+                event="claim",
+                issue=601,
+                agent="control-agent",
+                at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                lane="control",
+                reason=REASON_BRAIN_DIRECTED,
+                ttl_hours=DEFAULT_TTL_HOURS,
+                directive_id="d-1",
+                directive_from="brain",
+            )
+        ],
+    )
+    expect_clean(
+        "provenance-agrees",
+        [
+            record(601, REASON_NEXT_IN_MILESTONE, provenance=Provenance(issue=601, lane="control")),
+            record(605, REASON_CHILD_OF_CLAIM, provenance=Provenance(issue=605, epic=601, lane="control")),
+        ],
+    )
     expect_rejected(
         "duplicate-claim",
         [record(601, REASON_NEXT_IN_MILESTONE, agent="agent-a"), record(601, REASON_NEXT_IN_MILESTONE, agent="agent-b")],
@@ -916,4 +1219,170 @@ def self_control(now: datetime | None = None) -> list[str]:
     )
     if not audit_text('{"event": "claim", "issue": 601}\n', snapshot, moment):
         problems.append("self-control['malformed']: a malformed record passed the audit")
+    return problems
+
+
+def arbitration_self_control(now: datetime | None = None) -> list[str]:
+    """Prove every dispatch refusal can bite (anti-formality, GR-12, issue #726).
+
+    ``self_control`` proves the *ledger* rules can fail. These prove the
+    *dispatch* refusals can: a refusal that cannot fire would let a directive be
+    routed for a closed issue or under a closed epic, or let a second lane drive a
+    unit another lane already holds. Every reason in ``ARBITRATION_REFUSALS`` must
+    be provoked with the evidence it is supposed to name, and a valid unit must
+    still be granted — otherwise the gate fails.
+
+    The fixtures are in a temporary directory and the sent mailbox is rebound for
+    the duration, so this control touches no repository state.
+    """
+    moment = now or datetime.now(timezone.utc)
+    snapshot = control_snapshot(moment)
+    stale = Snapshot(
+        generated_at=(moment - timedelta(minutes=DEFAULT_STALENESS_MINUTES + 5)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        source="self-control",
+        issues=snapshot.issues,
+    )
+    problems: list[str] = []
+    provoked: list[str] = []
+
+    global SENT_DIR  # the sent mailbox is rebound only for this control
+    original_sent = SENT_DIR
+    with tempfile.TemporaryDirectory(prefix="dispatch-arbitration.") as tmp:
+        root = Path(tmp)
+        ledger = root / "claims"
+        locks = root / "locks"
+        sent = root / "sent"
+        sent.mkdir(parents=True)
+        SENT_DIR = sent
+        try:
+            # A unit held by another lane, in the ledger and lock the refusal names.
+            append_event(
+                ClaimEvent(
+                    event="claim",
+                    issue=614,
+                    agent="holder-agent",
+                    at=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    lane="holder-lane",
+                    reason=REASON_NEXT_IN_MILESTONE,
+                    ttl_hours=DEFAULT_TTL_HOURS,
+                ),
+                ledger,
+            )
+
+            def write_directive(directive_id: str, task: dict) -> None:
+                (sent / f"{directive_id}.json").write_text(
+                    json.dumps(
+                        {
+                            "from": "brain",
+                            "to": "lane",
+                            "type": "directive",
+                            "id": directive_id,
+                            "task": task,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            write_directive("d-epic", {"issue": 601, "epic": 999})
+            write_directive("d-lane", {"issue": 601, "lane": "other-lane"})
+
+            def refuse(
+                name: str,
+                reason: str,
+                issue: int,
+                *,
+                lane: str = "control-lane",
+                agent: str = "control-agent",
+                directive_id: str = "",
+                require_lane: bool = False,
+                board: Snapshot = snapshot,
+                must_contain: tuple[str, ...] = (),
+            ) -> None:
+                try:
+                    arbitrate(
+                        issue,
+                        agent,
+                        lane,
+                        board,
+                        ledger=ledger,
+                        lock_dir=locks,
+                        directive_id=directive_id,
+                        require_lane=require_lane,
+                        now=moment,
+                    )
+                except ClaimRefused as exc:
+                    provoked.append(exc.reason)
+                    if exc.reason != reason:
+                        problems.append(f"arbitration['{name}']: expected {reason}, got {exc.reason}")
+                    if "evidence:" not in exc.detail:
+                        problems.append(f"arbitration['{name}']: the refusal names no evidence ({exc.detail})")
+                    for marker in must_contain:
+                        if marker not in exc.detail:
+                            problems.append(
+                                f"arbitration['{name}']: the refusal does not name {marker!r} ({exc.detail})"
+                            )
+                else:
+                    problems.append(f"arbitration['{name}']: the refusal did not bite ({reason})")
+
+            refuse("unknown-issue", REASON_UNKNOWN_ISSUE, 999, must_contain=("#999",))
+            refuse("closed-issue", REASON_ISSUE_CLOSED, 604, must_contain=("state=closed",))
+            refuse("closed-epic", REASON_EPIC_CLOSED, 606, must_contain=("#613", "state=closed"))
+            refuse("epic-is-not-work", REASON_EPIC_NOT_WORKABLE, 607, must_contain=("type:epic",))
+            refuse("blocked", REASON_BLOCKED, 602, must_contain=("#603",))
+            refuse(
+                "held-by-another-lane",
+                REASON_ALREADY_CLAIMED,
+                614,
+                must_contain=("holder-agent", "holder-lane"),
+            )
+            refuse(
+                "directive-epic-mismatch",
+                REASON_PROVENANCE_MISMATCH,
+                601,
+                directive_id="d-epic",
+                must_contain=("task.epic=999", "no Parent edge"),
+            )
+            refuse(
+                "directive-lane-mismatch",
+                REASON_PROVENANCE_MISMATCH,
+                601,
+                lane="control-lane",
+                directive_id="d-lane",
+                must_contain=("other-lane", "requested lane=control-lane"),
+            )
+            refuse("unowned", REASON_UNOWNED, 601, lane="", require_lane=True, must_contain=("no lane owns",))
+            refuse("stale-board", REASON_SNAPSHOT_STALE, 601, board=stale, must_contain=("refresh first",))
+
+            try:
+                granted = arbitrate(
+                    601,
+                    "control-agent",
+                    "control-lane",
+                    snapshot,
+                    ledger=ledger,
+                    lock_dir=locks,
+                    now=moment,
+                )
+            except ClaimRefused as exc:
+                # A control that refuses a unit it must grant is itself a failure:
+                # report it rather than letting the exception escape the gate.
+                granted = None
+                problems.append(f"arbitration['grant']: a valid unit was refused ({exc.reason} — {exc.detail})")
+        finally:
+            SENT_DIR = original_sent
+
+    if granted is not None and (
+        granted.lane != "control-lane" or granted.epic is not None or not granted.provenance.evidence
+    ):
+        problems.append(
+            "arbitration['grant']: a valid unit did not record its issue -> epic -> lane provenance "
+            f"({granted.provenance.to_json()})"
+        )
+    unprovoked = [reason for reason in ARBITRATION_REFUSALS if reason not in set(provoked)]
+    if unprovoked:
+        problems.append(
+            "arbitration control: no provoked refusal for "
+            + ", ".join(unprovoked)
+            + " (an unprovoked refusal may not fire)"
+        )
     return problems

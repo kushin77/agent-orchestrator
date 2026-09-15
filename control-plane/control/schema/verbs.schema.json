@@ -78,7 +78,7 @@
           },
           "note": {
             "type": "string",
-            "description": "Why this verb is declared the way it is. Optional; never a substitute for a field."
+            "description": "Why this verb is declared the way it is (e.g. why a read-class verb also carries 409, or why a refusal extends the 401/403/503 scaffold). Optional; never a substitute for a field."
           }
         }
       }
