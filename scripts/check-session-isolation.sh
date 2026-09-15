@@ -27,7 +27,10 @@
 # It also pins that the execution loop provisions through this module, so the
 # isolation is applied to dispatched agents rather than only available to them.
 #
-# Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+# Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. A control whose report
+# the audit declined to produce (its own rc 2, or a signal death) is NOT-OK for
+# nothing: it is CANNOT-ASSESS, and the run says so rather than reporting FAIL
+# (issue #843: a false red costs a full gate cycle and teaches re-run-until-green).
 #
 # Usage: bash scripts/check-session-isolation.sh
 set -uo pipefail
@@ -57,6 +60,49 @@ for required in "$cli" "$terminal" "$suites"; do
 done
 
 fail=0
+#: Controls whose report the audit declined to produce. A control that could not
+#: read the report has MEASURED NOTHING: it is CANNOT-ASSESS, and the check says
+#: so on exit rather than claiming the code is wrong (issue #843).
+cannot=0
+
+# --- 0. the presence rule and the verdict rule ------------------------------
+# `verdict_of` maps one audit invocation onto a verdict, and it is the single
+# place the two halves of a control meet:
+#
+#   undetected  rc 0            the violation was NOT refused — a real failure
+#   unmeasured  rc 2            the audit's own CANNOT-ASSESS — no verdict
+#   unmeasured  rc >= 128       the audit died by signal — no verdict
+#   unnamed     rc 1, no text   refused, but the finding is not in the report
+#   ok          rc 1, text met  refused and named — the control holds
+#
+# The presence test is computed by bash itself (no second process, no pipe).
+# The previous form — `printf '%s' "$output" | grep -qF -- "$code"` under
+# `set -o pipefail` — can report ABSENT for text that is PRESENT: `grep -q`
+# exits on its first match, SIGPIPE then terminates the producer, and pipefail
+# promotes that 141 to the status of the whole pipeline (measured 2026-09-15:
+# a 150 KB report that DOES contain the string reported NO-MATCH). grep is also
+# an extra process that under load can fail to start or be killed, which is the
+# same false verdict by another route. Bash substring matching cannot fail that
+# way, so a control that CAN be measured always is.
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+verdict_of() { # verdict_of <rc> <output> <expected-code> -> one verdict word
+  local rc="$1" output="$2" code="$3"
+  if [ "$rc" -eq 0 ]; then
+    printf 'undetected\n'
+  elif [ "$rc" -eq 2 ] || [ "$rc" -ge 128 ]; then
+    printf 'unmeasured\n'
+  elif contains "$output" "$code"; then
+    printf 'ok\n'
+  else
+    printf 'unnamed\n'
+  fi
+}
 
 # --- 1. the rule is declared institutionally --------------------------------
 # Each entry is "file|marker|marker|...". The markers are the substance of the
@@ -169,33 +215,58 @@ lane_session() { # lane_session <issue> <agent> <lane> — prints "<sid> <worktr
 }
 
 expect_ok() { # expect_ok <label> <session>
-  if python3 "$cli" audit --main "$scratch" --session "$2" >/dev/null 2>&1; then
+  # One invocation, one verdict: the audit is run once and its own tri-state is
+  # honoured, so an audit that declined to assess (rc 2) or died by signal is
+  # never reported as "a valid lane was reported as not isolated" (issue #843).
+  local output rc
+  output="$(python3 "$cli" audit --main "$scratch" --session "$2" 2>&1)"
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
     echo "  OK    $1"
+  elif [ "$rc" -eq 2 ] || [ "$rc" -ge 128 ]; then
+    echo "  CANNOT-ASSESS  $1 (the audit exited $rc, so it produced no report to read)" >&2
+    printf '%s\n' "$output" | sed 's/^/        /' >&2
+    cannot=$((cannot + 1))
   else
     echo "  FAIL  $1 (a valid lane was reported as not isolated)" >&2
-    python3 "$cli" audit --main "$scratch" --session "$2" 2>&1 | sed 's/^/        /' >&2
+    printf '%s\n' "$output" | sed 's/^/        /' >&2
     fail=$((fail + 1))
   fi
 }
 
 expect_fail() { # expect_fail <label> <session> <expected-code> [<also-named-finding>]
-  local output rc
+  local output rc verdict
   output="$(python3 "$cli" audit --main "$scratch" --session "$2" 2>&1)"
   rc=$?
-  if [ "$rc" -eq 0 ]; then
-    echo "  FAIL  $1 (the violation went undetected; expected $3)" >&2
-    fail=$((fail + 1))
-  elif ! printf '%s' "$output" | grep -qF -- "$3"; then
-    echo "  FAIL  $1 (audit failed without naming $3)" >&2
-    printf '%s\n' "$output" | sed 's/^/        /' >&2
-    fail=$((fail + 1))
-  elif [ -n "${4:-}" ] && ! printf '%s' "$output" | grep -qF -- "$4"; then
-    echo "  FAIL  $1 (audit named $3 but never quoted the predicate's own finding $4)" >&2
-    printf '%s\n' "$output" | sed 's/^/        /' >&2
-    fail=$((fail + 1))
-  else
-    echo "  OK    $1 (audit refused: $3${4:+, and named $4})"
-  fi
+  verdict="$(verdict_of "$rc" "$output" "$3")"
+  case "$verdict" in
+    undetected)
+      echo "  FAIL  $1 (the violation went undetected; expected $3)" >&2
+      fail=$((fail + 1))
+      ;;
+    unmeasured)
+      # The audit produced no report to read — rc 2 is the audit's own
+      # CANNOT-ASSESS, and a signal death measured nothing either. Reporting
+      # FAIL here would be a claim about the code that no measurement supports.
+      echo "  CANNOT-ASSESS  $1 (the audit exited $rc, so it produced no report to read)" >&2
+      printf '%s\n' "$output" | sed 's/^/        /' >&2
+      cannot=$((cannot + 1))
+      ;;
+    unnamed)
+      echo "  FAIL  $1 (audit refused but the report names no $3)" >&2
+      printf '%s\n' "$output" | sed 's/^/        /' >&2
+      fail=$((fail + 1))
+      ;;
+    *)
+      if [ -n "${4:-}" ] && ! contains "$output" "$4"; then
+        echo "  FAIL  $1 (audit named $3 but never quoted the predicate's own finding $4)" >&2
+        printf '%s\n' "$output" | sed 's/^/        /' >&2
+        fail=$((fail + 1))
+      else
+        echo "  OK    $1 (audit refused: $3${4:+, and named $4})"
+      fi
+      ;;
+  esac
 }
 
 commit_in() { # commit_in <worktree> <file> <trailer-or-empty>
@@ -234,7 +305,7 @@ else
   elif [ "$rc" -ne 1 ]; then
     echo "  FAIL  the tmpfs refusal exited $rc, not NOT-OK (1)" >&2
     fail=$((fail + 1))
-  elif ! printf '%s' "$output" | grep -qF "lane-worktree-on-tmpfs"; then
+  elif ! contains "$output" "lane-worktree-on-tmpfs"; then
     echo "  FAIL  the tmpfs refusal did not name lane-worktree-on-tmpfs" >&2
     printf '%s\n' "$output" | sed 's/^/        /' >&2
     fail=$((fail + 1))
@@ -325,7 +396,7 @@ expect_fail "a reference only in the subject line is refused" "$g_sid" \
 # one rule with two surfaces, not two rules that happen to agree today.
 g_sha="$(git -C "$g_wt" rev-parse HEAD 2>/dev/null)"
 gate_out="$(bash "$predicate" --repo "$scratch" --landed --range "$g_sha^..$g_sha" --enforcement-gate "$g_sha^" 2>&1)"
-if printf '%s' "$gate_out" | grep -qF -- "commit-ref-only-in-subject:${g_sha:0:12}"; then
+if contains "$gate_out" "commit-ref-only-in-subject:${g_sha:0:12}"; then
   echo "  OK    $predicate names the same defect: commit-ref-only-in-subject:${g_sha:0:12}"
 else
   echo "  FAIL  $predicate did not name commit-ref-only-in-subject:${g_sha:0:12} for the same commit" >&2
@@ -357,6 +428,55 @@ read -r f_sid _f_wt < <(lane_session 268 gate-agent foundation)
 git -C "$scratch" config --unset extensions.worktreeConfig >/dev/null 2>&1
 expect_fail "a lane without a worktree-scoped identity is refused" "$f_sid" "identity-not-lane-local"
 
+# --- 3c. the verdict rule is provoked, the unmeasured case included ---------
+# `verdict_of` decides whether a control can be measured at all, so it is the
+# one rule here that must not be a formality: a rule that cannot report
+# CANNOT-ASSESS brings the false red straight back the next time the box is
+# loaded. Two of the cases below drive the REAL audit into an unmeasured exit
+# rather than feeding the classifier a fabricated status.
+verdict_fail=0
+provoke_verdict() { # provoke_verdict <expected> <rc> <output> <code>
+  local got
+  got="$(verdict_of "$2" "$3" "$4")"
+  if [ "$got" = "$1" ]; then
+    echo "  OK    verdict(rc=$2, code=$4) is $got"
+  else
+    echo "  FAIL  verdict(rc=$2, code=$4) is $got, expected $1" >&2
+    verdict_fail=1
+  fi
+}
+provoke_verdict ok 1 "the report refuses and names commit-missing-ticket-trailer here" \
+  "commit-missing-ticket-trailer"
+provoke_verdict unnamed 1 "a report that refused for some other reason" \
+  "commit-missing-ticket-trailer"
+provoke_verdict undetected 0 "" "commit-missing-ticket-trailer"
+provoke_verdict unmeasured 2 "audit: CANNOT-ASSESS - no lane record for session deadbeef" \
+  "commit-missing-ticket-trailer"
+provoke_verdict unmeasured 137 "" "commit-missing-ticket-trailer"
+
+# Resource-starved, through the real CLI: an unreadable main is the audit's own
+# CANNOT-ASSESS, and the control must read it as unmeasured, never as a FAIL.
+missing_main="$work/absent-repo"
+missing_out="$(python3 "$cli" audit --main "$missing_main" --session "$b_sid" 2>&1)"
+missing_rc=$?
+provoke_verdict unmeasured "$missing_rc" "$missing_out" "commit-missing-ticket-trailer"
+if [ "$missing_rc" -ne 2 ]; then
+  echo "  FAIL  the audit exited $missing_rc for an unreadable main, not CANNOT-ASSESS (2)" >&2
+  verdict_fail=1
+else
+  echo "  OK    the real audit returns CANNOT-ASSESS for an unreadable main, and the control calls that unmeasured"
+fi
+
+# A report that died by signal measured nothing either.
+killed_rc="$( { python3 -c 'import os, signal; os.kill(os.getpid(), signal.SIGKILL)' 2>&1; printf '%s' "$?"; } 2>/dev/null )"
+provoke_verdict unmeasured "$killed_rc" "" "commit-missing-ticket-trailer"
+if [ "$killed_rc" -lt 128 ]; then
+  echo "  FAIL  a signal-killed audit exited $killed_rc, not >= 128" >&2
+  verdict_fail=1
+else
+  echo "  OK    a signal-killed audit (rc=$killed_rc) is unmeasured, not a claim about the code"
+fi
+
 # --- 4. vacuity control: the declaration check must be able to fail ---------
 grep -vF "Session identity & lane isolation" AGENTS.md > "$work/agents-without-the-rule.md"
 IFS='|' read -r -a parts <<< "${declarations[0]}"
@@ -369,6 +489,14 @@ fi
 
 if [ "$fail" -gt 0 ]; then
   echo "check-session-isolation: FAIL ($fail violation(s))" >&2
+  exit 1
+fi
+if [ "$cannot" -gt 0 ]; then
+  echo "check-session-isolation: CANNOT-ASSESS ($cannot control(s) produced no report to read; not a pass and not a failure)" >&2
+  exit 2
+fi
+if [ "$verdict_fail" -ne 0 ]; then
+  echo "check-session-isolation: FAIL (the verdict rule did not hold)" >&2
   exit 1
 fi
 echo "check-session-isolation: OK — the rule is declared, lanes are isolated, and every violation is refused"
