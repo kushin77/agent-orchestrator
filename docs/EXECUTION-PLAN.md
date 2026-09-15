@@ -238,3 +238,99 @@ the loop's call turns the wiring assertion red.
 AO-GR-24's standing condition — *"Max-agents fan-out is blocked until this check
 is green: the raising change and this gate land together or not at all"* — is
 satisfied by this lane: the raising change (#718) and the gate landed together.
+
+## 9. Gate admission control (issue #724)
+
+The operator measured **49 concurrent `make verify` runs, 43 of them stacked in
+two worktrees, ~16 hours of duplicated work**. Nothing bounded them, so the gate
+now admits work instead of assuming it:
+
+* **one composite gate per worktree.** A gate holds an exclusive `flock` on a
+  lock file keyed by the worktree path, so a second gate in the *same* worktree
+  refuses to start and names the process that holds it. Two different worktrees
+  never collide: the key is the worktree, not the machine.
+* **a box-wide permit bound.** A gate must also take one of
+  `AO_GATE_MAX_CONCURRENT` permit slots before it starts. No free slot means
+  **PARKED**: the gate runs no check and overwrites no previous attestation.
+* **release on signal and on crash.** `acquire` forks a holder that keeps the
+  descriptors open, so a gate killed with `SIGKILL` — where no trap can run —
+  still releases its permit. A holder killed outright leaves its record behind;
+  the next gate reclaims it while **naming the owner** it took it from.
+
+The permit store must not live in a workspace (every worktree has its own copy of
+the repository, so a bound stored there would be edited per lane). It is shared,
+stable, and outside every checkout:
+
+| Env var | Default | Meaning |
+|---------|---------|---------|
+| `AO_GATE_LOCK_ROOT` | `${XDG_RUNTIME_DIR:-/tmp}/agent-orchestrator-gates` | the shared permit store |
+| `AO_GATE_MAX_CONCURRENT` | `4` | box-wide cap on concurrent gates |
+| `AO_GATE_LOCK_TTL` | `900` | seconds before a leftover record is called stale |
+
+`/tmp` on this box is a 16 GB tmpfs that has silently truncated writes to 0
+bytes, so the store verifies its own writes (a grant it cannot evidence is an
+error, not a grant), and a 0-byte record is never read as an empty slot: the
+`flock`, not the bytes, is the exclusion.
+
+**The wiring is APPLIED and self-applying (issue #724).** The admission block is
+part of `scripts/verify.sh` itself — it is not a snippet an operator pastes, and
+no gate run can skip it, because the gate IS the file that carries it. It sits
+immediately after the `mode="${1:-verify}"` line and *before* `verify_dir`/`log`
+are reset, so a parked gate leaves the previous attestation untouched instead of
+truncating the only evidence of the last real run. **If you edit
+`scripts/verify.sh`, keep that ordering**: an admission check placed after the
+`.verify/` reset would let a parked gate destroy the last real attestation.
+
+`scripts/check-gate-lock.sh` is wired into the gate of record by
+`scripts/verify.sh`'s check-discovery layer (#698), so
+`scripts/check-gate-coverage.sh` reports it as invoked rather than as an
+`uninvoked` artifact. It proves the wiring two ways, and both can genuinely fail:
+**structurally** (the prelude is present in `scripts/verify.sh` and precedes the
+`.verify/` truncation, so a deleted or relocated prelude fails by name) and
+**live** (a second real `scripts/verify.sh` is started in the same worktree and
+must be refused by name while running zero checks and writing nothing).
+
+The lines now in `scripts/verify.sh`:
+
+```bash
+# --- admission control (issue #724) -----------------------------------------
+bash "$root/scripts/gate-lock.sh" acquire --worktree "$root" --mode "$mode" \
+  --owner-pid $$
+lock_rc=$?
+if [ "$lock_rc" -ne 0 ]; then
+  case "$lock_rc" in
+    10) echo "verify: PARKED (rc 10, not a pass and not a failure) — another gate already holds this worktree; ..." >&2 ;;
+    11) echo "verify: PARKED (rc 11, not a pass and not a failure) — the box-wide gate cap is reached; ..." >&2 ;;
+    *) echo "verify: CANNOT-ASSESS (rc $lock_rc, not a pass and not a failure) — the gate permit store is unusable; ..." >&2 ;;
+  esac
+  exit "$lock_rc"
+fi
+# Only a gate that HELD the lock installs the release traps.
+trap 'bash "$root/scripts/gate-lock.sh" release --worktree "$root" --owner-pid $$ >/dev/null 2>&1' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+```
+
+The `release` call belongs in the EXIT trap and the signal traps map to a real
+exit code, so the trap runs on `Ctrl-C` (`exit 130`), on `TERM` (`exit 143`) and
+on `HUP` (`exit 129`), and every one of those paths releases the worktree lock
+and the permit slot. `SIGHUP` is handled deliberately: its default action
+terminates the shell immediately, so a loop that left it unhandled would skip the
+release. A gate killed outright runs no trap at all; there the holder is what
+keeps the bound — `--owner-pid $$` makes it watch the gate's own pid and release
+the moment that process is gone, however it died, `SIGKILL` included.
+
+`scripts/gate-lock.sh acquire|release|status` is the only interface a gate needs;
+`fleet/gatelock.py` holds the mechanism and `scripts/check-gate-lock.sh` proves
+the refusals — including a mutant whose exclusion always grants, so the refusal
+proof cannot pass vacuously.
+
+**Running a gate while another holds your worktree.** Query before you start:
+`bash scripts/gate-lock.sh status --worktree "$PWD"` reports `HELD`, `STALE` or
+`FREE`. A `STALE` record (a holder killed outright) is reclaimed by the next
+`acquire`, which names the owner it took it from, so no manual clearing is
+needed for that case. Do not clear a `HELD` lock to "unblock" a run: that is the
+bound doing its job, and the honest response is to wait for the holder or to
+raise `AO_GATE_MAX_CONCURRENT` — never to disable the lock.
+
