@@ -186,7 +186,14 @@ enforcement cannot solve: measured at `9707146`, thirteen commits that landed
 in a trailing trailer block (a fourteenth, the #826 squash `4e3d62da`, was added
 by the reconciliation in issue #832), so a check that simply failed on them would
 have turned `make verify` red for every lane on the day it landed — which is how a
-gate gets disabled instead of obeyed. `cli.py enforce`
+gate gets disabled instead of obeyed. **That list has since shrunk, and the
+shrink is the evidence that the rule and the artifact now agree:** 8 of the 14
+were one shape — a bare `Closes #<n>` sharing the trailing paragraph with the
+reference — and issue #835 widened the predicate's trailer line to accept
+GitHub's own auto-close keyword, so those 8 commits comply and their entries were
+removed (14 entries → 6). The 6 that remain are a reference separated from the
+trailing block by prose, or no reference at all: shapes the rule still refuses by
+design. `cli.py enforce`
 ([`landed.py`](landed.py)) is that enforcement, and it has three parts:
 
 * the **legacy class** is grandfathered by the shared predicate's own frozen
@@ -255,40 +262,51 @@ stepped over; **the first paragraph that is not all trailer lines ends it**, and
 a reference at or above that paragraph is then outside the block even though it
 is in the message. A trailer line is the reference line itself (`Refs
 owner/repo#n`, whose colon git's own parser requires and this predicate does
-not), a `Token: value` line, or an indented continuation.
+not), a `Token: value` line, an indented continuation, or GitHub's own bare
+auto-close keyword (`Closes #<n>`, `Fixes #<n>`, `Resolves #<n>`).
 
-So the trap is a **non-trailer line sharing a paragraph with the reference**, or
-sitting directly below it. GitHub's auto-close keyword is colon-less — `Closes
-#724` — and that paragraph then ends the block one paragraph *below* the
-reference:
+**The auto-close keyword is a trailer line because the landing path composes it**
+(#835). `gh pr merge --squash` over a body whose last paragraph is `Closes #<n>`
+produces one trailing paragraph holding the keyword, the assistant line and the
+reference — by position a trailer paragraph, and GitHub's keyword is colon-less,
+so before #835 the paragraph was classified `other`, the walk-back stopped on it,
+and the reference *inside* it was refused as
+`commit-ref-outside-the-trailer-block`. That one shape accounted for 8 of the 12
+`commit-ref-outside-the-trailer-block` entries in
+[`landed-baseline.json`](landed-baseline.json); accepting it made those commits
+comply and the list shrank from 14 entries to 6.
 
-```
-…prose…
-
-Refs kushin77/agent-orchestrator#724
-Closes #724                     <- not a trailer line, SAME paragraph as the
-                                   reference: this paragraph is not all
-                                   trailer lines, so the block it ends is the
-                                   one below — and the reference is outside it
-
-AI-assistance: Copilot (…)
-```
-
-Measured: this is exactly how the #826 squash (`4e3d62da`, which landed #724)
-was refused with `commit-ref-outside-the-trailer-block`, and it is recorded in
-the baseline by issue #832. The compliant shape gives the keyword line its **own**
-paragraph and ends the message with a paragraph of trailer lines only, the
-reference among them:
+**What is still a trap is a non-trailer line sharing the paragraph with the
+reference, or sitting directly below it.** A line that is neither a keyword, nor
+a `Token: value` line, nor a continuation ends the block:
 
 ```
 …prose…
 
-Closes #724                     <- its own paragraph, above the reference: the
-                                   walk-back ends HERE, and the block it keeps
-                                   still holds the reference below
+Refs kushin77/agent-orchestrator#835
+See the rollout notes for the rest of the plan   <- prose: this paragraph is
+                                                    not all trailer lines, so it
+                                                    ends the block, and the
+                                                    reference above it is outside
 
-Refs kushin77/agent-orchestrator#724
 AI-assistance: Copilot (…)
+```
+
+Measured: the shapes the rule still refuses are the ones
+[`landed-baseline.json`](landed-baseline.json) records — a reference separated
+from the trailing block by prose, or absent altogether. **A closing keyword is
+never a substitute for the reference:** a paragraph holding only `Closes #<n>` and
+no `Refs owner/repo#n` line is still `commit-missing-ticket-trailer` (selftest
+case 2f). The keyword is only a line that no longer ends the block it sits in;
+the reference is what the rule requires — so both the landing path's own
+paragraph and the ordering below now pass:
+
+```
+…prose…
+
+Closes #835
+AI-assistance: Copilot (…)
+Refs kushin77/agent-orchestrator#835
 ```
 
 Check a commit the way the gate checks it — the gate's own predicate, one commit

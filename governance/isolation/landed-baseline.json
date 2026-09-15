@@ -1,7 +1,7 @@
 {
-  "note": "Recorded legacy for the ticket-trailer rule over LANDED history (issue #287). Every commit here landed AFTER the shared predicate's enforcement boundary and still does not carry the ticket reference in a trailing trailer block, as measured -- not assumed -- by `scripts/check-pr-contract.sh --landed`. They are RECORDED, not accepted: `governance/isolation/cli.py enforce` reports them on every run. An entry is ADDED only by an explicit, reviewed commit to this file -- never automatically, and never to silence a run. That review IS the control, and it is the only admissible terminal state for post-boundary residue: the commit is already squash-merged onto a protected branch, so its message cannot be corrected (history is never rewritten, GR hard floor), and the gate that caught it has no other way to close. A NEW violation therefore still reds the gate FIRST; recording it is the follow-up decision, not the fix (#836). Nothing is ever dropped from this list silently: an entry whose commit now complies (`quarantine-entry-stale`) or is outside the assessed range (`quarantine-entry-not-assessed`) fails the check, and a missing or malformed baseline fails rather than skipping.",
+  "note": "Recorded legacy for the ticket-trailer rule over LANDED history (issue #287). Every commit here landed AFTER the shared predicate's enforcement boundary and still does not carry the ticket reference in a trailing trailer block, as measured -- not assumed -- by `scripts/check-pr-contract.sh --landed`. They are RECORDED, not accepted: `governance/isolation/cli.py enforce` reports them on every run. An entry is ADDED only by an explicit, reviewed commit to this file -- never automatically, and never to silence a run. That review IS the control, and it is the only admissible terminal state for post-boundary residue: the commit is already squash-merged onto a protected branch, so its message cannot be corrected (history is never rewritten, GR hard floor), and the gate that caught it has no other way to close. A NEW violation therefore still reds the gate FIRST; recording it is the follow-up decision, not the fix (#836). Nothing is ever dropped from this list silently: an entry whose commit now complies (`quarantine-entry-stale`) or is outside the assessed range (`quarantine-entry-not-assessed`) fails the check, and a missing or malformed baseline fails rather than skipping. The list SHRANK by issue #835 (2026-09-15): the predicate's trailer line now includes GitHub's own bare auto-close keyword (`Closes #<n>`), which is the paragraph the landing path composes (`gh pr merge --squash` over a body ending in a bare `Closes #<n>`), so the 8 entries whose trailing paragraph had that shape now COMPLY -- each re-checked, the shared predicate reporting rc 0 for it -- and were removed. 14 entries became 6. The 6 that remain are the shapes the rule still refuses by design: the reference separated from the trailing block by prose (`commit-ref-outside-the-trailer-block`), or no reference at all (`commit-missing-ticket-trailer`).",
   "measured_at": "2026-09-15",
-  "measured_head": "4e3d62da166fee2afc1f90f74fb1e60bb184cb61",
+  "measured_head": "dd8cbfc2ded903bb6de3471e1c64d927a3dc93c8",
   "measured_by": "governance/isolation/cli.py landed --range HEAD (delegating to scripts/check-pr-contract.sh --landed)",
   "entries": [
     {
@@ -25,41 +25,6 @@
       "why": "the reference is present in the message but outside the trailing trailer block"
     },
     {
-      "sha": "90a0500bbf5573793a3a6e15dd80fee8116a4cbc",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
-      "sha": "eea5389e122b115c0f4d5c0afcaf3155ed8641f2",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
-      "sha": "d51a9fe32f19e970dc00b26b18d0028a087b15a8",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
-      "sha": "eae061df5a55058c5a98987e099ff990e5d3a8f0",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
-      "sha": "e0e89435696f941f69332a630baf66fb5858b36f",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
-      "sha": "f9065de27669d6dfe420dbb5df0682d768e9b598",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
-      "sha": "d9236e8e881e03519b368067b4c47d617336fd84",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
       "sha": "6380f7b4983e9d027a0a03eb3fe948d35098f816",
       "code": "commit-ref-outside-the-trailer-block",
       "why": "the reference is present in the message but outside the trailing trailer block"
@@ -68,11 +33,6 @@
       "sha": "6999f2a3bd4ada1332ed032b40d377ece82a453f",
       "code": "commit-ref-outside-the-trailer-block",
       "why": "the reference is present in the message but outside the trailing trailer block"
-    },
-    {
-      "sha": "4e3d62da166fee2afc1f90f74fb1e60bb184cb61",
-      "code": "commit-ref-outside-the-trailer-block",
-      "why": "the reference is present in the message but outside the trailing trailer block: the #826 squash message placed a colon-less `Closes #724` line between `Refs kushin77/agent-orchestrator#724` and `AI-assistance: ...`, so git's trailing block held only the `AI-assistance:` line and the reference fell outside it -- reconciled by issue #832, which also documents the compliant shape in README.md"
     }
   ]
 }

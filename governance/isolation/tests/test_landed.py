@@ -120,6 +120,44 @@ def test_a_recorded_entry_that_now_complies_is_stale(boundary, tmp_path: Path):
     assert any("quarantine-entry-stale" in line for line in result.lines())
 
 
+def test_the_landing_paths_closing_keyword_paragraph_is_accepted(boundary, tmp_path: Path):
+    """#835: the paragraph the landing path composes — GitHub's bare `Closes #<n>`
+    keyword, the assistant line and the reference in ONE trailing paragraph — is
+    a trailer paragraph, so the commit is clean.
+
+    Both directions are asserted, because together they are what forces the
+    quarantine to SHRINK instead of being re-keyed: the commit passes with an
+    empty baseline, and recording it anyway is refused as
+    ``quarantine-entry-stale``.
+    """
+    repo, base = boundary
+    sha = commit(
+        repo,
+        "work.txt",
+        "do the work",
+        trailer="Closes #835\nAI-assistance: Copilot (Relentless)\nRefs kushin77/agent-orchestrator#835",
+    )
+    clean = landed.assess(repo, assessed_range(base), write_baseline(tmp_path / "empty.json"), base)
+    assert clean.verdict == VERDICT_OK
+    assert clean.unenforced == ()
+
+    recorded = landed.assess(repo, assessed_range(base), write_baseline(tmp_path / "b.json", sha), base)
+    assert recorded.verdict == VERDICT_NOT_OK
+    assert [entry.sha for entry in recorded.stale] == [sha]
+    assert any("quarantine-entry-stale" in line for line in recorded.lines())
+
+
+def test_a_closing_keyword_without_the_reference_is_still_refused(boundary, tmp_path: Path):
+    """The widened vocabulary is not a weaker rule: `Closes #<n>` alone is a
+    MISSING trailer, so a commit carrying only the keyword is refused by name and
+    cannot be booked as clean."""
+    repo, base = boundary
+    commit(repo, "work.txt", "do the work", trailer="Closes #835")
+    result = landed.assess(repo, assessed_range(base), write_baseline(tmp_path / "b.json"), base)
+    assert result.verdict == VERDICT_NOT_OK
+    assert [finding.code for finding in result.unenforced] == ["commit-missing-ticket-trailer"]
+
+
 def test_a_recorded_entry_outside_the_range_is_not_assessed(boundary, tmp_path: Path):
     """An unreconcilable baseline is unproven — CANNOT-ASSESS, never a pass."""
     repo, base = boundary
