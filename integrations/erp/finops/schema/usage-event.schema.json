@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp.finops/metered-event",
+  "title": "ERP metered document event",
+  "description": "The published shape of a metered ERP document operation. The lane's check validates EVERY event it emits against this document, so a field the emitter stops writing is a measured failure rather than a drifting transcript. additionalProperties is false because an undeclared field is a fact no consumer was told about.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "tenant",
+    "kind",
+    "documentId",
+    "operation",
+    "eventKind",
+    "actor",
+    "at",
+    "sourceKey",
+    "resource"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "ao.erp.finops/v1"
+    },
+    "tenant": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "documentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["create", "transition"]
+    },
+    "eventKind": {
+      "type": "string",
+      "enum": ["erp.document.created", "erp.document.transitioned"]
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "at": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 20,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "sourceKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resource": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fromState": {
+      "type": "string",
+      "minLength": 1
+    },
+    "toState": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

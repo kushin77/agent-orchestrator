@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp.finops/rate-card",
+  "title": "ERP FinOps rate card",
+  "description": "The price of one metered ERP document operation. Validated by the lane's keyword-frozen subset validator (integrations/erp/finops/schema.py), which REFUSES any keyword it cannot enforce, so this document cannot become a decoration. An entry with priced=false is a deliberate declaration that the operation is metered and unpublished; an operation with no entry at all is refused (rate-missing) rather than defaulted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "currency", "supportedCurrencies", "rates"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "ao.erp.finops/v1"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "supportedCurrencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 3
+      }
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "operation"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operation": {
+            "type": "string",
+            "enum": ["create", "transition"]
+          },
+          "priced": {
+            "type": "boolean"
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

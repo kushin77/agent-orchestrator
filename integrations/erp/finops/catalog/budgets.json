@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "ao.erp.finops/v1",
+  "currency": "USD",
+  "policies": [
+    {
+      "tenantId": "acme",
+      "mode": "enforce",
+      "window": "month",
+      "limitUsd": 250.0,
+      "warnAtPct": 0.8,
+      "cap": "hard",
+      "note": "Enforcing tenant. Reaching the limit is a hard stop: the next metered ERP operation is refused budget-exhausted, and nothing is written for it."
+    },
+    {
+      "tenantId": "globex",
+      "mode": "observe",
+      "window": "month",
+      "limitUsd": 50.0,
+      "warnAtPct": 0.6,
+      "cap": "soft",
+      "note": "Observing tenant on a soft cap: overrunning is reported (warn/would_warn) and the alert feed carries the breach, but the operation is never refused. This is the platform's own soft-cap semantics, deliberately not re-implemented here."
+    },
+    {
+      "tenantId": "initech",
+      "mode": "enforce",
+      "window": "day",
+      "limitUsd": 5.0,
+      "warnAtPct": 0.5,
+      "cap": "hard",
+      "note": "Daily-window enforcing tenant: the same ladder evaluated over the UTC day bucket instead of the month, which is what a tenant with bursty end-of-month postings wants."
+    }
+  ]
+}

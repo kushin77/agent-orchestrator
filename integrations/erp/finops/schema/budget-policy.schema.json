@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp.finops/budget-policy",
+  "title": "ERP FinOps per-tenant budget policy",
+  "description": "The declaration that a tenant MAY spend, which is what makes its ERP operations meterable (an undeclared tenant is refused budget-unknown-tenant). Each entry is constructed into the platform's own telemetry.budgets.budget.TenantBudgetPolicy, so a value the platform type cannot accept is refused here rather than at enforcement time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "policies"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "ao.erp.finops/v1"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tenantId", "limitUsd"],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["observe", "enforce"]
+          },
+          "window": {
+            "type": "string",
+            "enum": ["day", "month"]
+          },
+          "limitUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "warnAtPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "cap": {
+            "type": "string",
+            "enum": ["soft", "hard"]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
