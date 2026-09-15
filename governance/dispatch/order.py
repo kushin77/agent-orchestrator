@@ -6,6 +6,13 @@ issue the agent already took through the chain, (c) a child of the ACTIVE epic
 (epic focus, issue #707), or (d) the frontier of the active milestone — the
 lowest-numbered open, unblocked, unclaimed issue in the milestone the agent is
 already working. Anything else is kanban scavenging and is refused.
+
+Epic focus adds one *refusal* beside those edges (lane F6 / issue #721): while a
+focus is active, work OUTSIDE the active epic is refused `out-of-epic-pooled` and
+parked in `.board/pool.jsonl`, so the fleet concentrates on one epic without the
+deferred work being lost. The check sits before the milestone frontier, because a
+frontier that hands out another epic's issue is the incoherence focus prevents.
+All of it stays a pure function of the snapshot plus the focus file.
 """
 
 from __future__ import annotations
@@ -22,6 +29,7 @@ from model import (
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
     REASON_NO_CHAIN_EDGE,
+    REASON_OUT_OF_EPIC_POOLED,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_UNKNOWN_ISSUE,
     Eligibility,
@@ -62,13 +70,18 @@ def eligible(
     active_claims: frozenset[int] = frozenset(),
     agent_history: frozenset[int] = frozenset(),
     claimed_by_others: frozenset[int] = frozenset(),
-    focus_path: Path | str = focus.DEFAULT_PATH,
+    focus_path: Path | str | None = None,
 ) -> Eligibility:
     """Decide whether ``issue_number`` is the next eligible step for this agent.
 
     ``focus_path`` names the pinned ``.board/focus.json`` (epic focus, #707) so
-    the active-epic edge is resolvable offline against a fixture.
+    the active-epic edge is resolvable offline against a fixture. It defaults to
+    ``None`` and is resolved to ``focus.DEFAULT_PATH`` *at call time*: a default
+    argument would freeze the module constant at import, so a test (or a caller)
+    that repoints the focus would silently keep judging against the old file.
     """
+    if focus_path is None:
+        focus_path = focus.DEFAULT_PATH
     issue = snapshot.get(issue_number)
     if issue is None:
         return Eligibility(issue_number, False, REASON_UNKNOWN_ISSUE, "not present in .board/snapshot.json")
@@ -119,6 +132,26 @@ def eligible(
             REASON_SUCCESSOR_OF_CLAIM,
             f"successor of {listed}, which this agent already advanced",
         )
+
+    # Epic focus (#707, lane F6): while a focus is ACTIVE the fleet drives exactly
+    # that epic, so out-of-epic work is parked — never dispatched. This is checked
+    # BEFORE the milestone-frontier branch: a frontier can interleave several
+    # epics, which is precisely the incoherence the focus exists to prevent, so an
+    # out-of-epic issue must never be handed out on the frontier. The pooled set
+    # is `focus.pooled` (the epic, its children and other epics excluded), and
+    # with no active epic it is a no-op — the branch is a no-relaxation guard.
+    active_epic = focus.active(snapshot, focus_path)
+    if active_epic is not None:
+        pooled_numbers = {candidate.number for candidate in focus.pooled(snapshot, active_epic.number)}
+        if issue_number in pooled_numbers:
+            return Eligibility(
+                issue_number,
+                False,
+                REASON_OUT_OF_EPIC_POOLED,
+                f"#{issue_number} is outside the active epic #{active_epic.number} "
+                "(parked in .board/pool.jsonl; promoted just-in-time by a brain directive "
+                "when an active-epic child declares it as a blocker)",
+            )
 
     milestone = active_milestone(snapshot, active_claims)
     if issue.milestone and issue.milestone == milestone:

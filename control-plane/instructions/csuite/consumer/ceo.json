@@ -1,0 +1,14 @@
+{
+  "canonical": {
+    "id": "csuite-ceo",
+    "version": "1.0.0"
+  },
+  "consumer": "kushin77/agent-orchestrator#643 (ceo)",
+  "mirrors": {
+    ".cursorrules": "9148aa8c467423daf2c83582c3c9365c06c20094fa684dd989d8e68ca2ad4d08",
+    "AGENTS.md": "f6a7daa137e8e881724d44b722d055c1e8f1f65ac65244a66657d49db3208f2d",
+    "CLAUDE.md": "b1f3d737d3241e3aa710b0a30466c2737a3face0050e62cb876a267f832e5bc9",
+    "copilot-instructions.md": "77ed12ccf37bd72764dbc5f5a3df39a335692f5de80f699262d5ff2d4135091f"
+  },
+  "schema": "ao.instructions.consumer/v1"
+}

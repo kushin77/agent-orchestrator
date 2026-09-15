@@ -58,6 +58,48 @@ artifactTypes:
   tool:
     summary: "Tool manifest (allowlisted tool id)."
     refSource: "identity/rbac tool manifests (issue #37/#38) + profile tool catalog"
+  skill:
+    summary: >-
+      Skill artifact: a first-class, independently-versioned capability a pack
+      bundles and a tenant installs/upgrades/rolls back on its own. A skill
+      carries an `evalEvidence` block (workbook-8 harness, registry/prompts/
+      evals.py) and cannot be published without it.
+    refSource: >-
+      registry/packs skills.py (issue #640, workbook-9 Skill Studio); eval
+      evidence shape consumed from registry/prompts/evals.py (issue #639)
+
+# Closed Skill Studio category vocabulary (issue #640, workbook-9). A skill
+# declares exactly one category, which is what makes the catalog searchable by
+# skill. This is a pack-level closed vocabulary; it does NOT redefine the pack
+# `categories` above (those group whole packs).
+skillCategories:
+  code-authoring:
+    summary: "Skills that write or modify source code."
+  code-review:
+    summary: "Skills that read code and emit a review verdict."
+  testing:
+    summary: "Skills that author or run tests / evals."
+  analysis:
+    summary: "Skills that analyze artifacts and produce findings."
+  data:
+    summary: "Skills that transform or summarize data."
+  operations:
+    summary: "Skills that drive operational / fleet workflows."
+  security:
+    summary: "Skills that enforce a security or DLP guardrail."
+  communication:
+    summary: "Skills that produce human-facing artifacts (docs, reports)."
+
+# Skill Studio lifecycle (issue #640): author -> test -> publish.
+# `draft`      — authored, no eval evidence yet (never installable)
+# `tested`      — eval evidence attached and green (publish prerequisites met)
+# `published`   — frozen immutable snapshot; installable by tenants
+# `deprecated`  — was published, no longer offered to new installs (terminal)
+skillLifecycleStates:
+  - draft
+  - tested
+  - published
+  - deprecated
 
 lifecycleStates:
   - planned

@@ -220,8 +220,16 @@ def test_a_declared_tier_selects_the_model_the_runner_is_invoked_with(monkeypatc
     assert command[:4] == [resolved, "-p", "--model", PRO_MODEL], (
         f"the runner was not invoked with the tier's model: {command!r}"
     )
-    assert command[-1].startswith("You are an epic-focused subagent"), (
-        "the prompt must remain the runner's final argument"
+    # The prompt's OPENING LINE is the standing mandate (live CI/CD SDLC +
+    # replaceability), frontloaded so a subagent that reads only the first lines
+    # still knows it is gated and replaceable. Assert what the position actually
+    # guarantees — the prompt is the runner's final argument, and it opens with
+    # the mandate — rather than a phrase the mandate now precedes.
+    assert command[-1].startswith("STANDING MANDATE"), (
+        "the standing mandate must open the prompt that is the runner's final argument"
+    )
+    assert "You are an epic-focused subagent" in command[-1], (
+        "the prompt must still carry the subagent role statement"
     )
     assert FLASH_MODEL not in command, (
         "a directive that declared `pro` was dispatched at the default tier's model"

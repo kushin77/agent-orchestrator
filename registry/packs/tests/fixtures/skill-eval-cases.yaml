@@ -1,0 +1,46 @@
+# tests/fixtures/skill-eval-cases.yaml — regression-eval cases for the Skill
+# Studio tests (issue #640).
+#
+# Shaped EXACTLY like registry/prompts/evals/eval-cases.yaml so the same
+# workbook-8 harness (registry/prompts/evals.py) scores it — the packs skill
+# gate consumes the harness, it never reimplements scoring. `expected` is the
+# ground-truth label set and `observed` the set the skill's output carried, so
+# a missing label is a false negative and an invented one a false positive.
+#
+# A skill revision is scored under `<skillId>@<skillVersion>` (the harness's
+# own EvalCase.prompt_id join key). The cases below exercise every verdict the
+# publish gate must distinguish:
+#   - `codemod@1.0.0` / `codemod@2.0.0` / `reviewer@1.0.0`  green -> publishable
+#   - `lint-fixer@1.0.0`                                   RED   -> refused
+#   - (no case at all)                        UNEVALUATED -> refused
+cases:
+  - caseId: codemod-v1-applies-rename
+    promptId: codemod@1.0.0
+    expected: [patch-applied, tests-passed]
+    observed: [patch-applied, tests-passed]
+  - caseId: codemod-v1-reports-scope
+    promptId: codemod@1.0.0
+    expected: [scope-reported]
+    observed: [scope-reported]
+
+  - caseId: codemod-v2-applies-rename
+    promptId: codemod@2.0.0
+    expected: [patch-applied, tests-passed]
+    observed: [patch-applied, tests-passed]
+  - caseId: codemod-v2-reports-scope
+    promptId: codemod@2.0.0
+    expected: [scope-reported, rollback-plan-attached]
+    observed: [scope-reported, rollback-plan-attached]
+
+  - caseId: reviewer-verdict
+    promptId: reviewer@1.0.0
+    expected: [verdict-emitted]
+    observed: [verdict-emitted]
+
+  # A RED case: the skill's output omits `tests-passed` (false negative) and
+  # invents `summary-written` (false positive). Evidence built from this case
+  # is not green, so publish must refuse it.
+  - caseId: lint-fixer-skips-verification
+    promptId: lint-fixer@1.0.0
+    expected: [lint-applied, tests-passed]
+    observed: [lint-applied, summary-written]

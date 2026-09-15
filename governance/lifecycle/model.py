@@ -111,6 +111,12 @@ INVARIANTS: Tuple[Invariant, ...] = (
         subject_kind="epic",
     ),
     Invariant(
+        code="EPIC_CHILD_MARKER_MISSING",
+        requires="an epic whose child set is checked must reach every child it is checked against - a supplied child that declares no `Parent: #<n>` marker anywhere in its body is unverifiable and is REPORTED, never silently passed",
+        remediation="give the child the marker its parent is established by (a line starting `Parent: #<n>` naming the epic), or check the epic against the child that really declares it - an epic that cannot be shown to have children is not an epic whose children are all closed",
+        subject_kind="epic",
+    ),
+    Invariant(
         code="FILING_LABELS_MISSING",
         requires="an open, milestoned item declares the labels the conformance gate holds it to",
         remediation="add the declaring labels (`class:`, and the pillar the class expects) or close the item",

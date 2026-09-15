@@ -1,0 +1,26 @@
+{
+  "_comment": "gateway/mcp outbound MCP server registry (issue #641, workbook-10). This is gateway/mcp's OWN declaration - it is deliberately NOT an entry in infra/feature-flags/registry.yaml, because an outbound server is a gateway surface's declaration to own. The registry-level flag lives in code as AO_MCP_OUTBOUND_ENABLED (see gateway/mcp/outbound.py, OUTBOUND_FLAG_ENV) and compiles OFF; each seeded entry also ships enabled=false, so enabling a deployment and enabling a server are two independent decisions (GR-5: new surfaces ship flag-gated OFF).",
+  "_schema": "gateway/mcp outbound registry v1",
+  "servers": [
+    {
+      "id": "drawio",
+      "displayName": "draw.io (diagrams.net) MCP server",
+      "endpoint": "mcp+stdio://drawio-mcp-server",
+      "pinnedVersion": "1.0.0",
+      "authzScope": "mcp:outbound",
+      "transport": "stdio",
+      "enabled": false,
+      "tools": [
+        "drawio.create_diagram",
+        "drawio.export_svg",
+        "drawio.list_templates"
+      ],
+      "_note": "The CTO workbook row (workbook-8, registry/prompts/modules/cto-primary.v1.yaml) references this server by ID - the id is the contract, never the endpoint, so an endpoint move is a config change rather than a prompt rewrite. The endpoint above is a DECLARED local transport name, not a URL a caller may substitute: outbound.py refuses a caller-supplied endpoint (status endpoint_override). pinnedVersion is exact - a request for any other version is refused (there is no floating fallback), and a server that answers off-pin is refused too.",
+      "provenance": [
+        "kushin77/agent-orchestrator issue #641 (workbook-10: outbound MCP server management, draw.io)",
+        "kushin77/agent-orchestrator issue #631 (EPIC: Paperclip enterprise-workbook four-pillar delta)",
+        "guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml rule workbook-drawio-mcp-diagramming (CTO automated draw.io diagram generation)"
+      ]
+    }
+  ]
+}

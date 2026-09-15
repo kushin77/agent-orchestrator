@@ -553,6 +553,21 @@ verbs:
     refusals: [401, 403, 503]
     note: "Resolves the ONE active epic, its open children and the pooled set (epic #707); read-only — it changes no dispatch decision."
 
+  - id: board.pool
+    source: governance/dispatch/cli.py
+    local: pool
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: >-
+      Shows the out-of-epic pool (`.board/pool.jsonl`): the issues epic focus
+      parked because they are outside the active epic (epic #707). Read-only —
+      it reports what a drain WOULD take; the drain itself happens on the claim
+      path (`board.claim`) and in `board.drain`.
+
   - id: board.claim
     source: governance/dispatch/cli.py
     local: claim

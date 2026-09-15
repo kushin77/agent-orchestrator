@@ -59,6 +59,12 @@ control-plane/instructions/
 │   ├── tenant-override.json
 │   ├── consumer-state.json    #   pinned (compliant) consumer
 │   └── rendered/              #   COMMITTED generator output (byte-stable proof)
+├── csuite/                    # the five C-suite seats as canonical sources
+│   ├── derive.py              #   DERIVES each seat from the workbook artifacts
+│   ├── canonical/<role>.yaml  #   ceo/cto/coo/cfo/cmo (generated, never authored)
+│   ├── rendered/<role>/       #   per-tool mirrors + manifest (byte-stable proof)
+│   ├── consumer/<role>.json   #   pinned consumer states (drift-checked)
+│   └── tests/                 #   conformance for all five seats + mutation proof
 └── tests/                     # pytest suite (offline; runs the negatives too)
     ├── conftest.py
     ├── test_render_deterministic.py
@@ -248,3 +254,13 @@ tenant/control plane uses to *produce* the governed instruction files each
 harness consumes.  The two are complementary — the consumer template is where
 the generated mirrors land; this layer is the mechanism that makes them
 model-agnostic, tenant-bounded and drift-checked.
+
+## The five C-suite instruction sets (`csuite/`, issue #643)
+
+[`csuite/`](csuite/) is a **consumer** of everything above: it supplies the five
+C-suite canonical sources this layer was missing, **derived** from the
+workbook-1 PersonaCards (`registry/personas/cards/`) and the workbook-8 prompt
+modules (`registry/prompts/modules/`) rather than authored as a second copy of
+that governance.  It reuses this lane's renderer, ledger and conformance checker
+unchanged — there is no C-suite-specific render path.  See
+[`csuite/README.md`](csuite/README.md).

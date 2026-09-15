@@ -163,6 +163,12 @@ cases = {
     "CHILD_NOT_CLOSED": record([item(children=[
         {"number": 300, "state": "open", "body": "Parent: #269"},
     ])]),
+    # An epic whose child edge CANNOT be established: a supplied child whose body
+    # declares no parent marker at all. The audit must REPORT it - reading "no
+    # children found" as "all children closed" is the silent pass #720 forbids.
+    "EPIC_CHILD_MARKER_MISSING": record([item(children=[
+        {"number": 300, "state": "closed", "body": "no parent marker here"},
+    ])]),
     # Every child terminal: the invariant must be able to PASS, not only fail.
     "CHILD_ALL_CLOSED": record([item(children=[
         {"number": 300, "state": "closed", "body": "Parent: #269"},
@@ -243,6 +249,7 @@ declare -a provoked=(
   ISSUE_NOT_CLOSED
   FILING_LABELS_MISSING
   CHILD_NOT_CLOSED
+  EPIC_CHILD_MARKER_MISSING
 )
 for code in "${provoked[@]}"; do
   expect_code "$code" "$work/$code.json"
@@ -257,6 +264,22 @@ expect_code "CHILD_NOT_CLOSED" "$work/CHILD_NOT_CLOSED.json"
 # names a different parent (the marker is read, not guessed).
 expect_pass "an epic whose children are all terminal is accepted" "$work/CHILD_ALL_CLOSED.json"
 expect_pass "a child naming a different parent is not this epic's child" "$work/CHILD_WRONG_PARENT.json"
+
+# A supplied child whose edge cannot be established is REPORTED, and the report
+# must name the child: "the epic has no children I could tie to it" is a finding,
+# never a silent pass (#720).
+output="$(audit "$work/EPIC_CHILD_MARKER_MISSING.json")"
+rc=$?
+if [ "$rc" -eq 0 ]; then
+  echo "  FAIL  a child whose edge cannot be established went unreported" >&2
+  fail=$((fail + 1))
+elif ! printf '%s' "$output" | grep -qF -- "#300"; then
+  echo "  FAIL  the unedged child was not named in the report" >&2
+  printf '%s\n' "$output" | sed 's/^/        /' >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    an unverifiable child edge is REPORTED and named: #300"
+fi
 
 # --- 4. the quarantine excuses legacy, and only while it is tracked ----------
 expect_pass "a quarantined legacy item is excused while its tracker is open" \
