@@ -14,7 +14,10 @@ solves the problem that makes the naive version unusable: measured at ``9707146`
 (thirteen post-boundary commits), landed history does **not** satisfy the rule,
 and the shared predicate already says so. A check that merely failed on those
 commits would turn ``make verify`` red for every lane on the day it landed, which
-is how a gate gets disabled instead of obeyed.
+is how a gate gets disabled instead of obeyed. The residue is not frozen at that
+measurement: a commit that lands later and still misses the rule is refused by
+name, and reconciling one means recording it here with the finding that was
+measured for it (``4e3d62da``, the #826 squash, recorded by issue #832).
 
 THE DESIGN — a class boundary, plus a quarantine that can only shrink
 --------------------------------------------------------------------
@@ -25,11 +28,13 @@ THE DESIGN — a class boundary, plus a quarantine that can only shrink
   module consumes the predicate's post-boundary findings and never maintains a
   second copy of the boundary. A boundary is provably frozen: a new commit is
   always a descendant, never an ancestor, so the grandfathering cannot grow.
-* **The measured residue is quarantined by commit.** The thirteen commits that
-  landed *after* that boundary and still do not comply are recorded in
+* **The measured residue is quarantined by commit.** The commits that landed
+  *after* that boundary and still do not comply are recorded in
   ``landed-baseline.json``, by full commit id, with the finding the shared
   predicate prints for each. They are named, not silently accepted: the check
-  reports them as recorded legacy on every run.
+  reports them as recorded legacy on every run. The quarantine is not closed to
+  new measurements -- a commit that lands non-compliant is refused by name and
+  the *recording* of it is the reconciliation, never a quiet pass.
 * **The quarantine can only shrink.** An entry whose commit no longer produces a
   finding is *stale* — the predicate changed, or the commit was rewritten — and a
   stale entry is a **failure** (``quarantine-entry-stale``), never a quiet

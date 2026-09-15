@@ -183,9 +183,10 @@ re-interpreted.
 and enforcing it are different jobs, and the difference is a problem the naive
 enforcement cannot solve: measured at `9707146`, thirteen commits that landed
 *after* the shared predicate's enforced boundary still do not carry the reference
-in a trailing trailer block, so a check that simply failed on them would have
-turned `make verify` red for every lane on the day it landed — which is how a gate
-gets disabled instead of obeyed. `cli.py enforce`
+in a trailing trailer block (a fourteenth, the #826 squash `4e3d62da`, was added
+by the reconciliation in issue #832), so a check that simply failed on them would
+have turned `make verify` red for every lane on the day it landed — which is how a
+gate gets disabled instead of obeyed. `cli.py enforce`
 ([`landed.py`](landed.py)) is that enforcement, and it has three parts:
 
 * the **legacy class** is grandfathered by the shared predicate's own frozen
@@ -196,7 +197,11 @@ gets disabled instead of obeyed. `cli.py enforce`
 * the post-boundary **residue is recorded by commit** in
   [`landed-baseline.json`](landed-baseline.json), with the finding the predicate
   measured for each entry, and reported as recorded legacy on every run.
-  Recorded, not accepted — the report names every one of them;
+  Recorded, not accepted — the report names every one of them. A commit that
+  lands non-compliant *later* is refused by name, and the remedy for one that has
+  already landed — history on a protected branch is not rewritten — is to record
+  it here with the finding that was measured for it (`4e3d62da`, the #826 squash,
+  recorded by issue #832; see [§7](#7-composing-a-message-the-trailer-block-will-hold));
 * the recording **can only shrink**. An entry whose commit now complies is
   `quarantine-entry-stale`, which is a failure; an entry outside the assessed
   range is `quarantine-entry-not-assessed`, which is CANNOT-ASSESS and therefore
@@ -240,7 +245,66 @@ The fleet execution loop ([`fleet/terminal.py`](../../fleet/terminal.py))
 provisions every subagent through this module, so a dispatched agent starts in
 its own lane with its own identity instead of in the shared checkout.
 
-## 7. Tests
+## 7. Composing a message the trailer block will hold
+
+The rule this module enforces is **positional**: the ticket reference must be a
+line of the message's *trailing trailer block*. The block is found by walking the
+message's paragraphs backwards from the end. A paragraph whose significant lines
+are all trailer lines extends the block; a bare `---------` squash separator is
+stepped over; **the first paragraph that is not all trailer lines ends it**, and
+a reference at or above that paragraph is then outside the block even though it
+is in the message. A trailer line is the reference line itself (`Refs
+owner/repo#n`, whose colon git's own parser requires and this predicate does
+not), a `Token: value` line, or an indented continuation.
+
+So the trap is a **non-trailer line sharing a paragraph with the reference**, or
+sitting directly below it. GitHub's auto-close keyword is colon-less — `Closes
+#724` — and that paragraph then ends the block one paragraph *below* the
+reference:
+
+```
+…prose…
+
+Refs kushin77/agent-orchestrator#724
+Closes #724                     <- not a trailer line, SAME paragraph as the
+                                   reference: this paragraph is not all
+                                   trailer lines, so the block it ends is the
+                                   one below — and the reference is outside it
+
+AI-assistance: Copilot (…)
+```
+
+Measured: this is exactly how the #826 squash (`4e3d62da`, which landed #724)
+was refused with `commit-ref-outside-the-trailer-block`, and it is recorded in
+the baseline by issue #832. The compliant shape gives the keyword line its **own**
+paragraph and ends the message with a paragraph of trailer lines only, the
+reference among them:
+
+```
+…prose…
+
+Closes #724                     <- its own paragraph, above the reference: the
+                                   walk-back ends HERE, and the block it keeps
+                                   still holds the reference below
+
+Refs kushin77/agent-orchestrator#724
+AI-assistance: Copilot (…)
+```
+
+Check a commit the way the gate checks it — the gate's own predicate, one commit
+at a time. `rc 0` with `LANDED OK` is the whole contract; a finding names itself:
+
+```bash
+bash scripts/check-pr-contract.sh --landed --range HEAD^..HEAD
+```
+
+Not `git log -1 --format='%(trailers)'`. That is git's own parser, which is a
+**different rule**: measured, it omits the colon-less `Refs owner/repo#n` line
+even on a commit this gate accepts (`bdce21d5` prints only its `Co-authored-by:`
+trailer), so it shows an empty block for a compliant message and would send a lane
+to "fix" a commit the gate already accepts.
+
+## 8. Tests
 
 `governance/isolation/tests` (declared in [`scripts/pytest-suites.txt`](../../scripts/pytest-suites.txt),
 run per suite by `make tests`) pins the mint, the per-worktree signature, the
