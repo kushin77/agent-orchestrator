@@ -216,6 +216,45 @@ assets (`views/chat.html`, `js/chat.js`) are absent, and the check runs
 distinguishable by an authentication probe. `scripts/check-chat-ux.sh` proves
 that control by provoking it.
 
+## The workbook-11 views (issue #642)
+
+Three views join the platform's enterprise-workbook declarations to the console:
+the org chart (workbook-1 declaration + workbook-6 role health), the skill studio
+(workbook-9 `SkillStudio`), and the tenant task board (workbook-3 ticket
+lifecycle). Each one is a **serving half only** — it owns transport shape and the
+honesty rules of the view, and reads every fact through the module that owns it.
+
+| View | Routes | Consumes (never re-implements) |
+|---|---|---|
+| Org chart | `GET /api/orgchart/chart`, `GET /api/orgchart/health` | `registry/personas/org-chart.yaml` + `cards/*.yaml` through the registry's own `validate_org_chart`, joined to `telemetry/role_health.RoleHealthReport` |
+| Skill studio | `GET /api/skillstudio/skills`, `GET /api/skillstudio/skills/<id>`, `POST /api/skillstudio/{author,test,publish}` | `registry/packs/skills.SkillStudio` — its lifecycle, its hashes, and **its** publish gate |
+| Task board | `GET /api/taskboard/tickets`, `GET /api/taskboard/tickets/<id>`, `GET /api/taskboard/moves/<state>` | `engine/core/tickets.TicketRuntime` — every row is a replay of the engine's event log; the board holds no ticket state |
+
+Honesty rules these views enforce, because a plausible-looking wrong number is
+worse than a missing one:
+
+- **an unmetered role is `null`, not `0`.** A seat the workbook-6 feed never
+  metered reports `spentUsd: null` and `position: "unknown"` — a fabricated zero
+  would read as "no spend, all good".
+- **a chart that cannot be read or validated is served `unresolved`**, with an
+  empty `nodes` list and a `note` naming the defect — empty is allowed, invented
+  is not.
+- **a ticket the engine's store does not hold is `404`.** `TicketRuntime.project`
+  over zero events yields a plausible `created` projection for *any* id, so an
+  empty log is treated as "no such ticket" rather than projected into existence.
+  A listed-but-absent id is reported in `absent[]` rather than dropped.
+- **publish is refused without green eval evidence** — and the refusal is the
+  studio's, carrying its own reason. The adapter re-checks no gate.
+
+Their flags are declared in the portal's **own** `portal/config/feature-flags.yaml`
+(read through `portal/server/config_flags.py`), not in
+`infra/feature-flags/registry.yaml`: these are views *inside* the portal service
+and add no service and no terraform variable, which that registry's 1:1 lock-step
+with `infra/terraform/variables.tf` requires. All three default **OFF** (GR-5),
+and the gate runs **before** AuthN, so an unpromoted view is absent rather than
+merely unauthorised. `e2e/workbook11_portal.py` probes all three over the real
+app.
+
 ## Verification (2026-09-08)
 
 - `python3 -m pytest portal/tests -q -p no:cacheprovider` → **{count} passed**

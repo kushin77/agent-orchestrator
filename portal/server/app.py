@@ -43,9 +43,18 @@ from portal.server.fleet import FleetProjection
 from portal.server.live_feed import MAX_REPLAY_LIMIT, LiveFeed
 from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
+from portal.server.org_chart import OrgChartView
+from portal.server.skill_studio import (
+    ACTION_AUTHOR,
+    ACTION_PUBLISH,
+    ACTION_TEST,
+    SkillStudioError,
+    SkillStudioSurface,
+)
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, ConsoleSso, SESSION_COOKIE
 from portal.server.state import Approval, ConsoleState, seed_state
 from portal.server.surfaces import PortalSurfacesFeed
+from portal.server.task_board import TaskBoardError, TaskBoardSurface
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -121,6 +130,9 @@ class ConsoleApplication:
         ops_health: Optional[OpsHealthReports] = None,
         bridge: Optional[LiveBridge] = None,
         chat_surface: Optional[ChatSurface] = None,
+        org_chart_view: Optional[OrgChartView] = None,
+        skill_studio_surface: Optional[SkillStudioSurface] = None,
+        task_board_surface: Optional[TaskBoardSurface] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -182,6 +194,25 @@ class ConsoleApplication:
             chat_surface
             if chat_surface is not None
             else ChatSurface(repo_root=self.repo_root)
+        )
+        # The workbook-11 views (issue #642) — each flag-gated OFF. Their flags
+        # are declared in the portal's OWN config (portal/config/feature-flags
+        # .yaml) rather than the control-plane registry, because they are views
+        # inside the portal service and add no service or terraform variable.
+        self.org_chart = (
+            org_chart_view
+            if org_chart_view is not None
+            else OrgChartView(repo_root=self.repo_root)
+        )
+        self.skill_studio = (
+            skill_studio_surface
+            if skill_studio_surface is not None
+            else SkillStudioSurface(repo_root=self.repo_root)
+        )
+        self.task_board = (
+            task_board_surface
+            if task_board_surface is not None
+            else TaskBoardSurface(repo_root=self.repo_root)
         )
 
     # -- request pipeline ---------------------------------------------------
@@ -390,6 +421,32 @@ class ConsoleApplication:
         if parts[0] == "control":
             return __import__("portal.server.control_api", fromlist=["control"]).control(self, parts[1:], method, body, cookies, now_iso)
 
+        # The workbook-11 views (issue #642) ship feature-flag-gated OFF (GR-5),
+        # also before authN: an unpromoted view is absent, not merely
+        # unauthorised. Their flags live in the portal's own
+        # portal/config/feature-flags.yaml (see portal/server/config_flags.py).
+        if parts[0] == "orgchart" and not self.org_chart.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the org-chart view is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.org_chart)",
+            )
+        if parts[0] == "skillstudio" and not self.skill_studio.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the skill-studio surface is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.skill_studio)",
+            )
+        if parts[0] == "taskboard" and not self.task_board.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the tenant task board is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.task_board)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -407,6 +464,12 @@ class ConsoleApplication:
                 return self._route_bridge(parts[2:], principal, method, query)
             if parts[0] == "chat":
                 return self._route_chat(parts, method, query, body, principal)
+            if parts[0] == "orgchart":
+                return self._route_org_chart(parts, method)
+            if parts[0] == "skillstudio":
+                return self._route_skill_studio(parts, method, query, body)
+            if parts[0] == "taskboard":
+                return self._route_task_board(parts, method, query)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -493,6 +556,106 @@ class ConsoleApplication:
         if surface == ["surfaces"]:
             return self._ok(self.surfaces.document())
         raise ApiError(404, "not_found", f"no such portal surface: {'/'.join(surface)}")
+
+    # -- workbook-11 views (issue #642) --------------------------------------
+    def _route_org_chart(self, parts: list[str], method: str) -> Response:
+        """The org-chart view (issue #642, workbook-11).
+
+        Two reads, both delegated to ``OrgChartView``: the workbook-1
+        declaration (``GET /api/orgchart/chart``) and the workbook-6 role-health
+        feed joined to it (``GET /api/orgchart/health``). GET-only; when the
+        view's flag is off the route never reaches here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the org-chart view is GET only")
+        surface = parts[1:]
+        if surface == ["chart"]:
+            return self._ok(self.org_chart.chart())
+        if surface == ["health"]:
+            return self._ok(self.org_chart.health())
+        raise ApiError(404, "not_found", f"no such org-chart view: {'/'.join(surface)}")
+
+    def _route_skill_studio(
+        self,
+        parts: list[str],
+        method: str,
+        query: dict[str, str],
+        body: dict[str, Any],
+    ) -> Response:
+        """The skill-studio surface (issue #642, workbook-11).
+
+        Reads: ``GET /api/skillstudio/skills`` (optionally ``?category=`` /
+        ``?text=``) and ``GET /api/skillstudio/skills/<id>`` (optionally
+        ``?version=``). Writes: ``POST /api/skillstudio/<author|test|publish>``,
+        each one a single edge of the workbook-9 lifecycle driven through
+        ``SkillStudio`` — the surface re-checks no gate, so a refused publish
+        carries the studio's own reason. Every read is delegated to the surface,
+        which owns the filter vocabulary and the not-found refusal.
+        """
+        surface = parts[1:]
+        if method == "GET":
+            try:
+                if not surface or surface == ["skills"]:
+                    return self._ok(
+                        self.skill_studio.skills(
+                            category=(query.get("category") or "").strip() or None,
+                            text=(query.get("text") or "").strip() or None,
+                        )
+                    )
+                if len(surface) == 2 and surface[0] == "skills":
+                    return self._ok(
+                        self.skill_studio.skill(
+                            surface[1],
+                            version=(query.get("version") or "").strip() or None,
+                        )
+                    )
+            except SkillStudioError as exc:
+                raise ApiError(exc.status, exc.code, exc.message) from None
+            raise ApiError(404, "not_found", f"no such skill-studio read: {'/'.join(surface)}")
+        if method == "POST":
+            if len(surface) == 1 and surface[0] == ACTION_AUTHOR:
+                return self._skill_studio_write(self.skill_studio.author, body)
+            if len(surface) == 1 and surface[0] == ACTION_TEST:
+                return self._skill_studio_write(self.skill_studio.test, body)
+            if len(surface) == 1 and surface[0] == ACTION_PUBLISH:
+                return self._skill_studio_write(self.skill_studio.publish, body)
+            raise ApiError(404, "not_found", f"no such skill-studio action: {'/'.join(surface)}")
+        raise ApiError(405, "method_not_allowed", "the skill studio is GET/POST only")
+
+    def _skill_studio_write(self, action, body: dict[str, Any]) -> Response:
+        """Run one studio transition, translating its refusals into the envelope."""
+        try:
+            return self._ok(action(body))
+        except SkillStudioError as exc:
+            raise ApiError(exc.status, exc.code, exc.message) from None
+
+    def _route_task_board(
+        self, parts: list[str], method: str, query: dict[str, str]
+    ) -> Response:
+        """The tenant task board (issue #642, workbook-11).
+
+        Reads: ``GET /api/taskboard/tickets`` (the board) and
+        ``GET /api/taskboard/tickets/<id>`` (one ticket). Every row is a replay
+        of the engine's own event log through ``TicketRuntime`` — the board
+        keeps no ticket state of its own. GET-only; when the board's flag is off
+        the route never reaches here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the tenant task board is GET only")
+        surface = parts[1:]
+        tenant = (query.get("tenant") or "").strip()
+        try:
+            if surface == ["tickets"]:
+                return self._ok(self.task_board.board(tenant=tenant))
+            if len(surface) == 2 and surface[0] == "tickets":
+                return self._ok(self.task_board.ticket(surface[1], tenant=tenant))
+            if len(surface) == 2 and surface[0] == "moves":
+                return self._ok(
+                    self.task_board.legal_moves(surface[1], tenant=tenant)
+                )
+        except TaskBoardError as exc:
+            raise ApiError(exc.status, exc.code, exc.message) from None
+        raise ApiError(404, "not_found", f"no such task-board read: {'/'.join(surface)}")
 
     # -- finops single-pane (issue #341) ------------------------------------
     def _route_finops(
