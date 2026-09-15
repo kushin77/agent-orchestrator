@@ -29,6 +29,14 @@ Sections (paperclip's planning shape, in dependency order):
 * **blocked**   — work that cannot proceed, named with what it waits on.
 * **delivered** — terminal outcomes the fleet already recorded.
 
+The **active epic** block (epic #707, lane #722) precedes them: the epic the
+fleet is focused on, its per-epic progress (children closed/total), the pooled
+queue and the effective agent count the focus declares. It is derived from the
+same committed board the sections are — injected as a `Snapshot` plus a `Focus`
+— so `epic_from()` is a PURE function a test can assert from a fixture with no
+fleet and no network. It is read-only: reporting never changes a dispatch
+decision (ADR-0012 decision (d)).
+
 Every item carries its issue number, its lane, and an evidence pointer (the run,
 the claim, the child's own ``Verify:`` command, or the closing record).
 
@@ -63,8 +71,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
 import claims as claims_mod  # noqa: E402
+import focus as focus_mod  # noqa: E402
 import order  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
+from model import Snapshot  # noqa: E402
 
 REPO = "kushin77/agent-orchestrator"
 SCHEMA = "fleet.report/v1"
@@ -96,6 +106,21 @@ PROVENANCE: dict[str, Any] = {
 
 SECTIONS = ("now", "next", "blocked", "delivered")
 ITEM_FIELDS = ("issue", "lane", "state", "title", "agent", "evidence", "source")
+#: The active-epic block's own shape (epic #707, lane #722). Reported by a PURE
+#: builder over an injected snapshot + focus; it is never a dispatch input.
+EPIC_FIELDS = (
+    "number",
+    "title",
+    "activated_at",
+    "wave_cap",
+    "max_agents",
+    "effective_agents",
+    "progress",
+    "closed_children",
+    "open_children",
+    "pooled",
+    "error",
+)
 
 
 # --- paths (resolved per call, so a test can redirect the whole tree) --------
@@ -129,6 +154,11 @@ def slog_path(root: Path | str | None = None) -> Path:
 
 def board_snapshot_path(root: Path | str | None = None) -> Path:
     return repo_root(root) / ".board" / "snapshot.json"
+
+
+def focus_path(root: Path | str | None = None) -> Path:
+    """The pinned focus (``.board/focus.json``) — which epic the fleet drives."""
+    return repo_root(root) / ".board" / "focus.json"
 
 
 def board_ledger_path(root: Path | str | None = None) -> Path:
@@ -250,13 +280,41 @@ def read_runs(directory: Path) -> list[dict]:
     return runs
 
 
-def read_board(path: Path) -> dict:
+def read_snapshot(path: Path) -> Snapshot | None:
+    """The board as a typed `Snapshot`, or None when it is absent/unusable.
+
+    The typed object — not just the dict `read_board` flattens — is what the
+    active-epic block needs: a child edge and a `type:epic` label are facts a
+    flat issue listing cannot answer.
+    """
+    try:
+        return snapshot_mod.load(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def read_focus(path: Path) -> tuple[focus_mod.Focus | None, str]:
+    """The pinned focus plus any refusal reason.
+
+    A malformed focus is REFUSED, never silently read as "nothing pinned": a
+    corrupt board must not quietly disable the focus the fleet dispatches from
+    (`governance/dispatch/focus.py`), so the reason is carried into the report
+    instead of being defaulted away.
+    """
+    try:
+        return focus_mod.load(path), ""
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return None, f"{path}: {exc}"
+
+
+def read_board(path: Path, snapshot: Snapshot | None = None) -> dict:
     """The board snapshot plus the active milestone and its frontier.
 
     Milestone and frontier come from `governance/dispatch/order.py` — the rule the
     claim gate enforces — so the report cannot disagree with dispatch about what
     is next. An absent or unusable snapshot is reported as unreadable, never
-    guessed at.
+    guessed at. `snapshot` lets a caller that already loaded it (the report does)
+    avoid reading the file twice.
     """
     board: dict[str, Any] = {
         "readable": False,
@@ -267,9 +325,9 @@ def read_board(path: Path) -> dict:
         "issues": {},
         "blocked": [],
     }
-    try:
-        snapshot = snapshot_mod.load(path)
-    except (OSError, ValueError, json.JSONDecodeError):
+    if snapshot is None:
+        snapshot = read_snapshot(path)
+    if snapshot is None:
         return board
     milestone = order.active_milestone(snapshot, frozenset())
     frontier = order.frontier(snapshot, milestone) if milestone else None
@@ -347,7 +405,9 @@ def read_state(
     runs = read_runs(runs_dir(root))
     outcomes = tail_records(slog_path(root), OUTCOME_LIMIT)
     telemetry = tail_records(runs_log(root), TELEMETRY_LIMIT)
-    board = read_board(board_snapshot_path(root))
+    snapshot = read_snapshot(board_snapshot_path(root))
+    board = read_board(board_snapshot_path(root), snapshot)
+    focus, focus_error = read_focus(focus_path(root))
     verify = read_verify(attestation_path(root))
     return {
         "root": str(repo_root(root)),
@@ -359,6 +419,9 @@ def read_state(
         "outcomes": outcomes,
         "telemetry": telemetry,
         "board": board,
+        "snapshot": snapshot,
+        "focus": focus,
+        "focus_error": focus_error,
         "verify": verify,
         "sources": {
             "waves": {"path": str(waves_dir(root)), "records": len(waves), "present": waves_dir(root).exists()},
@@ -441,10 +504,66 @@ class Basis:
 
 
 @dataclass(frozen=True)
+class Epic:
+    """The active epic the fleet is focused on (epic #707, lane #722).
+
+    Reported, never decided. The number is the one dispatch resolves from the
+    injected `Snapshot` + `Focus`; the progress is the board's own child states;
+    the pooled queue is `focus.pooled(...)`; and the agent figure is copied from
+    the focus — ``0`` means "the pool" and is labelled as such rather than
+    resolved here (the capacity formula is lane F3/#718's, not this lane's).
+    """
+
+    number: int | None = None
+    title: str = ""
+    activated_at: str = ""
+    wave_cap: int = 0
+    max_agents: int = 0
+    closed_children: tuple[int, ...] = ()
+    open_children: tuple[int, ...] = ()
+    pooled: tuple[int, ...] = ()
+    error: str = ""
+
+    @property
+    def total(self) -> int:
+        return len(self.closed_children) + len(self.open_children)
+
+    @property
+    def progress(self) -> str:
+        """`closed/total` over the epic's children — the epic's own progress."""
+        return f"{len(self.closed_children)}/{self.total}"
+
+    @property
+    def effective_agents(self) -> str:
+        """The effective agent count the focus declares (`0` == the pool)."""
+        return "the pool" if self.max_agents == 0 else str(self.max_agents)
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "number": self.number,
+            "title": self.title,
+            "activated_at": self.activated_at,
+            "wave_cap": self.wave_cap,
+            "max_agents": self.max_agents,
+            "effective_agents": self.effective_agents,
+            "progress": {
+                "closed": len(self.closed_children),
+                "total": self.total,
+                "label": self.progress,
+            },
+            "closed_children": list(self.closed_children),
+            "open_children": list(self.open_children),
+            "pooled": list(self.pooled),
+            "error": self.error,
+        }
+
+
+@dataclass(frozen=True)
 class Report:
-    """The report itself: a basis and the four planning sections."""
+    """The report itself: a basis, the active epic, and four planning sections."""
 
     basis: Basis
+    epic: Epic | None = None
     now: tuple[Item, ...] = ()
     next: tuple[Item, ...] = ()
     blocked: tuple[Item, ...] = ()
@@ -462,6 +581,7 @@ class Report:
             "repo": REPO,
             "provenance": PROVENANCE,
             "basis": self.basis.to_json(),
+            "epic": self.epic.to_json() if self.epic is not None else None,
             "sections": {name: [item.to_json() for item in self.section(name)] for name in SECTIONS},
             "counts": self.counts(),
             "verdict": verdict(self),
@@ -486,6 +606,17 @@ def validate_report(payload: Any, where: str = "report") -> list[str]:
         problems.append(f"{where}: basis must be an object")
     elif not str(basis.get("commit") or "").strip():
         problems.append(f"{where}: basis.commit must name the commit the report was derived at")
+    epic = payload.get("epic")
+    if epic is not None:
+        if not isinstance(epic, dict):
+            problems.append(f"{where}: epic must be an object or null")
+        else:
+            missing = [field for field in EPIC_FIELDS if field not in epic]
+            if missing:
+                problems.append(f"{where}: epic is missing {missing}")
+            number = epic.get("number")
+            if number is not None and (isinstance(number, bool) or not isinstance(number, int)):
+                problems.append(f"{where}: epic.number must be an integer or null")
     sections = payload.get("sections")
     if not isinstance(sections, dict):
         problems.append(f"{where}: sections must be an object")
@@ -508,6 +639,43 @@ def validate_report(payload: Any, where: str = "report") -> list[str]:
 
 
 # --- derivation (pure: asserted by the tests, so it must not do I/O) --------
+
+
+def epic_from(
+    snapshot: Snapshot | None,
+    focus: focus_mod.Focus | None,
+    *,
+    error: str = "",
+) -> Epic:
+    """The active-epic block from an injected snapshot + focus. PURE.
+
+    No I/O, no network, no shell-out, and nothing written: the epic is resolved
+    with exactly the rule dispatch uses (`focus.resolve`), progress is read from
+    the board's own child states, the pooled queue is `focus.pooled(...)`, and
+    the agent figure is copied from the focus. Read-only by construction, so no
+    reporting change can alter a dispatch decision (ADR-0012 decision (d)).
+
+    An unreadable focus is refused, not guessed at: `error` (set by
+    `read_focus`) yields "no active epic" with the reason, never a fabricated
+    active epic resolved from a board the focus cannot be trusted to describe.
+    """
+    if error:
+        return Epic(number=None, error=error)
+    pinned = focus.active_epic if focus is not None else None
+    resolved = focus_mod.resolve(snapshot, pinned) if snapshot is not None else None
+    number = resolved.number if resolved is not None else None
+    children = snapshot.children_of(number) if snapshot is not None and number is not None else []
+    pooled = focus_mod.pooled(snapshot, number) if snapshot is not None else []
+    return Epic(
+        number=number,
+        title=resolved.title if resolved is not None else "",
+        activated_at=focus.activated_at if focus is not None else "",
+        wave_cap=focus.wave_cap if focus is not None else 0,
+        max_agents=focus.max_agents if focus is not None else 0,
+        closed_children=tuple(issue.number for issue in children if issue.closed),
+        open_children=tuple(issue.number for issue in children if not issue.closed),
+        pooled=tuple(issue.number for issue in pooled),
+    )
 
 
 def closed_issues(state: dict) -> set[int]:
@@ -813,9 +981,15 @@ def build_report(state: dict) -> Report:
         sources=tuple(Source(name=name, **fields) for name, fields in state["sources"].items()),
         verify=state.get("verify"),
     )
+    epic = epic_from(
+        state.get("snapshot"),
+        state.get("focus"),
+        error=str(state.get("focus_error") or ""),
+    )
     in_flight = now_items(state)
     return Report(
         basis=basis,
+        epic=epic,
         now=in_flight,
         next=next_items(state, in_flight),
         blocked=blocked_items(state),
@@ -892,6 +1066,48 @@ def basis_lines(basis: Basis) -> list[str]:
     )]
 
 
+def numbered(numbers: tuple[int, ...]) -> str:
+    """`#1, #2` — or a word when the set is empty, never a bare blank."""
+    return ", ".join(f"#{number}" for number in numbers) if numbers else "none"
+
+
+def epic_lines(epic: Epic | None) -> list[str]:
+    """The active-epic block: the focus, its progress, its pool and its budget.
+
+    PURE — everything it prints is in `epic`. Deliberately NOT one of the four
+    planning sections: it is the focus those sections belong to, so it prints
+    above them. The agent figure is the focus's own declaration, and `0` is
+    labelled "the pool" rather than resolved into a number this lane does not
+    own (lane F3/#718).
+    """
+    if epic is None or epic.number is None:
+        title = "EPIC"
+        lines = [f"\u2500\u2500 {title} " + "\u2500" * max(0, WIDTH - len(title) - 8)]
+        lines.append("  no active epic \u2014 nothing is pinned and no open epic is workable")
+        if epic is not None and epic.error:
+            lines.append(f"  focus:    refused \u2014 {truncate(epic.error)}")
+        return lines
+    title = f"EPIC #{epic.number} ({epic.progress} children closed)"
+    agents = (
+        "the pool (max_agents 0 \u2014 lane F3/#718 resolves it against the ceiling)"
+        if epic.max_agents == 0
+        else f"{epic.max_agents}"
+    )
+    lines = [
+        f"\u2500\u2500 {title} " + "\u2500" * max(0, WIDTH - len(title) - 8),
+        f"  epic:     #{epic.number} {truncate(epic.title, 48)}",
+        f"  progress: {epic.progress} children closed "
+        f"(closed {numbered(epic.closed_children)} \u00b7 open {numbered(epic.open_children)})",
+        f"  pooled:   {len(epic.pooled)} issue(s)"
+        + (f" \u2014 {numbered(epic.pooled)}" if epic.pooled else ""),
+        f"  agents:   {agents} \u00b7 wave cap {epic.wave_cap}"
+        + (f" \u00b7 activated {epic.activated_at}" if epic.activated_at else ""),
+    ]
+    if epic.error:
+        lines.append(f"  focus:    refused \u2014 {truncate(epic.error)}")
+    return lines
+
+
 def render(report: Report) -> str:
     """The human-readable report. Pure: everything it needs is in `report`."""
     lines = [
@@ -901,6 +1117,7 @@ def render(report: Report) -> str:
         f"  persona:  {PROVENANCE['persona_id']} tier {PROVENANCE['persona_tier']} \u00b7 {PROVENANCE['persona']}",
         *basis_lines(report.basis),
         "\u2550" * WIDTH,
+        *epic_lines(report.epic),
     ]
     for name, title in (("now", "NOW"), ("next", "NEXT"), ("blocked", "BLOCKED"), ("delivered", "DELIVERED")):
         lines.append(section(title, report.section(name)))
