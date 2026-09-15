@@ -14,5 +14,14 @@ github:
   push:
     branch: ^master$
 filename: infra/cloudbuild/apply.yaml
+# The workbook-surface switches (issue #644, workbook-13) are declared here and
+# consumed by apply.yaml's plan step, so the posture of the only apply route is
+# readable in one place: every one of them is "false" until a reviewed
+# promotion flips it.
 substitutions:
   _ENABLE_APPLY: "false"
+  _ENABLE_ORG_CHART: "false"
+  _ENABLE_SKILL_STUDIO: "false"
+  _ENABLE_TASK_BOARD: "false"
+  _ENABLE_MCP_OUTBOUND: "false"
+  _ENABLE_SANDBOX_RUNTIME: "false"

@@ -8,6 +8,18 @@
 #
 # Never run by hand. Never applied from a console. Ships OFF.
 
+# The workbook-surface switches (issue #644, workbook-13). Each is a declared
+# pair — services.<name> in infra/feature-flags/registry.yaml and its own
+# enable_<name> variable in infra/terraform/variables.tf — and this is where the
+# pair reaches the only apply route: the plan below renders each one from its
+# substitution instead of letting terraform fall back to the committed default.
+# A promotion can therefore be applied by flipping one substitution, and the
+# apply log records the posture it rendered (the `workbook_surface_flags`
+# output), so "promoted but never rendered" is visible rather than silent.
+# The substitutions are declared in apply-trigger.yaml (all "false"), exactly as
+# _ENABLE_APPLY is: the trigger is the only entry point, so there is one place
+# to read the route's posture and one place to flip it.
+
 options:
   # Run as the deployer SA (created by modules/deployer-sa at promotion).
   # Populated via substitution at go-live; never hard-coded (GR-6).
@@ -43,7 +55,13 @@ steps:
       - '-lc'
       - |
         cd infra/terraform
-        terraform plan -out=/workspace/tfplan
+        terraform plan -input=false \
+          -var="enable_org_chart=$_ENABLE_ORG_CHART" \
+          -var="enable_skill_studio=$_ENABLE_SKILL_STUDIO" \
+          -var="enable_task_board=$_ENABLE_TASK_BOARD" \
+          -var="enable_mcp_outbound=$_ENABLE_MCP_OUTBOUND" \
+          -var="enable_sandbox_runtime=$_ENABLE_SANDBOX_RUNTIME" \
+          -out=/workspace/tfplan
 
   - id: terraform-apply
     name: 'hashicorp/terraform:1.6'
