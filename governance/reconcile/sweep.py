@@ -43,6 +43,13 @@ from governance.lifecycle.report import (
     BoardReporter,
     finding_key,
 )
+from governance.reconcile.audit import (
+    CLAIMS_DIR,
+    LANDING_DIR,
+    AuditUnavailable,
+    WorktreeEntry,
+    parse_worktrees,
+)
 from governance.reconcile.heartbeat import (
     DEFAULT_TTL_MINUTES,
     ORPHAN,
@@ -513,6 +520,81 @@ class RepoOps:
     def clear_session(self, session_id: str) -> str:
         removed = clear(session_id, self.root)
         return "cleared heartbeat" if removed else "no heartbeat to clear"
+
+    # -- the read-only half, for the worktree/branch audit (issue #628) --------
+    #
+    # These are the same injected port as the teardown effects above, so the
+    # audit is driven by a test double in the suite and by real git in the gate —
+    # the git calls are not buried inside the audit's own logic. Every one of
+    # them raises ``AuditUnavailable`` rather than returning a plausible empty
+    # answer, because "nothing is there" and "I could not look" must not be the
+    # same verdict.
+
+    def list_worktrees(self) -> list[WorktreeEntry]:
+        try:
+            porcelain = self._git("worktree", "list", "--porcelain")
+        except RuntimeError as exc:
+            raise AuditUnavailable(f"git worktree list failed: {exc}") from exc
+        return parse_worktrees(porcelain)
+
+    def list_local_branches(self) -> list[str]:
+        try:
+            names = self._git("for-each-ref", "--format=%(refname:short)", "refs/heads")
+        except RuntimeError as exc:
+            raise AuditUnavailable(f"git for-each-ref failed: {exc}") from exc
+        return [name for name in names.splitlines() if name.strip()]
+
+    def active_claims(self) -> dict[int, str]:
+        """Live claims, keyed by issue — the dispatch ledger's own replay.
+
+        The replay (claim / release / reap, and the TTL) is the dispatch
+        package's, not reimplemented here: a second parser is a second answer.
+        """
+        import sys
+
+        ledger = self.root / CLAIMS_DIR
+        # The *code* comes from this checkout; only the *data* comes from the
+        # audited root. Resolving the module under the root would make the audit
+        # CANNOT-ASSESS on every scratch repository it is pointed at, which is
+        # exactly where it is proven.
+        dispatch_dir = str(Path(__file__).resolve().parents[1] / "dispatch")
+        if dispatch_dir not in sys.path:
+            sys.path.insert(0, dispatch_dir)
+        try:
+            # Qualified: the dispatch modules import their siblings by bare name,
+            # so the directory must be on the path first, and this keeps a single
+            # module identity rather than a second `claims` loaded by filename.
+            from governance.dispatch import claims as dispatch_claims  # noqa: PLC0415
+        except Exception as exc:  # noqa: BLE001 - unreadable, not empty
+            raise AuditUnavailable(f"the claim ledger cannot be read: {exc}") from exc
+        try:
+            events = dispatch_claims.read_ledger(ledger)
+            return {number: claim.agent for number, claim in dispatch_claims.active_claims(events).items()}
+        except Exception as exc:  # noqa: BLE001 - a corrupt record is not "no claim"
+            raise AuditUnavailable(f"the claim ledger is unreadable: {exc}") from exc
+
+    def landed_issues(self) -> set[int]:
+        """Issues whose work landed, from the lifecycle journals.
+
+        The journal is written by the close-out once the item's change has been
+        merged, so its presence *is* the landing record — the same fact the
+        lifecycle audit reads rather than a snapshot that ages.
+        """
+        directory = self.root / LANDING_DIR
+        if not directory.exists():
+            return set()
+        landed: set[int] = set()
+        for path in sorted(directory.glob("*.json")):
+            try:
+                int(path.stem)
+            except ValueError as exc:
+                raise AuditUnavailable(f"{path.name} does not name an issue") from exc
+            try:
+                json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:  # noqa: BLE001 - a corrupt journal is not "not landed"
+                raise AuditUnavailable(f"{path.name} is unreadable ({type(exc).__name__})") from exc
+            landed.add(int(path.stem))
+        return landed
 
 
 def describe(report: SweepReport) -> str:

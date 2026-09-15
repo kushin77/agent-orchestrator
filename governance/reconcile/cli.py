@@ -3,6 +3,7 @@
 
     python3 governance/reconcile/cli.py stamp --session <id> --issue <n> --agent <a> --pid <pid>
     python3 governance/reconcile/cli.py status
+    python3 governance/reconcile/cli.py status --disk                 # report-only (#628)
     python3 governance/reconcile/cli.py sweep --ttl-minutes 15            # dry run
     python3 governance/reconcile/cli.py sweep --ttl-minutes 15 --apply    # reconcile
     python3 governance/reconcile/cli.py watch --interval-seconds 60 --apply
@@ -10,10 +11,24 @@
 `sweep` is the reconciliation worker; `watch` is the same pass as a daemon, for
 the repo's cron-owned ops (code-native automation — no GitHub Actions, GR-15).
 
+`status --disk` is the read-only half (issue #628): it adds the worktree/branch
+audit to the status report — every `git worktree list` entry and every local
+`issue-*` branch that no session beat, claim record or landing record explains,
+reported by name — and removes nothing. It is an option on the existing `status`
+verb rather than a verb of its own on purpose: a new CLI verb is a surface change
+that the control-plane verb registry gates (`control-plane/control/verbs.yaml`,
+contract-first), and that contract belongs to its own lane. The audit is a
+read-only addition to a report that already exists, so it is declared as one.
+
 Exit-code contract (repo tri-state convention): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 `status` and `sweep` exit 1 when an orphan is present and nothing was applied —
 so a cron tick or a gate can tell "the fleet is clean" from "someone left a lane
 behind" without parsing prose.
+
+`status` exits 2 — never 0 — when `--disk` was asked for and the disk could not
+be read (an unreadable `git`, a corrupt beat, claim record or journal). The defect
+the audit fixes was a *wrong OK*: "nothing is there" and "I could not look" must
+not share a verdict.
 """
 
 from __future__ import annotations
@@ -34,6 +49,7 @@ from governance.lifecycle.report import (  # noqa: E402
     BoardReporter,
     GhFiler,
 )
+from governance.reconcile.audit import audit, describe as describe_audit  # noqa: E402
 from governance.reconcile.heartbeat import (  # noqa: E402
     DEFAULT_BEAT_SECONDS,
     DEFAULT_TTL_MINUTES,
@@ -117,14 +133,44 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "reason": verdict.reason,
             }
         )
+    disk = audit(args.root, ops=RepoOps(args.root)) if args.disk else None
+    orphans = [row for row in rows if row["status"] == ORPHAN]
+    summary = f"reconcile-status: {len(rows)} session(s), {len(orphans)} orphan(s)"
     if args.json:
-        print(json.dumps({"sessions": rows}, indent=2))
+        # Measured while adding --disk: this summary line used to follow the JSON
+        # document on stdout, so `status --json` was not parseable as JSON at all.
+        # stdout is now the document alone; the human line goes to stderr and the
+        # counts are in the payload, so no information is lost either way.
+        payload: dict = {"sessions": rows, "session_count": len(rows), "orphan_count": len(orphans)}
+        if disk is not None:
+            payload["disk"] = disk.to_json()
+        print(json.dumps(payload, indent=2))
+        print(summary, file=sys.stderr)
     else:
         for row in rows:
             print(f"  {row['status']:<8} #{row['issue']:<5} {row['session_id']} {row['agent']} ({row['age_seconds']}s) {row['reason']}")
-    orphans = [row for row in rows if row["status"] == ORPHAN]
-    print(f"reconcile-status: {len(rows)} session(s), {len(orphans)} orphan(s)")
-    return EXIT_NOT_OK if orphans else EXIT_OK
+        if disk is not None:
+            print(describe_audit(disk))
+        print(summary)
+    if disk is not None:
+        # The disk audit reports; it never removes. Its refusal is named here in
+        # the same words the audit uses, and its verdict is folded into the exit
+        # code so a cron tick can act on it — including CANNOT-ASSESS, which must
+        # never be mistaken for a clean fleet.
+        if not disk.assessable:
+            print(f"reconcile-status: CANNOT-ASSESS — the disk could not be audited: {disk.reason}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        for item in disk.unmatched:
+            print(f"reconcile-audit: unmatched {item.artifact}", file=sys.stderr)
+        if disk.unmatched:
+            print(
+                f"reconcile-audit: NOT-OK — {len(disk.unmatched)} artifact(s) no session beat, "
+                "claim record or landing record explains (reported, not removed)",
+                file=sys.stderr,
+            )
+    if orphans or (disk is not None and disk.unmatched):
+        return EXIT_NOT_OK
+    return EXIT_OK
 
 
 def cmd_sweep(args: argparse.Namespace) -> int:
@@ -212,6 +258,11 @@ def build_parser() -> argparse.ArgumentParser:
     status_cmd = sub.add_parser("status", help="every session and its verdict")
     status_cmd.add_argument("--ttl-minutes", type=float, default=DEFAULT_TTL_MINUTES)
     status_cmd.add_argument("--json", action="store_true")
+    status_cmd.add_argument(
+        "--disk",
+        action="store_true",
+        help="also audit the disk: report every worktree/branch no record explains (#628)",
+    )
     status_cmd.set_defaults(func=cmd_status)
 
     sweep_cmd = sub.add_parser("sweep", help="one reconciliation pass")

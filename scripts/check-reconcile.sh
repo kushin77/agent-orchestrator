@@ -16,6 +16,22 @@
 #   * a step that cannot complete reports FAILED, never a silent success;
 #   * a dry run decides (reclaimed / parked / reported) without acting.
 #
+# It then proves the other half (issue #628): the worktree/branch **audit**, whose
+# whole job is to name what no record explains. The defect it fixes was a wrong
+# OK — `sweep` saw only sessions that beat, so a lane that left no heartbeat was
+# invisible and `status` reported zero orphans while 41 closed issues' worktrees
+# sat on disk. So the audit is proven two ways, and the second is the one that
+# matters:
+#
+#   * an artifact nothing explains is NAMED, and an artifact explained by a beat,
+#     by a claim record or by the landing history is not — with the evidence
+#     removed again to prove each match is what did the explaining;
+#   * a corrupt beat makes the verdict CANNOT-ASSESS, never OK — an audit that
+#     cannot tell "nothing is there" from "I could not look" is the defect.
+#
+# The audit removes nothing, and this gate asserts that too: after it has named an
+# unmatched worktree, the worktree and its work are still exactly where they were.
+#
 # The bookkeeping steps against the repo's own CLIs are covered by the unit suite
 # (`governance/reconcile/tests`), which asserts them on the happy path; this gate
 # covers what a scratch repository cannot fake — the git mechanics and the
@@ -290,7 +306,198 @@ else
   fail=$((fail + 1))
 fi
 
-# --- 4. vacuity control: the declaration check must be able to fail ---------
+# --- 4. the worktree/branch audit, exercised for real (issue #628) ----------
+#
+# The provoke-and-observe shape is deliberate. It is not enough that a matching
+# artifact is un-refused: the evidence is then REMOVED and the same artifact must
+# become refused, which is what proves the beat / the claim record / the landing
+# journal was what did the explaining. And the load-bearing control is the last
+# one — an audit that cannot read the state must say CANNOT-ASSESS, because the
+# defect it fixes was reporting OK.
+if python3 - "$root" "$work" <<'PYAUDIT'
+"""Live proofs for the worktree/branch audit (issue #628)."""
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2])
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from governance.reconcile.audit import audit
+from governance.reconcile.heartbeat import clear, stamp
+from governance.reconcile.sweep import RepoOps
+
+problems = []
+
+
+def check(label, condition, detail=""):
+    if condition:
+        print(f"  OK    {label}")
+    else:
+        problems.append(label)
+        print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr)
+
+
+def git(cwd, *args):
+    result = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)}: {result.stderr.strip()[-200:]}")
+    return result.stdout.strip()
+
+
+def now_iso():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def names(report):
+    return {item.artifact.name for item in report.unmatched}
+
+
+# A scratch repository of its own, so the audit's verdict is not entangled with
+# the teardown proofs above: those leave worktrees, branches and beats behind.
+origin = work / "audit-origin.git"
+repo = work / "audit-repo"
+repo.mkdir(parents=True)
+subprocess.run(["git", "init", "--bare", "-q", str(origin)], check=True)
+subprocess.run(["git", "init", "-q", "-b", "master", str(repo)], check=True)
+git(repo, "config", "user.name", "Gate Human")
+git(repo, "config", "user.email", "gate-human@example.com")
+(repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+git(repo, "add", "seed.txt")
+git(repo, "commit", "-q", "-m", "seed")
+git(repo, "remote", "add", "origin", str(origin))
+git(repo, "push", "-q", "-u", "origin", "master")
+git(repo, "fetch", "-q", "origin")
+
+ops = RepoOps(repo)
+
+# --- an artifact each record DOES explain, one per source -------------------
+beaten = work / "audit-lane-beaten"
+subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "issue-905",
+                str(beaten), "origin/master"], check=True)
+stamp("audit-beaten", issue=905, agent="gate-agent", root=repo, worktree=str(beaten),
+      branch="issue-905", at=datetime.now(timezone.utc).timestamp())
+
+(repo / ".board").mkdir(exist_ok=True)
+(repo / ".board" / "claims.jsonl").write_text(
+    json.dumps({"event": "claim", "issue": 901, "agent": "gate-agent", "at": now_iso(),
+                "lane": "gate", "reason": "next-in-milestone"}) + "\n",
+    encoding="utf-8",
+)
+git(repo, "branch", "issue-901")
+
+(repo / ".fleet" / "lifecycle").mkdir(parents=True, exist_ok=True)
+(repo / ".fleet" / "lifecycle" / "902.json").write_text(
+    json.dumps({"closing_evidence": True}) + "\n", encoding="utf-8"
+)
+git(repo, "branch", "issue-902")
+
+# --- the provoked negatives: an artifact NO record explains -----------------
+orphan = work / "audit-lane-orphan"
+subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "orphan-branch",
+                str(orphan), "origin/master"], check=True)
+(orphan / "unmerged.txt").write_text("unmerged work\n", encoding="utf-8")
+git(orphan, "add", "unmerged.txt")
+git(orphan, "commit", "-q", "-m", "unmerged")
+git(repo, "branch", "issue-903")
+
+report = audit(repo, ops=ops)
+refused = names(report)
+check("the audit is assessable against a real repository", report.assessable, report.reason)
+check("an unmatched worktree is refused by name", str(orphan) in refused, str(sorted(refused)))
+check("an unmatched issue-* branch is refused by name", "issue-903" in refused, str(sorted(refused)))
+check("the audit is NOT-OK (1) while an artifact is unexplained", report.exit_code == 1, str(report.exit_code))
+check("a session beat explains its worktree, so it is not refused",
+      str(beaten) not in refused, str(sorted(refused)))
+check("a claim record explains a branch, so it is not refused",
+      "issue-901" not in refused, str(sorted(refused)))
+check("the landing history explains a branch, so it is not refused",
+      "issue-902" not in refused, str(sorted(refused)))
+check("the primary checkout is exempt, not refused",
+      len(report.exempt) == 1 and report.exempt[0].artifact.name == str(repo)
+      and str(repo) not in refused,
+      f"exempt={[item.artifact.name for item in report.exempt]} refused={sorted(refused)}")
+
+# --- the evidence is what does the explaining: remove it, observe the verdict
+clear("audit-beaten", repo)
+(repo / ".board" / "claims.jsonl").unlink()
+(repo / ".fleet" / "lifecycle" / "902.json").unlink()
+after = audit(repo, ops=ops)
+after_refused = names(after)
+check("removing the beat makes that worktree refused (the beat was doing the explaining)",
+      str(beaten) in after_refused, str(sorted(after_refused)))
+check("removing the claim record makes that branch refused (the claim was doing the explaining)",
+      "issue-901" in after_refused, str(sorted(after_refused)))
+check("removing the landing journal makes that branch refused (the journal was doing the explaining)",
+      "issue-902" in after_refused, str(sorted(after_refused)))
+
+# --- the load-bearing negative: unreadable state is CANNOT-ASSESS, not OK ---
+sessions = repo / ".fleet" / "sessions"
+sessions.mkdir(parents=True, exist_ok=True)
+(sessions / "corrupt-beat.json").write_text("{ not json", encoding="utf-8")
+broken = audit(repo, ops=ops)
+check("a corrupt session beat is CANNOT-ASSESS, never a clean OK",
+      (not broken.assessable) and broken.exit_code == 2, broken.reason)
+check("the CANNOT-ASSESS verdict names the unreadable beat",
+      "corrupt-beat.json" in broken.reason, broken.reason)
+(sessions / "corrupt-beat.json").unlink()
+
+not_a_repo = work / "audit-not-a-repo"
+not_a_repo.mkdir()
+blind = audit(not_a_repo, ops=RepoOps(not_a_repo))
+check("a directory that is not a repository is CANNOT-ASSESS, never a clean OK",
+      (not blind.assessable) and blind.exit_code == 2 and not blind.unmatched,
+      f"exit={blind.exit_code} reason={blind.reason}")
+
+# --- the command's own tri-state, end to end --------------------------------
+# `status --disk` rather than a verb of its own: a new CLI verb is a surface the
+# control-plane verb registry gates (contract-first), and that contract is its
+# own lane's. The audit removes nothing, so it is a flag on the report that
+# already exists.
+cli = repo_root / "governance" / "reconcile" / "cli.py"
+not_ok = subprocess.run([sys.executable, str(cli), "--root", str(repo), "status", "--disk"],
+                        capture_output=True, text=True)
+check("`status --disk` exits 1 (NOT-OK) and names the unmatched worktree on stderr",
+      not_ok.returncode == 1 and str(orphan) in not_ok.stderr,
+      f"rc={not_ok.returncode} stderr={not_ok.stderr.strip()[-200:]}")
+check("`status --disk` names the unmatched branch on stderr too",
+      "issue-903" in not_ok.stderr, not_ok.stderr.strip()[-200:])
+blind_cli = subprocess.run([sys.executable, str(cli), "--root", str(not_a_repo), "status", "--disk"],
+                           capture_output=True, text=True)
+check("`status --disk` exits 2 (CANNOT-ASSESS), never 0, when it cannot look",
+      blind_cli.returncode == 2, f"rc={blind_cli.returncode}")
+plain = subprocess.run([sys.executable, str(cli), "--root", str(not_a_repo), "status"],
+                       capture_output=True, text=True)
+check("plain `status` is unchanged: rc 0 with no beats and no orphans",
+      plain.returncode == 0, f"rc={plain.returncode} out={plain.stdout.strip()[-120:]}")
+
+# --- it reports; it never removes -------------------------------------------
+check("the audit removed nothing: the refused worktree and its unmerged work survive",
+      orphan.exists()
+      and (orphan / "unmerged.txt").read_text(encoding="utf-8") == "unmerged work\n"
+      and "orphan-branch" in git(repo, "branch", "--list", "orphan-branch")
+      and str(orphan) in git(repo, "worktree", "list"),
+      "the worktree or its work was removed")
+check("the audit removed nothing: every branch it examined still exists",
+      all(name in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads").splitlines()
+          for name in ("issue-901", "issue-902", "issue-903")),
+      git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads"))
+
+if problems:
+    print(f"  ({len(problems)} live proof(s) failed)", file=sys.stderr)
+    raise SystemExit(1)
+PYAUDIT
+then
+  :
+else
+  fail=$((fail + 1))
+fi
+
+# --- 5. vacuity control: the declaration check must be able to fail ---------
 grep -vF "Orphan reconciliation" AGENTS.md > "$work/agents-without-the-rule.md"
 IFS='|' read -r -a parts <<< "${declarations[0]}"
 if missing_declarations "$work/agents-without-the-rule.md" "${parts[@]:1}" >/dev/null 2>&1; then
@@ -304,5 +511,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-reconcile: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-reconcile: OK — heartbeats beat, orphans are flagged, landed lanes are reclaimed, and unmerged work is never destroyed"
+echo "check-reconcile: OK — heartbeats beat, orphans are flagged, landed lanes are reclaimed, unmerged work is never destroyed, and the disk audit names what no record explains (removing nothing, and refusing to guess when it cannot look)"
 exit 0
