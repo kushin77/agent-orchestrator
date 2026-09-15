@@ -198,3 +198,61 @@ surfaces:
       `faang`; no live-sync module, so not `elite`. Live under
       integrations/paperclip/ deliberately — the canonical module (#448), never a
       second top-level module.
+  # Widened by issue #620 (EPIC #616; measured 2026-09-14 against this tree).
+  # #590 widened the *roots*; the git ecosystem itself still had no row, so the
+  # gate never looked at `.github/**`, at `.gitmessage`, or at the four
+  # `governance/` packages this repo's own rules are built on — held to NO class
+  # at all while the table read green. Each declaration below is the rung that
+  # surface's own evidence MEASURES (`make surface-class` re-derives it); none is
+  # declared above its evidence, and a raise of one rung fails the gate by name.
+  - surface: github
+    path: .github
+    declared_class: template
+    notes: >-
+      The repository's GitHub surface: the issue forms
+      (.github/ISSUE_TEMPLATE/), the PR template
+      (.github/PULL_REQUEST_TEMPLATE.md) and dependabot.yml. Its substantive
+      gates are scripts/check-issue-template.sh and
+      scripts/check-pr-contract.sh; the machine `gate` evidence matches on the
+      surface NAME, so it also matches scripts/check-github-lifecycle.sh by
+      substring — the measured rung does not depend on it. There is no test suite
+      and no README.md under the path, and the ladder's `tests`/`contract`
+      evidence is directory-shaped, so the measured rung is the base one.
+  - surface: commit-contract
+    path: .gitmessage
+    declared_class: template
+    notes: >-
+      The commit-message contract (issue #5, content lane #623, bootstrap lane
+      #624) parsed by scripts/check-pr-contract.sh. The path is a single file, so
+      `tests` and `contract` — measured as artifacts *under* the path — cannot
+      exist; the measured rung is the base one.
+  - surface: dispatch
+    path: governance/dispatch
+    declared_class: pattern
+    notes: >-
+      Claim/order/dispatch governance (AGENTS.md rule 14, chronological
+      dependency-gated selection): contract, a suite (governance/dispatch/tests)
+      and its gate scripts/check-chronological-dispatch.sh. It owns no
+      controls/audit/schema artifact, which is what holds it at `pattern`.
+  - surface: isolation
+    path: governance/isolation
+    declared_class: pattern
+    notes: >-
+      Session identity and lane isolation (AGENTS.md rule 15, issue #263):
+      contract, a suite, the gate scripts/check-session-isolation.sh and the
+      audit module (audit.py) the instrumentation reads. It has `audit` but owns
+      no `controls` or `schema` artifact, so it stops at `pattern`.
+  - surface: lifecycle
+    path: governance/lifecycle
+    declared_class: pattern
+    notes: >-
+      End-to-end closure (AGENTS.md rule 16, issue #269): contract, a suite, the
+      gate scripts/check-github-lifecycle.sh and audit.py. `controls` and a
+      `*.schema.json` are absent, so the measured rung is `pattern`.
+  - surface: reconcile
+    path: governance/reconcile
+    declared_class: pattern
+    notes: >-
+      Orphan reconciliation (AGENTS.md rule 17, issue #304): contract, a suite
+      and the gate scripts/check-reconcile.sh. It owns no audit/control/schema
+      artifact, so the measured rung is `pattern`.
