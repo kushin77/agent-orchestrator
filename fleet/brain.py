@@ -33,6 +33,7 @@ rung a real process:
   every ~30s. That stream is captured to `.fleet/brain.log` (the watchdog owns
   the spawn), which is what the `brain` window of the `fleet` tmux session shows;
 * it refuses — never improvises — when the order is malformed, names no issue,
+  names an issue the committed board says is already closed (or absent from it),
   or asks for a tier below the floor that work requires.
 
 It reaches the sister only through `channel.py send`, so the contract's trust
@@ -94,6 +95,13 @@ DISPATCH_MARKERS = FLEET_DIR / "brain" / "dispatched"
 # The prefix `dispatch()` returns when the marker says the order is already out.
 # Callers report "already dispatched" and never send a second directive.
 DUPLICATE_SUPPRESSED = "duplicate suppressed"
+# The committed board the brain routes against, and the SAME artifact a claim is
+# validated against (`governance/dispatch/snapshot.py`). Reading it here is what
+# makes the brain's answer agree with the claim layer's: an issue this file says
+# is closed is an issue `claim` refuses, so a directive for it could never start
+# (#693). It is refreshed explicitly by `python3 governance/dispatch/cli.py
+# snapshot --from-github` — the only network-touching board read.
+BOARD_PATH = ROOT / ".board" / "snapshot.json"
 # How often the beat is refreshed while an order is being handled. The watchdog
 # SIGTERMs a rung whose beat is older than `channel.STALE_HEARTBEAT_SECONDS`
 # (120s), and a decompose order outlives that easily; the sister beats every 15s
@@ -426,6 +434,71 @@ def build_directive(order: dict) -> dict:
     return directive
 
 
+# -- the closure guard (issue #693) -------------------------------------------
+# The brain could compose a directive, mark it sent and hand it to the sister for
+# an issue that was already CLOSED. Measured: 17 such directives accumulated in
+# the inbox and wedged the terminal loop — every one of them naming work the claim
+# layer refuses `issue-closed` (`governance/dispatch/order.py`), i.e. a run that
+# could never start. The board the brain already holds answers the question, so it
+# is asked HERE, in the one funnel every directive passes through — before the
+# sent-marker is written and before the channel is invoked — and the refusal is
+# reported instead of a directive being issued.
+ISSUE_CLOSED = "issue-closed"
+ISSUE_UNKNOWN = "unknown-issue"
+BOARD_UNREADABLE = "cannot-assess"
+
+
+def board_issue_state(number: int) -> tuple[str, str]:
+    """``(state, detail)`` for an issue, read from the COMMITTED board snapshot.
+
+    The states are the snapshot's own: ``open``, or the two refusals below. Both
+    absences are refusals rather than defaults, because a silent allow is exactly
+    how a dead directive gets in (#693):
+
+    * ``unknown-issue`` — the snapshot does not carry the issue. An absent issue
+      is NOT an open issue, and the claim layer refuses a claim for it with this
+      same reason (`handle_decompose` says so in as many words: a child absent
+      from the snapshot "would be refused `unknown-issue` the moment the wave
+      arrives"), so a directive for it is dead on arrival. The detail names the
+      remedy: refresh the snapshot.
+    * ``cannot-assess`` — the snapshot itself cannot be read. The brain does not
+      know the state, and not knowing is never a licence to dispatch: the same
+      posture as ``advance_ready``, which dispatches nothing when its board fetch
+      fails.
+
+    Only ``open`` lets a directive through.
+    """
+    try:
+        board = snapshot_mod.load(BOARD_PATH)
+    except (OSError, ValueError) as exc:
+        return BOARD_UNREADABLE, f"the committed board snapshot {BOARD_PATH} is unreadable: {exc}"
+    issue = board.get(number)
+    if issue is None:
+        return ISSUE_UNKNOWN, (
+            f"#{number} is not in the committed board snapshot {BOARD_PATH} "
+            "(refresh it: python3 governance/dispatch/cli.py snapshot --from-github)"
+        )
+    if issue.closed:
+        return ISSUE_CLOSED, f"#{number} is closed on the committed board ({BOARD_PATH})"
+    return "open", f"#{number} is open on the committed board ({BOARD_PATH})"
+
+
+def closure_refusal(number: int) -> str | None:
+    """Why no directive may be issued for this issue, or None when one may.
+
+    The state is read from the committed board snapshot once per dispatch. The
+    refusal names the state it read, so the operator sees WHICH board said so
+    rather than a bare "refused".
+    """
+    state, detail = board_issue_state(number)
+    if state == "open":
+        return None
+    return (
+        f"{state} — {detail}; the brain issued no directive for #{number}: no sent-marker was "
+        "written and the channel was not invoked, so nothing entered the sister's inbox"
+    )
+
+
 def dispatch(order: dict) -> tuple[bool, str]:
     """Send the composed directive through the channel; return (ok, message).
 
@@ -434,11 +507,26 @@ def dispatch(order: dict) -> tuple[bool, str]:
     refuses to send the same order twice. Marker first, send second — the reverse
     order loses the at-most-once property this exists for. `(False, ...)` with a
     `DUPLICATE_SUPPRESSED` prefix means "already sent", not "send failed".
+
+    The closure guard (#693) runs between composing the directive and sending it:
+    an issue the committed board says is closed (or does not carry at all) is a
+    refusal, and nothing is written or sent for it.
     """
     marker = order_marker(order)
     if marker is not None and marker.exists():
         return False, f"{DUPLICATE_SUPPRESSED} — {marker.name} records that this order was already sent"
     directive = build_directive(order)
+    # The closure guard (#693), between composing the directive and sending it. The
+    # routing question above is answered first because it asks about the ORDER
+    # (can the registry back the capability it claims?); this one asks about the
+    # BOARD. Both are refusals, and neither writes a marker nor reaches the
+    # channel — so no directive for a closed (or unassessable) issue can enter the
+    # sister's inbox. An order that names no issue has no state to look up.
+    number = order_issue(order)
+    if number is not None:
+        refusal = closure_refusal(number)
+        if refusal is not None:
+            return False, refusal
     if marker is not None:
         write_marker(marker, order, "sending")
     result = subprocess.run(
@@ -580,7 +668,6 @@ def file_child_issue(title: str, body: str, declaring: dict) -> int:
 # — and every guard runs BEFORE the first `gh issue create`, so a refused wave
 # files nothing and therefore has nothing to repair afterwards.
 FOCUS_PATH = ROOT / ".board" / "focus.json"
-BOARD_PATH = ROOT / ".board" / "snapshot.json"
 
 
 def resolve_active_epic() -> tuple[int | None, str]:
