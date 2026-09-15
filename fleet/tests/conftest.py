@@ -55,8 +55,12 @@ RUNTIME_PATHS = {
         "STEERS",
     ),
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "RUNNER_HOLD", "WORKTREE_ROOT"),
-    "brain": ("HEARTBEAT", "WAVES"),
+    "brain": ("HEARTBEAT", "WAVES", "DISPATCH_MARKERS"),
     "health": ("SISTER_HEARTBEAT", "BRAIN_HEARTBEAT"),
+    # The dispatch markers' state machine (#796): it reads and writes the marker
+    # set, the run registry and the dead-letter store, so a test that reconciles
+    # must land in `tmp_path` — the same cover, for the newest runtime tree.
+    "markers": ("DISPATCHED", "RUNS", "DEAD_LETTER"),
     "telemetry": ("RUNS_LOG",),
     # `watchdog.spawn` OPENS a file named after FLEET_DIR, and `console` reads
     # the same tree — without these three lines a test would create real
