@@ -49,7 +49,6 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import signal
 import subprocess
 import sys
@@ -64,6 +63,7 @@ sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
 
 import channel  # noqa: E402
 import decompose_policy  # noqa: E402
+import markers  # noqa: E402
 import routing  # noqa: E402
 import runtime  # noqa: E402
 import singleton  # noqa: E402
@@ -91,10 +91,21 @@ PROFILE_PATH = ROOT / "fleet" / "profiles" / "brain.profile.json"
 # the dispatch and `channel.consume_order` used to re-read the order on restart
 # and send it a second time (measured: `['4242', '4242']`). On restart the marker
 # suppresses the duplicate instead of repeating it.
-DISPATCH_MARKERS = FLEET_DIR / "brain" / "dispatched"
+#
+# The marker set is `fleet/markers.py`'s (it owns the state machine: sending /
+# sent / in-flight / completed / dead). This module keeps the name so the
+# directory has one owner and one spelling, and passes it to the reconciler
+# explicitly so a test that redirects it redirects the reconciliation with it.
+DISPATCH_MARKERS = markers.DISPATCHED
 # The prefix `dispatch()` returns when the marker says the order is already out.
 # Callers report "already dispatched" and never send a second directive.
 DUPLICATE_SUPPRESSED = "duplicate suppressed"
+# The prefix `dispatch()` returns when the marker is TERMINAL — the order
+# completed, or its directive was retired / its re-arm budget was exhausted
+# (#796). Distinct from DUPLICATE_SUPPRESSED on purpose: "already sent" and
+# "finished, parked" are different facts and the operator must see which one
+# holds, with the issue named and the verb that lifts it.
+PARKED_SUPPRESSED = "terminal marker"
 # The committed board the brain routes against, and the SAME artifact a claim is
 # validated against (`governance/dispatch/snapshot.py`). Reading it here is what
 # makes the brain's answer agree with the claim layer's: an issue this file says
@@ -102,6 +113,18 @@ DUPLICATE_SUPPRESSED = "duplicate suppressed"
 # (#693). It is refreshed explicitly by `python3 governance/dispatch/cli.py
 # snapshot --from-github` — the only network-touching board read.
 BOARD_PATH = ROOT / ".board" / "snapshot.json"
+
+
+def suppressed(message: str) -> bool:
+    """True when `dispatch()` refused because the marker already covers the order.
+
+    One predicate for both refusals, so a caller cannot handle "already sent" and
+    silently mis-handle "parked" — which is exactly how a terminal marker used to
+    read as a delivery failure.
+    """
+    return message.startswith((DUPLICATE_SUPPRESSED, PARKED_SUPPRESSED))
+
+
 # How often the beat is refreshed while an order is being handled. The watchdog
 # SIGTERMs a rung whose beat is older than `channel.STALE_HEARTBEAT_SECONDS`
 # (120s), and a decompose order outlives that easily; the sister beats every 15s
@@ -353,30 +376,55 @@ def order_reference(order: dict) -> str:
 
 # Characters that may not appear in a marker filename. The reference arrives in
 # operator-supplied JSON and becomes a path component, so `../` must not be able
-# to walk out of the marker directory.
-_MARKER_UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
+# to walk out of the marker directory. The rule lives with the state machine that
+# builds the path (`markers.safe_reference`, #796) — one sanitizer, one spelling.
 
 
 def order_marker(order: dict) -> Path | None:
-    """The sent-marker path for an order, or None when it carries no reference."""
+    """The marker path for an order, or None when it carries no reference.
+
+    The sanitizer lives with the state machine (`fleet/markers.py`): the reference
+    arrives in operator-supplied JSON and becomes a path component, so `../` must
+    not be able to walk out of the marker directory — and the reconciler, which
+    derives the same path from the same reference, must agree byte for byte.
+    """
     reference = order_reference(order)
     if not reference:
         return None
-    return DISPATCH_MARKERS / f"{_MARKER_UNSAFE.sub('_', reference)[:120]}.json"
+    return DISPATCH_MARKERS / f"{markers.safe_reference(reference)}.json"
 
 
-def write_marker(marker: Path, order: dict, state: str) -> None:
-    """Persist (atomically) what the brain has done with this order so far."""
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    entry = {
-        "reference": order_reference(order),
-        "issue": order_issue(order),
-        "state": state,
-        "ts": now_iso(),
-    }
-    tmp = marker.with_suffix(".tmp")
-    tmp.write_text(json.dumps(entry) + "\n", encoding="utf-8")
-    tmp.replace(marker)
+def write_marker(marker: Path, order: dict, state: str, previous: markers.Marker | None = None) -> None:
+    """Persist (atomically) what the brain has done with this order so far.
+
+    One writer for the marker set: the schema and the atomic write live in
+    `fleet/markers.py`, so the brain cannot drift from the reconciler that reads
+    what it writes.
+
+    Two fields are carried across a send and are NOT the sender's business:
+    `sent_at` is stamped here (it is the timestamp the re-arm grace is measured
+    from), and `attempts`/`next_attempt_at` — the #796 re-arm budget — survive it,
+    because a send that reset the count would be an unbounded retry by
+    construction. The one-shot `rearm` token is deliberately NOT carried: this
+    write is what consumes it.
+    """
+    moment = markers.now_iso()
+    markers.write(
+        marker,
+        markers.Marker(
+            reference=order_reference(order),
+            issue=order_issue(order),
+            state=state,
+            ts=moment,
+            sent_at=moment if state == markers.SENT else (previous.sent_at if previous else None),
+            attempts=previous.attempts if previous else 0,
+            next_attempt_at=previous.next_attempt_at if previous else None,
+            rearm=None,
+            reason=previous.reason if previous else None,
+            evidence=previous.evidence if previous else None,
+            announced=previous.announced if previous else None,
+        ),
+    )
 
 
 def directive_identity(order: dict) -> tuple[str | None, str | None]:
@@ -511,10 +559,37 @@ def dispatch(order: dict) -> tuple[bool, str]:
     The closure guard (#693) runs between composing the directive and sending it:
     an issue the committed board says is closed (or does not carry at all) is a
     refusal, and nothing is written or sent for it.
+
+    The marker is consulted for its STATE, not merely its existence (#796):
+    "already sent" and "finished" are different facts, and the refusal names
+    which one holds. A marker whose state is terminal, or whose reality the
+    reconciler has not examined, still refuses — at-most-once is intact. Only a
+    marker carrying the reconciler's one-shot `rearm` token is sent past, and this
+    call consumes it: a restart re-reading a plan, or an operator re-ordering the
+    same order, finds no token and is still suppressed.
     """
     marker = order_marker(order)
+    record: markers.Marker | None = None
     if marker is not None and marker.exists():
-        return False, f"{DUPLICATE_SUPPRESSED} — {marker.name} records that this order was already sent"
+        record = markers.read(marker)
+        if record is None:
+            # Unreadable is not absent: never send on ignorance.
+            return False, (
+                f"{DUPLICATE_SUPPRESSED} — {marker.name} exists but cannot be read; the brain "
+                "suppresses the order rather than sending it blind"
+            )
+        if not record.armed:
+            if record.terminal:
+                return False, (
+                    f"{PARKED_SUPPRESSED} — {marker.name} records state={record.state}"
+                    f"{' — ' + record.reason if record.reason else ''}; the order is finished, not in "
+                    "flight, and stays parked until an operator re-arms it by name: "
+                    f"python3 fleet/markers.py rearm --reference {record.reference}"
+                )
+            return False, (
+                f"{DUPLICATE_SUPPRESSED} — {marker.name} records that this order was already sent "
+                f"(state={record.state}, attempts={record.attempts})"
+            )
     directive = build_directive(order)
     # The closure guard (#693), between composing the directive and sending it. The
     # routing question above is answered first because it asks about the ORDER
@@ -528,7 +603,7 @@ def dispatch(order: dict) -> tuple[bool, str]:
         if refusal is not None:
             return False, refusal
     if marker is not None:
-        write_marker(marker, order, "sending")
+        write_marker(marker, order, markers.SENDING, previous=record)
     result = subprocess.run(
         ["python3", CHANNEL, "send", "--message", json.dumps(directive)],
         cwd=ROOT,
@@ -539,7 +614,24 @@ def dispatch(order: dict) -> tuple[bool, str]:
     ok = result.returncode == 0
     if marker is not None:
         if ok:
-            write_marker(marker, order, "sent")
+            write_marker(marker, order, markers.SENT, previous=record)
+        elif record is not None and record.attempts:
+            # A RE-ARMED marker is not dropped on a refused re-send. The earlier
+            # send is real evidence, and the re-arm budget lives in this very file:
+            # unlinking it would reset the count on every refusal and make the
+            # bound decorative. The token is consumed (this write drops it) and the
+            # refusal is paced by the backoff, so the next attempt is not a spin.
+            markers.write(
+                marker,
+                markers.Marker(
+                    **{
+                        **record.payload(),
+                        "state": markers.SENT,
+                        "rearm": None,
+                        "reason": f"the re-send was refused: {output[:200]}",
+                    }
+                ),
+            )
         else:
             # The channel answered non-zero, and `cmd_send` refuses *before* it
             # queues anything: nothing left the brain, so the marker is dropped
@@ -969,8 +1061,25 @@ def issue_is_closed(number: int) -> bool:
     return result.stdout.strip() == "closed"
 
 
-def dispatch_ready_children(parent: int, plan: dict) -> list[int]:
+def board_closed(number: int) -> bool | None:
+    """Closed per the COMMITTED board snapshot? None when it cannot be read.
+
+    The offline half of the reality probe: the wave path reconciles a handful of
+    child markers per idle tick, and paying a `gh` round trip for each of them
+    would be both slow and unnecessary — the committed snapshot already answers
+    the question the dispatch-time closure guard (#693) asks. `unknown-issue` and
+    an unreadable snapshot both read as None, i.e. CANNOT-ASSESS: never re-arm on
+    an unknown.
+    """
+    state, _ = board_issue_state(number)
+    if state == "open":
+        return False
+    return True if state == ISSUE_CLOSED else None
+
+
+def dispatch_ready_children(parent: int, plan: dict, probe: markers.Probe | None = None) -> list[int]:
     """Dispatch any child whose dependencies are all closed and not yet dispatched."""
+    probe = markers.FleetProbe(closed_lookup=board_closed) if probe is None else probe
     dispatched = []
     for child in plan["children"]:
         if child["issue"] in plan["dispatched"]:
@@ -991,11 +1100,17 @@ def dispatch_ready_children(parent: int, plan: dict) -> list[int]:
             },
             "body": f"Micro-task of #{parent}. Verify: {child['verify']}",
         }
+        # Reconcile THIS child's marker before dispatching it (#796): a child whose
+        # directive died was suppressed for ever, and the wave plan's own
+        # `dispatched` list cannot tell a delivered micro-task from a dead one.
+        for finding in markers.reconcile_reference(order["id"], child["issue"], probe, directory=DISPATCH_MARKERS):
+            print(finding.render(), flush=True)
         ok, message = dispatch(order)
-        if message.startswith(DUPLICATE_SUPPRESSED):
-            # Already out (a restart re-read the plan): stop retrying it, but do not
-            # report it as a wave this idle tick advanced.
+        if suppressed(message):
+            # Already out, or finished and parked — either way the plan must stop
+            # retrying it, and the operator must SEE which of the two it is (#796).
             plan["dispatched"].append(child["issue"])
+            print(f"[brain] wave #{parent}: micro-task #{child['issue']} not dispatched — {message}", flush=True)
         elif ok:
             plan["dispatched"].append(child["issue"])
             dispatched.append(child["issue"])
@@ -1043,6 +1158,15 @@ def advance_ready() -> list[int]:
         return []
     live = claims.active_claims(claims.read_ledger())
     claimed = frozenset(live)
+    # Reconcile the marker set against reality BEFORE the ready set is walked
+    # (#796). The idle path is the only tick that runs without an order, so it is
+    # the tick that must notice a marker whose directive died. The board is already
+    # in memory here, so the whole marker set is reconciled at no extra cost — and
+    # this is what turns "sent once" back into "re-eligible, counted" (or, when the
+    # budget is done, into a PARKED finding naming the issue).
+    probe = markers.FleetProbe(board=board)
+    for finding in markers.reconcile(probe, directory=DISPATCH_MARKERS):
+        print(finding.render(), flush=True)
     dispatched = []
     for issue in order.advance_candidates(board, claimed=claimed):
         directive_order = {
@@ -1058,7 +1182,11 @@ def advance_ready() -> list[int]:
             ),
         }
         ok, message = dispatch(directive_order)
-        if message.startswith(DUPLICATE_SUPPRESSED):
+        if suppressed(message):
+            # NEVER a silent continue (#796): the defect was precisely that a
+            # suppression read the same whether the directive was in flight or
+            # dead. Silence here is what let three ready issues stay invisible.
+            print(f"[brain] advance: #{issue.number} not dispatched — {message}", flush=True)
             continue
         if ok:
             dispatched.append(issue.number)
@@ -1096,9 +1224,10 @@ def handle_order(order: dict) -> tuple[bool, str]:
         # the capability the order claims, so nothing is dispatched (ADR-0012).
         return False, f"dispatch refused for #{issue}: {exc}"
     if not ok:
-        if message.startswith(DUPLICATE_SUPPRESSED):
-            # Not a failure: the directive is already out. Consuming the order (the
-            # loop does that next) is what breaks the duplicate-dispatch cycle.
+        if suppressed(message):
+            # Not a failure: the directive is already out, or the order is finished
+            # and parked. Consuming the order (the loop does that next) is what
+            # breaks the duplicate-dispatch cycle; the message names the state.
             return True, f"#{issue} was already dispatched — {message}"
         return False, f"dispatch refused for #{issue}: {message}"
     tier, thinking = choose_model(order)

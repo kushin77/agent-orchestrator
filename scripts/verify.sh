@@ -186,6 +186,18 @@ checks=(
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'
+  # dispatch-reconcile (issue #796): `sent` was treated as `done` — a dispatched
+  # directive's marker was permanent, so a directive that DIED (quarantined,
+  # dead-lettered, a phantom run) suppressed its issue for ever while the brain
+  # reported itself idle with that issue in its own ready set (measured: idle
+  # 1535s, 63 open issues, three ready and all three suppressed). The check drives
+  # the real reconciler against a scratch runtime, and PROVOKES both halves: a
+  # marker for an open issue with no live claim/run/directive must be re-armed
+  # (counted, bounded, then parked by name), while a marker with live evidence must
+  # stay suppressed — asserting the first half alone would pass a reconciler that
+  # ignores the marker set. Two mutants (never-stale, liveness-ignored) must each
+  # fail by name.
+  'dispatch-reconcile|bash scripts/check-dispatch-reconcile.sh'
   # dead-letter (issue #754): the runaway guard (#723) retires a directive the
   # LOOP can prove is unrunnable; a peer agent or an operator must be able to say
   # so OVER THE CONTROL CHANNEL, not by `mv`-ing an order out of `.fleet/inbox/`
