@@ -39,6 +39,8 @@ phases:
     surfaces:
       - flag: services.gateway
         go_live_stage: full
+      - flag: services.mcp_outbound
+        go_live_stage: full
   "3":
     name: state-machine execution engine
     note: Durable orchestration engine, agent loop, memory, queue.
@@ -50,6 +52,8 @@ phases:
     note: DLP, isolation, policy gates, sandboxing.
     surfaces:
       - flag: services.guardrails
+        go_live_stage: full
+      - flag: services.sandbox_runtime
         go_live_stage: full
   "5":
     name: observability
@@ -70,6 +74,12 @@ phases:
       - flag: services.portal
         go_live_stage: full
       - flag: services.web
+        go_live_stage: full
+      - flag: services.org_chart
+        go_live_stage: full
+      - flag: services.skill_studio
+        go_live_stage: full
+      - flag: services.task_board
         go_live_stage: full
   "8":
     name: autonomous operations and governance

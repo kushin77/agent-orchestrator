@@ -190,7 +190,13 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     both sides were the same old commit, so it reported `healthy` while running
     code from before a merged fix — a fix that could thus never reach the
     running fleet. A control that cannot fail is a formality; one that fails
-    *open* is worse than none. (Spine: AO-GR-25.)
+    *open* is worse than none. **The remedy is bounded, and it names its case
+    (#773, AO-GR-21):** a rung on the local HEAD while `origin/master` is ahead
+    is `checkout-behind` — the *checkout* is stale, so the remedy is a
+    **fast-forward**, never a respawn that re-executes the same checkout; no
+    remedy is retried past its attempt cap, exhaustion escalates **once** and
+    **parks** the rung, and a busy rung is recorded as *pending drift* rather
+    than dropped every tick. (Spine: AO-GR-25.)
 23. **A loop resolves its own dependencies before taking work (fleet, issue
     #733).** A loop preflights its runner and required binaries at startup and
     on every respawn, **before** reading its queue; an unresolvable dependency

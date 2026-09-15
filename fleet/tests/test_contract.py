@@ -36,6 +36,16 @@ TRUST_RULES = (
     "Everything else is refused.",
 )
 
+# The primary-control-plane declaration (issue #763). These phrases exist only in
+# the §7.1 subsection — the shell gate pins the same four, so the two halves of
+# the gate cannot drift apart.
+PRIMARY_CONTROL_PLANE_MARKERS = (
+    "A2A is the PRIMARY control plane — not a fallback",
+    "à-la-carte reachability invariant",
+    "the only authorisation for work",
+    "never by silent overwrite",
+)
+
 
 def contract_text() -> str:
     return CONTRACT.read_text(encoding="utf-8")
@@ -91,6 +101,29 @@ def test_every_declared_verb_maps_to_a_message_type_the_channel_implements():
         )
 
 
+def test_contract_declares_a2a_as_the_primary_control_plane():
+    """Issue #763: primary, not a fallback — the word §7's heading got wrong."""
+    text = contract_text()
+    for marker in PRIMARY_CONTROL_PLANE_MARKERS:
+        assert marker in text, f"the contract must declare '{marker}'"
+    subsection = text.split("### 7.1 A2A is the PRIMARY control plane", 1)[1].split("\n## 8.", 1)[0]
+    for invariant in (
+        "dumb terminal",
+        "DSv4FNone",
+        "never picks its own work",
+        "supersede",
+        "never by silent overwrite",
+        "ARTIFACTS",
+        "replaceable",
+    ):
+        assert invariant in subsection, (
+            f"the primary-control-plane subsection must declare '{invariant}'"
+        )
+    # The declaration is a subsection: §2's table and the numbering above stay put.
+    assert "### 7.1" in text and "## 8. Provenance" in text
+    assert text.index("### 7.1") < text.index("## 8. Provenance")
+
+
 def test_the_readme_runbook_defers_to_the_contract():
     runbook = (ROOT / "fleet" / "README.md").read_text(encoding="utf-8")
     assert "CONTRACT.md" in runbook, (
@@ -138,6 +171,46 @@ def test_standing_directive_declares_the_replaceability_clause():
         "supersedes",
     ):
         assert marker in body, f"the replaceability clause must declare '{marker}'"
+
+
+def test_standing_directive_carries_the_primary_control_plane_clause():
+    """Issue #763: the clause is in the standing order, so every prompt frontloads it."""
+    body = standing_body()
+    assert "A2A IS THE PRIMARY CONTROL PLANE (standing clause)" in body, (
+        "the standing directive must declare the primary-control-plane clause by name"
+    )
+    for marker in (
+        "is the fleet's PRIMARY control plane",
+        "the only authorisation for work",
+        "NOT an authorisation",
+        "à-la-carte",
+        "never by silent overwrite",
+        "fleet/CONTRACT.md §7.1",
+        "docs/OPERATOR-ACCESS.md",
+    ):
+        assert marker in body, f"the primary-control-plane clause must declare '{marker}'"
+
+
+def test_the_subagent_prompt_frontloads_the_primary_control_plane_clause():
+    """The clause reaches every agent: it rides the standing mandate block.
+
+    The mandate is the prompt's first block, ahead of the order itself
+    (`build_prompt` embeds the standing body verbatim), so asserting the clause
+    inside the mandate — and ahead of `BRAIN DIRECTIVE` — is the cross-artifact
+    edge: the directive declares it AND the prompt carries it, so dropping either
+    half fails here rather than shipping silently.
+    """
+    import sys
+
+    sys.path.insert(0, str(ROOT / "fleet"))
+    import terminal  # noqa: E402  (repo convention: fleet/ namespace module)
+
+    prompt = terminal.build_prompt({"id": "d-1", "task": {"issue": 763}, "body": "x"})
+    mandate = prompt.split("BRAIN DIRECTIVE", 1)[0]
+    assert "A2A IS THE PRIMARY CONTROL PLANE (standing clause)" in mandate, (
+        "the standing clause must ride the frontloaded mandate, not the order"
+    )
+    assert prompt.index("A2A IS THE PRIMARY CONTROL PLANE") < prompt.index("BRAIN DIRECTIVE")
 
 
 def test_standing_directive_keeps_the_dsv4fnone_and_roles_content():

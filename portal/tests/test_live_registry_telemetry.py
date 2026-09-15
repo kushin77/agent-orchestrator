@@ -33,8 +33,19 @@ _TELEMETRY = REPO_ROOT / "telemetry"
 
 
 def _seed(profile_id: str) -> dict:
-    path = next(_SEEDS.glob(f"{profile_id}.*.yaml"))
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    """The revision the live registry resolves for ``profile_id``.
+
+    A profile may publish more than one version — ``paperclip`` publishes 1.0.0
+    and 1.1.0 (issue #447) — and ``RegistrySnapshot`` resolves the highest
+    published version. ``Path.glob`` yields entries in *filesystem* order, so
+    ``next(...)`` would compare the projection against an arbitrary revision and
+    this suite would go red on a correct build depending on the order the
+    checkout happened to create the seeds directory in. Sort and take the last,
+    which is the registry's own rule.
+    """
+    paths = sorted(_SEEDS.glob(f"{profile_id}.*.yaml"))
+    assert paths, f"no AgentProfile seed for {profile_id!r} under {_SEEDS}"
+    return yaml.safe_load(paths[-1].read_text(encoding="utf-8"))
 
 
 def _tier_ladder() -> dict:

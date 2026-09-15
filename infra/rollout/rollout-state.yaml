@@ -54,6 +54,34 @@ flags:
     stage: "off"
     rollout_pct: 0
     targeted: []
+  # Workbook surfaces (issue #644, workbook-13): one promotable flag per new
+  # surface, all OFF. Without these rows the flags would be declared in the
+  # registry but unpromotable here — measured: the engine refuses an unknown
+  # flag with `unknown flag '<name>' (not declared in rollout state)`, so the
+  # registry row alone would be a declaration the pipeline could not act on.
+  # scripts/check-feature-flags.py keeps each of these in lock-step with
+  # infra/terraform/variables.tf, and check_rollout.py requires each to have a
+  # registry row.
+  services.org_chart:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.skill_studio:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.task_board:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.mcp_outbound:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  services.sandbox_runtime:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
   rollout.pipeline:
     stage: "off"
     rollout_pct: 0

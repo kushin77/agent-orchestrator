@@ -11,6 +11,14 @@ bootstrap, mailbox layout, listener loop and day-to-day commands. Where the two
 could disagree about *who may say what to whom*, the contract wins; where they
 could disagree about *which command to type*, this file wins.
 
+**The operator's way in is its own page:**
+[`../docs/OPERATOR-ACCESS.md`](../docs/OPERATOR-ACCESS.md). It names every
+surface an operator can use — the A2A control channel (the **primary** control
+plane, §7.1 of the contract), this file's control verbs, `make operator` (the
+live view) and `make console` (the browser console, loopback and fail-closed by
+default) — with the exact command for each and what needs a shell on the box.
+This runbook defers to it for access; it stays authoritative for mechanics.
+
 ## The model
 
 | Role | Runtime | Behaviour |
@@ -504,6 +512,59 @@ loop rung, restarts the **monitor** when it is missing, and does nothing when
 the fleet is healthy — so a tick is cheap and idempotent. A run in flight is
 never restarted just to update code (the one rule the watchdog never breaks).
 
+### Two different drift faults, two different remedies (AO-GR-21, issue #773)
+
+The running commit differing from `origin/master` is *one* fact; what to do
+about it is another, and getting that wrong made the watchdog a runaway. The two
+cases are named separately because their remedies differ:
+
+* **`drifted`** — the rung's commit is **not** the local checkout's HEAD either,
+  so the rung itself is stale: **respawn** (it re-executes the checkout, which
+  already holds the merged code) is the right remedy.
+* **`checkout-behind`** — the rung's commit **is** the local HEAD while
+  `origin/master` is ahead: the rung is current *relative to the checkout* and
+  the **checkout** is stale. A respawn re-executes that same stale checkout and
+  therefore **cannot** change the value being compared; the remedy is a
+  **fast-forward** (`git fetch` + `git merge --ff-only`), after which one respawn
+  loads the new HEAD. A diverged checkout is refused by name, never force-moved.
+
+Measured 2026-09-15, this distinction missing: **132 `drifted … — respawned`
+decisions, 45 `stopping cleanly` cycles, a brain process never older than 60s,
+and no work done at all.** The detection was right (AO-GR-25); the remedy was an
+action that could not change what was compared, repeated without bound —
+AO-GR-21's own lesson, applied to the watchdog itself.
+
+### The remedy is bounded (AO-GR-21, issue #773)
+
+Every acting path is recorded per rung under `.fleet/watchdog/` and bounded:
+
+* a remedy that does not change the observed state is attempted at most
+  **`AO_WATCHDOG_RESPAWN_ATTEMPTS`** times (default **3**), spaced by
+  `min(AO_WATCHDOG_RESPAWN_BACKOFF * 2**(n-1), 300)` seconds (base default
+  **60**) — the same contract harvested from the CMR hub's `ops/retry.sh` that
+  `fleet/runaway.py` uses for a directive;
+* when the cap is exhausted the watchdog **escalates once** — naming both
+  commits and the checkout path, and writing
+  `.fleet/watchdog/escalations/<rung>.<first-seen>.json` — and **parks** the rung:
+  it is reported on every pass and **never retried** until an operator rearms it;
+* a remedy that *works* resets the counter, so a healing fleet is never parked;
+* an unusable knob value **refuses the pass** (exit 2) instead of silently
+  disarming the cap;
+* a **busy** rung is never restarted to update code, but the finding is no longer
+  dropped: it is recorded as **pending drift** and acted on by the first pass
+after the run completes (previously it logged `left alone` on every tick,
+forever).
+
+```bash
+python3 fleet/watchdog.py rearm --rung brain   # clear a parked record after fixing the cause
+```
+
+`bash scripts/check-watchdog-bounded.sh` drives the real module: it names both
+cases, fast-forwards a REAL scratch repository, measures the attempt counts, and
+mutation-proves itself with two mutants of the real source (the cap removed, and
+the local-HEAD distinction removed) — each required to diverge on a probe whose
+value must change, with the mutation's landing proved by sha256.
+
 ### What "drifted" is measured against (AO-GR-25, issue #739)
 
 The baseline is **`origin/master`** — never the shared checkout's HEAD. This
@@ -535,14 +596,16 @@ Two consequences worth knowing:
 
 ```
 [watchdog] brain: healthy (running 47a068b, origin/master 47a068b)
-[watchdog] sister: drifted (running 592b132, origin/master 47a068b) — respawned
+[watchdog] sister: drifted (running 592b132, origin/master 47a068b) — respawned (attempt 1/3)
+[watchdog] sister: checkout-behind (the checkout is behind: running b95a8b7 = local HEAD, origin/master 37f87f9) — fast-forwarded the checkout (fast-forwarded b95a8b7 -> 37f87f9) and respawned so the rung loads 37f87f9 (attempt 1/3)
 [watchdog] monitor: healthy
 ```
 
 Exit codes are the repo's tri-state: **0** every rung healthy, **1** a definite
-failure (`RESPAWN FAILED`, or a `CAPABILITY STALE` rung), **2** CANNOT-ASSESS —
-no readable baseline, so the comparison could not be made. A known failure
-outranks an unassessable one.
+failure (`RESPAWN FAILED`, a `CAPABILITY STALE` rung, or a drift whose remedy did
+not resolve it — including the escalated, parked rung), **2** CANNOT-ASSESS — no
+readable baseline, so the comparison could not be made, or an unusable remedy
+budget. A known failure outranks an unassessable one.
 
 `bash scripts/check-fleet-drift.sh` proves all of this against the real
 classifier (a mutation-proof pair restores the local-HEAD baseline and the
@@ -601,7 +664,7 @@ The machine shape is **declared in-tree** and enforced at construction
 
 | Signal | Labels | Value | Verdict source (imported, never re-declared) |
 |---|---|---|---|
-| `fleet.rung_state` | `rung`, `state` | 1 | `watchdog.decide` — `healthy` / `stale` / `drifted` / `missing` |
+| `fleet.rung_state` | `rung`, `state` | 1 | `watchdog.decide` — `healthy` / `stale` / `drifted` / `checkout-behind` / `missing` |
 | `fleet.rung_beat_age_seconds` | `rung`, `bucket` | seconds | `channel.heartbeat_age_seconds` — `fresh` / `stale` |
 | `fleet.reconcile_outcome` | `outcome` | count | `governance/reconcile` sweep report |
 | `fleet.watchdog_verdict` | `rung`, `verdict` | 1 | `channel.capability_finding` (#319) |

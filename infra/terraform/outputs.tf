@@ -29,3 +29,21 @@ output "paperclip_runtime_uri" {
   description = "URI of the self-hosted paperclip runtime; null until enable_paperclip"
   value       = module.paperclip_runtime.service_uri
 }
+
+# Workbook surfaces (issue #644, workbook-13). The five flags gate code inside
+# the portal, the gateway and the guardrails services, so they create no
+# resource and no module output could report them. This output is what keeps
+# them from being inert declarations: every plan and apply records the exact
+# posture of each workbook switch, so a promotion that reached the pipeline but
+# was never rendered is visible as `false` in the deploy log instead of passing
+# unnoticed. All five are false until a reviewed promotion.
+output "workbook_surface_flags" {
+  description = "Rendered posture of the five workbook-surface switches (issue #644); false until each one is promoted."
+  value = {
+    org_chart       = var.enable_org_chart
+    skill_studio    = var.enable_skill_studio
+    task_board      = var.enable_task_board
+    mcp_outbound    = var.enable_mcp_outbound
+    sandbox_runtime = var.enable_sandbox_runtime
+  }
+}

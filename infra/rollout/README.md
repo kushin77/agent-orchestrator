@@ -65,6 +65,33 @@ explicitly targeted or its stable hash bucket (`sha256(flag:subject) % 100`)
 falls below the rollout percentage — so a canary slice is stable across
 calls.
 
+## Workbook surfaces — one flag per surface (issue #644, workbook-13)
+
+The five surfaces workbook-11/12/5 added carry an in-module switch, a row in
+`infra/feature-flags/registry.yaml` (`services.<name>`, lock-stepped with
+`infra/terraform/variables.tf` by `scripts/check-feature-flags.py`) and a flag
+here in `rollout-state.yaml` — all **OFF**. A flag is a promotion unit only
+where the pipeline can reach it: the offline engine refuses a flag that
+`rollout-state.yaml` does not carry (`unknown flag '<name>' (not declared in
+rollout state)`), so a registry row without a state row would be a declaration
+nobody could promote. Registered here, each flag travels the normal path
+OFF → CANARY → GRADUAL → FULL with the same gates as every other flag.
+
+| Flag | Surface it gates | In-module switch | Terraform variable | Enable criteria |
+|------|------------------|------------------|--------------------|-----------------|
+| `services.org_chart` | Org-chart view, `GET /api/orgchart/chart`, `GET /api/orgchart/health` (portal deployable) | `surfaces.org_chart` in `portal/config/feature-flags.yaml`, read by `portal/server/config_flags.py` | `enable_org_chart` | The workbook-1 org declaration and its bound cards are committed and render against the live role-health feed; a missing feed degrades to an explicit NO_DATA, never a fabricated chart; the portal suite is green; approval-as-code recorded for this flag and target stage. |
+| `services.skill_studio` | Skill studio, `GET /api/skillstudio/skills[/<id>]`, `POST /api/skillstudio/author\|test\|publish` (portal deployable) | `surfaces.skill_studio` in `portal/config/feature-flags.yaml` | `enable_skill_studio` | The workbook-9 studio API is green on its own gates (a publish without green eval evidence is refused by the studio, not by this flag); at least one authored skill round-trips author → test → publish in evidence; approval-as-code recorded. |
+| `services.task_board` | Tenant task board, `GET /api/taskboard/tickets[/<id>]` (portal deployable) | `surfaces.task_board` in `portal/config/feature-flags.yaml` | `enable_task_board` | The workbook-3 ticket runtime is green and the board is a replay of the durable log (an absent ticket is absent, not invented); per-tenant scoping is exercised in evidence; approval-as-code recorded. |
+| `services.mcp_outbound` | Outbound MCP calls, `gateway/mcp/outbound.py` (gateway deployable) | `AO_MCP_OUTBOUND_ENABLED` (compiled OFF) | `enable_mcp_outbound` | Every server to be dialled is declared with `enabled: true`, an allow-listed endpoint and a reachability check; egress and DLP policy are reviewed (guardrails promoted or the policy gate in force); the caller's declared capability is enforced, not bypassed; approval-as-code recorded. |
+| `services.sandbox_runtime` | Real sandbox runtime — docker / firecracker — over `guardrails/sandbox/` (guardrails deployable) | `SandboxEnablement` in `guardrails/sandbox/enablement.py` | `enable_sandbox_runtime` | The runtime's dependency is genuinely present in the target image (an unavailable runtime fails before the flag flips, never half-enabled); the enable/disable round-trip is proven; the per-category security profile is reviewed; approval-as-code recorded. |
+
+Two properties hold for all five, and both are structural rather than promises:
+the flags default OFF in every declaration that carries them (registry,
+terraform, rollout state), and one flag can never widen more than its own
+surface — `mcp_outbound` still needs the per-server `enabled` and the caller's
+capability, `sandbox_runtime` still needs a runtime that exists, and the three
+portal views are independent of each other and of `enable_portal`.
+
 ## The only promotion path (no console)
 
 ```mermaid

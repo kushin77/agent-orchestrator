@@ -440,14 +440,23 @@ else
   bad "fleet/tests/test_runaway_guard.py is not green"
 fi
 
-# --- 6. the honest note about the wiring (owned by the wiring lane, not here) -
+# --- 6. the wiring of record: how scripts/verify.sh reaches this check -------
+# Proved behaviourally, not textually: the #698 discovery layer is ASKED what it
+# would run, and this check must be in its answer. `scripts/verify.sh` sources
+# that layer, so a discovered entry is reachable with no hand-edit — the gate of
+# record runs this check without a new line in its explicit array. An explicit
+# registration is still honoured and reported as such, because then the entry,
+# not the discovery, is what names it.
+discovered="$(bash -c 'source scripts/discover-checks.sh; discover_check_scripts' 2>/dev/null)"
 if grep -qF 'bash scripts/check-runaway-guard.sh' scripts/verify.sh 2>/dev/null; then
-  ok "scripts/verify.sh runs this check"
+  ok "scripts/verify.sh runs this check (explicit registration)"
+elif printf '%s\n' "$discovered" | grep -qxF 'runaway-guard|bash scripts/check-runaway-guard.sh'; then
+  ok "scripts/verify.sh runs this check (auto-discovered, #698 scripts/discover-checks.sh)"
 else
-  note "scripts/verify.sh does not name this check yet — wire it as:"
-  note "  'runaway-guard|bash scripts/check-runaway-guard.sh'"
-  note "(check-gate-coverage refuses a newly delivered scripts/check-*.sh that no gate file invokes,"
-  note " so the gate of record stays red until that one line lands)"
+  note "no gate file reaches this check — scripts/verify.sh names it neither explicitly"
+  note "  ('runaway-guard|bash scripts/check-runaway-guard.sh') nor through the #698"
+  note "  discovery layer (scripts/discover-checks.sh), so check-gate-coverage sees a"
+  note "  delivered-but-uninvoked check and the gate of record stays red."
 fi
 
 echo ""

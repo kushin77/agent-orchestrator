@@ -27,6 +27,30 @@
 here parses, both triggers are `disabled: true`, and the `_ENABLE_*`
 substitutions mirror the OFF default.
 
+## Workbook-surface switches (issue #644, workbook-13)
+
+The five workbook surfaces are declared once in
+`infra/feature-flags/registry.yaml` (`services.<name>`) and kept in lock-step
+with `infra/terraform/variables.tf` by `scripts/check-feature-flags.py`. This is
+where that pair reaches the build: `apply.yaml` passes each switch to
+`terraform plan` as an explicit `-var` from its substitution, and the trigger
+declares every substitution `"false"`, so the only apply route renders the
+posture it was told to render instead of inheriting a default silently.
+
+| Build substitution | Registry flag | Terraform variable | Default |
+|--------------------|---------------|--------------------|---------|
+| `_ENABLE_ORG_CHART` | `services.org_chart` | `enable_org_chart` | `"false"` |
+| `_ENABLE_SKILL_STUDIO` | `services.skill_studio` | `enable_skill_studio` | `"false"` |
+| `_ENABLE_TASK_BOARD` | `services.task_board` | `enable_task_board` | `"false"` |
+| `_ENABLE_MCP_OUTBOUND` | `services.mcp_outbound` | `enable_mcp_outbound` | `"false"` |
+| `_ENABLE_SANDBOX_RUNTIME` | `services.sandbox_runtime` | `enable_sandbox_runtime` | `"false"` |
+
+The rendered posture is not taken on trust: the `workbook_surface_flags` output
+in `infra/terraform/outputs.tf` reports all five values in the plan/apply log,
+so a promotion that reached the trigger but not the plan is visible as `false`
+in the deploy record. `_DEPLOYER_SA` is still supplied at import (never
+hard-coded, GR-6), and the apply stays fail-closed behind `_ENABLE_APPLY`.
+
 ## Why this exists (issue #6)
 
 The repo gate of record is `make verify`, runnable with no network and no

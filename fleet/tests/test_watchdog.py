@@ -198,6 +198,206 @@ def test_a_cannot_assess_rung_is_respawned_but_says_why(monkeypatch):
     assert "unreadable" in line
 
 
+# --- the bounded remedy (#773, AO-GR-21) --------------------------------------
+#
+# Measured 2026-09-15 on the live fleet: `#739` compared the running commit to
+# `origin/master` and RESPAWNED on a mismatch. When the mismatch was the *checkout*
+# being behind, the respawn re-executed the same checkout, so the watchdog took an
+# action that could not change the value it compared — 132 resprints decisions,
+# 45 clean stops in one night, and no work done. These tests pin the two cases,
+# the bound, and the pending record.
+
+REMOTE = "remote99"
+LOCAL = "local111"
+
+
+def _drift_env(monkeypatch, *, attempts=3, backoff=60):
+    """Pin the remedy budget so a developer's environment cannot change the count."""
+    monkeypatch.setenv(watchdog.ENV_RESPAWN_ATTEMPTS, str(attempts))
+    monkeypatch.setenv(watchdog.ENV_RESPAWN_BACKOFF, str(backoff))
+
+
+def _wire_drift(monkeypatch, commit, *, local=LOCAL, baseline=REMOTE, inflight=False):
+    """One drifting rung, with every side effect measured instead of performed."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit=commit))
+    monkeypatch.setattr(watchdog, "run_in_flight", lambda: inflight)
+    monkeypatch.setattr(
+        watchdog.channel, "capability_line", lambda finding: f"{finding.rung}: {finding.case}"
+    )
+    calls = []
+    monkeypatch.setattr(
+        watchdog, "respawn", lambda pattern, script, name="": calls.append((script, name)) or True
+    )
+    return calls, {"local_head": local, "baseline": baseline}
+
+
+def _act(monkeypatch, *, commit, when, local=LOCAL, baseline=REMOTE, inflight=False, checkout_root=None):
+    calls, kwargs = _wire_drift(monkeypatch, commit, local=local, baseline=baseline, inflight=inflight)
+    line = watchdog.rung_action(
+        "sister",
+        "fleet/terminal.py",
+        "fleet/terminal.sh",
+        Path("/tmp/x"),
+        False,
+        kwargs["baseline"],
+        local_head=kwargs["local_head"],
+        when=when,
+        checkout_root=checkout_root,
+    )
+    return line, calls
+
+
+def test_running_the_local_head_while_the_remote_is_ahead_is_checkout_behind(monkeypatch):
+    """Case (a): the rung is current *relative to the checkout*; the checkout is stale."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    state, reason = watchdog.decide(111, _beat(commit=LOCAL), REMOTE, local_head=LOCAL)
+    assert state == watchdog.CHECKOUT_BEHIND
+    assert LOCAL in reason and REMOTE in reason
+    # The SAME commits, judged without the local HEAD, are plain drift — so the new
+    # case is additive and the #739 detection is not weakened.
+    assert watchdog.decide(111, _beat(commit=LOCAL), REMOTE)[0] == watchdog.DRIFTED
+    # A rung that is on neither the checkout's HEAD nor origin/master is drifted.
+    assert watchdog.decide(111, _beat(commit="other22"), REMOTE, local_head=LOCAL)[0] == watchdog.DRIFTED
+
+
+def test_checkout_behind_is_fast_forwarded_not_respawned_into_the_same_checkout(monkeypatch):
+    """Case (a), remedy: the CHECKOUT moves, then the rung loads it — exactly once."""
+    _drift_env(monkeypatch)
+    forwarded = []
+
+    def fake_ff(root=None, *, remote="origin/master"):
+        forwarded.append(remote)
+        return True, REMOTE, f"fast-forwarded {LOCAL} -> {REMOTE}"
+
+    monkeypatch.setattr(watchdog, "fast_forward_checkout", fake_ff)
+    line, calls = _act(monkeypatch, commit=LOCAL, when=0)
+    assert forwarded == ["origin/master"], "the checkout must be fast-forwarded"
+    assert calls == [("fleet/terminal.sh", "sister")], "and then the rung loads the new HEAD"
+    assert "checkout-behind" in line and "fast-forwarded" in line
+
+
+def test_a_respawn_that_cannot_change_the_commit_is_bounded_then_escalates_once(monkeypatch, tmp_path):
+    """Case (b): the remedy is attempted `cap` times, escalated ONCE, then parked."""
+    _drift_env(monkeypatch, attempts=3)
+    attempts_seen = []
+    lines = []
+    for step in range(5):
+        line, calls = _act(monkeypatch, commit="other22", when=step * 1000)
+        attempts_seen.append(len(calls))
+        lines.append(line)
+    assert attempts_seen == [1, 1, 1, 0, 0], "no remedy after the cap: the watchdog stops retrying"
+    assert sum(1 for line in lines if "ESCALATED ONCE" in line) == 1, "escalate exactly once"
+    escalation = [line for line in lines if "ESCALATED ONCE" in line][0]
+    assert "other22" in escalation and REMOTE in escalation, "both commits are named"
+    assert watchdog.ROOT.as_posix() in escalation, "the checkout is named"
+    assert "PARKED" in lines[-1], "and it stays parked instead of silently retrying"
+    artifacts = list(watchdog.escalation_dir().glob("sister.*.json"))
+    assert len(artifacts) == 1, f"exactly one escalation artifact, got {artifacts}"
+
+
+def test_the_bound_counts_only_consecutive_unresolved_attempts(monkeypatch):
+    """A remedy that WORKS resets the counter: the cap must not punish progress."""
+    _drift_env(monkeypatch, attempts=2)
+    calls, kwargs = _wire_drift(monkeypatch, "old0000")
+    commits = iter(["old0000", "old0000", "new1111", "new1111"])
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit=next(commits, "new1111")))
+    for step in range(4):
+        line = watchdog.rung_action(
+            "sister",
+            "fleet/terminal.py",
+            "fleet/terminal.sh",
+            Path("/tmp/x"),
+            False,
+            kwargs["baseline"],
+            local_head=kwargs["local_head"],
+            when=step * 1000,
+        )
+    assert "ESCALATED ONCE" not in line, "the rung moved, so the bound must not fire"
+
+
+def test_the_next_attempt_is_held_until_the_backoff_elapses(monkeypatch):
+    """AO-GR-21's spacing: attempts are not fired back to back."""
+    _drift_env(monkeypatch, attempts=3, backoff=60)
+    first, calls = _act(monkeypatch, commit="other22", when=0)
+    assert calls == [("fleet/terminal.sh", "sister")]
+    too_soon, calls = _act(monkeypatch, commit="other22", when=10)
+    assert calls == [], "a second attempt inside the backoff window must not run"
+    assert "holding" in too_soon and "due in 50s" in too_soon
+    due, calls = _act(monkeypatch, commit="other22", when=61)
+    assert calls == [("fleet/terminal.sh", "sister")]
+
+
+def test_a_genuinely_drifted_rung_is_still_respawned(monkeypatch):
+    """Case (c): the fix must not stop repairing real drift."""
+    _drift_env(monkeypatch)
+    line, calls = _act(monkeypatch, commit="other22", when=0)
+    assert calls == [("fleet/terminal.sh", "sister")]
+    assert "drifted" in line and "respawned" in line
+
+
+def test_a_busy_drifted_rung_is_recorded_pending_and_acted_on_when_the_run_ends(monkeypatch):
+    """Case (d): a drifted-but-busy rung is not dropped every tick."""
+    _drift_env(monkeypatch)
+    busy, calls = _act(monkeypatch, commit="other22", when=0, inflight=True)
+    assert calls == [], "the one rule the watchdog never breaks"
+    assert "left alone" in busy
+    record = watchdog.load_drift_record("sister")
+    assert record is not None and record["phase"] == "pending"
+    assert record["running"] == "other22" and record["baseline"] == REMOTE
+    idle, calls = _act(monkeypatch, commit="other22", when=5, inflight=False)
+    assert calls == [("fleet/terminal.sh", "sister")], "the pending finding is acted on, not re-dropped"
+    assert "respawned" in idle
+
+
+def test_a_healthy_rung_clears_the_record_so_a_fixed_rung_keeps_no_budget(monkeypatch):
+    _drift_env(monkeypatch)
+    _act(monkeypatch, commit="other22", when=0)
+    assert watchdog.load_drift_record("sister") is not None
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit=REMOTE))
+    line = watchdog.rung_action(
+        "sister",
+        "fleet/terminal.py",
+        "fleet/terminal.sh",
+        Path("/tmp/x"),
+        False,
+        REMOTE,
+        local_head=REMOTE,
+        when=1,
+    )
+    assert line.startswith("sister: healthy")
+    assert watchdog.load_drift_record("sister") is None
+
+
+def test_an_unusable_attempt_cap_refuses_the_pass_instead_of_disarming_the_bound(monkeypatch, capsys):
+    monkeypatch.setenv(watchdog.ENV_RESPAWN_ATTEMPTS, "zero")
+    assert watchdog.watchdog_once() == watchdog.channel.EXIT_CANNOT_ASSESS
+    err = capsys.readouterr().err
+    assert watchdog.ENV_RESPAWN_ATTEMPTS in err
+    assert "CANNOT-ASSESS" in err
+
+
+def test_rearm_clears_the_record_so_the_next_pass_judges_the_rung_again(monkeypatch, capsys):
+    _drift_env(monkeypatch, attempts=1)
+    _act(monkeypatch, commit="other22", when=0)
+    parked, calls = _act(monkeypatch, commit="other22", when=1000)
+    assert "ESCALATED ONCE" in parked and calls == []
+    assert watchdog.cmd_rearm(type("A", (), {"rung": "sister"})()) == watchdog.channel.EXIT_OK
+    assert watchdog.load_drift_record("sister") is None
+    assert "cleared" in capsys.readouterr().out
+    again, calls = _act(monkeypatch, commit="other22", when=2000)
+    assert calls == [("fleet/terminal.sh", "sister")], "rearm restores the remedy"
+
+
+def test_the_harvested_backoff_formula_is_the_vendored_one(monkeypatch):
+    """`delay = min(base * 2**(n-1), 300)` — harvested from vendor/CMR/ops/retry.sh."""
+    _drift_env(monkeypatch, backoff=30)
+    assert [watchdog.respawn_backoff_seconds(n) for n in (1, 2, 3)] == [30.0, 60.0, 120.0]
+    _drift_env(monkeypatch, backoff=200)
+    assert watchdog.respawn_backoff_seconds(3) == float(watchdog.BACKOFF_CAP_SECONDS)
+
+
 # --- the capture log (A: the rung's stream must survive the spawn) ------------
 
 
