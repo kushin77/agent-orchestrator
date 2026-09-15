@@ -1,7 +1,7 @@
 {
   "note": "Recorded legacy for the ticket-trailer rule over LANDED history (issue #287). Every commit here landed AFTER the shared predicate's enforcement boundary and still does not carry the ticket reference in a trailing trailer block, as measured -- not assumed -- by `scripts/check-pr-contract.sh --landed`. They are RECORDED, not accepted: `governance/isolation/cli.py enforce` reports them on every run. This list can only SHRINK: an entry whose commit now complies (`quarantine-entry-stale`) or is outside the assessed range (`quarantine-entry-not-assessed`) fails the check, and adding an entry for a newly landed non-compliant commit is the defect the check exists to catch, not a fix.",
   "measured_at": "2026-09-15",
-  "measured_head": "97071460fea97d641e9a9ea63f44f811f032e4b0",
+  "measured_head": "4e3d62da166fee2afc1f90f74fb1e60bb184cb61",
   "measured_by": "governance/isolation/cli.py landed --range HEAD (delegating to scripts/check-pr-contract.sh --landed)",
   "entries": [
     {
@@ -68,6 +68,11 @@
       "sha": "6999f2a3bd4ada1332ed032b40d377ece82a453f",
       "code": "commit-ref-outside-the-trailer-block",
       "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "4e3d62da166fee2afc1f90f74fb1e60bb184cb61",
+      "code": "commit-ref-outside-the-trailer-block",
+      "why": "the reference is present in the message but outside the trailing trailer block: the #826 squash message placed a colon-less `Closes #724` line between `Refs kushin77/agent-orchestrator#724` and `AI-assistance: ...`, so git's trailing block held only the `AI-assistance:` line and the reference fell outside it -- reconciled by issue #832, which also documents the compliant shape in README.md"
     }
   ]
 }
