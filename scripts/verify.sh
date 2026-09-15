@@ -60,6 +60,18 @@ checks=(
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
   'epic-focus|bash scripts/check-epic-focus.sh'
+  # capacity-gate (epic #707, lane F3/#718): the fan-out default is the MAXIMUM,
+  # bounded by three real limits — effective = min(pool, disjoint ready lanes,
+  # resource ceiling). Unbounded maximum is a verify storm (measured: 49
+  # concurrent gates, 43 stacked in two worktrees, ~16h), and an unbounded
+  # *claim* is a formality, so each of the three bounds is PROVOKED: the check
+  # builds the input that would exceed it and requires the excess HELD *and the
+  # holding bound named*, then requires the relaxed input ADMITTED — the two
+  # paths cannot collapse into one exit code. It asserts the loop actually calls
+  # the gate (no bare `active >= pool` remains) and mutation-proves both halves:
+  # a resolution that cannot bind must turn the controls red, and removing the
+  # loop's call must turn the wiring assertion red.
+  'capacity-gate|bash scripts/check-capacity-gate.sh'
   'fleet-channel|bash scripts/check-fleet-channel.sh'
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'fleet-runbook|bash scripts/check-fleet-runbook.sh'

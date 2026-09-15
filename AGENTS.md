@@ -179,8 +179,14 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     Rule 2 forbids two lanes sharing a file; this makes that mechanical. It
     exists because fan-out by issue produced **27 source-file collisions across
     14 lanes** (six siblings editing the same seven files) — so **raising the
-    agent count multiplies conflicts, not throughput**. Max-agents fan-out is
-    blocked until this check is green. (Spine: AO-GR-24.)
+    agent count multiplies conflicts, not throughput**. Max-agents fan-out was
+    blocked until this check is green; **it landed with the raising change in
+    issue #718**, which resolves the fan-out as `effective = min(pool, disjoint
+    ready lanes, resource ceiling)` — the second bound is this rule, the third is
+    the measured RAM / `/tmp` headroom (a `verify.sh` storm was 49 concurrent
+    gates) — and holds any directive it cannot take, naming the binding bound.
+    `scripts/check-capacity-gate.sh` provokes all three bounds.
+    (Spine: AO-GR-24.)
 22. **Drift is measured against the remote, and never fails open (fleet, issue
     #739).** A running loop's commit is compared against **`origin/master`** —
     never the local checkout, which may itself be the stale side — and an

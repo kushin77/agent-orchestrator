@@ -73,7 +73,12 @@
         "issue": { "type": "integer", "minimum": 1 },
         "epic": { "type": "integer", "minimum": 1 },
         "lane": { "type": "string" },
-        "title": { "type": "string", "description": "Optional title, used by the brain's FinOps floor check (a security/auth/IaC order never dispatches at flash/none)." }
+        "title": { "type": "string", "description": "Optional title, used by the brain's FinOps floor check (a security/auth/IaC order never dispatches at flash/none)." },
+        "files": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The files this lane owns (issue #718). The capacity gate (fleet/capacity.py) uses it to hold a directive whose file set intersects an in-flight lane's — AO-GR-24: a wave is provably file-disjoint before dispatch. Additive: a directive that declares no files is ADMITTED, and the gate reports it as unattributable by name, so an undeclared lane is never silently called disjoint. An operator who would rather hold undeclared work sets AO_LANE_FILES_REQUIRED=1."
+        }
       },
       "if": { "properties": { "kind": { "enum": ["status", "report", "ping"] } }, "required": ["kind"] },
       "then": {},

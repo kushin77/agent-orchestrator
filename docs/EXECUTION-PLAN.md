@@ -158,3 +158,83 @@ starts choosing issues ad hoc is violating the repo's execution contract.
 **honest composite gate** (shell syntax, YAML, JSON, docs, secrets) — every
 check can genuinely fail (no-false-green doctrine). A red gate blocks the next
 dispatch wave.
+
+## 8. Fan-out capacity (epic #707, lane F3 / issue #718)
+
+The fleet fans out to the **maximum** number of agents by default — but
+"maximum" is resolved, not chosen. Every dispatch cycle the ceiling is:
+
+```
+effective = min(pool_size, disjoint_ready_lanes, resource_ceiling)
+```
+
+`governance/dispatch/cli.py focus` reports the two bounds that do not depend on
+the ready set; `fleet/terminal.py` resolves the third and the minimum per cycle:
+
+```
+capacity: max_agents_default=10 (FLEET_MAX_AGENTS/focus/FLEET_SISTER_POOL) \
+resource_ceiling=12 (12 lane(s) — bound by RAM: RAM 19068 MiB / 1536 MiB = 12, \
+/tmp 12578 MiB / 512 MiB = 24) — effective = min(pool, disjoint-ready-lanes, \
+resource_ceiling); the disjoint bound is resolved per dispatch cycle over the ready set
+```
+
+### 8.1 The three bounds, and why each exists
+
+| Bound | Resolved from | The failure it prevents |
+|---|---|---|
+| `pool` | `FLEET_MAX_AGENTS` → the focus's `max_agents` (a positive value) → `FLEET_SISTER_POOL` / `DEFAULT_POOL_SIZE` (`0` in either of the first two means "the pool") | an operator cannot cap the fleet without a code change |
+| `disjoint` | the file sets the ready lanes declare (`task.files`), pairwise-intersecting lanes refused (AO-GR-24) | **27 source-file collisions across 14 lanes** — raising the agent count multiplied conflicts instead of throughput |
+| `resource` | `MemAvailable` / per-lane RAM budget, and free space on `/tmp` / per-lane `/tmp` budget | **49 concurrent `make verify` runs, 43 stacked in two worktrees, ~16 hours** (the verify storm) |
+
+Budgets: `AO_LANE_RAM_MIB` (default **1536**) and `AO_LANE_TMP_MIB` (default
+**512**), both per concurrent lane. They are conservative by design and the
+ceiling is *computed from the headroom that exists right now*.
+
+The RAM number is measurement-derived, not taste: on 2026-09-14 the aggregate
+`VmRSS` of one gate's whole process **tree** was sampled every 0.5s for 420s
+across sibling lanes, and the per-gate **peak** was 236 MiB (the five gates seen
+peaked at 3 / 23 / 24 / 194 / 236 MiB). A lane is a *subagent plus its gate*, and
+the subagent is the heavier half, so 1536 MiB (≈6× the gate-only peak) is the
+budget — and it is the number that reproduces this box's observed-safe
+concurrency: **19 GiB available ÷ 1.5 GiB ≈ 12 lanes**, the concurrency the board
+was already running at.
+
+The `/tmp` number is a conservative allowance, stated as such: the largest single
+consumer measured under `/tmp` was a **lane's own scratch tree at 912 MiB** (with
+a repo copy at 480 MiB beside it), so 512 MiB is deliberately *below* the largest
+observed lane scratch. On this box it does not bind (13 GiB free ÷ 512 MiB = 26 >
+the RAM-driven 12) — it is the emergency bound, not the everyday one.
+
+### 8.2 The rules that keep the bound honest
+
+1. **An unreadable measurement is CANNOT-ASSESS, never unbounded.** If
+   `/proc/meminfo` or `/tmp` cannot be read, the ceiling is unresolved and the
+   queue is **held** — a control that cannot measure does not get to say "no
+   limit" (AO-GR-25: failing open is worse than no control).
+2. **A directive the ceiling cannot take is HELD, not consumed.** It stays in the
+   inbox and the next cycle re-resolves the ceiling against the lanes that are
+   actually live. The hold names the bound that held it, so an operator tuning one
+   knob can see whether that knob is the one binding.
+3. **A lane that declares no file set is UNATTRIBUTABLE, and is named.** It is
+   admitted — holding all undeclared work would wedge a queue whose writers do not
+   declare `task.files` yet — but every hold prints the count and the names, so
+   "disjoint" is never claimed for work nobody could check. An operator who wants
+   the strict reading sets `AO_LANE_FILES_REQUIRED=1` and undeclared lanes are
+   held instead. Neither mode is silent.
+4. **A set-but-unusable knob is REFUSED**, never defaulted: `FLEET_MAX_AGENTS=zero`
+   is an error, not a quiet return to 10.
+
+### 8.3 Verify
+
+`bash scripts/check-capacity-gate.sh` (registered in `scripts/verify.sh` and
+`make lint`; `make capacity-gate` runs it alone) provokes each of the three
+bounds — it builds the input that would exceed the bound, requires the excess
+**held** with the holding bound named, then requires the relaxed input
+**admitted**, so the two paths cannot collapse into one exit code. It asserts the
+loop is wired to the gate (no bare `active >= pool` remains) and mutation-proves
+both halves: a resolution that cannot bind turns the controls red, and removing
+the loop's call turns the wiring assertion red.
+
+AO-GR-24's standing condition — *"Max-agents fan-out is blocked until this check
+is green: the raising change and this gate land together or not at all"* — is
+satisfied by this lane: the raising change (#718) and the gate landed together.

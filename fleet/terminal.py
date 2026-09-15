@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+import capacity
 import channel
 import routing
 import runaway
@@ -1298,6 +1299,10 @@ REPORTED = runtime.FLEET_DIR / "reported"
 #: so an operator can widen or narrow the fleet without a code change.
 DEFAULT_POOL_SIZE = 10
 
+#: The pinned focus (governance/dispatch/focus.py owns its schema). Read for one
+#: field, ``max_agents`` — the board's word for this epic's fan-out default.
+FOCUS_PATH = ROOT / ".board" / "focus.json"
+
 
 def pool_size() -> int:
     """Up to this many subagents run at once; ``FLEET_SISTER_POOL`` overrides it."""
@@ -1307,6 +1312,49 @@ def pool_size() -> int:
     except (TypeError, ValueError):
         size = DEFAULT_POOL_SIZE
     return max(1, size)
+
+
+def capacity_lanes() -> list[capacity.Lane]:
+    """The in-flight lanes, with the file set each one declared when it was admitted."""
+    lanes: list[capacity.Lane] = []
+    for slot in active_run_slots():
+        lane = slot.get("capacity_lane")
+        if isinstance(lane, capacity.Lane):
+            lanes.append(lane)
+        else:
+            # A slot registered before this build cannot name its files; it is
+            # reported as unattributable rather than assumed disjoint.
+            lanes.append(
+                capacity.Lane(
+                    id=str(slot.get("directive") or "unknown"),
+                    issue=slot.get("issue") if isinstance(slot.get("issue"), int) else None,
+                    files=None,
+                )
+            )
+    return lanes
+
+
+def resolve_capacity(directive: dict) -> tuple[capacity.Capacity, capacity.Lane]:
+    """Resolve the fan-out ceiling for ``directive`` against the live pool (#718).
+
+    Re-resolved EVERY cycle, not once at startup, because two of the three bounds
+    move: the ready-lane set changes as lanes land, and the RAM / ``/tmp``
+    headroom moves with everything else sharing the box. The incoming lane is
+    part of the ready set — otherwise it would be measured against a ceiling that
+    does not include the work it is about to add.
+    """
+    lane = capacity.Lane.from_directive(directive)
+    try:
+        focus_max = capacity.read_focus_max_agents(FOCUS_PATH)
+    except capacity.CapacityConfigError as exc:
+        print(f"[terminal] focus unreadable for the fan-out default: {exc}", file=sys.stderr, flush=True)
+        focus_max = None
+    resolved = capacity.resolve_capacity(
+        ready=[*capacity_lanes(), lane],
+        focus_max_agents=focus_max,
+        pool_size=pool_size(),
+    )
+    return resolved, lane
 
 
 #: Live per-directive run slots, keyed by directive id. The old single ``IN_FLIGHT``
@@ -2167,7 +2215,6 @@ def loop(args: argparse.Namespace) -> int:
 
     idle_printed = False
     paused_printed = False
-    pool = pool_size()
     while True:
         # Mid-run steering (issue #367): deliver any steer the brain queued for a
         # live run before this cycle does anything else.
@@ -2486,14 +2533,28 @@ def loop(args: argparse.Namespace) -> int:
                 return 1
             continue
 
-        if active >= pool:
-            # The pool is full: this directive is work but there is no free worker.
-            # Leave it pending (do NOT consume it) and let a freed slot take it next
-            # cycle. The skip list keeps `watch` from re-returning only the already
-            # running directives; this one stays queued for a later slot.
-            print(f"[terminal] pool full ({active}/{pool}) — holding #{issue} pending", flush=True)
+        # The fan-out ceiling is resolved HERE, every cycle, because two of its
+        # three bounds move: the ready-lane set changes as lanes land, and the RAM
+        # / `/tmp` headroom moves with every other process on the box (#718). A
+        # directive the ceiling cannot take is HELD, not consumed: it stays in the
+        # inbox for a later slot, exactly as the pool-full path always did. The
+        # decision NAMES the bound that held it, so an operator tuning one knob can
+        # see whether that knob is the one binding.
+        resolved, lane = resolve_capacity(directive)
+        decision = capacity.admit(lane, capacity=resolved, active=capacity_lanes())
+        if not decision.admitted:
+            print(decision.line(lane), flush=True)
+            if resolved.disjoint is not None and resolved.disjoint.unattributable:
+                # Never silent: a lane whose file set could not be compared is
+                # reported on every hold, so "disjoint" is never claimed for work
+                # nobody could check (AO-GR-24).
+                print(f"[terminal] capacity note: {resolved.disjoint.detail()}", flush=True)
             time.sleep(args.idle_sleep)
             continue
+        print(
+            f"[terminal] capacity: #{issue} admitted — {resolved.line()} [{decision.detail}]",
+            flush=True,
+        )
 
         # The FinOps block decides the runner BEFORE any claim is taken (#218): a
         # declaration this build cannot turn into a runner must cost nothing and
@@ -2629,6 +2690,10 @@ def loop(args: argparse.Namespace) -> int:
         # so a dead child can never strand an issue.
         slot = register_run(directive_id, issue, agent_id)
         slot["context"] = context
+        # The lane the capacity gate admitted travels with the slot, so the NEXT
+        # cycle's disjointness check can see which files are already owned by an
+        # in-flight run rather than having to re-derive them from the directive.
+        slot["capacity_lane"] = lane
         # The resolved block travels with the slot: `_run_child`/`run_once` then
         # dispatch at exactly the tier this loop recorded, and neither has to
         # re-decide (or could disagree).

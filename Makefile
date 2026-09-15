@@ -30,6 +30,7 @@ issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-ru
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety \
         remediation remediation-scan remediation-dispatch \
+        capacity-gate \
         control-verbs control-audit control-functions cockpit operator console operator-access operator-terminal
 
 .DEFAULT_GOAL := help
@@ -168,7 +169,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal
 	@echo ""
 	@echo "lint: OK"
 
@@ -238,6 +239,14 @@ issue-claims:
 ## the resolver + focus-schema self-control mutants, so it cannot pass vacuously
 epic-focus:
 	@bash scripts/check-epic-focus.sh
+
+## capacity-gate — max-agents ON and bounded (epic #707, lane F3/#718):
+## effective = min(pool, disjoint ready lanes, resource ceiling). Each of the
+## three bounds is PROVOKED (the excess is held, and the relaxed input is
+## admitted, so the two paths cannot share an exit code), the loop is asserted
+## wired to the gate, and BOTH halves are mutation-proved
+capacity-gate:
+	@bash scripts/check-capacity-gate.sh
 
 ## issue-template — the fleet issue-brief contract (issue #165): every required
 ## field present and the FinOps vocabularies canonical; a dropped field fails
