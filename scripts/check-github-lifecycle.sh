@@ -162,6 +162,12 @@ cases = {
     "CLAIM_STILL_HELD": record([item(claim={"agent": "subagent-dead", "live": True})]),
     "DIRECTIVE_NOT_CONSUMED": record([item(directive={"id": "d-269", "state": "sent"})]),
     "LANE_NOT_RECLAIMED": record([item(lane={"session_id": "s-269", "present": True})]),
+    # A DEAD lane record — the record outlived a worktree a reaper already removed
+    # (#834). `present` means a record remains, so the invariant is still owed; a
+    # record treated as nothing is exactly how it came to shadow a live lane and
+    # refuse a close-out whose lane was there all along.
+    "LANE_DEAD_RECORD": record([item(lane={"session_id": "s-269", "worktree": "/gone/ao-269-s-269",
+                                           "present": True, "worktree_exists": False})]),
     "CLOSING_EVIDENCE_MISSING": record([item(closing_evidence=False)]),
     "FILING_LABELS_MISSING": record([item(state="open", labels=["enhancement"], milestone="M26",
                                           pr={}, verify={})]),
@@ -270,6 +276,22 @@ done
 
 # Evidence must name the verified head commit (a squash merge creates a new one).
 expect_code "VERIFY_EVIDENCE_MISSING" "$work/VERIFY_WRONG_COMMIT.json"
+
+# A dead lane record is a finding, named in the vocabulary the isolation audit
+# already uses for it (#834) — and the report must SAY it is a dead record, so the
+# operator does not go looking for a worktree that no longer exists.
+dead_output="$(audit "$work/LANE_DEAD_RECORD.json" "$work/empty-baseline.json")"
+dead_rc=$?
+if [ "$dead_rc" -eq 0 ]; then
+  echo "  FAIL  a dead lane record went unreported (the audit passed a broken record)" >&2
+  fail=$((fail + 1))
+elif ! printf '%s' "$dead_output" | grep -qF -- "worktree-missing"; then
+  echo "  FAIL  a dead lane record was reported without saying the worktree is gone" >&2
+  printf '%s\n' "$dead_output" | sed 's/^/        /' >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    a dead lane record is refused by name: LANE_NOT_RECLAIMED (worktree-missing)"
+fi
 
 # An epic closed with a declared child still open is refused by name.
 expect_code "CHILD_NOT_CLOSED" "$work/CHILD_NOT_CLOSED.json"

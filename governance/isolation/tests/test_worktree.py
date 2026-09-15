@@ -8,23 +8,28 @@ A's commits and the identity is decoration.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from governance.isolation.identity import mint
 from governance.isolation.worktree import (
+    MACHINE_MANAGED_PATHS,
     ProvisionRefused,
     close,
     enable_worktree_config,
     filesystem_type,
+    foreign_uncommitted,
     git,
     is_linked_worktree,
     list_records,
+    machine_managed_uncommitted,
     provision,
     read_record,
     read_stamped_identity,
     shared_identity,
+    uncommitted_paths,
     write_record,
 )
 
@@ -91,7 +96,86 @@ def test_close_refuses_to_discard_uncommitted_work(lane, repo: Path):
     (lane.worktree / "uncommitted.txt").write_text("work in progress\n", encoding="utf-8")
     kept = close(lane, repo)
     assert kept and "uncommitted" in kept[0]
+    # The refusal NAMES the paths it refuses on: an operator should not have to
+    # guess which file stood in the way of the reclaim.
+    assert "uncommitted.txt" in kept[0]
     assert lane.worktree.exists()
+
+
+def board_state(lane, value: int) -> None:
+    """Write the fleet's machine-managed board state into a lane worktree."""
+    board = lane.worktree / ".board"
+    board.mkdir(parents=True, exist_ok=True)
+    (board / "focus.json").write_text(json.dumps({"active_epic": value}) + "\n", encoding="utf-8")
+
+
+def test_the_declared_machine_managed_set_is_exactly_the_board_state():
+    """Widening what a reclaim may discard is a deliberate act, not a side effect."""
+    assert MACHINE_MANAGED_PATHS == (".board/focus.json",)
+
+
+def test_a_lane_dirty_only_in_machine_managed_state_is_reclaimed(lane, repo: Path):
+    """The gate itself dirties `.board/focus.json`; refusing on it wedged the close-out (#834).
+
+    Measured: `fleet/tests/test_brain.py` — which `make verify` runs — drives the
+    real brain loop, whose `advance_epic_focus()` rewrites the checkout's own
+    `.board/focus.json` (committed `active_epic: 707` -> working tree `160`). A
+    lane is therefore dirty in exactly this path the moment the close-out's own
+    verification step finishes, and step 8 then refused the tree step 2 had just
+    written to. This test is that wedge, provoked: the board file is committed,
+    then rewritten, then the lane is reclaimed.
+    """
+    board_state(lane, 707)
+    git(lane.worktree, "add", ".board/focus.json")
+    git(lane.worktree, "commit", "-q", "-m", "board state")
+    board_state(lane, 160)
+
+    assert uncommitted_paths(lane.worktree) == [".board/focus.json"]
+    assert machine_managed_uncommitted(lane.worktree) == [".board/focus.json"]
+    assert foreign_uncommitted(lane.worktree) == []
+    assert close(lane, repo) == []
+    assert not lane.worktree.exists()
+    assert read_record(lane.session_id, repo) is None
+
+
+def test_a_mixed_tree_refuses_on_the_lanes_own_file_only(lane, repo: Path):
+    """The narrowing is not a blanket --force: lane work still refuses, and is named."""
+    board_state(lane, 707)
+    git(lane.worktree, "add", ".board/focus.json")
+    git(lane.worktree, "commit", "-q", "-m", "board state")
+    board_state(lane, 160)
+    (lane.worktree / "wip.txt").write_text("half-finished\n", encoding="utf-8")
+
+    kept = close(lane, repo)
+
+    assert kept and "wip.txt" in kept[0]
+    assert ".board/focus.json" not in kept[0], "the refusal names what it refuses on, not what it ignores"
+    assert lane.worktree.exists()
+    assert read_record(lane.session_id, repo) is not None
+
+
+def test_force_actually_forces_the_removal(lane, repo: Path):
+    """A forced reclaim must reach git: `git worktree remove` runs its own dirty test.
+
+    Measured while fixing #834: `force=True` skipped only this module's check, so
+    the removal still refused with `contains modified or untracked files, use
+    --force to delete it` — the flag the caller was told to pass had no path to
+    git. The lane is kept and its record preserved when that happens, which is at
+    least not a silent loss, but the documented remedy did not work.
+    """
+    (lane.worktree / "wip.txt").write_text("half-finished\n", encoding="utf-8")
+
+    assert close(lane, repo, force=True) == []
+    assert not lane.worktree.exists()
+    assert read_record(lane.session_id, repo) is None
+
+
+def test_uncommitted_paths_reads_untracked_and_spaced_names(lane):
+    """A quoted path could never match a declared set, so the read must be NUL-terminated."""
+    (lane.worktree / "two words.txt").write_text("wip\n", encoding="utf-8")
+    (lane.worktree / "untracked.txt").write_text("wip\n", encoding="utf-8")
+    assert sorted(uncommitted_paths(lane.worktree)) == ["two words.txt", "untracked.txt"]
+    assert foreign_uncommitted(lane.worktree) == ["two words.txt", "untracked.txt"]
 
 
 def test_close_removes_a_clean_lane_and_its_record(lane, repo: Path):

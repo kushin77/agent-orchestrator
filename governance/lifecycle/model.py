@@ -91,8 +91,8 @@ INVARIANTS: Tuple[Invariant, ...] = (
     ),
     Invariant(
         code="LANE_NOT_RECLAIMED",
-        requires="the item's lane worktree and session record are gone",
-        remediation="close the lane (`governance/isolation/cli.py close --session <id>`), committing or discarding its work first",
+        requires="the item's lane worktree AND its session record are gone - a record whose worktree a reaper already removed is still a record, and the invariant is owed until the record is retired",
+        remediation="close the lane (`governance/isolation/cli.py close --session <id>`), committing or discarding its work first; machine-managed board state (`.board/focus.json`) is ignored by that test and reported, never silently discarded",
     ),
     Invariant(
         code="CLOSING_EVIDENCE_MISSING",
