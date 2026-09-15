@@ -33,6 +33,33 @@ are different facts, and only the second tells an operator what is absent. A run
 that is *current* and still missing a declared capability is reported and never
 respawned: no restart adds a capability the build does not have. `python3
 fleet/watchdog.py capabilities` prints that report on its own.
+
+**The remedy is bounded (issue #773, AO-GR-21).** Drift detection is only half a
+control; the other half is an action that can actually change what was compared.
+Measured 2026-09-15: `#739` made the watchdog compare the running commit against
+`origin/master`, and on a mismatch it respawned — but a respawn re-executes the
+*same checkout*. When the drift was the checkout being behind, the watchdog took
+an action that could not change the compared value and repeated it without bound:
+**132 `drifted … — respawned` decisions, 45 clean stops, a brain process never
+older than 60s, and no work done at all.**
+
+So this module now separates the two cases by name and bounds every remedy:
+
+* **`drifted`** — the running commit is *not* the local HEAD: respawn loads HEAD.
+* **`checkout-behind`** — the running commit *is* the local HEAD while
+  `origin/master` is ahead: the rung is current relative to the checkout and the
+  **checkout** is stale, so the remedy is a **fast-forward** (`git fetch` +
+  `git merge --ff-only`), never a blind respawn.
+
+Every remedy is recorded per rung under `.fleet/watchdog/` and is bounded by an
+attempt cap with exponential backoff (the same harvested contract as
+`fleet/runaway.py`). A remedy that does not change the observed state is **not
+retried forever**: after the cap the watchdog **escalates once**, naming both
+commits and the checkout, and **parks** the rung — it never retries it again until
+an operator rearms it (`python3 fleet/watchdog.py rearm --rung <name>`) or the
+rung's state changes on its own. A drifted rung that is busy is *recorded* as
+pending drift and acted on when the run completes, instead of being dropped every
+tick.
 """
 
 from __future__ import annotations
@@ -78,6 +105,12 @@ HEALTHY = "healthy"
 MISSING = "missing"
 STALE = "stale"
 DRIFTED = "drifted"
+#: The third drift case (#773, AO-GR-21). Distinct from `DRIFTED` because the
+#: remedy differs: the rung runs the *local* HEAD, which is itself behind
+#: `origin/master`, so a respawn cannot change what was compared — the checkout
+#: must be fast-forwarded first. Reporting this as `drifted` is what made the
+#: watchdog a runaway: 132 respawn decisions in one night, zero work done.
+CHECKOUT_BEHIND = "checkout-behind"
 #: The fail-closed state (#739, AO-GR-25): the drift comparison could not be
 #: made — an unreadable `origin/master` baseline, or a loop that reports no
 #: commit. Distinct from `HEALTHY` on purpose: "I cannot see the baseline" is not
@@ -85,10 +118,188 @@ DRIFTED = "drifted"
 #: a drifted rung needs a respawn, an unassessable one needs the remote ref
 #: looked at first. It maps to the repo's exit-code 2 (CANNOT-ASSESS).
 CANNOT_ASSESS = "cannot-assess"
-RUNG_STATES = (MISSING, STALE, DRIFTED, CANNOT_ASSESS, HEALTHY)
+RUNG_STATES = (MISSING, STALE, DRIFTED, CHECKOUT_BEHIND, CANNOT_ASSESS, HEALTHY)
 #: Rung states that mean the rung is NOT healthy. `CANNOT_ASSESS` belongs here:
 #: the watchdog still acts (it cannot certify the rung), it just says so.
-UNHEALTHY_STATES = (MISSING, STALE, DRIFTED, CANNOT_ASSESS)
+UNHEALTHY_STATES = (MISSING, STALE, DRIFTED, CHECKOUT_BEHIND, CANNOT_ASSESS)
+
+# ── the bounded remedy (issue #773, AO-GR-21) ───────────────────────────────
+# A remedy that cannot change the value it compares must not be repeated without
+# bound. The budget and the backoff are HARVESTED, never invented (GR-10): the
+# CMR hub's `vendor/CMR/ops/retry.sh` declares `delay = BACKOFF * 2^(attempt-1)`
+# seconds capped at 300 and `--attempts N` as the budget after which the command
+# gives up — the same contract `fleet/runaway.py` reimplements for a directive.
+#
+# The knobs are configurable, and their defaults are documented here and nowhere
+# else:
+#
+# ============ ============================== ======= ========================
+# knob         env                            default meaning
+# ============ ============================== ======= ========================
+# K (cap)      ``AO_WATCHDOG_RESPAWN_ATTEMPTS``  ``3`` attempts on one unchanged
+#                                                     rung state before the
+#                                                     escalation; an attempt
+#                                                     that changes the observed
+#                                                     commit resets the counter
+# base         ``AO_WATCHDOG_RESPAWN_BACKOFF``   ``60`` seconds; the delay after
+#                                                     attempt *n* is
+#                                                     ``min(base * 2**(n-1), 300)``
+# ============ ============================== ======= ========================
+#
+# `3` attempts and `60` seconds, not `runaway.py`'s `5` / `30`: a watchdog tick
+# runs every 2 minutes under cron, so a 30s base would elapse inside a single
+# tick and the spacing would be decorative, and a fleet that is on stale code
+# should reach a human in ~6 minutes rather than ~15.
+#
+# An unusable value is REFUSED (raises `WatchdogConfigError`), never silently
+# fallen back to a default: a typo that disarms the attempt cap would restore the
+# very runaway this bound exists to stop.
+
+ENV_RESPAWN_ATTEMPTS = "AO_WATCHDOG_RESPAWN_ATTEMPTS"
+ENV_RESPAWN_BACKOFF = "AO_WATCHDOG_RESPAWN_BACKOFF"
+DEFAULT_RESPAWN_ATTEMPTS = 3
+DEFAULT_RESPAWN_BACKOFF_SECONDS = 60
+#: The harvested cap: `vendor/CMR/ops/retry.sh` never sleeps longer than this.
+BACKOFF_CAP_SECONDS = 300
+#: How long `git fetch` / `git merge --ff-only` may take before the remedy is
+#: recorded as a failed attempt. A blocked network must not stall the pass.
+FAST_FORWARD_TIMEOUT_SECONDS = 60
+
+
+class WatchdogConfigError(RuntimeError):
+    """A configured remedy budget is unusable — refuse rather than disarm."""
+
+
+def _env_positive_int(name: str, default: int) -> int:
+    """Read a positive integer knob; an unusable value is refused, never ignored."""
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        raise WatchdogConfigError(f"{name}={raw!r} is not an integer") from None
+    if value < 1:
+        raise WatchdogConfigError(f"{name}={raw!r} must be >= 1")
+    return value
+
+
+def respawn_attempt_cap() -> int:
+    """How many consecutive attempts one unchanged rung state gets. Refuses a typo."""
+    return _env_positive_int(ENV_RESPAWN_ATTEMPTS, DEFAULT_RESPAWN_ATTEMPTS)
+
+
+def respawn_backoff_seconds(attempt: int) -> float:
+    """The delay after attempt `attempt` — `min(base * 2**(attempt-1), 300)`.
+
+    The harvested formula, pinned numerically by `scripts/check-watchdog-bounded.sh`
+    against the vendored contract whenever `vendor/CMR` is initialised.
+    """
+    base = _env_positive_int(ENV_RESPAWN_BACKOFF, DEFAULT_RESPAWN_BACKOFF_SECONDS)
+    return float(min(base * (2 ** max(0, attempt - 1)), BACKOFF_CAP_SECONDS))
+
+
+def drift_state_dir() -> Path:
+    """The remedy ledger's directory: `.fleet/watchdog/`.
+
+    Derived from `FLEET_DIR` on every call — never captured at import — so the
+    fleet suite's isolation fixture (which redirects `watchdog.FLEET_DIR`) covers
+    it, and a test can never append to the live fleet's ledger.
+    """
+    return FLEET_DIR / "watchdog"
+
+
+def drift_record_path(rung: str) -> Path:
+    return drift_state_dir() / f"{rung}.json"
+
+
+def escalation_dir() -> Path:
+    return drift_state_dir() / "escalations"
+
+
+def load_drift_record(rung: str) -> dict | None:
+    """The rung's persisted remedy record, or None.
+
+    A torn or unreadable record reads as *absent*, which restarts the attempt
+    counter rather than crashing the watchdog: the bound still holds (the cap is
+    reached again from attempt 1), and a watchdog that dies on a bad JSON file
+    stops watching the fleet.
+    """
+    try:
+        record = json.loads(drift_record_path(rung).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def save_drift_record(rung: str, record: dict) -> None:
+    """Persist the record atomically (tmp + rename), so a torn write cannot corrupt it."""
+    path = drift_record_path(rung)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f".tmp.{os.getpid()}")
+    tmp.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def clear_drift_record(rung: str) -> None:
+    """Drop the record — the finding is gone, so the counter must not survive it."""
+    try:
+        drift_record_path(rung).unlink()
+    except OSError:
+        pass
+
+
+def _git(target: Path, argv: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(target), *argv],
+        capture_output=True,
+        text=True,
+        timeout=FAST_FORWARD_TIMEOUT_SECONDS,
+    )
+
+
+def _git_head(target: Path) -> str:
+    try:
+        result = _git(target, ["rev-parse", "--short", "HEAD"])
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return result.stdout.strip() if result.returncode == 0 else "unknown"
+
+
+def fast_forward_checkout(
+    root: Path | None = None, *, remote: str = "origin/master"
+) -> tuple[bool, str, str]:
+    """Fast-forward the checkout to `remote`; `(changed, head, detail)`.
+
+    This is the `checkout-behind` remedy (#773): when the rung already runs the
+    local HEAD, a respawn cannot change the compared commit, so the *checkout*
+    is what must move. `git fetch origin` first (the fetched ref is what the
+    drift baseline reads), then `git merge --ff-only`. A refusal is reported, not
+    swallowed: a diverged branch is `cannot fast-forward`, and the caller counts
+    the attempt so the bound still applies.
+
+    Never raises: a network-blocked or unreadable checkout is a recorded failed
+    attempt, not a crash — a watchdog that dies stops watching.
+    """
+    target = Path(root) if root is not None else ROOT
+    before = _git_head(target)
+    try:
+        fetched = _git(target, ["fetch", "origin"])
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, before, f"git fetch origin failed ({type(exc).__name__}: {exc})"
+    if fetched.returncode != 0:
+        return False, before, f"git fetch origin failed ({(fetched.stderr or '').strip().splitlines()[-1:] or ['no output']})"
+    try:
+        merged = _git(target, ["merge", "--ff-only", remote])
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, before, f"git merge --ff-only {remote} failed ({type(exc).__name__}: {exc})"
+    after = _git_head(target)
+    if merged.returncode != 0:
+        reason = (merged.stderr or merged.stdout or "").strip().splitlines()
+        return False, after, f"git merge --ff-only {remote} refused ({reason[-1] if reason else 'no output'})"
+    if before != "unknown" and after != before:
+        return True, after, f"fast-forwarded {before} -> {after}"
+    return False, after, f"the checkout is already at {after}"
 
 
 def rung_log(name: str) -> Path:
@@ -185,14 +396,27 @@ def run_in_flight() -> bool:
     return False
 
 
-def decide(pid: int | None, beat: dict | None, baseline: str, baseline_name: str = "origin/master") -> tuple[str, str]:
-    """Classify a rung: missing / stale / cannot-assess / drifted / healthy.
+def decide(
+    pid: int | None,
+    beat: dict | None,
+    baseline: str,
+    baseline_name: str = "origin/master",
+    local_head: str | None = None,
+) -> tuple[str, str]:
+    """Classify a rung: missing / stale / cannot-assess / drifted / checkout-behind / healthy.
 
     `baseline` is the **remote** commit (`origin/master`), never the local
     checkout's HEAD. The local checkout is routinely the stale side in this
     fleet, so comparing to it made the comparison *stale-to-stale*: the loop's
     own start commit read back as the baseline it was judged against, so a loop
     executing pre-fix code reported `healthy` (#739, AO-GR-25).
+
+    `local_head` is a **separate** input, and it does not weaken that (#773):
+    it is used only to tell the two mismatches apart. `running != baseline` is
+    always a finding; whether the remedy is a respawn (`drifted`: the rung is not
+    on the checkout's HEAD either) or a fast-forward (`checkout-behind`: the rung
+    IS the checkout's HEAD, so only the checkout can move) depends on it. A caller
+    that does not know the local HEAD passes nothing and gets the pre-#773 verdict.
 
     Fail-closed by construction: an unreadable baseline is CANNOT-ASSESS, never
     healthy. The previous rule — `if head != "unknown" and running != head` —
@@ -209,9 +433,11 @@ def decide(pid: int | None, beat: dict | None, baseline: str, baseline_name: str
     if age > channel.STALE_HEARTBEAT_SECONDS:
         return STALE, f"last beat {int(age)}s ago"
     running = str(beat.get("commit", "unknown"))
-    drift_state, reason = channel.classify_drift(running, baseline, baseline_name)
+    drift_state, reason = channel.classify_drift(running, baseline, baseline_name, local_head)
     if drift_state == channel.DRIFT_DRIFTED:
         return DRIFTED, reason
+    if drift_state == channel.DRIFT_CHECKOUT_BEHIND:
+        return CHECKOUT_BEHIND, reason
     if drift_state == channel.DRIFT_CANNOT_ASSESS:
         return CANNOT_ASSESS, reason
     return HEALTHY, ""
@@ -286,6 +512,191 @@ def respawn(
     return rung_came_up(pattern, pid, window=window, settle=settle)
 
 
+def record_pending(
+    name: str,
+    state: str,
+    reason: str,
+    running: str,
+    baseline: str,
+    baseline_name: str,
+    local_head: str | None,
+    when: float,
+) -> dict:
+    """Record that a rung needs action but is BUSY — pending drift, not a dropped finding.
+
+    Requirement 3 of #773: the sister logged `drifted … but a run is in flight —
+    left alone` on **every** tick and so was never updated even after its run
+    finished. The protection (never restart a run to update code) is right and is
+    kept; dropping the finding is not. The record carries no `next_attempt_at`, so
+    the first pass after the run completes acts on it immediately.
+    """
+    record = load_drift_record(name) or {}
+    record.update(
+        {
+            "rung": name,
+            "phase": "pending",
+            "state": state,
+            "reason": reason,
+            "running": running,
+            "baseline": baseline,
+            "baseline_name": baseline_name,
+            "local_head": local_head,
+            "attempts": int(record.get("attempts") or 0),
+            "first_seen": float(record.get("first_seen") or when),
+            "last_seen": when,
+        }
+    )
+    save_drift_record(name, record)
+    return record
+
+
+def escalate_once(name: str, record: dict) -> Path:
+    """Write the ONE escalation artifact for this incident; return its path.
+
+    Named after the incident's first sighting, so a later, genuinely new incident
+    gets its own artifact instead of overwriting this one — "escalate once" is
+    provable by counting artifacts, not by trusting a log line.
+    """
+    path = escalation_dir() / f"{name}.{int(record['first_seen'])}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        tmp = path.with_suffix(f".tmp.{os.getpid()}")
+        tmp.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        tmp.replace(path)
+    return path
+
+
+def bounded_remedy(
+    name: str,
+    state: str,
+    reason: str,
+    running: str,
+    baseline: str,
+    baseline_name: str,
+    local_head: str | None,
+    script: str,
+    pattern: str,
+    when: float,
+    checkout_root: Path | None,
+) -> tuple[str, bool]:
+    """Act on an unhealthy rung, bounded by an attempt cap (AO-GR-21, #773).
+
+    Returns `(outcome_text, ok)`. The counter counts *consecutive attempts that did
+    not change the observation*: an attempt after which the rung reports a
+    different commit (or state) resets to 1, because the remedy worked. When the
+    cap is exhausted the rung is escalated **once** and **parked** — the watchdog
+    stops retrying it, which is the whole point: a remedy that cannot change the
+    value it compares is a runaway, not a repair.
+
+    The remedy itself depends on the case, which is why the case is a state and
+    not a bare commit mismatch: `checkout-behind` needs the CHECKOUT to move
+    (fast-forward), everything else needs the RUNG to move (respawn).
+    """
+    cap = respawn_attempt_cap()
+    checkout = str(Path(checkout_root) if checkout_root is not None else ROOT)
+    record = load_drift_record(name) or {}
+    first_seen = float(record.get("first_seen") or when)
+    same_observation = record.get("state") == state and record.get("running") == running
+    previous_attempts = int(record.get("attempts") or 0)
+    attempts = previous_attempts + 1 if (same_observation and previous_attempts > 0) else 1
+
+    if record.get("phase") == "parked" and same_observation:
+        return (
+            f"PARKED — {previous_attempts} attempts could not change it, escalated once; refusing to "
+            f"retry (rearm: python3 fleet/watchdog.py rearm --rung {name})",
+            False,
+        )
+
+    if attempts > cap:
+        parked = {
+            **record,
+            "rung": name,
+            "phase": "parked",
+            "state": state,
+            "reason": reason,
+            "running": running,
+            "baseline": baseline,
+            "baseline_name": baseline_name,
+            "local_head": local_head,
+            "checkout": checkout,
+            "attempts": cap,
+            "first_seen": first_seen,
+            "last_seen": when,
+            "escalated_at": when,
+        }
+        path = escalate_once(name, parked)
+        save_drift_record(name, parked)
+        return (
+            f"ESCALATED ONCE after {cap} attempts that did not change it — running {running}, "
+            f"{baseline_name} {baseline}, checkout {checkout} ({path.name}); stopping retries (parked)",
+            False,
+        )
+
+    next_attempt_at = float(record.get("next_attempt_at") or 0)
+    if next_attempt_at and when < next_attempt_at:
+        save_drift_record(
+            name,
+            {
+                **record,
+                "rung": name,
+                "phase": "pending",
+                "state": state,
+                "reason": reason,
+                "running": running,
+                "baseline": baseline,
+                "baseline_name": baseline_name,
+                "local_head": local_head,
+                "checkout": checkout,
+                "attempts": attempts,
+                "first_seen": first_seen,
+                "last_seen": when,
+            },
+        )
+        return (
+            f"holding — attempt {attempts}/{cap} is due in {int(next_attempt_at - when)}s (backoff "
+            f"{int(respawn_backoff_seconds(attempts))}s, capped at {BACKOFF_CAP_SECONDS}s)",
+            True,
+        )
+
+    if state == CHECKOUT_BEHIND:
+        changed, new_head, detail = fast_forward_checkout(checkout_root)
+        if changed:
+            ok = respawn(pattern, script, name)
+            outcome = (
+                f"fast-forwarded the checkout ({detail}) and {'respawned' if ok else 'RESPAWN FAILED'} "
+                f"so the rung loads {new_head} (attempt {attempts}/{cap})"
+            )
+        else:
+            ok = True
+            outcome = (
+                f"fast-forward did not move the checkout ({detail}) — DRIFT UNRESOLVED, "
+                f"attempt {attempts}/{cap}"
+            )
+    else:
+        ok = respawn(pattern, script, name)
+        outcome = f"{'respawned' if ok else 'RESPAWN FAILED'} (attempt {attempts}/{cap})"
+
+    save_drift_record(
+        name,
+        {
+            "rung": name,
+            "phase": "retrying",
+            "state": state,
+            "reason": reason,
+            "running": running,
+            "baseline": baseline,
+            "baseline_name": baseline_name,
+            "local_head": local_head,
+            "checkout": checkout,
+            "attempts": attempts,
+            "first_seen": first_seen,
+            "last_seen": when,
+            "next_attempt_at": when + respawn_backoff_seconds(attempts),
+        },
+    )
+    return outcome, ok
+
+
 def rung_action(
     name: str,
     pattern: str,
@@ -294,6 +705,10 @@ def rung_action(
     force: bool,
     baseline: str,
     baseline_name: str = "origin/master",
+    *,
+    local_head: str | None = None,
+    when: float | None = None,
+    checkout_root: Path | None = None,
 ) -> str:
     """One rung, one decision: what did the watchdog do about it — and what is it missing?
 
@@ -308,25 +723,55 @@ def rung_action(
     audit the comparison instead of trusting the verdict. A comparison against a
     baseline that is stale, or against the local checkout, is invisible in a bare
     `healthy`.
+
+    Issue #773: every acting path goes through `bounded_remedy`, so no remedy is
+    repeated indefinitely, and the `checkout-behind` case is repaired by moving
+    the CHECKOUT rather than by respawning a rung that is already on its HEAD.
     """
+    moment = time.time() if when is None else when
+    if local_head is None:
+        local_head = channel.head_commit()
     pid = loop_pid(pattern)
     beat = read_beat(beat_path)
-    state, reason = decide(pid, beat, baseline, baseline_name)
+    state, reason = decide(pid, beat, baseline, baseline_name, local_head)
     running = str((beat or {}).get("commit", "unknown"))
     verbatim = f"running {running}, {baseline_name} {baseline}"
     if force:
         state, reason = "forced", "operator asked to respawn"
     capability = channel.capability_line(channel.capability_finding(name, beat, running))
     if state == HEALTHY:
+        # The finding is gone: the counter must not survive it, or a fixed rung
+        # would inherit a stale attempt budget from an earlier incident.
+        clear_drift_record(name)
         return f"{name}: healthy ({verbatim}) | {capability}"
-    if state == DRIFTED and name == "sister" and run_in_flight():
-        return f"{name}: drifted ({reason}) but a run is in flight — left alone | {capability}"
+    if force:
+        ok = respawn(pattern, script, name)
+        clear_drift_record(name)
+        return f"{name}: forced (operator asked to respawn) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
+    if state in (DRIFTED, CHECKOUT_BEHIND) and name == "sister" and run_in_flight():
+        record_pending(name, state, reason, running, baseline, baseline_name, local_head, moment)
+        return (
+            f"{name}: {state} ({reason}) — recorded as pending drift, a run is in flight — left alone "
+            f"until it completes, then acted on | {capability}"
+        )
     # CANNOT_ASSESS respawns too: the watchdog cannot certify the rung, and a
     # respawn is the only action that can restore a readable comparison. It is
     # reported with its reason so the operator sees WHY it could not be judged —
     # never silently folded into `healthy`.
-    ok = respawn(pattern, script, name)
-    return f"{name}: {state} ({reason}) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
+    outcome, ok = bounded_remedy(
+        name,
+        state,
+        reason,
+        running,
+        baseline,
+        baseline_name,
+        local_head,
+        script,
+        pattern,
+        moment,
+        checkout_root,
+    )
+    return f"{name}: {state} ({reason}) — {outcome} | {capability}"
 
 
 def monitor_missing() -> bool:
@@ -354,24 +799,45 @@ def watchdog_once(force: bool = False) -> int:
 
       * **0 OK** — every rung healthy and judgeable (a respawn that succeeded
         counts: the state was repaired).
-      * **1 NOT-OK** — a definite failure: `RESPAWN FAILED`, or a
-        `CAPABILITY STALE` rung, which is a silently absent control and the one
-        finding no respawn can repair (issue #319).
+      * **1 NOT-OK** — a definite failure: `RESPAWN FAILED`, a `CAPABILITY STALE`
+        rung, which is a silently absent control and the one finding no respawn can
+        repair (issue #319), or a drift whose remedy did not resolve it — including
+        the escalated, parked rung, which is reported on every pass so an exhausted
+        remedy is never mistaken for a quiet fleet (#773, AO-GR-21).
       * **2 CANNOT-ASSESS** — a rung's drift could not be judged at all because
-        the `origin/master` baseline was unreadable. Never folded into 0: the
-        whole defect this replaced was a control that reported `healthy` for a
-        comparison it could not actually make (#739, AO-GR-25).
+        the `origin/master` baseline was unreadable, or the configured remedy
+        budget is unusable. Never folded into 0: the whole defect this replaced was
+        a control that reported `healthy` for a comparison it could not actually
+        make (#739, AO-GR-25).
 
     A NOT-OK verdict outranks CANNOT-ASSESS: a known failure is reported as the
     failure it is, and the unassessable rung is still named on its own line.
     """
+    try:
+        # Refuse a misconfigured bound BEFORE any rung is acted on: a typo must
+        # not silently disarm the attempt cap that stops the runaway (#773).
+        respawn_attempt_cap()
+    except WatchdogConfigError as exc:
+        print(
+            f"[watchdog] config: CANNOT-ASSESS — {exc}; refusing the pass so a typo cannot "
+            f"disarm the attempt cap",
+            file=sys.stderr,
+            flush=True,
+        )
+        return channel.EXIT_CANNOT_ASSESS
     baseline = channel.remote_head_commit()
+    # The local HEAD is read ONCE and passed in, so both rungs are judged against
+    # the same checkout — the input that separates `drifted` (the rung is stale)
+    # from `checkout-behind` (the checkout is stale), #773.
+    local = channel.head_commit()
     failed = False
     unassessable = False
     for name, pattern, script, beat_path in RUNGS:
-        line = rung_action(name, pattern, script, beat_path, force, baseline)
+        line = rung_action(name, pattern, script, beat_path, force, baseline, local_head=local)
         print(f"[watchdog] {line}", flush=True)
         if "FAILED" in line or "CAPABILITY STALE" in line:
+            failed = True
+        if "ESCALATED ONCE" in line or "PARKED" in line or "DRIFT UNRESOLVED" in line:
             failed = True
         if f": {CANNOT_ASSESS} (" in line:
             unassessable = True
@@ -395,6 +861,25 @@ def watchdog_once(force: bool = False) -> int:
 def beat_path(rung: str) -> Path:
     """The beat this rung publishes (read through `channel`, so a test redirect applies)."""
     return channel.BRAIN_HEARTBEAT if rung == "brain" else channel.HEARTBEAT
+
+
+def cmd_rearm(args: argparse.Namespace) -> int:
+    """Clear a rung's attempt record after an operator has fixed the cause (#773).
+
+    The escalation ARTIFACT is deliberately kept: the incident happened, and the
+    record of it is the audit. What is cleared is the bound's own state, so the
+    next pass judges the rung afresh instead of short-circuiting to `PARKED`.
+    """
+    record = load_drift_record(args.rung)
+    clear_drift_record(args.rung)
+    if record is None:
+        print(f"watchdog rearm: {args.rung} had no remedy record — nothing to clear")
+        return channel.EXIT_OK
+    print(
+        f"watchdog rearm: {args.rung} cleared (was {record.get('phase')} after "
+        f"{record.get('attempts')} attempt(s)); the next pass judges it again"
+    )
+    return channel.EXIT_OK
 
 
 def cmd_capabilities(args: argparse.Namespace) -> int:
@@ -452,6 +937,12 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="one watchdog pass (the cron entry point)")
     run.add_argument("--force", action="store_true", help="respawn the loop rungs even when healthy")
     run.set_defaults(func=lambda args: watchdog_once(args.force))
+    rearm = sub.add_parser(
+        "rearm",
+        help="clear a rung's parked attempt record so the next pass judges it again (#773)",
+    )
+    rearm.add_argument("--rung", required=True, choices=[name for name, _p, _s, _b in RUNGS])
+    rearm.set_defaults(func=cmd_rearm)
     caps = sub.add_parser(
         "capabilities",
         help="report the declared capabilities each rung does not implement",
