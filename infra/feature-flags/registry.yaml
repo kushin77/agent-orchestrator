@@ -97,6 +97,25 @@ services:
       #411, ADR-0013): a process boundary, not a control-plane service. Pinned
       OCI image (infra/paperclip/release.yaml), health-probed at GET /api/health,
       nothing vendored. Inert until a reviewed go-live promotes this flag.
+  hermes:
+    default: off
+    promoted: false
+    phase: 2
+    tf_flag: enable_hermes
+    description: >
+      Local hermes agent-service provider (issue #255, module-catalog issue
+      #349): the keyless, Ollama-compatible /api/chat adapter
+      (gateway/providers/hermes.py, gateway/catalog/modules/hermes/module.json)
+      that serves the local hermes3 endpoint at http://localhost:8080/api/chat
+      and is the frozen hermes -> hermes/ollama fallback target (EPIC #253).
+      Unlike paperclip it is not a separate deployable process — no OCI image,
+      no terraform module (module.json distribution.terraform is null) — so
+      this row declares the independent rollout/kill-switch only; nothing in
+      infra/terraform creates or gates a resource for it. Promotion and
+      kill-switch enforcement for the in-process provider happen at the
+      rollout layer (infra/rollout/), the same posture documented for the
+      other in-process workbook surfaces below. Inert until a reviewed
+      go-live promotes this flag.
   chat:
     default: off
     promoted: false

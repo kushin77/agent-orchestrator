@@ -79,6 +79,12 @@ variable "enable_paperclip" {
   default     = false
 }
 
+variable "enable_hermes" {
+  description = "Independent rollout/kill-switch for the local hermes agent-service provider (issue #255, module-catalog issue #349, feature-flag registry entry `hermes`). Not a separate deployable process — no OCI image, no terraform resource — so this variable declares the switch only; the in-process gateway provider is gated at the rollout layer. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
 variable "enable_chat" {
   description = "Serve the conversational surface (issue #503, ADR-0023: POST /v1/chat/completions, POST /api/chat, GET /v1/models). Its own flag, so chat can be promoted or killed without promoting the gateway or the portal. OFF until promoted."
   type        = bool
