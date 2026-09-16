@@ -139,6 +139,23 @@ def decision_status(
     ``stale_after_seconds`` of ``now``; 503 for anything else, naming the reason
     it refused. A container that is up but whose evidence stopped advancing must
     fail this probe — "the process exists" is deliberately not enough (#712).
+
+    THE STALENESS CHECK IS SKIPPED WHILE A RUN IS STILL RUNNING. ``dev_run.py``
+    (D2, #710) writes its decision document ONCE, after the dispatch, and then
+    parks on ``/healthz`` for as long as the container lives — its own ``stop``
+    field stays ``{"clean": None, "note": "still running"}`` until a SIGTERM
+    actually stops it; ``finished_at`` never advances again. Enforcing
+    ``stale_after_seconds`` against that timestamp would flip a container doing
+    exactly what D2 designed it to do from 200 to 503 after the bound elapses —
+    a false red (this repo's own precedent, `dc3de7f fix(gates): the false red
+    in check-isolation-landed`), and worse under a `restart: unless-stopped`
+    policy, which would then restart a healthy container forever. So staleness
+    is judged against the RUN's own liveness claim, not merely a clock: a
+    document whose ``stop.clean`` is ``None`` is still being actively served by
+    the process that wrote it, and its age is not evidence of anything having
+    gone stale. Once that process stops (``stop.clean`` is ``True``/``False``),
+    or for a document with no ``stop`` field at all (a production writer that
+    does not use dev_run.py's shape), the bound applies normally.
     """
     if document is None:
         return 503, {
@@ -150,7 +167,8 @@ def decision_status(
     verdict = str(document.get("verdict", ""))
     changed = ((document.get("state") or {}).get("attributable_changes")) or []
     jobs = document.get("jobs") or []
-    age = _age_seconds(document, now)
+    still_running = "stop" in document and (document.get("stop") or {}).get("clean") is None
+    age = None if still_running else _age_seconds(document, now)
 
     if verdict != "ok":
         return 503, {
@@ -171,18 +189,19 @@ def decision_status(
             "jobs": len(jobs),
             "expected_jobs": expected_jobs,
         }
-    if age is None:
-        return 503, {
-            "status": "failed",
-            "reason": "the decision document has no timestamp to measure freshness from",
-        }
-    if age > stale_after_seconds:
-        return 503, {
-            "status": "stale",
-            "reason": f"the decision document is {int(age)}s old, past the {int(stale_after_seconds)}s staleness bound",
-            "age_seconds": int(age),
-            "stale_after_seconds": int(stale_after_seconds),
-        }
+    if not still_running:
+        if age is None:
+            return 503, {
+                "status": "failed",
+                "reason": "the decision document has no timestamp to measure freshness from",
+            }
+        if age > stale_after_seconds:
+            return 503, {
+                "status": "stale",
+                "reason": f"the decision document is {int(age)}s old, past the {int(stale_after_seconds)}s staleness bound",
+                "age_seconds": int(age),
+                "stale_after_seconds": int(stale_after_seconds),
+            }
     return 200, {
         "status": "ok",
         "dry_run": True,
@@ -190,7 +209,8 @@ def decision_status(
         "jobs": len(jobs),
         "expected_jobs": expected_jobs,
         "job_markers": [job.get("marker") for job in jobs],
-        "age_seconds": int(age),
+        "age_seconds": (int(age) if age is not None else None),
+        "still_running": still_running,
         "dispatch": {
             "dry_run": len([job for job in jobs if job.get("disposition") == "dry-run"]),
             "not-dispatched": len([job for job in jobs if job.get("disposition") == "not-dispatched"]),

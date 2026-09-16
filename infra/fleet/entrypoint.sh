@@ -95,15 +95,21 @@ fi
 log_json env-contract ok "environment satisfies ${REPO}/infra/fleet/env_contract.py"
 INTERVAL="$(python3 "${REPO}/infra/fleet/env_contract.py" print | sed -n 's/^AO_FLEET_CRON_INTERVAL=//p')"
 
+# NOTE for a reader of the log lines below: they deliberately do NOT spell out
+# the module + verb this step calls (that pair is what scripts/check-fleet-cron-image.sh's
+# `schedule-not-owned` provocation looks for in this file's own CODE, to prove
+# the entrypoint really is the one asking the owner; restating it in a log
+# string would leave that pair present even in a mutant where the call itself
+# had been removed, and the control would stop being able to fail).
 if [ "${AO_FLEET_CRON_NO_INSTALL:-0}" != "1" ]; then
   if python3 "${REPO}/fleet/cron.py" install --interval "${INTERVAL}"; then
-    log_json schedule ok "fleet/cron.py install --interval ${INTERVAL}"
+    log_json schedule ok "the schedule's single owner installed it (interval ${INTERVAL})"
   else
-    log_json schedule failed "fleet/cron.py install --interval ${INTERVAL} exited non-zero"
+    log_json schedule failed "the schedule's owner exited non-zero (interval ${INTERVAL})"
     exit 1
   fi
 else
-  log_json schedule skipped "AO_FLEET_CRON_NO_INSTALL=1 — the entrypoint did not install the schedule"
+  log_json schedule skipped "AO_FLEET_CRON_NO_INSTALL=1 — this entrypoint did not ask the owner to install"
 fi
 
 # --- run what was asked for, backgrounded so a signal is a logged event ------

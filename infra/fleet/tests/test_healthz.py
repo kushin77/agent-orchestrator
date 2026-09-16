@@ -104,6 +104,40 @@ def test_fresh_document_within_bound_is_200():
     assert status == 200
 
 
+def test_still_running_dev_run_is_never_stale():
+    """dev_run.py (D2) writes its decision document ONCE and then parks on
+    /healthz for the container's whole life, `stop.clean` staying None the
+    entire time. A two-hour-old document from a run that is still up and
+    serving must be 200, never 503 — the false-red this repo already names
+    as a precedent (dc3de7f).
+    """
+    doc = _document(jobs=3, age_seconds=7_200)
+    doc["stop"] = {"signal": None, "clean": None, "note": "still running"}
+    status, body = healthz.decision_status(doc, stale_after_seconds=900)
+    assert status == 200
+    assert body["still_running"] is True
+
+
+def test_stopped_dev_run_is_still_subject_to_the_staleness_bound():
+    doc = _document(jobs=3, age_seconds=7_200)
+    doc["stop"] = {"signal": "SIGTERM", "clean": True, "note": "clean stop"}
+    status, body = healthz.decision_status(doc, stale_after_seconds=900)
+    assert status == 503
+    assert body["status"] == "stale"
+
+
+def test_a_document_with_no_stop_field_uses_the_staleness_bound_normally():
+    """A production writer that doesn't use dev_run.py's `stop` shape gets the
+    ordinary staleness check — the still-running exemption is specific to that
+    one field, not a blanket skip for anything without a `stop`.
+    """
+    doc = _document(jobs=3, age_seconds=7_200)
+    assert "stop" not in doc
+    status, body = healthz.decision_status(doc, stale_after_seconds=900)
+    assert status == 503
+    assert body["status"] == "stale"
+
+
 def test_missing_timestamp_is_503():
     doc = _document(jobs=3)
     del doc["finished_at"]
