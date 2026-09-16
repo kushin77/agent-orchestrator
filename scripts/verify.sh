@@ -283,6 +283,12 @@ checks=(
   # every seed must validate as a projected identity; the check mutates its own
   # input, so it cannot pass vacuously.
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
+  # rbac-head-binding (issue #952): tenant/RBAC binding for the head-of-org
+  # personas (hermes, paperclip) — identity/rbac/presets/head-agents.yaml +
+  # identity/rbac/head_bindings.py; GR-28 default-off is asserted live and the
+  # check deletes a bound persona's Binding row and requires the identical op
+  # to flip to refused, so it cannot pass vacuously.
+  'rbac-head-binding|bash scripts/check-rbac-head-binding.sh'
   'paperclip-adapter|bash scripts/check-paperclip-integration-adapter.sh'
   'paperclip-canonical-module|bash scripts/check-paperclip-canonical-module.sh'
   # paperclip-auth (issue #412, ADR-0013): the cross-boundary auth seam in

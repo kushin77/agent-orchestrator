@@ -151,6 +151,7 @@ the four above keep their exact role mixes:
 | Pack | key | Roles |
 |------|-----|-------|
 | [`csuite.yaml`](presets/csuite.yaml) | `csuite` | ceo, cto, coo, cfo, cmo (issue #638) |
+| [`head-agents.yaml`](presets/head-agents.yaml) | `head-agents` | hermes-head, paperclip-head (issue #952, opt-in per tenant) |
 
 `load_pack(key)` accepts any `<key>.yaml` beside the module; `available_packs()`
 lists them; `load_csuite_pack()` loads the executive pack.
@@ -278,6 +279,61 @@ assert "acme-onboarding" not in {s.id for s in reg.visible_skills("globex")}
 
 Tests: [`tests/test_skills_isolation.py`](tests/test_skills_isolation.py).
 
+## Head-of-org agent bindings (issue #952)
+
+`hermes` (`registry/personas/cards/hermes.yaml`, coding/capability-routing
+worker) had no tenant/RBAC binding anywhere in `identity/` — the only `hermes`
+hits in this subtree were `hermes-agents` provenance notes (where a *pattern*
+was cannibalized from), not an in-repo binding. The `paperclip` "carve-out" in
+[`skills.py`](skills.py) is **not** a role binding either — it scopes
+`SKILL.md` visibility per org and creates no `Role`/`Binding` row at all.
+[`head_bindings.py`](head_bindings.py) supplies the real thing, for both
+personas, on one pattern.
+
+**The role.** [`presets/head-agents.yaml`](presets/head-agents.yaml) declares
+`hermes-head` and `paperclip-head`: org-wide roles that may read the org/agent
+registry (`org:read`, `team:read`, `agent:read`) and create their own kind of
+work item (`directive:create`/`ticket:create` for hermes,
+`doc:create`/`knowledge:read` for paperclip). Neither role is ever granted
+`org:manage` (tenant administration), `secret:rotate`, `rollout:approve` or
+`roles:manage` — `head_bindings.FORBIDDEN_PERMISSIONS` names all four and a
+test asserts the pack never grants one. A cross-tenant read is refused by a
+different mechanism entirely — the scope gate (`resolve_scope`), since a
+`Binding` never crosses an Org (see `model.Binding`), the same guarantee every
+other subject in this package gets.
+
+**Not a tenant type, opt-in only (GR-28).** `head-agents` is never resolved by
+`org.tenant_type` (`presets.BUILTIN_TENANT_TYPES` does not name it) and no
+code in this repo seeds it automatically — an Org seeded from any built-in
+pack (or `csuite`) carries **no** head-of-org binding until a tenant calls
+`bind_persona_to_tenant(store, org, persona_id)` for the persona it wants,
+exactly once per persona, idempotently. `unbind_persona_from_tenant` revokes
+it; `is_persona_bound` / `guard_persona` read and enforce it.
+
+```python
+from rbac import HERMES_PERSONA_ID, InMemoryStore, bind_persona_to_tenant, guard_persona, seed_org
+
+store = InMemoryStore()
+org = store.add_org("acme", "Acme", tenant_type="startup")
+seed_org(store, org)  # the tenant's own admin/owner/member roles - untouched
+
+# Unbound: refused at the scope gate, GR-28's default.
+assert guard_persona(store, org.id, HERMES_PERSONA_ID, "org:read").denied
+
+bind_persona_to_tenant(store, org, HERMES_PERSONA_ID)     # explicit opt-in
+assert guard_persona(store, org.id, HERMES_PERSONA_ID, "org:read").allowed
+assert guard_persona(store, org.id, HERMES_PERSONA_ID, "org:manage").denied  # never granted
+```
+
+Tests: [`tests/test_head_bindings.py`](tests/test_head_bindings.py) — allowed
+ops pass and forbidden ops are refused by name for a bound persona; an unbound
+tenant is refused; a binding never reaches a second tenant (cross-tenant read
+refused); bind/unbind are idempotent; and deleting the `Binding` row directly
+reproduces the gate script's negative control. Gate:
+[`scripts/check-rbac-head-binding.sh`](../../scripts/check-rbac-head-binding.sh)
+(registered in `scripts/verify.sh`) re-runs the suite, asserts GR-28
+default-off live, and provokes the same delete-the-binding control end to end.
+
 ## Layout
 
 | File | Purpose |
@@ -288,6 +344,7 @@ Tests: [`tests/test_skills_isolation.py`](tests/test_skills_isolation.py).
 | [`bindings.py`](bindings.py) | `grant_role` / `revoke_role` + the no-lockout invariant |
 | [`guard.py`](guard.py) | `guard` / `guard_session` / sessions + denial contract |
 | [`presets/`](presets/) | YAML role packs + custom-pack seam |
+| [`head_bindings.py`](head_bindings.py) | Tenant/RBAC binding for the head-of-org personas (issue #952), opt-in per tenant |
 | [`tests/`](tests/) | pytest suite (see below) |
 | [`__init__.py`](__init__.py) | Public API re-exports |
 

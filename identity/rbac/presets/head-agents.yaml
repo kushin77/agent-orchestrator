@@ -1,0 +1,67 @@
+# Head-of-org agent role pack (issue #952) - RBAC roles for the platform
+# personas that act with head-of-org authority in a tenant: hermes (coding /
+# capability-routing worker) and paperclip (knowledge / reporting worker).
+#
+# NOT a tenant type: this pack is never resolved by seed_org(org.tenant_type -
+# see presets/__init__.py BUILTIN_TENANT_TYPES) and is never auto-seeded when
+# an Org is created. It is loaded and granted ONE PERSONA AT A TIME, on
+# request, by identity/rbac/head_bindings.py::bind_persona_to_tenant - the
+# opt-in seam. Per GR-28 (declared-default-off), a tenant is bound to no
+# persona until it explicitly enables one; nothing in this repo grants these
+# roles automatically.
+#
+# Pack schema: identity/rbac/README.md. Provenance for the permission set:
+# registry/personas/cards/{hermes,paperclip}.yaml (capabilitySet/ownedLanes)
+# projected onto the resource:action language - never a copy of the cards,
+# a projection, the same discipline identity/rbac/boundaries.py uses for the
+# C-suite pack.
+key: head-agents
+name: Head-of-Org Agent Bindings
+description: >-
+  Roles for platform head-of-org personas (hermes, paperclip), bound to a
+  tenant only on explicit opt-in (GR-28).
+role_admin_permission: roles:manage
+roles:
+  # hermes - registry/personas/cards/hermes.yaml: coding / capability-routing
+  # worker. Head-of-org authority means it may read the org/agent registry and
+  # open directives/tickets against it - it explicitly does NOT get
+  # tenant administration, secret rotation, or rollout approval; those stay
+  # with the tenant's own admin/owner role from its BUILTIN_TENANT_TYPES pack.
+  # Cross-tenant reads are refused by the scope gate (resolve_scope), not by
+  # this permission list - a binding only ever exists inside one Org.
+  - key: hermes-head
+    name: Hermes (head-of-org agent)
+    description: >-
+      Head-of-org coding/routing worker. May read the org/agent registry and
+      create directives/tickets. Must NOT administer tenants, rotate secrets,
+      approve rollouts, or read another tenant's data.
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+      - directive:create
+      - ticket:create
+    is_system: true
+
+  # paperclip - registry/personas/cards/paperclip.yaml: knowledge / reporting
+  # worker (LOW tier). Same non-negotiable exclusions as hermes: no tenant
+  # administration, no secret rotation, no rollout approval, no cross-tenant
+  # reads (scope-gated). This is the real RBAC role/binding the existing
+  # identity/rbac/skills.py carve-out is NOT: skills.py scopes SKILL.md
+  # visibility per org, it grants no resource:action permission and creates no
+  # Role/Binding at all.
+  - key: paperclip-head
+    name: Paperclip (head-of-org agent)
+    description: >-
+      Head-of-org knowledge/reporting worker. May read the org/agent registry
+      and author docs/briefs. Must NOT administer tenants, rotate secrets,
+      approve rollouts, or read another tenant's data.
+    level: org
+    permissions:
+      - org:read
+      - team:read
+      - agent:read
+      - doc:create
+      - knowledge:read
+    is_system: true
