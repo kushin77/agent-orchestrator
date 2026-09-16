@@ -68,6 +68,37 @@ tree_is_dirty() { # -> 0 dirty, 1 clean  (MERGE_GATE_FORCE_DIRTY=1 forces dirty)
   [ -n "$(git status --porcelain 2>/dev/null)" ]
 }
 
+# A gate PARK is box contention, not a verdict (issue #956). `scripts/verify.sh
+# verify` exits 10 (this worktree already held), 11 (box-wide cap reached) or 12
+# (permit store unusable) BEFORE running a single check and without touching any
+# attestation. A merge gate that reads that as a failure refuses a green lane
+# merely because the box was busy. So the verify step is retried, bounded and
+# with a fixed wait (never exponential), and a real verdict (0 PASS / 1 NOT-OK)
+# or a genuine CANNOT-ASSESS (anything other than 10/11/12) is returned
+# immediately. After the budget the last PARK code is returned, which the step
+# maps to CANNOT-ASSESS — a merge never proceeds on a PARK (no-false-green).
+run_verify_step() { # -> scripts/verify.sh's own exit code
+  local attempt rc
+  local max_attempts="${MERGE_GATE_VERIFY_ATTEMPTS:-8}"
+  local wait_seconds="${MERGE_GATE_VERIFY_WAIT:-20}"
+  rc=11
+  for attempt in $(seq 1 "$max_attempts"); do
+    bash scripts/verify.sh verify
+    rc=$?
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]; then
+      return "$rc"
+    fi
+    if [ "$rc" -ne 10 ] && [ "$rc" -ne 11 ] && [ "$rc" -ne 12 ]; then
+      return "$rc"
+    fi
+    # PARK (10/11/12): contention, retry with a fixed wait (AO-GR-21: bounded).
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      sleep "$wait_seconds"
+    fi
+  done
+  return "$rc"
+}
+
 # --- run (default): the full pre-merge contract ------------------------------
 run_contract() {
   if tree_is_dirty; then
@@ -94,7 +125,7 @@ run_contract() {
   }
 
   : > "$verify_dir/merge-gate.log"
-  step verify    bash scripts/verify.sh verify
+  step verify    run_verify_step
   step drift     bash scripts/check-drift.sh
   step tests     bash scripts/run-pytest-suites.sh
   step negative-controls bash scripts/check-negative-controls.sh
