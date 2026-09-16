@@ -1,0 +1,34 @@
+# Enterprise control map — the machine-readable source of truth (#874).
+#
+# One row per rule in Part B of docs/GOLDEN-RULES.md (the platform/SaaS spine).
+# `scripts/check-control-coverage.sh` validates every row against the repository:
+#   * the rule exists in the spine's Part B;
+#   * every module path exists;
+#   * every control named is INVOKED BY A GATE (discovered by
+#     scripts/discover-checks.sh, or named in scripts/verify.sh / the Makefile) —
+#     a control nobody runs is a formality;
+#   * a rule that is not ENFORCED is recorded in scripts/control-coverage-gaps.tsv,
+#     which is SHRINK-ONLY: a new gap is refused by name.
+#
+# Status vocabulary — the honest three, not a pass/fail:
+#   ENFORCED  a gate control exists whose STATED SUBJECT is this rule
+#   PARTIAL   a control covers part of the rule, and the remainder is a gap
+#   GAP       no gate control enforces it today
+#
+# Format: <rule>\t<status>\t<modules (comma-separated)>\t<controls (comma-separated, "-" for none)>
+#
+# `rule` is the spine rule id; the subject is the spine's own heading, never
+# restated here, so the two cannot drift apart. The `rule status modules controls`
+# line below is a HEADER, not a row — it is commented out on purpose, and the gate
+# additionally requires a row's first field to look like a rule id.
+#
+# rule	status	modules	controls
+AO-GR-12	ENFORCED	control-plane/	check-control-functions.sh,check-control-verbs.sh
+AO-GR-13	PARTIAL	governance/merge/,governance/lifecycle/	check-landing.sh
+AO-GR-14	ENFORCED	governance/merge/,identity/rbac/	check-authority.sh
+AO-GR-15	GAP	telemetry/ledger/,identity/edges/	-
+AO-GR-16	ENFORCED	guardrails/dlp/,guardrails/chat/	check-chat-guardrails.sh
+AO-GR-17	ENFORCED	telemetry/ledger/,telemetry/audit/	check-audit-read-model.sh
+AO-GR-18	ENFORCED	gateway/finops/,telemetry/chat/	check-chat-finops.sh,check-metering-parity.sh
+AO-GR-19	ENFORCED	guardrails/policy/,guardrails/honesty/	check-negative-controls.sh,check-guardrail-controls.sh,check-policy-schema.sh
+AO-GR-20	ENFORCED	infra/feature-flags/,portal/config/	check-feature-flags.py
