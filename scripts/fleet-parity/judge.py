@@ -697,7 +697,7 @@ def _gh(slug: str, path: str) -> object | None:
 def _composite_verdict_line(output: str) -> str | None:
     """The GATE's own verdict line — never a per-check line.
 
-    Two forms are accepted and both are real artifacts: `verify: PASS|FAIL…` / 
+    Two forms are accepted and both are real artifacts: `verify: PASS|FAIL…` and
     `GATE: PASS|FAIL` from the gate's stdout, and the attestation projection
     `attestation(<path>): result=PASS checks=N skipped=K`, which the collector
     renders from the gate's own signed record (the rendering names its source, so

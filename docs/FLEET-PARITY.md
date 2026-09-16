@@ -147,6 +147,12 @@ The aggregate is CANNOT-ASSESS, and that is the honest answer: eight dimensions
 hold, one could not be read. It is **not** a PASS, because the rule this document
 exists to enforce is that an unreadable input is not a pass.
 
+The same instrument, pointed at **the lane that built it** while that lane was still
+unmerged, reports 2 OK and 8 CANNOT-ASSESS and exits 2 — no FAIL. That is the
+behaviour `make verify` depends on: the check runs inside every lane's composite
+gate, so a lane that is simply incomplete must be a SKIP (exit 2 is recorded as one,
+by name), never a red.
+
 The subject line is printed with every verdict, and it names **how the subject was
 chosen** — which pull request (and on what basis), which lane worktree (and why that
 one), which isolation session. Two of those were bugs before they were features,
