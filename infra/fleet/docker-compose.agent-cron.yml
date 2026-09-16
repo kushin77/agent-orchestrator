@@ -1,0 +1,129 @@
+# docker-compose.agent-cron.yml — the fleet-cron image, DEV-FIRST (issue #710, EPIC #706 D2).
+#
+# WHY this file exists
+#   D1 (#709) packaged the fleet's three scheduled jobs into one image
+#   (`infra/fleet/Dockerfile` + `inventory.yaml`). An image that BUILDS is not an
+#   image that BOOTS: the first step of the port is to start it here, on the box
+#   the schedule was written on, and watch it dispatch its roles — with every job
+#   in dry-run, so the experiment cannot touch live state. `dev_run.py` is what
+#   runs inside; this file is how an operator starts it and how the gate measures
+#   it. The epic's own acceptance is these three commands:
+#
+#     docker compose -f infra/fleet/docker-compose.agent-cron.yml up -d
+#     curl -fsS http://localhost:8790/healthz
+#     docker compose -f infra/fleet/docker-compose.agent-cron.yml logs --no-color | grep -c 'dry-run'
+#
+#   (`-f` is on all three: this repository has no default `docker-compose.yml` at
+#   its root, so a bare `docker compose logs` would resolve a file that does not
+#   exist. The issue's own sketch omits it on the last line; the command it
+#   MEANS is the one above, and the gate runs that.)
+#
+# THE LIVE STATE IS MOUNTED READ-ONLY — and the mount is measured, not assumed
+#   `.fleet/` (mailbox, heartbeat, audit rail) and `.board/` (the claim ledger
+#   every other lane reads) are the state this dev run must not touch, so they
+#   are mounted `read_only: true`. That is the STRUCTURAL half. The other half is
+#   the run's own evidence: `dev_run.py` checksums both roots before and after
+#   every dispatch and refuses (verdict `not-ok`, `/healthz` 503) if a file the
+#   dispatched roles may write has moved, and it RECORDS how each root is mounted
+#   by reading `/proc/self/mountinfo` — so "read-only" is a measurement an
+#   operator can check in the decision document, not a claim in a comment.
+#
+#   `create_host_path: false` is deliberate: without it compose CREATES a missing
+#   host path for a bind mount, as root, empty — which would silently give the
+#   container a private empty board and make the whole run a fiction on a
+#   checkout that has no state yet. A missing state root is an error here.
+#
+# THE PORT
+#   One variable, `AO_FLEET_CRON_PORT`, defaulting to the port `infra/fleet/inventory.yaml`
+#   declares — used for the container's `AO_FLEET_PORT` and for the published
+#   host port, so the two cannot drift from each other. It is published on
+#   `127.0.0.1` only: this is a dev-first surface on the operator's own box, and
+#   the fact it serves (whether THIS run was clean) has no business on the LAN.
+#
+# SECRETS: NONE (GR-6). No `env_file` — deliberately, per EPIC #706's own scope:
+#   a mounted env file is visible in `docker inspect`. Nothing here is a
+#   credential; the fleet's own credential (`gh`'s) is not mounted by this file,
+#   because the dry run dispatches nothing that writes.
+#
+# FLAG POSTURE (GR-5)
+#   Nothing is promoted: this file starts a container on the operator's box and
+#   declares no Terraform resource and no service flag. Deployment onto a
+#   scheduler is D3+ — that is where the OFF-by-default flag belongs.
+
+name: agent-fleet-cron
+
+services:
+  agent-cron:
+    # The image D1 builds. `build:` is here so `up` works from a cold box; when
+    # the image is already present compose uses it unchanged.
+    image: ${AO_FLEET_CRON_IMAGE:-agent-fleet-cron:dev}
+    build:
+      context: ../..
+      dockerfile: infra/fleet/Dockerfile
+    container_name: ${AO_FLEET_CRON_CONTAINER:-agent-orchestrator-fleet-cron}
+    # The command replaces the image's default (`cron -f`): the entrypoint still
+    # validates the environment and installs the schedule first, because that is
+    # the image's contract, and then this is what runs.
+    command: ["python3", "/repo/infra/fleet/dev_run.py"]
+    environment:
+      # Where the checkout is, where its state is, and how the run behaves. Every
+      # one of these is declared in infra/fleet/env_contract.py, which the
+      # entrypoint and the dev run both validate against before doing anything.
+      AO_FLEET_REPO: /repo
+      AO_FLEET_DIR: /repo/.fleet
+      AO_FLEET_BOARD_DIR: /repo/.board
+      AO_FLEET_CRON_NO_INSTALL: "0"
+      # The one value that is refused rather than honoured: this lane is the
+      # dry-run harness (env_contract.py, `dry-run-required`).
+      AO_FLEET_DRY_RUN: "1"
+      AO_FLEET_CRON_INTERVAL: "${AO_FLEET_CRON_INTERVAL:-2}"
+      AO_FLEET_PORT: "${AO_FLEET_CRON_PORT:-8790}"
+      AO_FLEET_ROLE_TIMEOUT: "${AO_FLEET_ROLE_TIMEOUT:-120}"
+    ports:
+      - "127.0.0.1:${AO_FLEET_CRON_PORT:-8790}:${AO_FLEET_CRON_PORT:-8790}"
+    volumes:
+      # The live runtime state of the checkout this file lives in (override with
+      # AO_FLEET_HOST_REPO when the state belongs to another checkout, e.g. a lane
+      # worktree reading the shared one). Read-only, and required to exist.
+      - type: bind
+        source: ${AO_FLEET_HOST_REPO:-../..}/.fleet
+        target: /repo/.fleet
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AO_FLEET_HOST_REPO:-../..}/.board
+        target: /repo/.board
+        read_only: true
+        bind:
+          create_host_path: false
+    # FinOps: a dev harness on a shared laptop declares what it may take. The run
+    # is two planning passes and an HTTP answer; these bounds are generous for
+    # that and small enough that a mistake cannot starve a sibling lane.
+    cpus: 1.0
+    mem_limit: 512m
+    # A clean stop is the signal being handled, not the grace period being long:
+    # dev_run.py installs its SIGTERM/SIGINT handler before the first role runs.
+    stop_grace_period: 20s
+    healthcheck:
+      # The image ships no curl it may rely on (D1 installs it for BUILD-time
+      # fetches only), so the probe uses the interpreter the image is certain to
+      # have. It answers from the real surface, and a run that wrote to a state
+      # root answers 503 — which is what makes this probe able to fail.
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c "import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:${AO_FLEET_CRON_PORT:-8790}/healthz',timeout=3).status==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      # The run checksums both state roots before and after every dispatch, and
+      # the live `.fleet/` here holds thousands of files: 20s proved too short on
+      # this box under load (measured while writing the gate), so the surface is
+      # given the room it needs before a probe counts as unhealthy.
+      start_period: 60s
+    labels:
+      ao.module: fleet-cron
+      ao.issue: "710"
+      ao.epic: "706"
