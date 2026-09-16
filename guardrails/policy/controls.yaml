@@ -111,3 +111,44 @@ controls:
     implemented_by:
       - guardrails/policy/bundles/platform/workbook-mechanical-rules.yaml
     since: "issue #636"
+
+  # ------------------------------------------------------------------------ #
+  # Head-of-org guardrails (issue #951, parent EPIC #878 lanes L9/L10).
+  # Paperclip and hermes have no guardrail policy entry (#951's gap); these
+  # two controls gate the allow-list policies in
+  # bundles/platform/hermes-head.yaml and
+  # bundles/platform/paperclip-operator.yaml. Inert unless the control is
+  # enabled AND the corresponding provider flag is on
+  # (infra/feature-flags/registry.yaml: `enable_paperclip` shipped;
+  # `enable_hermes` is added by sibling lane #950 and is read defensively —
+  # tolerating absence — by scripts/check-guardrail-head-policy.sh).
+  # ------------------------------------------------------------------------ #
+  - id: hermes-head-guardrails
+    name: Hermes head-of-org guardrails
+    description: >-
+      Activates the hermes-head-guardrails policy: hermes may dispatch/direct
+      only through the gateway and under its budget ceiling; hermes is
+      refused on self-promotion, approving a full rollout, touching secrets,
+      and running IaC apply.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/hermes-head.yaml
+    since: "issue #951"
+    notes: >
+      (informational) Default OFF; also gated by the platform's hermes
+      provider flag `enable_hermes` (sibling lane #950), read defensively.
+  - id: paperclip-operator-guardrails
+    name: Paperclip operator-seam guardrails
+    description: >-
+      Activates the paperclip-operator-guardrails policy: paperclip is
+      confined to the ADR-0013 ticket/heartbeat/budget contract shapes; it is
+      refused on code execution and cross-tenant reads.
+    enabled: false
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/paperclip-operator.yaml
+    since: "issue #951"
+    notes: >
+      (informational) Default OFF; also gated by the platform's paperclip
+      provider flag `enable_paperclip` (infra/feature-flags/registry.yaml).
