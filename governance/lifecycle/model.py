@@ -72,7 +72,13 @@ INVARIANTS: Tuple[Invariant, ...] = (
     Invariant(
         code="VERIFY_EVIDENCE_MISSING",
         requires="a green verification attestation naming the pull request's head commit - the tree that was verified and then merged",
-        remediation="run `make verify` on the branch head before merging and record its attestation; evidence names a commit, and a summary is not evidence",
+        remediation=(
+            "run `make verify` on the branch head before merging and record its attestation; evidence "
+            "names a commit, and a summary is not evidence. Close out BEFORE the lane is torn down "
+            "(`governance/lifecycle/cli.py close --issue <n>`), or keep the verified commit reachable: "
+            "the attestation is measured from one of the two, and the driver refuses to reclaim a lane "
+            "while this invariant is unsatisfied (#786)"
+        ),
     ),
     Invariant(
         code="BRANCH_NOT_DELETED",

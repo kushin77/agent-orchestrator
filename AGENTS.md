@@ -133,6 +133,19 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     `governance/lifecycle/baseline.json`, honoured only while the issue tracking
     it is open: the quarantine shrinks as legacy closes, and a new item failing
     the same invariant fails immediately.
+
+    **Close-out BEFORE lane teardown (#786).** The close-out's verification step
+    *measures the lane worktree* and its reclaim step *removes* it, so the order
+    between them is load-bearing and irreversible. `close-out` therefore refuses to
+    reclaim a lane while the item still owes its verification record — the lane is
+    kept, the refusal is named, and the next pass finishes the job — and a lane
+    already torn down is recovered by re-measuring the **verified head commit** in a
+    throwaway worktree, never by declaring the evidence missing. Measured before
+    this: three lanes of epic #616 (#622, #623, #626) plus #793 carried a permanent
+    `VERIFY_EVIDENCE_MISSING` for work whose gate *was* green, with a remediation
+    that had no branch left to run on.
+    (`scripts/check-lifecycle-verify-order.sh` provokes the ordering, its negative
+    controls, and both halves of the fix.)
 17. **Orphan reconciliation (institutional, issue #304).** A session records a
     **heartbeat** in `.fleet/sessions/<session_id>.json` while it runs, refreshed
     on an interval. A session whose beat passes the TTL (15 minutes) is orphaned;

@@ -246,6 +246,57 @@ The gate is [`scripts/check-lifecycle-reclaim.sh`](../../scripts/check-lifecycle
 all three wedges are provoked against a real repository, and each fix is reverted
 in a mutant that must make the controls go red.
 
+### 3.5 Step 7 is gated on step 2, and the record survives the lane (#786)
+
+Step 2 — `record-verification` — **measures the lane worktree**, and step 7 — `reclaim-lane`
+— **removes it**, so the order between them is load-bearing *and irreversible*. Until #786
+the driver only *ordered* them: `reclaim-lane` ran whether or not `record-verification` had
+recorded anything. A transient PARK — the
+by-design outcome of the admission control while four other lanes are gating — or a
+genuine failure therefore destroyed the only tree the evidence could have come from,
+and the invariant naming that evidence became **permanently unsatisfiable**. Measured
+three times in one dispatch on the lanes of epic #616 (#622, #623, #626) and again on
+#793 (#854):
+
+```
+  failed    record-verification: RuntimeError: no lane worktree for #622; the verified tree no longer exists
+  REMAINS  VERIFY_EVIDENCE_MISSING  #622  no green verification attestation is recorded
+```
+
+A permanently red record for work that *was* verified, carrying a remediation ("run
+`make verify` on the branch head") that no longer had a branch to run it on. A control
+that cannot succeed is a formality; this one **inverted**. The order is therefore
+enforced from both ends:
+
+| End | Mechanism |
+|---|---|
+| **the driver** refuses the unsafe order | `reclaim-lane` is **withheld** while the item still owes `record-verification`, refused by name, and the lane is kept. The next pass finishes the job — the retry the eight-step design always assumed, made reachable instead of asserted. |
+| **the record** is order-independent | `record-verification` re-measures the **verified head commit** once the lane is gone, in a throwaway detached worktree, and removes that tree again. The commit — not the branch, not the worktree — is what proves the tree. |
+
+Three consequences worth stating, because each is a place a change could quietly
+weaken this:
+
+- a lane kept **on purpose** is not reported as `LANE_NOT_RECLAIMED`. That finding's
+  remediation ("close the lane, committing or discarding its work first") **is** the
+  wedge in this state, so a driver that printed it would be instructing the operator
+  to destroy the evidence. The withholding is printed as a step and named in
+  `WITHHELD`, and the finding that remains is the root cause. A lane the driver
+  *tried* to reclaim and could not is still charged in full;
+- withheld is **not** unassessed. A park still reports CANNOT-ASSESS and never NOT-OK
+  (#840): nothing was measured, and keeping the lane is what makes the next attempt
+  able to measure it;
+- re-measurement is not a blanket pass. A red gate at that commit stays a failure, and
+  a commit the repository does not hold is refused **by name**, naming the ordering
+  that would have prevented it — never the old dead end.
+
+The controls live in
+[`scripts/check-lifecycle-verify-order.sh`](../../scripts/check-lifecycle-verify-order.sh),
+which drives the real driver, the real port and the real reclaim command against a real
+repository whose lane is a real `git worktree`: a lane reclaimed before close-out whose
+gate was **green** has its invariant *satisfied*; the same lane with a **red** gate, or
+an unreachable commit, is still refused by name; and disabling either half of the fix
+reproduces the wedge, so neither half is decoration.
+
 ## 4. Auditing, and why it is offline
 
 `cli.py collect` reaches GitHub; `cli.py audit` never does. The rules are asserted

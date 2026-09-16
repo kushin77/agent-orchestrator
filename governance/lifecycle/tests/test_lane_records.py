@@ -135,7 +135,11 @@ def test_record_verification_runs_the_gate_in_the_live_lane(
     assert "verify green" in detail
     assert str(live.worktree) in log.read_text(encoding="utf-8"), "the gate ran in the LIVE lane, not the dead one"
     assert str(dead.worktree) not in log.read_text(encoding="utf-8")
-    assert read_journal(ISSUE, repo)["verify"] == {"ok": True, "commit": head}
+    # The record names which source produced it (#786): a green attestation can be
+    # measured in the lane or re-measured at the commit, and the two are only
+    # distinguishable if the record says which. Keeping the lane preferred is what
+    # this test is for; the source is what makes the two paths auditable.
+    assert read_journal(ISSUE, repo)["verify"] == {"ok": True, "commit": head, "source": "lane"}
 
 
 def test_record_verification_names_a_dead_lane_rather_than_denying_it(repo: Path, live_and_dead):
