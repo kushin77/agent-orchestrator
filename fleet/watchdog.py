@@ -60,6 +60,38 @@ an operator rearms it (`python3 fleet/watchdog.py rearm --rung <name>`) or the
 rung's state changes on its own. A drifted rung that is busy is *recorded* as
 pending drift and acted on when the run completes, instead of being dropped every
 tick.
+
+**And the remedy has to be reachable (issue #780).** #773 gave the
+`checkout-behind` case its correct remedy, and that remedy could not run: cron
+executes `python3 fleet/watchdog.py run` **from the shared checkout**, so the
+watchdog in flight is whatever copy the checkout holds — and when the checkout is
+the stale side, the running watchdog *is* the pre-fix watchdog, whose remedy is
+the code it cannot see. Measured 2026-09-15: the shared checkout sat 5 commits
+behind (`e9cfc10` merged, `HEAD` `b95a8b7`), the sister ran `592b132` for ~5.5
+hours, and #773's own evidence records a **human** doing the fast-forward.
+
+Two circularities, and this module now closes both:
+
+1. **Availability** — the remedy must not be read out of the checkout it repairs.
+   `self_freshness` answers "am I current?" by comparing THIS FILE's blob at
+   `origin/master` (`git rev-parse origin/master:fleet/watchdog.py`) against the
+   working tree's (`git hash-object`), and `bootstrap_checkout` performs the move
+   with `git fetch` + `git merge --ff-only` as *git subprocesses*. Neither the read
+   nor the move depends on the content of the loaded module — they depend on
+   `git`, which lives outside the checkout. That is the small stable kernel #780
+   asks for, and its body is kept tiny on purpose: a stale copy that has it can
+   always run it.
+2. **Durability** — a process that fast-forwards the checkout has already IMPORTED
+   the old module, so the rest of its pass would still be the code it just
+   replaced, and the repair would never become the running code.
+   `bootstrap_preflight` therefore `execv`s a fresh interpreter onto the
+   now-current file and re-runs the same verb, bounded by `ENV_BOOTSTRAPPED` to
+   one re-exec per invocation — never a loop.
+
+The residual is stated rather than hidden: a checkout whose copy of this module
+predates this kernel cannot bootstrap itself, because the kernel has to be
+installed once. That is why the kernel is tiny and why the pass reports its
+freshness VERDICT — not its age — naming both commits and both blobs.
 """
 
 from __future__ import annotations
@@ -291,6 +323,16 @@ def fast_forward_checkout(
         return False, before, f"git fetch origin failed ({type(exc).__name__}: {exc})"
     if fetched.returncode != 0:
         return False, before, f"git fetch origin failed ({(fetched.stderr or '').strip().splitlines()[-1:] or ['no output']})"
+    return _fast_forward_move(target, remote, before)
+
+
+def _fast_forward_move(target: Path, remote: str, before: str) -> tuple[bool, str, str]:
+    """The move itself — `git merge --ff-only`, the fetch being the caller's job.
+
+    Extracted so the rung remedy (#773) and the bootstrap (#780) perform the SAME
+    move while keeping their own message shapes: they differ in what they decide
+    *before* merging, never in how they merge.
+    """
     try:
         merged = _git(target, ["merge", "--ff-only", remote])
     except (OSError, subprocess.SubprocessError) as exc:
@@ -302,6 +344,279 @@ def fast_forward_checkout(
     if before != "unknown" and after != before:
         return True, after, f"fast-forwarded {before} -> {after}"
     return False, after, f"the checkout is already at {after}"
+
+
+# ── the bootstrap kernel (issue #780) ───────────────────────────────────────
+# cron runs this module FROM the checkout it supervises, so the copy in flight is
+# the checkout's copy. Everything below therefore reads and moves through `git`
+# subprocesses and the standard library only — never through the loaded module's
+# own understanding of itself — so that a checkout which is BEHIND can still ask
+# whether it is behind, and still be brought forward.
+
+#: This module's own path inside the checkout. The bootstrap kernel identifies
+#: itself by it, so it can ask the REMOTE what this file should say instead of
+#: trusting the copy it is currently executing (#780).
+SOURCE_RELPATH = "fleet/watchdog.py"
+#: Set in the re-exec'd process's environment so the bootstrap happens at most
+#: ONCE per invocation: the second process finds it set and does not re-exec.
+ENV_BOOTSTRAPPED = "AO_WATCHDOG_BOOTSTRAPPED"
+
+#: The freshness verdicts (`self_freshness`). `behind` is the one #780 exists for:
+#: the checkout holds older code, so the code being executed is old code.
+FRESH_CURRENT = "current"
+FRESH_BEHIND = "behind"
+FRESH_DIVERGED = "diverged"
+FRESH_CANNOT_ASSESS = "cannot-assess"
+FRESH_STATES = (FRESH_CURRENT, FRESH_BEHIND, FRESH_DIVERGED, FRESH_CANNOT_ASSESS)
+
+
+def _short(value: str | None, width: int = 12) -> str:
+    """A commit or blob hash, shortened for a log line — `unknown` when unreadable."""
+    return value[:width] if value else "unknown"
+
+
+def _git_read(target: Path, argv: list[str]) -> str | None:
+    """One git READ, or `None`. A read that fails is never a value (#780)."""
+    try:
+        result = _git(Path(target), argv)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def source_blob(root: Path | None = None) -> str | None:
+    """The blob hash of THIS module's file as the working tree holds it.
+
+    `git hash-object` reads the bytes on disk, so this is the source of the code
+    in flight — not the commit the tree claims to be at.
+    """
+    target = Path(root) if root is not None else ROOT
+    return _git_read(target, ["hash-object", "--", str(target / SOURCE_RELPATH)])
+
+
+def remote_source_blob(root: Path | None = None, *, remote: str = "origin/master") -> str | None:
+    """The blob hash of THIS module's file AT `remote` — the remedy's own version.
+
+    This is the read that dissolves the circularity (#780): "am I current?" is
+    answered from the remote ref, so a checkout that is behind can still ask the
+    question, and the answer does not depend on the copy doing the asking.
+    """
+    target = Path(root) if root is not None else ROOT
+    return _git_read(target, ["rev-parse", "--verify", "--quiet", f"{remote}:{SOURCE_RELPATH}"])
+
+
+def _is_ancestor(target: Path, older: str, newer: str) -> bool:
+    """True when `older` is an ancestor of `newer`.
+
+    `merge-base --is-ancestor` answers with an EXIT CODE (1 is a real answer, not a
+    failure), so this cannot use `_git_read`, which folds every non-zero into
+    `None`: an unreadable repository must not be confused with "not an ancestor".
+    """
+    try:
+        result = _git(Path(target), ["merge-base", "--is-ancestor", older, newer])
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def self_freshness(root: Path | None = None, *, remote: str = "origin/master") -> dict:
+    """Is the code THIS process is running the code at `remote`? (#780)
+
+    The precondition #780 asks for: the checkout's freshness becomes an ASSERTED
+    measurement instead of an assumption. Every input is a `git` subprocess, so a
+    checkout that is behind can still make the measurement — the failure the old
+    design could not see, because it could only ask the copy in flight.
+
+    Verdicts (the `verdict` key, with `reason` naming both sides):
+
+      * ``current``       — the working tree's blob EQUALS `remote`'s: this process
+                            is running the code the remote holds.
+      * ``behind``        — the blobs differ and the local HEAD is a STRICT ancestor
+                            of `remote`: the checkout holds older code. This is the
+                            condition the bootstrap exists to repair, and the one
+                            #773 could not reach.
+      * ``diverged``      — the blobs differ and the local HEAD is not a strict
+                            ancestor: the checkout carries its own work — its own
+                            commits (a lane worktree, which is AHEAD), or
+                            uncommitted edits to this file — so `merge --ff-only`
+                            cannot close the gap without rewriting it. Reported,
+                            never silently repaired, and never confused with
+                            `behind`. The strictness matters: a commit is an
+                            ancestor of ITSELF, so a tree whose HEAD equals the
+                            remote but whose file differs is a tree with local
+                            edits, not a tree that is behind.
+      * ``cannot-assess`` — a read failed. Fail-closed: an unreadable checkout is
+                            never reported `current`, because "I cannot tell"
+                            dressed as "I am current" is #739's defect one level up.
+    """
+    target = Path(root) if root is not None else ROOT
+    local_head = _git_read(target, ["rev-parse", "--short", "HEAD"])
+    remote_head = _git_read(target, ["rev-parse", "--short", remote])
+    local_blob = source_blob(target)
+    remote_blob = remote_source_blob(target, remote=remote)
+    record: dict = {
+        "root": str(target),
+        "local_head": local_head,
+        "remote_head": remote_head,
+        "local_blob": local_blob,
+        "remote_blob": remote_blob,
+    }
+    if None in (local_head, remote_head, local_blob, remote_blob):
+        unreadable = [
+            label
+            for label, value in (
+                ("the local HEAD", local_head),
+                (remote, remote_head),
+                (f"{SOURCE_RELPATH} in the working tree", local_blob),
+                (f"{remote}:{SOURCE_RELPATH}", remote_blob),
+            )
+            if value is None
+        ]
+        record["verdict"] = FRESH_CANNOT_ASSESS
+        record["reason"] = f"cannot read {', '.join(unreadable)}"
+        return record
+    record["reason"] = (
+        f"running {_short(local_blob)} at {local_head}, {remote} {_short(remote_blob)} at {remote_head}"
+    )
+    if local_blob == remote_blob:
+        record["verdict"] = FRESH_CURRENT
+        return record
+    if local_head != remote_head and _is_ancestor(target, local_head, remote_head):
+        record["verdict"] = FRESH_BEHIND
+        record["reason"] += " — the checkout is BEHIND, so the code in flight is older than the remote"
+    else:
+        record["verdict"] = FRESH_DIVERGED
+        record["reason"] += (
+            " — the checkout is NOT strictly behind the remote (it carries its own commits or "
+            "uncommitted edits), so a fast-forward would have to discard them"
+        )
+    return record
+
+
+def bootstrap_checkout(
+    root: Path | None = None, *, remote: str = "origin/master"
+) -> tuple[bool, str, str]:
+    """Move a BEHIND checkout forward using nothing from the code it repairs (#780).
+
+    `(moved, head, detail)`. The move is `git fetch origin` then a fast-forward,
+    run as *git* subprocesses: the `git` binary is not in the checkout, so the
+    remedy is available no matter how old the tree is — and no matter whether the
+    loaded module knows about it, which is what makes this a bootstrap rather
+    than a second instance of the same defect.
+
+    A `current` verdict is a no-op. `diverged` is REFUSED by name, because a
+    fast-forward would have to discard the checkout's own work. `cannot-assess`
+    is a refusal too, never a silent success. Never raises: a watchdog that dies
+    stops watching, so a blocked network is a recorded refusal, not a crash.
+    """
+    target = Path(root) if root is not None else ROOT
+    before = _git_head(target)
+    if before == "unknown":
+        # Refuse BEFORE fetching: a directory that does not resolve to a git HEAD is
+        # not a checkout that is behind, and a network call would tell us nothing
+        # about it. The refusal names the path, so the operator learns WHICH tree
+        # could not be read rather than only that something failed.
+        return (
+            False,
+            before,
+            f"REFUSED, the checkout cannot be read at all ({target} did not resolve to a git HEAD)",
+        )
+    try:
+        fetched = _git(target, ["fetch", "origin"])
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, before, f"git fetch origin failed ({type(exc).__name__}: {exc})"
+    if fetched.returncode != 0:
+        reason = (fetched.stderr or fetched.stdout or "").strip().splitlines()
+        return False, before, f"git fetch origin failed ({reason[-1] if reason else 'no output'})"
+    freshness = self_freshness(target, remote=remote)
+    verdict = freshness["verdict"]
+    if verdict == FRESH_CURRENT:
+        return False, before, f"the code in flight is already {remote}'s ({freshness['reason']})"
+    if verdict == FRESH_CANNOT_ASSESS:
+        return False, before, f"REFUSED, the checkout cannot be certified current ({freshness['reason']})"
+    if verdict == FRESH_DIVERGED:
+        return False, before, (
+            f"REFUSED, the checkout is not an ancestor of {remote} so a fast-forward would have to "
+            f"discard it; only a BEHIND checkout is moved ({freshness['reason']})"
+        )
+    moved, head, detail = _fast_forward_move(target, remote, before)
+    if not moved:
+        return False, head, detail
+    return True, head, f"{detail} (source {_short(freshness['remote_blob'])}, was {_short(freshness['local_blob'])})"
+
+
+def reexec_watchdog(argv: list[str]) -> None:
+    """Replace this process with a fresh interpreter on the NOW-CURRENT module (#780).
+
+    The process that performed the fast-forward had already IMPORTED the old
+    module, so without this the pass it goes on to run would still be the code it
+    just replaced: the repair would not become the running code. `execv` re-reads
+    the file from disk, so it must only be called AFTER the checkout has moved.
+    Never returns.
+
+    `ENV_BOOTSTRAPPED` is set first, so the process this creates does not bootstrap
+    again — the bootstrap runs at most once per invocation.
+    """
+    os.environ[ENV_BOOTSTRAPPED] = "1"
+    os.execv(sys.executable, [sys.executable, str(Path(__file__).resolve()), *argv])
+
+
+def freshness_line(freshness: dict) -> str:
+    """The one line an operator (and the gate) reads: verdict, both commits, both blobs."""
+    return f"{freshness['verdict']} — {freshness['reason']}"
+
+
+def bootstrap_preflight(argv: list[str], root: Path | None = None) -> int | None:
+    """The `run` verb's precondition: the checkout must be the code being executed.
+
+    Returns an exit code when the pass must NOT run, or `None` when it should
+    continue. Re-execs — and so never returns — when the checkout moved, so the
+    pass that follows is executed by the code that just arrived (#780).
+
+    Fail-closed: a checkout that cannot be assessed returns CANNOT-ASSESS rather
+    than running a pass whose currency it cannot vouch for. A checkout that is
+    BEHIND and does not move is NOT-OK, because that state — a fleet silently
+    pinned to old code — is exactly what #780 measured.
+    """
+    freshness = self_freshness(root)
+    print(f"[watchdog] source: {freshness_line(freshness)}", flush=True)
+    verdict = freshness["verdict"]
+    if verdict == FRESH_CANNOT_ASSESS:
+        print(
+            f"[watchdog] source: CANNOT-ASSESS — {freshness['reason']}; refusing the pass rather "
+            f"than running code whose currency cannot be vouched for",
+            file=sys.stderr,
+            flush=True,
+        )
+        return channel.EXIT_CANNOT_ASSESS
+    if verdict != FRESH_BEHIND:
+        return None
+    moved, _head, detail = bootstrap_checkout(root)
+    print(f"[watchdog] bootstrap: {detail}", flush=True)
+    if moved:
+        if os.environ.get(ENV_BOOTSTRAPPED):
+            print(
+                "[watchdog] bootstrap: the checkout moved but this process was already re-exec'd "
+                "once — continuing on the loaded code rather than re-execing without bound",
+                flush=True,
+            )
+            return None
+        reexec_watchdog(argv)
+    # The checkout did not move. Another process may have moved it in the interval,
+    # in which case there is nothing wrong and the pass may proceed.
+    after = self_freshness(root)
+    if after["verdict"] == FRESH_CURRENT:
+        print(f"[watchdog] source: {freshness_line(after)} — brought forward concurrently", flush=True)
+        return None
+    print(
+        f"[watchdog] source: NOT-OK — the code in flight is not the remote's and the checkout was "
+        f"not moved ({after['reason']}); this is the fleet pinned to old code (#780)",
+        file=sys.stderr,
+        flush=True,
+    )
+    return channel.EXIT_NOT_OK
 
 
 def rung_log(name: str) -> Path:
@@ -847,6 +1162,12 @@ def watchdog_once(force: bool = False) -> int:
             flush=True,
         )
         return channel.EXIT_CANNOT_ASSESS
+    # #780: the pass REPORTS whether the code it is executing is the remote's, so a
+    # checkout pinned to old code is a visible finding rather than a silent
+    # condition. It does not repair here — `bootstrap_preflight` does that on the
+    # `run` verb, before this pass — because a function a test may call must not
+    # move a repository as a side effect of being observed.
+    print(f"[watchdog] source: {freshness_line(self_freshness())}", flush=True)
     baseline = channel.remote_head_commit()
     # The local HEAD is read ONCE and passed in, so both rungs are judged against
     # the same checkout — the input that separates `drifted` (the rung is stale)
@@ -959,6 +1280,49 @@ def cmd_capabilities(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bootstrap(args: argparse.Namespace) -> int:
+    """Bring the checkout forward without requiring its own copy of this code (#780).
+
+    The bootstrap's entry point, and deliberately thin: the freshness read is
+    `git`'s and the move is `git`'s, so a stale checkout that HAS this verb can
+    always run it — which is the whole point. `--root` names the checkout to
+    repair, which is what lets the gate start from a deliberately stale checkout
+    and prove the remedy reaches it; `--no-reexec` stops after the move.
+
+    Tri-state, like every other verb here: 0 OK (the checkout now holds the code
+    it is executing, whether or not it had to move), 1 NOT-OK (it is not current
+    and was not moved — `diverged`, or a refused merge), 2 CANNOT-ASSESS (the
+    checkout could not be read, so nothing can be claimed about it).
+    """
+    root = Path(args.root).resolve() if args.root else None
+    before = self_freshness(root)
+    print(f"[watchdog] source: {freshness_line(before)}", flush=True)
+    if before["verdict"] == FRESH_CURRENT:
+        print("watchdog bootstrap: the checkout already holds the code it is executing — nothing to do")
+        return channel.EXIT_OK
+    if before["verdict"] == FRESH_CANNOT_ASSESS:
+        print(f"watchdog bootstrap: CANNOT-ASSESS — {before['reason']}", file=sys.stderr)
+        return channel.EXIT_CANNOT_ASSESS
+    moved, _head, detail = bootstrap_checkout(root)
+    print(f"[watchdog] bootstrap: {detail}", flush=True)
+    after = self_freshness(root)
+    print(f"[watchdog] source: {freshness_line(after)}", flush=True)
+    if not moved:
+        print(
+            f"watchdog bootstrap: NOT-OK — the checkout is not current and was not moved "
+            f"({after['verdict']})",
+            file=sys.stderr,
+        )
+        return channel.EXIT_NOT_OK
+    if args.no_reexec or os.environ.get(ENV_BOOTSTRAPPED):
+        return channel.EXIT_OK
+    # The move is done and the file on disk is now the remote's, so re-exec onto it:
+    # the remainder of the run is then executed by the code that just arrived, and
+    # the re-exec'd process reports the `current` verdict it can now certify.
+    reexec_watchdog(["bootstrap", *(["--root", str(root)] if root else []), "--no-reexec"])
+    return channel.EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-watchdog", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -971,6 +1335,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rearm.add_argument("--rung", required=True, choices=[name for name, _p, _s, _b in RUNGS])
     rearm.set_defaults(func=cmd_rearm)
+    boot = sub.add_parser(
+        "bootstrap",
+        help="bring a BEHIND checkout forward without needing its own copy of this code (#780)",
+    )
+    boot.add_argument("--root", help="the checkout to repair (default: the one this file lives in)")
+    boot.add_argument(
+        "--no-reexec",
+        action="store_true",
+        help="stop after the move instead of re-execing onto the code that just arrived",
+    )
+    boot.set_defaults(func=cmd_bootstrap)
     caps = sub.add_parser(
         "capabilities",
         help="report the declared capabilities each rung does not implement",
@@ -990,6 +1365,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "run":
+        # #780: the checkout's freshness is an asserted PRECONDITION of the pass, not
+        # an assumption. cron runs this from the checkout, so a pass started from
+        # behind the remote is the defect itself — the remedy is executed BEFORE the
+        # code it repairs, and re-execs onto the code that just arrived.
+        reexec_args = ["run", *(["--force"] if getattr(args, "force", False) else [])]
+        preflight = bootstrap_preflight(reexec_args)
+        if preflight is not None:
+            return preflight
     return args.func(args)
 
 

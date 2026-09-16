@@ -11,44 +11,44 @@ bootstrap, mailbox layout, listener loop and day-to-day commands. Where the two
 could disagree about *who may say what to whom*, the contract wins; where they
 could disagree about *which command to type*, this file wins.
 
-**The operator's way in is its own page:**
+**The principal's way in is its own page:**
 [`../docs/OPERATOR-ACCESS.md`](../docs/OPERATOR-ACCESS.md). It names every
-surface an operator can use — the A2A control channel (the **primary** control
+surface a principal can use — the A2A control channel (the **primary** control
 plane, §7.1 of the contract), this file's control verbs, `make operator` (the
 live view) and `make console` (the browser console, loopback and fail-closed by
 default) — with the exact command for each and what needs a shell on the box.
 This runbook defers to it for access; it stays authoritative for mechanics.
-An operator who has **no** shell on the box starts at §6 of that page: the
+A principal who has **no** shell on the box starts at §6 of that page: the
 remote route (SSH over the existing Cloudflare Tunnel, with Cloudflare Access in
 front) that removes that first need. It is flag-gated OFF and publishes nothing
-until an operator applies it, so none of the bootstrap below changes while it
+until a principal applies it, so none of the bootstrap below changes while it
 ships off.
 
 ## The model
 
 | Role | Runtime | Behaviour |
 |---|---|---|
-| **Operator** | You, at the override terminal | Orders the **brain** (`channel.py order`). Never addresses the sister directly — the channel refuses it, because skipping a rung makes the brain advisory. |
-| **Brain** | DSv4PM (DeepSeek v4 Pro Max) with **human override** | The middle rung and the only directive issuer: `fleet/brain.py` drains the operator's orders, signs each one into a directive for the sister, and reports back. |
-| **Fleet brain (sister)** | DeepSeek v4.1 Flash, **no thinking** (DSv4FNone) | A dumb terminal: drains `.fleet/inbox`, executes only brain directives, spawns epic-focused subagents per directive, writes acks/results to `.fleet/outbox`. Never picks issues on its own. |
-| **Fleet subagents** | DeepSeek agent model, tier/thinking chosen by the brain's FinOps block | Epic-focused executors. One issue = one subagent = one lane, each in its own worktree. |
+| **Principal** | You, at the override terminal | Orders the **director** (`channel.py order`). Never addresses the dispatcher directly — the channel refuses it, because skipping a rung makes the director advisory. |
+| **Director** | DSv4PM (DeepSeek v4 Pro Max) with **human override** | The middle rung and the only directive issuer: `fleet/brain.py` drains the principal's orders, signs each one into a directive for the dispatcher, and reports back. |
+| **Dispatcher** | DeepSeek v4.1 Flash, **no thinking** (DSv4FNone) | Never picks work: drains `.fleet/inbox`, executes only director directives, spawns epic-focused executors per directive, writes acks/results to `.fleet/outbox`. |
+| **Executors** | DeepSeek agent model, tier/thinking chosen by the director's FinOps block | Epic-focused executors. One issue = one executor = one lane, each in its own worktree. |
 
 The chain is enforced by the transport, not by convention:
 
 ```
-operator ──order──▶ brain ──directive──▶ sister ──spawn──▶ subagent
+principal ──order──▶ director ──directive──▶ dispatcher ──spawn──▶ executor
    ▲                   ▲                     │                 │
    └──── ack/report ────┴───── ack/report ────┴──── result ────┘
 ```
 
 ```bash
-# order the brain (the top of the chain, and the ONLY way in)
-python3 fleet/channel.py order --message '{"type":"directive","task":{"issue":166,"lane":"session-fleet"},"body":"dispatch one subagent"}'
-python3 fleet/channel.py brain-outbox           # the brain's acks and refusals
-python3 fleet/channel.py brain-inbox --timeout-seconds 5   # what the brain is working on
+# order the director (the top of the chain, and the ONLY way in)
+python3 fleet/channel.py order --message '{"type":"directive","task":{"issue":166,"lane":"session-fleet"},"body":"dispatch one executor"}'
+python3 fleet/channel.py brain-outbox           # the director's acks and refusals
+python3 fleet/channel.py brain-inbox --timeout-seconds 5   # what the director is working on
 ```
 
-The brain ↔ sister and sister ↔ subagent traffic uses this file-mailbox
+The director ↔ dispatcher and dispatcher ↔ executor traffic uses this file-mailbox
 channel as the transport of record (localhost mechanics, GR-21) — decided and
 recorded in [ADR-0011](../docs/decision-records/ADR-0011-session-fleet-transport.md),
 which the channel cites. The message contract is
@@ -61,60 +61,61 @@ ships — that graduation is a transport swap, not a rewrite of the contract.
 
 ## Bootstrap (the ONLY human step)
 
-1. Open the **sister session** in VS Code.
+1. Open the **dispatcher session** in VS Code.
 2. In that session, set the model to **DeepSeek v4.1 Flash** and thinking
-   effort to **none** (DSv4FNone). Nothing else is needed from the operator.
-3. The sister session reads `fleet/directive.json` (the standing directive)
+   effort to **none** (DSv4FNone). Nothing else is needed from the principal.
+3. The dispatcher session reads `fleet/directive.json` (the standing directive)
    and starts draining `.fleet/inbox` — its dispatcher is
    `fleet/channel.py` plus the executor from issue #163.
 
-Everything after step 2 is code: the brain sends directives with
-`python3 fleet/channel.py send --message <file-or-inline-json>`, the sister acknowledges into
-`.fleet/outbox`, subagents work the issue (subject to the claim rules in
+Everything after step 2 is code: the director sends directives with
+`python3 fleet/channel.py send --message <file-or-inline-json>`, the dispatcher acknowledges into
+`.fleet/outbox`, executors work the issue (subject to the claim rules in
 `governance/dispatch/`), and evidence returns the same way.
 
 ## Directives
 
 ```json
 {
-  "from": "brain",
-  "to": "sister",
+  "schema": 2,
+  "from": "director",
+  "to": "dispatcher",
   "type": "directive",
   "model": { "tier": "flash", "thinking": "none" },
   "task": { "issue": 162, "epic": 160, "lane": "fleet" },
-  "body": "spawn one subagent for issue #162 and report back"
+  "body": "spawn one executor for issue #162 and report back"
 }
 ```
 
 * Only `directive`, `ack`, `result` and `halt` message types exist.
-* A directive is also a **chain edge**: the subagent authorizes its claim with
+* A directive is also a **chain edge**: the executor authorizes its claim with
   it — `python3 governance/dispatch/cli.py claim --issue N --agent X --lane L
-  --directive <id>` — so the brain can legally direct off-frontier work while
+  --directive <id>` — so the director can legally direct off-frontier work while
   unordered scavenging stays refused.
-* Only the brain may address a directive to the sister; the sister can never
-  issue directives (dumb-terminal rule, enforced).
+* Only the director may address a directive to the dispatcher; the dispatcher can never
+  issue directives (dispatcher-never-picks-work rule, enforced).
 * Every directive is stamped with a `nonce` when it does not carry one, and
   `send` refuses a nonce it has already seen — a replay never overwrites a
   queued order (contract §3).
 * `model.tier` ∈ {`pro`, `flash`} and `model.thinking` ∈ {`none`, `low`,
-  `high`}; anything else is refused. A subagent cannot raise its own tier —
-  only a new brain directive may escalate.
+  `high`}; anything else is refused. An executor cannot raise its own tier —
+  only a new director directive may escalate.
 
 ## Enterprise instruction stack
 
-Every brain directive hands the subagent the **same enterprise instruction
-stack the operator's top-level agent runs under**, not just the repo's own
+Every director directive hands the executor the **same enterprise instruction
+stack the principal's top-level agent runs under**, not just the repo's own
 docs. `fleet/brain.py` combines three KB groups into the directive's
 "Read first" block:
 
 * `kb.own_repo` — repo-relative doctrine (`AGENTS.md`, `docs/GOLDEN-RULES.md`,
   `docs/EXECUTION-PLAN.md`, `docs/ARCHITECTURE.md`, `fleet/CONTRACT.md`,
   `.board/snapshot.json`);
-* `kb.enterprise_instructions` — the operator's home-relative instruction stack
+* `kb.enterprise_instructions` — the principal's home-relative instruction stack
   (`~/.claude/*`, the VS Code user prompts, `~/deepseek/{AGENTS,CLAUDE}.md`,
   `~/cmr/{AGENTS,GOLDEN-RULES}.md`, the key `~/cmr/docs/*.md`, and all 11
   `~/.copilot/agents/*.agent.md` SME profiles). Each `~` is expanded to a real
-  path by `fleet/brain.py` so a subagent can open it without a shell;
+  path by `fleet/brain.py` so an executor can open it without a shell;
 * `kb.fleet_modules` — the fleet-module pointers, kept last as provenance.
 
 The paths live in `fleet/profiles/brain.profile.json`
@@ -122,39 +123,39 @@ The paths live in `fleet/profiles/brain.profile.json`
 
 ## Push → wait → completion trigger
 
-The brain never spins a session on a task. It pushes, blocks, and wakes:
+The director never spins a session on a task. It pushes, blocks, and wakes:
 
 ```bash
-# brain
+# director
 python3 fleet/channel.py send --message /tmp/directive.json      # prints the message id
 python3 fleet/channel.py wait --id <id> --timeout-seconds 600    # blocks
 
 # `--message` also takes inline JSON, so a live terminal needs no temp file:
-python3 fleet/channel.py send --message '{"from":"brain","to":"sister","type":"directive","correlation_id":"x","task":{"issue":5}}'
+python3 fleet/channel.py send --message '{"from":"director","to":"dispatcher","type":"directive","correlation_id":"x","task":{"issue":5}}'
 
-# executor (sister / subagent), the moment the task is done:
-python3 fleet/channel.py report --from sister --correlation <id> --type result --body "merged #171"
+# executor (the dispatcher), the moment the task is done:
+python3 fleet/channel.py report --from dispatcher --correlation <id> --type result --body "merged #171"
 
-# the waiting brain prints the result and continues — that is the A2A trigger
+# the waiting director prints the result and continues — that is the A2A trigger
 ```
 
 `wait` matches the outbox by message id **or** `correlation_id`, so an executor
 answers the exact directive that is being waited on. A timeout exits 1 (NOT-OK)
-— a silent pass would be a false green. The sister dispatcher (#163) calls
+— a silent pass would be a false green. The dispatcher (#163) calls
 `report` on completion; ack/result messages must carry their `correlation_id`
-and may never come from the brain itself (enforced by the contract and the
+and may never come from the director itself (enforced by the contract and the
 gate).
 
-## Sister listener loop (the pulse)
+## Dispatcher listener loop (the pulse)
 
-The sister has no agency of its own — it runs the listener and acts on whatever
+The dispatcher has no agency of its own — it runs the listener and acts on whatever
 it prints:
 
 ```bash
 while true; do
   python3 fleet/channel.py watch --timeout-seconds 600   # blocks until an order arrives
   # ...execute exactly what it printed...
-  python3 fleet/channel.py report --from sister --correlation <id> --type result --body "<evidence>"
+  python3 fleet/channel.py report --from dispatcher --correlation <id> --type result --body "<evidence>"
 done
 ```
 
@@ -162,27 +163,27 @@ done
 to run it again, not an error. Reporting **consumes** the directive: it leaves
 `.fleet/inbox` and lands in `.fleet/done`, so the pending count is always the
 number of outstanding orders. Without a running listener, queued directives sit
-unread — which is exactly what a timed-out `wait` on the brain side means.
+unread — which is exactly what a timed-out `wait` on the director side means.
 
 ## Escalation + the live log (both sides idle, never asleep)
 
-The brain and sister never sleep — they idle and wait to be pinged:
+The director and dispatcher never sleep — they idle and wait to be pinged:
 
 ```bash
-# sister/subagent: when a directive hits trouble, raise it instead of going dark
-python3 fleet/channel.py escalate --from sister --correlation <id> \
+# dispatcher/executor: when a directive hits trouble, raise it instead of going dark
+python3 fleet/channel.py escalate --from dispatcher --correlation <id> \
   --severity critical --body "verify failed twice: <exact error>"
 
-# brain: idle-watch the whole channel as a live log
+# director: idle-watch the whole channel as a live log
 python3 fleet/channel.py listen --timeout-seconds 0
 ```
 
 `listen` tails `.fleet/slog.jsonl` (the append-only structured log every
 `send`/`report`/`escalate` writes) and prints each message the moment it lands,
-so an escalation from the sister pings the brain terminal in real time. The
-brain stays blocked on `listen` — idle, not asleep — and answers on demand.
+so an escalation from the dispatcher pings the director terminal in real time. The
+director stays blocked on `listen` — idle, not asleep — and answers on demand.
 Escalations must carry `correlation_id` and a `severity` (`info`/`warn`/
-`critical`) and may only come from the sister or a subagent, never the brain
+`critical`) and may only come from the dispatcher or an executor, never the director
 (enforced by the gate).
 
 ## Live logs, KB access and mid-run steering (the A2A extension, issue #367)
@@ -206,21 +207,21 @@ python3 fleet/channel.py kb --json --text "lessons" --limit 3
 python3 fleet/channel.py steer --directive <directive-id> \
   --body "the gate is green in the worktree; the failure is a stale snapshot — refresh and re-run"
 
-# the operator steers through the hierarchy, never directly:
+# the principal steers through the hierarchy, never directly:
 python3 fleet/channel.py order --message '{
   "type": "directive", "task": {"kind": "steer", "directive": "<directive-id>"},
   "body": "retry against the refreshed board snapshot"}'
 ```
 
 - **`follow`** tails `.fleet/runs/<directive>.log` — every stdout line the
-  subagent writes (streamed by the loop as it happens) plus the loop's own
+  executor writes (streamed by the loop as it happens) plus the loop's own
   events (dispatch, claim, lane, steer, verdict). `--timeout-seconds 0`
   follows forever; `--max-lines` bounds it.
 - **`kb`** answers from `governance/knowledge/catalog.json` (the recorded
   knowledge index), each hit with source-backed evidence; a missing catalogue
   is CANNOT-ASSESS (exit 2), a query with no matches is NOT-OK (exit 1).
-- **`steer`** queues a brain-signed hint for an in-flight directive. The
-  sister loop delivers it every cycle: the hint goes to the running child's
+- **`steer`** queues a director-signed hint for an in-flight directive. The
+  dispatcher loop delivers it every cycle: the hint goes to the running child's
   stdin, is echoed into the run's log stream and stamped into the run marker
   (`.fleet/runs/<id>.json` → `steered`), then the steer is consumed. A steer
   whose run has not started stays queued; one whose run already finished is
@@ -228,26 +229,26 @@ python3 fleet/channel.py order --message '{
 
 ## Control plane (refresh / update / poke / halt / debug / watch / health)
 
-From the brain/human terminal — without stopping the sister loop:
+From the director/human terminal — without stopping the dispatcher loop:
 
 ```bash
 python3 fleet/control.py refresh    # git pull --ff-only + snapshot + make verify
 python3 fleet/control.py update     # refresh + rebuild the knowledge index
-python3 fleet/control.py poke       # ping the sister: it acks (liveness)
-python3 fleet/control.py halt       # stop the sister loop cleanly
+python3 fleet/control.py poke       # ping the dispatcher: it acks (liveness)
+python3 fleet/control.py halt       # stop the dispatcher loop cleanly
 python3 fleet/control.py debug      # channel + board + slog tail + loop process
 python3 fleet/control.py watch      # idle-watch the slog (same as listen)
 python3 fleet/control.py health     # tri-state signal: 0 healthy / 1 degraded / 2 failing
 ```
 
-`health` (issue #163) is read-only: it never spawns a subagent or touches the
+`health` (issue #163) is read-only: it never spawns an executor or touches the
 mailbox. It reports `2 failing` when `fleet/terminal.py` is not running at
 all, `1 degraded` when the loop runs but `.fleet/slog.jsonl` has gone stale or
 a claim is wedged past the staleness window, `0 healthy` otherwise. Run it
 directly for the raw JSON and exit code: `python3 fleet/health.py check
 [--stale-minutes N]`.
 
-`refresh` on the sister side is a **self-update**: the loop pulls, runs
+`refresh` on the dispatcher side is a **self-update**: the loop pulls, runs
 `make verify`, then re-executes itself with the new code — so the terminal can
 be upgraded live without a human restart. `poke` forces it to react so you can
 debug it without stopping it.
@@ -264,12 +265,12 @@ bash fleet/run-fleet.sh        # == python3 fleet/control.py live
 Or separately:
 
 ```bash
-bash fleet/brain.sh            # brain: the context stream + the order loop
-bash fleet/terminal.sh         # sister: never-idle loop (watch -> run -> report/escalate)
+bash fleet/brain.sh            # director: the context stream + the order loop
+bash fleet/terminal.sh         # dispatcher: never-idle loop (watch -> run -> report/escalate)
 ```
 
-The sister loop (`fleet/terminal.py`) is code-native: it watches `.fleet/inbox`
-forever, runs one subagent per directive with the agent CLI (`--runner "claude
+The dispatcher loop (`fleet/terminal.py`) is code-native: it watches `.fleet/inbox`
+forever, runs one executor per directive with the agent CLI (`--runner "claude
 -p"` by default; `--dry-run` prints the command), reports the result, and
 escaluates any failure. An empty inbox is just another poll cycle — it never
 idles out. `FLEET_RUNNER` overrides the runner.
@@ -282,16 +283,16 @@ per-user install directories (`~/.local/bin`, `~/bin`, `~/.claude/local`, …,
 derived from HOME — `fleet/runtime.py`), and `argv[0]` is handed to the child as
 an **absolute** path. This is not belt-and-braces: the loop is cron's child and
 inherits cron's minimal PATH, and the measured failure was the fleet being unable
-to spawn a single subagent because `~/.local/bin` was not on it.
+to spawn a single executor because `~/.local/bin` was not on it.
 
 The same environment is passed explicitly at spawn (`fleet/watchdog.py`), so the
-whole chain — cron → watchdog → launcher → loop → subagent — sees one PATH.
+whole chain — cron → watchdog → launcher → loop → executor — sees one PATH.
 
 An unresolvable runner is a **startup condition, not a per-directive failure**:
 the loop escalates **once**, holds the queue via `.fleet/paused` (so every control
 is still read — the hold is released automatically the moment the runner
 resolves), and dispatches nothing. The hold is recorded in
-`.fleet/runner-hold.json`, so the preflight never releases a pause an operator
+`.fleet/runner-hold.json`, so the preflight never releases a pause a principal
 set.
 
 A gate the loop could not assess is **CANNOT-ASSESS**, never a failure of the
@@ -307,7 +308,7 @@ only when all four agree — `fleet/runners.py` is where that is declared and ch
 
 Measured 2026-09-15 (`master` @ `dd8cbfc`): the loop asked whether `claude` resolved
 (it did) and never whether it could honour `deepseek-v4-flash` (it could not), so
-every subagent run died about ten seconds after it started:
+every executor run died about ten seconds after it started:
 
     [claude-code:unrecognized_model] {"model":"deepseek-v4-flash","query_source":"sdk"}
     .fleet/runs/*.log: 192 model-rejection lines, 40 status=failed, 0 status=ok
@@ -324,7 +325,7 @@ Two profiles are declared:
 | `claude-byok` (default) | `claude` | `--model` | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
 | `deepseek-native` | `deepseek` | `-m` | nothing — it carries its own credential config |
 
-The profile is inferred from `argv[0]`'s basename. An operator whose runner is a
+The profile is inferred from `argv[0]`'s basename. A principal whose runner is a
 wrapper — or who wants a non-default profile — names it:
 
 ```bash
@@ -350,7 +351,7 @@ not need the network.
 
 ## Log into the live session
 
-`live` (alias `attach`) is the operator's way in: it starts only the rungs that
+`live` (alias `attach`) is the principal's way in: it starts only the rungs that
 are missing — the same rule `start` follows — and then attaches to a tmux session
 named `fleet`.
 
@@ -389,14 +390,14 @@ python3 fleet/console.py --once    # a single frame, for a script or a log
 ```
 
 The frame carries: the header (repo, HEAD, time); each rung (pid, state, running
-commit, heartbeat age); the orders waiting for the brain and the latest one; the
-brain's latest acks; the live claims; wave progress with `✓` closed, `▶`
+commit, heartbeat age); the orders waiting for the director and the latest one; the
+director's latest acks; the live claims; wave progress with `✓` closed, `▶`
 dispatched and `·` pending; the last events from `.fleet/slog.jsonl`; and the last
 verdicts from `.fleet/watchdog.log`.
 
-### What the brain prints
+### What the director prints
 
-The brain's stream (`brain.log`, and the `brain` window) is the only place the
+The director's stream (`brain.log`, and the `brain` window) is the only place the
 middle rung explains itself. It is deliberately low-noise — a banner, the order
 it received, what it did with it, the waves it advanced, and a heartbeat while
 idle:
@@ -483,17 +484,17 @@ synthetic fleet, no network and no tmux.
 ## Mailbox
 
 ```
-.fleet/inbox/    pending directives for the sister   (runtime, gitignored)
-.fleet/sent/     the brain's copy of what it sent    (runtime, gitignored)
-.fleet/outbox/   acks and results back to the brain  (runtime, gitignored)
+.fleet/inbox/    pending directives for the dispatcher   (runtime, gitignored)
+.fleet/sent/     the director's copy of what it sent    (runtime, gitignored)
+.fleet/outbox/   acks and results back to the director  (runtime, gitignored)
 .fleet/done/     directives answered and consumed   (runtime, gitignored)
 .fleet/runs/     run markers + each run's live log stream (`<id>.log`)  (runtime, gitignored)
-.fleet/brain/steer/  the brain's pending steering hints, one per directive  (runtime, gitignored)
+.fleet/brain/steer/  the director's pending steering hints, one per directive  (runtime, gitignored)
 .fleet/attempts/     one persisted attempt budget per directive  (runtime, gitignored)
 .fleet/dead-letter/  the terminal artifact of a retired directive  (runtime, gitignored)
 ```
 
-`fleet/directive.json` and the schema are tracked artifacts — the sister can
+`fleet/directive.json` and the schema are tracked artifacts — the dispatcher can
 always discover its standing orders from a clean clone.
 
 ## Dead-lettering a directive by protocol (`control:drop`)
@@ -506,7 +507,7 @@ ways one becomes **terminal**, and they share one implementation
    (`.fleet/attempts/<id>.json`, `AO_RUNAWAY_ATTEMPTS`, default 5). Its held
    paths (a refused claim, a run that did not land, a self-heal, an in-flight
    hold, an untracked foreign claim) all count against that one counter.
-2. **By protocol** — an operator, or a peer agent that can see the order is
+2. **By protocol** — a principal, or a peer agent that can see the order is
    wedged, says so **over the control channel**:
 
 ```bash
@@ -515,8 +516,8 @@ python3 fleet/control.py dead-letter                       # list the mailbox
 python3 fleet/control.py dead-letter --directive <id>      # inspect one record
 ```
 
-The verb orders the **brain**, which issues the control to the sister exactly
-like every other lever; the sister retires the named directive, **acks** the
+The verb orders the **director**, which issues the control to the dispatcher exactly
+like every other lever; the dispatcher retires the named directive, **acks** the
 sender naming what it dropped, and the order is moved to
 `.fleet/dead-letter/<id>.json`. `channel watch` will never return it again.
 
@@ -525,23 +526,23 @@ sender naming what it dropped, and the order is moved to
 `/tmp/dead-directives/` on 2026-09-14) *works*, but it races the loop's
 mid-`watch` reader, loses the attempt history and the reason, bypasses the
 channel so there is no ack and no audit record, and **cannot be done by an agent
-at all** — a subagent that detects its own directive is wedged has no way to say
+at all** — an executor that detects its own directive is wedged has no way to say
 so. Use the verb; it is the same lever the automatic path uses. To revive a
 retired order after fixing the cause:
 `python3 fleet/runaway.py rearm --directive <id>`.
 
-## Recovery (no operator step — code handles each failure)
+## Recovery (no principal step — code handles each failure)
 
 Every failure mode below is handled by an existing command; none of them needs
 a human to do anything but run the command (or nothing at all, if the loop
 self-heals).
 
-* **The sister dies mid-claim.** A claim carries a `ttl_hours` (24h default,
+* **The dispatcher dies mid-claim.** A claim carries a `ttl_hours` (24h default,
   set at claim time by `governance/dispatch/cli.py claim`). Once the TTL
   elapses the claim is stale and `governance/dispatch/cli.py claim` for the
   same issue on a new agent **reaps** it automatically (`reaped_agent` in the
   claim event names who was taken over from) — no manual unlock step. A new
-  sister session just claims again; there is nothing to clean up by hand.
+  dispatcher session just claims again; there is nothing to clean up by hand.
 * **The mailbox fills up (`.fleet/inbox` backs up).** `report` **consumes**
   the directive it answers — it moves the message from `.fleet/inbox` to
   `.fleet/done`, so a backlog only means the listener stopped running, not
@@ -550,7 +551,7 @@ self-heals).
   off; nothing needs to be deleted or re-sent.
 * **The dispatcher loop fails (rc=2).** `fleet/health.py check` returns `2
   failing` exactly when `fleet/terminal.py` is not running at all (see
-  below) — that exit code is itself the alert: the brain's `listen`/`watch`
+  below) — that exit code is itself the alert: the director's `listen`/`watch`
   loop or any script polling `health` sees `2` and knows to restart the
   terminal (`bash fleet/terminal.sh`) rather than guess. `1 degraded` means
   the loop is up but stale (`.fleet/slog.jsonl` hasn't moved, or a claim is
@@ -560,7 +561,7 @@ self-heals).
 ## Cron-owned fleet (the watchdog)
 
 The fleet survives a reboot or a crashed loop without a human: one crontab
-line owns the brain/sister/monitor rungs. Every N minutes it runs
+line owns the director/dispatcher/monitor rungs. Every N minutes it runs
 `fleet/watchdog.py run`, which respawns a **missing**, **stale** or **drifted**
 loop rung, restarts the **monitor** when it is missing, and does nothing when
 the fleet is healthy — so a tick is cheap and idempotent. A run in flight is
@@ -583,7 +584,7 @@ cases are named separately because their remedies differ:
   loads the new HEAD. A diverged checkout is refused by name, never force-moved.
 
 Measured 2026-09-15, this distinction missing: **132 `drifted … — respawned`
-decisions, 45 `stopping cleanly` cycles, a brain process never older than 60s,
+decisions, 45 `stopping cleanly` cycles, a director process never older than 60s,
 and no work done at all.** The detection was right (AO-GR-25); the remedy was an
 action that could not change what was compared, repeated without bound —
 AO-GR-21's own lesson, applied to the watchdog itself.
@@ -600,7 +601,7 @@ Every acting path is recorded per rung under `.fleet/watchdog/` and bounded:
 * when the cap is exhausted the watchdog **escalates once** — naming both
   commits and the checkout path, and writing
   `.fleet/watchdog/escalations/<rung>.<first-seen>.json` — and **parks** the rung:
-  it is reported on every pass and **never retried** until an operator rearms it;
+  it is reported on every pass and **never retried** until a principal rearms it;
 * a remedy that *works* resets the counter, so a healing fleet is never parked;
 * an unusable knob value **refuses the pass** (exit 2) instead of silently
   disarming the cap;
@@ -626,7 +627,7 @@ matters more than it sounds. The shared checkout is routinely *behind* (it is
 wherever a human or a lane last left it), so comparing a loop's commit to it can
 compare **stale-to-stale**: the loop's own start commit reads back as the
 baseline it is judged against, and a loop executing pre-fix code reports
-`healthy`. That was measured on 2026-09-14 — the sister loop (pid 17797, started
+`healthy`. That was measured on 2026-09-14 — the dispatcher loop (pid 17797, started
 19:18Z) ran code from before a fix that merged at ~23:00Z, and the watchdog
 logged `sister: healthy` on every tick.
 
@@ -640,7 +641,7 @@ Two consequences worth knowing:
   refreshed by the lanes: every lane fetches before it cuts a worktree, so it
   tracks the remote as closely as the fleet actually pulls. The tradeoff is that
   a fix merged **after** the last fetch is invisible until the next one — which is
-  exactly why the watchdog line prints the baseline it used, so an operator can
+  exactly why the watchdog line prints the baseline it used, so a principal can
   see how far behind the comparison is rather than trusting a bare `healthy`.
 
 * **An unreadable baseline is `cannot-assess`, and the pass exits 2.** It is
@@ -667,7 +668,7 @@ fail-open guard, and requires each to be caught).
 
 Every rung it respawns is started detached with stdout+stderr appended to
 `.fleet/<rung>.log` — the capture the `brain`, `sister` and `monitor` windows of
-the live session tail, and the only reason the brain is observable at all (it
+the live session tail, and the only reason the director is observable at all (it
 used to be spawned into `/dev/null`).
 
 ```bash
@@ -688,10 +689,10 @@ subcommands are reachable from the control plane:
 
 `fleet/monitor.py` is the cron-owned, change-only progress watcher. It polls
 every 20s and appends one timestamped line to `.fleet/open-eye.log` only when
-the fleet's observable state changed since the previous tick — sister/brain
+the fleet's observable state changed since the previous tick — dispatcher/director
 state, held claims, the wave dispatch list and git HEAD — and rewrites
 `.fleet/monitor.heartbeat.json` with a JSON liveness beat (`pid`, `state`,
-`commit`, `ts`) every tick, in the same shape the brain and sister publish, so
+`commit`, `ts`) every tick, in the same shape the director and dispatcher publish, so
 the console reads all three rungs with one code path. It exits cleanly on
 SIGTERM, and the watchdog restarts it whenever it is missing, so the monitor
 is durable and self-healing rather than a one-off runtime script.
@@ -812,7 +813,7 @@ bash scripts/check-fleet-channel.sh   # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
 
 The check validates `fleet/directive.json` against the contract, runs the
 channel's own mutants (unknown message type, bad tier, bad thinking, missing
-role, a sister-issued directive) — each mutant must be refused, so the check
+role, a dispatcher-issued directive) — each mutant must be refused, so the check
 cannot pass vacuously — and drives the runaway alarm (§9): raised and naming the
 offending directive + worktree, still raised once the excursion is removed,
 cleared by `ack`, with a second `ack` refused. A check that cannot fail is a
@@ -852,7 +853,7 @@ the probe must notice it, and the source is restored byte-for-byte afterwards.
 Both loops install handlers for **`SIGTERM` and `SIGINT` only**
 (`fleet/terminal.py:1036`, `fleet/brain.py:262`, `fleet/monitor.py:178`). Those
 are *clean* stops: the signal handler releases the in-flight claim and takes its
-subagent down with it, so the restart suppresses a duplicate rather than
+executor down with it, so the restart suppresses a duplicate rather than
 stranding work.
 
 **`SIGHUP` is NOT handled.** On Linux its default action is to **terminate the

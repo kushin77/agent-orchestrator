@@ -65,7 +65,7 @@ def test_model_call_event_priced_from_rate_card(intake):
 
 def test_gateway_record_priced_from_rate_card(intake):
     record = intake.normalize(
-        gateway_record(provider="anthropic", model="claude-sonnet-4-5",
+        gateway_record(provider="anthropic", model="claude-sonnet-5",
                        input_tokens=800, output_tokens=200)
     )
     assert record.metered is True
@@ -233,7 +233,7 @@ def test_gateway_record_unknown_model_positive_attached_estimate(intake):
 def test_gateway_record_known_model_tokens_beat_attached_estimate(intake):
     """When the model is on the card and tokens exist, the card is authoritative."""
     record = intake.normalize(
-        gateway_record(provider="anthropic", model="claude-sonnet-4-5",
+        gateway_record(provider="anthropic", model="claude-sonnet-5",
                        input_tokens=800, output_tokens=200,
                        estimated_cost_usd=0.99)
     )

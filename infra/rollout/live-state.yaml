@@ -1,0 +1,27 @@
+# Declarative LIVE promotion state - agent-orchestrator rollout pipeline
+# (issue #914, child of #607 go-live). This is the ONLY committed file that
+# may ever record a flag above "off": infra/rollout/rollout-state.yaml stays
+# the declared-default document (GR-28) and
+# infra/rollout/model.py::validate_rollout_state_doc still refuses any flag
+# there that is not "off" - unchanged by this file.
+#
+# Every entry here is a genuine, ordered transition
+# (infra/rollout/model.py::validate_live_state_doc enforces: never "off" -
+# omit the row instead; from_stage -> stage must be an allowed forward step;
+# exactly one of approval_id/policy; "full" requires a human approval_id -
+# a policy auto-approval can never reach full) whose audit_record must
+# resolve to a real file under infra/rollout/audit/ or infra/rollout/approvals/
+# (infra/rollout/checks/check_rollout.py::check_live_state enforces that
+# existence - an I/O concern, not this file's own schema).
+#
+# RolloutEngine.load overlays this file's entries onto the rollout-state.yaml
+# defaults (infra/rollout/engine.py); `cli.py promote/rollback/canary
+# --live-state-out` is what writes it. Empty is the correct, honest state
+# today: nothing has been promoted yet.
+#
+# Schema: flags.<name> = {stage, from_stage, since, audit_record,
+#                          approval_id (human) | policy (auto-approve)}
+
+schema_version: 1
+
+flags: {}

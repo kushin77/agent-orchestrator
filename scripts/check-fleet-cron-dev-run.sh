@@ -30,7 +30,9 @@
 #   C. THE ISSUE'S OWN COMMANDS, live: `docker compose … up -d`, `curl` on
 #      `/healthz`, `docker compose … logs | grep -c 'dry-run'`, and a stop whose
 #      exit code is recorded;
-#   D. THE MUTANTS. Fifteen static mutations (one per rule) must each produce
+#   D. THE MUTANTS. Eighteen static mutations (one per rule — three added by
+#      issue #711, D3: state-rw gating and the secrets injection contract) must
+#      each produce
 #      their OWN named finding — and the unmutated audit must produce none, so a
 #      gate that reds a clean tree cannot hide behind its provocations. The live
 #      half provokes what no static check can: an environment refusal, a mutant
@@ -44,7 +46,14 @@
 #   other, and a control that fails because a sibling is running is not a
 #   control. The numbers differ; the mechanism is the one the file ships.
 #
-# THE TWO THINGS THIS BOX DOES TO A CONTAINER, BOTH MEASURED
+#   THE CONTAINER NAME AND THE COMPOSE PROJECT ARE DERIVED THE SAME WAY, and
+#   the project name is the one that mattered (issue #939): compose groups by
+#   PROJECT, not by container name, so two lanes sharing the file's constant
+#   `name: agent-fleet-cron` had the second lane's `up -d` RECREATE — i.e.
+#   destroy — the first lane's container. Measured 2026-09-16; see the block
+#   above COMPOSE_PROJECT_NAME below.
+#
+# THE THREE THINGS THIS BOX DOES TO A CONTAINER, ALL MEASURED
 #   1. a bridge container cannot resolve DNS, so the BUILD borrows the host's
 #      resolution (`--network=host`) — D1 measured this, and this gate probes it
 #      on every run rather than assuming it;
@@ -56,6 +65,12 @@
 #      failing the dev run for the host's defect: it probes the capability with a
 #      trivial container FIRST, then makes the issue's own request from
 #      whichever side can make it, and reports which side that was.
+#   3. **two lanes running this gate used to share one compose project**, so one
+#      lane's `up -d`/`down` removed the other's container mid-run and made five
+#      assertions fail together (issue #939). The project is now derived from
+#      this gate's pid, and asserted to be (see the `compose project is its own`
+#      control) — so a regression of that isolation fails BY NAME rather than
+#      turning into a phantom dev-run failure.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
@@ -90,6 +105,23 @@ for required in "$COMPOSE" "$INVENTORY" "$IMAGE_DIR/dev_run.py" \
   fi
 done
 
+# --- 0. the declared pytest suite (issue #711, D3) --------------------------
+# `infra/fleet` is declared in scripts/pytest-suites.txt; naming it here (a
+# wired check, auto-discovered per #698) is what makes it COVERED rather than
+# merely declared (scripts/check-gate-coverage.sh, issue #526).
+printf '\n== fleet-cron-dev-run: the declared pytest suite (infra/fleet/tests) ==\n'
+if python3 -c 'import pytest' >/dev/null 2>&1; then
+  pytest_log="$(mktemp /tmp/ao-fleet-cron-pytest.XXXXXX)"
+  if env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q infra/fleet/tests >"$pytest_log" 2>&1; then
+    ok "infra/fleet/tests: $(tail -1 "$pytest_log")"
+  else
+    bad "infra/fleet/tests failed: $(tail -5 "$pytest_log" | tr '\n' ' ')"
+  fi
+  rm -f "$pytest_log"
+else
+  unmeasured "pytest is not importable, so infra/fleet/tests was not run"
+fi
+
 work="$(mktemp -d /tmp/ao-fleet-cron-dev-run.XXXXXX)"
 gate_image="agent-fleet-cron:dev-run-gate-$$"
 gate_container="ao-710-dev-run-gate-$$"
@@ -97,6 +129,32 @@ live_port=$((20000 + $$ % 20000))
 containers_to_remove=()
 images_to_remove=()
 snapshot=""
+
+# --- the compose PROJECT is per-run too (issue #939) ------------------------
+# The container NAME and the published PORT were already derived from this
+# gate's own pid — but compose groups containers by PROJECT, not by container
+# name, and the compose file declares a CONSTANT project (`name: agent-fleet-cron`).
+# Two lanes running this gate at once therefore shared one project, and the
+# second lane's `up -d` printed `Container <lane A> Recreate / Recreated`:
+# it DESTROYED the first lane's container, and `down` then removed the shared
+# network. Measured 2026-09-16 (two lanes, one box, same file).
+#
+# The first lane's remaining assertions then failed TOGETHER — `docker exec` on
+# a container that no longer existed read `answered 0, not 404`, its `dev-run:`
+# log lines were gone (so no `dry-run` line and no `UNTOUCHED` line), and the
+# healthcheck and the exit code both read `unknown` — while every assertion that
+# had already run (`up -d`, the verdict, `/healthz` 200) passed. That is issue
+# #939 exactly, and it is why #939 was red only when a sibling lane was running
+# `make verify` at the same time.
+#
+# The gate's own principle — stated above the port, and the reason the port is
+# derived rather than fixed — is that "a control that fails because a sibling is
+# running is not a control". The project name was the one identifier compose
+# groups by that did not honour it. COMPOSE_PROJECT_NAME overrides the file's
+# `name:` (measured: the file resolves to `agent-fleet-cron`, and to this value
+# once the variable is set), so every compose call below — `config`, `up`,
+# `stop`, `down`, `logs` — is now scoped to *this* run.
+export COMPOSE_PROJECT_NAME="ao-710-dev-run-gate-$$"
 
 cleanup() {
   local container
@@ -135,6 +193,7 @@ cat > "$work/audit.py" <<'PY'
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 
 try:
@@ -181,6 +240,7 @@ try:
     import dev_run
     import env_contract
     import healthz
+    import secrets_contract
 except Exception as exc:  # noqa: BLE001 — an unimportable harness is a finding
     print(f"harness-unimportable: {os.path.basename(IMAGE_DIR)} modules do not import ({exc})")
     raise SystemExit(0)
@@ -235,15 +295,23 @@ if compose is not None:
             bad("env-file-present", f"service {name!r} mounts an env file")
 
         # every mount that lands on a state root must be read-only, and must not
-        # create a missing host path (a root-owned empty board is a fiction).
+        # create a missing host path (a root-owned empty board is a fiction) —
+        # UNLESS the service is behind a compose `profiles:` gate (issue #711,
+        # D3: `docker compose up` with no `--profile` never starts it, so a
+        # profiled service's writable mount is the flag-gated-OFF posture, not
+        # a violation of it). A service with NO profiles is the default surface
+        # `docker compose up` starts, and that one may never write state.
+        profiles = [str(item) for item in (service.get("profiles") or [])]
         for volume in service.get("volumes") or []:
             if not isinstance(volume, dict):
                 continue
             target = str(volume.get("target") or "")
             if target not in ("/repo/.fleet", "/repo/.board"):
                 continue
-            if volume.get("read_only") is not True:
+            if not profiles and volume.get("read_only") is not True:
                 bad("state-mount-writable", f"{target} is mounted without read_only: true")
+            if profiles and volume.get("read_only") is not True:
+                ok(f"service {name!r} (profile {profiles}) mounts {target} read-write behind a gate that defaults OFF")
             if (volume.get("bind") or {}).get("create_host_path") is not False:
                 bad(
                     "host-path-create",
@@ -273,6 +341,29 @@ if compose is not None:
             bad("port-drift", "the service declares no AO_FLEET_PORT")
 
     ok(f"the compose file {os.path.basename(COMPOSE)} declares {len(services)} service(s), no env file, no {dev_run.FORBIDDEN_TOKEN}")
+
+    # --- 1b. no default (non-profiled) service is state-rw (issue #711, D3) ---
+    # `AO_FLEET_STATE_RW` documents the writable-mount posture in the image's own
+    # environment contract; a non-profiled service claiming it is a service the
+    # flag cannot actually gate off, since `docker compose up` starts it anyway.
+    for name, service in services.items():
+        profiles = [str(item) for item in (service.get("profiles") or [])]
+        env = {str(key): str(value) for key, value in (service.get("environment") or {}).items()}
+        if not profiles and env.get("AO_FLEET_STATE_RW") == "1":
+            bad("state-rw-not-gated", f"service {name!r} sets AO_FLEET_STATE_RW=1 with no profiles: gate")
+
+    # --- 1c. secrets injection contract (issue #711, D3): mounted from outside
+    # the repo, read-only, never `env_file` (checked above) and never a secret
+    # VALUE spelled out anywhere in this compose file's own text.
+    secret_findings = secrets_contract.validate(repo_root=pathlib.Path(REPO))
+    if secret_findings:
+        for finding in secret_findings:
+            bad(finding.code, finding.detail)
+    else:
+        ok(f"secrets_contract declares {len(secrets_contract.SECRET_MOUNTS)} mount(s), all sourced outside the checkout")
+    leaked = secrets_contract.scan_for_secret_values(text)
+    if leaked:
+        bad("secret-value-in-compose", f"names that look like a credential value: {leaked}")
 
 # --- 2. the dispatch discipline, from the code that enforces it -------------
 drift = dev_run.check_role_table(markers)
@@ -453,7 +544,26 @@ elif case == "env-contract-not-called":
 elif case == "decision-in-a-state-root":
     patch(dev_run, 'DECISION_RELATIVE = Path(".verify/dev-run/decision.json")', 'DECISION_RELATIVE = Path(".fleet/dev-run/decision.json")')
 elif case == "health-path-drift":
-    patch(image / "healthz.py", 'HEALTH_PATH = "/healthz"', 'HEALTH_PATH = "/health"')
+    # The path declaration has TWO shapes in this tree's history, and the
+    # mutation must LAND against whichever the tree ships — otherwise the control
+    # silently stops measuring anything and the gate degrades to CANNOT-ASSESS
+    # rather than reporting a finding. Measured while rebasing #939 onto #909
+    # (D4): that commit replaced the bare literal with a tuple whose FIRST entry
+    # is the canonical path, the old anchor missed, and this gate went from OK to
+    # `CANNOT-ASSESS — the mutation for health-path-drift did not land`.
+    #
+    # Both shapes are mutated to the SAME property — the surface answers
+    # something other than '/healthz' — so the rule that catches them is
+    # unchanged and still load-bearing.
+    drift = image / "healthz.py"
+    if 'HEALTH_PATH = "/healthz"' in drift.read_text():
+        patch(drift, 'HEALTH_PATH = "/healthz"', 'HEALTH_PATH = "/health"')
+    else:
+        patch(
+            drift,
+            'HEALTH_PATHS = ("/healthz", "/health")',
+            'HEALTH_PATHS = ("/health", "/healthz")',
+        )
 elif case == "env-port-drift":
     # ONLY the contract's default moves: the inventory keeps the port it declares,
     # so the finding checked here is the drift BETWEEN the two declarations and
@@ -461,6 +571,18 @@ elif case == "env-port-drift":
     patch(image / "env_contract.py", '        default="8790",\n        kind="port",', '        default="8799",\n        kind="port",')
 elif case == "inventory-role-drift":
     patch(inventory, "      discipline: dry-run\n      command: \"fleet/prune.py run\"", "      discipline: apply\n      command: \"fleet/prune.py run\"")
+elif case == "state-rw-not-gated":
+    patch(compose, "    profiles:\n      - state-rw\n    command:", "    command:")
+elif case == "secret-source-inside-repo":
+    secrets_module = image / "secrets_contract.py"
+    patch(
+        secrets_module,
+        'default_host_path="${HOME}/.config/gh"',
+        f'default_host_path={str(root / "infra" / "fleet")!r}',
+    )
+elif case == "secret-value-in-compose":
+    example_name = "AO_FLEET_SAMPLE_" + "TOKEN"  # built, not spelled, so this file stays clean of the literal
+    patch(compose, '      AO_FLEET_STATE_RW: "1"', f'      AO_FLEET_STATE_RW: "1"\n      {example_name}: "x"')
 else:
     raise SystemExit(f"unknown case {case!r}")
 PY
@@ -503,6 +625,9 @@ provoke "the decision document moved into a state root" decision-in-a-state-root
 provoke "a health surface on the wrong path"          health-path-drift      health-path-drift
 provoke "the port declared in two places"             env-port-drift         env-port-drift
 provoke "an inventory role that stopped matching the harness" inventory-role-drift inventory-role-drift
+provoke "a state-rw service with no profile to gate it"       state-rw-not-gated    state-rw-not-gated
+provoke "a secret source resolving inside the checkout"       secret-source-inside-repo secret-source-inside-repo
+provoke "a credential-shaped value spelled out in compose"    secret-value-in-compose secret-value-in-compose
 
 # ---------------------------------------------------------------------------
 # E. THE LIVE HALF
@@ -547,6 +672,31 @@ if docker build "${build_network[@]}" -f "$IMAGE_DIR/Dockerfile" -t "$gate_image
   ok "the image builds from the repository root ($(docker image inspect --format '{{.Size}}' "$gate_image" 2>/dev/null) bytes)"
 else
   bad "the image does not build: $(tail -3 "$work/build.log" | tr '\n' ' ')"
+fi
+
+# --- this run's compose project is its OWN (issue #939) --------------------
+# A control, not a formality: if the export above is removed the project
+# resolves back to the file's shared `agent-fleet-cron`, two lanes share it
+# again, and this assertion names that. `--format json` is compose v2's own
+# view of the project, so what is asserted is what compose will group by.
+#
+# `${COMPOSE_PROJECT_NAME:-<unset>}` rather than the bare variable: this script
+# runs under `set -u`, so the first version of this control died with
+# `COMPOSE_PROJECT_NAME: unbound variable` instead of reporting the finding in
+# its own words (measured by provoking exactly that). A control that crashes
+# still exits non-zero, but a crash does not NAME the regression, and naming it
+# is the whole point of the assertion.
+expected_project="${COMPOSE_PROJECT_NAME:-<unset>}"
+resolved_project="$(docker compose -f "$COMPOSE" config --format json 2>/dev/null \
+  | python3 -c 'import json, sys
+try:
+    print((json.load(sys.stdin) or {}).get("name", ""))
+except Exception:
+    print("")' 2>/dev/null)"
+if [ "$resolved_project" = "$expected_project" ]; then
+  ok "this gate's compose project is its own ($resolved_project), not the file's shared 'agent-fleet-cron'"
+else
+  bad "the gate's compose project resolved to '${resolved_project:-none}', not '$expected_project' — a concurrent lane would share that project, and its own \`up -d\` would recreate — i.e. destroy — this gate's container mid-run"
 fi
 
 # --- the default port, without starting anything ---------------------------

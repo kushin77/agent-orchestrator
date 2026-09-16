@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -682,3 +683,327 @@ def test_status_reports_installed(monkeypatch, capsys):
     monkeypatch.setattr(cron, "LOG", Path("/nonexistent-watchdog-log"))
     assert cron.cmd_status(type("Args", (), {})()) == 0
     assert "installed" in capsys.readouterr().out
+
+
+# --- the bootstrap (#780) -----------------------------------------------------
+#
+# Measured 2026-09-15: cron runs `cd <checkout> && python3 fleet/watchdog.py run`, so
+# the watchdog IN FLIGHT is whatever copy the checkout holds. The shared checkout
+# stood 5 commits behind (`e9cfc10` merged, `HEAD` `b95a8b7`) and the sister ran
+# `592b132` for ~5.5 hours, missing every fix merged that day. #773 had given the
+# `checkout-behind` case the right remedy — a fast-forward — but the code holding
+# that remedy lives in the checkout, so a stale checkout executed a watchdog that
+# could not see it; #773's own evidence records a HUMAN doing the move.
+#
+# These tests drive the remedy against REAL git repositories, because the code under
+# test IS `git fetch` + `git merge --ff-only`: a stubbed repository would prove
+# nothing about reachability. The stale clone's own `fleet/watchdog.py` is the
+# PRE-bootstrap revision — the copy that does not contain the remedy — which is
+# exactly the state cron found the shared checkout in.
+
+#: The revision BEFORE the bootstrap: a stand-in for the pre-#780 module, in which
+#: no remedy for the checkout's staleness exists at all.
+_PRE_FIX_SOURCE = (
+    '"""The fleet watchdog as it stood before the checkout remedy became reachable."""\n'
+    "\n"
+    'WATCHDOG_ERA = "no-remedy"\n'
+)
+#: The revision AT `origin/master`: a stand-in for this module, which carries the
+#: kernel. Its `bootstrap` is a tripwire, so a test that executed the checkout's copy
+#: of the remedy would fail loudly instead of passing for the wrong reason.
+_FIXED_SOURCE = (
+    '"""The fleet watchdog at origin/master, carrying the bootstrap (#780)."""\n'
+    "\n"
+    'WATCHDOG_ERA = "bootstrap"\n'
+    "\n"
+    "\n"
+    "def bootstrap(*args, **kwargs):\n"
+    "    raise AssertionError(\"the checkout's own copy of the remedy must never be executed\")\n"
+)
+
+_AGENT = ("-c", "user.email=agent780@agents.invalid", "-c", "user.name=agent780")
+
+
+def _run(*argv):
+    """Run a command, capturing output; never raises, so a refusal is an assertion's job."""
+    return subprocess.run(list(argv), capture_output=True, text=True, check=False)
+
+
+def _rev(repo, spec="HEAD"):
+    return _run("git", "-C", str(repo), "rev-parse", spec).stdout.strip()
+
+
+def _commit_all(repo, message):
+    _run("git", "-C", str(repo), "add", "-A")
+    result = _run("git", "-C", str(repo), *_AGENT, "commit", "-q", "-m", message)
+    assert result.returncode == 0, f"the test's own commit failed: {result.stderr}"
+
+
+def _stale_checkout(tmp_path):
+    """A real origin, and a real clone of it left strictly one commit BEHIND.
+
+    Returns `(seed, stale, behind_sha, remote_sha)`. The bare origin's HEAD is
+    pointed at `refs/heads/master` explicitly, so `origin/master` is the
+    remote-tracking ref this module reads whatever the host's `init.defaultBranch`.
+    """
+    origin = tmp_path / "origin.git"
+    assert _run("git", "init", "--bare", "-q", str(origin)).returncode == 0
+    assert _run("git", "-C", str(origin), "symbolic-ref", "HEAD", "refs/heads/master").returncode == 0
+
+    seed = tmp_path / "seed"
+    assert _run("git", "clone", "-q", str(origin), str(seed)).returncode == 0
+    (seed / "fleet").mkdir(parents=True, exist_ok=True)
+    (seed / "fleet" / "watchdog.py").write_text(_PRE_FIX_SOURCE, encoding="utf-8")
+    _commit_all(seed, "the revision before the bootstrap")
+    behind = _rev(seed)
+    assert _run("git", "-C", str(seed), "push", "-q", "origin", "HEAD:master").returncode == 0
+
+    (seed / "fleet" / "watchdog.py").write_text(_FIXED_SOURCE, encoding="utf-8")
+    _commit_all(seed, "the bootstrap kernel")
+    remote = _rev(seed)
+    assert _run("git", "-C", str(seed), "push", "-q", "origin", "HEAD:master").returncode == 0
+
+    stale = tmp_path / "stale"
+    assert _run("git", "clone", "-q", str(origin), str(stale)).returncode == 0
+    reset = _run("git", "-C", str(stale), "reset", "-q", "--hard", behind)
+    assert reset.returncode == 0, reset.stderr
+    assert _rev(stale) == behind
+    return seed, stale, behind, remote
+
+
+@pytest.fixture
+def bootstrap_env(monkeypatch):
+    """Restore `ENV_BOOTSTRAPPED`, which `reexec_watchdog` sets directly.
+
+    An empty value is falsy, so the code under test still treats the process as
+    un-bootstrapped — and pytest restores the variable afterwards instead of the
+    suite leaking it into a later test.
+    """
+    monkeypatch.setenv(watchdog.ENV_BOOTSTRAPPED, "")
+
+
+def test_a_checkout_that_is_behind_is_brought_forward_without_its_own_copy_of_the_remedy(tmp_path):
+    """THE regression test for #780: the remedy must not be gated on the checkout being current.
+
+    The stale clone's copy of this module is the PRE-bootstrap revision, which does
+    not contain the remedy at all — the state the shared checkout was measured in.
+    The remedy must still reach it, which is the whole defect: before this change the
+    running watchdog was the copy in the stale tree, so the repair waited on the code
+    it was supposed to repair.
+    """
+    seed, stale, behind, remote = _stale_checkout(tmp_path)
+
+    # The premise, asserted rather than assumed.
+    assert _rev(stale) == behind, "the checkout was not left behind"
+    stale_source = (stale / "fleet" / "watchdog.py").read_text(encoding="utf-8")
+    assert stale_source == _PRE_FIX_SOURCE
+    assert "def bootstrap" not in stale_source, "the stale copy must genuinely LACK the remedy"
+    remote_source = _run("git", "-C", str(stale), "show", "origin/master:fleet/watchdog.py").stdout
+    assert "def bootstrap" in remote_source, "the remote's copy is the one carrying the remedy"
+
+    before = watchdog.self_freshness(stale)
+    assert before["verdict"] == watchdog.FRESH_BEHIND, before["reason"]
+    # The verdict reports SHORT commits; the fixture works in full ones.
+    assert behind.startswith(before["local_head"])
+    assert remote.startswith(before["remote_head"])
+    assert before["local_blob"] != before["remote_blob"]
+
+    moved, head, detail = watchdog.bootstrap_checkout(stale)
+
+    assert moved is True, detail
+    assert remote.startswith(head), detail
+    assert _rev(stale) == remote, "the checkout did not actually move"
+    assert watchdog.self_freshness(stale)["verdict"] == watchdog.FRESH_CURRENT
+    assert (stale / "fleet" / "watchdog.py").read_text(encoding="utf-8") == _FIXED_SOURCE
+
+
+def test_the_verdict_is_answered_from_the_remote_not_from_the_working_tree(tmp_path):
+    """The read that dissolves the circularity: a behind checkout can still ask the question."""
+    _seed, stale, _behind, remote = _stale_checkout(tmp_path)
+    from_remote = _run("git", "-C", str(stale), "rev-parse", "origin/master:fleet/watchdog.py").stdout.strip()
+
+    assert watchdog.remote_source_blob(stale) == from_remote
+    assert watchdog.source_blob(stale) != watchdog.remote_source_blob(stale)
+    # The working tree's blob is the OLD file's, so the two sides are genuinely different
+    # and the verdict is computed against the remote's — never against the copy asking.
+    assert watchdog.source_blob(stale) == _run(
+        "git", "-C", str(stale), "hash-object", "--", str(stale / "fleet" / "watchdog.py")
+    ).stdout.strip()
+    assert _rev(stale, "origin/master") == remote
+
+
+def test_a_checkout_that_is_ahead_is_diverged_not_behind_and_is_never_moved(tmp_path):
+    """No false positive: a lane's own commits are not staleness, and are never discarded."""
+    _seed, stale, _behind, remote = _stale_checkout(tmp_path)
+    assert _run("git", "-C", str(stale), "reset", "-q", "--hard", "origin/master").returncode == 0
+    (stale / "fleet" / "watchdog.py").write_text(_FIXED_SOURCE + "\nLANE_WORK = True\n", encoding="utf-8")
+    _commit_all(stale, "the lane's own work")
+    lane_head = _rev(stale)
+
+    freshness = watchdog.self_freshness(stale)
+    assert freshness["verdict"] == watchdog.FRESH_DIVERGED, freshness["reason"]
+
+    moved, _head, detail = watchdog.bootstrap_checkout(stale)
+    assert moved is False, detail
+    assert "REFUSED" in detail
+    assert _rev(stale) == lane_head, "a diverged checkout must not be moved"
+    assert remote != lane_head
+    assert (stale / "fleet" / "watchdog.py").read_text(encoding="utf-8").endswith("LANE_WORK = True\n")
+
+
+def test_uncommitted_edits_are_diverged_not_behind(tmp_path):
+    """A commit is an ancestor of ITSELF, so HEAD == remote with different bytes is local work.
+
+    Pinned because the first cut of the fix got this wrong: the ancestor test alone
+    reported `behind` for a tree whose HEAD *equalled* the remote but whose file held
+    uncommitted edits — which would have had the bootstrap try to overwrite them.
+    """
+    _seed, stale, _behind, remote = _stale_checkout(tmp_path)
+    assert _run("git", "-C", str(stale), "reset", "-q", "--hard", "origin/master").returncode == 0
+    (stale / "fleet" / "watchdog.py").write_text("locally edited, never committed\n", encoding="utf-8")
+
+    assert _rev(stale) == remote, "the premise: HEAD is the remote's commit"
+    freshness = watchdog.self_freshness(stale)
+    assert freshness["verdict"] == watchdog.FRESH_DIVERGED, freshness["reason"]
+    assert freshness["local_blob"] != freshness["remote_blob"]
+
+    moved, _head, detail = watchdog.bootstrap_checkout(stale)
+    assert moved is False and "REFUSED" in detail
+    assert (stale / "fleet" / "watchdog.py").read_text(encoding="utf-8") == "locally edited, never committed\n"
+
+
+def test_a_checkout_already_at_the_remote_is_not_moved(tmp_path):
+    """Idempotence: a checkout that is current is left exactly as it is."""
+    _seed, stale, _behind, remote = _stale_checkout(tmp_path)
+    assert _run("git", "-C", str(stale), "reset", "-q", "--hard", "origin/master").returncode == 0
+
+    moved, _head, detail = watchdog.bootstrap_checkout(stale)
+
+    assert moved is False, detail
+    assert "already" in detail
+    assert _rev(stale) == remote
+
+
+def test_an_unreadable_checkout_is_cannot_assess_never_current(tmp_path):
+    """Fail-closed, #739's rule one level up: "I cannot tell" must never read as "I am current"."""
+    plain = tmp_path / "not-a-repository"
+    plain.mkdir()
+
+    freshness = watchdog.self_freshness(plain)
+
+    assert freshness["verdict"] == watchdog.FRESH_CANNOT_ASSESS, freshness
+    assert freshness["verdict"] != watchdog.FRESH_CURRENT
+    assert "cannot read" in freshness["reason"]
+
+    moved, _head, detail = watchdog.bootstrap_checkout(plain)
+    assert moved is False, "an unassessable checkout must never be reported as repaired"
+    assert "REFUSED" in detail
+    assert str(plain) in detail, "the refusal must name the tree it could not read"
+
+
+def test_the_run_preflight_refuses_an_unassessable_checkout_instead_of_failing_open(tmp_path):
+    """`run` from a directory git cannot read returns CANNOT-ASSESS — never a pass."""
+    plain = tmp_path / "not-a-repository"
+    plain.mkdir()
+
+    rc = watchdog.bootstrap_preflight(["run"], root=plain)
+
+    assert rc == watchdog.channel.EXIT_CANNOT_ASSESS
+    assert rc != watchdog.channel.EXIT_OK
+
+
+def test_the_run_preflight_reports_behind_as_not_ok_when_it_cannot_move(tmp_path, monkeypatch):
+    """The measured state — a fleet silently pinned to old code — is a failure, not a note.
+
+    Provoked by building a genuinely BEHIND checkout and then withholding the move, so
+    the refusal branch is exercised on its own terms: the verdict is `behind`, nothing
+    repaired it, and the pass must not proceed as though the code were current.
+    """
+    _seed, stale, _behind, _remote = _stale_checkout(tmp_path)
+    assert watchdog.self_freshness(stale)["verdict"] == watchdog.FRESH_BEHIND
+    monkeypatch.setattr(
+        watchdog,
+        "bootstrap_checkout",
+        lambda root=None, *, remote="origin/master": (False, "deadbee", "the move was refused"),
+    )
+
+    rc = watchdog.bootstrap_preflight(["run"], root=stale)
+
+    assert rc == watchdog.channel.EXIT_NOT_OK, "a checkout pinned to old code is NOT-OK, not a note"
+    assert rc != watchdog.channel.EXIT_OK
+
+
+def test_after_the_checkout_moves_the_preflight_re_execs_onto_the_code_that_arrived(
+    tmp_path, monkeypatch, bootstrap_env
+):
+    """Durability: the process that moved the checkout had already imported the OLD module."""
+    _seed, stale, behind, remote = _stale_checkout(tmp_path)
+    calls = []
+    monkeypatch.setattr(watchdog.os, "execv", lambda path, argv: calls.append((path, argv)))
+
+    rc = watchdog.bootstrap_preflight(["run"], root=stale)
+
+    assert rc is None, "the preflight returned instead of re-execing onto the new code"
+    assert len(calls) == 1, f"exactly one re-exec, measured: {calls}"
+    path, argv = calls[0]
+    assert path == sys.executable
+    assert Path(argv[1]).name == "watchdog.py"
+    assert argv[2:] == ["run"], "the SAME verb is re-run, by the process that now holds the new code"
+    assert os.environ.get(watchdog.ENV_BOOTSTRAPPED) == "1"
+    assert _rev(stale) == remote, "the move still happened"
+    assert behind != remote
+
+
+def test_the_re_exec_is_bounded_to_one_per_invocation(tmp_path, monkeypatch, capsys):
+    """A re-exec that could repeat is the runaway #773 exists to stop."""
+    _seed, stale, _behind, remote = _stale_checkout(tmp_path)
+    monkeypatch.setenv(watchdog.ENV_BOOTSTRAPPED, "1")  # the re-exec'd process's view
+    calls = []
+    monkeypatch.setattr(watchdog.os, "execv", lambda path, argv: calls.append(argv))
+
+    rc = watchdog.bootstrap_preflight(["run"], root=stale)
+
+    assert calls == [], "a second re-exec is exactly the unbounded remedy this bound prevents"
+    assert rc is None
+    assert _rev(stale) == remote, "only the re-exec is bounded; the move still happens"
+    assert "already re-exec'd once" in capsys.readouterr().out
+
+
+def test_the_run_verb_preflights_the_checkout_before_the_pass(monkeypatch):
+    """#780: `run` asserts the precondition first — and a refusal stops the pass."""
+    seen = []
+    monkeypatch.setattr(
+        watchdog,
+        "bootstrap_preflight",
+        lambda argv: seen.append(argv) or watchdog.channel.EXIT_CANNOT_ASSESS,
+    )
+
+    rc = watchdog.main(["run", "--force"])
+
+    assert seen == [["run", "--force"]], "the preflight must run first, and carry the verb"
+    assert rc == watchdog.channel.EXIT_CANNOT_ASSESS, "and its refusal must stop the pass"
+
+
+def test_the_bootstrap_verb_moves_a_stale_checkout_and_names_both_commits(tmp_path, capsys, bootstrap_env):
+    """The operator-facing entry point, driven through the real CLI dispatch."""
+    seed, stale, behind, remote = _stale_checkout(tmp_path)
+    behind_short = _run("git", "-C", str(stale), "rev-parse", "--short", behind).stdout.strip()
+    remote_short = _run("git", "-C", str(seed), "rev-parse", "--short", remote).stdout.strip()
+
+    rc = watchdog.main(["bootstrap", "--root", str(stale), "--no-reexec"])
+
+    out = capsys.readouterr().out
+    assert rc == watchdog.channel.EXIT_OK, out
+    assert behind_short in out and remote_short in out, f"the finding must name both commits: {out}"
+    assert _rev(stale) == remote
+
+
+def test_the_bootstrap_verb_is_cannot_assess_on_a_checkout_it_cannot_read(tmp_path, capsys):
+    """Tri-state, not boolean: the verb distinguishes "repaired" from "cannot be judged"."""
+    plain = tmp_path / "not-a-repository"
+    plain.mkdir()
+
+    rc = watchdog.main(["bootstrap", "--root", str(plain), "--no-reexec"])
+
+    assert rc == watchdog.channel.EXIT_CANNOT_ASSESS
+    assert "CANNOT-ASSESS" in capsys.readouterr().err

@@ -25,17 +25,49 @@ The model guarantees (each is tested):
   across calls.
 * **Rollback-to-OFF** - a failed canary/gradual health check must revert the
   flag to OFF; the model never returns "stay on" for a failed health signal.
+* **Declared holds are parsed, never dropped** - a stage declaring a dwell
+  (`gradual.ramp.dwell: 24h`) exposes it as ``StageSpec.dwell_seconds``, so a
+  driver can enforce the hold from a recorded timestamp rather than trusting a
+  caller-supplied boolean (#619).
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 # Canonical stage vocabulary in promotion order (index == stage order).
 STAGE_ORDER_KEYS: Tuple[str, ...] = ("off", "canary", "gradual", "full")
+
+#: Seconds per dwell unit (`24h`, `30m`, `45s`, `2d`).
+_DWELL_UNITS: Mapping[str, int] = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+
+
+def parse_dwell(value: object) -> int:
+    """Seconds for a declared dwell duration (`"24h"`, `"30m"`, `"45s"`).
+
+    A bare integer is read as seconds. Anything else — including a YAML 1.1
+    boolean — is a hard error rather than a silent "no dwell": a stage that
+    declares a hold the reader quietly discards is a gate that cannot fail
+    (GR-12), which is exactly the defect the go-live driver (#619) closes.
+    """
+    if isinstance(value, bool) or value is None:
+        raise ValueError(f"{value!r} is not a dwell duration")
+    if isinstance(value, int):
+        if value < 0:
+            raise ValueError(f"dwell must not be negative, got {value}")
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text.isdigit():
+            return int(text)
+        match = re.fullmatch(r"(\d+)\s*([smhd])", text)
+        if match:
+            return int(match.group(1)) * _DWELL_UNITS[match.group(2)]
+    raise ValueError(f"{value!r} is not a dwell duration (expected e.g. '24h', '30m', '45s')")
 
 
 class RolloutStage(str, Enum):
@@ -126,7 +158,14 @@ class Audience:
 
 @dataclass(frozen=True)
 class StageSpec:
-    """One stage's declarative spec."""
+    """One stage's declarative spec.
+
+    ``dwell_seconds`` is the minimum time a flag must be HELD at this stage
+    before it may promote out of it (``ramp.dwell`` in ``stage-model.yaml``,
+    e.g. `24h` on ``gradual``). ``0`` means no declared hold. It is parsed
+    (never dropped) so a caller can enforce the hold from a recorded
+    transition timestamp instead of trusting a caller-supplied boolean.
+    """
 
     stage: RolloutStage
     order: int
@@ -135,6 +174,7 @@ class StageSpec:
     description: str = ""
     audiences: Tuple[str, ...] = ()
     ramp_steps: Tuple[int, ...] = ()
+    dwell_seconds: int = 0
 
 
 @dataclass(frozen=True)
@@ -218,6 +258,15 @@ class StageModel:
                     raise ValueError(f"stage '{token}' ramp steps must be 1..100")
                 if tuple(sorted(ramp_steps)) != ramp_steps:
                     raise ValueError(f"stage '{token}' ramp steps must be ascending")
+            dwell_raw = spec_raw.get("dwell")
+            if dwell_raw is None and isinstance(ramp, dict):
+                dwell_raw = ramp.get("dwell")
+            dwell_seconds = 0
+            if dwell_raw is not None:
+                try:
+                    dwell_seconds = parse_dwell(dwell_raw)
+                except ValueError as exc:
+                    raise ValueError(f"stage '{token}' dwell: {exc}") from exc
             stages[stage] = StageSpec(
                 stage=stage,
                 order=order,
@@ -226,6 +275,7 @@ class StageModel:
                 description=str(spec_raw.get("description", "")),
                 audiences=tuple(str(a) for a in spec_raw.get("audiences", [])),
                 ramp_steps=ramp_steps,
+                dwell_seconds=dwell_seconds,
             )
 
         # Closed vocabulary: every stage in order must be present.
@@ -460,6 +510,81 @@ def validate_rollout_state_doc(doc: Mapping[str, object]) -> List[str]:
             errors.append(f"flag '{name}' must default to off, got '{state.stage.value}'")
         if state.stage is RolloutStage.OFF and state.rollout_pct != 0:
             errors.append(f"flag '{name}' is off but rollout_pct is {state.rollout_pct}")
+    return errors
+
+
+def validate_live_state_doc(
+    doc: Mapping[str, object],
+    known_flags: Sequence[str],
+    model: "StageModel",
+) -> List[str]:
+    """Structural + ordering errors for ``infra/rollout/live-state.yaml``.
+
+    ``live-state.yaml`` is the ONLY place a promoted stage may be committed;
+    ``rollout-state.yaml`` stays the declared-default document
+    (``validate_rollout_state_doc`` still refuses anything but ``off``
+    there - unchanged, GR-28). Every live-state entry must be a genuine,
+    ordered transition (never ``off`` - omit the row instead; never a
+    backward or skipped step relative to its own ``from_stage``) and must
+    carry exactly one of ``approval_id`` / ``policy``; ``full`` can only be
+    reached with a human ``approval_id`` (a policy auto-approval can never
+    reach ``full``, mirroring ``check_stage_model``'s own full-policy
+    refusal). Whether the referenced ``audit_record`` actually exists on
+    disk is an I/O concern left to the gate (``checks/check_rollout.py``),
+    not this pure model function.
+    """
+    errors: List[str] = []
+    if not isinstance(doc, dict):
+        return ["live-state document must be a mapping"]
+    if doc.get("schema_version") != 1:
+        errors.append("live-state schema_version must be 1")
+    flags = doc.get("flags")
+    if not isinstance(flags, dict):
+        errors.append("live-state.flags must be a mapping (empty is valid - nothing promoted yet)")
+        return errors
+    for name, raw in flags.items():
+        if name not in known_flags:
+            errors.append(f"live-state flag '{name}' is not declared in rollout-state.yaml")
+        if not isinstance(raw, dict):
+            errors.append(f"live-state flag '{name}' entry must be a mapping")
+            continue
+        try:
+            stage = RolloutStage.coerce(raw.get("stage"))
+        except ValueError as exc:
+            errors.append(f"live-state flag '{name}': {exc}")
+            continue
+        if stage is RolloutStage.OFF:
+            errors.append(f"live-state flag '{name}' must not record 'off' (omit the row instead)")
+            continue
+        try:
+            from_stage = RolloutStage.coerce(raw.get("from_stage", "off"))
+        except ValueError as exc:
+            errors.append(f"live-state flag '{name}' from_stage: {exc}")
+            continue
+        if not from_stage.can_promote_to(stage, jump_allowed=model.jump_allowed):
+            errors.append(
+                f"live-state flag '{name}' records {from_stage.value} -> {stage.value}, "
+                "which is not an allowed step"
+            )
+        since = raw.get("since")
+        if not isinstance(since, str) or not since:
+            errors.append(f"live-state flag '{name}' must carry a non-empty 'since'")
+        audit_record = raw.get("audit_record")
+        if not isinstance(audit_record, str) or not audit_record:
+            errors.append(f"live-state flag '{name}' must carry a non-empty 'audit_record'")
+        approval_id = raw.get("approval_id")
+        policy = raw.get("policy")
+        has_approval = isinstance(approval_id, str) and bool(approval_id)
+        has_policy = isinstance(policy, str) and bool(policy)
+        if has_approval and has_policy:
+            errors.append(f"live-state flag '{name}' must carry exactly one of approval_id/policy, not both")
+        elif not has_approval and not has_policy:
+            errors.append(f"live-state flag '{name}' must carry approval_id or policy")
+        if stage is RolloutStage.FULL and not has_approval:
+            errors.append(
+                f"live-state flag '{name}' is at full but has no human approval_id "
+                "(policy auto-approve is not accepted for full)"
+            )
     return errors
 
 

@@ -25,6 +25,41 @@ locals {
   web_image = "us-central1-docker.pkg.dev/${var.project_id}/ao-images/portal:${var.web_image_tag}"
 }
 
+# The `ao-images` Artifact Registry repository the web build (issue #606,
+# infra/cloudbuild/web-image.yaml, web-image-trigger.yaml) pushes
+# `portal:<commit-sha>` into, and that `local.web_image` above and
+# `modules/web-surface` resolve by reference. Declared here because nothing
+# in this tree provisioned it (confirmed via `gcloud artifacts repositories
+# list` — no `ao-images` entry existed) even though three files already
+# assumed it.
+#
+# Deliberately UNCONDITIONAL, not gated behind an `enable_*` flag: this repo
+# is a build precondition, not a promoted surface (it holds no traffic, costs
+# nothing idle, and grants no IAM). Every `enable_*` var in this file names a
+# CANONICAL_SERVICES-shaped surface with a required infra/feature-flags/registry.yaml
+# row (scripts/check-feature-flags.py, `make verify`) — the web build has to
+# push a real image and get a real commit-sha tag BEFORE `enable_web` can ever
+# be promoted with a non-placeholder `web_image_tag`, so gating the repo behind
+# `enable_web` (or a new flag needing its own registry row) would deadlock that
+# build -> tag -> promote chain.
+resource "google_artifact_registry_repository" "ao_images" {
+  project       = var.project_id
+  location      = var.region
+  repository_id = "ao-images"
+  format        = "DOCKER"
+  description   = "Web build images (issue #606) — portal:<commit-sha> pushed by web-image.yaml, consumed by modules/web-surface."
+
+  labels = {
+    managed_by = "terraform"
+    product    = "agent-orchestrator"
+    surface    = "web"
+  }
+
+  docker_config {
+    immutable_tags = true
+  }
+}
+
 module "control_plane_service" {
   source = "./modules/control-plane-service"
 
@@ -69,4 +104,19 @@ module "paperclip_runtime" {
   image      = var.paperclip_image
   project_id = var.project_id
   region     = var.region
+}
+
+# The fleet-cron container pair on the shared-services on-prem HA cluster
+# (issue #900, EPIC #706, lane L5 #884): 2 replicas, active-active, on nodes
+# 192.168.168.31 / .42. Count-gated on enable_fleet_cron, so with the flag OFF
+# (the committed default) this module is inert.
+module "fleet_cron" {
+  source = "./modules/fleet-cron"
+
+  count = var.enable_fleet_cron ? 1 : 0
+
+  enabled                   = var.enable_fleet_cron
+  image                     = var.fleet_cron_image
+  ssh_private_key_path      = var.fleet_cron_ssh_private_key_path
+  keydb_password_secret_ref = var.fleet_cron_keydb_password_secret_ref
 }

@@ -1,8 +1,8 @@
 {
   "note": "Recorded legacy for the ticket-trailer rule over LANDED history (issue #287). Every commit here landed AFTER the shared predicate's enforcement boundary and still does not carry the ticket reference in a trailing trailer block, as measured -- not assumed -- by `scripts/check-pr-contract.sh --landed`. They are RECORDED, not accepted: `governance/isolation/cli.py enforce` reports them on every run. An entry is ADDED only by an explicit, reviewed commit to this file -- never automatically, and never to silence a run. That review IS the control, and it is the only admissible terminal state for post-boundary residue: the commit is already squash-merged onto a protected branch, so its message cannot be corrected (history is never rewritten, GR hard floor), and the gate that caught it has no other way to close. A NEW violation therefore still reds the gate FIRST; recording it is the follow-up decision, not the fix (#836). Nothing is ever dropped from this list silently: an entry whose commit now complies (`quarantine-entry-stale`) or is outside the assessed range (`quarantine-entry-not-assessed`) fails the check, and a missing or malformed baseline fails rather than skipping. The list SHRANK by issue #835 (2026-09-15): the predicate's trailer line now includes GitHub's own bare auto-close keyword (`Closes #<n>`), which is the paragraph the landing path composes (`gh pr merge --squash` over a body ending in a bare `Closes #<n>`), so the 8 entries whose trailing paragraph had that shape now COMPLY -- each re-checked, the shared predicate reporting rc 0 for it -- and were removed. 14 entries became 6. The 6 that remain are the shapes the rule still refuses by design: the reference separated from the trailing block by prose (`commit-ref-outside-the-trailer-block`), or no reference at all (`commit-missing-ticket-trailer`).",
-  "measured_at": "2026-09-15",
-  "measured_head": "dd8cbfc2ded903bb6de3471e1c64d927a3dc93c8",
-  "measured_by": "governance/isolation/cli.py landed --range HEAD (delegating to scripts/check-pr-contract.sh --landed)",
+  "measured_at": "2026-09-16T22:00:00Z",
+  "measured_head": "f7a7a12c44118b0ac16d5b3f7c1b665773fc91f3",
+  "measured_by": "owner session 2026-09-16 (kushin77), measured finding from scripts/check-isolation-landed.sh on origin/master",
   "entries": [
     {
       "sha": "afebf84844b76e692f237cafdead2da9d3b688de",
@@ -33,6 +33,16 @@
       "sha": "6999f2a3bd4ada1332ed032b40d377ece82a453f",
       "code": "commit-ref-outside-the-trailer-block",
       "why": "the reference is present in the message but outside the trailing trailer block"
+    },
+    {
+      "sha": "7d5f6a1a400d12def08ced5ed210a1ef8c507285",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #960 (issue #629) landed on master without a trailing trailer paragraph"
+    },
+    {
+      "sha": "f7a7a12c44118b0ac16d5b3f7c1b665773fc91f3",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #976 (issue #671) landed on master without a trailing trailer paragraph"
     }
   ]
 }

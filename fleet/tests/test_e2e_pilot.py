@@ -54,6 +54,13 @@ def test_one_brain_command_flows_operator_to_pr_merge(tmp_path, monkeypatch):
     sister_inbox = list((tmp_path / "inbox").glob("*.json"))
     assert len(sister_inbox) == 1
     landed_directive = json.loads(sister_inbox[0].read_text(encoding="utf-8"))
+    # The emitted dialect is the RECIPIENT's (issue #777), and here the dispatcher
+    # has declared nothing: its beat is the redirected, non-existent tmp path, so
+    # the emitter may not assume schema 2 and writes the spelling a build from
+    # before this migration can read. That is the whole reason the running fleet
+    # survives the rename — asserted, not assumed.
+    assert channel.declared_envelope_schema("dispatcher") is None
+    assert landed_directive["schema"] == channel.SCHEMA_VERSION_LEGACY
     assert landed_directive["from"] == "brain"
     assert landed_directive["to"] == "sister"
     assert landed_directive["task"]["issue"] == 167
@@ -84,8 +91,8 @@ def test_one_brain_command_flows_operator_to_pr_merge(tmp_path, monkeypatch):
     assert "#167" in result["body"]
 
 
-def test_operator_to_sister_bypass_is_refused(tmp_path, monkeypatch):
-    """The operator orders the brain; it may never address the sister directly."""
+def test_principal_to_dispatcher_bypass_is_refused(tmp_path, monkeypatch):
+    """The principal orders the director; it may never address the dispatcher directly."""
     _mailbox(monkeypatch, tmp_path)
     bypass = {
         "from": "operator",
@@ -95,13 +102,13 @@ def test_operator_to_sister_bypass_is_refused(tmp_path, monkeypatch):
         "body": "spawn one subagent for issue #167",
     }
     problems = channel.validate(bypass)
-    assert any("operator does not address the sister" in problem for problem in problems)
+    assert any("principal does not address the dispatcher" in problem for problem in problems)
     assert channel.cmd_send(_args(message=json.dumps(bypass))) == EXIT_NOT_OK
     assert list((tmp_path / "inbox").glob("*.json")) == []
 
 
-def test_sister_issued_directive_is_refused(tmp_path, monkeypatch):
-    """The sister is a dumb terminal: it executes directives, it never issues them."""
+def test_dispatcher_issued_directive_is_refused(tmp_path, monkeypatch):
+    """The dispatcher never picks work: it executes directives, it never issues them."""
     _mailbox(monkeypatch, tmp_path)
     rogue = {
         "from": "sister",
@@ -111,6 +118,6 @@ def test_sister_issued_directive_is_refused(tmp_path, monkeypatch):
         "body": "dispatch yourself",
     }
     problems = channel.validate(rogue)
-    assert any("sister" in problem and "cannot issue directives" in problem for problem in problems)
+    assert any("dispatcher" in problem and "cannot issue directives" in problem for problem in problems)
     assert channel.cmd_send(_args(message=json.dumps(rogue))) == EXIT_NOT_OK
     assert list((tmp_path / "inbox").glob("*.json")) == []

@@ -12,7 +12,7 @@ tenants:
   - tenantId: acme
     mappings:
       LOW: anthropic
-      MAX: anthropic/claude-opus-4-5
+      MAX: anthropic/claude-opus-5
       summarize: ollama/llama3.2
   - tenantId: globex
     mappings:

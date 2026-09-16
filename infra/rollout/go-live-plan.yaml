@@ -81,6 +81,18 @@ phases:
         go_live_stage: full
       - flag: services.task_board
         go_live_stage: full
+      # The two halves the AgentConsole composes (issue #954, child of EPIC
+      # #607), planned here because the rollout state carries them and this plan
+      # must resolve every flag it names. They are listed ahead of the console
+      # because that is the dependency the registry declares - the console's read
+      # half is `GET /api/fleet/*` (`fleet_projection`) and its write half is
+      # `POST /api/control/*` (`remote_control`), each gated on its own flag, so
+      # promoting the console before its two halves would open a console that
+      # answers 404 on both panels.
+      - flag: surfaces.fleet_projection
+        go_live_stage: full
+      - flag: surfaces.remote_control
+        go_live_stage: full
       # The AgentConsole (issue #802) is a `surfaces.*` flag rather than a
       # `services.*` one: it gates a route family inside the portal deployable
       # and has no terraform variable of its own. It is planned here because the

@@ -37,11 +37,134 @@ from infra.rollout.model import (
     StageModel,
     check_promotion,
     rollback_decision,
+    validate_live_state_doc,
     validate_rollout_state_doc,
 )
 
 GENESIS_HASH = "0" * 64
 DEFAULT_REASON = "promotion"
+
+#: Directory (under ``infra/rollout/``) holding one evidence record per
+#: transition. ``checks/check_rollout.py::check_live_state`` resolves every
+#: live-state entry's ``audit_record`` against ``infra/rollout/``, so a record
+#: named here resolves by construction.
+AUDIT_RECORD_SUBDIR = "audit"
+
+#: The record body. A record is evidence, not a claim (see
+#: ``infra/rollout/audit/README.md``): it carries the command that produced
+#: the transition and the audit-log line (`seq` + `hash`) a reader can
+#: re-verify with ``AuditLog.verify``.
+AUDIT_RECORD_TEMPLATE = """# Promotion audit record - `{flag}` {from_stage} -> {to_stage}
+
+One transition, written by the promotion path immediately BEFORE the
+live-state entry that names it (`infra/rollout/cli.py promote --live-state-out`,
+and the ordered driver `infra/rollout/go_live.py`). `check_rollout.py` refuses a
+promoted flag whose record is missing, so this file is what makes the promotion
+provable rather than claimed.
+
+| field | value |
+|---|---|
+| flag | `{flag}` |
+| transition | `{from_stage}` -> `{to_stage}` |
+| actor | `{actor}` |
+| approval | {approval} |
+| verify_green | {verify_green} |
+| recorded_at | {recorded_at} |
+| live-state | `{live_state_rel}` |
+| audit log | `{audit_log_rel}` seq {audit_seq}, hash `{audit_hash}` |
+
+## The command (re-runnable)
+
+```
+{command}
+```
+
+## What the engine reported
+
+```
+{outcome}
+```
+
+A record is evidence, not a claim: the audit-log line above is machine-checkable
+(`AuditLog.verify` recomputes the sha-256 chain) and the transition it names is
+the one the live-state entry carries.
+"""
+
+
+def _slug(value: str) -> str:
+    """A filename-safe form of a flag name (`services.registry` -> `services-registry`)."""
+    return "".join(ch if ch.isalnum() else "-" for ch in value).strip("-")
+
+
+def audit_record_name(
+    flag: str,
+    from_stage: object,
+    to_stage: object,
+    *,
+    seq: int = 0,
+    when: Optional[str] = None,
+) -> str:
+    """The canonical record path for one transition, relative to ``infra/rollout/``.
+
+    ``audit/<flag>-<from>-<to>-s<seq>-<UTC stamp>.md``. The audit-log sequence
+    number is part of the name, so the name is unique per appended record even
+    when two transitions land in the same second.
+    """
+    stamp = (when or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())).replace(":", "").replace("-", "")
+    frm = RolloutStage.coerce(from_stage).value
+    to = RolloutStage.coerce(to_stage).value
+    return f"{AUDIT_RECORD_SUBDIR}/{_slug(flag)}-{frm}-{to}-s{seq:04d}-{stamp}.md"
+
+
+def write_audit_record(
+    path: str,
+    *,
+    flag: str,
+    from_stage: str,
+    to_stage: str,
+    actor: str,
+    approval_kind: str,
+    approval_id: str,
+    policy: str,
+    verify_green: bool,
+    command: str,
+    outcome: str,
+    live_state_rel: str,
+    audit_log_rel: str,
+    audit_seq: int,
+    audit_hash: str,
+    recorded_at: Optional[str] = None,
+) -> str:
+    """Write one transition's evidence record atomically and return the path."""
+    if approval_kind == "policy":
+        approval = f"policy `{policy}` (auto-approved on green verification evidence)"
+    elif approval_id:
+        approval = f"human approval_id `{approval_id}`"
+    else:
+        approval = "none (recorded as policy auto-approval)"
+    body = AUDIT_RECORD_TEMPLATE.format(
+        flag=flag,
+        from_stage=from_stage,
+        to_stage=to_stage,
+        actor=actor,
+        approval=approval,
+        verify_green=str(bool(verify_green)).lower(),
+        recorded_at=recorded_at or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        live_state_rel=live_state_rel,
+        audit_log_rel=audit_log_rel,
+        audit_seq=audit_seq,
+        audit_hash=audit_hash,
+        command=command,
+        outcome=outcome,
+    )
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(body)
+    os.replace(tmp, path)
+    return path
 
 
 class RolloutError(Exception):
@@ -127,6 +250,16 @@ class ApprovalLedger:
         self._by_id[approval.approval_id] = approval
         return approval
 
+    def records(self) -> List[Approval]:
+        """Every loaded approval, in approval-id order (deterministic).
+
+        A caller resolving "the approval for (flag, target)" must get the same
+        record on every run; ordering by approval id makes that true, and it
+        means a self-granted record is never skipped in favour of a later one
+        (it is validated, and refuses the promotion - AO-GR-14).
+        """
+        return [self._by_id[key] for key in sorted(self._by_id)]
+
     def require(self, flag: str, target: RolloutStage, actor: str, approval_id: str) -> Approval:
         """Return the approval permitting this promotion or raise ``RolloutError``."""
         approval = self._by_id.get(approval_id)
@@ -196,9 +329,21 @@ class AuditLog:
         record["hash"] = self._hash(record)
         self._records.append(record)
         if self.path:
+            parent = os.path.dirname(self.path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
             with open(self.path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(record, sort_keys=True) + "\n")
         return record
+
+    def next_seq(self) -> int:
+        """The sequence number the next ``append`` will store.
+
+        Callers use it to name a transition's audit record file BEFORE the
+        record is appended (the record must exist on disk before the
+        live-state entry that names it is written).
+        """
+        return len(self._records) + 1
 
     def records(self) -> List[Dict[str, object]]:
         return list(self._records)
@@ -237,8 +382,18 @@ class RolloutEngine:
         rollout_state_path: str,
         approvals_dir: Optional[str] = None,
         audit_path: Optional[str] = None,
+        live_state_path: Optional[str] = None,
     ) -> "RolloutEngine":
-        """Build an engine from the committed declarative YAML."""
+        """Build an engine from the committed declarative YAML.
+
+        ``rollout_state_path`` (``rollout-state.yaml``) stays the
+        declared-default document - every flag there must be ``off``
+        (GR-28, unchanged). When ``live_state_path`` is given and the file
+        exists, its validated, promoted entries are overlaid onto the
+        in-memory state (``load`` overlays live-state on defaults) so the
+        engine reflects the real, currently-promoted stage without ever
+        requiring a non-off flag to be committed to ``rollout-state.yaml``.
+        """
         with open(stage_model_path, encoding="utf-8") as fh:
             model = StageModel.load(yaml.safe_load(fh))
         with open(rollout_state_path, encoding="utf-8") as fh:
@@ -249,6 +404,17 @@ class RolloutEngine:
         flags: Dict[str, FlagState] = {}
         for name, raw in state_doc["flags"].items():
             flags[str(name)] = FlagState.from_doc(str(name), raw)
+        if live_state_path and os.path.isfile(live_state_path):
+            with open(live_state_path, encoding="utf-8") as fh:
+                live_doc = yaml.safe_load(fh) or {}
+            live_errors = validate_live_state_doc(live_doc, list(flags), model)
+            if live_errors:
+                raise RolloutError("; ".join(live_errors))
+            for name, raw in (live_doc.get("flags") or {}).items():
+                live_stage = RolloutStage.coerce(raw.get("stage"))
+                spec = model.spec(live_stage)
+                flags[name].stage = live_stage
+                flags[name].rollout_pct = spec.rollout_pct
         approvals = ApprovalLedger.load_dir(approvals_dir) if approvals_dir else ApprovalLedger()
         return cls(
             model=model,
@@ -279,6 +445,80 @@ class RolloutEngine:
             yaml.safe_dump(self.snapshot_doc(), fh, sort_keys=False, default_flow_style=False)
         os.replace(tmp, path)
 
+    def live_state_doc(
+        self, *, audit_record: str = "", previous: Optional[Mapping[str, object]] = None
+    ) -> Dict[str, object]:
+        """The live-state document - one entry per flag NOT at off.
+
+        Sourced from the audit log's most recent ``promote`` record into the
+        flag's current stage (the ``from_stage`` it actually transitioned
+        from, and whether it was a human or policy approval). A flag that
+        has since rolled back to off is simply absent here - rollback never
+        leaves a stale live-state entry behind.
+
+        A flag the log cannot account for (its promotion was recorded in a
+        different log, e.g. a rotated or separately-written one) keeps the
+        entry already committed for it: that entry IS the evidence. Nothing is
+        ever fabricated - if neither the log nor the committed document can
+        account for a promoted stage, this raises rather than writing an
+        entry with no record.
+        """
+        preserved = previous if isinstance(previous, Mapping) else {}
+        last_promote: Dict[str, Dict[str, object]] = {}
+        for record in self.audit.records():
+            if record.get("action") == "promote":
+                last_promote[str(record["flag"])] = record
+
+        entries: Dict[str, object] = {}
+        for name, state in sorted(self.flags.items()):
+            if state.stage is RolloutStage.OFF:
+                continue
+            record = last_promote.get(name)
+            existing = preserved.get(name)
+            if record is None and isinstance(existing, Mapping):
+                entries[name] = dict(existing)
+                continue
+            if record is None:
+                raise RolloutError(
+                    f"flag '{name}' is at '{state.stage.value}' but neither this audit log nor the "
+                    "committed live-state can account for it; refusing to write an entry with no evidence"
+                )
+            # Each flag names its OWN transition's record. Without this the
+            # single ``audit_record`` argument would be stamped on every entry,
+            # so a reader would be shown some other flag's evidence (#619).
+            record_path = str(record.get("audit_record", ""))
+            entry: Dict[str, object] = {
+                "stage": state.stage.value,
+                "from_stage": record["from_stage"],
+                "since": record["ts"],
+                "audit_record": record_path or audit_record,
+            }
+            if record.get("approval_kind") == "policy":
+                entry["policy"] = record.get("policy", "")
+            else:
+                entry["approval_id"] = record.get("approval_id", "") or ""
+            entries[name] = entry
+        return {"schema_version": 1, "flags": entries}
+
+    def _previous_live_state(self, path: str) -> Dict[str, object]:
+        """The entries already committed at ``path`` (empty when absent)."""
+        if not os.path.isfile(path):
+            return {}
+        with open(path, encoding="utf-8") as fh:
+            doc = yaml.safe_load(fh) or {}
+        flags = doc.get("flags") if isinstance(doc, dict) else None
+        return dict(flags) if isinstance(flags, dict) else {}
+
+    def write_live_state(self, path: str, *, audit_record: str = "") -> None:
+        """Atomically persist the live-state document (see ``live_state_doc``)."""
+        doc = self.live_state_doc(
+            audit_record=audit_record, previous=self._previous_live_state(path)
+        )
+        tmp = f"{path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(doc, fh, sort_keys=False, default_flow_style=False)
+        os.replace(tmp, path)
+
     # -- transitions ------------------------------------------------------- #
 
     def promote(
@@ -291,12 +531,16 @@ class RolloutEngine:
         actor: str = "rollout-pipeline",
         canary_health_ok: Optional[bool] = None,
         gradual_complete: bool = False,
+        audit_record: str = "",
     ) -> FlagState:
         """Promote ``name`` one gated step toward ``target_stage``.
 
         The gate (green verify evidence + approval-as-code + per-target health
         signals) is enforced here; a violation raises ``RolloutError``. The
-        transition is audit-logged.
+        transition is audit-logged, and ``audit_record`` (the on-disk evidence
+        file for THIS transition, relative to ``infra/rollout/``) is recorded
+        on the audit entry so ``live_state_doc`` can attribute each live-state
+        entry to the transition that produced it.
         """
         flag = self.flag(name)
         target = RolloutStage.coerce(target_stage)
@@ -333,6 +577,7 @@ class RolloutEngine:
                 approval_kind="policy",
                 policy=policy.policy,
                 verify_green=bool(verify_green),
+                audit_record=audit_record,
                 reason=f"auto-approved by policy '{policy.policy}'",
             )
         else:
@@ -347,6 +592,7 @@ class RolloutEngine:
                 approval_kind="human" if approval_id else "",
                 policy="",
                 verify_green=bool(verify_green),
+                audit_record=audit_record,
                 reason=DEFAULT_REASON,
             )
         return flag

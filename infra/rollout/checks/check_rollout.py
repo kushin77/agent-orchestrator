@@ -12,7 +12,11 @@ Asserts the declarative rollout contract, all of which can genuinely fail
   4. the rollout Cloud Build triggers ship DISABLED with _ENABLE_ROLLOUT=false
      (flag-gated OFF), mirroring the infra/cloudbuild convention;
   5. service and CI/CD flags in the rollout state mirror
-     infra/feature-flags/registry.yaml 1:1 (drift is a finding).
+     infra/feature-flags/registry.yaml 1:1 (drift is a finding);
+  6. the plan's declared ``promotion_order`` is the one the ordered go-live
+     driver (#619) honours. It was read by NO code before that driver, so a
+     plan that quietly declared something else would have been an order nobody
+     implemented - now it is a gate failure.
 
 Usage:
 
@@ -26,6 +30,7 @@ is not a formality.
 
 from __future__ import annotations
 
+import copy
 import os
 import sys
 
@@ -42,12 +47,14 @@ from infra.rollout.model import (  # noqa: E402
     RolloutStage,
     StageModel,
     validate_go_live_plan_doc,
+    validate_live_state_doc,
     validate_rollout_state_doc,
 )
 
 ROLLOUT_DIR = os.path.join(_REPO_ROOT, "infra", "rollout")
 CLOUDBUILD_DIR = os.path.join(_REPO_ROOT, "infra", "cloudbuild")
 REGISTRY = os.path.join(_REPO_ROOT, "infra", "feature-flags", "registry.yaml")
+LIVE_STATE = os.path.join(ROLLOUT_DIR, "live-state.yaml")
 
 ROLLOUT_TRIGGERS = (
     ("rollout-promote-trigger.yaml", "rollout-promote.yaml"),
@@ -84,8 +91,42 @@ def check_rollout_state(doc: object) -> list:
     return [f"rollout-state: {e}" for e in validate_rollout_state_doc(doc)]
 
 
+def check_live_state(doc: object, known_flags: list, model: StageModel, rollout_dir: str = ROLLOUT_DIR) -> list:
+    """Structural (``validate_live_state_doc``) + I/O errors for live-state.yaml.
+
+    The structural/ordering rules are the pure model function; this adds the
+    one thing that function cannot check without I/O: every entry's
+    ``audit_record`` must resolve to a real file under ``infra/rollout/``
+    (audit/ or approvals/) - a promoted stage with no provable audit trail
+    is a finding, not a formality.
+    """
+    errors = [f"live-state: {e}" for e in validate_live_state_doc(doc, known_flags, model)]
+    if not isinstance(doc, dict):
+        return errors
+    flags = doc.get("flags")
+    if not isinstance(flags, dict):
+        return errors
+    for name, raw in flags.items():
+        if not isinstance(raw, dict):
+            continue
+        audit_record = raw.get("audit_record")
+        if not isinstance(audit_record, str) or not audit_record:
+            continue  # already flagged as missing by validate_live_state_doc
+        candidate = audit_record if os.path.isabs(audit_record) else os.path.join(rollout_dir, audit_record)
+        if not os.path.isfile(candidate):
+            errors.append(f"live-state: flag '{name}' audit_record '{audit_record}' does not exist")
+    return errors
+
+
 def check_go_live_plan(doc: object, known_flags: list, model: StageModel) -> list:
-    return [f"go-live-plan: {e}" for e in validate_go_live_plan_doc(doc, known_flags, model)]
+    errors = [f"go-live-plan: {e}" for e in validate_go_live_plan_doc(doc, known_flags, model)]
+    if isinstance(doc, dict) and doc.get("promotion_order") != "strict-by-phase":
+        errors.append(
+            "go-live-plan: promotion_order must be 'strict-by-phase' - the ordered go-live driver "
+            "(infra/rollout/go_live.py) computes and enforces that order, so a plan declaring anything "
+            "else declares an order no code implements"
+        )
+    return errors
 
 
 def check_registry_parity(state_flags: list, registry: object) -> list:
@@ -169,6 +210,13 @@ def check_all() -> list:
     if model is not None:
         errors.extend(check_go_live_plan(plan, known_flags, model))
 
+    if os.path.isfile(LIVE_STATE):
+        live_state_doc = _load(LIVE_STATE)
+    else:
+        live_state_doc = {"schema_version": 1, "flags": {}}
+    if model is not None:
+        errors.extend(check_live_state(live_state_doc, known_flags, model))
+
     errors.extend(check_registry_parity(known_flags, _load(REGISTRY)))
     errors.extend(check_triggers())
     return errors
@@ -231,6 +279,21 @@ def _probes() -> list:
         model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
         return check_go_live_plan(bad_plan, ["services.registry", "ci_cd.verify_trigger", "rollout.pipeline"], model)
 
+    def promotion_order_probe():
+        """A plan whose declared order no code honours must fail BY NAME.
+
+        The probe keeps full phase coverage (unlike ``bad_plan``) so it fires
+        the promotion_order rule alone rather than the coverage rule.
+        """
+        model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
+        plan = copy.deepcopy(_load(os.path.join(ROLLOUT_DIR, "go-live-plan.yaml")))
+        plan["promotion_order"] = "whatever-order"
+        known = list(_load(os.path.join(ROLLOUT_DIR, "rollout-state.yaml"))["flags"])
+        errors = check_go_live_plan(plan, known, model)
+        if any("promotion_order" in error for error in errors):
+            return errors[:1]
+        return [f"the promotion_order rule did not fire: {errors!r}"]
+
     def parity_probe():
         return check_registry_parity(["services.nope", "ci_cd.verify_trigger"], bad_registry)
 
@@ -249,14 +312,66 @@ def _probes() -> list:
     def trigger_probe():
         return check_triggers(bad_trigger_dir)
 
+    def live_state_missing_audit_probe():
+        model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
+        bad_live_state = {
+            "schema_version": 1,
+            "flags": {
+                "services.registry": {
+                    "stage": "canary",
+                    "from_stage": "off",
+                    "since": "2026-09-16T00:00:00Z",
+                    "policy": "low-risk-auto-approve",
+                    "audit_record": "audit/does-not-exist.md",
+                }
+            },
+        }
+        return check_live_state(bad_live_state, ["services.registry"], model)
+
+    def live_state_full_policy_probe():
+        model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
+        bad_live_state = {
+            "schema_version": 1,
+            "flags": {
+                "services.registry": {
+                    "stage": "full",
+                    "from_stage": "gradual",
+                    "since": "2026-09-16T00:00:00Z",
+                    "policy": "low-risk-auto-approve",
+                    "audit_record": "audit/some-record.md",
+                }
+            },
+        }
+        return check_live_state(bad_live_state, ["services.registry"], model)
+
+    def live_state_non_adjacent_probe():
+        model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
+        bad_live_state = {
+            "schema_version": 1,
+            "flags": {
+                "services.registry": {
+                    "stage": "full",
+                    "from_stage": "off",
+                    "since": "2026-09-16T00:00:00Z",
+                    "approval_id": "a-full",
+                    "audit_record": "audit/some-record.md",
+                }
+            },
+        }
+        return check_live_state(bad_live_state, ["services.registry"], model)
+
     return [
         ("stage-model rejects unknown stage", stage_probe),
         ("stage-model rejects policy auto-approving full", full_autoapprove_probe),
         ("rollout-state rejects default-ON flag", state_probe),
         ("go-live-plan rejects partial phase coverage", plan_probe),
+        ("go-live-plan rejects a promotion_order no driver honours", promotion_order_probe),
         ("registry parity rejects unknown service flag", parity_probe),
         ("registry parity checks a surfaces flag against the surfaces section", surface_parity_probe),
         ("cloudbuild requires disabled rollout triggers", trigger_probe),
+        ("live-state rejects a missing audit_record file", live_state_missing_audit_probe),
+        ("live-state rejects full with a policy approval (not human)", live_state_full_policy_probe),
+        ("live-state rejects a non-adjacent stage jump", live_state_non_adjacent_probe),
     ]
 
 

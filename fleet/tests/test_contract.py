@@ -30,11 +30,68 @@ DIRECTIVE_VERBS = (
 )
 
 TRUST_RULES = (
+    "Only the director may issue directives to the dispatcher.",
+    "The dispatcher may only spawn executors per a directive.",
+    "Executors report back through the dispatcher.",
+    "Everything else is refused.",
+)
+
+# The RETIRED (schema 1) rendering of the same four rules. Schema 1 is still
+# ACCEPTED on read for the deprecation window the glossary declares, so the
+# contract must go on declaring the exact rules a schema-1 reader enforces — as a
+# glow, inside the marked legacy region. `scripts/check-fleet-contract.sh` pins
+# these same four strings, so keeping them is the contract's own obligation and
+# not only this suite's.
+RETIRED_TRUST_RULES = (
     "Only the brain may issue directives to the sister.",
     "The sister may only spawn subagents per a directive.",
     "Subagents report back through the sister.",
     "Everything else is refused.",
 )
+
+#: The role vocabulary (issue #777). The single authority is
+#: `governance/vocabulary/fleet.yaml`; the contract renders it, and the marked
+#: legacy region is the ONLY place a retired term may appear as a name.
+CURRENT_ROLES = ("principal", "director", "dispatcher", "executor")
+RETIRED_ROLES = ("operator", "brain", "sister", "subagent")
+LEGACY_START = "<!-- legacy-gloss:start -->"
+LEGACY_END = "<!-- legacy-gloss:end -->"
+
+
+def legacy_region(text: str) -> str:
+    """Every marked legacy-gloss region, concatenated."""
+    parts: list[str] = []
+    cursor = 0
+    while True:
+        opening = text.find(LEGACY_START, cursor)
+        closing = text.find(LEGACY_END, opening + 1) if opening >= 0 else -1
+        if opening < 0 or closing < 0:
+            return "\n".join(parts)
+        parts.append(text[opening : closing + len(LEGACY_END)])
+        cursor = closing + len(LEGACY_END)
+
+
+def outside_legacy_region(text: str) -> str:
+    """The contract with every marked legacy-gloss region removed."""
+    while LEGACY_START in text and LEGACY_END in text:
+        opening = text.index(LEGACY_START)
+        closing = text.index(LEGACY_END, opening) + len(LEGACY_END)
+        text = text[:opening] + text[closing:]
+    return text
+
+
+def prose_only(text: str) -> str:
+    """The text a retired term may NOT appear in: everything but the artifacts.
+
+    Mirrors the rule `scripts/check-fleet-vocabulary.sh` enforces — an inline code
+    span, a link target, a path and a filename are ARTIFACT NAMES (the glossary's
+    declared out-of-scope), so a retired word inside one is named machinery rather
+    than a role. §3 legitimately renders the schema-1 dialect in code spans.
+    """
+    text = re.sub(r"`[^`]*`", " ", text)
+    text = re.sub(r"\]\([^)]*\)", " ", text)
+    text = re.sub(r"\S*/\S*", " ", text)
+    return re.sub(r"[\w.-]+\.(?:py|sh|json|md|log|lock|ya?ml|txt)\b", " ", text).lower()
 
 # The primary-control-plane declaration (issue #763). These phrases exist only in
 # the §7.1 subsection — the shell gate pins the same four, so the two halves of
@@ -55,10 +112,46 @@ def test_contract_exists():
     assert CONTRACT.is_file(), "the session-fleet contract must exist at fleet/CONTRACT.md"
 
 
-def test_contract_declares_the_three_roles():
+def test_contract_declares_the_four_roles_in_the_current_vocabulary():
+    """§1 names the function, not the metaphor (issue #777)."""
+    section = contract_text().split("## 1. Roles", 1)[1].split("## 2.", 1)[0]
+    for role in CURRENT_ROLES:
+        assert role in section, f"§1 must declare the role '{role}'"
+    assert "the dispatcher never picks work" in section.lower(), (
+        "§1 must keep the invariant the retired metaphor carried"
+    )
+
+
+def test_the_retired_spellings_survive_as_a_declared_gloss_only():
+    """Dual-accept on read means the retired dialect stays documented.
+
+    A dialect the transport still accepts cannot be left undocumented, so the
+    four retired names must survive — but ONLY inside a marked legacy region. A
+    retired term outside one is a name the migration did not finish.
+    """
     text = contract_text()
-    for role in ("brain", "fleet brain", "sister", "subagent"):
-        assert role in text, f"the contract must declare the role '{role}'"
+    gloss = legacy_region(text)
+    assert LEGACY_START in text and LEGACY_END in text, (
+        "the contract must mark where a retired term is a declared gloss"
+    )
+    for retired in RETIRED_ROLES:
+        assert retired in gloss, f"the legacy gloss must render the retired role '{retired}'"
+    outside = prose_only(outside_legacy_region(text))
+    for retired in RETIRED_ROLES:
+        assert retired not in outside, (
+            f"'{retired}' is used as a name outside the declared legacy region"
+        )
+
+
+def test_the_contract_declares_the_versioned_envelope():
+    """§3 declares the envelope version and the one thing it must never carry."""
+    section = contract_text().split("## 3.", 1)[1].split("## 4.", 1)[0]
+    for marker in ("`schema`", "Absent means `1`", "schema-2 envelope"):
+        assert marker in section, f"§3 must declare '{marker}'"
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    assert schema["properties"]["schema"]["enum"] == [1, 2], (
+        "the envelope schema must carry the two versions the contract declares"
+    )
 
 
 def test_contract_declares_every_directive_verb():
@@ -68,9 +161,18 @@ def test_contract_declares_every_directive_verb():
 
 
 def test_contract_declares_the_trust_model_verbatim():
+    """Both dialects, verbatim: the current rules and the retired rendering.
+
+    Schema 1 is still accepted on read, so the contract must declare both. The
+    retired four live inside the marked legacy region — asserted here so a later
+    edit cannot quietly delete the dialect the transport still understands.
+    """
     text = contract_text()
     for rule in TRUST_RULES:
         assert rule in text, f"the contract must declare the trust rule '{rule}'"
+    gloss = legacy_region(text)
+    for rule in RETIRED_TRUST_RULES:
+        assert rule in gloss, f"the legacy gloss must declare the rule '{rule}'"
 
 
 def test_contract_declares_the_envelope_fields_and_the_finops_block():
@@ -108,7 +210,10 @@ def test_contract_declares_a2a_as_the_primary_control_plane():
         assert marker in text, f"the contract must declare '{marker}'"
     subsection = text.split("### 7.1 A2A is the PRIMARY control plane", 1)[1].split("\n## 8.", 1)[0]
     for invariant in (
-        "dumb terminal",
+        # The metaphor is gone (issue #777) and the INVARIANT it carried is what
+        # §7.1 must still declare (asserted on the sentence as written: the
+        # casing of the opening word is layout, not doctrine).
+        "The dispatcher never picks work",
         "DSv4FNone",
         "never picks its own work",
         "supersede",
@@ -217,14 +322,21 @@ def test_the_subagent_prompt_frontloads_the_primary_control_plane_clause():
 
 
 def test_standing_directive_keeps_the_dsv4fnone_and_roles_content():
-    """The new clauses are additive: the DSv4FNone order and the roles stay."""
+    """The new clauses are additive: the DSv4FNone order and the roles stay.
+
+    The roles are asserted in the CURRENT vocabulary (issue #777): the standing
+    directive is a normative surface, so a retired name here would be the
+    half-done rename the migration exists to prevent — and the invariant the
+    retired metaphor carried is asserted in its place.
+    """
     body = standing_body()
     for marker in (
         "DSv4FNone",
         "DeepSeek v4.1 Flash",
-        "dumb terminal",
-        "ROLES:",
-        "brain = DSv4PM (DeepSeek v4 Pro Max)",
+        "the dispatcher session",
+        "never picks work",
+        "ROLES",
+        "director = DSv4PM (DeepSeek v4 Pro Max)",
         "fleet/control.py",
     ):
         assert marker in body, f"the standing directive must keep '{marker}'"

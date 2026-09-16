@@ -1,0 +1,13 @@
+{
+  "canonical": {
+    "id": "fleet-operator",
+    "version": "1.0.0"
+  },
+  "mirrors": {
+    ".cursorrules": "a7ed2c78b602447a96a7f2974728ed2a6bc30e1121fdaa71dd8d175d2e13c0a4",
+    "AGENTS.md": "4e01daa31de9e8f5098c082ec14057cb6f6eb8f502573cc3cc3a6ac996aae69c",
+    "CLAUDE.md": "32e659ac9fb5965dbfc1a6f8c88ca0d686924eb37071f482938b3ee386bb4b9a",
+    "copilot-instructions.md": "064e9a73d3967924a6eb0b00c2147136ef32c44c919f50f4db5a2b408fc2ca50"
+  },
+  "schema": "ao.instructions.distribution/v1"
+}
