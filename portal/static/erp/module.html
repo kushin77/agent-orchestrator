@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP module — agent-orchestrator console</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+  <link rel="stylesheet" href="/erp/module.css">
+</head>
+<body class="erp-body">
+  <header class="erp-head">
+    <div>
+      <h1 id="erpTitle">ERP module</h1>
+      <p class="erp-sub">
+        module <span class="erp-mono" id="erpModuleId" data-module="">—</span>
+        <span class="erp-badge" id="erpFlag" data-state="unknown">flag: unknown</span>
+        <span class="erp-src" id="erpSource"></span>
+      </p>
+    </div>
+    <button class="erp-move" type="button" id="erpReload">↻ reload</button>
+  </header>
+
+  <p class="erp-note" id="status" data-state="loading">loading the module declaration…</p>
+
+  <section class="erp-pane" id="paneDashboard">
+    <h2>Dashboard</h2>
+    <p class="erp-sub" id="dashTotals" data-documents="0" data-families="0">—</p>
+    <table class="erp-table">
+      <thead>
+        <tr><th>Family</th><th>Documents</th><th>Lifecycle</th><th>States</th><th>Redacted fields</th></tr>
+      </thead>
+      <tbody id="familyRows"></tbody>
+    </table>
+  </section>
+
+  <section class="erp-pane" id="paneDocuments">
+    <h2>Document lists and forms</h2>
+    <div class="erp-filters">
+      <label>Family <select id="docKind" data-filter="kind"></select></label>
+      <label>State <select id="docState" data-filter="state"></select></label>
+      <label>Search <input type="search" id="docFilter" data-filter="text" placeholder="id or field text"></label>
+    </div>
+    <table class="erp-table">
+      <thead>
+        <tr><th>Id</th><th>Family</th><th>State</th><th>Moves</th></tr>
+      </thead>
+      <tbody id="docRows"></tbody>
+    </table>
+    <p class="erp-note" id="docCount" data-count="0" data-visible="0">—</p>
+
+    <h3 id="formTitle">New document</h3>
+    <form id="docForm" data-mode="create">
+      <fieldset class="erp-fieldset" id="formFields" style="border:0;padding:0;margin:0"></fieldset>
+      <div class="erp-actions">
+        <button type="submit" id="formSubmit">create</button>
+        <button type="button" class="erp-move" id="formReset">reset</button>
+      </div>
+      <p class="erp-note" id="formResult" data-state="idle">the form's fields are the family's own schema, read from the ERP-06 contract</p>
+    </form>
+  </section>
+
+  <section class="erp-pane" id="paneReports">
+    <h2>Reports</h2>
+    <div class="erp-filters">
+      <label>Report <select id="reportPick" data-filter="report"></select></label>
+    </div>
+    <table class="erp-table">
+      <thead id="reportHead"></thead>
+      <tbody id="reportBody"></tbody>
+    </table>
+  </section>
+
+  <script src="/js/api.js"></script>
+  <script src="/erp/module.js"></script>
+</body>
+</html>

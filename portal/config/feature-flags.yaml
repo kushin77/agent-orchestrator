@@ -56,3 +56,25 @@ surfaces:
       store. Served read-only at GET /api/taskboard/tickets and
       GET /api/taskboard/tickets/<id>. A ticket the log does not contain is
       absent, not invented.
+  erp_module:
+    default: off
+    phase: 7
+    description: >
+      ERP module portal surface (ERP-07, issue #652; EPIC #645): the module's
+      dashboards, document lists/forms and reports, mounted into the console
+      behind the module's own switch — the `features[].id: erp-module` entry in
+      integrations/erp/module.yaml, which is also what
+      infra/feature-flags/registry.yaml declares as services.erp_module /
+      surfaces.erp_module for promotion. Served by `portal/server/erp.py`:
+      GET /api/erp/module (the module's own declaration, read through ERP-01's
+      loader, plus ERP-06's served contract), GET /api/erp/dashboard,
+      GET /api/erp/reports[<id>], the verbatim proxy of ERP-06's own routes
+      (/api/erp/documents/... and /api/erp/openapi.json|health), and the
+      module's frame at /erp/module.html. The declarations the views render —
+      the family vocabulary, each family's states and legal moves, and the
+      fields a form offers — are read from the ERP-06 contract at request time,
+      so the projection re-derives no knowledge the indexer already carries, and
+      every document read and write is ERP-06's own answer carrying ERP-08's
+      authorization decision (the module types no role of its own). Offline: the
+      ERP-06 surface is transport-free, so the module renders with no socket, no
+      network and no deployment.

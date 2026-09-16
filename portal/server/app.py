@@ -49,6 +49,7 @@ from portal.server.surface_health import (
 from portal.server.live_feed import MAX_REPLAY_LIMIT, LiveFeed
 from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
+from portal.server.erp import ErpModuleError, ErpModuleSurface
 from portal.server.org_chart import OrgChartView
 from portal.server.skill_studio import (
     ACTION_AUTHOR,
@@ -81,6 +82,26 @@ OPERATOR_TERMINAL_SURFACE = "operator_terminal"
 #: ``feature_disabled`` so an unauthenticated probe cannot tell the surface
 #: exists (the ``CHAT_ASSETS`` precedent).
 OPERATOR_TERMINAL_ASSETS: tuple[str, ...] = ("views/console.html", "js/operator.js")
+
+#: The path prefix the ERP module's own documents live under (ERP-07, issue
+#: #652). Gated BEFORE AuthN and before static serving: while ``erp_module`` is
+#: off the whole namespace is *absent* — not merely unauthorised — so a probe
+#: cannot enumerate a surface that does not exist yet.
+ERP_MODULE_ASSET_PREFIX = "erp/"
+
+
+def _is_erp_document(path: str) -> bool:
+    """True for the module's namespace, the bare directory included.
+
+    The bare ``/erp`` matters: left to the static handler it is a directory and
+    answers ``404 not_found``, which is a *different* refusal from the
+    ``feature_disabled`` every other path in the namespace gives. One namespace,
+    one answer while the flag is off.
+    """
+    stripped = path.strip("/")
+    return stripped == ERP_MODULE_ASSET_PREFIX.rstrip("/") or stripped.startswith(
+        ERP_MODULE_ASSET_PREFIX
+    )
 
 
 class ApiError(Exception):
@@ -148,6 +169,7 @@ class ConsoleApplication:
         skill_studio_surface: Optional[SkillStudioSurface] = None,
         task_board_surface: Optional[TaskBoardSurface] = None,
         operator_terminal_enabled: Optional[bool] = None,
+        erp_module_surface: Optional[ErpModuleSurface] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -229,6 +251,18 @@ class ConsoleApplication:
             if task_board_surface is not None
             else TaskBoardSurface(repo_root=self.repo_root)
         )
+        # The ERP module's portal surface (ERP-07, issue #652) — flag-gated OFF.
+        # Its switch is declared in the portal's OWN config, beside the three
+        # workbook views above and for the same reason: it is a view inside the
+        # portal service. The module's manifest records that the *promotion* row
+        # (infra/feature-flags/registry.yaml services.erp_module /
+        # surfaces.erp_module) lands with this surface; the fail-closed reader is
+        # the one those three views already use.
+        self.erp = (
+            erp_module_surface
+            if erp_module_surface is not None
+            else ErpModuleSurface(repo_root=self.repo_root)
+        )
         # The operator terminal (issue #774) — feature-flag-gated OFF. It
         # composes the fleet projection (read) and the remote control family
         # (steer); this flag gates the route + view only, and the two halves
@@ -282,6 +316,17 @@ class ConsoleApplication:
                     "feature_disabled",
                     "the operator terminal is feature-flag-gated OFF "
                     "(infra/feature-flags/registry.yaml surfaces.operator_terminal)",
+                )
+            # The ERP module's own documents ship the same way (ERP-07, issue
+            # #652): *absent* while unpromoted, before any session work and
+            # before static serving, so the whole directory is invisible rather
+            # than protected.
+            if not self.erp.enabled and _is_erp_document(path):
+                raise ApiError(
+                    404,
+                    "feature_disabled",
+                    "the ERP module surface is feature-flag-gated OFF "
+                    "(portal/config/feature-flags.yaml surfaces.erp_module)",
                 )
             if self._is_static(path):
                 return self._serve_static(path)
@@ -421,6 +466,7 @@ class ConsoleApplication:
         segments = path.strip("/").split("/")
         return bool(segments) and segments[0] in {
             "views", "css", "js", "design-tokens", "assets", "favicon.svg",
+            "erp",
         }
 
     def _serve_static(self, path: str) -> Response:
@@ -572,6 +618,17 @@ class ConsoleApplication:
                 "(portal/config/feature-flags.yaml surfaces.task_board)",
             )
 
+        # The ERP module's surface (ERP-07, issue #652) ships the same way and
+        # is gated at the same point — before authN — so an unpromoted module is
+        # absent rather than distinguishable by an authentication probe.
+        if parts[0] == "erp" and not self.erp.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the ERP module surface is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.erp_module)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -595,6 +652,8 @@ class ConsoleApplication:
                 return self._route_skill_studio(parts, method, query, body)
             if parts[0] == "taskboard":
                 return self._route_task_board(parts, method, query)
+            if parts[0] == "erp":
+                return self._route_erp(parts[1:], method, body)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -781,6 +840,68 @@ class ConsoleApplication:
         except TaskBoardError as exc:
             raise ApiError(exc.status, exc.code, exc.message) from None
         raise ApiError(404, "not_found", f"no such task-board read: {'/'.join(surface)}")
+
+    def _route_erp(
+        self, surface: list[str], method: str, body: dict[str, Any]
+    ) -> Response:
+        """The ERP module's portal surface (ERP-07, issue #652).
+
+        Three answers are the module's own — the declaration (``module``), the
+        per-family tallies (``dashboard``) and the reports — and each is composed
+        from ERP-06's served contract and the API's own answers, never from a
+        store of its own. Everything else under ``/api/erp/`` is a **verbatim
+        proxy** of ERP-06's route table: the path is handed to the module's own
+        surface, which appends ERP-06's prefix and returns that surface's
+        envelope unchanged, so an operator reading the console sees ERP-06's
+        status, code and message rather than a second dialect of them. The ERP
+        authorization decision belongs to ERP-08 and is taken inside the surface
+        this proxy mounts; the session in front of it authenticates the operator
+        and is never turned into an ERP role.
+
+        When the module's flag is off none of this is reachable — the route is
+        refused with 404 ``feature_disabled`` before authN.
+        """
+        try:
+            if surface == ["module"] and method == "GET":
+                return self._ok(self.erp.module())
+            if surface == ["dashboard"] and method == "GET":
+                return self._ok(self.erp.dashboard())
+            if surface == ["reports"] and method == "GET":
+                return self._ok(self.erp.reports())
+            if len(surface) == 2 and surface[0] == "reports" and method == "GET":
+                return self._ok(self.erp.report(surface[1]))
+        except ErpModuleError as exc:
+            raise ApiError(exc.status, exc.code, exc.message) from None
+        if surface and surface[0] in {"module", "dashboard", "reports"}:
+            raise ApiError(405, "method_not_allowed", f"{method} is not allowed here")
+        if not surface:
+            raise ApiError(404, "not_found", "no such ERP route: /api/erp")
+        return self._erp_proxy(surface, method, body)
+
+    def _erp_proxy(
+        self, surface: list[str], method: str, body: dict[str, Any]
+    ) -> Response:
+        """Hand one request to ERP-06 and return **its** envelope, unchanged.
+
+        The envelope ERP-06 emits is the same house envelope the console emits
+        (``identity/cpapi/router``), so it travels as the response body verbatim:
+        no code is renamed, no status is re-derived, and a refusal ERP-08 made —
+        ``403 permission-denied``, ``409 state_jumped``, a field policy's
+        ``field-write-denied`` — arrives with the code and status the module's
+        own contract declares for it.
+        """
+        try:
+            envelope = self.erp.call(
+                method, "/" + "/".join(surface), body=body if method in {"POST", "PUT"} else None
+            )
+        except ErpModuleError as exc:
+            raise ApiError(exc.status, exc.code, exc.message) from None
+        status = envelope.get("status")
+        return Response(
+            status=int(status) if isinstance(status, int) else 200,
+            is_json=True,
+            payload=envelope,
+        )
 
     # -- finops single-pane (issue #341) ------------------------------------
     def _route_finops(

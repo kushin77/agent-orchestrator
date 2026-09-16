@@ -1,0 +1,216 @@
+/* ERP module — portal frame styles (ERP-07, issue #652).
+ * Token-based only (no literal colours): the frame is loaded into the shell's
+ * stage iframe and must follow the console's light/dark themes without a second
+ * palette. Every `var(--os-*)` here is declared in design-tokens/tokens.css. */
+
+.erp-body {
+  margin: 0;
+  padding: var(--os-space-6);
+  background: var(--os-color-bg);
+  color: var(--os-color-fg);
+  font-family: var(--os-font-ui);
+  font-size: var(--os-font-size-base);
+  line-height: var(--os-line-height-normal);
+}
+
+.erp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--os-space-4);
+  border-bottom: 1px solid var(--os-color-border);
+  padding-bottom: var(--os-space-4);
+  margin-bottom: var(--os-space-6);
+}
+
+.erp-head h1 {
+  font-family: var(--os-font-heading);
+  font-size: var(--os-font-size-2xl);
+  font-weight: var(--os-font-weight-semibold);
+  margin: 0 0 var(--os-space-2);
+}
+
+.erp-sub {
+  color: var(--os-color-fg-subtle);
+  font-size: var(--os-font-size-sm);
+  margin: 0;
+}
+
+.erp-badge {
+  display: inline-block;
+  margin-left: var(--os-space-2);
+  padding: 0 var(--os-space-2);
+  border: 1px solid var(--os-color-border);
+  border-radius: var(--os-radius-sm);
+  background: var(--os-color-bg-subtle);
+  font-family: var(--os-font-mono);
+  font-size: var(--os-font-size-xs);
+}
+
+.erp-badge[data-state="on"] {
+  background: var(--os-color-success);
+  color: var(--os-color-primary-fg);
+  border-color: var(--os-color-success);
+}
+
+.erp-badge[data-state="off"] {
+  background: var(--os-color-error);
+  color: var(--os-color-primary-fg);
+  border-color: var(--os-color-error);
+}
+
+.erp-src {
+  font-family: var(--os-font-mono);
+  font-size: var(--os-font-size-xs);
+  color: var(--os-color-muted);
+  margin-left: var(--os-space-2);
+}
+
+.erp-pane {
+  background: var(--os-color-surface);
+  border: 1px solid var(--os-color-border-subtle);
+  border-radius: var(--os-radius-lg);
+  padding: var(--os-space-5);
+  margin-bottom: var(--os-space-6);
+}
+
+.erp-pane h2 {
+  font-family: var(--os-font-heading);
+  font-size: var(--os-font-size-lg);
+  font-weight: var(--os-font-weight-semibold);
+  margin: 0 0 var(--os-space-3);
+}
+
+.erp-pane h3 {
+  font-size: var(--os-font-size-base);
+  font-weight: var(--os-font-weight-medium);
+  margin: var(--os-space-5) 0 var(--os-space-3);
+}
+
+.erp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--os-font-size-sm);
+}
+
+.erp-table th,
+.erp-table td {
+  text-align: left;
+  padding: var(--os-space-2) var(--os-space-3);
+  border-bottom: 1px solid var(--os-color-border-subtle);
+  vertical-align: top;
+}
+
+.erp-table th {
+  color: var(--os-color-fg-subtle);
+  font-weight: var(--os-font-weight-medium);
+}
+
+.erp-table tbody tr:hover {
+  background: var(--os-color-surface-hover);
+}
+
+.erp-mono {
+  font-family: var(--os-font-mono);
+  font-size: var(--os-font-size-xs);
+}
+
+.erp-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--os-space-4);
+  margin-bottom: var(--os-space-4);
+}
+
+.erp-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--os-space-1);
+  font-size: var(--os-font-size-xs);
+  color: var(--os-color-fg-subtle);
+}
+
+.erp-filters select,
+.erp-filters input,
+.erp-field input {
+  padding: var(--os-space-1) var(--os-space-2);
+  border: 1px solid var(--os-color-border);
+  border-radius: var(--os-radius-sm);
+  background: var(--os-color-bg);
+  color: var(--os-color-fg);
+  font-family: var(--os-font-ui);
+  font-size: var(--os-font-size-sm);
+}
+
+.erp-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--os-space-1);
+  margin-bottom: var(--os-space-3);
+}
+
+.erp-field label {
+  font-size: var(--os-font-size-xs);
+  color: var(--os-color-fg-subtle);
+}
+
+.erp-field .erp-req {
+  color: var(--os-color-error);
+  font-family: var(--os-font-mono);
+}
+
+.erp-field .erp-help {
+  font-size: var(--os-font-size-xs);
+  color: var(--os-color-muted);
+}
+
+.erp-actions {
+  display: flex;
+  gap: var(--os-space-3);
+  align-items: center;
+}
+
+.erp-actions button {
+  padding: var(--os-space-2) var(--os-space-4);
+  border: 1px solid var(--os-color-border);
+  border-radius: var(--os-radius-sm);
+  background: var(--os-color-primary);
+  color: var(--os-color-primary-fg);
+  font-family: var(--os-font-ui);
+  font-size: var(--os-font-size-sm);
+  cursor: pointer;
+}
+
+.erp-actions button:hover {
+  background: var(--os-color-primary-strong);
+}
+
+.erp-move {
+  margin-right: var(--os-space-1);
+  padding: 0 var(--os-space-2);
+  border: 1px solid var(--os-color-border);
+  border-radius: var(--os-radius-sm);
+  background: var(--os-color-bg-subtle);
+  color: var(--os-color-fg);
+  font-size: var(--os-font-size-xs);
+  cursor: pointer;
+}
+
+.erp-note {
+  font-size: var(--os-font-size-sm);
+  color: var(--os-color-fg-subtle);
+  margin: var(--os-space-3) 0 0;
+}
+
+.erp-note[data-state="refused"] {
+  color: var(--os-color-error);
+}
+
+.erp-note[data-state="ok"] {
+  color: var(--os-color-success);
+}
+
+.erp-empty {
+  color: var(--os-color-muted);
+  font-style: italic;
+}

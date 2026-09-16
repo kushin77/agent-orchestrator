@@ -25,3 +25,4 @@ substitutions:
   _ENABLE_TASK_BOARD: "false"
   _ENABLE_MCP_OUTBOUND: "false"
   _ENABLE_SANDBOX_RUNTIME: "false"
+  _ENABLE_ERP_MODULE: "false"

@@ -24,6 +24,7 @@
     wireTheme();
     showCrumb();
     loadView(currentView());
+    offerErpModule();
   }
 
   var NAV_TENANT = [
@@ -52,6 +53,36 @@
 
   function isGlobalView(view) {
     return NAV_GLOBAL.some(function (item) { return item.id === view; });
+  }
+
+  /* A view whose frame is not under /views/ names its own target. The ERP module
+   * (ERP-07, issue #652) is the first: its frame is a whole module directory
+   * (/erp/module.html + its own script and stylesheet), so the shell must not
+   * synthesise /views/erp.html for it. */
+  var VIEW_TARGETS = {
+    erp: "/erp/module.html"
+  };
+
+  /* The ERP module is a *gated* view: it is offered only when the module is
+   * actually reachable. `GET /api/erp/module` is refused 404 `feature_disabled`
+   * while its flag is off, so a probe that fails adds no nav entry — an
+   * unpromoted module is absent from the shell, not a dead link in it. */
+  async function offerErpModule() {
+    try {
+      var payload = await CP.get("/api/erp/module");
+      if (!payload || !payload.data) return;
+    } catch (err) {
+      return;
+    }
+    var item = { id: "erp", label: "ERP", icon: "\u25a4" };
+    var nav = document.getElementById("nav");
+    var group = nav.querySelector("[data-group='erp']");
+    if (!group) {
+      group = CP.el("div", { class: "ng", "data-group": "erp", text: "Modules" });
+      nav.appendChild(group);
+    }
+    nav.appendChild(navButton(item));
+    window.ErpModule = { offered: true };
   }
 
   function currentView() {
@@ -112,7 +143,7 @@
 
   function loadView(view) {
     var frame = document.getElementById("stageFrame");
-    var target = "/views/" + view + ".html";
+    var target = VIEW_TARGETS[view] || ("/views/" + view + ".html");
     if (!isGlobalView(view)) target += "?tenant=" + encodeURIComponent(state.tenant);
     frame.src = target;
     showCrumb(view);
@@ -121,7 +152,8 @@
   function showCrumb(view) {
     var crumb = document.getElementById("crumb");
     var global = NAV_GLOBAL.filter(function (item) { return item.id === view; })[0];
-    var label = global ? global.label : state.tenant + " / " + view;
+    var label = global ? global.label
+      : (VIEW_TARGETS[view] ? view : state.tenant + " / " + view);
     crumb.textContent = label;
   }
 
