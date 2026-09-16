@@ -158,3 +158,4 @@ governance/spawn
 # what scripts/check-fleet-cron-dev-run.sh enforces. Named in
 # scripts/verify.sh via scripts/run-pytest-suites.sh (this manifest).
 infra/fleet
+e2e/erp
