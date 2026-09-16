@@ -169,7 +169,108 @@ THINKING_LEVELS = ("none", "low", "medium", "high")
 # answered by the brain without dispatching anything to the sister.
 TASK_KINDS = ("work", "status", "report", "ping", "steer")
 NON_WORK_KINDS = ("status", "report", "ping", "steer")
-_ROLE_RE = re.compile(r"^(operator|brain|sister|subagent(-[a-z0-9]+)?)$")
+
+# ── the declared role vocabulary (issue #777) ───────────────────────────────
+# The role names are WIRE VALUES, not comments: the envelope carries them, this
+# module refuses any sender or recipient outside the closed set, and
+# `fleet/terminal.py` / `fleet/brain.py` branch on them. Renaming them is
+# therefore a protocol migration rather than a find-and-replace — and it cannot
+# be done by restarting the fleet, because a live loop is reading these names.
+#
+# So the migration is versioned, and the two dialects are named here:
+#
+#   schema 1 (retired): operator · brain · sister · subagent[-<name>]
+#   schema 2 (current): principal · director · dispatcher · executor[-<name>]
+#
+# The SINGLE AUTHORITY for this vocabulary is `governance/vocabulary/fleet.yaml`
+# (the glossary). The constants below are the code's copy of it, and
+# `scripts/check-fleet-vocabulary.sh` — wired into `make verify` — fails when the
+# two stop agreeing, so a lane cannot mint a third name by editing one side. This
+# is the same declared-policy-plus-code-plus-agreeing-gate pattern
+# `scripts/check-finops-chooser.sh` already uses for the FinOps vocabulary (#164).
+SCHEMA_VERSION_LEGACY = 1
+SCHEMA_VERSION_CURRENT = 2
+SCHEMA_VERSIONS = (SCHEMA_VERSION_LEGACY, SCHEMA_VERSION_CURRENT)
+
+#: Current (schema 2) role names — the function in the chain, not the metaphor.
+ROLES_CURRENT = ("principal", "director", "dispatcher", "executor")
+#: Retired (schema 1) role names. Still ACCEPTED on read (dual-accept) and still
+#: emitted to a recipient that has not declared schema 2, for the deprecation
+#: window declared in the glossary.
+ROLES_LEGACY = ("operator", "brain", "sister", "subagent")
+#: Retired name -> current name. The one mapping that makes the rename total.
+ROLE_RENAME = {
+    "operator": "principal",
+    "brain": "director",
+    "sister": "dispatcher",
+    "subagent": "executor",
+}
+#: Roles whose name may carry an instance suffix (`executor-<name>`; schema 1
+#: spelled the same seat `subagent-<name>`). The suffix names an instance, not a
+#: role, so it is preserved across the rename.
+INSTANCED_ROLES = ("subagent", "executor")
+
+#: The named roles the trust rules are stated on, so the rules are readable and
+#: nothing compares a bare literal.
+ROLE_PRINCIPAL, ROLE_DIRECTOR, ROLE_DISPATCHER, ROLE_EXECUTOR = ROLES_CURRENT
+
+
+def _role_pattern(names: tuple[str, ...]) -> str:
+    """A single-role-alternation regex body for ``names`` (instance-aware).
+
+    Built from the declared names rather than hand-written, so the regex cannot
+    drift from the vocabulary it enforces.
+    """
+    parts = [
+        f"{name}(-[a-z0-9]+)?" if name in INSTANCED_ROLES else name for name in names
+    ]
+    return "(" + "|".join(parts) + ")"
+
+
+#: Every role name this channel accepts on READ — both dialects (dual-accept).
+_ROLE_RE = re.compile("^" + _role_pattern(ROLES_CURRENT + ROLES_LEGACY) + "$")
+#: A retired (schema 1) role name — refused in a schema-2 envelope, by name.
+_RETIRED_ROLE_RE = re.compile("^" + _role_pattern(ROLES_LEGACY) + "$")
+#: A current (schema 2) role name.
+_CURRENT_ROLE_RE = re.compile("^" + _role_pattern(ROLES_CURRENT) + "$")
+
+#: The env seam that forces an emitting dialect. `auto` (the default) negotiates
+#: from the recipient rung's live heartbeat; `1`/`2` pin it, which is what a gate
+#: or an operator uses to prove a single dialect end to end.
+ENVELOPE_SCHEMA_ENV = "AO_FLEET_ENVELOPE_SCHEMA"
+ENVELOPE_SCHEMA_AUTO = "auto"
+
+#: The heartbeat key by which a rung declares it speaks schema 2. A rung whose
+#: beat predates this field declares nothing, which is the honest reading of "an
+#: older build": it is the RUNNING loop's shape while this lane lands.
+ENVELOPE_SCHEMA_BEAT_KEY = "envelope_schema"
+
+
+def role_base(role: str) -> str:
+    """The role name without its instance suffix (``executor-x`` -> ``executor``)."""
+    return role.split("-", 1)[0]
+
+
+def current_role(role: str) -> str:
+    """The schema-2 spelling of ``role``, preserving any instance suffix.
+
+    Idempotent for a name already in the current dialect, so callers can
+    normalise unconditionally before applying a trust rule.
+    """
+    base = role_base(role)
+    mapped = ROLE_RENAME.get(base, base)
+    suffix = role[len(base) :]
+    return mapped + suffix
+
+
+def is_retired_role(role: str) -> bool:
+    """True when ``role`` is a schema-1 name (including an instanced one)."""
+    return bool(_RETIRED_ROLE_RE.match(role))
+
+
+def is_current_role(role: str) -> bool:
+    """True when ``role`` is a schema-2 name (including an instanced one)."""
+    return bool(_CURRENT_ROLE_RE.match(role))
 
 EXIT_OK = 0
 EXIT_NOT_OK = 1
@@ -549,6 +650,144 @@ def _parse_ts(value: str) -> bool:
         return False
 
 
+# ── the emitting dialect: negotiated, never assumed (issue #777) ─────────────
+# An emitter emits ONE dialect per envelope. Which one is a property of the
+# RECIPIENT, not of the emitter: a rung that is still running an older build can
+# only read the names it was built with, and a rename that ignored that would
+# break the fleet the moment it landed — the running loop reads these names.
+#
+# The recipient declares what it speaks in its own heartbeat, so the emitter has
+# an observable fact to decide on rather than a guess. When a rung restarts on
+# this build its beat starts declaring `envelope_schema: 2`, and the emitter
+# switches for it automatically: the deprecation window is closed by the
+# respawn, per rung, with nothing to remember and no date to pin.
+
+def recipient_beat(recipient: str) -> Path | None:
+    """The heartbeat that declares what ``recipient`` can read, or ``None``.
+
+    A FUNCTION over this module's own constants, never a dict frozen at import:
+    ``HEARTBEAT`` and ``BRAIN_HEARTBEAT`` are redirection seams — a second fleet
+    re-bases them through ``fleet/runtime.py``, and the test corpus monkeypatches
+    them — so a mapping captured at import time would keep reading the
+    PRE-redirect path and decide the dialect from a file the caller never wrote.
+    The whole negotiation would then be a no-op that silently always downgrades.
+    """
+    return {
+        ROLE_DIRECTOR: BRAIN_HEARTBEAT,
+        ROLE_DISPATCHER: HEARTBEAT,
+    }.get(role_base(current_role(recipient)))
+
+
+def declared_envelope_schema(recipient: str) -> int | None:
+    """The schema the recipient rung declares it speaks, or None when unknown.
+
+    None means "not declared" — an absent beat, an unreadable beat, or a beat
+    written by a build that predates the field. All three are the same fact for
+    this decision, and all three must be read as "cannot confirm schema 2", never
+    as "assume current": a downgrade to the retired dialect is always readable by
+    both sides, whereas the reverse is not.
+    """
+    # The recipient is normalised first: an emitter that names its recipient in
+    # the retired dialect must still find that recipient's beat, or the
+    # negotiation would be skipped exactly where it matters most.
+    path = recipient_beat(recipient)
+    if path is None:
+        return None
+    try:
+        beat = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    value = beat.get(ENVELOPE_SCHEMA_BEAT_KEY) if isinstance(beat, dict) else None
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def dialect_for(recipient: str) -> tuple[int, str]:
+    """The envelope schema this emitter must use for ``recipient``, and why.
+
+    Returns ``(schema, reason)``. ``AO_FLEET_ENVELOPE_SCHEMA`` pins the answer
+    (a gate or an operator proving one dialect end to end); ``auto`` — the default
+    — negotiates it from the recipient's beat.
+    """
+    pinned = (os.environ.get(ENVELOPE_SCHEMA_ENV) or "").strip()
+    if pinned and pinned != ENVELOPE_SCHEMA_AUTO:
+        try:
+            version = int(pinned)
+        except ValueError:
+            version = SCHEMA_VERSION_LEGACY
+        if version in SCHEMA_VERSIONS:
+            return version, f"pinned by {ENVELOPE_SCHEMA_ENV}={version}"
+        return SCHEMA_VERSION_LEGACY, f"{ENVELOPE_SCHEMA_ENV}={pinned} is not a declared version"
+    declared = declared_envelope_schema(recipient)
+    if declared is not None and declared >= SCHEMA_VERSION_CURRENT:
+        return (
+            SCHEMA_VERSION_CURRENT,
+            f"recipient '{current_role(recipient)}' declares "
+            f"{ENVELOPE_SCHEMA_BEAT_KEY}={declared} in its heartbeat",
+        )
+    return (
+        SCHEMA_VERSION_LEGACY,
+        f"recipient '{current_role(recipient)}' does not declare "
+        f"{ENVELOPE_SCHEMA_BEAT_KEY}>={SCHEMA_VERSION_CURRENT} in its heartbeat",
+    )
+
+
+def stamp_envelope(message: dict, *, recipient: str | None = None) -> dict:
+    """Stamp the emitting dialect on ``message``, in place, and return it.
+
+    This is the SINGLE write seam: every emitter calls it, so single-emit is a
+    property of the transport rather than a habit each emitter has to remember.
+    It sets ``schema``, rewrites ``from``/``to`` into that dialect, and — when a
+    recipient it cannot confirm as schema 2 forces the retired spelling — RECORDS
+    the downgrade by name on stderr. A downgrade is reported, never silent: that
+    is the difference between a deprecation window and two vocabularies both
+    being quietly authoritative.
+
+    An explicit ``schema`` on the message is honoured rather than overridden — a
+    caller that declares a version has declared its intent, and `validate` then
+    refuses an envelope that mixes a version with the other dialect's roles. It is
+    still single-emit: one dialect per envelope.
+    """
+    target = recipient or (message.get("to") if isinstance(message.get("to"), str) else "")
+    declared = message.get("schema")
+    if (
+        isinstance(declared, int)
+        and not isinstance(declared, bool)
+        and declared in SCHEMA_VERSIONS
+    ):
+        version, reason = declared, f"declared by the message (schema {declared})"
+    elif target:
+        version, reason = dialect_for(target)
+    else:
+        version, reason = SCHEMA_VERSION_LEGACY, "no recipient to negotiate with"
+    message["schema"] = version
+    for field in ("from", "to"):
+        value = message.get(field)
+        if not isinstance(value, str):
+            continue
+        if version == SCHEMA_VERSION_CURRENT and is_retired_role(value):
+            message[field] = current_role(value)
+        elif version == SCHEMA_VERSION_LEGACY and is_current_role(value):
+            message[field] = _legacy_role(value)
+    if version == SCHEMA_VERSION_LEGACY:
+        print(
+            f"channel: legacy-dialect — emitting schema {SCHEMA_VERSION_LEGACY} role names to "
+            f"'{target or '-'}': {reason}",
+            file=sys.stderr,
+        )
+    return message
+
+
+def _legacy_role(role: str) -> str:
+    """The schema-1 spelling of a current role, preserving an instance suffix."""
+    base = role_base(role)
+    for legacy, current in ROLE_RENAME.items():
+        if current == base:
+            return legacy + role[len(base) :]
+    return role
+
+
 def validate(message: dict) -> list[str]:
     """Return every contract violation; empty list means the message is valid."""
     problems: list[str] = []
@@ -560,7 +799,41 @@ def validate(message: dict) -> list[str]:
     for field in ("from", "to"):
         value = message.get(field)
         if not isinstance(value, str) or not _ROLE_RE.match(value):
-            problems.append(f"{field} must match operator|brain|sister|subagent(-name)?")
+            problems.append(
+                f"{field} must name a role in a declared dialect "
+                f"({'|'.join(ROLES_CURRENT)} for schema {SCHEMA_VERSION_CURRENT}, "
+                f"{'|'.join(ROLES_LEGACY)} for schema {SCHEMA_VERSION_LEGACY}; "
+                f"governance/vocabulary/fleet.yaml)"
+            )
+    # ── the envelope version, and the one thing it must never carry ─────────
+    # Dual-accept on READ: both dialects are understood, so a message in flight
+    # or a mailbox entry written by an older build is still valid. What is
+    # refused is the MIXTURE — a current envelope carrying a retired role. That
+    # is the state ADR-0012 warns about (two things quietly both being
+    # authoritative), and it is why this is a versioned migration rather than a
+    # silent accept of both forever.
+    envelope_schema = message.get("schema", SCHEMA_VERSION_LEGACY)
+    if isinstance(envelope_schema, bool) or envelope_schema not in SCHEMA_VERSIONS:
+        problems.append(
+            "schema must be one of "
+            + ", ".join(str(version) for version in SCHEMA_VERSIONS)
+            + f" (the envelope version; absent means {SCHEMA_VERSION_LEGACY})"
+        )
+    elif envelope_schema == SCHEMA_VERSION_CURRENT:
+        for field in ("from", "to"):
+            value = message.get(field)
+            if isinstance(value, str) and is_retired_role(value):
+                problems.append(
+                    f"{field} is '{value}', a retired schema-{SCHEMA_VERSION_LEGACY} role in a "
+                    f"schema-{SCHEMA_VERSION_CURRENT} envelope: schema {SCHEMA_VERSION_CURRENT} "
+                    f"emits '{current_role(value)}' only (a schema-2 emitter must not emit a "
+                    f"schema-1 role)"
+                )
+    # The trust rules below are stated on the CURRENT names and are applied to the
+    # NORMALISED roles, so a message cannot slip past a rule by spelling its
+    # sender or recipient in the other dialect.
+    sender = current_role(message["from"]) if isinstance(message.get("from"), str) else None
+    recipient = current_role(message["to"]) if isinstance(message.get("to"), str) else None
     if "id" in message and (not isinstance(message["id"], str) or not message["id"].strip()):
         problems.append("id must be a non-empty string")
     if "ts" in message and (not isinstance(message["ts"], str) or not _parse_ts(message["ts"])):
@@ -569,60 +842,65 @@ def validate(message: dict) -> list[str]:
         problems.append("correlation_id must be a string")
     if "nonce" in message and (not isinstance(message["nonce"], str) or not message["nonce"].strip()):
         problems.append("nonce must be a non-empty string (the anti-replay token)")
-    if message_type == "directive" and message.get("to") not in ("sister", "brain"):
-        problems.append("directives are addressed to the sister (from the brain) or to the brain (from the operator)")
-    # Hierarchy (contract §4, rule 1b): the operator commands the brain, and the
-    # brain commands the sister. Neither step may be skipped — an operator that
-    # could address the sister directly would make the brain advisory. Reports
-    # and escalations still travel *up* to the brain, so the rule is scoped to
-    # the operator's own traffic and to directives addressed to the brain.
-    if message.get("from") == "operator":
-        if message.get("to") != "brain":
+    if message_type == "directive" and recipient not in (ROLE_DISPATCHER, ROLE_DIRECTOR):
+        problems.append(
+            "directives are addressed to the dispatcher (from the director) or to the "
+            "director (from the principal)"
+        )
+    # Hierarchy (contract §4, rule 1b): the principal commands the director, and
+    # the director commands the dispatcher. Neither step may be skipped — a
+    # principal that could address the dispatcher directly would make the
+    # director advisory. Reports and escalations still travel *up* to the
+    # director, so the rule is scoped to the principal's own traffic and to
+    # directives addressed to the director.
+    if sender == ROLE_PRINCIPAL:
+        if recipient != ROLE_DIRECTOR:
             problems.append(
-                "the operator does not address the sister: it orders the brain, and the brain orders the sister"
+                "the principal does not address the dispatcher: it orders the director, and the "
+                "director orders the dispatcher"
             )
         elif message_type != "directive":
-            problems.append("an operator order to the brain must be a directive")
-    if message.get("to") == "brain" and message_type == "directive" and message.get("from") != "operator":
-        problems.append("the brain takes orders only from the operator")
-    if message_type == "directive" and message.get("to") == "sister" and message.get("from") != "brain":
-        problems.append("only the brain may issue directives to the sister")
-    if message.get("from") == "sister" and message_type == "directive":
-        problems.append("the sister is a dumb terminal: it cannot issue directives")
+            problems.append("a principal order to the director must be a directive")
+    if recipient == ROLE_DIRECTOR and message_type == "directive" and sender != ROLE_PRINCIPAL:
+        problems.append("the director takes orders only from the principal")
+    if message_type == "directive" and recipient == ROLE_DISPATCHER and sender != ROLE_DIRECTOR:
+        problems.append("only the director may issue directives to the dispatcher")
+    if sender == ROLE_DISPATCHER and message_type == "directive":
+        problems.append("the dispatcher never picks work: it cannot issue directives")
     if message_type in ("ack", "result") and not message.get("correlation_id"):
         problems.append(f"{message_type} must carry correlation_id (the directive it answers)")
-    if message_type in ("ack", "result") and message.get("from") == "brain" and message.get("to") != "operator":
-        problems.append("the brain does not ack or report on its own directives (only back to the operator)")
-    if message_type == "halt" and message.get("from") != "brain":
-        problems.append("only the brain may issue a halt")
+    if message_type in ("ack", "result") and sender == ROLE_DIRECTOR and recipient != ROLE_PRINCIPAL:
+        problems.append("the director does not ack or report on its own directives (only back to the principal)")
+    if message_type == "halt" and sender != ROLE_DIRECTOR:
+        problems.append("only the director may issue a halt")
     if message_type == "steer":
-        # Mid-run steering (issue #367): the brain injects a hint into a live
-        # run, so it stays inside the hierarchy — only the brain steers, and it
-        # steers the sister (the loop that owns the run), never a subagent.
+        # Mid-run steering (issue #367): the director injects a hint into a live
+        # run, so it stays inside the hierarchy — only the director steers, and
+        # it steers the dispatcher (the loop that owns the run), never an executor.
         if not message.get("correlation_id"):
             problems.append("steer must carry correlation_id (the in-flight directive it steers)")
-        if message.get("from") != "brain":
-            problems.append("only the brain may steer a run mid-flight")
-        if message.get("to") != "sister":
-            problems.append("steer is addressed to the sister (the loop that owns the run)")
+        if sender != ROLE_DIRECTOR:
+            problems.append("only the director may steer a run mid-flight")
+        if recipient != ROLE_DISPATCHER:
+            problems.append("steer is addressed to the dispatcher (the loop that owns the run)")
         target = message.get("correlation_id")
         if isinstance(target, str) and not DIRECTIVE_ID_RE.fullmatch(target):
             problems.append("steer names a directive id that is not a safe mailbox name")
     if message_type == "escalate":
         if not message.get("correlation_id"):
             problems.append("escalate must carry correlation_id (the directive that hit trouble)")
-        if message.get("from") == "brain":
-            if message.get("to") != "operator":
-                problems.append("a brain escalation is addressed to the operator (the next level up)")
-        elif message.get("to") != "brain":
-            problems.append("escalations go up: subagents and the sister escalate to the brain")
+        if sender == ROLE_DIRECTOR:
+            if recipient != ROLE_PRINCIPAL:
+                problems.append("a director escalation is addressed to the principal (the next level up)")
+        elif recipient != ROLE_DIRECTOR:
+            problems.append("escalations go up: executors and the dispatcher escalate to the director")
         severity = message.get("severity")
         if severity is not None and severity not in SEVERITIES:
             problems.append(f"severity must be one of {', '.join(SEVERITIES)}")
     control = message.get("control")
     if control is not None:
-        if message.get("from") != "brain":
-            problems.append("only the brain may issue control")
+        if sender != ROLE_DIRECTOR:
+            problems.append("only the director may issue control")
         if control not in CONTROL_ACTIONS:
             problems.append(f"control must be one of {', '.join(CONTROL_ACTIONS)}")
         if control in TASK_CONTROLS and not (message.get("task") or {}).get("issue"):
@@ -855,17 +1133,18 @@ def cmd_steer(args: argparse.Namespace) -> int:
     """
     if args.message is not None:
         message = load_message(args.message)
-        message.setdefault("from", "brain")
-        message.setdefault("to", "sister")
+        message.setdefault("from", ROLE_DIRECTOR)
+        message.setdefault("to", ROLE_DISPATCHER)
         message.setdefault("type", "steer")
     else:
         message = {
-            "from": "brain",
-            "to": "sister",
+            "from": ROLE_DIRECTOR,
+            "to": ROLE_DISPATCHER,
             "type": "steer",
             "correlation_id": args.directive,
             "body": args.body,
         }
+    stamp_envelope(message, recipient=ROLE_DISPATCHER)
     problems = validate(message)
     if problems:
         print(f"channel steer: REFUSED ({len(problems)} violation(s))", file=sys.stderr)
@@ -953,6 +1232,7 @@ def _slog(message: dict) -> None:
 
 def cmd_send(args: argparse.Namespace) -> int:
     message = load_message(args.message)
+    stamp_envelope(message)
     problems = validate(message)
     if problems:
         print(f"channel send: REFUSED ({len(problems)} violation(s))", file=sys.stderr)
@@ -1269,9 +1549,10 @@ def cmd_order(args: argparse.Namespace) -> int:
     was accepted twice (#278).
     """
     message = load_message(args.message)
-    message.setdefault("from", "operator")
-    message.setdefault("to", "brain")
+    message.setdefault("from", ROLE_PRINCIPAL)
+    message.setdefault("to", ROLE_DIRECTOR)
     message.setdefault("type", "directive")
+    stamp_envelope(message, recipient=ROLE_DIRECTOR)
     problems = validate(message)
     if problems:
         print(f"channel order: REFUSED ({len(problems)} violation(s))", file=sys.stderr)
@@ -1325,8 +1606,8 @@ def consume_order(message_id: str) -> bool:
 def brain_reply(order: dict, message_type: str, body: str) -> None:
     """Answer the operator in the brain outbox — the report the operator reads."""
     message = {
-        "from": "brain",
-        "to": "operator",
+        "from": ROLE_DIRECTOR,
+        "to": ROLE_PRINCIPAL,
         "type": message_type,
         "correlation_id": str(order.get("id") or order.get("correlation_id") or ""),
         "id": str(uuid.uuid4()),
@@ -1334,6 +1615,7 @@ def brain_reply(order: dict, message_type: str, body: str) -> None:
         "nonce": str(uuid.uuid4()),
         "body": body[:2000],
     }
+    stamp_envelope(message, recipient=ROLE_PRINCIPAL)
     BRAIN_OUTBOX.mkdir(parents=True, exist_ok=True)
     (BRAIN_OUTBOX / f"{message['id']}.json").write_text(json.dumps(message, indent=2) + "\n", encoding="utf-8")
     _slog(message)
@@ -1421,12 +1703,13 @@ def cmd_report(args: argparse.Namespace) -> int:
     """Executor side: write an ack/result answering a directive into the outbox."""
     message = {
         "from": args.from_role,
-        "to": "brain",
+        "to": ROLE_DIRECTOR,
         "type": args.type,
         "correlation_id": args.correlation,
     }
     if args.body:
         message["body"] = args.body
+    stamp_envelope(message, recipient=ROLE_DIRECTOR)
     problems = validate(message)
     if problems:
         print(f"channel report: REFUSED ({len(problems)} violation(s))", file=sys.stderr)
@@ -1448,13 +1731,14 @@ def cmd_escalate(args: argparse.Namespace) -> int:
     """Sister/subagent side: raise a problem to the brain for elite steering."""
     message = {
         "from": args.from_role,
-        "to": "brain",
+        "to": ROLE_DIRECTOR,
         "type": "escalate",
         "correlation_id": args.correlation,
         "severity": args.severity,
     }
     if args.body:
         message["body"] = args.body
+    stamp_envelope(message, recipient=ROLE_DIRECTOR)
     problems = validate(message)
     if problems:
         print(f"channel escalate: REFUSED ({len(problems)} violation(s))", file=sys.stderr)

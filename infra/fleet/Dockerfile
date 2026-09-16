@@ -106,6 +106,63 @@ RUN set -eux; \
     test -f /repo/infra/fleet/entrypoint.sh; \
     chmod 0755 /repo/infra/fleet/entrypoint.sh
 
+# --- container healthcheck (issue #712, EPIC #706 D4) -----------------------
+#
+# Docker's own liveness probe, against `infra/fleet/healthz.py`'s `/health`
+# path (an alias of this repo's own `/healthz`, added so this image also
+# answers the peer contract's name — shared-services `docker/cronrunner`).
+# `AO_FLEET_PORT` mirrors what `infra/fleet/env_contract.py` resolves (default
+# 8790); declaring it here too means a container started with no override
+# still probes the port it actually serves.
+#
+# The probe is `python3 infra/fleet/healthz.py probe`, not `curl`:
+# `inventory.yaml` (read-only to this lane) declares curl `stage: build`
+# only, and a runtime dependency on a build-stage package would make the
+# porting contract say something false that the gate's static audit does not
+# check for (it checks package presence, not stage). `python3` is already a
+# declared runtime binary, and `healthz.py`'s own `probe` subcommand exits
+# 1 on anything but HTTP 200 — a stale decision document, a short job list,
+# or a process up but no longer writing evidence all flip this unhealthy
+# (#712's own acceptance: "not merely process exists").
+#
+# WHO IS LISTENING. The image's DEFAULT command (`cron -f`, no operator
+# command) starts no /health listener — `entrypoint.sh` says why: nothing
+# writes a decision document for that posture yet (D3+, blocked-by #711), so
+# an image-level HEALTHCHECK that started one would only ever answer
+# not-ready. `infra/fleet/docker-compose.agent-cron.yml` (D2's wired
+# consumer) replaces the command with `dev_run.py`, which serves its own
+# copy AND overrides this HEALTHCHECK with its own `healthcheck:` — so the
+# probe declared here is this image's OWN default for a bare `docker run`,
+# not yet exercised by anything in this repo until a later deliverable wires
+# a listener into the default path too.
+ENV AO_FLEET_PORT=8790
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python3 /repo/infra/fleet/healthz.py probe --port "${AO_FLEET_PORT}" || exit 1
+
+# --- restart policy (documented here; the compose file is D3's lane, #711) --
+#
+# This image declares HEALTHCHECK; it does not and must not declare
+# `restart:` — that is a compose-level field, and
+# `infra/fleet/docker-compose.agent-cron.yml` belongs to issue #711, not this
+# one. The snippet its consumer needs, in inventory-agnostic form (no node
+# name, no literal beyond this image's own port default):
+#
+#   services:
+#     agent-cron:
+#       restart: unless-stopped   # AGENTS.md rule 24: a killed container comes
+#                                  # back rather than leaving the schedule dark
+#       init: true                 # a second PID-1 reaper at the compose layer;
+#                                  # belt-and-suspenders with this image's own tini
+#       stop_grace_period: 30s     # >= one reconcile pass (issue #304), so
+#                                  # `docker compose down` does not SIGKILL a
+#                                  # loop mid claim-release
+#       deploy:
+#         resources:
+#           limits:
+#             cpus: "1.0"          # a CPU cap; tune to the host's headroom —
+#                                  # this image's own three jobs are bursty,
+#                                  # not sustained-load
+#
 # tini is PID 1: it reaps the rungs' orphans and forwards SIGTERM/SIGINT to the
 # entrypoint, which is what makes `docker stop` a clean stop rather than an
 # abrupt kill of a loop that holds a claim (AGENTS.md rule 24).

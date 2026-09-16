@@ -12,7 +12,11 @@ Asserts the declarative rollout contract, all of which can genuinely fail
   4. the rollout Cloud Build triggers ship DISABLED with _ENABLE_ROLLOUT=false
      (flag-gated OFF), mirroring the infra/cloudbuild convention;
   5. service and CI/CD flags in the rollout state mirror
-     infra/feature-flags/registry.yaml 1:1 (drift is a finding).
+     infra/feature-flags/registry.yaml 1:1 (drift is a finding);
+  6. the plan's declared ``promotion_order`` is the one the ordered go-live
+     driver (#619) honours. It was read by NO code before that driver, so a
+     plan that quietly declared something else would have been an order nobody
+     implemented - now it is a gate failure.
 
 Usage:
 
@@ -26,6 +30,7 @@ is not a formality.
 
 from __future__ import annotations
 
+import copy
 import os
 import sys
 
@@ -114,7 +119,14 @@ def check_live_state(doc: object, known_flags: list, model: StageModel, rollout_
 
 
 def check_go_live_plan(doc: object, known_flags: list, model: StageModel) -> list:
-    return [f"go-live-plan: {e}" for e in validate_go_live_plan_doc(doc, known_flags, model)]
+    errors = [f"go-live-plan: {e}" for e in validate_go_live_plan_doc(doc, known_flags, model)]
+    if isinstance(doc, dict) and doc.get("promotion_order") != "strict-by-phase":
+        errors.append(
+            "go-live-plan: promotion_order must be 'strict-by-phase' - the ordered go-live driver "
+            "(infra/rollout/go_live.py) computes and enforces that order, so a plan declaring anything "
+            "else declares an order no code implements"
+        )
+    return errors
 
 
 def check_registry_parity(state_flags: list, registry: object) -> list:
@@ -267,6 +279,21 @@ def _probes() -> list:
         model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
         return check_go_live_plan(bad_plan, ["services.registry", "ci_cd.verify_trigger", "rollout.pipeline"], model)
 
+    def promotion_order_probe():
+        """A plan whose declared order no code honours must fail BY NAME.
+
+        The probe keeps full phase coverage (unlike ``bad_plan``) so it fires
+        the promotion_order rule alone rather than the coverage rule.
+        """
+        model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
+        plan = copy.deepcopy(_load(os.path.join(ROLLOUT_DIR, "go-live-plan.yaml")))
+        plan["promotion_order"] = "whatever-order"
+        known = list(_load(os.path.join(ROLLOUT_DIR, "rollout-state.yaml"))["flags"])
+        errors = check_go_live_plan(plan, known, model)
+        if any("promotion_order" in error for error in errors):
+            return errors[:1]
+        return [f"the promotion_order rule did not fire: {errors!r}"]
+
     def parity_probe():
         return check_registry_parity(["services.nope", "ci_cd.verify_trigger"], bad_registry)
 
@@ -338,6 +365,7 @@ def _probes() -> list:
         ("stage-model rejects policy auto-approving full", full_autoapprove_probe),
         ("rollout-state rejects default-ON flag", state_probe),
         ("go-live-plan rejects partial phase coverage", plan_probe),
+        ("go-live-plan rejects a promotion_order no driver honours", promotion_order_probe),
         ("registry parity rejects unknown service flag", parity_probe),
         ("registry parity checks a surfaces flag against the surfaces section", surface_parity_probe),
         ("cloudbuild requires disabled rollout triggers", trigger_probe),

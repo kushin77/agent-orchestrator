@@ -27,9 +27,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -54,6 +56,19 @@ EXIT_CANNOT_ASSESS = 2
 
 JOURNAL_DIR = ".fleet/lifecycle"
 BASELINE = Path("governance/lifecycle/baseline.json")
+
+#: Where a verification is re-measured once the lane is gone: a throwaway worktree
+#: that cannot outlive the run. Unlike a lane — which ``governance/isolation``
+#: refuses from a RAM-backed root because a lane outlives a reboot — this one is
+#: scratch by construction, so tmpfs is fine.
+SCRATCH_ENV = "AO_LIFECYCLE_SCRATCH"
+
+
+def scratch_root() -> Path:
+    """The directory a re-measurement worktree is created under."""
+    override = os.environ.get(SCRATCH_ENV, "").strip()
+    return Path(override) if override else Path(tempfile.gettempdir())
+
 
 CLOSE_PATTERN = re.compile(r"(?:closes|fixes|resolves)\s+#(\d+)", re.IGNORECASE)
 BRANCH_PATTERN = re.compile(r"^issue-(\d+)")
@@ -144,11 +159,21 @@ def _live_claims(root: Path | None = None) -> dict[int, str]:
         return {}
 
 
-def _lane_records(root: Path | None = None) -> dict[int, dict]:
-    """Provisioned lanes keyed by issue, from the isolation module's records."""
+def _lane_records(root: Path | None = None) -> dict[int, list[dict]]:
+    """**Every** provisioned lane record, keyed by issue (#834).
+
+    A list, not one record per issue. ``.fleet/lanes/`` can hold more than one
+    record for an issue — the lane that provisioned a worktree, and a sibling
+    whose worktree has since been removed — and collapsing them by issue let the
+    later-sorted record win, so a *dead* record shadowed the live lane. Measured
+    on #287: ``record-verification`` refused ``no lane worktree for #287; the
+    verified tree no longer exists`` while the live lane existed, audited clean,
+    and held the verified commit. The choice is now explicit (:func:`select_lane`)
+    instead of accidental.
+    """
     root = root or ROOT
     directory = root / ".fleet" / "lanes"
-    lanes: dict[int, dict] = {}
+    lanes: dict[int, list[dict]] = {}
     if not directory.exists():
         return lanes
     for path in sorted(directory.glob("*.json")):
@@ -157,12 +182,78 @@ def _lane_records(root: Path | None = None) -> dict[int, dict]:
         except (OSError, json.JSONDecodeError):
             continue
         worktree = Path(str(payload.get("worktree", "")))
-        lanes[int(payload["issue"])] = {
-            "session_id": str(payload.get("session_id", "")),
-            "worktree": str(worktree),
-            "present": worktree.exists(),
-        }
+        lanes.setdefault(int(payload["issue"]), []).append(
+            {
+                "session_id": str(payload.get("session_id", "")),
+                "worktree": str(worktree),
+                "worktree_exists": worktree.exists(),
+            }
+        )
     return lanes
+
+
+def lane_head(record: dict) -> str:
+    """The commit a lane's worktree holds, or ``""`` when there is no tree to read."""
+    if not record.get("worktree_exists"):
+        return ""
+    result = subprocess.run(
+        ["git", "-C", str(record.get("worktree") or ""), "rev-parse", "HEAD"], capture_output=True, text=True
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def select_lane(records: list[dict] | None, commit: str = "") -> dict | None:
+    """The record that represents the item's lane, out of every record it has.
+
+    Two preferences, in order (#834):
+
+    1. **a record whose worktree exists** wins over one whose worktree is gone —
+       a dead record may never shadow a live lane, which is the wedge that made
+       ``record-verification`` refuse a lane that was there all along;
+    2. among equally live records, **the one whose HEAD is ``commit``** when the
+       caller knows the verified commit, because that is the tree the evidence is
+       about. Reading a HEAD costs a subprocess, so it is only paid when a commit
+       was named and there is more than one live candidate to choose between.
+
+    A dead record is still *returned* when it is all there is: the caller must be
+    able to say *worktree-missing* rather than "no lane worktree", which is what
+    tells an operator the tree was removed rather than never created.
+    """
+    candidates = list(records or [])
+    if not candidates:
+        return None
+    live = [record for record in candidates if record.get("worktree_exists")]
+    pool = live or candidates
+    if commit and len(pool) > 1:
+        for record in pool:
+            if lane_head(record) == commit:
+                return record
+    return pool[0]
+
+
+def lane_view(records: list[dict] | None, commit: str = "") -> dict:
+    """The item's lane, as the audit and the close-out both read it (#834).
+
+    ``present`` means the lane is **not reclaimed — a session record remains**,
+    which is exactly what the closure invariant demands be gone, and therefore
+    what makes close-out step 8 run. ``worktree_exists`` says whether the tree is
+    still there: a record without one is a *dead* lane record whose worktree a
+    reaper already removed, and it is reported by name (:func:`audit_item`) rather
+    than treated as nothing — treating it as nothing is how it came to shadow a
+    live lane in the first place.
+    """
+    chosen = select_lane(records, commit)
+    if chosen is None:
+        return {}
+    every = list(records or [])
+    return {
+        "session_id": chosen["session_id"],
+        "worktree": chosen["worktree"],
+        "present": True,
+        "worktree_exists": bool(chosen["worktree_exists"]),
+        "sessions": [record["session_id"] for record in every],
+        "dead": [record["session_id"] for record in every if not record["worktree_exists"]],
+    }
 
 
 def _directive_for(issue: int, root: Path | None = None) -> dict:
@@ -221,7 +312,7 @@ def collect_from_github(root: Path | None = None) -> dict:
     items = []
     for issue in issues:
         number = int(issue["number"])
-        lane = lanes.get(number)
+        lane = lane_view(lanes.get(number))
         pull = by_issue.get(number)
         claimed_by = claims.get(number)
         closed = issue.get("state") == "closed"
@@ -338,8 +429,17 @@ class GhOps:
             raise RuntimeError(f"PR {number} is {payload.get('state')}, not merged")
         return str((payload.get("mergeCommit") or {}).get("oid", ""))
 
-    def record_verification(self, issue: int, commit: str) -> str:
-        """Re-run the repo gate in the lane and journal the attestation it writes.
+    def _gate_in(self, worktree: Path, described: str) -> None:
+        """Run the repo gate in ``worktree`` and read its verdict through the closed table.
+
+        The lane is *resolved*, never guessed (#834): a record whose worktree is
+        still there wins over a dead sibling, and among live records the one whose
+        HEAD is the verified commit wins. A lane whose only record has no worktree
+        is refused naming ``worktree-missing`` — so the operator learns the tree is
+        gone, not that no lane ever existed (the message that sent #287's lane
+        hunting for a worktree it had provisioned itself) — and a lane that is gone
+        while its verified commit is still in the object store is **re-measured at
+        that commit** rather than mourned (#786), so the invariant stays satisfiable.
 
         The exit code is read through ``governance.lifecycle.gate``, whose closed
         table is the only place that decision lives: a park (10/11), an unusable
@@ -349,6 +449,36 @@ class GhOps:
         nobody measured (#840). A genuine failure (rc 1) is still a failure, and
         still leaves the item's evidence missing.
 
+        One reader for both trees — the lane's and the re-measurement's — so the two
+        paths cannot drift into reading the same gate differently.
+        """
+        run = gate.run_gate(lambda: _gate_attempt(worktree))
+        if run.admitted:
+            return
+        if run.cannot_assess:
+            raise gate.CannotAssess(run.verdict, run.detail(), run.remediation())
+        raise RuntimeError(
+            f"{run.detail()} — the gate ran against {described} and reported a failure, "
+            "so the item has no green verification"
+        )
+
+    def record_verification(self, issue: int, commit: str) -> str:
+        """Record a green attestation for ``commit``, from the lane or from the commit.
+
+        The lane is the first source: the gate is re-run in it, and the attestation it
+        writes is journalled. That is the strongest evidence available, because the
+        tree and the run are the same object.
+
+        When the lane is gone the invariant is **re-measured from the commit**, not
+        declared missing (#786). ``record-verification`` used to require the lane
+        worktree, which made the invariant *permanently unsatisfiable* the instant a
+        lane was reclaimed — measured on #622/#623/#626, where the evidence of three
+        green trees was discarded because it had not been journalled before teardown
+        and every later pass refused with "the verified tree no longer exists". The
+        invariant names the **verified head commit**, and the commit — not the branch,
+        not the worktree — is what proves it; a commit that is still in the object
+        store can still be measured.
+
         A run that did not happen writes **no journal**. ``.fleet/lifecycle``'s
         presence is another module's landing record — ``governance/reconcile``
         reads a journal file as "this issue's work landed" — so writing one for a
@@ -356,23 +486,107 @@ class GhOps:
         golden rule 17 forbids. The attempts are recorded where close-out prints
         them instead; nothing carries them as evidence.
         """
-        lane = _lane_records(self.root).get(issue)
-        if not lane or not lane.get("present"):
-            raise RuntimeError(f"no lane worktree for #{issue}; the verified tree no longer exists")
-        worktree = Path(lane["worktree"])
-        head = self._run(["git", "-C", str(worktree), "rev-parse", "HEAD"])
-        if commit and head != commit:
-            raise RuntimeError(f"lane head {head[:12]} is not the verified commit {commit[:12]}")
-        run = gate.run_gate(lambda: _gate_attempt(worktree))
-        if run.admitted:
-            write_journal(issue, {"verify": {"ok": True, "commit": head}}, self.root)
+        records = _lane_records(self.root).get(issue) or []
+        lane = select_lane(records, commit)
+        if lane is not None and lane["worktree_exists"]:
+            worktree = Path(lane["worktree"])
+            head = self._run(["git", "-C", str(worktree), "rev-parse", "HEAD"])
+            if commit and head != commit:
+                raise RuntimeError(f"lane head {head[:12]} is not the verified commit {commit[:12]}")
+            self._gate_in(worktree, head[:12])
+            write_journal(issue, {"verify": {"ok": True, "commit": head, "source": "lane"}}, self.root)
             return f"verify green at {head[:12]}"
-        if run.cannot_assess:
-            raise gate.CannotAssess(run.verdict, run.detail(), run.remediation())
-        raise RuntimeError(
-            f"{run.detail()} — the gate ran against {head[:12]} and reported a failure, "
-            "so the item has no green verification"
+        if any(record["worktree_exists"] for record in records):
+            # A live lane exists yet the resolution did not return it (#834). The gate
+            # must run IN the lane — that is the strongest evidence there is, and the
+            # reason a dead record may never shadow it — so a broken choice is refused
+            # by name rather than papered over by re-measuring somewhere else.
+            raise RuntimeError(
+                f"lane {(lane or {}).get('session_id') or '(unknown)'} for #{issue} is worktree-missing: "
+                f"{(lane or {}).get('worktree') or '(unknown)'} does not exist, but another record's "
+                "worktree does — the resolution picked a dead record over a live lane"
+            )
+        # The lane is gone: a dead record (#834 keeps it whole and names it) or no
+        # record at all. The invariant names the COMMIT (#786), so a commit that is
+        # still in the object store is re-measured rather than mourned — and when
+        # there is none, ``_remeasure`` refuses by name, naming the ordering.
+        measured = self._remeasure(issue, commit, dead=lane)
+        write_journal(
+            issue,
+            {"verify": {"ok": True, "commit": measured, "source": "reclaimed-lane"}},
+            self.root,
         )
+        return f"verify green at {measured[:12]} (re-measured at the verified commit; the lane is gone)"
+
+    def _remeasure(self, issue: int, commit: str, dead: dict | None = None) -> str:
+        """Re-measure a verified commit whose lane worktree no longer exists.
+
+        ``dead`` is the lane record the resolution found whose worktree is gone, when
+        one exists (#834). It is carried only so the refusal below can keep naming
+        ``worktree-missing`` — the isolation audit's own vocabulary — instead of the
+        old "no lane worktree", which sent the operator hunting for a tree the lane
+        had provisioned itself.
+
+        The commit is checked out into a **throwaway detached worktree** and the gate
+        is run there — a real measurement at the real commit, never an inherited
+        claim, and the tree is destroyed again either way so a re-measurement cannot
+        itself become a lane.
+
+        A commit that is not in this repository is refused **by name**, and the
+        refusal names the ordering, because that is the fact an operator can act on:
+        the lane was reclaimed before close-out recorded its verification. That
+        ordering is no longer merely advised — ``governance/lifecycle/closeout.py``
+        refuses to reclaim a lane while the item still owes this record, so a new
+        instance of this state cannot be created by the driver.
+        """
+        if not commit:
+            raise RuntimeError(
+                f"no lane worktree for #{issue} and no verified head commit is recorded, so there is "
+                "nothing to re-measure: the lane was reclaimed before close-out journalled its "
+                "verification. The ordering is close-out BEFORE lane teardown"
+            )
+        probe = subprocess.run(
+            ["git", "-C", str(self.root), "rev-parse", "--verify", f"{commit}^{{commit}}"],
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0:
+            if dead is not None:
+                raise RuntimeError(
+                    f"lane {dead['session_id'] or '(unknown)'} for #{issue} is worktree-missing: "
+                    f"{dead['worktree'] or '(unknown)'} does not exist, and the verified commit "
+                    f"{commit[:12]} is not in this repository either, so its attestation cannot be "
+                    "re-measured. The ordering is close-out BEFORE lane teardown: keep the lane (or "
+                    "the commit) until `governance/lifecycle/cli.py close` has journalled the "
+                    f"attestation (looked in {self.root})"
+                )
+            raise RuntimeError(
+                f"no lane worktree for #{issue}: the verified commit {commit[:12]} is not in this "
+                "repository, so its attestation cannot be re-measured — the lane was reclaimed before "
+                "close-out recorded its verification. The ordering is close-out BEFORE lane teardown: "
+                "keep the lane (or the commit) until `governance/lifecycle/cli.py close` has journalled "
+                f"the attestation (looked in {self.root})"
+            )
+        resolved = probe.stdout.strip()
+        root_dir = scratch_root()
+        root_dir.mkdir(parents=True, exist_ok=True)
+        scratch = Path(tempfile.mkdtemp(prefix="ao-lifecycle-verify-", dir=str(root_dir)))
+        try:
+            self._run(["git", "-C", str(self.root), "worktree", "add", "--detach", str(scratch), resolved])
+            self._gate_in(scratch, resolved[:12])
+        finally:
+            # Always give the tree back: a leaked worktree is another lane's
+            # isolation problem, and this one is scratch by construction.
+            cleanup = subprocess.run(
+                ["git", "-C", str(self.root), "worktree", "remove", "--force", str(scratch)],
+                capture_output=True,
+                text=True,
+            )
+            if cleanup.returncode != 0:
+                subprocess.run(
+                    ["git", "-C", str(self.root), "worktree", "prune"], capture_output=True, text=True
+                )
+        return resolved
 
     def delete_branch(self, branch: str) -> str:
         self._run(["git", "-C", str(self.root), "push", "origin", "--delete", branch])
@@ -407,9 +621,35 @@ class GhOps:
         return self._run(["gh", "issue", "close", str(issue), "--comment", evidence])
 
     def reclaim_lane(self, session_id: str) -> str:
-        return self._run(
-            ["python3", str(self.root / "governance" / "isolation" / "cli.py"), "close", "--session", session_id]
-        )
+        """Reclaim the item's lane, and the dead records beside it (#834).
+
+        An issue can carry more than one lane record: the live one, and a sibling
+        whose worktree a reaper already removed. The invariant is about the
+        *item's records* being gone, so reclaiming only the live one would leave
+        the sibling to be reported by the very next audit — and the item could
+        then never reach OK. A sibling whose worktree is gone holds no work, so
+        retiring it discards nothing; a sibling whose tree still exists is left
+        alone, because that tree is a lane with its own close-out.
+        """
+        # Imported here rather than at module scope: this file is copied into a
+        # scratch repository by scripts/check-control-verbs.sh, where
+        # governance/isolation need not exist — the same reason ``_live_claims``
+        # imports its claims module lazily.
+        from governance.isolation.worktree import list_records, read_record  # noqa: PLC0415
+
+        targets = [session_id]
+        identity = read_record(session_id, self.root)
+        if identity is not None:
+            targets += [
+                other.session_id
+                for other in list_records(self.root)
+                if other.issue == identity.issue and other.session_id != session_id and not other.worktree.exists()
+            ]
+        for target in targets:
+            self._run(
+                ["python3", str(self.root / "governance" / "isolation" / "cli.py"), "close", "--session", target]
+            )
+        return f"reclaimed {len(targets)} session record(s): {', '.join(targets)}"
 
     def refresh(self, item: dict) -> dict:
         """Re-collect this item from the live board, so the final audit reads the

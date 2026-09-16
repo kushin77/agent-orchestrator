@@ -28,6 +28,8 @@ python3 -m portal.server.main --port 8787
 # open http://127.0.0.1:8787/
 ```
 
+To run the **fleet SPoG** (`/views/fleet.html` + `/api/fleet/*`) on a checkout with no external infra — a minted session the server accepts, plus the promoted surface registry — follow [`docs/PORTAL-OFFLINE-DEV.md`](../docs/PORTAL-OFFLINE-DEV.md): a **dev stopgap, not the production surface**.
+
 The console has **no login of its own**: an unauthenticated visitor is
 redirected to the shared-frontend OS auth gate (`/auth/login`), and a console
 session exists only once the portal has verified the auth-gate RS256

@@ -474,18 +474,18 @@ def test_a_newer_steer_replaces_an_undelivered_older_one():
         _kill(child)
 
 
-def test_only_the_brain_may_steer_and_the_hint_must_be_safe():
+def test_only_the_director_may_steer_and_the_hint_must_be_safe():
     """The steer verb rides the existing validator: hierarchy and safe ids hold.
 
-    A `steer` is brain→sister, correlated to a directive whose id is a safe
-    mailbox name — a sister-issued steer, an operator-issued steer, a steer with
-    no correlation or a traversal id are all REFUSED, never queued (#367 adds
-    without weakening #162's boundary).
+    A `steer` is director->dispatcher, correlated to a directive whose id is a
+    safe mailbox name — a dispatcher-issued steer, a principal-issued steer, a
+    steer with no correlation or a traversal id are all REFUSED, never queued
+    (#367 adds without weakening #162's boundary).
     """
     problems = channel.validate(
         {"from": "sister", "to": "brain", "type": "steer", "correlation_id": "d-1"}
     )
-    assert "only the brain may steer a run mid-flight" in problems, problems
+    assert "only the director may steer a run mid-flight" in problems, problems
 
     args = argparse.Namespace(
         directive="../outside", body=HINT, message=None

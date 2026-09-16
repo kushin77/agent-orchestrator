@@ -9,6 +9,19 @@ Typical use, from the execution loop:
     python3 governance/isolation/cli.py landed --commit <sha>      # real landed history
     python3 governance/isolation/cli.py enforce --range HEAD      # enforced over real history
 
+The identity has two halves, and they are not interchangeable (issue #934):
+
+* ``AO_*`` says *who the session is*. Export it anywhere, including a shell several
+  lanes share.
+* the git signature says *who signs*. ``open`` already wrote it into the lane's own
+  worktree config (``git config --worktree``), which is the mechanism that survives a
+  shared shell — so a plain ``git commit`` in the lane is correctly signed. Do NOT
+  export ``GIT_AUTHOR_*``/``GIT_COMMITTER_*`` into a shared shell: they outrank the
+  worktree config *and* a ``git -c user.email=`` override, so they author whichever
+  lane commits next as this session. When a shell has to carry a signature anyway,
+  export the ``AO_*`` half (``env --shared-shell``) and prefix the commit with
+  ``commit_form``'s command, which scopes the pair to that one process.
+
 Exit-code contract (repo tri-state convention): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 An audit that assessed nothing is CANNOT-ASSESS, never OK: ``audit`` with no lane
 records and ``enforce`` with no commits in range both report that they could not
@@ -19,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -26,8 +40,9 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.isolation.audit import audit_all, audit_lane  # noqa: E402
+from governance.isolation.audit import Violation, audit_lane  # noqa: E402
 from governance.isolation.identity import (  # noqa: E402
+    IDENTITY_DOMAIN,
     IdentityRefused,
     SessionIdentity,
     mint,
@@ -49,7 +64,9 @@ from governance.isolation.worktree import (  # noqa: E402
     close,
     default_worktree_root,
     git,
+    is_linked_worktree,
     list_records,
+    machine_managed_uncommitted,
     main_repo_root,
     provision,
     read_record,
@@ -60,6 +77,123 @@ from governance.isolation.worktree import (  # noqa: E402
 EXIT_OK = 0
 EXIT_NOT_OK = 1
 EXIT_CANNOT_ASSESS = 2
+
+#: Refs tried, in order, when deriving the commits a lane ADDED. ``origin/master``
+#: first and deliberately: the local ``master`` can be stale, and a stale base puts
+#: already-landed commits inside the lane's own range — the false-positive shape
+#: that gets a gate disabled rather than obeyed (AO-GR-25 measured the same trap
+#: for drift detection, #739). ``open`` branches from ``origin/master`` by default,
+#: so this is the ref a lane was actually cut from.
+LANE_BASE_CANDIDATES = ("origin/master", "master", "origin/HEAD")
+
+#: `git log --format` separator — no address in this doctrine contains it.
+_FIELD = "\x1f"
+
+
+def lane_base(worktree: Path) -> str:
+    """The ref this lane was cut from, or ``""`` when none resolves."""
+    for candidate in LANE_BASE_CANDIDATES:
+        if git(
+            worktree, "rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}"
+        ).returncode == 0:
+            return candidate
+    return ""
+
+
+def lane_own_commits(worktree: Path) -> list[tuple[str, str]] | None:
+    """``(sha, author_email)`` for every non-merge commit this lane ADDED.
+
+    "Added" is scoped to the lane's own range — ``merge-base(HEAD, <base>)..HEAD``
+    — so the commits the base branch already carried (this repository's other
+    sessions' landed work, merged in to stay current) are not this lane's history
+    and are never attributed to it. Merges are excluded for the same reason the
+    shared predicate excludes them: git generates a merge message, not the session.
+
+    ``None`` means the range itself could not be derived, which is NOT the same
+    answer as "this lane added nothing": an unmeasurable rule is reported as
+    unproven rather than as satisfied (GR-12).
+    """
+    base = lane_base(worktree)
+    if not base:
+        return None
+    merge_base = git(worktree, "merge-base", "HEAD", base)
+    if merge_base.returncode != 0:
+        return None
+    log = git(
+        worktree,
+        "log",
+        "--no-merges",
+        "--format=%H" + _FIELD + "%ae",
+        f"{merge_base.stdout.strip()}..HEAD",
+    )
+    if log.returncode != 0:
+        return None
+    commits: list[tuple[str, str]] = []
+    for line in log.stdout.splitlines():
+        sha, _, email = line.strip().partition(_FIELD)
+        if sha and email:
+            commits.append((sha, email.strip()))
+    return commits
+
+
+def foreign_authored_commits(identity: SessionIdentity, main: Path | str) -> list[Violation]:
+    """Commits this lane added that ANOTHER session's identity authored.
+
+    This is the rule the ambient ``GIT_*`` pair would otherwise hide.
+    :func:`~governance.isolation.audit.audit_lane` selects a lane's commits *by
+    author address*, so a commit authored by a different agent is not merely
+    unchecked — it is invisible, and the lane reports as isolated. Measured (issue
+    #934): with rule 15's identity env exported, a lane whose only commit was
+    authored by ``agent+subagent-366@agents.invalid`` audited clean. The gate was
+    not red, it was **blinded** — and that is the part that must not recur.
+
+    A commit authored by a non-agent identity is deliberately not flagged: what is
+    enforced is that a *session*'s own range belongs to that session, not that
+    nobody else may ever touch a lane branch. ``main`` is accepted for symmetry with
+    ``audit_lane`` and for the callers that have only the main repository to hand.
+    """
+    del main  # the rule is about this lane's own worktree and its own range
+    worktree = identity.worktree
+    if not worktree.exists() or not is_linked_worktree(worktree):
+        # `audit_lane` already refuses these by name; there is no range to read.
+        return []
+
+    own = lane_own_commits(worktree)
+    if own is None:
+        return [
+            Violation(
+                "commit-authorship-unmeasurable",
+                f"the commits {worktree} added could not be derived — none of "
+                f"{' or '.join(LANE_BASE_CANDIDATES)} resolves, or git could not read the "
+                "range — so this lane's authorship rule is unproven rather than satisfied",
+            )
+        ]
+
+    foreign = [
+        (sha, email)
+        for sha, email in own
+        if email != identity.author_email and email.endswith(f"@{IDENTITY_DOMAIN}")
+    ]
+    if not foreign:
+        return []
+    named = ", ".join(f"{sha[:8]} (authored by {email})" for sha, email in foreign[:5])
+    if len(foreign) > 5:
+        named += f", +{len(foreign) - 5} more"
+    return [
+        Violation(
+            "commit-authored-by-another-session",
+            f"{len(foreign)} of the {len(own)} commit(s) this lane added were authored by a "
+            f"different agent session, not by {identity.author_name} <{identity.author_email}>: "
+            f"{named}. Every commit in a lane's own range belongs to the lane session — an "
+            "exported GIT_AUTHOR_*/GIT_COMMITTER_* pair outranks the worktree signature and "
+            "silently re-attributes them (issue #934)",
+        )
+    ]
+
+
+def audit_lane_full(identity: SessionIdentity, main: Path | str) -> list[Violation]:
+    """``audit_lane`` plus the authorship-ownership rule the audit surface owns."""
+    return [*audit_lane(identity, main), *foreign_authored_commits(identity, main)]
 
 
 def _mint(args: argparse.Namespace) -> SessionIdentity:
@@ -94,11 +228,19 @@ def cmd_open(args: argparse.Namespace) -> int:
         print(f"open: NOT-OK — {refused}", file=sys.stderr)
         return EXIT_NOT_OK
     write_record(identity, main)
-    problems = audit_lane(identity, main) if result.ok else []
+    problems = audit_lane_full(identity, main) if result.ok else []
     payload = {
         "identity": identity.to_json(),
         "created": result.created,
-        "env": identity.env(),
+        # The identity as an ENVIRONMENT is the AO_* half ONLY. Printing the git
+        # pair here is what made rule 15's "export the identity" a trap in a shared
+        # shell: those four variables outrank every config-based signature, so
+        # `eval`ing a block that contains them arms whichever lane commits next with
+        # THIS session's signature (issue #934). The pair is printed as what it is —
+        # a per-commit argument, with the exact command that applies it.
+        "env": identity.shared_shell_env(),
+        "git_signature": identity.git_signature(),
+        "commit_form": identity.commit_form(),
         "problems": [str(problem) for problem in problems],
     }
     print(json.dumps(payload, indent=2))
@@ -110,12 +252,24 @@ def cmd_open(args: argparse.Namespace) -> int:
 
 
 def cmd_env(args: argparse.Namespace) -> int:
-    """The identity as environment: the session's own id and signature."""
+    """The identity as environment: the session's own id and signature.
+
+    ``--shared-shell`` withholds the four ``GIT_*`` variables and prints only the
+    ``AO_*`` half, which is the part safe to export where another lane may commit
+    (issue #934). The default is unchanged because the spawned-process caller wants
+    the signature too — it is the *shared shell* that must not receive it.
+    """
     identity = _mint(args)
+    environment = identity.shared_shell_env() if args.shared_shell else identity.env()
     if args.json:
-        print(json.dumps(identity.env(), indent=2))
+        print(json.dumps(environment, indent=2))
     else:
-        print(identity.shell_env())
+        print(
+            "\n".join(
+                f"export {name}={shlex.quote(value)}"
+                for name, value in sorted(environment.items())
+            )
+        )
     return EXIT_OK
 
 
@@ -131,9 +285,12 @@ def cmd_audit(args: argparse.Namespace) -> int:
         if identity is None:
             print(f"audit: CANNOT-ASSESS — no lane record for session {args.session}", file=sys.stderr)
             return EXIT_CANNOT_ASSESS
-        results = {identity.session_id: audit_lane(identity, main)}
+        results = {identity.session_id: audit_lane_full(identity, main)}
     else:
-        results = audit_all(main)
+        results = {
+            identity.session_id: audit_lane_full(identity, main)
+            for identity in list_records(main)
+        }
 
     if not results:
         # An empty audit is not a pass (issue #287): with no lane records there is
@@ -257,18 +414,26 @@ def cmd_enforce(args: argparse.Namespace) -> int:
 
 
 def cmd_close(args: argparse.Namespace) -> int:
-    """Remove a lane's worktree — never discarding uncommitted work silently."""
+    """Remove a lane's worktree — never discarding the lane's own work silently.
+
+    What was *ignored* is reported, not hidden: a reclaim that proceeded past
+    machine-managed board state says which paths it passed over (#834), so
+    "the worktree looked clean" and "the worktree was dirty only in state the
+    fleet regenerates" are distinguishable in the output.
+    """
     main = Path(args.main)
     identity = read_record(args.session, main)
     if identity is None:
         print(f"close: CANNOT-ASSESS — no lane record for session {args.session}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
+    ignored = machine_managed_uncommitted(identity.worktree) if identity.worktree.exists() and not args.force else []
     kept = close(identity, main, force=args.force)
     if kept:
         for reason in kept:
             print(f"close: NOT-OK — {reason}", file=sys.stderr)
         return EXIT_NOT_OK
-    print(f"close: OK — lane {identity.session_id} removed")
+    note = f" (ignored machine-managed state: {', '.join(ignored)})" if ignored else ""
+    print(f"close: OK — lane {identity.session_id} removed{note}")
     return EXIT_OK
 
 
@@ -306,6 +471,16 @@ def build_parser() -> argparse.ArgumentParser:
     env_cmd = sub.add_parser("env", help="print the session environment (id + signature)")
     add_mint_args(env_cmd)
     env_cmd.add_argument("--json", action="store_true")
+    env_cmd.add_argument(
+        "--shared-shell",
+        action="store_true",
+        help=(
+            "print only the AO_* half — the part safe to export where another lane may "
+            "commit; the GIT_* pair outranks `git config --worktree` and a `git -c "
+            "user.email=` override, so exporting it re-signs the next commit in that "
+            "shell as this session (issue #934)"
+        ),
+    )
     env_cmd.set_defaults(func=cmd_env)
 
     audit_cmd = sub.add_parser("audit", help="verify lanes satisfy the isolation contract")

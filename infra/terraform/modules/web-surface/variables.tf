@@ -5,6 +5,14 @@
 # no service, no DNS records, no domain mapping, no certificate, nothing.
 # Promotion = a reviewed go-live flips `enabled`; the root module passes the
 # real Artifact Registry image assembled from project_id + web_image_tag.
+#
+# TWO gates, not one (issue #731). `enabled` decides whether the SURFACE exists;
+# `create_gcp_edge_route` (default false) decides whether the GCP EDGE ROUTE for
+# its hostname exists — the Cloud DNS record plus the Cloud Run domain mapping.
+# That route is RETIRED: the live fronting for the domain is a Cloudflare tunnel
+# to the shared-services run half (docs/EDGE-CUTOVER.md), so promoting the
+# surface must NOT silently re-create a competing GCP record. Declaring the GCP
+# route again is a deliberate, separate act.
 
 variable "enabled" {
   description = "Master flag-gate for the web surface. When false (default), nothing is created."
@@ -44,7 +52,7 @@ variable "image" {
 }
 
 variable "domain" {
-  description = "Public hostname the web surface serves (custom domain + Google-managed TLS)."
+  description = "Public hostname the web surface serves. Also the name the RETIRED GCP edge route would claim, so it is only tied to a Google-managed certificate when create_gcp_edge_route = true."
   type        = string
   default     = "ai.purebliss.app"
 }
@@ -56,15 +64,31 @@ variable "zone_name" {
 }
 
 variable "dns_name" {
-  description = "DNS zone apex (with trailing dot). The zone is created only when create_dns_zone is true."
+  description = "DNS zone apex (with trailing dot). The zone is created only when create_gcp_edge_route and create_dns_zone are both true."
   type        = string
   default     = "purebliss.app."
 }
 
-variable "create_dns_zone" {
-  description = "Create the DNS managed zone (true) or attach records to a pre-existing zone (false)."
+variable "create_gcp_edge_route" {
+  description = "Declare the RETIRED GCP edge route for var.domain: the Cloud DNS CNAME record to ghs.googlehosted.com and the Cloud Run domain mapping that provisions Google-managed TLS. Default false — the live fronting is a Cloudflare tunnel to the shared-services run half (docs/EDGE-CUTOVER.md), so a default deploy creates neither. Neither this flag nor the edge route affects the Cloud Run service or its public invoker binding."
   type        = bool
-  default     = true
+  default     = false
+}
+
+variable "create_dns_zone" {
+  description = "Create the DNS managed zone (true) or resolve a pre-existing one by name (false). Only meaningful with create_gcp_edge_route = true, because the zone exists to hold that route's record; it defaults to false so a default deploy creates no zone."
+  type        = bool
+  default     = false
+
+  # The incoherent combination is refused BY NAME rather than applied (issue
+  # #731): a zone whose only purpose was to hold the retired route's record is a
+  # zone that holds nothing. Before this, `create_dns_zone` defaulted true while
+  # the route was retired, so the module's own default declaration asked for an
+  # orphan zone.
+  validation {
+    condition     = !var.create_dns_zone || var.create_gcp_edge_route
+    error_message = "create-dns-zone-orphan: create_dns_zone = true declares a DNS managed zone to hold the GCP edge route's record, but create_gcp_edge_route = false means that route is RETIRED and no record will be created in it (docs/EDGE-CUTOVER.md). Declare the route with create_gcp_edge_route = true, or leave create_dns_zone = false."
+  }
 }
 
 variable "labels" {
