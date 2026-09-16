@@ -187,8 +187,14 @@ fi
 
 # --- 5. the wiring: this check must actually run in `make verify` ----------
 wired="$(bash -c 'source scripts/discover-checks.sh; discover_check_scripts' 2>/dev/null || true)"
-if grep -q 'discover-checks.sh' scripts/verify.sh \
-  && printf '%s\n' "$wired" | grep -qF 'marker-scan|bash scripts/check-marker-scan.sh'; then
+# Bash-native (#868): a piped `grep -q` under `set -o pipefail` reports ABSENT for
+# text that is PRESENT once the report passes the pipe buffer, and in this polarity
+# that skips the branch which proves the check is wired — it fails OPEN.
+wired_ok=0
+case "$wired" in
+  *'marker-scan|bash scripts/check-marker-scan.sh'*) wired_ok=1 ;;
+esac
+if grep -q 'discover-checks.sh' scripts/verify.sh && [ "$wired_ok" -eq 1 ]; then
   echo "  OK  scripts/verify.sh discovers this check (marker-scan) — wired the moment it lands"
 else
   echo "check-marker-scan: FAIL — scripts/verify.sh does not discover this check; it would be inert" >&2

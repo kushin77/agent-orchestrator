@@ -131,8 +131,13 @@ assert_loop() { # assert_loop <root> <label>
   fi
 
   # 7. the interface the loop depends on still exists
-  if [ -r "$r/governance/reconcile/cli.py" ] \
-     && python3 "$r/governance/reconcile/cli.py" sweep --help 2>/dev/null | grep -q -- '--apply'; then
+  local help_out=""
+  if [ -r "$r/governance/reconcile/cli.py" ]; then
+    help_out="$(python3 "$r/governance/reconcile/cli.py" sweep --help 2>/dev/null)"
+  fi
+  # Bash-native (#868): the piped form of this test is the #852 idiom, and in this
+  # polarity a false negative would report the interface as MISSING when it is there.
+  if contains "$help_out" '--apply'; then
     printf '  OK    reconcile sweep still offers --apply (the interface the loop depends on)\n'
   else
     findings="$findings"$'\n'"  $label: reconcile sweep no longer offers --apply"
