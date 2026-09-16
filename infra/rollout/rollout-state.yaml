@@ -103,6 +103,25 @@ flags:
     stage: "off"
     rollout_pct: 0
     targeted: []
+  # The two halves the AgentConsole composes (issue #954, child of EPIC #607).
+  # The registry's own `operator_terminal` entry already declares this promotion
+  # verbatim - "a reviewed go-live that flips this flag (and independently
+  # promotes `fleet_projection` and `remote_control` for the two halves it
+  # composes)" - but the machine did not carry it: `fleet_projection` is the flag
+  # `portal/server/fleet.py` refuses `/api/fleet/*` on (404 feature_disabled), so
+  # a completed, owner-approved phase-7 go-live left the SPoG dark, the epic's
+  # acceptance criterion unreachable by the declared path. They sit next to the
+  # console because that IS the dependency: the console's read half is
+  # `fleet_projection` and its write half is `remote_control`. Reachable, not
+  # walked - both rows stay `stage: "off"`; nothing here promotes anything.
+  surfaces.fleet_projection:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  surfaces.remote_control:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
   # The ERP module's portal surface (issue #652) under its own key, for the same
   # reason the terminal has one: the registry declares WHAT is gated and this
   # row is what makes the surface withdrawable, with check_rollout.py's parity
