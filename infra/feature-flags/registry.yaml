@@ -111,10 +111,12 @@ services:
       Unlike paperclip it is not a separate deployable process — no OCI image,
       no terraform module (module.json distribution.terraform is null) — so
       this row declares the independent rollout/kill-switch only; nothing in
-      infra/terraform creates or gates a resource for it. Promotion and
-      kill-switch enforcement for the in-process provider happen at the
-      rollout layer (infra/rollout/), the same posture documented for the
-      other in-process workbook surfaces below. Inert until a reviewed
+      infra/terraform creates or gates a resource for it, and (like paperclip)
+      it carries no infra/rollout/rollout-state.yaml entry. The declared
+      `enable_hermes` variable is the switch itself; the gateway provider does
+      not yet read it, so today the switch is a declared kill-switch surface
+      only, not a live gate on the in-process adapter — enforcing it in the
+      gateway is follow-up work, not claimed here. Inert until a reviewed
       go-live promotes this flag.
   chat:
     default: off
