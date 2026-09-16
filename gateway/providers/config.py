@@ -11,17 +11,32 @@ Two configuration layers:
 
 2. Per-tenant overrides - a tenant may remap any *logical* key (a tier such as
    ``LOW`` or a task key such as ``summarize``) to a different provider/model
-   (``"anthropic"`` or ``"anthropic/claude-opus-4-5"``). Overrides load from
+   (``"anthropic"`` or ``"anthropic/claude-opus-5"``). Overrides load from
    YAML (``example-tenant-overrides.yaml``) or the ``TenantOverrides`` API.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Any, Mapping
 
 from providers.contract import DEFAULT_TIER
 from providers.resilience import CircuitBreakerSettings, RetryPolicy
+
+#: DEPRECATED - pre-parity (issue #894) Claude model ids that other pillars
+#: (``gateway/health/health.yaml`` + ``fallback.py`` + ``cli.py``,
+#: ``gateway/finops/tiers.yaml``) still reference directly, out of this
+#: lane's scope. Rather than edit those out-of-lane files, the old id is
+#: accepted here and normalised to its current replacement before the
+#: fail-closed ``model_supported`` check and before any request is built, so
+#: an old id still resolves to a real, currently-served model. Remove once
+#: health/finops migrate off the old ids.
+LEGACY_MODEL_ALIASES: Mapping[str, str] = {
+    "claude-haiku-4-5": "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-5": "claude-sonnet-5",
+    "claude-opus-4-5": "claude-opus-5",
+    "claude-opus-4-1": "claude-opus-5",
+}
 
 
 @dataclass(frozen=True)
@@ -50,15 +65,27 @@ class ProviderConfig:
     #: Graceful-degradation chain: provider names tried when this provider is
     #: unavailable (cloud -> local). Empty tuple = no fallback.
     fallback: tuple[str, ...] = ()
+    #: Generic, adapter-read, platform-config bag for provider-specific
+    #: capabilities that must ship flag-gated OFF by default (GR-28) - e.g.
+    #: the anthropic adapter's ``prompt_caching`` / ``thinking_effort``
+    #: knobs (issue #255 follow-up, claude-anthropic parity). Empty by
+    #: default for every provider; only an adapter that reads a key opts in.
+    provider_options: Mapping[str, Any] = field(default_factory=dict)
 
     def tier_model_for(self, tier: str) -> str:
         """Resolve a logical tier to this provider's model id for that tier."""
         return self.tier_models.get(tier) or self.default_model
 
+    def normalize_model(self, model: str) -> str:
+        """Map a deprecated ``LEGACY_MODEL_ALIASES`` id to its current
+        replacement; any other id (including one already current) passes
+        through unchanged."""
+        return LEGACY_MODEL_ALIASES.get(model, model)
+
     def model_supported(self, model: str) -> bool:
         if not self.supported_models:
             return True  # adapter accepts arbitrary model ids (endpoint passthrough)
-        return model in self.supported_models
+        return self.normalize_model(model) in self.supported_models
 
 
 def _base(name: str, base_url: str, api_path: str, tier_models: Mapping[str, str]) -> ProviderConfig:
@@ -90,12 +117,29 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
     card and catalog module are addressable.
     """
     configs: dict[str, ProviderConfig] = {
-        "anthropic": _base(
-            "anthropic",
-            "https://api.anthropic.com",
-            "/v1/messages",
-            {"LOW": "claude-haiku-4-5", "MED": "claude-sonnet-4-5",
-             "HIGH": "claude-sonnet-4-5", "MAX": "claude-opus-4-5"},
+        "anthropic": _replace(
+            _base(
+                "anthropic",
+                "https://api.anthropic.com",
+                "/v1/messages",
+                {"LOW": "claude-haiku-4-5-20251001", "MED": "claude-sonnet-5",
+                 "HIGH": "claude-sonnet-5", "MAX": "claude-opus-5"},
+            ),
+            # ``claude-fable-5-1`` is not tier-mapped (it is Anthropic's
+            # most-capable/most-expensive model, opt-in via an explicit
+            # tenant pin: ``anthropic/claude-fable-5-1``), but it is a
+            # supported model id so the fail-closed model check accepts it.
+            supported_models=frozenset(
+                {"claude-haiku-4-5-20251001", "claude-sonnet-5",
+                 "claude-opus-5", "claude-fable-5-1"}
+            ),
+            # Prompt caching + thinking-effort are Claude-specific
+            # capabilities (claude-anthropic module.json features
+            # ``prompt-caching`` / ``thinking-effort``); flag-gated OFF by
+            # default (GR-28) - empty here means disabled. A tenant/operator
+            # enables them by registering a provider config with
+            # ``provider_options={"prompt_caching": True, "thinking_effort": "low"}``.
+            provider_options={},
         ),
         "deepseek": _base(
             "deepseek",
@@ -171,6 +215,7 @@ def _replace(config: ProviderConfig, **changes: object) -> ProviderConfig:
         "retry": config.retry,
         "breaker": config.breaker,
         "fallback": config.fallback,
+        "provider_options": config.provider_options,
     }
     values.update(changes)
     return ProviderConfig(**values)

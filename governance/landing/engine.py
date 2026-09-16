@@ -60,7 +60,7 @@ FAILED = "failed"
 #: invalid, so no amount of re-running is the driver's business. A green
 #: attestation naming only a *different* commit is stale rather than invalid —
 #: apply mode re-runs the contract, which re-attests the current head.
-REFUSING_GAPS = (evidence_mod.GAP_NOT_GREEN, evidence_mod.GAP_UNNAMED_COMMIT)
+REFUSING_GAPS = (evidence_mod.GAP_NOT_GREEN, evidence_mod.GAP_UNNAMED_COMMIT, evidence_mod.GAP_UNATTRIBUTED)
 
 #: The evidence path in the PR body / report when the contract has not run yet.
 CONTRACT_COMMAND = "bash scripts/merge-gate.sh run"

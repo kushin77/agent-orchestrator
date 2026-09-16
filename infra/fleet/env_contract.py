@@ -138,6 +138,20 @@ VARS: tuple[Var, ...] = (
         code="role-timeout-not-a-positive-integer",
         why="the bound on each dispatched role, so a wedged role is reported rather than waited on forever.",
     ),
+    Var(
+        name="AO_FLEET_STATE_RW",
+        default="0",
+        kind="one-of",
+        choices=("0", "1"),
+        code="state-rw-not-a-flag",
+        why=(
+            "D3 (issue #711, EPIC #706): whether the state mounts (.fleet/.board) are bound "
+            "read-write instead of read-only. OFF by default — the compose file's primary "
+            "service never sets this to '1'; only the flag-gated `state-rw` profile service "
+            "does. This is independent of AO_FLEET_DRY_RUN: a writable mount is not permission "
+            "to apply — dry-run-required still refuses AO_FLEET_DRY_RUN=0 regardless of this flag."
+        ),
+    ),
 )
 
 BY_NAME: dict[str, Var] = {var.name: var for var in VARS}

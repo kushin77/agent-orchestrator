@@ -65,6 +65,7 @@ def write_contract(path: Path, signals, *, commit: str = HEAD, rc: int = 1) -> P
                 "commit": commit,
                 "branch": "issue-764",
                 "timestamp": "fixture",
+                "verified_by": "the-verifying-agent",
                 "checks": [
                     {"name": name, "rc": code, "status": "OK" if code == 0 else "NOT-OK"}
                     for name, code in signals

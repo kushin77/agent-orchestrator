@@ -40,6 +40,7 @@ guide.
 from __future__ import annotations
 
 from providers.config import (
+    LEGACY_MODEL_ALIASES,
     ProviderConfig,
     TenantModelMapping,
     TenantOverrides,
@@ -84,6 +85,7 @@ from providers.registry import (
     DEFAULT_PROVIDER_BY_TIER,
     PROVIDER_CLASSES,
     PROVIDER_NAMES,
+    PROVIDER_TIER_LADDERS,
     ProviderClient,
     ProviderRegistry,
 )
@@ -126,9 +128,11 @@ __all__ = [
     "TenantModelMapping",
     "TenantOverrides",
     "default_provider_configs",
+    "LEGACY_MODEL_ALIASES",
     "PROVIDER_NAMES",
     "PROVIDER_CLASSES",
     "DEFAULT_PROVIDER_BY_TIER",
+    "PROVIDER_TIER_LADDERS",
     # resilience
     "RetryPolicy",
     "CircuitBreaker",

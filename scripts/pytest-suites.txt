@@ -150,3 +150,12 @@ integrations/erp/auth
 # a declared-but-unnamed suite is refused by check-gate-coverage, which never
 # grandfathers a newly declared one.
 governance/spawn
+# Issue #711 (EPIC #706 D3): fleet-cron state volumes + secrets wiring. The
+# suite proves the AO_FLEET_STATE_RW flag defaults OFF, the secrets contract
+# refuses a mount source resolving inside the checkout, the credential-value
+# scanner catches a name embedded in a compound identifier, and the compose
+# file's state-rw posture (profile-gated, explicit re-listed volumes) matches
+# what scripts/check-fleet-cron-dev-run.sh enforces. Named in
+# scripts/verify.sh via scripts/run-pytest-suites.sh (this manifest).
+infra/fleet
+e2e/erp
