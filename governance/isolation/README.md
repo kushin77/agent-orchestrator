@@ -125,6 +125,34 @@ repository, for instance. A lane meant to persist must never use it.
 Reclaiming the worktrees this refusal is meant to stop creating is a separate,
 already-tracked tool: `bash scripts/prune-worktrees.sh` (issue #207).
 
+### 4.2 The reclaim, and the state it must not refuse on (issue #834)
+
+`close` refuses to discard **the lane's own** uncommitted work. Not every dirty
+path is the lane's: `worktree.py` declares `MACHINE_MANAGED_PATHS` — currently
+`.board/focus.json` and nothing else — the paths a *machine* rewrites in a lane.
+Refusing on those made the reclaim racy against the fleet that owns the file, and
+against the close-out itself: step 2 of `governance/lifecycle` runs `make verify`
+in the lane, and the gate runs `fleet/tests/test_brain.py`, whose brain loop
+rewrites the checkout's `.board/focus.json` (`active_epic` `707` → `160`, measured
+2026-09-15). Step 8 then refused the tree step 2 had just written to.
+
+```bash
+# only machine-managed state is dirty: the lane IS reclaimed, and says so
+python3 governance/isolation/cli.py close --session <session_id>
+# close: OK — lane <session_id> removed (ignored machine-managed state: .board/focus.json)
+
+# the lane's own file is dirty: still refused, and the file is NAMED
+python3 governance/isolation/cli.py close --session <session_id>
+# close: NOT-OK — worktree <path> has uncommitted work (wip.txt); commit it or pass --force
+```
+
+The exclusion is a declared list, not a blanket `--force`, and it is **reported**
+rather than silent — a reviewer can see exactly what a reclaim is allowed to pass
+over. `dirty()` still answers "is this tree dirty at all"; only `close()` narrows
+the question to work the lane produced. `--force` removes a lane dirty in its own
+files, and now actually reaches `git worktree remove`, which runs its own dirty
+test and would otherwise refuse after the module had already decided to proceed.
+
 ## 5. What the audit checks, and why each one can fail
 
 | Violation | Raised when |

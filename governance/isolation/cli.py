@@ -50,6 +50,7 @@ from governance.isolation.worktree import (  # noqa: E402
     default_worktree_root,
     git,
     list_records,
+    machine_managed_uncommitted,
     main_repo_root,
     provision,
     read_record,
@@ -257,18 +258,26 @@ def cmd_enforce(args: argparse.Namespace) -> int:
 
 
 def cmd_close(args: argparse.Namespace) -> int:
-    """Remove a lane's worktree — never discarding uncommitted work silently."""
+    """Remove a lane's worktree — never discarding the lane's own work silently.
+
+    What was *ignored* is reported, not hidden: a reclaim that proceeded past
+    machine-managed board state says which paths it passed over (#834), so
+    "the worktree looked clean" and "the worktree was dirty only in state the
+    fleet regenerates" are distinguishable in the output.
+    """
     main = Path(args.main)
     identity = read_record(args.session, main)
     if identity is None:
         print(f"close: CANNOT-ASSESS — no lane record for session {args.session}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
+    ignored = machine_managed_uncommitted(identity.worktree) if identity.worktree.exists() and not args.force else []
     kept = close(identity, main, force=args.force)
     if kept:
         for reason in kept:
             print(f"close: NOT-OK — {reason}", file=sys.stderr)
         return EXIT_NOT_OK
-    print(f"close: OK — lane {identity.session_id} removed")
+    note = f" (ignored machine-managed state: {', '.join(ignored)})" if ignored else ""
+    print(f"close: OK — lane {identity.session_id} removed{note}")
     return EXIT_OK
 
 
