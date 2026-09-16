@@ -1,6 +1,9 @@
-# Head-of-org agent role pack (issue #952) - RBAC roles for the platform
-# personas that act with head-of-org authority in a tenant: hermes (coding /
-# capability-routing worker) and paperclip (knowledge / reporting worker).
+# Head-of-org agent role pack (issue #952) - RBAC roles for two platform
+# personas granted head-of-org registry access in a tenant: hermes (coding /
+# capability-routing worker, ADR-0012's routing half) and paperclip (knowledge
+# / reporting worker, ADR-0012's reporting half - "head-of-org" here names the
+# treatment, a real per-tenant role binding, not a claim that paperclip
+# outranks hermes; ADR-0012 keeps paperclip the reporting half only).
 #
 # NOT a tenant type: this pack is never resolved by seed_org(org.tenant_type -
 # see presets/__init__.py BUILTIN_TENANT_TYPES) and is never auto-seeded when
@@ -9,6 +12,14 @@
 # opt-in seam. Per GR-28 (declared-default-off), a tenant is bound to no
 # persona until it explicitly enables one; nothing in this repo grants these
 # roles automatically.
+#
+# role_admin_permission below is the pack schema's required field, set to the
+# same default every other pack uses - it is NOT granted by either role here,
+# deliberately (neither persona may administer roles). That is safe only
+# because this pack is never seeded through seed_org(), whose "grants its own
+# role-admin permission" refusal (presets/__init__.py) exists for packs that
+# ARE resolved by tenant_type; head_bindings.py's own `_ensure_role` creates
+# these roles directly and never calls seed_org with this pack.
 #
 # Pack schema: identity/rbac/README.md. Provenance for the permission set:
 # registry/personas/cards/{hermes,paperclip}.yaml (capabilitySet/ownedLanes)
@@ -52,11 +63,13 @@ roles:
   # visibility per org, it grants no resource:action permission and creates no
   # Role/Binding at all.
   - key: paperclip-head
-    name: Paperclip (head-of-org agent)
+    name: Paperclip (head-of-org agent binding)
     description: >-
-      Head-of-org knowledge/reporting worker. May read the org/agent registry
-      and author docs/briefs. Must NOT administer tenants, rotate secrets,
-      approve rollouts, or read another tenant's data.
+      Knowledge/reporting worker (ADR-0012 reporting half), granted the same
+      head-of-org REGISTRY ACCESS treatment as hermes - not head-of-org
+      authority. May read the org/agent registry and author docs/briefs. Must
+      NOT administer tenants, rotate secrets, approve rollouts, or read
+      another tenant's data.
     level: org
     permissions:
       - org:read

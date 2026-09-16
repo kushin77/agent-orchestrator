@@ -361,11 +361,17 @@ python3 -m pytest identity/rbac/tests -q -p no:cacheprovider
 make verify   # repo gate must stay green (YAML/JSON parse, docs, no markers)
 ```
 
-## Verification summary (2026-09-08)
+## Verification summary (2026-09-08, updated 2026-09-16)
 
-- `python3 -m pytest identity/rbac/tests -q -p no:cacheprovider` → **52 passed**,
-  covering: permission allow/deny incl. wildcards; the scope-vs-permission
-  separation negative tests (cross-tenant and cross-team denied at the scope
-  gate); the no-lockout invariant; preset-pack loading + custom-pack seam;
-  guard + sessions.
+- `python3 -m pytest identity/rbac/tests -q -p no:cacheprovider` → **52 passed**
+  (2026-09-08), covering: permission allow/deny incl. wildcards; the
+  scope-vs-permission separation negative tests (cross-tenant and cross-team
+  denied at the scope gate); the no-lockout invariant; preset-pack loading +
+  custom-pack seam; guard + sessions.
+- 2026-09-16 (issue #952): `python3 -m pytest identity/rbac/tests -q
+  -p no:cacheprovider` → **109 passed**, adding
+  `tests/test_head_bindings.py` (hermes/paperclip head-of-org bindings; GR-28
+  default-off; cross-tenant refusal even when both tenants opted in; the
+  deleted-binding negative control). Gate:
+  `bash scripts/check-rbac-head-binding.sh` → OK.
 - `make verify` → green (see PR evidence).

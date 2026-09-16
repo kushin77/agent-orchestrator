@@ -22,10 +22,15 @@ permission gate (`rbac.guard.guard`) denies them because the role never grants
 them - see `tests/test_head_bindings.py::test_forbidden_ops_refused_by_name`.
 
 A cross-tenant read is refused by a *different* gate - the scope gate
-(`rbac.resolve.resolve_scope`). A binding only ever exists inside one Org
-(`Binding.org_id` pins it - see `model.py`), so a persona bound in org A has no
-binding at all in org B and `resolve_scope` denies with `code="out_of_scope"`
-before the permission gate is ever reached, exactly like every other subject
+(`rbac.resolve.resolve_scope`) - and by construction, not by luck: the subject
+a persona binds as is **tenant-qualified** (`persona_subject` returns
+``persona:<id>@<org_id>``, never a bare ``persona:<id>``). Even when the same
+persona is bound in two tenants at once - the expected steady state for a
+platform persona like hermes - "org A's hermes" and "org B's hermes" are two
+entirely different subject strings with two entirely separate `Binding` rows
+(`Binding.org_id` pins each - see `model.py`), so `store.bindings_for_subject`
+for org B never returns org A's row and `resolve_scope` denies org A's subject
+at org B's node with `code="out_of_scope"` - exactly like every other subject
 in this package (`tests/test_scope_vs_permission.py`).
 
 Opt-in only (GR-28)
@@ -44,7 +49,7 @@ default OFF; nothing here defaults ON either).
 
 from __future__ import annotations
 
-from rbac.model import Binding, Org, Role, ScopeNode
+from rbac.model import SUBJECT_AGENT, Binding, Org, Role, ScopeNode
 from rbac.guard import Decision, guard
 from rbac.presets import RolePack, load_pack
 
@@ -92,10 +97,22 @@ def _require_known(persona_id: str) -> str:
     return role_key
 
 
-def persona_subject(persona_id: str) -> str:
-    """The RBAC subject id a persona binds as: ``persona:<persona_id>``."""
+def persona_subject(persona_id: str, org_id: str) -> str:
+    """The RBAC subject id a persona binds as *inside one Org*.
+
+    Tenant-qualified (``persona:<persona_id>@<org_id>``) rather than a global
+    id - a platform persona like hermes is expected to opt in for many
+    tenants at once, and a global ``persona:hermes`` subject would resolve
+    against the bindings of *every* org it is bound in, defeating the scope
+    gate's cross-tenant isolation the moment a second tenant opts in. Scoping
+    the subject to the org keeps each tenant's grant a completely separate
+    row - `store.bindings_for_subject(org_id, subject)` for org A can never
+    see org B's binding, because the subject strings themselves differ.
+    """
     _require_known(persona_id)
-    return f"persona:{persona_id}"
+    if not org_id:
+        raise ValueError("persona_subject: org_id must be non-empty")
+    return f"persona:{persona_id}@{org_id}"
 
 
 def load_head_agents_pack() -> RolePack:
@@ -139,7 +156,7 @@ def is_persona_bound(store, org_id: str, persona_id: str) -> bool:
     role = store.find_role_by_key(org_id, role_key)
     if role is None:
         return False
-    subject = persona_subject(persona_id)
+    subject = persona_subject(persona_id, org_id)
     return any(
         b.role_id == role.id and b.team_id is None
         for b in store.bindings_for_subject(org_id, subject)
@@ -154,14 +171,14 @@ def bind_persona_to_tenant(store, org: Org, persona_id: str) -> Binding:
     ``head-agents`` pack on first use (the role never auto-seeds with the Org).
     """
     role = _ensure_role(store, org, persona_id)
-    subject = persona_subject(persona_id)
+    subject = persona_subject(persona_id, org.id)
     for binding in store.bindings_for_subject(org.id, subject):
         if binding.role_id == role.id and binding.team_id is None:
             return binding
     return store.add_binding(
         org_id=org.id,
         subject=subject,
-        subject_type="agent",
+        subject_type=SUBJECT_AGENT,
         role_id=role.id,
         team_id=None,
     )
@@ -177,7 +194,7 @@ def unbind_persona_from_tenant(store, org_id: str, persona_id: str) -> bool:
     role = store.find_role_by_key(org_id, role_key)
     if role is None:
         return False
-    subject = persona_subject(persona_id)
+    subject = persona_subject(persona_id, org_id)
     for binding in store.bindings_for_subject(org_id, subject):
         if binding.role_id == role.id and binding.team_id is None:
             store.delete_binding(binding.id)
@@ -189,9 +206,10 @@ def guard_persona(store, org_id: str, persona_id: str, permission: str) -> Decis
     """Guard one ``resource:action`` call by ``persona_id`` at the org node.
 
     A thin, persona-aware wrapper over `rbac.guard.guard`: resolves the same
-    subject `bind_persona_to_tenant` grants, at the org-level `ScopeNode`, so
-    callers never have to know the `persona:<id>` subject convention.
+    tenant-qualified subject `bind_persona_to_tenant` grants, at the org-level
+    `ScopeNode`, so callers never have to know the `persona:<id>@<org_id>`
+    subject convention.
     """
-    subject = persona_subject(persona_id)
+    subject = persona_subject(persona_id, org_id)
     node = ScopeNode(org_id=org_id)
     return guard(store, subject, node, permission)

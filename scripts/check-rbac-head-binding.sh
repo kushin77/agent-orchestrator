@@ -98,13 +98,36 @@ for persona_id, permission in (
     pristine_allowed = guard_persona(store, org.id, persona_id, permission).allowed
     check(f"{persona_id}: bound tenant allowed ({permission})", pristine_allowed)
 
-    # Negative control: delete the Binding row directly, bypassing
+    from rbac.head_bindings import persona_subject
+
+    # Cross-tenant isolation: bind the SAME persona in a second, independent
+    # tenant, then require org A's persona subject to be refused at org B's
+    # node - even though org B bound the persona too, under its own,
+    # separate binding row. This is the case issue #952 names explicitly
+    # ("may NOT ... read other tenants' data"), not merely "an unbound
+    # tenant is refused".
+    from rbac.guard import guard
+    from rbac.model import ScopeNode
+
+    globex = store.add_org("globex", "Globex", tenant_type="startup")
+    bind_persona_to_tenant(store, globex, persona_id)
+    acme_subject = persona_subject(persona_id, org.id)
+    cross_tenant_denied = guard(
+        store, acme_subject, ScopeNode(org_id=globex.id), permission
+    )
+    check(
+        f"{persona_id}: control - cross-tenant read refused even though both opted in ({permission})",
+        cross_tenant_denied.denied and cross_tenant_denied.reason == "scope",
+    )
+    check(
+        f"{persona_id}: control - globex's own binding still works ({permission})",
+        guard_persona(store, globex.id, persona_id, permission).allowed,
+    )
+
+    # Negative control: delete acme's Binding row directly, bypassing
     # unbind_persona_from_tenant, to simulate an external/bad deletion. The
     # allowed op MUST flip to refused, or this control has caught nothing.
-    from rbac.model import SUBJECT_AGENT  # noqa: F401 (documents subject_type)
-
-    subject = f"persona:{persona_id}"
-    (binding,) = store.bindings_for_subject(org.id, subject)
+    (binding,) = store.bindings_for_subject(org.id, acme_subject)
     deleted = store.delete_binding(binding.id)
     check(f"{persona_id}: binding row deleted", deleted)
     mutated_decision = guard_persona(store, org.id, persona_id, permission)

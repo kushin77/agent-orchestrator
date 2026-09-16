@@ -71,7 +71,7 @@ def test_pack_permissions_are_well_formed_and_never_forbidden():
 
 def test_unknown_persona_is_refused():
     with pytest.raises(UnknownPersonaError):
-        persona_subject("not-a-persona")
+        persona_subject("not-a-persona", "acme")
 
 
 # --- no tenant is bound by default (GR-28) --------------------------------
@@ -133,37 +133,45 @@ def test_binding_is_scoped_to_its_own_tenant(store, persona_id):
 # --- cross-tenant read is refused (the scope gate, not the permission list) --
 
 
-def test_cross_tenant_read_is_refused():
+@pytest.mark.parametrize("persona_id", KNOWN_PERSONAS)
+def test_cross_tenant_read_is_refused_even_when_both_tenants_opted_in(persona_id):
+    """The case the task names explicitly: hermes/paperclip may NOT read
+    another tenant's data. Both acme and globex opt in independently (the
+    expected steady state for a platform persona) - proving the refusal is
+    real isolation, not just "the other tenant never bound it" (that's
+    already covered by test_binding_is_scoped_to_its_own_tenant)."""
     store = InMemoryStore()
     acme = _org(store, "acme")
     globex = _org(store, "globex")
-    bind_persona_to_tenant(store, acme, HERMES_PERSONA_ID)
-    bind_persona_to_tenant(store, globex, HERMES_PERSONA_ID)
+    bind_persona_to_tenant(store, acme, persona_id)
+    bind_persona_to_tenant(store, globex, persona_id)
 
-    # Hermes bound in acme cannot read globex, even though hermes is *also*
-    # bound (separately) in globex under its own binding - no fallback, no
-    # cross-tenant reach, because a Binding never crosses an Org.
-    acme_subject = persona_subject(HERMES_PERSONA_ID)
+    permission = ALLOWED_PERMISSIONS[persona_id][0]
+    acme_subject = persona_subject(persona_id, acme.id)
+
     from rbac.guard import guard
     from rbac.model import ScopeNode
 
-    # acme's hermes binding grants org:read only inside acme's own node.
-    decision_home = guard(store, acme_subject, ScopeNode(org_id=acme.id), "org:read")
-    assert decision_home.allowed
-    # There is no such thing as "acme's hermes reading globex" in this model -
-    # the subject string is identical, but resolve_scope only ever consults
-    # bindings recorded under the requested org_id (globex), which is where
-    # globex's OWN hermes binding lives, not a foreign reach from acme.
-    decision_cross = guard(store, acme_subject, ScopeNode(org_id=globex.id), "org:read")
-    # This passes because globex bound hermes too (its own, separate grant) -
-    # proving the binding is per-org, not proving a cross-tenant reach.
-    assert decision_cross.allowed
-    unbind_persona_from_tenant(store, globex.id, HERMES_PERSONA_ID)
-    decision_cross_unbound = guard(
-        store, acme_subject, ScopeNode(org_id=globex.id), "org:read"
-    )
-    assert decision_cross_unbound.denied
-    assert decision_cross_unbound.reason == "scope"
+    # acme's persona binding grants the permission inside acme's own node.
+    assert guard(store, acme_subject, ScopeNode(org_id=acme.id), permission).allowed
+
+    # acme's persona subject is tenant-qualified (persona:<id>@acme), so it has
+    # no binding at all in globex - globex's own, entirely separate binding
+    # does not leak to it. Asserted two ways: the row is absent, and the guard
+    # denies at the scope gate.
+    assert store.bindings_for_subject(globex.id, acme_subject) == []
+    decision_cross = guard(store, acme_subject, ScopeNode(org_id=globex.id), permission)
+    assert decision_cross.denied
+    assert decision_cross.reason == "scope"
+
+    # globex's OWN binding still works - this is isolation, not breakage.
+    globex_subject = persona_subject(persona_id, globex.id)
+    assert guard(store, globex_subject, ScopeNode(org_id=globex.id), permission).allowed
+
+    unbind_persona_from_tenant(store, globex.id, persona_id)
+    assert guard(
+        store, globex_subject, ScopeNode(org_id=globex.id), permission
+    ).denied
 
 
 # --- idempotence + revocation ----------------------------------------------
@@ -175,7 +183,7 @@ def test_bind_is_idempotent(store, persona_id):
     first = bind_persona_to_tenant(store, org, persona_id)
     second = bind_persona_to_tenant(store, org, persona_id)
     assert first.id == second.id
-    assert len(store.bindings_for_subject(org.id, persona_subject(persona_id))) == 1
+    assert len(store.bindings_for_subject(org.id, persona_subject(persona_id, org.id))) == 1
 
 
 @pytest.mark.parametrize("persona_id", KNOWN_PERSONAS)
@@ -210,7 +218,7 @@ def test_deleting_the_binding_entry_reproduces_the_gates_negative_control(
     permission = ALLOWED_PERMISSIONS[persona_id][0]
     assert guard_persona(store, org.id, persona_id, permission).allowed
 
-    subject = persona_subject(persona_id)
+    subject = persona_subject(persona_id, org.id)
     role_key = ROLE_KEY_FOR_PERSONA[persona_id]
     role = store.find_role_by_key(org.id, role_key)
     (binding,) = [
