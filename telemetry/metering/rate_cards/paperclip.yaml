@@ -1,0 +1,36 @@
+# telemetry/metering rate card — Paperclip (operator seam, OpenAI-compatible)
+#
+# Paperclip is the vendored planning / status-report workflow module
+# (vendor/CMR/catalog/modules/paperclip, issue #124). Its provider adapter
+# (gateway/providers/paperclip.py) inherits OpenAICompatProvider and calls a
+# real cloud endpoint (providers.config default_provider_configs()["paperclip"]
+# -> https://api.paperclip.dev/v1, requires_key=True) — unlike hermes/ollama,
+# this is NOT a local hop, so it is not eligible for the `local: true` $0
+# convention (ratecards.py: "the only deliberate $0 rates on the shipped
+# cards are the local Ollama models").
+#
+# What paperclip actually bills for is an operator seam, not raw tokens: the
+# frozen docs/contracts/paperclip/ heartbeat.schema.json (agent_id/session_id/
+# tick/cadence_seconds/wake/outcome beats) and ticket.schema.json /
+# budget.schema.json describe a per-ticket / per-heartbeat cost surface with
+# its own cap/spend/period (telemetry/budgets/, budget.schema.json `cap`/
+# `spent`/`period`), not an input/output token price list. No commercial
+# per-token price list for the paperclip-planner model id exists in this
+# checkout or in any provenance source cited by gateway/catalog/modules/
+# paperclip/module.json, so this card does NOT invent one.
+#
+# Per issue #953: represent honestly. inputUsdPerMillion/outputUsdPerMillion
+# are set to 0.0 — NOT a priced local $0 (paperclip is not local), an
+# UNPRICED placeholder pending a real per-ticket/heartbeat contract price.
+# Until that contract is sourced, per-token metering of paperclip calls
+# undercounts true operator-seam cost; the ticket/heartbeat/budget contracts
+# above are the eventual source of truth for that price, not this token-rate
+# card. Re-source before relying on this figure for tenant billing.
+schemaVersion: 1
+provider: paperclip
+note: "unpriced — set from contract. Paperclip is an operator seam (per-ticket/heartbeat, docs/contracts/paperclip/{ticket,heartbeat,budget}.schema.json), not a per-token cloud model; 0.0 is a placeholder, not a sourced price. USD per 1M tokens shape kept for loader compatibility. Point-in-time 2026-09."
+models:
+  paperclip-planner:
+    standard:
+      inputUsdPerMillion: 0.0
+      outputUsdPerMillion: 0.0
