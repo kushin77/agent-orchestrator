@@ -133,6 +133,7 @@ infra/cloudflare
 # scripts/check-erp-module.sh (the gate of record runs it, so the suite is
 # covered rather than only declared).
 integrations/erp/catalog
+integrations/erp/webhooks
 # ERP-08 (issue #653, EPIC #645) — the tenant-access lane's suite. It runs the
 # module's refusals (all 18 of the closed vocabulary, each provoked BY NAME) and
 # the controls the acceptance criteria name: a request for another tenant is
