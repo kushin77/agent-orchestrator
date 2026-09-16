@@ -12,15 +12,21 @@
 # mutated copy whose unmodified twin the same invocation accepts, so a rule
 # cannot be a formality:
 #
-#   1. the declaration (infra/portal/auth-env.json) against the CONSOLE, read
-#      from portal/server/sso.py — the env names must be the ones the code reads,
+#   1. the declaration (infra/terraform/modules/web-surface/auth-env.json) against
+#      the CONSOLE, read from portal/server/sso.py — the env names must be the
+#      ones the code reads,
 #      every *_FILE variable must be delivered as a mounted file, the mirror must
 #      reference `latest` (a pinned version turns a key rollover into a
 #      redeploy), and every variable the console reads must be declared or
 #      exempted WITH A REASON, so a new one cannot ship unsupplied;
 #   2. the Terraform module PROJECTS that declaration instead of restating it, so
 #      the deploy and the console cannot drift apart; it mounts the secret, injects
-#      the secret version, and grants the runtime identity a read;
+#      the secret version, and grants the runtime identity a read. The projection
+#      is measured as a FACT and not as text: the declaration it names must be a
+#      file that ships beside it, which is where `${path.module}` resolves —
+#      asserting only the expression left this gate green while the committed
+#      module referenced a declaration that was never there (`terraform validate`
+#      was the check that caught it);
 #   3. no value where a reference is promised: no payload, private key or
 #      Terraform secret version under infra/ or portal/, an allowlist value
 #      refused by name, and a *_FILE variable pointed at a path the declaration
@@ -46,7 +52,10 @@ cd "$root" || exit 2
 
 declare -r auth_env="infra/portal/auth_env.py"
 declare -r mirror="infra/portal/mirror-auth-gate-jwks.sh"
-declare -r declaration="infra/portal/auth-env.json"
+# The declaration ships INSIDE the module directory it is projected from: the
+# module reads it with `file("${path.module}/auth-env.json")`, so a declaration
+# kept anywhere else is a `terraform validate` failure rather than a choice.
+declare -r declaration="infra/terraform/modules/web-surface/auth-env.json"
 declare -r module="infra/terraform/modules/web-surface/main.tf"
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -190,6 +199,9 @@ refuse "a module that injects no secret version" "secret-key-ref-missing" \
 refuse "a module that does not read the declaration" "projection-missing" \
   python3 "$auth_env" check-declaration --root "$root" --declaration "$root/$declaration" \
   --module "$(mutant_module noread 'jsondecode(file("${path.module}/auth-env.json"))' 'jsondecode("{}")')" || projection_ok=1
+refuse "a module projecting a declaration that ships nowhere" "projection-unresolved" \
+  python3 "$auth_env" check-declaration --root "$root" --declaration "$root/$declaration" \
+  --module "$(mutant_module unresolved 'file("${path.module}/auth-env.json")' 'file("${path.module}/auth-env-missing.json")')" || projection_ok=1
 refuse "a module that grants no read on the secrets" "secret-accessor-missing" \
   python3 "$auth_env" check-declaration --root "$root" --declaration "$root/$declaration" \
   --module "$(mutant_module noiam 'roles/secretmanager.secretAccessor' 'roles/secretmanager.viewer')" || projection_ok=1

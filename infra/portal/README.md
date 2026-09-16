@@ -13,7 +13,7 @@ names the secrets, and the deploy reads them from Secret Manager (GR-6).
 
 | File | What it is |
 |---|---|
-| `auth-env.json` | The declaration: the env names, the secret ids, the delivery shape and the mount path — the single source of truth both the deploy and the gate read. |
+| `auth-env.json` | Not in this directory: the declaration ships **beside the module that projects it**, at `infra/terraform/modules/web-surface/auth-env.json`. It carries the env names, the secret ids, the delivery shape and the mount path — the single source of truth both the deploy and the gate read. |
 | `auth_env.py` | The validator. Reads the declaration, the Terraform module and the console's own source, and refuses every way they can drift apart (`check`), validates a key set with the console's own predicate (`check-jwks`), scans one file (`scan-file`), and prints the wiring (`describe`). |
 | `mirror-auth-gate-jwks.sh` | The mirror job: fetch the auth gate's published key set, refuse it if the console could not use it, and publish it into Secret Manager **on stdin**. |
 
@@ -24,7 +24,9 @@ dedicated runtime identity that holds no other role.
 
 ## Why one declaration, and not literals in the Terraform
 
-The env names exist in one non-code place. The module reads
+The env names exist in one non-code place: `auth-env.json`, shipped inside the
+module directory so the read below stays `path.module`-relative and keeps
+resolving wherever the root module is invoked. The module reads
 `file("${path.module}/auth-env.json")` and never restates a name — the gate
 refuses a restatement as `env-name-restated`, so the deploy and the console
 cannot drift apart in a way that only a live deploy would reveal. The names

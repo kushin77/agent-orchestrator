@@ -2,7 +2,8 @@
 # mirror-auth-gate-jwks.sh — publish the OS auth gate's JWKS into Secret Manager (#730).
 #
 # The console verifies its session tokens OFFLINE, against a mirror of the auth
-# gate's published key set. `infra/portal/auth-env.json` declares that mirror as a
+# gate's published key set. The web-surface module's `auth-env.json`
+# (`infra/terraform/modules/web-surface/auth-env.json`) declares that mirror as a
 # Secret Manager secret mounted into the container; this is the other half — the
 # job that PUTS the mirror there. Without it the declaration names a secret that
 # holds nothing, and the container exits 1 at boot rather than refusing sessions

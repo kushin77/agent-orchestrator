@@ -165,8 +165,9 @@ The compose handoff above gets its two variables from the run half's shell. The
 **deployed** surface cannot: a variable exported on a box is configuration nobody
 can audit, and an unset one is a console that refuses every session. So the Cloud
 Run service declared by `infra/terraform/modules/web-surface` is wired to Secret
-Manager, and the wiring is **declared once** in `infra/portal/auth-env.json` and
-projected into the service — the env names exist in one non-code place, and
+Manager, and the wiring is **declared once** in `auth-env.json`, shipped inside
+that module (`infra/terraform/modules/web-surface/auth-env.json`), and projected
+into the service — the env names exist in one non-code place, and
 `scripts/check-portal-auth-env.sh` refuses a name restated in the Terraform.
 
 | Variable | Secret Manager secret | How it reaches the container |

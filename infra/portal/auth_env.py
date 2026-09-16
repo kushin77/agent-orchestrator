@@ -5,8 +5,9 @@ The console fails **closed**: ``portal/server/sso.py`` refuses every session
 until a mirror of the OS auth gate's published JWKS is present, so a deploy that
 never supplies that mirror serves nothing, however green its healthcheck is. This
 module is the deploy side of that contract — it reads the one declaration
-(``infra/portal/auth-env.json``) and refuses, by name, every way the declaration
-can stop matching the code it feeds:
+(``infra/terraform/modules/web-surface/auth-env.json``, which ships beside the
+module that projects it) and refuses, by name, every way the declaration can stop
+matching the code it feeds:
 
 * ``declaration-schema``          — a required field is absent, a delivery is
   unknown, or one env/secret is declared twice;
@@ -24,9 +25,11 @@ can stop matching the code it feeds:
   turns a key rollover into a redeploy;
 * ``mount-dir-not-absolute`` / ``mount-dir-reserved`` / ``filename-not-bare``  —
   a mount the container runtime cannot honour;
-* ``projection-missing`` / ``env-name-restated`` — the Terraform module restates
-  the env names instead of projecting the declaration, which is exactly the drift
-  the declaration exists to prevent;
+* ``projection-missing`` / ``projection-unresolved`` / ``env-name-restated`` —
+  the Terraform module restates the env names instead of projecting the
+  declaration, or reads a declaration that does not ship beside it, which is
+  exactly the drift the declaration exists to prevent (and the shape in which
+  this lane first shipped a module `terraform validate` could not build);
 * ``secret-key-ref-missing`` / ``volume-mount-missing`` /
   ``secret-accessor-missing``    — a projection that would not reach the
   container, or a runtime identity that could not read the secret;
@@ -59,7 +62,13 @@ from typing import Any, Mapping, Sequence
 SCHEMA = "portal-auth-env/v1"
 
 #: The declaration, the module that projects it, and the code it must match.
-DECLARATION_REL = "infra/portal/auth-env.json"
+#: The declaration ships INSIDE the module directory: the module reads it with
+#: ``file("${path.module}/auth-env.json")``, and ``path.module`` is the only path
+#: expression that keeps resolving however the root module is invoked. A
+#: repo-relative read would break the moment this module is consumed from
+#: anywhere but the repository root — and a file that is not there at all is a
+#: ``terraform validate`` failure, which is how this coupling was found.
+DECLARATION_REL = "infra/terraform/modules/web-surface/auth-env.json"
 MODULE_REL = "infra/terraform/modules/web-surface/main.tf"
 SSO_REL = "portal/server/sso.py"
 
@@ -67,6 +76,12 @@ SSO_REL = "portal/server/sso.py"
 #: restating it. `path.module`, not a repo-relative path: the module must load
 #: the file that ships beside it, wherever the root module is invoked from.
 PROJECTION_READ = 'file("${path.module}/auth-env.json")'
+
+#: The same read, reduced to the file it names, so the file can be looked for
+#: where `path.module` resolves it. Asserting the expression is not enough: the
+#: committed module named a declaration that was never placed beside it, and this
+#: gate was green while `terraform validate` refused the module outright.
+PROJECTION_FILE_RE = re.compile(r'file\("\$\{path\.module\}/(?P<name>[^"/]+)"\)')
 
 #: The two trees the acceptance criterion scopes (`git grep ... -- infra/ portal/`),
 #: and the two names it greps for: the file-delivered mirror and the allowlist.
@@ -135,7 +150,7 @@ def _text(path: Path) -> str:
 
 
 def load_declaration(root: Path) -> Mapping[str, Any]:
-    """The declaration at ``<root>/infra/portal/auth-env.json``."""
+    """The declaration at ``<root>/infra/terraform/modules/web-surface/auth-env.json``."""
     path = Path(root) / DECLARATION_REL
     try:
         document = json.loads(_text(path))
@@ -386,8 +401,16 @@ def validate_declaration(
     return findings
 
 
-def validate_projection(module_text: str, declared_envs: Sequence[str]) -> list[str]:
-    """The Terraform module must PROJECT the declaration, never restate it."""
+def validate_projection(
+    module_text: str, declared_envs: Sequence[str], module_path: Path | None = None
+) -> list[str]:
+    """The Terraform module must PROJECT the declaration, never restate it.
+
+    ``module_path`` (the module's own file, when the caller knows it) turns the
+    read from a text pattern into a resolvable fact: a module that names a
+    declaration the deploy cannot open is refused, because `path.module` is
+    exactly where Terraform will look for it.
+    """
     findings: list[str] = []
 
     if PROJECTION_READ not in module_text:
@@ -395,6 +418,20 @@ def validate_projection(module_text: str, declared_envs: Sequence[str]) -> list[
             f"projection-missing: {MODULE_REL} does not read the declaration ({PROJECTION_READ}); the "
             "env names would then have to be written twice, which is the drift the declaration prevents"
         )
+
+    # Reported whether or not the read above is the expected one: a module can
+    # name the right expression and still resolve it to a file that is not there
+    # (one directory, one filename — the whole of this lane's first defect), and
+    # the two findings answer different questions, so neither hides the other.
+    if module_path is not None:
+        for name in sorted(set(PROJECTION_FILE_RE.findall(module_text))):
+            target = Path(module_path).parent / name
+            if not target.is_file():
+                findings.append(
+                    f"projection-unresolved: {MODULE_REL} reads `${{path.module}}/{name}`, which "
+                    f"resolves to {target}, and nothing ships there — the module projects a "
+                    "declaration the deploy cannot open"
+                )
 
     for env in sorted(declared_envs):
         if re.search(rf'name\s*=\s*"{re.escape(env)}"', module_text):
@@ -558,7 +595,7 @@ def check_pair(root: Path, declaration_path: Path, module_path: Path) -> list[st
 
     findings = validate_declaration(declaration, sso_env_constants(root))
     envs = [str(entry.get("env") or "") for entry in declaration_entries(declaration) if entry.get("env")]
-    findings.extend(validate_projection(_text(module_path), envs))
+    findings.extend(validate_projection(_text(module_path), envs, module_path))
     return findings
 
 
@@ -593,7 +630,7 @@ def check_tree(root: Path) -> tuple[list[str], list[str]]:
     envs = [str(entry.get("env") or "") for entry in entries if entry.get("env")]
     module = Path(root) / MODULE_REL
     if module.is_file():
-        findings.extend(validate_projection(_text(module), envs))
+        findings.extend(validate_projection(_text(module), envs, module))
     else:
         findings.append(f"projection-missing: {MODULE_REL} is absent")
 

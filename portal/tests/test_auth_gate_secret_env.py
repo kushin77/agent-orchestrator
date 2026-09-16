@@ -13,7 +13,8 @@ it, and asserts that criterion at the end of it:
    STDIN: a ``--data-file=<payload>`` form is indistinguishable, to a mechanical
    scan, from a hardcoded credential);
 3. the platform materialises the secret as the volume the Terraform module
-   declares, at the path ``infra/portal/auth-env.json`` names;
+   declares, at the path ``infra/terraform/modules/web-surface/auth-env.json``
+   names;
 4. the console boots with **only** the declaration's env, reading the mirror from
    that mounted file;
 5. a real ``os-session-token`` reaches ``GET /api/console/me`` with HTTP 200,
@@ -264,7 +265,12 @@ def test_a_payload_delivered_as_a_value_is_refused_at_boot(
 
 def test_the_declaration_carries_no_value() -> None:
     """Wiring only (GR-6): the declaration names ids, never a key or an allowlist."""
-    raw = (REPO_ROOT / "infra" / "portal" / "auth-env.json").read_text(encoding="utf-8")
+    # The path is spelled out rather than read from auth_env.DECLARATION_REL: a
+    # test that follows the constant cannot catch the constant pointing at a file
+    # that is not there, and that is exactly the defect this lane shipped once.
+    raw = (
+        REPO_ROOT / "infra" / "terraform" / "modules" / "web-surface" / "auth-env.json"
+    ).read_text(encoding="utf-8")
     assert "kty" not in raw
     assert "@" not in raw
     for declared in auth_env.declaration_entries(declaration()):
