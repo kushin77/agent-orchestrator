@@ -4,6 +4,12 @@
   "name": "agent-orchestrator",
   "type": "service",
   "class": ["backend", "service", "saas", "control-plane"],
+  "os_apps": {
+    "hosts": false,
+    "model_owner": "kushin77/shared-frontend",
+    "model_contract": "modules/schema.json",
+    "declaration": "docs/MODULE-ADMISSION.md"
+  },
   "source": {
     "repo": "kushin77/agent-orchestrator",
     "default_branch": "master"

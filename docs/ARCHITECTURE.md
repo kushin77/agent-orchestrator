@@ -115,6 +115,29 @@ Assets harvested from fleet/hub repos are tracked with provenance (repo, path,
 license) in the cannibalization index (issue #8). `vendor/CMR` is the pinned
 read-only hub submodule; `.research/` holds local clones (gitignored).
 
+## 7. No OS apps here — the app/addon model belongs to the OS host (issue #945)
+
+This repository has **no `addons/`, no `apps/`, and no `category: "system"`
+app** — and that is correct by design. The à-la-carte OS app model (an app as an
+`addons/<id>/` directory wired by `shell/src/addons.ts` + `registry/modules.json`
+with `mount.type` from `modules/schema.json`) is owned by the **OS portal host,
+`kushin77/shared-frontend`**. This module is a `type: service` module: it ships
+services, surfaces and contracts, and hosts no apps.
+
+The fleet **single pane of glass** (`ai.purebliss.app`) is consequently **not an
+app**: it is a route surface — the view `portal/static/views/fleet.html` at
+`GET /views/fleet.html` plus the flag-gated `GET /api/fleet/*` family (surface
+`surfaces.fleet_projection`), fronted at the hostname by the shared-services run
+half ([`EDGE-CUTOVER.md`](EDGE-CUTOVER.md), issue #731), with any in-shell
+appearance registered by shared-frontend as a registry module entry
+([`CHAT-MOUNT.md`](CHAT-MOUNT.md), issue #511).
+
+The full declaration, its machine-readable marker, and the command a reader can
+run to check it are in `docs/MODULE-ADMISSION.md` §9
+([`MODULE-ADMISSION.md`](MODULE-ADMISSION.md)); the gate is
+`scripts/check-system-app-declaration.sh` (part of `make verify`), and it is the
+same check an agent should run before concluding this repo has no OS-app model.
+
 ## References
 
 - [EPIC-00 — issue #4](https://github.com/kushin77/agent-orchestrator/issues/4)

@@ -193,3 +193,96 @@ The gate is the enforcement seam for the epic's definition of done — *"a peer
 can declare itself a sub-module of this repo against a published, gated
 contract"*: the peer declares, `module.json` records the measured truth, and the
 gate refuses any claim that does not hold.
+
+## 9. The app/addon model is not here — declared, and gated (issue #945)
+
+Status: **declared and gated** (2026-09-16, issue #945). The gate is
+`scripts/check-system-app-declaration.sh`; `module.json` carries the same
+declaration as data (`os_apps`).
+
+This repository carries no `addons/`, no `apps/`, and no `category: "system"`
+app anywhere outside `vendor/` — and that absence is **correct by design, not an
+oversight**. Until this section existed, nothing said which of the two it was: a
+reader (or an agent) asking *"where is the system-app structure?"* got the same
+empty result for "by design" and for "forgotten". An undeclared exemption is not
+an exemption; it is an absence that reads as a gap.
+
+### 9.1 Which repo owns the app/addon model
+
+The **à-la-carte OS app model belongs to the OS portal host,
+`kushin77/shared-frontend`** — to no other repo, and never to this one:
+
+| Part of the model | Owner and path |
+|---|---|
+| A native app/addon | `shared-frontend` `addons/<id>/` — a default-export component (with an optional `addonNav`), wired by one dynamic import line in `shell/src/addons.ts` and one entry in `registry/modules.json` (`mount.type: native`, `mount.entry`) |
+| The mount contract | `shared-frontend` `modules/schema.json` — `mount.type ∈ iframe \| tab \| native`; the framed case talks to the shell only through the `os:*` postMessage bridge (`docs/BRIDGE.md`, ADR-0001) |
+| The one registry | `shared-frontend` `registry/modules.json`; `category: "system"` there is what marks an OS function's app |
+| The shell itself | `shared-frontend` (vendored into `kushin77/CMR` `templates/frontend/shell/`, canonical source: shared-frontend) |
+
+**This repository is a service module and hosts no OS apps.** `module.json`
+declares `type: "service"` and `class: ["backend", "service", "saas",
+"control-plane"]`, and `os_apps` records `hosts: false` with the owner above. It
+ships services, surfaces, libraries and contracts — never an `addons/<id>/`.
+A second app model invented here would be exactly the thing this section exists
+to prevent.
+
+Measured, one command each (a reader can re-take these at any time):
+
+```bash
+find . -maxdepth 2 -type d \( -name addons -o -name apps \) | grep -v vendor   # (no output)
+grep -rniE '^[[:space:]]*"category"[[:space:]]*:[[:space:]]*"system"' \
+  --include=*.json --include=*.yaml --include=*.yml . | grep -v vendor         # (no output)
+python3 -c 'import json;print(json.load(open("module.json"))["os_apps"])'
+```
+
+### 9.2 How the fleet SPoG becomes reachable
+
+The surface this epic is about — the fleet **single pane of glass** at
+`ai.purebliss.app` — is **NOT an app and NOT an addon**, in this repo or in the
+host. It is a **URL/route surface**, and both halves of making it reachable are
+owned outside this repository:
+
+| Half | Where it lives | Owner |
+|---|---|---|
+| The page and its reads | **this repo**: the static view `portal/static/views/fleet.html` reached at `GET /views/fleet.html`, plus the flag-gated API family `GET /api/fleet/*` (surface `surfaces.fleet_projection` in `infra/feature-flags/registry.yaml`, `default: off`, `promoted: false`). One front door: an unauthenticated visitor is sent to the OS auth gate, and the view verifies the shell's RS256 `os-session-token` **offline** against a mirrored JWKS | this repo (source + build + registry) |
+| The hostname `ai.purebliss.app` | The Cloudflare tunnel to the **shared-services run half** — declared in [`EDGE-CUTOVER.md`](EDGE-CUTOVER.md) (issue #731); this repo ships no hostname and no deploy | `kushin77/shared-services` |
+| An in-shell appearance, if the shell should host the fleet view inline | A **`registry/modules.json` module entry in the OS portal host**, `mount.type: iframe` framing the same-origin view above (the mount `CHAT-MOUNT.md` already chose for this repo's chat surface, issue #511); never an `addons/<id>/` addon here | `kushin77/shared-frontend` |
+
+Two precedents fix the shape, and both are recorded in this repo rather than
+invented here: the console's own hosting decision
+([`AGENTCONSOLE-HOSTING.md`](AGENTCONSOLE-HOSTING.md), issue #801) is that a
+top-level surface behind the OS SSO gate is **never an iframe**, and the chat
+mount ([`CHAT-MOUNT.md`](CHAT-MOUNT.md), issue #511) is the framed case — owned
+by the same portal, framed by the shell, `native` refused on the record. The
+shell-half work for this epic is already filed on the OS host's board
+(`kushin77/shared-frontend#483`, `#484`, `#485`, from EPIC #338), so the
+registration is that repo's work item, not a new app model here.
+
+The machine-readable half of this declaration, asserted against `module.json`
+and against the tree by the gate:
+
+<!-- system-app-declaration
+hosts_os_apps: false
+app_model_owner: kushin77/shared-frontend
+app_model_contract: modules/schema.json
+spog_view: portal/static/views/fleet.html
+spog_route: GET /views/fleet.html
+spog_surface_flag: surfaces.fleet_projection
+spog_registered_by: kushin77/shared-frontend
+spog_fronted_by: kushin77/shared-services
+-->
+
+### 9.3 Verify
+
+```bash
+bash scripts/check-system-app-declaration.sh   # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS
+python3 scripts/check-feature-flags.py         # the registry this declaration points at
+make verify
+```
+
+The gate refuses, **by name**, a deleted `os_apps` block, `hosts: true`, a
+deleted or disagreeing marker, an `addons/` directory that appears in the tree,
+a declared SPoG view or surface that does not resolve, and an `ARCHITECTURE.md`
+that no longer points at this section. It provokes each of those against a
+staged copy of its own inputs on every run, so a check that cannot fail cannot
+pass (AO-GR-4).
