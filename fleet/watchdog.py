@@ -110,6 +110,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fleet"))
 
 import channel  # noqa: E402
+import freeze  # noqa: E402  (#978 — refuse_if_frozen before every spawn)
 import lease  # noqa: E402  (#977 — single-writer lease around the tick)
 import runtime  # noqa: E402
 
@@ -127,6 +128,15 @@ WATCHDOG_LEASE_JOB = "watchdog"
 #: 2x the job's own timeout" convention) — generous enough that a slow but
 #: healthy tick never loses its own lease mid-pass.
 WATCHDOG_LEASE_TTL_SECONDS = 600.0
+
+
+class RespawnRefused(Exception):
+    """`respawn()`/`start_monitor()` refused because the fleet is frozen (#978).
+
+    Raised — not folded into the plain `False` "spawn failed" result — so a
+    caller can tell "no new dispatch started because the fleet is draining"
+    (not a failure; the tick should stay quiet) from "the spawn itself broke"
+    (a real `RESPAWN FAILED`, which trips the pass to NOT-OK)."""
 
 RUNGS = (
     ("brain", "fleet/brain.py", "fleet/brain.sh", channel.BRAIN_HEARTBEAT),
@@ -856,8 +866,13 @@ def respawn(
                 os.kill(pid, signal.SIGKILL)
             except OSError:
                 pass
+    rung = name or Path(script).stem
+    refusal = freeze.refuse_if_frozen(rung)
+    if refusal:
+        print(f"[watchdog] {refusal}", flush=True)
+        raise RespawnRefused(refusal)
     try:
-        spawn(name or Path(script).stem, ["setsid", "bash", str(ROOT / script)])
+        spawn(rung, ["setsid", "bash", str(ROOT / script)])
     except (OSError, subprocess.SubprocessError):
         return False
     return rung_came_up(pattern, pid, window=window, settle=settle)
@@ -1012,11 +1027,19 @@ def bounded_remedy(
     if state == CHECKOUT_BEHIND:
         changed, new_head, detail = fast_forward_checkout(checkout_root)
         if changed:
-            ok = respawn(pattern, script, name)
-            outcome = (
-                f"fast-forwarded the checkout ({detail}) and {'respawned' if ok else 'RESPAWN FAILED'} "
-                f"so the rung loads {new_head} (attempt {attempts}/{cap})"
-            )
+            try:
+                ok = respawn(pattern, script, name)
+                outcome = (
+                    f"fast-forwarded the checkout ({detail}) and "
+                    f"{'respawned' if ok else 'RESPAWN FAILED'} so the rung loads {new_head} "
+                    f"(attempt {attempts}/{cap})"
+                )
+            except RespawnRefused as exc:
+                ok = True
+                outcome = (
+                    f"fast-forwarded the checkout ({detail}) but did not respawn — {exc} "
+                    f"(attempt {attempts}/{cap}, not counted)"
+                )
         else:
             ok = True
             outcome = (
@@ -1024,8 +1047,12 @@ def bounded_remedy(
                 f"attempt {attempts}/{cap}"
             )
     else:
-        ok = respawn(pattern, script, name)
-        outcome = f"{'respawned' if ok else 'RESPAWN FAILED'} (attempt {attempts}/{cap})"
+        try:
+            ok = respawn(pattern, script, name)
+            outcome = f"{'respawned' if ok else 'RESPAWN FAILED'} (attempt {attempts}/{cap})"
+        except RespawnRefused as exc:
+            ok = True
+            outcome = f"REFUSED (frozen) — {exc} (attempt {attempts}/{cap}, not counted)"
 
     save_drift_record(
         name,
@@ -1096,9 +1123,13 @@ def rung_action(
         clear_drift_record(name)
         return f"{name}: healthy ({verbatim}) | {capability}"
     if force:
-        ok = respawn(pattern, script, name)
-        clear_drift_record(name)
-        return f"{name}: forced (operator asked to respawn) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
+        try:
+            ok = respawn(pattern, script, name)
+            clear_drift_record(name)
+            return f"{name}: forced (operator asked to respawn) — {'respawned' if ok else 'RESPAWN FAILED'} | {capability}"
+        except RespawnRefused as exc:
+            clear_drift_record(name)
+            return f"{name}: forced (operator asked to respawn) — REFUSED (frozen) — {exc} | {capability}"
     if state in (DRIFTED, CHECKOUT_BEHIND) and name == "sister" and run_in_flight():
         record_pending(name, state, reason, running, baseline, baseline_name, local_head, moment)
         return (
@@ -1136,6 +1167,10 @@ def start_monitor(*, window: float | None = None, settle: float | None = None) -
     Like `respawn`, a successful `Popen` is not a running monitor: a monitor that
     dies at startup must surface as `RESPAWN FAILED` so the pass exits non-zero.
     """
+    refusal = freeze.refuse_if_frozen(MONITOR_NAME)
+    if refusal:
+        print(f"[watchdog] {refusal}", flush=True)
+        raise RespawnRefused(refusal)
     try:
         spawn(MONITOR_NAME, ["setsid", "python3", str(ROOT / "fleet" / "monitor.py")])
     except (OSError, subprocess.SubprocessError):
@@ -1230,10 +1265,13 @@ def _watchdog_once_locked(force: bool) -> int:
     # and no code-drift concept, so a missing process is always restarted and a
     # present one is left alone.
     if monitor_missing():
-        ok = start_monitor()
-        print(f"[watchdog] monitor: missing — {'respawned' if ok else 'RESPAWN FAILED'}", flush=True)
-        if not ok:
-            failed = True
+        try:
+            ok = start_monitor()
+            print(f"[watchdog] monitor: missing — {'respawned' if ok else 'RESPAWN FAILED'}", flush=True)
+            if not ok:
+                failed = True
+        except RespawnRefused as exc:
+            print(f"[watchdog] monitor: missing — REFUSED (frozen) — {exc}", flush=True)
     else:
         print("[watchdog] monitor: healthy", flush=True)
     if failed:

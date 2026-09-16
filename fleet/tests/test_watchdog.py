@@ -1061,3 +1061,43 @@ def test_watchdog_once_releases_the_lease_even_on_a_failed_pass(monkeypatch):
 
     assert released == [True]
 
+
+# --- #978: refuse_if_frozen wired in before every spawn ------------------
+
+
+def test_a_missing_loop_is_not_respawned_while_frozen(monkeypatch):
+    """`refuse_if_frozen` wins before `spawn()` — the frozen fleet dispatches nothing."""
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: None)
+    monkeypatch.setattr(watchdog.freeze, "refuse_if_frozen", lambda rung: f"[{rung}] REFUSED — frozen")
+    monkeypatch.setattr(
+        watchdog, "spawn", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not spawn while frozen"))
+    )
+
+    line = watchdog.rung_action("sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "head")
+
+    assert "REFUSED (frozen)" in line
+    assert "RESPAWN FAILED" not in line
+
+
+def test_a_missing_loop_is_respawned_once_thawed(monkeypatch):
+    """Thawed: normal dispatch, unaffected by the frozen-path wiring."""
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: None)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: None)
+    monkeypatch.setattr(watchdog.freeze, "refuse_if_frozen", lambda rung: None)
+    calls = []
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name="": calls.append((script, name)) or True)
+
+    line = watchdog.rung_action("sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "head")
+
+    assert "missing" in line and calls == [("fleet/terminal.sh", "sister")]
+
+
+def test_start_monitor_refuses_while_frozen(monkeypatch):
+    monkeypatch.setattr(watchdog.freeze, "refuse_if_frozen", lambda rung: f"[{rung}] REFUSED — frozen")
+    monkeypatch.setattr(
+        watchdog, "spawn", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not spawn while frozen"))
+    )
+
+    with pytest.raises(watchdog.RespawnRefused):
+        watchdog.start_monitor()
