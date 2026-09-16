@@ -278,6 +278,7 @@ checks=(
   'audit-read-model|bash scripts/check-audit-read-model.sh'
   'gateway-catalog-parity|bash scripts/check-gateway-catalog-parity.sh'
   'guardrail-controls|bash scripts/check-guardrail-controls.sh'
+  'guardrail-head-policy|bash scripts/check-guardrail-head-policy.sh'
   # agent-identity-parity (issue #346): the shared agent-identity schema's
   # closed vocabularies must equal agent-profile.schema.json + catalog.yaml and
   # every seed must validate as a projected identity; the check mutates its own
