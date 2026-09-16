@@ -94,7 +94,8 @@ fi
 
 echo
 echo "== erp-e2e: the lane's own tri-state check =="
-check_out="$(python3 -m "$driver" check 2>&1)"
+run_dir="$root/.verify/e2e-erp"
+check_out="$(python3 -m "$driver" --out "$run_dir" check 2>&1)"
 check_rc=$?
 printf '%s\n' "$check_out" | grep -E '^  FAIL|^erp-e2e check' | sed 's/^/  /'
 case "$check_rc" in
@@ -119,6 +120,53 @@ case "$check_out" in
   *)
     fail "the composed sibling-lane control reported no coverage across the six lanes" ;;
 esac
+
+echo
+echo "== erp-e2e: the artifacts the run leaves behind are lint-clean =="
+# The repository's own `yaml-lint` (`scripts/check-yaml.py`) walks the WHOLE worktree —
+# `.verify/` included — and parses every `*.yaml`/`*.yml`. A deliberately unparseable
+# fixture therefore cannot carry a YAML suffix, or the lane reds the composite gate by
+# name. Measured: it did exactly that (`.verify/e2e-erp/flag-declarations/malformed.yaml`,
+# `yaml: 1 of 234 file(s) FAILED`), so the regression is refused here, in the lane's own
+# gate, instead of being discovered one composite run later.
+lint_out="$(
+  python3 - "$run_dir" <<'PY' 2>&1
+import os
+import sys
+
+import yaml
+
+root = sys.argv[1]
+seen = 0
+for dirpath, _dirnames, filenames in os.walk(root):
+    for name in sorted(filenames):
+        if not name.endswith((".yml", ".yaml")):
+            continue
+        seen += 1
+        path = os.path.join(dirpath, name)
+        try:
+            with open(path, encoding="utf-8") as handle:
+                yaml.safe_load(handle)
+        except yaml.YAMLError as exc:
+            print(f"NOT-YAML {path}: {exc}")
+print(f"COUNT {seen}")
+PY
+)"
+lint_rc=$?
+lint_count="$(printf '%s\n' "$lint_out" | sed -n 's/^COUNT //p')"
+if [ "$lint_rc" -ne 0 ]; then
+  fail "the run's YAML artifacts could not be linted: $lint_out"
+elif [ "${lint_count:-0}" = "0" ]; then
+  fail "the run left no .yaml artifact behind, so this measurement is vacuous"
+else
+  lint_bad="$(printf '%s\n' "$lint_out" | grep -c '^NOT-YAML' || true)"
+  if [ "$lint_bad" = "0" ]; then
+    ok "every .yaml the run left behind parses ($lint_count file(s))"
+  else
+    fail "$lint_bad .yaml artifact(s) the run left behind do not parse, and yaml-lint walks the whole worktree"
+    printf '%s\n' "$lint_out" | grep '^NOT-YAML' | sed 's/^/        /'
+  fi
+fi
 
 echo
 echo "== erp-e2e: the mutant — the console's ERP flag gate disabled =="

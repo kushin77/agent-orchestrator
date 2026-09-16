@@ -144,9 +144,18 @@ def flag_off_refused(run_dir: Path, *, repo_root: Path = REPO_ROOT, session: Con
     # The reader's fail-closed contract, provoked three ways. A surface that could be
     # switched on by a typo, a truncated write or an absent file would make the refusal
     # below invisible rather than absent, so this is measured before it is relied on.
+    #
+    # The unparseable one is named without a `.yaml`/`.yml` suffix ON PURPOSE, and that
+    # is not cosmetic: the repository's own `yaml-lint` (`scripts/check-yaml.py`) walks
+    # the whole worktree — `.verify/` included — and parses every `*.yaml`, so a fixture
+    # whose whole point is to be unparseable would red `make verify` by name. Measured:
+    # this file as `malformed.yaml` failed the gate with
+    # `yaml: 1 of 234 file(s) FAILED` on `.verify/e2e-erp/flag-declarations/malformed.yaml`.
+    # The reader under test is handed the path, so the suffix is not part of what is
+    # measured: the bytes are what must be refused.
     absent = scratch / "no-such-entry.yaml"
     absent.write_text("surfaces:\n  some_other_surface:\n    default: on\n", encoding="utf-8")
-    malformed = scratch / "malformed.yaml"
+    malformed = scratch / "malformed.declaration"
     malformed.write_text("surfaces: [\n", encoding="utf-8")
     missing = scratch / "missing.yaml"
     fail_closed = {
