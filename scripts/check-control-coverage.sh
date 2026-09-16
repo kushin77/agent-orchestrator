@@ -181,15 +181,16 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
       *) map_findings="$map_findings"$'\n'"  $label: $rule has status '$status', not ENFORCED/PARTIAL/GAP" ; continue ;;
     esac
 
-    # every named module path must exist
+    # every named module path must exist. The comma list is normalized into one value
+    # per line BEFORE the loop: a lone `read` under a comma IFS consumes the whole
+    # record and leaves every later name empty (docs/SHELL-PATTERNS.md, SP-3).
     local m
-    IFS=',' read -r -a mods <<< "$modules"
-    for m in "${mods[@]}"; do
+    while IFS= read -r m; do
       m="${m%%[[:space:]]}"; [ -n "$m" ] || continue
       if [ ! -e "$root/$m" ]; then
         map_findings="$map_findings"$'\n'"  $label: $rule names module '$m', which does not exist"
       fi
-    done
+    done < <(printf '%s\n' "$modules" | tr ',' '\n')
 
     # a non-ENFORCED rule must name no control; an ENFORCED one must name >= 1 that
     # a gate actually runs.
@@ -203,9 +204,9 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
       map_findings="$map_findings"$'\n'"  $label: $rule is $status but names no control"
       continue
     fi
+    # the same normalization for the controls list (SP-3).
     local c
-    IFS=',' read -r -a ctrls <<< "$controls"
-    for c in "${ctrls[@]}"; do
+    while IFS= read -r c; do
       c="${c%%[[:space:]]}"; [ -n "$c" ] || continue
       case "$c" in
         suite:*)
@@ -229,7 +230,7 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
           fi
           ;;
       esac
-    done
+    done < <(printf '%s\n' "$controls" | tr ',' '\n')
   done < <(part_b_rules "$spine")
 
   # a row for a rule that is not in Part B is a different rule's claim
