@@ -65,9 +65,14 @@ control-plane/instructions/
 │   ├── rendered/<role>/       #   per-tool mirrors + manifest (byte-stable proof)
 │   ├── consumer/<role>.json   #   pinned consumer states (drift-checked)
 │   └── tests/                 #   conformance for all five seats + mutation proof
+├── fleet-operator/            # the operator seat supervising hermes + paperclip
+│   ├── canonical.yaml         #   hand-authored (issue #953; not derived — registry/
+│   │                          #   PersonaCards for hermes/paperclip are out of lane)
+│   └── rendered/              #   per-tool mirrors + manifest (byte-stable proof)
 └── tests/                     # pytest suite (offline; runs the negatives too)
     ├── conftest.py
     ├── test_render_deterministic.py
+    ├── test_fleet_operator_mirrors.py
     ├── test_override_contract.py
     ├── test_drift_detector.py
     ├── test_conformance.py
@@ -264,3 +269,16 @@ modules (`registry/prompts/modules/`) rather than authored as a second copy of
 that governance.  It reuses this lane's renderer, ledger and conformance checker
 unchanged — there is no C-suite-specific render path.  See
 [`csuite/README.md`](csuite/README.md).
+
+## The Fleet Operator instruction set (`fleet-operator/`, issue #953)
+
+[`fleet-operator/`](fleet-operator/) supplies the canonical source for the
+operator seat that supervises `hermes` (the local coding/routing head,
+`gateway/providers/hermes.py`) and `paperclip` (the planning/status-report
+operator seam, `gateway/providers/paperclip.py`) — the two provider agents
+that had no rate card and no operator persona before issue #953. Unlike
+`csuite/`, it is **hand-authored, not derived**: there is no `registry/`
+PersonaCard for `hermes`/`paperclip` this lane may generate from (`registry/`
+is out of lane per the issue). It states directive flow, approval authority,
+escalation and budget checks for both agents and reuses this lane's own
+renderer/conformance checker unchanged, exactly like `csuite/` does.

@@ -70,3 +70,18 @@ module "paperclip_runtime" {
   project_id = var.project_id
   region     = var.region
 }
+
+# The fleet-cron container pair on the shared-services on-prem HA cluster
+# (issue #900, EPIC #706, lane L5 #884): 2 replicas, active-active, on nodes
+# 192.168.168.31 / .42. Count-gated on enable_fleet_cron, so with the flag OFF
+# (the committed default) this module is inert.
+module "fleet_cron" {
+  source = "./modules/fleet-cron"
+
+  count = var.enable_fleet_cron ? 1 : 0
+
+  enabled                   = var.enable_fleet_cron
+  image                     = var.fleet_cron_image
+  ssh_private_key_path      = var.fleet_cron_ssh_private_key_path
+  keydb_password_secret_ref = var.fleet_cron_keydb_password_secret_ref
+}

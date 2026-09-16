@@ -238,6 +238,11 @@ def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
         "state": state,
         "started_at": started_at,
         "commit": commit,
+        # What this build can READ on the envelope (issue #777). An emitter asks
+        # the recipient's beat before choosing a dialect, so a rung that restarts
+        # on this build switches the fleet's traffic to the current role names by
+        # declaring it here — the deprecation window's terminus is this field.
+        channel.ENVELOPE_SCHEMA_BEAT_KEY: channel.SCHEMA_VERSION_CURRENT,
         "ts": now_iso(),
     }
     HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
@@ -455,8 +460,8 @@ def build_directive(order: dict) -> dict:
     # operator remembering to say it.
     kb = "\n".join(f"  - {source}" for source in KB_SOURCES)
     directive = {
-        "from": "brain",
-        "to": "sister",
+        "from": channel.ROLE_DIRECTOR,
+        "to": channel.ROLE_DISPATCHER,
         "type": "directive",
         "correlation_id": order_reference(order),
         "task": task,
@@ -470,9 +475,14 @@ def build_directive(order: dict) -> dict:
         ),
     }
     if order.get("control") == "override" or task.get("override"):
-        # The operator's override still travels the hierarchy: the operator orders
-        # the brain, and the brain issues the control to the sister.
+        # The operator's override still travels the hierarchy: the principal orders
+        # the director, and the director issues the control to the dispatcher.
         directive["control"] = "override"
+    # Single-emit (issue #777): the dialect is the RECIPIENT's, negotiated from
+    # the dispatcher's live beat — a dispatcher still running a build from before
+    # this lane receives the retired spelling it can read, and the downgrade is
+    # recorded rather than silent.
+    channel.stamp_envelope(directive, recipient=channel.ROLE_DISPATCHER)
     message_id, nonce = directive_identity(order)
     if message_id and nonce:
         # Deterministic identity (see `directive_identity`): the same order must

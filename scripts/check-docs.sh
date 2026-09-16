@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Docs/foundation gate for `make verify` (GR-12): required files present,
 # markdown relative links resolve, product text files are free of trailing
-# whitespace, and code files carry no unfinished markers. Every branch exits
-# nonzero on failure — no-false-green (fleet doctrine).
+# whitespace, code files carry no unfinished markers, and every tracked
+# docs/*.md is indexed in docs/README.md (issue #629, EPIC #616). Every
+# branch exits nonzero on failure — no-false-green (fleet doctrine).
 #
 # Legacy extraction artifacts (MIGRATION_NOTES.md, VALIDATION.md,
 # .github/workflows/*) are preserved as-is and excluded from the whitespace
@@ -43,7 +44,9 @@
 #   bash scripts/check-docs.sh                    the full docs gate (make verify)
 #   bash scripts/check-docs.sh --markers FILE...   the marker rule ALONE, over
 #                                                  exactly the named files
-#   bash scripts/check-docs.sh --self-test         prove the rule fires BOTH ways
+#   bash scripts/check-docs.sh --self-test         prove the marker rule AND the
+#                                                  docs-index rule (issue #629)
+#                                                  each fire both ways
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -205,6 +208,204 @@ marker_self_test() {
   return "$rc"
 }
 
+repo_files() {
+  git ls-files --cached --others --exclude-standard -- "$@"
+}
+
+
+# --- 5. Docs index completeness (issue #629, EPIC #616) --------------------
+# Every tracked docs/*.md must be reachable from docs/README.md, or it is
+# discoverable only by accident (issue #608). Two escape hatches, both
+# committed here rather than left to drift:
+#   - deliberately unindexed DIRECTORIES (decision-records/, spikes/,
+#     contracts/) whose members are indexed by their own local README, not
+#     the top-level one;
+#   - a per-FILE quarantine baseline for docs that predate this gate and are
+#     not yet folded into the index, held open under issue #629 itself (this
+#     gate is hermetic/offline by design — no live GitHub call to test each
+#     entry's tracking issue for state, the `.verify/`-authority lesson of
+#     issue #764 above applies just the same to a network call here) — so
+#     "honored while open" is enforced by review, and by the STALE-ENTRY
+#     checks below catching the file once it stops needing the exemption.
+# The baseline is checked in BOTH directions: an entry for a file that no
+# longer exists, or that has since been indexed, is a FAIL too — so the list
+# is a measured snapshot, not a permanent amnesty, and cannot rot into a
+# fiction (issue #629 acceptance criteria). "Indexed" means an inline
+# `](target)` markdown link in docs/README.md; a reference-style link or a
+# bare backticked path does not count.
+idx_excluded_dirs=(
+  docs/decision-records/
+  docs/spikes/
+  docs/contracts/
+)
+
+# Quarantine baseline: tracked docs/*.md not yet indexed in docs/README.md,
+# as measured when this gate was introduced (issue #629). 31 files, held
+# open under issue #629. Remove an entry once the doc is indexed — leaving a
+# stale entry in place is itself a FAIL (see docs_index_stale below).
+idx_quarantine=(
+  docs/AGENT-IDENTITY.md
+  docs/BOARD-ATTACK-PLAN.md
+  docs/CHAT-MOUNT.md
+  docs/CODEIDX-CAPABILITY-REGISTER.md
+  docs/CONTROL-COVERAGE.md
+  docs/CROSS-REPO-LESSONS-SYNC.md
+  docs/DIAGRAMS-CAPABILITY-REGISTER.md
+  docs/EDGE-CUTOVER.md
+  docs/FLEET-CAPABILITY-DRIFT.md
+  docs/FLEET-DASHBOARD-GAP-ANALYSIS.md
+  docs/FLEET-STATE.md
+  docs/GLOSSARY.md
+  docs/GOLDEN-RULES.md
+  docs/LEASE-POLICY.md
+  docs/LIVE-DATA-BRIDGE.md
+  docs/MECHANICAL-EXECUTION-LAYER.md
+  docs/MODULE-BRIEF.md
+  docs/MODULE-REGISTRY.md
+  docs/OBSERVABILITY.md
+  docs/OPERATOR-ACCESS.md
+  docs/PORTAL-OFFLINE-DEV.md
+  docs/QA-GATE.md
+  docs/SCRATCH-SPACE-DISCIPLINE.md
+  docs/SESSION-FLEET-SYNC.md
+  docs/SHARED-SERVICES-FALLBACK.md
+  docs/SHELL-PATTERNS.md
+  docs/SURFACE-CLASS.md
+  docs/erp-finops/compliance-audit.md
+  docs/erp-finops/current-state.md
+  docs/erp-finops/saas-metrics-current-state.md
+  docs/erp-finops/token-baseline.md
+)
+
+# Every link target in docs/README.md, normalized to a repo-root-relative
+# path (links are written relative to docs/, e.g. `ARCHITECTURE.md` or
+# `../CONTRIBUTING.md`), so membership can be tested by exact path. Populates
+# the global idx_indexed associative array; called once against the real
+# docs/README.md, below.
+declare -A idx_indexed
+docs_index_build_indexed_map() {
+  local target idx_abs idx_rel
+  idx_indexed=()
+  # Without this, an unreadable docs/README.md would come back as an empty
+  # map and every doc would read as "not indexed" (loud) or, worse in
+  # --self-test, as a vacuously clean baseline (silent) — the exact failure
+  # mode the marker rule's own mutants exist to catch. CANNOT-ASSESS, not a
+  # false OK.
+  [ -r docs/README.md ] || {
+    echo 'check-docs: CANNOT-ASSESS — docs/README.md unreadable; the index cannot be tested' >&2
+    return 2
+  }
+  while IFS= read -r target; do
+    [ -z "$target" ] && continue
+    case "$target" in
+      http://*|https://*|mailto:*|ftp://*|tel:*|data:*|irc:*|\#*) continue ;;
+    esac
+    target="${target%% *}"
+    target="${target%%\"*}"
+    target="${target%%#*}"
+    [ -z "$target" ] && continue
+    idx_abs="$(realpath -m "docs/$target" 2>/dev/null)" || continue
+    idx_rel="${idx_abs#"$root"/}"
+    idx_indexed["$idx_rel"]=1
+  done < <(grep -oE '\]\([^)]*\)' docs/README.md | sed -E 's/^\]\((.*)\)$/\1/')
+}
+
+# Every tracked docs/*.md not indexed, not excluded-by-directory, and not in
+# the quarantine list named by $1 (a nameref to an array). Prints FAILs to
+# stderr and returns the count via idx_missing.
+idx_missing=0
+docs_index_missing() {
+  local -n _quarantine="$1"
+  local -A _quarantined=()
+  local idx_q idx_f idx_skip idx_d
+  for idx_q in "${_quarantine[@]+"${_quarantine[@]}"}"; do
+    _quarantined["$idx_q"]=1
+  done
+  idx_missing=0
+  while IFS= read -r idx_f; do
+    [ "$idx_f" = "docs/README.md" ] && continue
+    idx_skip=0
+    for idx_d in "${idx_excluded_dirs[@]}"; do
+      case "$idx_f" in "$idx_d"*) idx_skip=1; break ;; esac
+    done
+    [ "$idx_skip" -eq 1 ] && continue
+    [ -n "${idx_indexed[$idx_f]:-}" ] && continue
+    [ -n "${_quarantined[$idx_f]:-}" ] && continue
+    printf '  FAIL  %s (tracked doc not indexed in docs/README.md)\n' "$idx_f" >&2
+    idx_missing=$((idx_missing + 1))
+  done < <(repo_files 'docs/*.md' 'docs/**/*.md' | LC_ALL=C sort -u)
+}
+
+# The baseline named by $1, checked in BOTH directions: a FAIL for any entry
+# whose file no longer exists (gone), and a FAIL for any entry whose file IS
+# now indexed (stale amnesty). Prints FAILs to stderr and returns the count
+# via idx_stale.
+idx_stale=0
+docs_index_stale() {
+  local -n _q="$1"
+  local idx_q
+  idx_stale=0
+  for idx_q in "${_q[@]+"${_q[@]}"}"; do
+    if [ ! -f "$idx_q" ]; then
+      printf '  FAIL  %s (quarantine baseline entry no longer exists; remove it)\n' "$idx_q" >&2
+      idx_stale=$((idx_stale + 1))
+      continue
+    fi
+    if [ -n "${idx_indexed[$idx_q]:-}" ]; then
+      printf '  FAIL  %s (quarantine baseline entry is now indexed; remove it)\n' "$idx_q" >&2
+      idx_stale=$((idx_stale + 1))
+    fi
+  done
+}
+
+# The provocation (issue #629): both stale-baseline directions, over the REAL
+# indexed map, so this exercises the same idx_indexed this gate computes —
+# not a copy. A "gone" mutant (file that does not exist) and a "now indexed"
+# mutant (docs/ARCHITECTURE.md, which IS indexed today) are each appended to
+# a COPY of the real baseline; each half must move the verdict on its own,
+# or the check is vacuous.
+docs_index_self_test() {
+  local rc=0
+  echo "== the docs-index baseline rule, provoked both ways =="
+  if ! docs_index_build_indexed_map; then
+    echo 'check-docs: CANNOT-ASSESS — docs-index self-test cannot read docs/README.md' >&2
+    return 2
+  fi
+
+  local -a gone_copy=("${idx_quarantine[@]+"${idx_quarantine[@]}"}" "docs/DOES-NOT-EXIST-629.md")
+  docs_index_stale gone_copy
+  if [ "$idx_stale" -ge 1 ]; then
+    echo '  OK  a baseline entry for a file that no longer exists is refused'
+  else
+    printf 'check-docs: FAIL — a gone baseline entry was NOT refused\n' >&2
+    rc=1
+  fi
+
+  local -a indexed_copy=("${idx_quarantine[@]+"${idx_quarantine[@]}"}" "docs/ARCHITECTURE.md")
+  docs_index_stale indexed_copy
+  if [ "$idx_stale" -ge 1 ]; then
+    echo '  OK  a baseline entry for a doc that is now indexed is refused'
+  else
+    printf 'check-docs: FAIL — a now-indexed baseline entry was NOT refused\n' >&2
+    rc=1
+  fi
+
+  # The real baseline, unmutated, must be clean — proves the two mutants
+  # above are what moved the verdict, not a rule that always fires.
+  docs_index_stale idx_quarantine
+  if [ "$idx_stale" -eq 0 ]; then
+    echo '  OK  the real, unmutated baseline is clean — the mutants above are load-bearing'
+  else
+    printf 'check-docs: FAIL — the real baseline is not clean (%s stale entries)\n' "$idx_stale" >&2
+    rc=1
+  fi
+
+  if [ "$rc" -eq 0 ]; then
+    echo 'check-docs: docs-index self-test OK — the baseline rule fires both ways'
+  fi
+  return "$rc"
+}
+
 # --- verb dispatch (issue #804) ---------------------------------------------
 # The rule is provokable on its own: `--self-test` proves it fires both ways, and
 # `--markers` applies it to exactly the named files — the artefact-level mutation
@@ -228,8 +429,10 @@ case "${1:-}" in
     exit 1
     ;;
   --self-test)
-    marker_self_test
-    exit $?
+    self_test_rc=0
+    marker_self_test || self_test_rc=1
+    docs_index_self_test || self_test_rc=1
+    exit "$self_test_rc"
     ;;
   -h|--help)
     usage
@@ -251,10 +454,6 @@ esac
 # check exactly that way and blocked every automated landing (issue #764).
 # `vendor/` is a pinned submodule, listed by git as a gitlink, so its contents
 # are outside the tree by construction.
-repo_files() {
-  git ls-files --cached --others --exclude-standard -- "$@"
-}
-
 # --- 1. Required foundation + pillar files ---------------------------------
 echo "== foundation files =="
 required=(
@@ -334,6 +533,25 @@ if [ "${#mk_files[@]}" -gt 0 ]; then
   marker_scan_files "$mk_pattern" "${mk_files[@]}" || fail=$((fail + marker_hits))
 else
   echo "unfinished markers: OK"
+fi
+
+
+# --- 5. Docs index completeness (issue #629, EPIC #616) --------------------
+# Rule, baseline and mutants live above, before verb dispatch, so `--self-test`
+# exercises the SAME functions the gate runs (issue #804's own lesson).
+echo "== docs index completeness =="
+if docs_index_build_indexed_map; then
+  docs_index_missing idx_quarantine
+  docs_index_stale idx_quarantine
+  idx_fail=$((idx_missing + idx_stale))
+else
+  idx_fail=1
+fi
+if [ "$idx_fail" -ne 0 ]; then
+  printf 'docs index completeness: %s problem(s)\n' "$idx_fail" >&2
+  fail=$((fail + idx_fail))
+else
+  echo "docs index completeness: OK"
 fi
 
 # --- Summary ----------------------------------------------------------------
