@@ -1,0 +1,140 @@
+# infra/fleet/inventory.yaml — the fleet-cron image's DEPENDENCY INVENTORY.
+#
+# This file is the porting contract for `infra/fleet/Dockerfile` (issue #709,
+# EPIC #706 D1). "Package the scheduled automation into one image so it can run
+# off this box" is only honest if the list of things the image needs is written
+# down, complete in both directions, and checked against the thing it describes
+# — so this is not documentation, it is the file
+# `scripts/check-fleet-cron-image.sh` compares the image to:
+#
+#   * a package the Dockerfile installs that is NOT listed here is a refusal
+#     (the image grew a dependency nobody recorded);
+#   * a package listed here that the Dockerfile does NOT install is a refusal
+#     (the contract claims something the image does not do);
+#   * `schedule`, `rungs` and `state_roots` are re-MEASURED from the modules
+#     they describe at gate time (`fleet/cron.py`, `fleet/watchdog.py`,
+#     `fleet/runtime.py`) and compared with what is declared here, so this file
+#     cannot drift from the code it inventories.
+#
+# `derived` records the entries that the issue's own prose did not name and
+# explains why each one cannot be dropped. Each is proved load-bearing by a
+# provoked control in the gate — a one-line mutant image that removes it and
+# must be reported broken — rather than by an argument in this comment.
+schema: fleet-cron-inventory-v1
+issue: 709
+parent: 706
+
+image:
+  name: agent-fleet-cron
+  base: python:3.12-slim
+  workdir: /repo
+  entrypoint: /repo/infra/fleet/entrypoint.sh
+  build: docker build -f infra/fleet/Dockerfile -t agent-fleet-cron:dev .
+  verify: docker run --rm agent-fleet-cron:dev python3 fleet/cron.py status
+
+# 1. THE SCHEDULE — three crontab lines, and one owner for all three.
+#
+# `fleet/cron.py` is the only writer: it owns the markers (which is how a
+# foreign crontab line is never touched), the interval, the log paths and the
+# interpreter path. The image holds NO second copy of any of that; the
+# entrypoint asks the module to install. Measured at gate time against
+# `fleet/cron.MARKERS`, so adding a fourth line to the module without recording
+# it here fails the gate.
+schedule:
+  owner: fleet/cron.py
+  install: python3 fleet/cron.py install
+  lines: 3
+  markers:
+    - ao-fleet-watchdog
+    - ao-fleet-prune
+    - ao-fleet-reconcile
+
+# 2. THE RUNGS the watchdog owns (fleet/watchdog.py) — respawned when missing or
+# drifted, never restarted merely to update code. Measured against
+# `fleet/watchdog.RUNGS` + `MONITOR_PATTERN`.
+rungs:
+  owner: fleet/watchdog.py
+  scripts:
+    - fleet/brain.py
+    - fleet/terminal.py
+    - fleet/monitor.py
+
+# 3. THE STATE ROOTS. `fleet/runtime.py` namespaces the fleet's runtime
+# directory behind `AO_FLEET_DIR` (default `<repo>/.fleet`, and byte-identical
+# when unset). The claim ledger is deliberately NOT namespaced — `.board/` stays
+# at the repo root, shared, so two fleets can never claim the same issue.
+state_roots:
+  - path: /repo/.fleet
+    env: AO_FLEET_DIR
+    namespaced: true
+  - path: /repo/.board
+    env: null
+    namespaced: false
+
+# The build context deliberately EXCLUDES the state roots (see `.dockerignore`):
+# they are runtime state, and an image that baked one host's claim ledger would
+# hand every container the same stale board. The image therefore depends on the
+# exclusion and creates the paths empty. Checked as a SUBSET — another image may
+# exclude more, never less.
+context_exclusions:
+  - .board
+  - .fleet
+
+# 4. THE BINARY DEPENDENCIES, as the issue names them, plus `/usr/bin/python3`:
+# the crontab lines are written with that literal path by `fleet/cron.py`, which
+# the image does not get to change, so the image must provide it.
+binaries:
+  - python3
+  - /usr/bin/python3
+  - git
+  - gh
+  - claude
+
+# 5. PACKAGES. Every package the image installs, with the reason it is there and
+# a marker of whether it is installed at build time only. Compared BOTH ways
+# against the Dockerfile's own install lines.
+packages:
+  - install: tini
+    via: apt
+    stage: runtime
+    gives: tini
+    why: "PID 1 — reaps the rungs' orphans and forwards SIGTERM/SIGINT, so `docker stop` is a clean stop of a loop that holds a claim."
+  - install: git
+    via: apt
+    stage: runtime
+    gives: git
+    why: "every rung's branch and worktree operation."
+  - install: openssh-client
+    via: apt
+    stage: runtime
+    gives: ssh
+    why: "`git push` over ssh."
+  - install: cron
+    via: apt
+    stage: runtime
+    gives: crontab
+    why: "the `crontab` binary `fleet/cron.py` reads and writes, and the daemon the entrypoint runs in the foreground."
+  - install: ca-certificates
+    via: apt
+    stage: runtime
+    gives: null
+    why: "TLS for gh and for the pinned claude download."
+  - install: curl
+    via: apt
+    stage: build
+    gives: curl
+    why: "fetching the pinned claude release, and the GitHub CLI's apt keyring."
+  - install: gh
+    via: apt
+    stage: runtime
+    gives: gh
+    why: "the fleet's issue and PR surface — the GitHub CLI, from GitHub's own apt repository."
+  - install: claude
+    via: release
+    stage: runtime
+    gives: claude
+    why: "the subagent runner every rung dispatches to."
+    version: "2.1.270"
+    platform: linux-x64
+    url: https://downloads.claude.ai/claude-code-releases
+    integrity: sha256 from the release manifest, verified at build time

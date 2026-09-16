@@ -25,6 +25,19 @@ infra/
     registry.yaml            declarative OFF-by-default registry for every
                              service/endpoint + CI/CD trigger (single source
                              of promotion truth)
+  fleet/
+    README.md                the fleet-cron image: what it carries, what it
+                             deliberately does not, and what D2-D7 inherit
+    inventory.yaml           the DEPENDENCY INVENTORY — the porting contract the
+                             image and its gate are both held to, in both
+                             directions (see below)
+    Dockerfile               python:3.12-slim + tini + git/gh/openssh-client/cron
+                             + the pinned claude release; the checkout is COPY'd
+                             to /repo
+    entrypoint.sh            asserts the schedule by calling `fleet/cron.py
+                             install` (the ONE owner of the crontab lines), then
+                             runs; with no command it starts cron in the
+                             foreground
   terraform/
     README.md                how to read / plan / promote the environment
     versions.tf providers.tf variables.tf main.tf outputs.tf
@@ -87,8 +100,28 @@ the IaC checks introduced here:
 | shell / yaml / json / docs / secrets | `../scripts/check-*.sh` + `check-yaml.py` | n/a (always-on) |
 | feature-flags | `../scripts/check-feature-flags.py` | n/a (always-on) |
 | cloudbuild | `../scripts/check-cloudbuild.sh` | n/a (always-on) |
+| fleet-cron-image | `../scripts/check-fleet-cron-image.sh` | docker absent or its daemon unreachable (the static half still runs) |
 | terraform fmt | `../scripts/check-terraform.sh fmt` | terraform binary absent |
 | terraform validate | `../scripts/check-terraform.sh validate` | terraform binary absent, or no local provider cache (offline) |
+
+## The fleet-cron image and its inventory
+
+`infra/fleet/` packages the fleet's scheduled automation as one image (issue
+#709, EPIC #706 D1) so it can run off the box it was written on. Its list of
+needs is `fleet/inventory.yaml`, and that file is a **contract rather than a
+comment**: `scripts/check-fleet-cron-image.sh` refuses a package the Dockerfile
+installs that the inventory does not declare, refuses a listing the Dockerfile
+does not install, re-reads the schedule markers from `fleet/cron.py` and the
+rungs from `fleet/watchdog.py`, and proves that the interpreter the schedule
+names (`/usr/bin/python3`, which `fleet/cron.py` writes literally) is a path the
+image actually provides. Every one of those controls is provoked on each run,
+and the gate builds the image and runs the issue's own
+`python3 fleet/cron.py status` against it.
+
+Like every other surface here it is **declared, not clicked**, and it adds no
+Terraform resource and no service flag — it is a build artifact, so there is
+nothing to ship ON. Deployment onto a scheduler is D2-D7's work, and that is
+where the OFF-by-default flag belongs.
 
 The gate writes a verify record to `.verify/` (gitignored): `verify.log`
 (full transcript) and `attestation.json` (timestamp, host, sha, per-check
