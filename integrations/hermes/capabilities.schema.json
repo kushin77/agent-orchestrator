@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "integrations/hermes/capabilities.schema.json",
+  "title": "hermes capability tier-entry (issue #942)",
+  "description": "One projected capability's FinOps tier mapping. The projection's `tiering.capabilities` map is keyed by capability name; each value must validate against this schema, which `mapping.check_projection` enforces per entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["default_tier", "max_tier"],
+  "properties": {
+    "default_tier": {
+      "type": "string",
+      "enum": ["L0", "L1", "L2"]
+    },
+    "max_tier": {
+      "type": "string",
+      "enum": ["L0", "L1", "L2"]
+    }
+  }
+}

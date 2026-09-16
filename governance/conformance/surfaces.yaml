@@ -256,3 +256,19 @@ surfaces:
       Orphan reconciliation (AGENTS.md rule 17, issue #304): contract, a suite
       and the gate scripts/check-reconcile.sh. It owns no audit/control/schema
       artifact, so the measured rung is `pattern`.
+  - surface: hermes-integration
+    path: integrations/hermes
+    declared_class: faang
+    notes: >-
+      The hermes peer-integration surface (issue #942): the thin, read-only
+      projection of hermes's declared orchestration surface (the persona card,
+      the profile seed, the FinOps tier table and the gateway catalog row) into
+      one canonical document, bound to the hermes-agents routing service and
+      naming the gateway's Ollama namesake (gateway/providers/hermes.py) as
+      excluded (ADR-0012). Mirrors the paperclip/reporting `faang` evidence
+      set: a contract (README.md), a test suite with a negative control, the
+      mapped tiering policy (policy.py), the cross-source consistency audit
+      (audit.py), the capability-registry schema (capabilities.schema.json) and
+      the dedicated gate scripts/check-hermes-integration.sh. No live-sync
+      module, so not `elite` — declared at the rung its evidence measures,
+      never above it.
