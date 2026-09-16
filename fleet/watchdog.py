@@ -110,9 +110,23 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fleet"))
 
 import channel  # noqa: E402
+import lease  # noqa: E402  (#977 — single-writer lease around the tick)
 import runtime  # noqa: E402
 
 from governance.spawn import liveness as spawn_liveness  # noqa: E402  (#793)
+
+#: The watchdog tick's own job lease (#977, issue #706 D5). Deliberately a
+#: distinct path from `singleton.py`'s `.fleet/<rung>.lock` — those guard the
+#: long-lived brain/sister loops for their whole lifetime; this guards one
+#: `watchdog_once()` pass so two replicas of the fleet-cron pair never spawn
+#: or fast-forward the same rung at once. `AO_FLEET_LOCK_BACKEND` (default
+#: `fcntl`, GR-28) picks the backend, same as everywhere else `lease.py` is
+#: used.
+WATCHDOG_LEASE_JOB = "watchdog"
+#: 2x the bounded settle/verify window a tick can take (issue #977's "ttl =
+#: 2x the job's own timeout" convention) — generous enough that a slow but
+#: healthy tick never loses its own lease mid-pass.
+WATCHDOG_LEASE_TTL_SECONDS = 600.0
 
 RUNGS = (
     ("brain", "fleet/brain.py", "fleet/brain.sh", channel.BRAIN_HEARTBEAT),
@@ -1150,6 +1164,28 @@ def watchdog_once(force: bool = False) -> int:
     A NOT-OK verdict outranks CANNOT-ASSESS: a known failure is reported as the
     failure it is, and the unassessable rung is still named on its own line.
     """
+    # #977 (issue #706 D5): acquire the single-writer lease BEFORE any rung is
+    # acted on. Two replicas of the fleet-cron pair must never both respawn or
+    # fast-forward the same rung; the loser no-ops this pass and exits 0 — it
+    # is not an error, it means the other replica already has this tick.
+    watchdog_lease = lease.make_lease(
+        job=WATCHDOG_LEASE_JOB,
+        path=FLEET_DIR / "watchdog.lease",
+        ttl_seconds=WATCHDOG_LEASE_TTL_SECONDS,
+    )
+    if not watchdog_lease.acquire():
+        record = lease.skipped_log(
+            WATCHDOG_LEASE_JOB, backend=lease.backend_name(), detail="watchdog tick lease held elsewhere"
+        )
+        print(f"[watchdog] {json.dumps(record, sort_keys=True)}", flush=True)
+        return channel.EXIT_OK
+    try:
+        return _watchdog_once_locked(force)
+    finally:
+        watchdog_lease.release()
+
+
+def _watchdog_once_locked(force: bool) -> int:
     try:
         # Refuse a misconfigured bound BEFORE any rung is acted on: a typo must
         # not silently disarm the attempt cap that stops the runaway (#773).

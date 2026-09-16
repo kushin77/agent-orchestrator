@@ -56,10 +56,18 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import lease
 import runtime
 
 ROOT = Path(__file__).resolve().parent.parent
 FLEET_DIR = runtime.FLEET_DIR
+
+#: The prune rung's single-writer lease (#977, issue #706 D5) — two replicas of
+#: the fleet-cron pair must never prune the mailbox concurrently (one deleting
+#: an entry the other just decided to keep is the exact race this closes).
+#: `AO_FLEET_LOCK_BACKEND` (default `fcntl`, GR-28) picks the backend.
+PRUNE_LEASE_JOB = "prune"
+PRUNE_LEASE_TTL_SECONDS = 600.0  # 2x prune's own nominal execution budget (300s)
 RUNS_DIR = FLEET_DIR / "runs"
 CLAIMS_LEDGER = ROOT / ".board" / "claims.jsonl"
 
@@ -416,6 +424,31 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not fleet_dir.is_dir():
         print(f"fleet-prune: CANNOT-ASSESS — no fleet directory at {fleet_dir}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
+    # #977 (issue #706 D5): only `--apply` actually mutates the mailbox, so
+    # only `--apply` needs the single-writer lease — a dry run is a read-only
+    # plan and must leave the tree (lease file included) untouched, which the
+    # existing `test_dry_run_mutates_nothing` proves.
+    if not args.apply:
+        return _cmd_run_locked(args)
+    prune_lease = lease.make_lease(
+        job=PRUNE_LEASE_JOB,
+        path=fleet_dir / f"{PRUNE_LEASE_JOB}.lease",
+        ttl_seconds=PRUNE_LEASE_TTL_SECONDS,
+    )
+    if not prune_lease.acquire():
+        record = lease.skipped_log(
+            PRUNE_LEASE_JOB, backend=lease.backend_name(), detail="prune lease held elsewhere"
+        )
+        print(f"fleet-prune: {json.dumps(record, sort_keys=True)}")
+        return EXIT_OK
+    try:
+        return _cmd_run_locked(args)
+    finally:
+        prune_lease.release()
+
+
+def _cmd_run_locked(args: argparse.Namespace) -> int:
+    fleet_dir = _resolve_fleet_dir(args.fleet_dir)
     if args.keep_generations < 0:
         print("fleet-prune: REFUSED — --keep-generations must be >= 0", file=sys.stderr)
         return EXIT_NOT_OK

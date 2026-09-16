@@ -1007,3 +1007,57 @@ def test_the_bootstrap_verb_is_cannot_assess_on_a_checkout_it_cannot_read(tmp_pa
 
     assert rc == watchdog.channel.EXIT_CANNOT_ASSESS
     assert "CANNOT-ASSESS" in capsys.readouterr().err
+
+
+# --- #977: the watchdog tick's own single-writer lease -------------------
+
+
+def test_watchdog_once_noops_and_logs_skip_when_lease_lost(monkeypatch, capsys):
+    """A lost lease race is not a failure: the pass no-ops and exits 0 (#977)."""
+
+    class _LosingLease:
+        def acquire(self):
+            return False
+
+        def release(self):  # pragma: no cover - never reached on loss
+            raise AssertionError("release must not be called when acquire never won")
+
+    monkeypatch.setattr(watchdog.lease, "make_lease", lambda **kwargs: _LosingLease())
+    # If the pass proceeded anyway it would try to act on real rungs; make any
+    # such action fail loudly instead of silently doing partial work.
+    monkeypatch.setattr(
+        watchdog, "_watchdog_once_locked", lambda force: (_ for _ in ()).throw(
+            AssertionError("must not do any rung work when the lease was lost")
+        )
+    )
+
+    rc = watchdog.watchdog_once()
+
+    assert rc == watchdog.channel.EXIT_OK
+    out = capsys.readouterr().out
+    assert '"status": "skipped"' in out
+    assert '"job": "watchdog"' in out
+
+
+def test_watchdog_once_releases_the_lease_even_on_a_failed_pass(monkeypatch):
+    """The lease is released in a `finally`, even when the guarded pass raises."""
+
+    released = []
+
+    class _WinningLease:
+        def acquire(self):
+            return True
+
+        def release(self):
+            released.append(True)
+
+    monkeypatch.setattr(watchdog.lease, "make_lease", lambda **kwargs: _WinningLease())
+    monkeypatch.setattr(
+        watchdog, "_watchdog_once_locked", lambda force: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+
+    with pytest.raises(RuntimeError):
+        watchdog.watchdog_once()
+
+    assert released == [True]
+
