@@ -1,0 +1,29 @@
+# Importable Cloud Build push trigger for the web-surface image build
+# (infra/cloudbuild/web-image.yaml) — issue #606/#607.
+#
+# Ships DISABLED (GR-5 / flag-gated OFF): nothing builds or pushes until a
+# reviewed go-live imports this trigger with `disabled: false`. Building the
+# image is a prerequisite for, but is not itself, the phase 7 promotion of
+# `services.web` / `services.portal` (infra/rollout/go-live-plan.yaml) — the
+# built image only fills the `web-surface.image` Terraform placeholder
+# (infra/terraform/modules/web-surface/variables.tf `image`); the surface
+# itself stays inert (`enabled: false`) until phases 1-6 have gone live and
+# phase 7 is promoted through infra/rollout/stage-model.yaml (off -> canary ->
+# gradual -> full), each transition with verify_green + approval_code +
+# audit_record.
+#
+# The trigger fires on push to master so the built image tracks the reviewed
+# commit that produced it ($SHORT_SHA), never a human-picked tag.
+name: control-plane-web-image
+disabled: true
+description: Flag-gated build+push of the web-surface (portal) image to Artifact Registry.
+github:
+  owner: kushin77
+  name: agent-orchestrator
+  push:
+    branch: ^master$
+filename: infra/cloudbuild/web-image.yaml
+substitutions:
+  _AR_REPO: us-central1-docker.pkg.dev/purebliss-ghl/ao-images
+  _IMAGE: portal
+  _TAG: $SHORT_SHA

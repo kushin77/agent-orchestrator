@@ -202,7 +202,14 @@ def test_the_real_port_reads_a_silent_death_as_unassessed(tmp_path, monkeypatch)
 
 
 def test_the_real_port_records_the_attestation_when_the_gate_admits(tmp_path, monkeypatch):
-    """Demanded case 3, end to end: rc 0 records the green attestation for the head."""
+    """Demanded case 3, end to end: rc 0 records the green attestation for the head.
+
+    The record also carries **where** it was measured (``source``). That is not
+    decoration: since #786 a green record can be produced from the lane *or*
+    re-measured from the commit once the lane is gone, and the two are only
+    distinguishable if the record says which one it was. The invariant is unchanged —
+    it is still the verified head that must be named, which is the line below.
+    """
     _worktree, head = _scratch_root(tmp_path)
     _stub_gate(tmp_path, monkeypatch, "passed")
 
@@ -210,7 +217,7 @@ def test_the_real_port_records_the_attestation_when_the_gate_admits(tmp_path, mo
 
     assert detail == f"verify green at {head[:12]}"
     journal = json.loads(journal_path(LANE_ISSUE, tmp_path).read_text(encoding="utf-8"))
-    assert journal["verify"] == {"ok": True, "commit": head}
+    assert journal["verify"] == {"ok": True, "commit": head, "source": "lane"}
 
 
 def test_the_real_port_retries_a_park_and_records_every_attempt(tmp_path, monkeypatch):

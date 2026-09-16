@@ -138,7 +138,7 @@ def gateway_record(
     tenant_id: str = "acme",
     agent_id: Optional[str] = "coder-1",
     provider: str = "anthropic",
-    model: str = "claude-sonnet-4-5",
+    model: str = "claude-sonnet-5",
     outcome: str = "success",
     input_tokens: int = 800,
     output_tokens: int = 200,

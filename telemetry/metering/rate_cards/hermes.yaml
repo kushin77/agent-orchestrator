@@ -1,0 +1,29 @@
+# telemetry/metering rate card — Hermes (local agent-service, Ollama-compatible)
+#
+# POINT-IN-TIME USD list prices per 1,000,000 tokens.  Hermes is the vendored
+# agent-routing / capability-registry / model-tiering module
+# (vendor/CMR/catalog/modules/hermes-agents, issue #124); its provider adapter
+# (gateway/providers/hermes.py) inherits OllamaProvider because its local
+# inference endpoint speaks the Ollama-compatible /api/chat wire shape
+# (requires_key=False — gateway/providers/config.py `configs["hermes"] =
+# _replace(configs["hermes"], requires_key=False)`), and the frozen EPIC #253
+# team mapping (hermes -> hermes/ollama) makes local Ollama its terminal
+# fallback. Same local-hop economics as ollama.yaml, so hermes3 is priced at
+# an EXPLICIT $0.00 per 1M tokens (a deliberate rate-card decision, flagged
+# `local: true`) — NOT an "unknown model" silent-zero. Local calls still
+# count as metered usage (tokens, calls) so the SaaS can account for
+# self-hosted capacity and the cloud->local fallback path without
+# fabricating a cloud price.
+#
+# Model id: hermes3 — the only tier mapping in
+# providers.config.default_provider_configs()["hermes"].model_map (LOW/MED/
+# HIGH/MAX all resolve to "hermes3").
+schemaVersion: 1
+provider: hermes
+note: "Local Hermes agent-service (Ollama-compatible /api/chat), USD per 1M tokens (explicit $0 local price). Point-in-time 2026-09."
+models:
+  hermes3:
+    local: true
+    standard:
+      inputUsdPerMillion: 0.0
+      outputUsdPerMillion: 0.0

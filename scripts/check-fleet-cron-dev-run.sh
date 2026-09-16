@@ -46,7 +46,14 @@
 #   other, and a control that fails because a sibling is running is not a
 #   control. The numbers differ; the mechanism is the one the file ships.
 #
-# THE TWO THINGS THIS BOX DOES TO A CONTAINER, BOTH MEASURED
+#   THE CONTAINER NAME AND THE COMPOSE PROJECT ARE DERIVED THE SAME WAY, and
+#   the project name is the one that mattered (issue #939): compose groups by
+#   PROJECT, not by container name, so two lanes sharing the file's constant
+#   `name: agent-fleet-cron` had the second lane's `up -d` RECREATE — i.e.
+#   destroy — the first lane's container. Measured 2026-09-16; see the block
+#   above COMPOSE_PROJECT_NAME below.
+#
+# THE THREE THINGS THIS BOX DOES TO A CONTAINER, ALL MEASURED
 #   1. a bridge container cannot resolve DNS, so the BUILD borrows the host's
 #      resolution (`--network=host`) — D1 measured this, and this gate probes it
 #      on every run rather than assuming it;
@@ -58,6 +65,12 @@
 #      failing the dev run for the host's defect: it probes the capability with a
 #      trivial container FIRST, then makes the issue's own request from
 #      whichever side can make it, and reports which side that was.
+#   3. **two lanes running this gate used to share one compose project**, so one
+#      lane's `up -d`/`down` removed the other's container mid-run and made five
+#      assertions fail together (issue #939). The project is now derived from
+#      this gate's pid, and asserted to be (see the `compose project is its own`
+#      control) — so a regression of that isolation fails BY NAME rather than
+#      turning into a phantom dev-run failure.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
@@ -116,6 +129,32 @@ live_port=$((20000 + $$ % 20000))
 containers_to_remove=()
 images_to_remove=()
 snapshot=""
+
+# --- the compose PROJECT is per-run too (issue #939) ------------------------
+# The container NAME and the published PORT were already derived from this
+# gate's own pid — but compose groups containers by PROJECT, not by container
+# name, and the compose file declares a CONSTANT project (`name: agent-fleet-cron`).
+# Two lanes running this gate at once therefore shared one project, and the
+# second lane's `up -d` printed `Container <lane A> Recreate / Recreated`:
+# it DESTROYED the first lane's container, and `down` then removed the shared
+# network. Measured 2026-09-16 (two lanes, one box, same file).
+#
+# The first lane's remaining assertions then failed TOGETHER — `docker exec` on
+# a container that no longer existed read `answered 0, not 404`, its `dev-run:`
+# log lines were gone (so no `dry-run` line and no `UNTOUCHED` line), and the
+# healthcheck and the exit code both read `unknown` — while every assertion that
+# had already run (`up -d`, the verdict, `/healthz` 200) passed. That is issue
+# #939 exactly, and it is why #939 was red only when a sibling lane was running
+# `make verify` at the same time.
+#
+# The gate's own principle — stated above the port, and the reason the port is
+# derived rather than fixed — is that "a control that fails because a sibling is
+# running is not a control". The project name was the one identifier compose
+# groups by that did not honour it. COMPOSE_PROJECT_NAME overrides the file's
+# `name:` (measured: the file resolves to `agent-fleet-cron`, and to this value
+# once the variable is set), so every compose call below — `config`, `up`,
+# `stop`, `down`, `logs` — is now scoped to *this* run.
+export COMPOSE_PROJECT_NAME="ao-710-dev-run-gate-$$"
 
 cleanup() {
   local container
@@ -505,7 +544,26 @@ elif case == "env-contract-not-called":
 elif case == "decision-in-a-state-root":
     patch(dev_run, 'DECISION_RELATIVE = Path(".verify/dev-run/decision.json")', 'DECISION_RELATIVE = Path(".fleet/dev-run/decision.json")')
 elif case == "health-path-drift":
-    patch(image / "healthz.py", 'HEALTH_PATH = "/healthz"', 'HEALTH_PATH = "/health"')
+    # The path declaration has TWO shapes in this tree's history, and the
+    # mutation must LAND against whichever the tree ships — otherwise the control
+    # silently stops measuring anything and the gate degrades to CANNOT-ASSESS
+    # rather than reporting a finding. Measured while rebasing #939 onto #909
+    # (D4): that commit replaced the bare literal with a tuple whose FIRST entry
+    # is the canonical path, the old anchor missed, and this gate went from OK to
+    # `CANNOT-ASSESS — the mutation for health-path-drift did not land`.
+    #
+    # Both shapes are mutated to the SAME property — the surface answers
+    # something other than '/healthz' — so the rule that catches them is
+    # unchanged and still load-bearing.
+    drift = image / "healthz.py"
+    if 'HEALTH_PATH = "/healthz"' in drift.read_text():
+        patch(drift, 'HEALTH_PATH = "/healthz"', 'HEALTH_PATH = "/health"')
+    else:
+        patch(
+            drift,
+            'HEALTH_PATHS = ("/healthz", "/health")',
+            'HEALTH_PATHS = ("/health", "/healthz")',
+        )
 elif case == "env-port-drift":
     # ONLY the contract's default moves: the inventory keeps the port it declares,
     # so the finding checked here is the drift BETWEEN the two declarations and
@@ -614,6 +672,31 @@ if docker build "${build_network[@]}" -f "$IMAGE_DIR/Dockerfile" -t "$gate_image
   ok "the image builds from the repository root ($(docker image inspect --format '{{.Size}}' "$gate_image" 2>/dev/null) bytes)"
 else
   bad "the image does not build: $(tail -3 "$work/build.log" | tr '\n' ' ')"
+fi
+
+# --- this run's compose project is its OWN (issue #939) --------------------
+# A control, not a formality: if the export above is removed the project
+# resolves back to the file's shared `agent-fleet-cron`, two lanes share it
+# again, and this assertion names that. `--format json` is compose v2's own
+# view of the project, so what is asserted is what compose will group by.
+#
+# `${COMPOSE_PROJECT_NAME:-<unset>}` rather than the bare variable: this script
+# runs under `set -u`, so the first version of this control died with
+# `COMPOSE_PROJECT_NAME: unbound variable` instead of reporting the finding in
+# its own words (measured by provoking exactly that). A control that crashes
+# still exits non-zero, but a crash does not NAME the regression, and naming it
+# is the whole point of the assertion.
+expected_project="${COMPOSE_PROJECT_NAME:-<unset>}"
+resolved_project="$(docker compose -f "$COMPOSE" config --format json 2>/dev/null \
+  | python3 -c 'import json, sys
+try:
+    print((json.load(sys.stdin) or {}).get("name", ""))
+except Exception:
+    print("")' 2>/dev/null)"
+if [ "$resolved_project" = "$expected_project" ]; then
+  ok "this gate's compose project is its own ($resolved_project), not the file's shared 'agent-fleet-cron'"
+else
+  bad "the gate's compose project resolved to '${resolved_project:-none}', not '$expected_project' — a concurrent lane would share that project, and its own \`up -d\` would recreate — i.e. destroy — this gate's container mid-run"
 fi
 
 # --- the default port, without starting anything ---------------------------

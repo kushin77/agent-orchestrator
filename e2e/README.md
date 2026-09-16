@@ -70,6 +70,58 @@ transport rig — no keys, no network.
 
 ---
 
+### 1.1 The go-live delivery path (issue #955)
+
+`e2e/golden_path.py` above proves the *platform* journey. `e2e/go_live_delivery.py`
+proves the *delivery* journey EPIC #607 is about: the **ordered, owner-gated
+go-live run** (`infra/rollout/`) reaching the live state that makes the **real
+portal** serve the fleet projection to an authenticated client. Before this file
+nothing ran the rollout half and the serving half in sequence — `grep -rln
+'go_live\|go-live' scripts/ e2e/` and `grep -rln 'infra.rollout' e2e/` were both
+empty — so the ladder could reach every stage it declared and still leave the
+SPoG dark, with no test to notice.
+
+`e2e/tests/test_go_live_delivery.py` asserts each stage. Every artifact of the run
+lands in a sandbox **root** (the driver and CLI resolve everything through
+`<root>/infra/rollout`), and the suite asserts the checkout is byte-identical
+afterwards:
+
+| Stage | Real API consumed | What is proven |
+|---|---|---|
+| `declared` | `infra.rollout.cli validate`, `go_live.py --preflight` | the run is ordered and lawful, and the driver names the owner-gated transitions |
+| `refused` | `go_live.py` with no gate inputs | rc 1 **and nothing written** (sandbox tree byte-identical) |
+| `promoted` | `go_live.py`'s `GoLiveDriver` | the declared 24h hold defers `gradual -> full`; with the owner's approval-as-code every planned flag reaches its `go_live_stage`; each live-state entry names an `audit_record` that exists and the hash-chained log verifies |
+| `served` | `portal.server.app.build_app` | with the promoted state an authenticated client reads `200` carrying the console's *own* projection (`repo`, rungs, row schema, the authz adapter's sections); anonymous reads `401` |
+| `dark` | the same app, the shipped declaration | `404 feature_disabled` **before authN**: an unpromoted surface is absent, not merely unauthorised |
+| `rolled-back` | `infra.rollout.cli rollback` + `portal/server/surface_state.py` | the ladder's rollback returns it to the declared rollback target, and the runtime overlay takes it dark while the declaration still says `on` — the round trip is proven by clearing it and reading `200` again. No commit either way |
+
+The stage that ties promotion to serving is explicit and derivable: the ladder
+records a **flag's** stage in `live-state.yaml`, the portal reads a **surface's**
+declaration in `infra/feature-flags/registry.yaml`, and `project_registry()`
+applies the coupling the reviewed promotion makes — a surface whose flag the run
+recorded above `off` is declared `on`; every other surface keeps the value it
+ships with. It is the same one-value edit `scripts/portal-dev-session.py` makes by
+hand and `e2e/erp/golden_path.py` makes for the ERP module; this one derives
+*which* surfaces from the run's own record instead of taking a name.
+
+`negative_controls()` provokes five refusals against the real gate, ledger,
+driver and validator — each control passes only when the guard genuinely blocks,
+and records the exact refusal it produced. The fifth is a **mutation of the
+probe's own predicate**: `serves_the_client` is fed the unpromoted observation
+through a weakened predicate (`answers_at_all`) and must return a *different*
+verdict, which is what proves "served" is not merely "the route answered".
+
+```bash
+python3 -m e2e.go_live_delivery --out /tmp/go-live-delivery.json   # the evidence, as JSON
+```
+
+Offline by construction (no network, sockets, docker, keys or GCP call) with one
+documented exception: the declared `gradual` dwell is 24h, so the second pass is
+driven with the driver's own `now` field moved past the recorded hold (no
+sleeping, no faked timestamp — the advance is recorded in the evidence).
+
+---
+
 ## 2. Negative controls (no-false-green)
 
 `e2e/negative_controls.py` runs one check per guard. A check **passes only

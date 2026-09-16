@@ -33,7 +33,7 @@ MONTH = "2026-09"
 DAY = "2026-09-08"
 
 # Rate-card prices the assertions below are derived from (per 1M tokens):
-# anthropic/claude-sonnet-4-5 = 3.00 in; gemini/gemini-2.5-pro = 1.25 in
+# anthropic/claude-sonnet-5 = 3.00 in; gemini/gemini-2.5-pro = 1.25 in
 # (2.50 in once the prompt passes 200k); deepseek/deepseek-chat = 0.27 in;
 # ollama/llama3.2 = an explicit, card-declared $0 local rate.
 SONNET_1M_USD = 3.00
@@ -47,7 +47,7 @@ def _record(
     tenant: str = "acme",
     agent: str = "coder-1",
     provider: str = "anthropic",
-    model: str = "claude-sonnet-4-5",
+    model: str = "claude-sonnet-5",
     input_tokens: int,
     output_tokens: int = 0,
     cost_usd: float | None,
@@ -242,7 +242,7 @@ def test_live_cost_budget_and_usage_per_agent_is_served(tmp_path: Path):
 # --------------------------------------------------------------------------- #
 def test_spend_alert_fires_on_breach(tmp_path: Path):
     store = tmp_path / "metering.jsonl"
-    # 50M input tokens on claude-sonnet-4-5 = $150, past acme's $120 hard cap
+    # 50M input tokens on claude-sonnet-5 = $150, past acme's $120 hard cap
     append_records(
         store, [_record(input_tokens=50_000_000, cost_usd=150.0, n=1)]
     )

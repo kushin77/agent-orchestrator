@@ -1,0 +1,36 @@
+# .gitattributes — git-config boilerplate (issue #624, EPIC #616).
+#
+# WHY THIS EXISTS
+#   Measured 2026-09-14 (issue #608 gap analysis, docs/GIT-TEMPLATES-GAP-ANALYSIS.md):
+#   no `.gitattributes` existed, so line-ending normalization and
+#   generated/state-path marking were per-editor convention, not enforced.
+#   `scripts/check-git-config.sh` (issue #624) checks this file exists and is
+#   sane; it does not re-derive these rules, so this file is the declaration.
+
+# --- normalization ----------------------------------------------------------
+# Let git decide text vs binary per-file and normalize line endings to LF in
+# the repository, converting to the platform's native line ending on checkout.
+* text=auto
+
+# Shell scripts and Python must always be LF (a CRLF shebang line breaks exec).
+*.sh text eol=lf
+*.py text eol=lf
+Makefile text eol=lf
+
+# --- explicit binary types this repo has -----------------------------------
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ico binary
+
+# --- generated / runtime-state paths ----------------------------------------
+# Mirrors the runtime-state declaration in scripts/check-gitignore.sh
+# (issue #625): these paths are generated/runtime output, not authored
+# source, so a diff viewer (and GitHub's linguist) should not treat them as
+# reviewable prose.
+.verify/** linguist-generated=true
+*.pyc linguist-generated=true linguist-vendored=true
