@@ -117,7 +117,11 @@ services:
       not yet read it, so today the switch is a declared kill-switch surface
       only, not a live gate on the in-process adapter — enforcing it in the
       gateway is follow-up work, not claimed here. Inert until a reviewed
-      go-live promotes this flag.
+      go-live promotes this flag. It declares no dedicated health-probe path
+      (unlike paperclip's GET /api/health): the health layer
+      (gateway/health/fallback.py) tracks hermes as a provider rung whose
+      outcomes are recorded by the caller, and its only declared endpoint is
+      the Ollama-compatible POST /api/chat chat surface above.
   chat:
     default: off
     promoted: false
