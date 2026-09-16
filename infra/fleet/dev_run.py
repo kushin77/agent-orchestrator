@@ -82,12 +82,20 @@ EPIC = 706
 
 @dataclass(frozen=True)
 class Role:
-    """One scheduled job, and the dry-run form of it (empty when there is none)."""
+    """One scheduled job, and the dry-run form of it (empty when there is none).
+
+    ``interpreter`` is what runs ``argv``'s first element: `sys.executable` for
+    every Python-owned role, ``("bash",)`` for the reap role, which shells out to
+    a `.sh` tool (`scripts/prune-worktrees.sh`) rather than a Python module. A
+    role that hard-coded `sys.executable` would launch a shell script through the
+    Python interpreter, which is not a dry run of it — it is a syntax error.
+    """
 
     marker: str
     name: str
     argv: tuple[str, ...]
     why: str
+    interpreter: tuple[str, ...] = (sys.executable,)
 
     @property
     def disposition(self) -> str:
@@ -121,6 +129,14 @@ ROLES: tuple[Role, ...] = (
         name="reconcile",
         argv=("governance/reconcile/cli.py", "watch", "--once"),
         why="one reconciliation pass, without `--apply`: it names the orphans it would act on.",
+    ),
+    Role(
+        marker="ao-fleet-reap",
+        name="reap",
+        argv=("scripts/prune-worktrees.sh",),
+        why="the worktree reaper (#207/#516, scheduled by #830/#901) reports without acting by "
+        "default; `--apply` is what removes a worktree, and this run never passes it.",
+        interpreter=("bash",),
     ),
 )
 
@@ -360,7 +376,7 @@ def check_no_apply() -> list[str]:
 
 def dispatch(role: Role, repo: Path, environment: dict, timeout: int) -> dict:
     """Run one role, bounded, and record what it said (tail) and how it ended."""
-    argv = [sys.executable, *role.argv]
+    argv = [*role.interpreter, *role.argv]
     started = time.time()
     record = {
         "marker": role.marker,

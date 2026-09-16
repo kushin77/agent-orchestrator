@@ -12,20 +12,40 @@ hand-edited.
     python3 fleet/cron.py render                    # print the rendered crontab
     python3 fleet/cron.py install [--interval 2]    # add/refresh the fleet lines
     python3 fleet/cron.py reconcile [--apply]       # report and heal drift (dry-run first)
+
+* the **watchdog** line — every N minutes it runs `fleet/watchdog.py run`, which
+  respawns a missing/stale/drifted rung and does nothing when the fleet is
+  healthy; and
+* the **prune** line — once a day it runs `fleet/prune.py run --apply`, which
+  ages out the answered mailbox entries and rotates the append-only ledgers so
+  `.fleet/` cannot grow without bound (issue #280); and
+* the **reap** line — once a day it runs `scripts/prune-worktrees.sh --apply`,
+  which reclaims stale LANE WORKTREES (issue #207, #516) so the pile that #516
+  measured does not silently rebuild (issue #830). The tool itself is fail
+  closed — claimed, dirty, in-use and unpreserved worktrees are always kept —
+  so scheduling it daily is the whole fix; nothing here re-implements its
+  judgment.
+
+Cron is the code-native automation this repo sanctions (no GitHub Actions,
+GR-15); the same lines are how the fleet survives a reboot or a crashed loop —
+and how its own runtime state stays bounded — without a human.
+
     python3 fleet/cron.py status                    # what is installed, and recent logs
     python3 fleet/cron.py enable / disable          # toggle without deleting
     python3 fleet/cron.py run                        # run the watchdog once, now
     python3 fleet/cron.py respawn                    # force-respawn the rungs
     python3 fleet/cron.py prune [--apply]            # run the pruner once (dry-run first)
+    python3 fleet/cron.py reap [--apply]             # run the worktree reaper once (dry-run first)
     python3 fleet/cron.py uninstall                  # remove the fleet lines
 
 Each line is identifiable by its trailing marker (`# ao-fleet-watchdog`,
-`# ao-fleet-prune`, `# ao-fleet-reconcile`), the same convention the other cron
-jobs on this box use, so `uninstall` removes exactly these jobs and
-`status`/`disable`/`enable` act on them alone — a foreign crontab line is never
-touched. Every job is a singleton: the rendered line wraps its command in
-`flock -n -E 99 <lock>` (a unique lock file per job), so a tick that overlaps a
-still-running predecessor exits 99 (skipped) rather than piling up.
+`# ao-fleet-prune`, `# ao-fleet-reconcile`, `# ao-fleet-reap`), the same
+convention the other cron jobs on this box use, so `uninstall` removes exactly
+these jobs and `status`/`disable`/`enable` act on them alone — a foreign
+crontab line is never touched. Every job is a singleton: the rendered line
+wraps its command in `flock -n -E 99 <lock>` (a unique lock file per job), so
+a tick that overlaps a still-running predecessor exits 99 (skipped) rather
+than piling up.
 """
 
 from __future__ import annotations
@@ -56,7 +76,16 @@ PRUNE_SCHEDULE = "23 4 * * *"
 RECONCILE_MARKER = "ao-fleet-reconcile"
 RECONCILE_LOG = runtime.FLEET_DIR / "reconcile.log"
 
-# The fourth job the manifest declares, ship-gated OFF (issue #241): refreshing
+# The worktree reaper (issue #830, closing the gap #516 left open) is the
+# fourth marked line: daily, like prune, because a worktree pile grows on the
+# scale of a day's lanes, not a watchdog tick. It shells out to
+# `scripts/prune-worktrees.sh`, the tool #207/#516 already shipped — this
+# module adds no second copy of its reclaim policy, only the schedule.
+REAP_MARKER = "ao-fleet-reap"
+REAP_LOG = runtime.FLEET_DIR / "reap.log"
+REAP_SCHEDULE = "47 3 * * *"
+
+# The fifth job the manifest declares, ship-gated OFF (issue #241): refreshing
 # the committed board snapshot is the one network-touching cron path, so it does
 # not change installed behaviour until an operator flips `enabled: true`.
 SNAPSHOT_REFRESH_MARKER = "ao-fleet-snapshot-refresh"
@@ -65,7 +94,7 @@ SNAPSHOT_REFRESH_MARKER = "ao-fleet-snapshot-refresh"
 #: inventory (`infra/fleet/inventory.yaml`) re-measures. A disabled job's marker
 #: is deliberately NOT here: it is declared in the manifest and recognised by the
 #: reconciler (so a stale line for it is removed), but never installed.
-MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER)
+MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, REAP_MARKER)
 
 #: Every marker this module has ever owned, enabled or not. `_is_ours` matches
 #: against these so `uninstall`/`reconcile` remove a line whose job is now
@@ -109,6 +138,16 @@ _LEGACY_JOBS = (
         "user": "",
         "log": "reconcile.log",
         "singleton": True,
+        "enabled": True,
+    },
+    {
+        "name": "reap",
+        "marker": REAP_MARKER,
+        "schedule": REAP_SCHEDULE,
+        "command": "bash scripts/prune-worktrees.sh --apply",
+        "user": "",
+        "log": "reap.log",
+        "singleton": False,
         "enabled": True,
     },
 )
@@ -271,6 +310,19 @@ def _marker_of(entry: str) -> str:
         if entry.rstrip().endswith(f"# {marker}"):
             return marker
     return ""
+
+
+def reap_line() -> str:
+    """The worktree-reap line: daily, applying, shelling out to the tool #207 shipped.
+
+    `prune-worktrees.sh` is fail-closed on its own (claimed/dirty/in-use/
+    unpreserved worktrees are always kept), so `--apply` here is safe on the
+    same grounds the daily prune line already relies on.
+    """
+    return (
+        f"{REAP_SCHEDULE} cd {ROOT} && bash scripts/prune-worktrees.sh --apply "
+        f">> {REAP_LOG} 2>&1 # {REAP_MARKER}"
+    )
 
 
 def _is_ours(entry: str) -> bool:
@@ -477,6 +529,14 @@ def cmd_prune(args: argparse.Namespace) -> int:
     return subprocess.call(command, cwd=ROOT)
 
 
+def cmd_reap(args: argparse.Namespace) -> int:
+    """Run the worktree reaper once, now — dry-run unless `--apply` is passed."""
+    command = ["bash", str(ROOT / "scripts" / "prune-worktrees.sh")]
+    if args.apply:
+        command.append("--apply")
+    return subprocess.call(command, cwd=ROOT)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-cron", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -498,6 +558,9 @@ def build_parser() -> argparse.ArgumentParser:
     prune = sub.add_parser("prune", help="run the .fleet retention job once (dry-run unless --apply)")
     prune.add_argument("--apply", action="store_true", help="perform the prune (default: dry-run)")
     prune.set_defaults(func=cmd_prune)
+    reap = sub.add_parser("reap", help="run the stale-worktree reaper once (dry-run unless --apply)")
+    reap.add_argument("--apply", action="store_true", help="perform the reap (default: dry-run)")
+    reap.set_defaults(func=cmd_reap)
     return parser
 
 

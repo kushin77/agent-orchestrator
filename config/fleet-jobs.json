@@ -35,6 +35,16 @@
       "enabled": true
     },
     {
+      "name": "reap",
+      "marker": "ao-fleet-reap",
+      "schedule": "47 3 * * *",
+      "command": "bash scripts/prune-worktrees.sh --apply",
+      "user": "",
+      "log": "reap.log",
+      "singleton": false,
+      "enabled": true
+    },
+    {
       "name": "snapshot-refresh",
       "marker": "ao-fleet-snapshot-refresh",
       "schedule": "*/10 * * * *",

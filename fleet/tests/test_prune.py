@@ -375,10 +375,11 @@ def test_install_adds_every_managed_line_and_keeps_foreign_ones():
     foreign = "0 * * * * /usr/bin/true # someone-else"
     merged = cron.install_lines([foreign, cron.line(2)], 2)
     assert foreign in merged, "a foreign crontab line was dropped"
-    assert merged[-1] == cron.reconcile_line(2)
-    assert merged[-2] == cron.prune_line()
-    assert merged[-3] == cron.line(2)
-    assert len([entry for entry in merged if cron._is_ours(entry)]) == 3
+    assert merged[-1] == cron.reap_line()
+    assert merged[-2] == cron.reconcile_line(2)
+    assert merged[-3] == cron.prune_line()
+    assert merged[-4] == cron.line(2)
+    assert len([entry for entry in merged if cron._is_ours(entry)]) == 4
 
 
 def test_install_is_idempotent():

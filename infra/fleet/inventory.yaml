@@ -43,11 +43,12 @@ image:
 schedule:
   owner: fleet/cron.py
   install: python3 fleet/cron.py install
-  lines: 3
+  lines: 4
   markers:
     - ao-fleet-watchdog
     - ao-fleet-prune
     - ao-fleet-reconcile
+    - ao-fleet-reap
 
 # 2. THE RUNGS the watchdog owns (fleet/watchdog.py) — respawned when missing or
 # drifted, never restarted merely to update code. Measured against
@@ -179,3 +180,8 @@ dev_run:
       discipline: dry-run
       command: "governance/reconcile/cli.py watch --once"
       why: "one reconciliation pass without --apply: it names the orphans it would act on."
+    - marker: ao-fleet-reap
+      role: reap
+      discipline: dry-run
+      command: "scripts/prune-worktrees.sh"
+      why: "the worktree reaper (#207/#516, scheduled by #830/#901) is a report by default; --apply is what removes anything."
