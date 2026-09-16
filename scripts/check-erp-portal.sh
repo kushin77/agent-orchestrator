@@ -431,9 +431,9 @@ PY_MUTATE
       named="$(grep -E '^  FAIL' "$scratch/mutant.log" || true)"
       if [ "$mutant_rc" -eq 0 ]; then
         problem "neutering the flag gate left the driver green — the flag gate is not what withholds the surface"
-      elif ! printf '%s' "$named" | grep -q 'feature_disabled'; then
-        problem "the mutant went red but named no probe about the flag gate: $(printf '%s' "$named" | head -1)"
-      elif printf '%s' "$named" | grep -vq 'feature_disabled'; then
+      elif [[ "$named" != *feature_disabled* ]]; then
+        problem "the mutant went red but named no probe about the flag gate: $(printf '%s' "$named" | head -n 1)"
+      elif [ -n "$(printf '%s\n' "$named" | grep -v 'feature_disabled')" ]; then
         problem "the mutant reddened an unrelated probe too, so it does not name the gate it removed"
       else
         note "the mutant goes red on that probe and on no unrelated one:"
