@@ -1,0 +1,38 @@
+# Owner-committed dispatch queue (issue #928, seeded from the "Owner queue
+# 2026-09-16" comment on #878).
+#
+# Schema:
+#   waves: an ordered list of {name, issues}. Issues are the owner's forced
+#   order WITHIN a wave (each issue is implicitly blocked_by every earlier
+#   issue in the same wave's list); every issue in a LATER wave is implicitly
+#   blocked_by every issue in an EARLIER wave. Only issue numbers that are
+#   still OPEN act as blockers (governance/dispatch/queue.py filters closed
+#   ones out against the live snapshot).
+#
+#   blocked_by (optional): explicit overrides/additions, {issue: [issue, ...]},
+#   unioned in on top of the implied wave edges. Use sparingly — most ordering
+#   should come from wave placement, not a hand-written override.
+#
+# PR-merge-only entries from the owner comment (items whose action is "merge
+# PR #NNN", not a claimable issue) are excluded: they are not dispatch units.
+#
+# Wave 0 (owner comment: "merge what's already green") is entirely PR-merge
+# entries and is therefore not represented here as a wave of claimable issues.
+
+waves:
+  - name: wave-1-epic-878-lanes
+    # EPIC #878 lanes L1-L11, forced order by dependency shape (owner queue
+    # comment, section B, items 9-19).
+    issues: [880, 881, 882, 883, 884, 885, 886, 887, 888, 889, 890]
+
+  - name: wave-2-epic-706-residual-and-golive
+    # #706 residual + go-live #607 (owner queue comment, section B, items
+    # 20-26). PR-merge entries #927/#926/#924 excluded.
+    issues: [902, 619, 731, 732]
+
+  - name: wave-3-active-governance-bugs
+    # Active bugs/governance blocking the ratchet itself (owner queue
+    # comment, section B, items 27-30).
+    issues: [865, 866, 786, 928]
+
+blocked_by: {}
