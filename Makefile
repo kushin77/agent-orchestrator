@@ -675,22 +675,22 @@ terraform:
 	@bash scripts/check-terraform.sh all
 
 ## web-image-dryrun — validate the web-surface image build config with no
-## push and no GCP mutation (issue #606/#607, gap 1). Prefers a real
-## `gcloud builds submit --dry-run` (renders the config + substitutions
-## against the local Dockerfile without submitting a build); falls back to a
-## local `docker build` (proves portal/Dockerfile actually builds) when
-## gcloud is unavailable. Never runs `gcloud builds submit` for real and
-## never pushes an image (GR-5 — no ad-hoc apply/deploy from this target).
+## push and no GCP mutation (issue #606/#607, gap 1). `gcloud builds submit`
+## has NO `--dry-run` flag (verified: `gcloud builds submit --help` lists no
+## such option) — invoking it at all submits a real build, which this target
+## must never do (GR-5, no ad-hoc apply/deploy). So this target only (1)
+## validates infra/cloudbuild/web-image.yaml parses and its trigger ships
+## disabled (scripts/check-cloudbuild.sh, already in `make verify`), then (2)
+## proves portal/Dockerfile actually builds with a local `docker build` —
+## no push, no Artifact Registry, no gcloud call.
 web-image-dryrun:
-	@if command -v gcloud >/dev/null 2>&1; then \
-		echo "== web-image-dryrun (gcloud --dry-run) =="; \
-		gcloud builds submit . \
-			--config=infra/cloudbuild/web-image.yaml \
-			--substitutions=_AR_REPO=us-central1-docker.pkg.dev/purebliss-ghl/ao-images,_IMAGE=portal,_TAG=dryrun-local \
-			--dry-run; \
-	else \
-		echo "== web-image-dryrun (gcloud absent; local docker build fallback) =="; \
+	@echo "== web-image-dryrun: config validation (no GCP call) =="
+	@bash scripts/check-cloudbuild.sh
+	@if command -v docker >/dev/null 2>&1; then \
+		echo "== web-image-dryrun: local docker build (proves portal/Dockerfile builds; no push) =="; \
 		docker build --file=portal/Dockerfile --tag=web-surface:dryrun-local .; \
+	else \
+		echo "== web-image-dryrun: docker absent, config validation only =="; \
 	fi
 
 ## tf-fmt — terraform fmt -check -recursive on infra/terraform
