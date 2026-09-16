@@ -5,11 +5,19 @@
 # declares:
 #   - a public Cloud Run v2 service (portal + shared-frontend bundle),
 #   - public unauthenticated invocation (roles/run.invoker for allUsers),
-#   - a DNS managed zone plus a CNAME record for the custom hostname,
-#   - a Cloud Run domain mapping that provisions Google-managed TLS,
 #   - and the console's auth-gate environment (issue #730): the JWKS mirror
 #     mounted from Secret Manager and the root-admin allowlist injected from a
 #     secret version, read by a dedicated runtime identity.
+#
+# THE GCP EDGE ROUTE IS RETIRED AND OFF BY DEFAULT (issue #731). The two DNS
+# resources this module used to declare whenever `enabled` was true — the CNAME
+# record pointing the hostname at Google's hosted load balancer, and the Cloud
+# Run domain mapping that provisions Google-managed TLS — are now gated on
+# `create_gcp_edge_route`, whose committed default is false. The live fronting
+# for the domain is a Cloudflare tunnel to the shared-services run half, so a
+# promoted surface must not re-create a competing GCP record; the declaration is
+# `docs/EDGE-CUTOVER.md` and `scripts/check-edge-cutover.sh` refuses a regression
+# of this posture. Setting the flag true declares the GCP route deliberately.
 #
 # There is no apply path here: this module is inert until a reviewed go-live
 # flips the flag and the flag-gated apply pipeline (infra/cloudbuild/apply.yaml)
@@ -17,6 +25,30 @@
 
 locals {
   create = var.enabled ? 1 : 0
+
+  # The retired GCP edge route is ONE decision, expressed once (issue #731): the
+  # DNS record and the Cloud Run domain mapping both hang off this local, so the
+  # two halves of the route cannot disagree about whether the route exists. With
+  # `create_gcp_edge_route = false` (the committed default) neither is created.
+  edge_route = var.enabled && var.create_gcp_edge_route ? 1 : 0
+
+  # `create_dns_zone` chooses WHERE a record would live: in the zone this module
+  # creates, or in a pre-existing one it RESOLVES. The two are mutually
+  # exclusive, so exactly one of these is 1 whenever the route is declared — and
+  # both are 0, and read by nothing, when it is not.
+  new_zone      = var.enabled && var.create_gcp_edge_route && var.create_dns_zone ? 1 : 0
+  existing_zone = var.enabled && var.create_gcp_edge_route && !var.create_dns_zone ? 1 : 0
+
+  # The zone a created record lives in — resolved, never assumed. A count-gated
+  # resource's splat is the EMPTY LIST at count 0, so this is the created zone's
+  # name or the looked-up one's and never an index into a resource that does not
+  # exist (the module's own `domain_mapping_name` output had exactly that shape).
+  # It is null when the route is off, and then no record reads it.
+  managed_zone = one(concat(
+    google_dns_managed_zone.zone[*].name,
+    data.google_dns_managed_zone.existing[*].name,
+  ))
+
   labels = merge(
     {
       service    = var.name
@@ -191,10 +223,11 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   member   = "allUsers"
 }
 
-# DNS managed zone for the domain (self-contained by default; set
-# create_dns_zone = false to attach records to a pre-existing zone instead).
+# DNS managed zone for the domain. Created only while the GCP edge route is
+# declared AND this module owns the zone; with create_dns_zone = false the zone
+# is looked up instead (the data source below) rather than named and hoped for.
 resource "google_dns_managed_zone" "zone" {
-  count       = var.enabled && var.create_dns_zone ? 1 : 0
+  count       = local.new_zone
   name        = var.zone_name
   dns_name    = var.dns_name
   description = "Public DNS zone for the agent-orchestrator web surface (${var.domain})."
@@ -202,21 +235,32 @@ resource "google_dns_managed_zone" "zone" {
   depends_on  = [google_project_service.dns]
 }
 
+# The pre-existing zone, RESOLVED rather than assumed (issue #731). Before this
+# lookup, `create_dns_zone = false` meant "attach the record to a zone name this
+# module never checked", so a wrong `zone_name` was invisible until the record
+# failed to resolve. Now a zone that does not exist fails at plan time.
+data "google_dns_managed_zone" "existing" {
+  count   = local.existing_zone
+  name    = var.zone_name
+  project = var.project_id
+}
+
 # CNAME record mapping the custom hostname to Google's hosted load balancer —
 # the verification target for the Cloud Run domain mapping (managed TLS).
+# RETIRED (issue #731): created only when create_gcp_edge_route = true.
 resource "google_dns_record_set" "web" {
-  count        = local.create
+  count        = local.edge_route
   name         = "${var.domain}."
   type         = "CNAME"
   ttl          = 300
-  managed_zone = var.zone_name
+  managed_zone = local.managed_zone
   rrdatas      = ["ghs.googlehosted.com."]
-  depends_on   = [google_dns_managed_zone.zone]
 }
 
 # Custom domain + Google-managed TLS for the web service.
+# RETIRED (issue #731): created only when create_gcp_edge_route = true.
 resource "google_cloud_run_domain_mapping" "web" {
-  count    = local.create
+  count    = local.edge_route
   name     = var.domain
   location = var.region
   project  = var.project_id

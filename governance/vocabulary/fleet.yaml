@@ -1,0 +1,230 @@
+# governance/vocabulary/fleet.yaml — the fleet's role vocabulary, declared once.
+#
+# Issue #777. This file is the SINGLE AUTHORITY for the names of the fleet's
+# roles. It exists because the names are load-bearing: they are WIRE VALUES on
+# the session-fleet envelope (`fleet/schema/message.schema.json`), `fleet/channel.py`
+# refuses any sender or recipient outside the closed set below, and
+# `fleet/terminal.py` / `fleet/brain.py` branch on them. So this is a protocol
+# migration, not a find-and-replace, and the failure mode it must avoid is the one
+# ADR-0012 names — *two things quietly both being authoritative* — here, two
+# vocabularies both being accepted and neither declared.
+#
+# How the authority is enforced (the repo's own FinOps pattern, #164): the
+# vocabulary is *declared here* and *mirrored as constants in `fleet/channel.py`*,
+# and `scripts/check-fleet-vocabulary.sh` — wired into `make verify` — FAILS when
+# the two stop agreeing. That is the same mechanism
+# `scripts/check-finops-chooser.sh` uses for the FinOps vocabulary, so a lane
+# cannot mint a third name by editing only one side: the gate names the drift.
+#
+# Renaming rule: prefer terms the repository already has (`authority`, `tier`,
+# `capability`, `lane`, `claim`) over inventing a second dialect.
+
+apiVersion: agent-orchestrator/v1
+kind: FleetRoleGlossary
+
+schema:
+  # The envelope version this glossary describes. `fleet/schema/message.schema.json`
+  # carries the same two values in its `schema` property.
+  current: 2
+  legacy: 1
+  # An envelope with no `schema` field is schema 1 — the standing directive and
+  # every in-flight message predate the field, so its absence cannot mean
+  # "unknown": the field is additive, exactly as `nonce` was in issue #161.
+  absent_means: 1
+  field: schema
+
+# The closed set. Four roles, named for the FUNCTION, not the metaphor.
+roles:
+  - name: principal
+    function: the human, and the override terminal
+    authority: >
+      Orders the director, and only the director. The top of the chain: it does not
+      address the dispatcher directly, because a chain the principal can skip is not
+      a chain.
+    legacy_name: operator
+
+  - name: director
+    function: the advisor session
+    authority: >
+      The only directive issuer. Steers, verifies, merges. Takes orders only from
+      the principal.
+    legacy_name: brain
+
+  - name: dispatcher
+    function: the fleet session that drains the mailbox
+    authority: >
+      Executes directives, and only directives: drains the inbox, spawns one
+      executor per directive, reports results back. Never picks work on its own.
+    legacy_name: sister
+
+  - name: executor
+    function: the epic-focused worker
+    authority: >
+      Executes the one issue its directive names. One issue = one lane = one
+      executor. Cannot escalate its own tier.
+    legacy_name: subagent
+    # `executor-<name>` is the instance form, matching the retired
+    # `subagent-<name>`: the suffix names the instance, not a new role.
+    instance_form: "executor-<name>"
+    instance_pattern: "^executor(-[a-z0-9]+)?$"
+
+# Retired names. Each is still ACCEPTED on read for as long as the deprecation
+# window below is open, and each may still appear in the repository as an
+# ARTIFACT name (a path, a command, a heartbeat filename) — but never as a role
+# NAME in a normative document. The `gloss` field is the only permitted way for a
+# retired term to appear in prose: as an explanation of what the term used to
+# mean, marked as such.
+retired:
+  - name: operator
+    replaced_by: principal
+    retired_in_schema: 2
+    gloss: >
+      "operator" described the human at the override terminal, but it reads as
+      whoever operates the machinery rather than as the seat at the top of the
+      authority chain.
+  - name: brain
+    replaced_by: director
+    retired_in_schema: 2
+    gloss: >
+      "brain" named the advisor session by metaphor. The invariant it carried —
+      the only seat that issues directives — survives as the director's declared
+      authority.
+  - name: sister
+    replaced_by: dispatcher
+    retired_in_schema: 2
+    gloss: >
+      "sister" named the loop by its relation to another seat, which says nothing
+      about what it does. "fleet brain" was a second name for the same seat,
+      declared nowhere, which is exactly the drift this glossary ends.
+  - name: subagent
+    replaced_by: executor
+    retired_in_schema: 2
+    gloss: >
+      "subagent" is accurate but generic — every agent in the fleet is a subagent
+      of something. "executor" names the seat's function in the chain.
+
+# The migration. Read dual-accepts; write single-emits.
+migration:
+  read: dual-accept
+  read_detail: >
+    `channel.validate` accepts BOTH dialects on read — a schema-1 role in a
+    schema-1 envelope and a schema-2 role in a schema-2 envelope — so a message in
+    flight or a mailbox entry written by an older build is still understood. It is
+    never a SILENT accept: a schema-2 envelope carrying a retired role is REFUSED
+    by name (see `refusals`), so the two dialects can never both be authoritative
+    for one envelope.
+  write: single-emit
+  write_detail: >
+    An emitter emits exactly ONE dialect per envelope, and it is a function of the
+    recipient's declared capability, never of the emitter's own preference. When
+    the recipient rung's live heartbeat declares `envelope_schema: 2`, the emitter
+    emits schema-2 roles ONLY; a schema-1 role in that envelope is refused. When
+    the recipient's beat does not declare it, the emitter emits the retired
+    spelling and RECORDS the downgrade by name — a downgrade is reported, never
+    silent.
+  downgrade_recorded_as: legacy-dialect
+  # The deprecation window's TERMINUS is mechanical, not a date: the window closes
+  # for a given recipient the moment that recipient's beat declares schema 2, which
+  # happens the first time that rung restarts on a build containing this lane.
+  # Nothing has to be remembered and no version is pinned in advance — the
+  # migration completes by itself as each rung is respawned, which is why the
+  # RUNNING loop (whose beat predates this field and therefore declares nothing)
+  # keeps receiving the retired spelling it can still read.
+  window_terminus: >
+    per recipient rung: closes when that rung's heartbeat declares
+    envelope_schema >= 2
+  declared_in: heartbeat
+
+# What the transport REFUSES, by the name it reports. Each is provoked by
+# `scripts/check-fleet-vocabulary.sh`, because a rule a gate cannot fail on is a
+# formality (GR-12).
+refusals:
+  - id: retired-role-in-current-envelope
+    rule: a schema-2 envelope must not carry a schema-1 (retired) role
+    names_in_the_finding: the offending field and the offending role token
+    provoked_by: scripts/check-fleet-vocabulary.sh
+  - id: unknown-schema-version
+    rule: the envelope's `schema` must be one of the declared versions
+    provoked_by: scripts/check-fleet-vocabulary.sh
+  - id: unknown-role
+    rule: from/to must be in the closed set (either dialect)
+    provoked_by: scripts/check-fleet-channel.sh
+
+# The invariants. These are what the rename must NOT lose — each one is stated as
+# a rule, not carried by a word. Issue #777's acceptance names the first three
+# explicitly; the operator->director edge is the one issue #161's revision added
+# as "rung 1b" and is kept for the same reason.
+invariants:
+  - id: dispatcher-never-picks-work
+    rule: the dispatcher never picks work; it executes only directives it is given
+    former_gloss: >
+      retired name: "dumb terminal" (a GLOSS for the dispatcher, never a name)
+  - id: director-is-the-only-issuer
+    rule: the director is the only issuer of directives to the dispatcher
+  - id: one-issue-one-lane-one-executor
+    rule: one issue = one lane = one executor
+  - id: principal-orders-the-director-only
+    rule: the principal orders the director, never the dispatcher directly
+    former_gloss: >
+      retired rendering: "the operator orders the brain, and never the sister"
+
+# The documents that MUST use the current terms, and in which a retired term may
+# appear only inside a marked legacy region, a fenced block, an inline code span
+# or a link target — i.e. as a declared gloss or an ARTIFACT name (a path, a
+# command, a heartbeat filename). As a role name in prose, it is a finding.
+normative_surfaces:
+  - fleet/CONTRACT.md
+  - fleet/README.md
+  - docs/OPERATOR-ACCESS.md
+  - docs/GLOSSARY.md
+  - fleet/profiles/brain.md
+  - fleet/directive.json
+legacy_region_markers:
+  start: "<!-- legacy-gloss:start -->"
+  end: "<!-- legacy-gloss:end -->"
+
+# DECLARED NON-SCOPE. Naming this is the point: a rename that quietly claims more
+# than it did is the half-done rename this issue exists to prevent.
+out_of_scope:
+  - >
+    ARTIFACT NAMES. `fleet/brain.py`, `fleet/terminal.sh`, `brain.heartbeat.json`,
+    `sister.lock` and the rung names the watchdog reports are filesystem and
+    telemetry identities, not envelope roles. Renaming them is a separate
+    migration with its own consumers (heartbeats, `governance/reconcile`,
+    `CAPABILITIES[].since` commits) and is NOT claimed here.
+  - >
+    CODE IDENTIFIERS. A Python name, a CLI flag or a mailbox directory that
+    happens to contain a retired word is not a role name. Named concretely, so
+    this exemption cannot be read as a licence: the channel's own subcommands
+    `brain-inbox` and `brain-outbox`, the Makefile target `operator`, the
+    `--rung brain` / `--rung sister` values `fleet/watchdog.py` reports, the
+    `CAPABILITY_RUNGS = ("brain", "sister")` literal in `fleet/channel.py`, the
+    mailbox paths `FLEET_DIR / "brain" / "inbox"` and
+    `FLEET_DIR / "sister.heartbeat.json"`, and the `[brain] ...` / `[sister] ...`
+    lines those commands PRINT (which are recorded evidence, and a rename would
+    falsify it). These are filesystem and telemetry identities with their own
+    consumers — the watchdog, `governance/reconcile`, the heartbeats — so
+    renaming them is a separate migration, not this one.
+  - >
+    CODE PROSE — DECLARED, NOT SILENTLY DONE. Renaming one on ONE side only is
+    refused by this gate; leaving the words in code while the contract, the
+    envelope, the validator and the documents move is a real asymmetry, so it is
+    named here rather than left to be discovered. Measured on this commit: 107
+    lines in `fleet/channel.py`, 136 in `fleet/brain.py` and 112 in
+    `fleet/terminal.py` still carry a retired word, and the great majority are
+    comments and module docstrings describing the loop (e.g. the
+    `fleet/channel.py` docstring still says "the **brain** … the **sister**
+    session (a dumb terminal …)"). They are NOT names the transport reads. The
+    sweep is deliberately out of this lane: it is prose with no gate behind it,
+    and doing it inside a protocol migration would bury it in a diff whose
+    evidence is the protocol. It is a follow-up, and it is stated as one.
+  - >
+    RUNBOOK THE GATE MUST NOT LOSE. Three gates pin text in documents this lane
+    does not own: `scripts/check-fleet-contract.sh` pins the four schema-1 trust
+    rules verbatim, `scripts/check-brain-profile.sh` pins the retired role chain,
+    and `scripts/check-operator-access.sh` pins the artifact commands. Those
+    strings survive inside marked legacy-gloss regions, which is why the region
+    markers exist rather than a plain find-and-replace.
+  - >
+    THE RUNTIME AUTHORITY QUESTION (should Hermes or Paperclip control the loop):
+    decided by ADR-0012 and ADR-0015, out of scope per issue #777.

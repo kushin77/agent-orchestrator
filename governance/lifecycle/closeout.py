@@ -17,6 +17,15 @@ is derived from the incident that motivated the module rather than from taste:
 8. **reclaim the lane last**, so a failure anywhere earlier leaves the worktree
    available for the re-run that finishes the job.
 
+Step 8 is not merely *ordered* last, it is **gated** (#786). Ordering alone was an
+assertion the code did not implement: the step reclaimed the worktree whether or not
+step 2 had recorded anything, and step 2 *measures that same worktree*. So a park, or
+a failure, destroyed the only tree the item's evidence could come from — and the
+invariant naming that evidence became permanently unsatisfiable for work that
+*was* verified. The lane is therefore kept while the item still owes its
+verification, refused by name, and the next pass finishes the job; the invariant's
+retry is reachable rather than assumed.
+
 Every step is idempotent: it first asks the operations port for the current state
 and skips when the invariant already holds. The result is never success by
 assertion — the executor re-derives the findings afterwards and reports ``ok``
@@ -47,10 +56,12 @@ from governance.lifecycle.report import (
 
 #: How a step ended: performed, skipped, failed — or one of the unassessed
 #: verdicts (``parked``/``unassessed``), which are a step's own outcome rather than
-#: a failure of it.
+#: a failure of it. ``REFUSED`` is a fifth: the step was deliberately *not* run,
+#: because running it would destroy evidence a step above it still owes (#786).
 PERFORMED = "performed"
 SKIPPED = "skipped"
 FAILED = "failed"
+REFUSED = "refused"
 
 #: The invariant a parked verification leaves unmeasured (#840).
 VERIFY_INVARIANT = "VERIFY_EVIDENCE_MISSING"
@@ -145,6 +156,10 @@ class CloseOutResult:
     steps: list[Step] = field(default_factory=list)
     remaining: list[Finding] = field(default_factory=list)
     not_assessed: list[Unassessed] = field(default_factory=list)
+    #: Steps withheld on purpose, with the reason: not run, and not because the
+    #: invariant already held. Kept beside ``not_assessed`` rather than inside it,
+    #: because a withheld step *was* assessed — the driver decided not to take it.
+    withheld: list[str] = field(default_factory=list)
     board_reports: list[BoardReport] = field(default_factory=list)
 
     @property
@@ -250,7 +265,6 @@ def closeout(
     verify = item.get("verify") or {}
     claim = item.get("claim") or {}
     directive = item.get("directive") or {}
-    lane = item.get("lane") or {}
     verified_commit = str(pr.get("head_commit") or "")
 
     # 1. merge (the verified head is what lands).
@@ -295,13 +309,13 @@ def closeout(
         str(item.get("state") or "").lower() != "closed",
     )
 
-    # 8. reclaim the lane last: a failure above must leave the worktree for the re-run.
-    _run(
-        result,
-        "reclaim-lane",
-        lambda: ops.reclaim_lane(str(lane.get("session_id") or "")),
-        bool(lane.get("present")),
-    )
+    # 8. reclaim the lane last — and only while it is not the last copy of evidence
+    #    the item still owes. The comment here has always said "a failure above must
+    #    leave the worktree for the re-run"; until #786 the code reclaimed
+    #    unconditionally, so step 2's failure destroyed the only tree step 2's retry
+    #    could have measured from — which is what made the invariant permanently
+    #    unsatisfiable, and the retry the eight-step design assumes unreachable.
+    _reclaim_lane(result, item, ops)
 
     # Never success by assertion: re-collect the item through the operations
     # port and re-derive from its *fresh* facts. The pre-close item is stale once
@@ -312,7 +326,83 @@ def closeout(
     verification = next((step for step in result.steps if step.action == "record-verification"), None)
     if verification is not None and verification.outcome in UNASSESSED_VERDICTS:
         _retire_unmeasured_verification(result, fresh, verification)
+    _retire_withheld_reclaim(result)
     return _finish(result, reporter, apply)
+
+
+def _verification_owed(item: dict, result: CloseOutResult) -> str:
+    """Why the item must keep its lane, or ``""`` when the lane may go.
+
+    The question is deliberately not "did a step fail": a failure five steps above
+    holds nothing the lane is the only source of. It is precisely whether the
+    attestation ``record-verification`` owes is **on record for the verified head**,
+    because while it is not, this worktree is the only tree it can be measured from.
+
+    Step 2's own outcome is read first: a ``performed`` verification is the record
+    itself, and only then does the item's pre-close state decide (a step that was
+    skipped as already satisfied is a record that was already there).
+    """
+    step = next((entry for entry in result.steps if entry.action == "record-verification"), None)
+    if step is not None and step.outcome == PERFORMED:
+        return ""
+    verify = item.get("verify") or {}
+    head = str((item.get("pr") or {}).get("head_commit") or "")
+    if verify.get("ok") and str(verify.get("commit") or "") == head:
+        return ""
+    outcome = step.outcome if step is not None else "not attempted"
+    detail = (step.detail if step is not None else "")[:160]
+    return (
+        f"the item still owes record-verification ({outcome}: {detail}) — reclaiming the lane would "
+        "remove the worktree that attestation is measured from, permanently, so the lane is kept and "
+        "the item is closed out again once the verification is recorded"
+    )
+
+
+def _reclaim_lane(result: CloseOutResult, item: dict, ops: CloseOutOps) -> None:
+    """Reclaim the lane — unless doing so would destroy evidence the item still owes.
+
+    ``record-verification`` measures the lane worktree; step 8 removes it. The order
+    between them is therefore load-bearing *and irreversible*: measured on
+    #622/#623/#626 (#786) and #793 (#854), a park or a failure left the attestation
+    unrecorded, step 8 removed the tree, and the invariant could never be satisfied
+    again — a permanently red record for work that *was* verified, with a remediation
+    ("run make verify on the branch head") that had no branch left to run on.
+
+    So the step is refused, by name, while the item still owes its verification: the
+    lane stays, the finding that remains is the *root cause*, and the next close-out
+    finishes the job — the retry the eight-step design already assumed, made
+    reachable instead of asserted.
+    """
+    lane = item.get("lane") or {}
+    if not lane.get("present"):
+        result.steps.append(Step("reclaim-lane", SKIPPED, "already satisfied"))
+        return
+    owed = _verification_owed(item, result)
+    if owed:
+        result.steps.append(Step("reclaim-lane", REFUSED, owed))
+        result.withheld.append(f"reclaim-lane: {owed}")
+        return
+    _run(result, "reclaim-lane", lambda: ops.reclaim_lane(str(lane.get("session_id") or "")), True)
+
+
+def _retire_withheld_reclaim(result: CloseOutResult) -> None:
+    """A lane kept *on purpose* is not the finding it looks like (#786).
+
+    ``audit`` is offline and sees only that the lane is still provisioned, so it
+    charges ``LANE_NOT_RECLAIMED`` — whose remediation ("close the lane, committing or
+    discarding its work first") is *harmful* in this state: following it destroys the
+    tree the item's missing evidence has to be measured from, which is the wedge this
+    fix removes. Reporting a finding whose remedy is the defect would be worse than
+    reporting nothing.
+
+    Nothing is hidden by retiring it: the refusal is printed as a step and named in
+    ``withheld``, and the item's remaining finding is the root cause that actually
+    blocks it. The invariant is retired only when the driver itself withheld the
+    step — a lane another process left behind is still charged.
+    """
+    if not any(step.action == "reclaim-lane" and step.outcome == REFUSED for step in result.steps):
+        return
+    result.remaining = [finding for finding in result.remaining if finding.code != "LANE_NOT_RECLAIMED"]
 
 
 def _retire_unmeasured_verification(result: CloseOutResult, fresh: dict, step: Step) -> None:
@@ -375,6 +465,8 @@ def describe(result: CloseOutResult) -> str:
     lines = [f"close-out #{result.issue}: {verdict}"]
     for step in result.steps:
         lines.append(f"  {step.outcome:<11} {step.action}: {step.detail}")
+    for record in result.withheld:
+        lines.append(f"  WITHHELD    {record}")
     for finding in result.remaining:
         lines.append(f"  REMAINS  {finding}")
         lines.append(f"           -> {finding.remediation}")
