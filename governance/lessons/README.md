@@ -94,9 +94,8 @@ that carries them.
 | `suggestion-without-owner` | error | an open idea with nobody accountable |
 | `evidence-unresolvable` | error | a cited commit is not in this repository's history, or a cited artifact is absent (a **deviation** in a shallow clone, where history cannot be resolved) |
 | `edge-unresolved` | error | a cross-record reference cannot be typed as a ticket edge (a malformed `origin` or `remediation_issue`, issue #402) |
-| `board-incident-without-rca` | error | an incident-labelled issue was closed with no RCA record |
-| `board-incident-pending` | deviation | an incident-labelled issue is open and has no RCA record yet |
-| `board-incident-exempt` | deviation | an explicitly exempt issue; the reason is printed every run |
+| `board-incident-without-rca` | error | an issue carrying the `incident` **record** label is closed and no `INC-*` line names it as its origin |
+| `board-incident-pending` | deviation | the same, while that issue is still open |
 | `rca-review-overdue` | deviation | the RCA was not re-read within the cadence |
 | `corrective-action-open` | deviation | the action is still in flight, tracked by its issue |
 | `suggestion-open` | deviation | the improvement idea is still open |
@@ -104,6 +103,31 @@ that carries them.
 `--strict` escalates every deviation to an error. That is the honest position:
 the in-flight work and the historical backlog are real and named, and a
 milestone that has caught up can raise the bar without editing the gate.
+
+## The board rule, provoked rather than asserted
+
+[`negative_control.py`](negative_control.py) runs on every gate pass (part 2 of
+`scripts/check-lessons.sh`) and plants one fact per probe, requiring the named
+verdict. It exists because this rule was wrong about *every* issue that held its
+label, and the by-hand exemptions that followed made it unable to fail at all:
+
+| Probe | What it must observe |
+|---|---|
+| `AREA-LABEL-IS-NOT-AN-INCIDENT` | a closed issue in the incident-response AREA produces no board finding |
+| `RECORD-LABEL-WITHOUT-A-RECORD-IS-REFUSED` | a record-labelled issue with no ledger record is still an error, named |
+| `LEDGER-INCIDENT-WITHOUT-RCA-IS-REFUSED` | a genuine incident RECORD with no RCA is still an error — the re-keying did not trade one inert check for another |
+| `RECORD-LABEL-WITH-A-RECORD-IS-ACCEPTED` | the detector reads the RECORD: the same issue, backed by `INC-*`, passes |
+| `OPEN-RECORD-LABEL-IS-A-DEVIATION` | an open one is a reported deviation, not an error |
+| `EXEMPTIONS-CANNOT-BE-DECLARED` | a policy declaring `board.exemptions` is refused by name |
+| `AREA-LABEL-CANNOT-BE-THE-RECORD-LABEL` | an `area:` label in that position is refused by name |
+| `SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL` | *this* repository's policy names the record label and has no exemption path |
+| `REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL` | the same verdict against the REAL ledger, policy and snapshot — the four area-label holders measured, not assumed |
+| `MUTANT-DROPS-THE-REFUSAL` | the control's own control: a scratch copy of the checker with the selector forced off must STOP refusing, or the probe above proves nothing |
+
+The last probe is the one that matters most. A control proved only against a
+fixture never sees reality, and a probe that fires under every mutation proves
+nothing — so the mutant is built, the refusal is observed to disappear, and the
+harness reports it by name.
 
 ## Escalation, ownership and review cadence
 
@@ -119,11 +143,16 @@ cannot quietly disappear. A `critical` severity incident is raised to the
 parent epic (#138) at the next review. An enforcement **error** blocks merge:
 the gate is part of `make verify`.
 
-**Exemptions.** The scope declaration lives in [`policy.yaml`](policy.yaml).
-An exemption must carry its reason, and the gate reports it (`board-incident-`
-`exempt`) on every run — an exemption that is invisible is indistinguishable
-from a bypass. The single exemption today is #141, the issue that installs this
-process: requiring an RCA for the rule that requires RCAs is circular.
+**Scope, and why there are no exemptions.** The scope declaration lives in
+[`policy.yaml`](policy.yaml) and is a *record* label: `incident` means "this
+issue records an incident", and it is deliberately distinct from
+`area:incident-response`, which says where the work lives. The gate refuses two
+things by name, so the defect this replaced cannot come back as a YAML edit: an
+`area:` label in `board.incident_label`, and any `board.exemptions` list at all.
+A by-issue exemption is how this rule became inert — every holder of the area
+label ended up exempt, so the check could no longer fail (issue #766). An issue
+that records no incident simply does not carry the record label, and the finding
+is only raised when the ledger has no `INC-*` line for it.
 
 **Review cadence.** Every RCA is re-read and re-stamped (`reviewed_at`) at
 least every 180 days (`review_cadence_days`); past that the gate reports
@@ -157,7 +186,7 @@ than stored again here.
 
 ## The incidents recorded so far
 
-Five real incidents from this repository's own history, each with an artifact,
+Six real incidents from this repository's own history, each with an artifact,
 a corrective action and a lesson:
 
 | Incident | Origin | RCA | What it was |
@@ -167,21 +196,40 @@ a corrective action and a lesson:
 | `INC-0003` | #155 | [`RCA-0003`](rca/RCA-0003-duplicate-lane-doc-change.md) | two lanes shipped a byte-identical 53-line change |
 | `INC-0004` | #157 | [`RCA-0004`](rca/RCA-0004-claim-replay-historical-truth.md) | the claim audit judged a historical claim by today's snapshot |
 | `INC-0005` | #157 | [`RCA-0005`](rca/RCA-0005-stale-snapshot-frontier.md) | a 19-minute-old snapshot named a closed issue as the frontier (**open**, #170) |
+| `INC-0006` | #800 | [`RCA-0006`](rca/RCA-0006-agentconsole-wrong-host.md) | the AgentConsole go-live was planned against this repository's own Cloud Run pipeline while the fleet's hosting contract fixes the remote shared-services cluster as the only live host |
 
-## Measured state (2026-09-13)
+## Measured state (2026-09-15)
 
-`bash scripts/check-lessons.sh` on this branch, exit code 0:
+`bash scripts/check-lessons.sh` on this branch, exit code 0. Both parts are
+quoted, the provoked control included; the long policy refusals are elided:
 
 ```text
-incidents: 5 (4 closed) | rcas: 5 | corrective actions: 7 (1 open) | lessons: 4
-| suggestions: 3 | board incident-labelled issues scanned: 1 (1 exempt)
+incidents: 6 (5 closed) | rcas: 6 | corrective actions: 8 (1 open) | lessons: 4
+| suggestions: 4 | board issues carrying the `incident` record label: 0
   WARNING suggestion-open         SUGGEST-0001 is open (owner: gate lane); ...
-  WARNING suggestion-open         SUGGEST-0003 is open (owner: fleet lane); ...
-  WARNING suggestion-open         SUGGEST-0002 is open (owner: governance lane); ...
   WARNING corrective-action-open  CA-0007 is open; remediation is tracked in #170
-  WARNING board-incident-exempt   incident-labelled issue #141 is exempt: ...
-lessons: OK (5 incident(s), 4 lesson(s) enforced, 5 deviation(s) tracked)
+lessons: OK (6 incident(s), 4 lesson(s) enforced, 5 deviation(s) tracked)
+  probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s), scanned=0, errors=[]
+  probe RECORD-LABEL-WITHOUT-A-RECORD-IS-REFUSED: PASS — code=board-incident-without-rca subject=#900 errors=['board-incident-without-rca']
+  probe LEDGER-INCIDENT-WITHOUT-RCA-IS-REFUSED: PASS — code=incident-without-rca count=1 errors=['corrective-action-unlinked', 'incident-without-rca', 'unknown-reference', 'unknown-reference']
+  probe RECORD-LABEL-WITH-A-RECORD-IS-ACCEPTED: PASS — scanned=1 board finding(s)=0 errors=[] (the ledger traces #900)
+  probe OPEN-RECORD-LABEL-IS-A-DEVIATION: PASS — code=board-incident-pending count=1 errors=[]
+  probe EXEMPTIONS-CANNOT-BE-DECLARED: PASS — board.exemptions is not a supported scope declaration (...); the retired refs #141/#494/#495/#497 cannot be declared
+  probe AREA-LABEL-CANNOT-BE-THE-RECORD-LABEL: PASS — board.incident_label='area:incident-response' is an AREA label (...)
+  probe SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL: PASS — incident_label='incident' exemptions attribute=False cadence=180
+  probe REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL: PASS — snapshot: 0 issue(s) carry 'incident' (scanned=0), 4 carry 'area:incident-response' and 0 of them is treated as an incident; board findings=0 errors=[] retired refs reported=(none)
+  probe MUTANT-DROPS-THE-REFUSAL: PASS — NOT-REFUSED board-incident-without-rca (the probe is proven able to fail)
+  PROBES: PASS (10 of 10)
+negative-control: OK — an area label cannot manufacture an incident, a
+record-labelled issue with no ledger record is still refused, no exemption can
+be declared, and the refusal is proven able to fail
 ```
+
+The real-board probe is the measurement the fix is about: **4 issues carry
+`area:incident-response` and 0 of them is treated as an incident**, while the
+gate is green with no exemption anywhere. Before this change all four were
+findings, then all four were exempt — i.e. the rule was wrong about every
+holder, and then unable to fail (issue #766).
 
 Five errors were raised and fixed while seeding the ledger — five artifacts
 that were not yet committed (`rca-artifact-untracked`). That is the gate doing
@@ -192,13 +240,15 @@ its job on its own author: an uncommitted RCA does not exist (`RCA-0002`).
 | Path | Role |
 |---|---|
 | [`ledger.jsonl`](ledger.jsonl) | the canonical ledger (single source of truth) |
-| [`policy.yaml`](policy.yaml) | incident label, exemptions and review cadence |
+| [`policy.yaml`](policy.yaml) | the `incident` record label and the review cadence — no exemptions |
 | [`rca-template.md`](rca-template.md) | the RCA template every artifact follows |
 | [`rca/`](rca/) | the RCA artifacts themselves |
 | [`model.py`](model.py) | record kinds, vocabularies, findings, report |
 | [`edges.py`](edges.py) | the typed ticket edges, node kinds and the PMO view (issue #402) |
 | [`checker.py`](checker.py) | detection logic over the ledger and the board |
 | [`cli.py`](cli.py) | `check` / `status` / `record` / `template` |
+| [`negative_control.py`](negative_control.py) | the provoked controls for the board rule, mutant included (issue #766) |
+| [`tests/`](tests/) | the detection suite — one planted defect per named finding |
 
 ## Related
 

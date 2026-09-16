@@ -21,12 +21,19 @@ if str(PKG_DIR) not in sys.path:
 
 REPO_ROOT = PKG_DIR.parent.parent
 
-from checker import Policy, check_ledger, parse_ledger_text  # noqa: E402
+from checker import check_ledger, parse_ledger_text  # noqa: E402
 from model import RCA_REQUIRED_SECTIONS  # noqa: E402
 
 TODAY = date(2026, 9, 15)
 ARTIFACT = "governance/lessons/rca/RCA-0001-sample.md"
-INCIDENT_LABEL = "area:incident-response"
+
+#: The board RECORD label: an issue that carries it *records* an incident, so
+#: the ledger must hold an `INC-*` line whose origin is that issue (#766).
+INCIDENT_LABEL = "incident"
+
+#: The board AREA label that was once read as a record marker. It says where the
+#: work lives — it can never say that an issue records an incident.
+AREA_LABEL = "area:incident-response"
 
 
 def rca_body() -> str:
@@ -181,18 +188,6 @@ def report_factory(root: Path):
         )
 
     return build
-
-
-@pytest.fixture
-def exempt_policy():
-    """A policy that exempts the enforcement issue from board coverage."""
-    return Policy(
-        incident_label=INCIDENT_LABEL,
-        review_cadence_days=180,
-        exemptions={
-            "#141": "installs this enforcement; an RCA for the rule is circular"
-        },
-    )
 
 
 @pytest.fixture

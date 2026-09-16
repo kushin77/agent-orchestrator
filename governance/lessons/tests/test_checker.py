@@ -25,6 +25,7 @@ from checker import (
     relpath,
 )
 from conftest import (
+    AREA_LABEL,
     ARTIFACT,
     INCIDENT_LABEL,
     REPO_ROOT,
@@ -38,7 +39,6 @@ from conftest import (
     suggestion,
 )
 from model import (
-    CODE_BOARD_INCIDENT_EXEMPT,
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
     CODE_CORRECTIVE_ACTION_OPEN,
@@ -402,17 +402,42 @@ def test_a_recent_review_is_not_reported(report_factory, clean_records):
     assert CODE_RCA_REVIEW_OVERDUE not in codes(report)
 
 
-# --- board coverage ---------------------------------------------------------
+# --- board coverage: a RECORD label, never an area label (issue #766) -------
 
 
-def test_a_closed_incident_labelled_issue_without_an_rca_is_reported(report_factory):
-    snapshot = board(board_issue(900, state="CLOSED"))
-    report = report_factory([incident(1)], snapshot=snapshot)
-    assert CODE_BOARD_INCIDENT_WITHOUT_RCA in codes(report)
+def test_a_closed_record_labelled_issue_with_no_ledger_record_is_reported(
+    report_factory,
+):
+    snapshot = board(board_issue(100, state="OPEN", labels=["area:board"]),
+                     board_issue(900, state="CLOSED"))
+    report = report_factory(clean_ledger(), snapshot=snapshot)
+    finding = only(report, CODE_BOARD_INCIDENT_WITHOUT_RCA)[0]
+    assert finding.subject == "#900"
+    assert INCIDENT_LABEL in finding.message
+    assert "no incident record in the ledger" in finding.message
     assert report.counts["board_incidents_scanned"] == 1
 
 
-def test_an_open_incident_labelled_issue_is_a_deviation(report_factory, clean_records):
+def test_an_area_labelled_issue_is_not_an_incident_record(report_factory):
+    """The #766 regression: #141/#494/#495/#497 hold the AREA label, not a record.
+
+    All four are work items with no incident to record, so none of them may be
+    a finding — and none may need a hand-written exemption to say so.
+    """
+    snapshot = board(
+        board_issue(100, state="OPEN", labels=["area:board"]),
+        {**board_issue(141, state="CLOSED"), "labels": [AREA_LABEL, "area:lessons"]},
+        {**board_issue(494, state="CLOSED"), "labels": [AREA_LABEL]},
+        {**board_issue(495, state="CLOSED"), "labels": [AREA_LABEL]},
+        {**board_issue(497, state="CLOSED"), "labels": [AREA_LABEL]},
+    )
+    report = report_factory(clean_ledger(), snapshot=snapshot)
+    assert report.counts["board_incidents_scanned"] == 0
+    assert [f for f in report.findings if f.code.startswith("board-incident")] == []
+    assert errors(report.findings) == []
+
+
+def test_an_open_record_labelled_issue_is_a_deviation(report_factory, clean_records):
     snapshot = board(
         board_issue(100, state="OPEN", labels=["area:board"]),
         board_issue(900, state="OPEN"),
@@ -424,13 +449,14 @@ def test_an_open_incident_labelled_issue_is_a_deviation(report_factory, clean_re
 
 
 def test_a_board_issue_traced_by_a_ledger_incident_is_not_reported(report_factory):
+    """The detector reads the RECORD: a label backed by an `INC-*` line is fine."""
     snapshot = board(board_issue(100, state="CLOSED"), board_issue(900, state="OPEN"))
     report = report_factory([incident(1)], snapshot=snapshot)
     assert CODE_BOARD_INCIDENT_WITHOUT_RCA not in codes(report)
     assert only(report, CODE_BOARD_INCIDENT_PENDING)[0].subject == "#900"
 
 
-def test_a_board_issue_without_the_label_is_out_of_scope(report_factory):
+def test_a_board_issue_without_the_record_label_is_out_of_scope(report_factory):
     snapshot = board({**board_issue(900), "labels": ["area:board"]})
     report = report_factory([incident(1)], snapshot=snapshot)
     assert report.counts["board_incidents_scanned"] == 0
@@ -438,48 +464,23 @@ def test_a_board_issue_without_the_label_is_out_of_scope(report_factory):
     assert CODE_BOARD_INCIDENT_PENDING not in codes(report)
 
 
-# --- policy and exemptions --------------------------------------------------
+# --- the policy: the label is the scope, and there are no exemptions --------
 
 
-def test_a_closed_enforcement_issue_is_an_error_without_an_exemption(report_factory):
-    """The post-merge regression: #141 closes, and the rule must not misfire."""
-    snapshot = board(
-        board_issue(100, state="OPEN", labels=["area:board"]),
-        board_issue(141, state="CLOSED"),
-    )
-    report = report_factory(clean_ledger(), snapshot=snapshot)
-    assert CODE_BOARD_INCIDENT_WITHOUT_RCA in codes(report)
-
-
-def test_an_exempt_issue_is_reported_rather_than_failed(
-    report_factory, exempt_policy
-):
-    snapshot = board(
-        board_issue(100, state="OPEN", labels=["area:board"]),
-        board_issue(141, state="CLOSED"),
-    )
-    report = report_factory(
-        clean_ledger(), snapshot=snapshot, policy=exempt_policy
-    )
-    assert errors(report.findings) == []
-    finding = only(report, CODE_BOARD_INCIDENT_EXEMPT)[0]
-    assert finding.subject == "#141"
-    assert "circular" in finding.message
-    assert report.counts["board_incidents_exempt"] == 1
-
-
-def test_the_shipped_policy_exempts_only_the_enforcement_issue():
+def test_the_shipped_policy_names_the_record_label_and_no_exemptions():
     policy = load_policy(REPO_ROOT / "governance/lessons/policy.yaml")
-    assert policy.exemptions == {
-        "#141": policy.exemptions["#141"],
-    }
-    assert "circular" in policy.exemptions["#141"]
-    assert policy.review_cadence_days == 180
     assert policy.incident_label == INCIDENT_LABEL
+    assert not policy.incident_label.startswith("area:")
+    assert not hasattr(policy, "exemptions")
+    assert policy.review_cadence_days == 180
 
 
 def test_the_snapshot_today_is_green_with_the_shipped_policy():
-    """The real board plus the real policy must not fail the gate."""
+    """The real board plus the real policy must not fail the gate — no exemption.
+
+    The four issues that used to carry a hand-written exemption are named: each
+    is a work item in the incident-response *area*, so none is a finding.
+    """
     probe = GitProbe(REPO_ROOT)
     if not probe.available:
         pytest.skip("not a git work tree")
@@ -495,8 +496,15 @@ def test_the_snapshot_today_is_green_with_the_shipped_policy():
         git=probe,
     )
     assert errors(report.findings) == []
-    assert report.counts["board_incidents_scanned"] >= 1
-    assert report.counts["board_incidents_exempt"] == 1
+    labelled = [
+        number
+        for number, issue in snapshot.items()
+        if policy.incident_label in (issue.get("labels") or [])
+    ]
+    assert report.counts["board_incidents_scanned"] == len(labelled)
+    subjects = {finding.subject for finding in report.findings}
+    for ref in ("#141", "#494", "#495", "#497"):
+        assert ref not in subjects
 
 
 def test_a_malformed_policy_cannot_be_loaded(tmp_path):
@@ -506,13 +514,32 @@ def test_a_malformed_policy_cannot_be_loaded(tmp_path):
         load_policy(broken)
 
 
-def test_a_policy_exemption_without_a_reason_is_rejected(tmp_path):
+def test_a_policy_that_declares_exemptions_is_refused(tmp_path):
+    """The retired by-issue exemptions cannot come back as a YAML edit (#766)."""
     path = tmp_path / "policy.yaml"
     path.write_text(
-        "board:\n  exemptions:\n    - ref: '#1'\n", encoding="utf-8"
+        "board:\n"
+        "  incident_label: incident\n"
+        "  exemptions:\n"
+        "    - ref: '#141'\n"
+        "      reason: the retired hand-written exemption\n",
+        encoding="utf-8",
     )
-    with pytest.raises(PolicyUnavailable):
+    with pytest.raises(PolicyUnavailable) as refused:
         load_policy(path)
+    assert "exemptions" in str(refused.value)
+
+
+def test_a_policy_with_an_area_label_is_refused_by_name(tmp_path):
+    """An area cannot manufacture an incident: the loader refuses it (#766)."""
+    path = tmp_path / "policy.yaml"
+    path.write_text(
+        "board:\n  incident_label: area:incident-response\n", encoding="utf-8"
+    )
+    with pytest.raises(PolicyUnavailable) as refused:
+        load_policy(path)
+    assert "AREA label" in str(refused.value)
+    assert "area:incident-response" in str(refused.value)
 
 
 def test_a_policy_with_a_bad_cadence_is_rejected(tmp_path):
@@ -562,8 +589,9 @@ def test_the_repositorys_own_ledger_is_green():
 
     The gate of record (``cli.py check``) loads ``policy.yaml`` before it
     checks, so this self-control mirrors it instead of using the empty default
-    policy: issue #141 — the issue that installs this process — is exempt by
-    policy and reported as such, never silently skipped.
+    policy. There is no exemption path: #141/#494/#495/#497 are work items in
+    the incident-response *area*, and the RECORD label keeps them out of scope
+    by construction (issue #766).
     """
     probe = GitProbe(REPO_ROOT)
     if not probe.available:
@@ -580,7 +608,7 @@ def test_the_repositorys_own_ledger_is_green():
         git=probe,
     )
     assert errors(report.findings) == []
-    assert CODE_BOARD_INCIDENT_EXEMPT in codes(report)
+    assert not [f for f in report.findings if f.code.startswith("board-incident")]
     assert report.counts["incidents"] >= 5
     assert report.counts["incidents_closed"] >= 4
     assert report.counts["rcas"] >= 5

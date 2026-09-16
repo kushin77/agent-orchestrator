@@ -12,9 +12,16 @@ Scope, stated honestly (the same posture as ``governance/conformance``):
   recorded, a lesson with no commit evidence, an action with no owner. These
   fail the gate.
 * **Deviations** are the historical backlog and the open work the process is
-  still draining (an incident-labelled issue with no RCA yet, an action that is
-  open, a review past its cadence). They are reported with the remediation that
-  carries them, counted in the report, and escalated to errors by ``--strict``.
+  still draining (an issue that records an incident with no RCA yet, an action
+  that is open, a review past its cadence). They are reported with the
+  remediation that carries them, counted in the report, and escalated to errors
+  by ``--strict``.
+* **Board scope** is a *record* label, never an ``area:`` one (issue #766). The
+  label says an issue records an incident; the LEDGER is the authority, so a
+  labelled issue is a finding only when no incident record names it as its
+  origin. ``load_policy`` refuses an ``area:`` label in that position, and
+  refuses ``board.exemptions`` outright: a by-issue exemption is how the rule
+  came to be inert with all four label holders exempted.
 """
 
 from __future__ import annotations
@@ -22,13 +29,12 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from model import (
-    CODE_BOARD_INCIDENT_EXEMPT,
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
     CODE_CORRECTIVE_ACTION_OPEN,
@@ -89,8 +95,18 @@ POLICY_RELPATH = "governance/lessons/policy.yaml"
 REPORT_RELPATH = ".verify/lessons-report.json"
 SNAPSHOT_RELPATH = ".board/snapshot.json"
 
-#: The board label that marks an issue as an incident or policy failure.
-INCIDENT_LABEL = "area:incident-response"
+#: The board label that marks an issue as *recording* an incident. It is a
+#: record label, never an ``area:`` label: an area says where the work lives,
+#: and keying this rule on one manufactured an incident out of four unrelated
+#: work items — #141, #494, #495 and #497 — while the gate was red on `master`
+#: for a finding no lane could fix (issue #766). ``load_policy`` refuses an
+#: ``area:`` label in this position by name, so the defect cannot be reinstated
+#: by editing YAML.
+INCIDENT_LABEL = "incident"
+
+#: A board AREA label names where the work lives. It can never say that an
+#: issue *records* an incident, so it can never be the label this rule keys on.
+AREA_LABEL_PREFIX = "area:"
 
 RE_ISSUE_REF = re.compile(r"^#(\d+)$")
 RE_SHA = re.compile(r"^[0-9a-f]{7,40}$")
@@ -106,16 +122,17 @@ class PolicyUnavailable(Exception):
 
 @dataclass(frozen=True)
 class Policy:
-    """What counts as an incident-labelled issue, and what is exempt from it.
+    """Which board issues record an incident, and how long an RCA may age.
 
-    ``exemptions`` maps an issue ref to the reason it is exempt. An exemption
-    is not a silent bypass: the gate still reports it, with the reason, every
-    time it runs.
+    There is no exemption list: ``load_policy`` refuses a policy that declares
+    one. An exemption *per issue* is how this rule became inert — with all four
+    holders of the area label exempted, the check could not fail (#766). The
+    label is the scope declaration, and an issue that records no incident
+    simply does not carry it.
     """
 
     incident_label: str = INCIDENT_LABEL
     review_cadence_days: int = REVIEW_CADENCE_DAYS
-    exemptions: Mapping[str, str] = field(default_factory=dict)
 
 
 def default_policy() -> Policy:
@@ -143,31 +160,34 @@ def load_policy(path: Path) -> Policy:
     board = payload.get("board") or {}
     if not isinstance(board, dict):
         raise PolicyUnavailable("%s: board must be an object" % path)
-    exemptions: Dict[str, str] = {}
-    for entry in board.get("exemptions") or []:
-        if not isinstance(entry, dict) or not str(entry.get("ref", "")).strip():
-            raise PolicyUnavailable(
-                "%s: every exemption needs a ref and a reason" % path
-            )
-        reason = str(entry.get("reason", "")).strip()
-        if not reason:
-            raise PolicyUnavailable(
-                "%s: exemption %s carries no reason" % (path, entry.get("ref"))
-            )
-        exemptions[str(entry["ref"]).strip()] = reason
+
+    label = str(board.get("incident_label", INCIDENT_LABEL)).strip()
+    if not label:
+        raise PolicyUnavailable("%s: board.incident_label is empty" % path)
+    if label.startswith(AREA_LABEL_PREFIX):
+        raise PolicyUnavailable(
+            "%s: board.incident_label=%r is an AREA label. An area says where the "
+            "work lives; it cannot say that an issue RECORDS an incident, so "
+            "keying this rule on one manufactures an incident out of unrelated "
+            "work (issue #766). Name a record label such as %r."
+            % (path, label, INCIDENT_LABEL)
+        )
+    if board.get("exemptions"):
+        raise PolicyUnavailable(
+            "%s: board.exemptions is not a supported scope declaration — an "
+            "exemption per issue is how this rule came to be inert, with every "
+            "holder of the label exempted (issue #766). The record label %r is "
+            "the scope declaration; an issue that records no incident does not "
+            "carry it." % (path, label)
+        )
 
     cadence = payload.get("review_cadence_days", REVIEW_CADENCE_DAYS)
     if not isinstance(cadence, int) or isinstance(cadence, bool) or cadence <= 0:
         raise PolicyUnavailable("%s: review_cadence_days must be a positive integer" % path)
 
-    label = str(board.get("incident_label", INCIDENT_LABEL)).strip()
-    if not label:
-        raise PolicyUnavailable("%s: board.incident_label is empty" % path)
-
     return Policy(
         incident_label=label,
         review_cadence_days=cadence,
-        exemptions=exemptions,
     )
 
 
@@ -402,17 +422,9 @@ def check_ledger(
             else sum(
                 1
                 for issue in snapshot.values()
-                if active_policy.incident_label in (issue.get("labels") or [])
-            )
-        ),
-        "board_incidents_exempt": (
-            0
-            if snapshot is None
-            else sum(
-                1
-                for issue in snapshot.values()
-                if active_policy.incident_label in (issue.get("labels") or [])
-                and "#%d" % issue.get("number", 0) in active_policy.exemptions
+                if _records_an_incident(
+                    issue, label=active_policy.incident_label
+                )
             )
         ),
         "artifacts_checked": len(rcas),
@@ -907,11 +919,24 @@ def _check_review_cadence(rcas, *, today: date, policy: Policy) -> List[Finding]
     return findings
 
 
-def _check_board(incidents, snapshot, *, policy: Policy) -> List[Finding]:
-    """AC2/DoD: an incident-labelled issue needs an RCA (closed) or a plan.
+def _records_an_incident(issue: Mapping[str, Any], *, label: str) -> bool:
+    """Does this board issue *record* an incident? The record label selects it.
 
-    Scope is declared in ``policy.yaml``. An issue listed as exempt is reported
-    with the reason it is exempt, so nothing is silently skipped.
+    ``label`` is a record label, never an ``area:`` one (``load_policy`` refuses
+    an area label in that position), so this selector cannot turn work that
+    merely *lives in* an area into an incident (issue #766).
+    """
+    return label in (issue.get("labels") or [])
+
+
+def _check_board(incidents, snapshot, *, policy: Policy) -> List[Finding]:
+    """AC2/DoD: an issue that *records* an incident must be backed by the record.
+
+    The ledger is the authority, not the label: an issue carrying the record
+    label is matched against the incident records that name it as their origin
+    (``INC-*`` whose ``origin`` is that issue), so a label can neither
+    manufacture an incident the ledger does not hold nor silence one it does.
+    There are no exemptions — ``load_policy`` refuses them (#766).
     """
     findings: List[Finding] = []
     traced = {
@@ -921,43 +946,37 @@ def _check_board(incidents, snapshot, *, policy: Policy) -> List[Finding]:
     }
     for number in sorted(snapshot):
         issue = snapshot[number]
-        if policy.incident_label not in (issue.get("labels") or []):
+        if not _records_an_incident(issue, label=policy.incident_label):
             continue
         ref = "#%d" % number
         if ref in traced:
-            continue
-        reason = policy.exemptions.get(ref)
-        if reason:
-            findings.append(
-                Finding(
-                    code=CODE_BOARD_INCIDENT_EXEMPT,
-                    message="incident-labelled issue %s is exempt: %s" % (ref, reason),
-                    subject=ref,
-                    severity=SEVERITY_WARNING,
-                    remediation="re-review the exemption when the issue closes",
-                )
-            )
             continue
         if str(issue.get("state", "")).upper() == "CLOSED":
             findings.append(
                 Finding(
                     code=CODE_BOARD_INCIDENT_WITHOUT_RCA,
-                    message="incident-labelled issue %s was closed with no RCA record"
-                    % ref,
+                    message="issue %s carries the `%s` record label, no incident "
+                    "record in the ledger names it as its origin, and it is closed"
+                    % (ref, policy.incident_label),
                     subject=ref,
                     severity=SEVERITY_ERROR,
-                    remediation="record the incident and its RCA, or remove the label",
+                    remediation="record the incident (%s line with origin %s) and "
+                    "its RCA, or drop the `%s` label"
+                    % (KIND_INCIDENT, ref, policy.incident_label),
                 )
             )
         else:
             findings.append(
                 Finding(
                     code=CODE_BOARD_INCIDENT_PENDING,
-                    message="incident-labelled issue %s is open and has no RCA record yet"
-                    % ref,
+                    message="issue %s carries the `%s` record label, no incident "
+                    "record in the ledger names it as its origin, and it is open"
+                    % (ref, policy.incident_label),
                     subject=ref,
                     severity=SEVERITY_WARNING,
-                    remediation="record the incident and RCA when the issue's work completes",
+                    remediation="record the incident and its RCA when the issue's "
+                    "work completes, or drop the `%s` label"
+                    % policy.incident_label,
                 )
             )
     return findings

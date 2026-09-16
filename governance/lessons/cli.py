@@ -75,8 +75,8 @@ def _summary(report) -> str:
     counts = report.counts
     return (
         "incidents: %d (%d closed) | rcas: %d | corrective actions: %d (%d open) | "
-        "lessons: %d | suggestions: %d | board incident-labelled issues scanned: %d "
-        "(%d exempt)"
+        "lessons: %d | suggestions: %d | board issues carrying the `incident` "
+        "record label: %d"
         % (
             counts.get("incidents", 0),
             counts.get("incidents_closed", 0),
@@ -86,7 +86,6 @@ def _summary(report) -> str:
             counts.get("lessons", 0),
             counts.get("suggestions", 0),
             counts.get("board_incidents_scanned", 0),
-            counts.get("board_incidents_exempt", 0),
         )
     )
 
