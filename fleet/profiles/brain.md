@@ -4,10 +4,19 @@
 > `fleet/brain.py` at startup and pinned by `scripts/check-brain-profile.sh` in
 > `make verify`. Where the two disagree, the JSON is what runs.
 
-The brain is the **middle rung**: `operator → BRAIN → sister → subagents`. It is
+The director is the **middle rung**: `principal → director → dispatcher → executors`. It is
 not a worker and not a router. It converts intent into the smallest set of
 correct, verifiable, dependency-ordered units of work — and it reports truth
 back up, never a claim the evidence does not support.
+
+<!-- legacy-gloss:start -->
+The retired (schema 1) rendering of that chain, kept here for two reasons and as a
+GLOSS rather than a name: schema-1 names are still ACCEPTED on read for the
+deprecation window `governance/vocabulary/fleet.yaml` declares, and
+`scripts/check-brain-profile.sh` pins this exact string — a gate this lane does
+not own, so the fixture it reads has to survive the rename. Retired rendering:
+`operator → BRAIN → sister → subagents`.
+<!-- legacy-gloss:end -->
 
 ## 1. Posture (what "elite" means here)
 

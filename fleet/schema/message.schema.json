@@ -1,25 +1,29 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/kushin77/agent-orchestrator/fleet/schema/message.schema.json",
-  "title": "Fleet steering message (operator <-> brain <-> sister <-> subagents)",
-  "description": "The message contract for the session fleet operating model (M26, issue #160). The operator orders the brain, the brain is the only sender of directives to the sister, the sister only spawns epic-focused subagents per a directive, and subagents report results back through the sister. Everything else is refused.",
+  "title": "Fleet steering message (principal <-> director <-> dispatcher <-> executors)",
+  "description": "The message contract for the session fleet operating model (M26, issue #160; role vocabulary declared by issue #777). The principal orders the director, the director is the only sender of directives to the dispatcher, the dispatcher only spawns epic-focused executors per a directive, and executors report results back through the dispatcher. Everything else is refused. The role vocabulary is the closed set in governance/vocabulary/fleet.yaml.",
   "type": "object",
   "required": ["from", "to", "type"],
   "additionalProperties": false,
   "properties": {
+    "schema": {
+      "enum": [1, 2],
+      "description": "Envelope version (issue #777). Absent means 1: the field is additive, exactly as `nonce` was in issue #161, so every message that predates it stays valid. Schema 2 is the current dialect and emits the current role names ONLY — a retired role in a schema-2 envelope is refused by `channel.validate`, by name. The distinction matters because it is the state ADR-0012 warns about: two vocabularies both quietly authoritative. The single authority for the vocabulary is governance/vocabulary/fleet.yaml."
+    },
     "id": {
       "type": "string",
       "description": "Unique message id (uuid4). Stamped by the channel when absent."
     },
     "from": {
       "type": "string",
-      "pattern": "^(operator|brain|sister|subagent(-[a-z0-9]+)?)$",
-      "description": "Sender role. The operator orders the brain; brain is the only directive issuer to the sister."
+      "pattern": "^(principal|director|dispatcher|executor(-[a-z0-9]+)?|operator|brain|sister|subagent(-[a-z0-9]+)?)$",
+      "description": "Sender role. Both dialects are accepted on READ (dual-accept): schema 2 spells the four roles principal/director/dispatcher/executor-<name>, schema 1 spelled them operator/brain/sister/subagent-<name>. A schema-2 envelope may not carry a schema-1 role."
     },
     "to": {
       "type": "string",
-      "pattern": "^(operator|brain|sister|subagent(-[a-z0-9]+)?)$",
-      "description": "Recipient role. operator -> brain (orders), brain -> sister (directives), up-only for reports and escalations."
+      "pattern": "^(principal|director|dispatcher|executor(-[a-z0-9]+)?|operator|brain|sister|subagent(-[a-z0-9]+)?)$",
+      "description": "Recipient role, in either declared dialect. principal -> director (orders), director -> dispatcher (directives), up-only for reports and escalations."
     },
     "type": {
       "enum": ["directive", "ack", "result", "halt", "escalate"],
