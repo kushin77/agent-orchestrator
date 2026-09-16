@@ -1,0 +1,62 @@
+{
+  "schema": "erp.api.provenance/v1",
+  "issue": "kushin77/agent-orchestrator#651",
+  "upstreamDomainSource": "frappe/erpnext (GPL-3.0) — the ERP domain pattern, declared once in integrations/erp/module.yaml and integrations/erp/core/provenance.json and deliberately not restated here (one declaration, no second copy to drift)",
+  "policy": {
+    "codeCopied": false,
+    "patternOnly": true,
+    "note": "Every harvest below is a shape or an interface read from this repository's own code, or a module imported by name. No file was copied, vendored or translated into integrations/erp/api/, and no third-party code is vendored anywhere in this lane."
+  },
+  "harvests": [
+    {
+      "shape": "an OpenAPI document emitted from its sources rather than hand-written, with a deterministic serialization and a committed artifact the gate re-emits byte for byte",
+      "mode": "pattern-only",
+      "source": {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "integrations/paperclip/api/openapi.py, integrations/paperclip/api/cli.py, scripts/check-paperclip-openapi.sh",
+        "license": "see LICENSE (this repository)"
+      },
+      "builtInstead": "integrations/erp/api/openapi.py emits the ERP document from integrations/erp/core/schemas — the components are the ERP-02 schemas with only their $ref targets rewritten — and scripts/check-erp-api.sh compares the committed artifact to a fresh emission"
+    },
+    {
+      "shape": "a route surface read from the thing that serves it, so the document cannot describe a route the surface does not have",
+      "mode": "pattern-only",
+      "source": {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "integrations/paperclip/api/surface.py (routes introspected from the client), identity/cpapi/control.py (the route-table facade)",
+        "license": "see LICENSE (this repository)"
+      },
+      "builtInstead": "integrations/erp/api/routes.py derives its kind vocabulary and transition actions from the ERP-02 model and its handler registry, and openapi.validate_document refuses a document that omits or invents a route"
+    },
+    {
+      "shape": "a transport-free router and the standardized {ok,status,requestId,data,error} envelope",
+      "mode": "consumed",
+      "source": {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "identity/cpapi/router.py",
+        "license": "see LICENSE (this repository)"
+      },
+      "builtInstead": "integrations/erp/api/surface.py imports compile_template, ok_envelope and error_envelope from it — the envelope is reused, not reimplemented — and integrations/erp/api/errors.py extends the same ApiError record for its boundary refusals"
+    },
+    {
+      "shape": "a client contract: stable operation ids, a route declaration and the error vocabulary a client binds to",
+      "mode": "pattern-only",
+      "source": {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "control-plane/sdk/python/aosdk/envelope.py, control-plane/sdk/python/aosdk/errors.py",
+        "license": "see LICENSE (this repository)"
+      },
+      "builtInstead": "the document carries x-erp-routes, x-erp-errors and x-erp-action-permissions so a generated client binds to a derivation it can diff rather than to prose"
+    },
+    {
+      "shape": "the authorization seam a serving surface must delegate to, with no allow path that skips it",
+      "mode": "consumed",
+      "source": {
+        "repo": "kushin77/agent-orchestrator",
+        "path": "integrations/erp/auth/scope.py",
+        "license": "see LICENSE (this repository)"
+      },
+      "builtInstead": "integrations/erp/api/surface.py calls scope.authorize from exactly one method, with the request's tenant always the principal's own; scripts/check-erp-api.sh greps the single call site and mutates the authorizer to prove the driver notices"
+    }
+  ]
+}

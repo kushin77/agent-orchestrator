@@ -1,0 +1,2565 @@
+{
+  "components": {
+    "parameters": {
+      "action": {
+        "description": "A transition the addressed document's workflow declares from its current state; `x-erp-transitions` is the derivation, per kind and state. Whether the move is legal is the workflow's decision — a static enum here would have to union every state's actions and would describe moves that are refused.",
+        "in": "path",
+        "name": "action",
+        "required": true,
+        "schema": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "documentId": {
+        "description": "The document's identifier, in ERP-02's own identifier shape.",
+        "in": "path",
+        "name": "documentId",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/document/$defs/identifier"
+        }
+      },
+      "kind": {
+        "description": "The document kind. The enum is the model's own closed kind vocabulary, derived from integrations/erp/core/schemas — an unknown kind is refused by the model before anything about the caller is considered.",
+        "in": "path",
+        "name": "kind",
+        "required": true,
+        "schema": {
+          "enum": [
+            "delivery-note",
+            "gl-posting",
+            "item",
+            "party",
+            "purchase-order",
+            "purchase-receipt",
+            "quotation",
+            "sales-invoice",
+            "sales-order",
+            "stock-entry"
+          ],
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "400": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (400) with code `invalid_body`, `schema_violation`."
+      },
+      "401": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (401) with code `unauthorized`."
+      },
+      "403": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (403) with code `forbidden`."
+      },
+      "404": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (404) with code `document_not_found`, `not_found`, `unknown_document_kind`, `unknown_workflow`."
+      },
+      "405": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (405) with code `method_not_allowed`."
+      },
+      "409": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (409) with code `conflict`, `state_jumped`, `unknown_action`, `unknown_state`."
+      },
+      "422": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (422) with code `invalid_transfer`, `missing_provenance`, `unbalanced_posting`, `workflow_invalid`."
+      },
+      "500": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (500) with code `internal`."
+      },
+      "503": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Envelope"
+            }
+          }
+        },
+        "description": "Refused (503) with code `unavailable`, `yaml_unavailable`."
+      }
+    },
+    "schemas": {
+      "CollectionResponse": {
+        "additionalProperties": false,
+        "description": "Every document of one kind in the caller's tenant, ordered by id.",
+        "properties": {
+          "count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ErpDocument"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "delivery-note",
+              "gl-posting",
+              "item",
+              "party",
+              "purchase-order",
+              "purchase-receipt",
+              "quotation",
+              "sales-invoice",
+              "sales-order",
+              "stock-entry"
+            ],
+            "type": "string"
+          },
+          "redacted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "count",
+          "items",
+          "redacted"
+        ],
+        "title": "CollectionResponse",
+        "type": "object"
+      },
+      "DeletedResponse": {
+        "additionalProperties": false,
+        "description": "The document that was removed — an id, not an assertion that something happened.",
+        "properties": {
+          "deleted": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/document/$defs/identifier"
+              },
+              "kind": {
+                "enum": [
+                  "delivery-note",
+                  "gl-posting",
+                  "item",
+                  "party",
+                  "purchase-order",
+                  "purchase-receipt",
+                  "quotation",
+                  "sales-invoice",
+                  "sales-order",
+                  "stock-entry"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "DeletedResponse",
+        "type": "object"
+      },
+      "DocumentResponse": {
+        "additionalProperties": false,
+        "description": "One document as this principal may see it.",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/ErpDocument"
+          },
+          "redacted": {
+            "description": "The fields withheld from this response by field policy, named so the withholding is auditable. A withheld field is absent from `document`, never blanked — absent and empty are different claims.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "document",
+          "redacted"
+        ],
+        "title": "DocumentResponse",
+        "type": "object"
+      },
+      "Envelope": {
+        "additionalProperties": false,
+        "description": "The one response shape this surface emits — `identity/cpapi/router.py`'s `ok_envelope`/`error_envelope` — reused rather than restated, so a client that speaks the control-plane dialect needs no second one. `error.code` is the closed vocabulary: every code here is raised somewhere below this document, and `check` refuses a code with no source.",
+        "properties": {
+          "data": {
+            "description": "The success payload; `null` when `ok` is false."
+          },
+          "error": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "enum": [
+                      "conflict",
+                      "document_not_found",
+                      "forbidden",
+                      "internal",
+                      "invalid_body",
+                      "invalid_transfer",
+                      "method_not_allowed",
+                      "missing_provenance",
+                      "not_found",
+                      "schema_violation",
+                      "state_jumped",
+                      "unauthorized",
+                      "unavailable",
+                      "unbalanced_posting",
+                      "unknown_action",
+                      "unknown_document_kind",
+                      "unknown_state",
+                      "unknown_workflow",
+                      "workflow_invalid",
+                      "yaml_unavailable"
+                    ],
+                    "type": "string"
+                  },
+                  "details": {
+                    "type": "object"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "details"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              200,
+              201,
+              400,
+              401,
+              403,
+              404,
+              405,
+              409,
+              422,
+              500,
+              503
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "status",
+          "requestId",
+          "data",
+          "error"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "ErpDocument": {
+        "description": "One ERP-02 document. The families are `oneOf` because a document is exactly one of them, and `discriminator.mapping` reproduces the `const` each family pins its `doctype` to — so a client can route a document to its family without a schema of its own.",
+        "discriminator": {
+          "mapping": {
+            "delivery-note": "#/components/schemas/delivery-note",
+            "gl-posting": "#/components/schemas/gl-posting",
+            "item": "#/components/schemas/item",
+            "party": "#/components/schemas/party",
+            "purchase-order": "#/components/schemas/purchase-order",
+            "purchase-receipt": "#/components/schemas/purchase-receipt",
+            "quotation": "#/components/schemas/quotation",
+            "sales-invoice": "#/components/schemas/sales-invoice",
+            "sales-order": "#/components/schemas/sales-order",
+            "stock-entry": "#/components/schemas/stock-entry"
+          },
+          "propertyName": "doctype"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/delivery-note"
+          },
+          {
+            "$ref": "#/components/schemas/gl-posting"
+          },
+          {
+            "$ref": "#/components/schemas/item"
+          },
+          {
+            "$ref": "#/components/schemas/party"
+          },
+          {
+            "$ref": "#/components/schemas/purchase-order"
+          },
+          {
+            "$ref": "#/components/schemas/purchase-receipt"
+          },
+          {
+            "$ref": "#/components/schemas/quotation"
+          },
+          {
+            "$ref": "#/components/schemas/sales-invoice"
+          },
+          {
+            "$ref": "#/components/schemas/sales-order"
+          },
+          {
+            "$ref": "#/components/schemas/stock-entry"
+          }
+        ],
+        "title": "ErpDocument"
+      },
+      "HealthReport": {
+        "additionalProperties": false,
+        "description": "The health verdict and the real per-dependency readings behind it (integrations/erp/api/health.py). A dependency that is missing makes the route answer 503 through `unavailable`, so a non-ok dependency is never reported as ok.",
+        "properties": {
+          "dependencies": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "detail": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "detail",
+                "name",
+                "state"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "httpStatus": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependencies",
+          "httpStatus",
+          "status"
+        ],
+        "title": "HealthReport",
+        "type": "object"
+      },
+      "OpenApiDocument": {
+        "description": "This document, as the surface serves it.",
+        "title": "OpenApiDocument",
+        "type": "object"
+      },
+      "TransitionResponse": {
+        "additionalProperties": false,
+        "description": "One declared transition, as it was carried out: the document's identity, the state it reached, and the action that moved it. It carries no fields, because a transition has none — `document` is deliberately not part of this shape, so a caller reads the document through the read route where field policy is applied by omission.",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "transition": {
+            "additionalProperties": false,
+            "properties": {
+              "docstatus": {
+                "$ref": "#/components/schemas/document/$defs/docstatus"
+              },
+              "doctype": {
+                "enum": [
+                  "delivery-note",
+                  "gl-posting",
+                  "item",
+                  "party",
+                  "purchase-order",
+                  "purchase-receipt",
+                  "quotation",
+                  "sales-invoice",
+                  "sales-order",
+                  "stock-entry"
+                ],
+                "type": "string"
+              },
+              "id": {
+                "$ref": "#/components/schemas/document/$defs/identifier"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "doctype",
+              "id",
+              "state",
+              "docstatus"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "transition",
+          "action"
+        ],
+        "title": "TransitionResponse",
+        "type": "object"
+      },
+      "delivery-note": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A delivery note records goods leaving a warehouse against an order. It is the document where the selling cycle touches stock, which is why against_sales_order is required: a delivery that fulfils no order is a stock adjustment, and the model has stock-entry for that. The stock half of the transactional spine (ERP-03, #648) reads this document to decide what the stock ledger receives.",
+        "properties": {
+          "against_sales_order": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The sales order this delivery fulfils. Required: fulfilment is the document's reason to exist, and a stock movement with no commitment behind it belongs to stock-entry instead."
+          },
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "delivery-note"
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "description": "The delivered lines. Each line's warehouse names the stock the movement is taken from.",
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/transactionLine"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "party": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "Link to the customer the goods are delivered to."
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "total": {
+            "$ref": "#/components/schemas/document/$defs/money",
+            "description": "The delivered value, which the invoice is raised against."
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate"
+          },
+          "warehouse": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The default source warehouse; a line may override it."
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "currency",
+          "transaction_date",
+          "party",
+          "against_sales_order",
+          "lines"
+        ],
+        "title": "Delivery Note — the stock-committing selling document",
+        "type": "object",
+        "x-erp-document": "delivery-note",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the delivery note field surface (against sales order, warehouse, delivered lines)",
+            "the fulfilment link from a delivery back to the order it satisfies",
+            "delivery as the point where the selling cycle commits stock"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field and lifecycle shapes from the upstream delivery note doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/stock/doctype/delivery_note",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Delivery Note"
+        }
+      },
+      "document": {
+        "$defs": {
+          "currencyCode": {
+            "description": "ISO 4217 alphabetic currency code. The closed three-letter shape is enforced; the value set is the ISO standard, deliberately not duplicated here.",
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "docstatus": {
+            "description": "The closed upstream docstatus vocabulary the document model adopts: 0 draft, 1 submitted, 2 cancelled. Every lifecycle schema pins this enum and tests/test_assets.py proves it equals the docstatuses its workflow's states declare.",
+            "enum": [
+              0,
+              1,
+              2
+            ],
+            "type": "integer"
+          },
+          "identifier": {
+            "description": "A document or master identifier (item code, warehouse, party, account, voucher). Shape-constrained so prose cannot drift into a key field; the value set is owned by the data, not by this schema.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "type": "string"
+          },
+          "isoDate": {
+            "description": "An ISO 8601 calendar date (YYYY-MM-DD).",
+            "format": "date",
+            "type": "string"
+          },
+          "label": {
+            "description": "Free-text human display name or description.",
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "money": {
+            "description": "A non-negative monetary amount in the document's own currency. Signs are carried by the side of the double entry, never by a negative amount.",
+            "minimum": 0,
+            "type": "number"
+          },
+          "quantity": {
+            "description": "A strictly positive quantity.",
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "rate": {
+            "description": "A non-negative unit rate or valuation.",
+            "minimum": 0,
+            "type": "number"
+          },
+          "taxLine": {
+            "additionalProperties": false,
+            "properties": {
+              "account": {
+                "$ref": "#/components/schemas/document/$defs/identifier",
+                "description": "The tax or charge account the row posts to."
+              },
+              "amount": {
+                "$ref": "#/components/schemas/document/$defs/money",
+                "description": "The charged amount."
+              },
+              "description": {
+                "$ref": "#/components/schemas/document/$defs/label"
+              },
+              "rate": {
+                "$ref": "#/components/schemas/document/$defs/rate",
+                "description": "The percentage applied, when the row is rate-derived rather than an explicit charge."
+              }
+            },
+            "required": [
+              "account",
+              "amount"
+            ],
+            "type": "object"
+          },
+          "transactionLine": {
+            "additionalProperties": false,
+            "properties": {
+              "amount": {
+                "$ref": "#/components/schemas/document/$defs/money",
+                "description": "The line total. Optional so a caller may send qty and rate and let the platform derive it."
+              },
+              "description": {
+                "$ref": "#/components/schemas/document/$defs/label",
+                "description": "The line description, which the upstream shape allows to differ from the item's own name."
+              },
+              "item_code": {
+                "$ref": "#/components/schemas/document/$defs/identifier",
+                "description": "Link to the item master."
+              },
+              "qty": {
+                "$ref": "#/components/schemas/document/$defs/quantity"
+              },
+              "rate": {
+                "$ref": "#/components/schemas/document/$defs/rate"
+              },
+              "warehouse": {
+                "$ref": "#/components/schemas/document/$defs/identifier",
+                "description": "Link to the warehouse the line is fulfilled from, for families whose lines touch stock."
+              }
+            },
+            "required": [
+              "item_code",
+              "qty",
+              "rate"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "description": "The definitions every ERP document family composes from: identifiers, money, quantities, rates, dates, the closed docstatus vocabulary and the two line shapes (transaction and tax). This schema is not itself a document family — it declares no x-erp-document — so it has no workflow and no state enum; the families $ref into it so that a unit of measure, a currency code or a line item means exactly one thing across the whole model. A family that redefined 'amount' locally could drift from every other family while still validating, which is why these are shared definitions rather than per-family copies.",
+        "title": "ERP document model — shared definitions",
+        "type": "object",
+        "x-erp-provenance": {
+          "harvest": [
+            "field shapes shared across doctypes (identifier, currency, amount, quantity, rate, date)",
+            "the docstatus closed vocabulary 0 draft / 1 submitted / 2 cancelled",
+            "the child-table row shape (item, qty, rate, amount, warehouse) for transaction doctypes"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Shared field shapes from the upstream doctype surface, re-expressed. No upstream file was read into this repository, and no upstream code, schema or text is copied or vendored — the upstream is GPL-3.0 and a pattern source only.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/**/doctype/*/*.json",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "erpnext doctype field definitions (all doctypes)"
+        }
+      },
+      "gl-posting": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The general-ledger document every accounting-committing family derives. Two invariants hold it together. The first is expressible in the schema and is enforced here: every line carries exactly one non-zero side, so a row is either a debit or a credit and never both or neither (the oneOf below). The second is a sum over the instance — total debits equal total credits — which JSON Schema cannot express, so the model enforces it as a declared family rule and refuses an unbalanced posting by name.",
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "gl-posting"
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "description": "At least two rows: a double entry needs both sides. Each row is exactly one of a debit or a credit.",
+            "items": {
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "properties": {
+                    "debit": {
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "debit"
+                  ]
+                },
+                {
+                  "properties": {
+                    "credit": {
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "credit"
+                  ]
+                }
+              ],
+              "properties": {
+                "account": {
+                  "$ref": "#/components/schemas/document/$defs/identifier",
+                  "description": "The ledger account the row posts to."
+                },
+                "cost_center": {
+                  "$ref": "#/components/schemas/document/$defs/identifier"
+                },
+                "credit": {
+                  "$ref": "#/components/schemas/document/$defs/money"
+                },
+                "debit": {
+                  "$ref": "#/components/schemas/document/$defs/money"
+                }
+              },
+              "required": [
+                "account"
+              ],
+              "type": "object"
+            },
+            "minItems": 2,
+            "type": "array"
+          },
+          "posting_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate",
+            "description": "The accounting date. The ledger a posting lands in is decided by this field, never by when the posting was written."
+          },
+          "remarks": {
+            "$ref": "#/components/schemas/document/$defs/label"
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "voucher_id": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The source document this posting is the ledger image of. Together with voucher_type it is the posting's provenance back into the transactional spine."
+          },
+          "voucher_type": {
+            "description": "The document family this posting was derived from. Closed so a posting cannot cite a source the model cannot resolve.",
+            "enum": [
+              "sales-invoice",
+              "purchase-invoice",
+              "stock-entry",
+              "journal-entry",
+              "payment"
+            ]
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "currency",
+          "posting_date",
+          "voucher_type",
+          "voucher_id",
+          "lines"
+        ],
+        "title": "GL Posting — a balanced double entry",
+        "type": "object",
+        "x-erp-document": "gl-posting",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the ledger row shape (account, debit, credit, cost center, posting date)",
+            "the voucher back-reference (voucher type and voucher id) that ties a ledger row to the document it images",
+            "double-entry as the invariant that makes a posting balanced or refused"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field shapes from the upstream ledger doctype, re-expressed as one posting document with an explicit balance rule. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/accounts/doctype/gl_entry",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "GL Entry"
+        }
+      },
+      "item": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The item master every transaction line links to. The harvested distinction that matters is is_stock_item: an item either moves through a warehouse (and so commits stock on a delivery note or a purchase receipt) or it does not (a service, a charge), and the transactional spine decides whether to write a stock ledger entry from that flag. uom is required because a quantity without its unit is not a quantity.",
+        "properties": {
+          "doctype": {
+            "const": "item",
+            "description": "The document family discriminant."
+          },
+          "has_batch_no": {
+            "description": "Whether a stock movement of this item must name a batch.",
+            "type": "boolean"
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The item code every transaction line cites."
+          },
+          "is_stock_item": {
+            "description": "Whether the item moves through a warehouse. This is the flag the transactional spine reads to decide whether a document commits stock.",
+            "type": "boolean"
+          },
+          "item_group": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "name": {
+            "$ref": "#/components/schemas/document/$defs/label"
+          },
+          "shelf_life_days": {
+            "description": "Shelf life in days; absent for items that do not expire.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "standard_rate": {
+            "$ref": "#/components/schemas/document/$defs/rate",
+            "description": "The default selling rate a transaction line inherits when the caller sends none."
+          },
+          "uom": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "Unit of measure (Nos, Kg, Hour). Required: a quantity with no unit cannot be committed to a ledger."
+          },
+          "valuation_rate": {
+            "$ref": "#/components/schemas/document/$defs/rate",
+            "description": "The current stock valuation rate, which is what a stock ledger entry debits."
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "name",
+          "uom",
+          "is_stock_item"
+        ],
+        "title": "Item — stock and service master",
+        "type": "object",
+        "x-erp-document": "item",
+        "x-erp-provenance": {
+          "harvest": [
+            "the item master field surface (uom, item group, standard and valuation rate)",
+            "the is_stock_item flag that gates whether a document commits stock",
+            "batch tracking as an item attribute rather than a transaction attribute"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field shapes from the upstream item doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/stock/doctype/item",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Item"
+        }
+      },
+      "party": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The party master: one document family covering both sides of a trade, distinguished by party_type rather than by two near-identical schemas. The closed party_type enum is the harvested shape (upstream carries Customer and Supplier as separate doctypes with the same field surface), and keeping one family is what lets a purchase order link a party and a sales order link the same document without the model claiming they are different kinds of thing.",
+        "properties": {
+          "credit_limit": {
+            "$ref": "#/components/schemas/document/$defs/money",
+            "description": "The exposure ceiling a credit check compares against. Absent means no ceiling is declared."
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "disabled": {
+            "description": "A disabled party stays linked by history but may not be selected on a new document.",
+            "type": "boolean"
+          },
+          "doctype": {
+            "const": "party",
+            "description": "The document family discriminant."
+          },
+          "email": {
+            "description": "The party's billing contact address.",
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "name": {
+            "$ref": "#/components/schemas/document/$defs/label",
+            "description": "The party's display name (its legal or trading name)."
+          },
+          "party_type": {
+            "description": "Which side of a trade this party is on. Closing the enum is what makes 'is this a supplier?' a question the model answers rather than guesses at.",
+            "enum": [
+              "customer",
+              "supplier"
+            ]
+          },
+          "tax_id": {
+            "description": "The jurisdiction's tax registration identifier. Deliberately free-text and bounded: its shape is jurisdiction-specific, so pinning a pattern here would refuse valid parties.",
+            "maxLength": 32,
+            "type": "string"
+          },
+          "territory": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "party_type",
+          "name",
+          "currency"
+        ],
+        "title": "Party — customer or supplier",
+        "type": "object",
+        "x-erp-document": "party",
+        "x-erp-provenance": {
+          "harvest": [
+            "the party field surface (name, tax_id, territory, credit limit, disabled)",
+            "the two doctypes' shared shape, collapsed into one family with a closed party_type discriminant",
+            "currency is a party attribute, which is what makes a document's currency defaultable from its party"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field shapes from the upstream party doctypes, re-expressed as one family. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/{selling,buying}/doctype/{customer,supplier}",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Customer / Supplier"
+        }
+      },
+      "purchase-order": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The buying cycle's mirror of the sales order: a commitment made to a supplier, fulfilled by a purchase receipt. The field names follow the buying side's convention (supplier, expected_delivery) rather than reusing the selling names, because the two cycles are read by different people and the upstream surface keeps them distinct.",
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "purchase-order"
+          },
+          "expected_delivery": {
+            "$ref": "#/components/schemas/document/$defs/isoDate",
+            "description": "The date the supplier is expected to deliver against, which the receipt is measured against."
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/transactionLine"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "net_total": {
+            "$ref": "#/components/schemas/document/$defs/money"
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "Link to the supplier party. Named 'supplier' rather than 'party' so the buying documents read the way the buying cycle speaks."
+          },
+          "supplier_quotation": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The supplier quotation this order was raised from, when it was."
+          },
+          "taxes": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/taxLine"
+            },
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/document/$defs/money"
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate"
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "currency",
+          "transaction_date",
+          "supplier",
+          "lines"
+        ],
+        "title": "Purchase Order — a commitment to a supplier",
+        "type": "object",
+        "x-erp-document": "purchase-order",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the purchase order field surface (supplier, expected_delivery, supplier quotation link, taxes, totals)",
+            "the buying convention of naming the party field for the side of the trade",
+            "the state set the buying cycle drives an order through"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field and lifecycle shapes from the upstream purchase order doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/buying/doctype/purchase_order",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Purchase Order"
+        }
+      },
+      "purchase-receipt": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A purchase receipt records goods arriving against a purchase order: the buying cycle's point of stock commitment. against_purchase_order is required for the same reason the delivery note requires its order — a receipt with no commitment behind it is a stock adjustment, which the model expresses as a stock-entry instead.",
+        "properties": {
+          "against_purchase_order": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The purchase order this receipt fulfils. Required: the receipt exists to satisfy a commitment."
+          },
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "purchase-receipt"
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/transactionLine"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "total": {
+            "$ref": "#/components/schemas/document/$defs/money",
+            "description": "The received value, which the purchase invoice is raised against."
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate"
+          },
+          "warehouse": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The default receiving warehouse; a line may override it."
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "currency",
+          "transaction_date",
+          "supplier",
+          "against_purchase_order",
+          "lines"
+        ],
+        "title": "Purchase Receipt — the stock-committing buying document",
+        "type": "object",
+        "x-erp-document": "purchase-receipt",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the purchase receipt field surface (supplier, against purchase order, warehouse, received lines)",
+            "the fulfilment link from a receipt back to the order it satisfies",
+            "receipt as the buying cycle's point of stock commitment"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field and lifecycle shapes from the upstream purchase receipt doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/stock/doctype/purchase_receipt",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Purchase Receipt"
+        }
+      },
+      "quotation": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A quotation to a customer, priced but not yet an order. Its lifecycle is data (workflows/quotation.yaml) and its state enum here is parity-locked to that workflow: closing the enum is what makes a state the platform cannot execute a schema violation rather than a runtime surprise, and the asset gate refuses a schema and a workflow that disagree.",
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The internal company the quotation is issued from."
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "quotation"
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "description": "At least one priced line — a quotation with no line item is not an offer.",
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/transactionLine"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "net_total": {
+            "$ref": "#/components/schemas/document/$defs/money"
+          },
+          "party": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "Link to the party the quotation is addressed to."
+          },
+          "state": {
+            "description": "The workflow state. Kept equal to workflows/quotation.yaml's state set by the asset gate, so the schema cannot accept a state the workflow cannot execute.",
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "taxes": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/taxLine"
+            },
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/document/$defs/money",
+            "description": "The grand total including taxes. Optional so a caller may send lines and let the platform derive it."
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate"
+          },
+          "valid_till": {
+            "$ref": "#/components/schemas/document/$defs/isoDate",
+            "description": "The date the offer lapses. Absent means no declared expiry."
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "currency",
+          "transaction_date",
+          "party",
+          "lines"
+        ],
+        "title": "Quotation — the selling cycle's entry document",
+        "type": "object",
+        "x-erp-document": "quotation",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the quotation field surface (valid_till, party, currency, company, taxes, totals)",
+            "the parent/child shape: a document header with a priced line table and a tax table",
+            "the docstatus lifecycle the upstream doctype drives (0 draft -> 1 submitted -> 2 cancelled)"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field and lifecycle shapes from the upstream quotation doctype, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied or vendored.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/selling/doctype/quotation",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Quotation"
+        }
+      },
+      "sales-invoice": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A sales invoice is where the selling cycle commits the general ledger: it carries its own posting date (distinct from the transaction date, because the accounting period an invoice lands in is a decision, not a consequence of when the sale happened) and it is the document a GL posting is derived from. The state enum is parity-locked to workflows/sales-invoice.yaml.",
+        "properties": {
+          "against_delivery_note": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The delivery note this invoice bills, when the invoice is raised against a fulfilment rather than directly."
+          },
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "sales-invoice"
+          },
+          "due_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate",
+            "description": "The payment due date the ageing report measures against."
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/transactionLine"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "net_total": {
+            "$ref": "#/components/schemas/document/$defs/money"
+          },
+          "outstanding_amount": {
+            "$ref": "#/components/schemas/document/$defs/money",
+            "description": "The unpaid remainder. Absent on a draft invoice, where nothing has been posted yet."
+          },
+          "party": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "posting_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate",
+            "description": "The accounting date, which selects the period and therefore the ledger the invoice lands in. Required and deliberately separate from transaction_date: a document posted late is normal, a document posted into the wrong period is a correction."
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "taxes": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/taxLine"
+            },
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/document/$defs/money"
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate"
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "currency",
+          "transaction_date",
+          "posting_date",
+          "party",
+          "lines"
+        ],
+        "title": "Sales Invoice — the accounting-committing selling document",
+        "type": "object",
+        "x-erp-document": "sales-invoice",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the sales invoice field surface (posting_date, due_date, against delivery note, outstanding amount)",
+            "the separation of transaction date from posting date",
+            "invoicing as the point where the selling cycle commits the general ledger"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field and lifecycle shapes from the upstream sales invoice doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/accounts/doctype/sales_invoice",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Sales Invoice"
+        }
+      },
+      "sales-order": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A sales order is what a quotation becomes once the customer commits: it carries a delivery commitment date and, once submitted, it is the document the delivery note is fulfilled against. The state enum is parity-locked to workflows/sales-order.yaml.",
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/document/$defs/currencyCode"
+          },
+          "delivery_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate",
+            "description": "The delivery commitment the fulfilment documents are measured against."
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "sales-order"
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/transactionLine"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "net_total": {
+            "$ref": "#/components/schemas/document/$defs/money"
+          },
+          "party": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "Link to the customer party."
+          },
+          "po_reference": {
+            "description": "The customer's own purchase-order reference, printed on our documents.",
+            "maxLength": 64,
+            "type": "string"
+          },
+          "quotation": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The quotation this order was raised from, when it was. Optional: an order may be raised directly."
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "taxes": {
+            "items": {
+              "$ref": "#/components/schemas/document/$defs/taxLine"
+            },
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/document/$defs/money"
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate"
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "currency",
+          "transaction_date",
+          "party",
+          "lines"
+        ],
+        "title": "Sales Order — a confirmed customer commitment",
+        "type": "object",
+        "x-erp-document": "sales-order",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the sales order field surface (delivery_date, po_reference, quotation link, taxes, totals)",
+            "the forward link from an order to the quotation that produced it",
+            "the state set the selling cycle drives an order through"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field and lifecycle shapes from the upstream sales order doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/selling/doctype/sales_order",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Sales Order"
+        }
+      },
+      "stock-entry": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "purpose": {
+                  "const": "material_receipt"
+                }
+              },
+              "required": [
+                "purpose"
+              ]
+            },
+            "then": {
+              "properties": {
+                "from_warehouse": false
+              },
+              "required": [
+                "to_warehouse"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "purpose": {
+                  "const": "material_issue"
+                }
+              },
+              "required": [
+                "purpose"
+              ]
+            },
+            "then": {
+              "properties": {
+                "to_warehouse": false
+              },
+              "required": [
+                "from_warehouse"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "purpose": {
+                  "const": "material_transfer"
+                }
+              },
+              "required": [
+                "purpose"
+              ]
+            },
+            "then": {
+              "required": [
+                "from_warehouse",
+                "to_warehouse"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "purpose": {
+                  "const": "manufacture"
+                }
+              },
+              "required": [
+                "purpose"
+              ]
+            },
+            "then": {
+              "required": [
+                "from_warehouse",
+                "to_warehouse"
+              ]
+            }
+          }
+        ],
+        "description": "A stock entry moves stock when no order stands behind the movement: a receipt with no purchase order, an issue to production, a warehouse transfer, a manufacture. purpose is required and closed because it is the field that decides which warehouses the document must name — the conditional requirements below are expressed in the schema itself (if/then), so a transfer that names one warehouse is a schema violation rather than a rule someone has to remember.",
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "docstatus": {
+            "$ref": "#/components/schemas/document/$defs/docstatus"
+          },
+          "doctype": {
+            "const": "stock-entry"
+          },
+          "from_warehouse": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The source warehouse. Required for an issue, a transfer and a manufacture; forbidden for a receipt."
+          },
+          "id": {
+            "$ref": "#/components/schemas/document/$defs/identifier"
+          },
+          "lines": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "batch_no": {
+                  "$ref": "#/components/schemas/document/$defs/identifier",
+                  "description": "The batch, required only for items the item master declares as batch-tracked."
+                },
+                "item_code": {
+                  "$ref": "#/components/schemas/document/$defs/identifier"
+                },
+                "qty": {
+                  "$ref": "#/components/schemas/document/$defs/quantity"
+                },
+                "valuation_rate": {
+                  "$ref": "#/components/schemas/document/$defs/rate",
+                  "description": "The rate the stock ledger entry is written at."
+                },
+                "warehouse": {
+                  "$ref": "#/components/schemas/document/$defs/identifier",
+                  "description": "Per-line override of the document's warehouse."
+                }
+              },
+              "required": [
+                "item_code",
+                "qty"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "purpose": {
+            "description": "Why the stock moved. Closed because it selects the required warehouse set — an open vocabulary here would make the conditional below unenforceable.",
+            "enum": [
+              "material_receipt",
+              "material_issue",
+              "material_transfer",
+              "manufacture"
+            ]
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "submitted",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "to_warehouse": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The destination warehouse. Required for a receipt, a transfer and a manufacture; forbidden for an issue."
+          },
+          "transaction_date": {
+            "$ref": "#/components/schemas/document/$defs/isoDate"
+          }
+        },
+        "required": [
+          "doctype",
+          "id",
+          "state",
+          "docstatus",
+          "company",
+          "purpose",
+          "lines"
+        ],
+        "title": "Stock Entry — a stock movement with no trading commitment",
+        "type": "object",
+        "x-erp-document": "stock-entry",
+        "x-erp-lifecycle": true,
+        "x-erp-provenance": {
+          "harvest": [
+            "the stock entry field surface (purpose, from and to warehouse, batch, valuation rate)",
+            "the purpose vocabulary that selects which warehouses a movement must name",
+            "stock movement as a document family of its own rather than an implicit effect of trading documents"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "Field and lifecycle shapes from the upstream stock entry doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/stock/doctype/stock_entry",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Stock Entry"
+        }
+      },
+      "workflow": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The meta-schema every file under workflows/ validates against. A workflow here is data, not engine code: it declares the states a document family moves through and the named actions that move it, and the durable execution engine consumes it without owning it. This schema is a meta-schema rather than a document family — it declares no x-erp-document — so it has no lifecycle of its own. It deliberately does not pin the state NAMES: those belong to each document family, and pinning them here would make the meta-schema the place a doctype had to be edited. The structural invariants a schema cannot express (a unique initial state, no outgoing transition from a terminal state, reachability) are refused by names in integrations/erp/core/workflow.py.",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The document family this lifecycle belongs to. This is the join key: the asset gate requires a schema declaring x-erp-document equal to it, and a schema declaring x-erp-lifecycle requires a workflow declaring it."
+          },
+          "initial": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The state a new document starts in. It must be declared in states and must carry docstatus 0 — the draft — which workflow.py enforces."
+          },
+          "schema": {
+            "const": "erp.workflow/v1",
+            "description": "The workflow data dialect. Optional for a caller building the document in memory; every shipped file declares it."
+          },
+          "states": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "docstatus": {
+                  "$ref": "#/components/schemas/document/$defs/docstatus",
+                  "description": "The document status this state corresponds to, from the closed upstream vocabulary."
+                },
+                "label": {
+                  "$ref": "#/components/schemas/document/$defs/label",
+                  "description": "The display name a portal renders. Defaults to the state name."
+                },
+                "name": {
+                  "$ref": "#/components/schemas/document/$defs/identifier",
+                  "description": "The state name. The lifecycle schema's state enum is the set of these, enforced as a parity invariant."
+                },
+                "terminal": {
+                  "description": "Whether the state ends the lifecycle. A terminal state may have no outgoing transition — workflow.py refuses one.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "docstatus"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "transitions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "$ref": "#/components/schemas/document/$defs/identifier",
+                  "description": "The named action a caller invokes. At most one transition may leave a given state on a given action: two would make the next state undecidable, and workflow.py refuses that."
+                },
+                "from": {
+                  "$ref": "#/components/schemas/document/$defs/identifier"
+                },
+                "label": {
+                  "$ref": "#/components/schemas/document/$defs/label"
+                },
+                "to": {
+                  "$ref": "#/components/schemas/document/$defs/identifier"
+                }
+              },
+              "required": [
+                "action",
+                "from",
+                "to"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "version": {
+            "description": "The workflow data revision. Bumping it is how a lifecycle change is made visible rather than silent.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "workflow": {
+            "$ref": "#/components/schemas/document/$defs/identifier",
+            "description": "The workflow's own identifier, unique across the model."
+          }
+        },
+        "required": [
+          "workflow",
+          "document",
+          "initial",
+          "states",
+          "transitions"
+        ],
+        "title": "ERP workflow data — the state/transition document shape",
+        "type": "object",
+        "x-erp-provenance": {
+          "harvest": [
+            "a document lifecycle expressed as states plus named transitions, rather than as engine code",
+            "each state carrying the docstatus it corresponds to",
+            "terminal states as a declared property rather than an absent transition"
+          ],
+          "issue": "kushin77/agent-orchestrator#647",
+          "note": "The workflow definition shape, re-expressed as our own data dialect consumed by the durable execution engine. No upstream file was read into this repository; no upstream code, schema or text is copied or vendored.",
+          "source": {
+            "license": "GPL-3.0",
+            "mode": "pattern-only",
+            "path": "erpnext/**/doctype/*/*.json (workflow field definitions)",
+            "repo": "frappe/erpnext"
+          },
+          "upstream_doctype": "Workflow"
+        }
+      }
+    }
+  },
+  "info": {
+    "description": "The REST surface of the ERP module (issue #651, EPIC #645): CRUD and declared workflow transitions over the indexer-fed document model of ERP-02, so the portal and external consumers integrate through one contract. Every component schema in this document is *emitted* from integrations/erp/core/schemas — no part of it is hand-maintained, and the gate compares the committed artifact to a fresh emission byte for byte. Authorization is not implemented here: it is delegated to integrations/erp/auth (ERP-08) and this surface has no path that bypasses it.",
+    "title": "ERP document API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/erp/documents/{kind}": {
+      "get": {
+        "description": "Reads every document of the kind in the caller's tenant; the field policy is applied by omission (integrations/erp/api/surface.py).",
+        "operationId": "erp.documents.list",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/kind"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponse"
+                }
+              }
+            },
+            "description": "Every document of this kind in the caller's tenant, ordered by id."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "Every document of this kind in the caller's tenant, ordered by id.",
+        "tags": [
+          "documents"
+        ],
+        "x-erp-action": "read",
+        "x-erp-mutation": false
+      },
+      "post": {
+        "description": "Validates the body against the kind's ERP-02 schema and its family rules before storing it (integrations/erp/api/store.py).",
+        "operationId": "erp.documents.create",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/kind"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErpDocument"
+              }
+            }
+          },
+          "description": "The document, validated by ERP-02 before it is stored: its family schema and its family rules (a GL posting's debits must equal its credits; a stock transfer must move between two warehouses).",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "Create a document, validated against its ERP-02 family schema."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "Create a document, validated against its ERP-02 family schema.",
+        "tags": [
+          "documents"
+        ],
+        "x-erp-action": "create",
+        "x-erp-mutation": true
+      }
+    },
+    "/v1/erp/documents/{kind}/{documentId}": {
+      "delete": {
+        "description": "Removes the document and returns what was removed.",
+        "operationId": "erp.documents.delete",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/kind"
+          },
+          {
+            "$ref": "#/components/parameters/documentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedResponse"
+                }
+              }
+            },
+            "description": "Remove a document from the tenant's store."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "Remove a document from the tenant's store.",
+        "tags": [
+          "documents"
+        ],
+        "x-erp-action": "delete",
+        "x-erp-mutation": true
+      },
+      "get": {
+        "description": "Answers 404 for a document that is absent and for one in another tenant: the surface is not an existence oracle.",
+        "operationId": "erp.documents.get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/kind"
+          },
+          {
+            "$ref": "#/components/parameters/documentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "One document by id, as this principal is permitted to see it."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "One document by id, as this principal is permitted to see it.",
+        "tags": [
+          "documents"
+        ],
+        "x-erp-action": "read",
+        "x-erp-mutation": false
+      },
+      "put": {
+        "description": "The body must describe the document the path addresses; a replace may not re-key a document.",
+        "operationId": "erp.documents.replace",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/kind"
+          },
+          {
+            "$ref": "#/components/parameters/documentId"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErpDocument"
+              }
+            }
+          },
+          "description": "The document, validated by ERP-02 before it is stored: its family schema and its family rules (a GL posting's debits must equal its credits; a stock transfer must move between two warehouses).",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "Replace a document in full; it is re-validated against ERP-02."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "Replace a document in full; it is re-validated against ERP-02.",
+        "tags": [
+          "documents"
+        ],
+        "x-erp-action": "write",
+        "x-erp-mutation": true
+      }
+    },
+    "/v1/erp/documents/{kind}/{documentId}/transitions/{action}": {
+      "post": {
+        "description": "Moves the document through a transition its workflow declares, refusing an undeclared move with the model's own code (409). The reply reports the move — the document's identity and the state it reached — because a transition carries no caller-supplied fields; read the document through the read route to project it.",
+        "operationId": "erp.documents.advance",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/kind"
+          },
+          {
+            "$ref": "#/components/parameters/documentId"
+          },
+          {
+            "$ref": "#/components/parameters/action"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitionResponse"
+                }
+              }
+            },
+            "description": "Move a document through a transition its workflow declares."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "Move a document through a transition its workflow declares.",
+        "tags": [
+          "documents"
+        ],
+        "x-erp-action": "{action}",
+        "x-erp-mutation": true
+      }
+    },
+    "/v1/erp/health": {
+      "get": {
+        "description": "Real readings of the dependencies the surface names; answers 503 through `unavailable` when one is unreachable.",
+        "operationId": "erp.health.get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            },
+            "description": "Health of the dependencies the surface names."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "Health of the dependencies the surface names.",
+        "tags": [
+          "platform"
+        ],
+        "x-erp-action": "none",
+        "x-erp-mutation": false
+      }
+    },
+    "/v1/erp/openapi.json": {
+      "get": {
+        "description": "The contract itself. It carries no tenant data, so it is not tenant-authorized — see x-erp-identity.",
+        "operationId": "erp.openapi.get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenApiDocument"
+                }
+              }
+            },
+            "description": "This document."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "security": [],
+        "summary": "This document.",
+        "tags": [
+          "platform"
+        ],
+        "x-erp-action": "none",
+        "x-erp-mutation": false
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "The surface is transport-free and mounted by an adapter; its routes are absolute paths, and this document declares no host, port or scheme it does not own.",
+      "url": "/"
+    }
+  ],
+  "x-erp-action-permissions": {
+    "cancel": "cancel",
+    "complete": "write",
+    "submit": "submit"
+  },
+  "x-erp-errors": [
+    {
+      "code": "invalid_body",
+      "origin": "model",
+      "status": 400
+    },
+    {
+      "code": "schema_violation",
+      "origin": "model",
+      "status": 400
+    },
+    {
+      "code": "unauthorized",
+      "origin": "surface",
+      "status": 401
+    },
+    {
+      "code": "forbidden",
+      "origin": "surface",
+      "status": 403
+    },
+    {
+      "code": "document_not_found",
+      "origin": "surface",
+      "status": 404
+    },
+    {
+      "code": "not_found",
+      "origin": "surface",
+      "status": 404
+    },
+    {
+      "code": "unknown_document_kind",
+      "origin": "model",
+      "status": 404
+    },
+    {
+      "code": "unknown_workflow",
+      "origin": "model",
+      "status": 404
+    },
+    {
+      "code": "method_not_allowed",
+      "origin": "surface",
+      "status": 405
+    },
+    {
+      "code": "conflict",
+      "origin": "surface",
+      "status": 409
+    },
+    {
+      "code": "state_jumped",
+      "origin": "model",
+      "status": 409
+    },
+    {
+      "code": "unknown_action",
+      "origin": "model",
+      "status": 409
+    },
+    {
+      "code": "unknown_state",
+      "origin": "model",
+      "status": 409
+    },
+    {
+      "code": "invalid_transfer",
+      "origin": "model",
+      "status": 422
+    },
+    {
+      "code": "missing_provenance",
+      "origin": "model",
+      "status": 422
+    },
+    {
+      "code": "unbalanced_posting",
+      "origin": "model",
+      "status": 422
+    },
+    {
+      "code": "workflow_invalid",
+      "origin": "model",
+      "status": 422
+    },
+    {
+      "code": "internal",
+      "origin": "surface",
+      "status": 500
+    },
+    {
+      "code": "unavailable",
+      "origin": "surface",
+      "status": 503
+    },
+    {
+      "code": "yaml_unavailable",
+      "origin": "model",
+      "status": 503
+    }
+  ],
+  "x-erp-identity": {
+    "authorization": "integrations/erp/auth (ERP-08)",
+    "detail": "This surface carries no credential and declares no security scheme, because it has none to declare (GR-6): the adapter that mounts it supplies a Principal, which is reference-based — a tenant id, a subject id and role names, with no field a token or password could occupy. Every tenant-scoped route is authorized by integrations/erp/auth *before* its body is read, and the request's tenant is the principal's own, so there is no parameter, header or body field that can select another tenant. The two routes marked with an empty security list carry no tenant data: one is this document, the other is the declarations' reachability.",
+    "scheme": "none-in-this-contract",
+    "teamSource": "the surface's declared scope team, never the request",
+    "tenantSource": "the principal, never the request"
+  },
+  "x-erp-model": {
+    "kinds": [
+      "delivery-note",
+      "gl-posting",
+      "item",
+      "party",
+      "purchase-order",
+      "purchase-receipt",
+      "quotation",
+      "sales-invoice",
+      "sales-order",
+      "stock-entry"
+    ],
+    "lifecycleKinds": [
+      "delivery-note",
+      "gl-posting",
+      "purchase-order",
+      "purchase-receipt",
+      "quotation",
+      "sales-invoice",
+      "sales-order",
+      "stock-entry"
+    ],
+    "root": "integrations/erp/core"
+  },
+  "x-erp-routes": [
+    {
+      "action": "read",
+      "kindScoped": true,
+      "method": "GET",
+      "mutation": false,
+      "operationId": "erp.documents.list",
+      "path": "/v1/erp/documents/{kind}"
+    },
+    {
+      "action": "create",
+      "kindScoped": true,
+      "method": "POST",
+      "mutation": true,
+      "operationId": "erp.documents.create",
+      "path": "/v1/erp/documents/{kind}"
+    },
+    {
+      "action": "read",
+      "kindScoped": true,
+      "method": "GET",
+      "mutation": false,
+      "operationId": "erp.documents.get",
+      "path": "/v1/erp/documents/{kind}/{documentId}"
+    },
+    {
+      "action": "write",
+      "kindScoped": true,
+      "method": "PUT",
+      "mutation": true,
+      "operationId": "erp.documents.replace",
+      "path": "/v1/erp/documents/{kind}/{documentId}"
+    },
+    {
+      "action": "delete",
+      "kindScoped": true,
+      "method": "DELETE",
+      "mutation": true,
+      "operationId": "erp.documents.delete",
+      "path": "/v1/erp/documents/{kind}/{documentId}"
+    },
+    {
+      "action": "{action}",
+      "kindScoped": true,
+      "method": "POST",
+      "mutation": true,
+      "operationId": "erp.documents.advance",
+      "path": "/v1/erp/documents/{kind}/{documentId}/transitions/{action}"
+    },
+    {
+      "action": "none",
+      "kindScoped": false,
+      "method": "GET",
+      "mutation": false,
+      "operationId": "erp.openapi.get",
+      "path": "/v1/erp/openapi.json"
+    },
+    {
+      "action": "none",
+      "kindScoped": false,
+      "method": "GET",
+      "mutation": false,
+      "operationId": "erp.health.get",
+      "path": "/v1/erp/health"
+    }
+  ],
+  "x-erp-schema-sources": {
+    "delivery-note": "integrations/erp/core/schemas/delivery-note.schema.json",
+    "document": "integrations/erp/core/schemas/document.schema.json",
+    "gl-posting": "integrations/erp/core/schemas/gl-posting.schema.json",
+    "item": "integrations/erp/core/schemas/item.schema.json",
+    "party": "integrations/erp/core/schemas/party.schema.json",
+    "purchase-order": "integrations/erp/core/schemas/purchase-order.schema.json",
+    "purchase-receipt": "integrations/erp/core/schemas/purchase-receipt.schema.json",
+    "quotation": "integrations/erp/core/schemas/quotation.schema.json",
+    "sales-invoice": "integrations/erp/core/schemas/sales-invoice.schema.json",
+    "sales-order": "integrations/erp/core/schemas/sales-order.schema.json",
+    "stock-entry": "integrations/erp/core/schemas/stock-entry.schema.json",
+    "workflow": "integrations/erp/core/schemas/workflow.schema.json"
+  },
+  "x-erp-transitions": {
+    "delivery-note": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    },
+    "gl-posting": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    },
+    "purchase-order": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    },
+    "purchase-receipt": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    },
+    "quotation": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    },
+    "sales-invoice": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    },
+    "sales-order": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    },
+    "stock-entry": {
+      "cancelled": [],
+      "completed": [],
+      "draft": [
+        "submit",
+        "cancel"
+      ],
+      "submitted": [
+        "complete",
+        "cancel"
+      ]
+    }
+  }
+}
