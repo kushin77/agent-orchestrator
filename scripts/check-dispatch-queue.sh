@@ -5,7 +5,7 @@
 # order.py/claims.py already refuse an out-of-order claim when Issue.blocked_by
 # is populated (order.py:120 REASON_BLOCKED, claims.py:487
 # raise ClaimRefused(REASON_BLOCKED, ...)) — but nothing populated that edge
-# from the owner's actual intended order until governance/dispatch/queue.py.
+# from the owner's actual intended order until governance/dispatch/owner_queue.py.
 # This gate proves three things:
 #
 #   1. governance/dispatch/queue.yaml is present and structurally valid

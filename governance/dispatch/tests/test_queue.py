@@ -3,7 +3,7 @@
 Covers: an out-of-order claim is refused with a `queue:` detail even when
 GitHub carries no `blocked_by` edge for it; the in-order successor is
 accepted; a closed queue-issue drops out of the chain (unblocking its
-successor); and `queue.validate()` catches a cycle in the `blocked_by`
+successor); and `owner_queue.validate()` catches a cycle in the `blocked_by`
 overrides.
 """
 

@@ -56,6 +56,7 @@ import pool
 import owner_queue as queue_mod
 from model import (
     ALLOWED_CLAIM_REASONS,
+    MISSING,
     ARBITRATION_REFUSALS,
     REASON_ACTIVE_EPIC_CHILD,
     REASON_ALREADY_CLAIMED,
@@ -439,13 +440,13 @@ def arbitrate(
     snapshot_sha256: str = "",
     now: datetime | None = None,
     stale_minutes: int = DEFAULT_STALENESS_MINUTES,
-    queue_data: dict | None = "unset",  # type: ignore[assignment]
+    queue_data: dict | None | object = MISSING,
 ) -> Arbitration:
     """Prove issue -> epic -> lane ownership before a unit is dispatched (#726).
 
     ``queue_data`` is the parsed owner queue (``owner_queue.load()``, #928),
     used only to name a queue-sourced blocker in the ``blocked`` refusal
-    detail. The sentinel default ``"unset"`` resolves to the committed file at
+    detail. The sentinel default ``model.MISSING`` resolves to the committed file at
     call time; pass ``None`` explicitly to mean "no queue" in a test.
 
     Returns the granted arbitration, or raises ``ClaimRefused`` naming the reason
@@ -460,7 +461,7 @@ def arbitrate(
     would refuse.
     """
     moment = now or datetime.now(timezone.utc)
-    if queue_data == "unset":
+    if queue_data is MISSING:
         queue_data = queue_mod.load()
     board = _board_evidence(snapshot, snapshot_path, snapshot_sha256)
 

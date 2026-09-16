@@ -27,6 +27,7 @@ from pathlib import Path
 import focus
 import owner_queue as queue_mod
 from model import (
+    MISSING,
     REASON_ACTIVE_EPIC_CHILD,
     REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
@@ -78,7 +79,7 @@ def eligible(
     agent_history: frozenset[int] = frozenset(),
     claimed_by_others: frozenset[int] = frozenset(),
     focus_path: Path | str | None = None,
-    queue_data: dict | None = "unset",  # type: ignore[assignment]
+    queue_data: dict | None | object = MISSING,
 ) -> Eligibility:
     """Decide whether ``issue_number`` is the next eligible step for this agent.
 
@@ -93,12 +94,13 @@ def eligible(
     refusal itself is decided by ``snapshot.blockers_open()``, which already
     carries the queue's edges once the caller has overlaid them (see
     ``owner_queue.overlay`` / ``cli._load_snapshot``). The sentinel default
-    ``"unset"`` (rather than ``None``) lets a caller explicitly pass ``None``
-    to mean "no queue" without it being confused with "use the committed file".
+    ``model.MISSING`` sentinel (rather than ``None``) lets a caller explicitly
+    pass ``None`` to mean "no queue" without it being confused with "use the
+    committed file".
     """
     if focus_path is None:
         focus_path = focus.DEFAULT_PATH
-    if queue_data == "unset":
+    if queue_data is MISSING:
         queue_data = queue_mod.load()
     issue = snapshot.get(issue_number)
     if issue is None:

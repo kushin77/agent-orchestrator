@@ -222,17 +222,25 @@ def queue_detail(issue_number: int, data: dict[str, Any] | None, snapshot: Snaps
 
 
 def next_claimable(snapshot: Snapshot, data: dict[str, Any] | None) -> list[int]:
-    """Every queued, open issue with no open queue-blocker left — the next claimable set."""
+    """Every queued, open issue with no open blocker left — the next claimable set.
+
+    Uses ``snapshot.blockers_open()`` on an OVERLAID copy, so a GitHub-declared
+    edge (not just a queue edge) also holds an issue back — a queue entry is
+    never reported ready while a real chain edge still blocks it. This does
+    NOT check live claims (a queued issue already held by an agent is still
+    reported here); a caller that needs "claimable right now" additionally
+    filters against the ledger (see ``cli.cmd_queue``).
+    """
     if not data:
         return []
     wave_lists = _wave_lists(data)
     queued_order = [n for wave in wave_lists for n in wave]
-    edges = _edges(data, snapshot)
+    overlaid = overlay(snapshot, data)
     ready: list[int] = []
     for number in queued_order:
-        issue = snapshot.get(number)
+        issue = overlaid.get(number)
         if issue is None or issue.closed:
             continue
-        if not edges.get(number):
+        if not overlaid.blockers_open(issue):
             ready.append(number)
     return ready

@@ -65,16 +65,11 @@ def _capacity_module():
 
 
 def _load_snapshot(path: Path) -> snapshot_mod.Snapshot:
-    """Load the board snapshot, then overlay the owner's committed queue (#928).
-
-    Every claim/eligibility verb goes through here, so the queue's implied
-    `blocked_by` edges reach the existing `order.eligible`/`claims.arbitrate`
-    refusal path uniformly — no verb can see a snapshot the queue has not
-    already been unioned into.
+    """Load the board snapshot. ``snapshot_mod.load`` overlays the owner's
+    committed queue (#928) by default — this wrapper exists only so every
+    verb reads the board through one seam.
     """
-    loaded = snapshot_mod.load(path)
-    queue_data = queue_mod.load()
-    return queue_mod.overlay(loaded, queue_data)
+    return snapshot_mod.load(path)
 
 
 def cmd_audit(args: argparse.Namespace) -> int:
@@ -511,9 +506,10 @@ def cmd_queue(args: argparse.Namespace) -> int:
             print(f"queue --next: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
             return EXIT_CANNOT_ASSESS
         snapshot = snapshot_mod.load(snapshot_path)
-        ready = queue_mod.next_claimable(snapshot, data)
+        held = claims.active_claims(claims.read_ledger(args.ledger))
+        ready = [n for n in queue_mod.next_claimable(snapshot, data) if n not in held]
         if not ready:
-            print("queue --next: <none> (every queued issue is closed, claimed-out, or blocked)")
+            print("queue --next: <none> (every queued issue is closed, live-claimed, or blocked)")
             return EXIT_OK
         for number in ready:
             issue = snapshot.get(number)
@@ -631,6 +627,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     queue_cmd.add_argument("--queue", default=str(queue_mod.DEFAULT_PATH))
     queue_cmd.add_argument("--snapshot", default=str(snapshot_mod.DEFAULT_PATH))
+    queue_cmd.add_argument("--ledger", default=str(claims.DEFAULT_CLAIMS_DIR))
     queue_cmd.add_argument("--stale-minutes", type=int, default=snapshot_mod.DEFAULT_STALENESS_MINUTES)
     queue_cmd.add_argument("--next", action="store_true", help="print the next claimable issue(s)")
     queue_cmd.add_argument(

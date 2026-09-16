@@ -238,7 +238,7 @@ still be **granted with its provenance**.
 `order.eligible`/`claims.arbitrate` refuse an out-of-order claim only when
 `Issue.blocked_by` is populated — but nothing populated that edge from the
 owner's actual intended order (posted as an advisory comment on #878,
-"Owner queue 2026-09-16"). `governance/dispatch/queue.py` closes that gap: it
+"Owner queue 2026-09-16"). `governance/dispatch/owner_queue.py` closes that gap: it
 is a new EDGE SOURCE, not a new refusal reason.
 
 `governance/dispatch/queue.yaml` is the single committed source of truth —
