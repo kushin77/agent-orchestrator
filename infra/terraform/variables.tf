@@ -233,3 +233,33 @@ variable "paperclip_image" {
   type        = string
   default     = "ghcr.io/paperclipai/paperclip:v2026.831.1"
 }
+
+# --- fleet-cron container pair (issue #900, EPIC #706, lane L5 #884) --------
+#
+# The fleet-cron container pair on the shared-services on-prem HA cluster
+# (nodes .31/.42), active-active. OFF by default; no resource is created
+# until this flag is promoted (GR-5).
+
+variable "enable_fleet_cron" {
+  description = "Deploy the fleet-cron container pair to the shared-services HA cluster (issue #900, EPIC #706). OFF until promoted."
+  type        = bool
+  default     = false
+}
+
+variable "fleet_cron_image" {
+  description = "Container image reference for the fleet-cron image (infra/fleet/Dockerfile, issue #709/#710). No default — required at promotion."
+  type        = string
+  default     = null
+}
+
+variable "fleet_cron_ssh_private_key_path" {
+  description = "Path to the SSH private key used to reach the shared-services nodes. A path, never key material (GR-6). No default — required at promotion."
+  type        = string
+  default     = null
+}
+
+variable "fleet_cron_keydb_password_secret_ref" {
+  description = "Reference (name/path) to the KeyDB password used for the active-active distributed lock. Never the secret value (GR-6). No default — required at promotion."
+  type        = string
+  default     = null
+}

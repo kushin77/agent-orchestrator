@@ -235,6 +235,25 @@ services:
       served contract, documents are ERP-06's own answers, and the
       authorization decision stays ERP-08's.
 
+  # The fleet-cron container pair on the shared-services on-prem HA cluster
+  # (issue #900, EPIC #706, lane L5 #884): 2 replicas, active-active, on
+  # nodes 192.168.168.31 / .42. Own `tf_flag` (not any of the seven
+  # canonical control-plane services) since it deploys to shared-services'
+  # cluster, not a control-plane Cloud Run surface.
+  fleet_cron:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_fleet_cron
+    description: >
+      Fleet-cron container pair on the shared-services on-prem HA cluster
+      (issue #900; parent EPIC #706 "port the fleet's cron automation into a
+      shared-services container"; lane L5 #884). 2 replicas, active-active,
+      arbitrated by the same KeyDB `scheduler:lock:<job-id>` SETNX scheme
+      documented in shared-services/docker/cronrunner/README.md. Terraform
+      module: infra/terraform/modules/fleet-cron. OFF until #706's dual-run
+      and cutover phases promote it.
+
 # Endpoint-level surfaces: a single endpoint family inside a service that is
 # promoted independently of the service flag around it (the service flag alone
 # is not enough — GR-5: a new surface ships OFF until a reviewed go-live).
