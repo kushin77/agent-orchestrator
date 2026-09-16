@@ -118,6 +118,54 @@ def test_anthropic_lifts_system_out_of_messages(sentiment_schema) -> None:
     assert "anthropic-version" in transport.requests[0]["headers"]
 
 
+def test_anthropic_prompt_caching_is_off_by_default(sentiment_schema) -> None:
+    """claude-anthropic module.json ``prompt-caching`` feature (default off)."""
+    model = _model_for("anthropic")
+    transport = RecordingTransport([ok_response("anthropic", model, VALID_CONTENT)])
+    adapter = PROVIDER_CLASSES["anthropic"](
+        config_for("anthropic"), transport, Credentials(api_key=FAKE_KEY)
+    )
+    adapter.chat(make_messages(), sentiment_schema, ChatOptions(model=model), _ctx())
+    payload = transport.requests[0]["body"]
+    assert isinstance(payload["system"], str)
+    assert isinstance(payload["messages"][-1]["content"], str)
+    assert "thinking" not in payload
+    assert "output_config" not in payload
+
+
+def test_anthropic_prompt_caching_marks_cache_control(sentiment_schema) -> None:
+    """Enabling ``provider_options.prompt_caching`` marks system + trailing
+    message content block ``cache_control: ephemeral`` (GR-28 opt-in)."""
+    from dataclasses import replace
+
+    model = _model_for("anthropic")
+    cfg = replace(config_for("anthropic"), provider_options={"prompt_caching": True})
+    transport = RecordingTransport([ok_response("anthropic", model, VALID_CONTENT)])
+    adapter = PROVIDER_CLASSES["anthropic"](cfg, transport, Credentials(api_key=FAKE_KEY))
+    adapter.chat(make_messages(), sentiment_schema, ChatOptions(model=model), _ctx())
+    payload = transport.requests[0]["body"]
+    assert payload["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert payload["messages"][-1]["content"][0]["cache_control"] == {
+        "type": "ephemeral"
+    }
+
+
+def test_anthropic_thinking_effort_is_off_by_default_and_opt_in(sentiment_schema) -> None:
+    """claude-anthropic module.json ``thinking-effort`` feature (default off)."""
+    from dataclasses import replace
+
+    model = _model_for("anthropic")
+    cfg = replace(config_for("anthropic"), provider_options={"thinking_effort": "low"})
+    transport = RecordingTransport([ok_response("anthropic", model, VALID_CONTENT)])
+    adapter = PROVIDER_CLASSES["anthropic"](cfg, transport, Credentials(api_key=FAKE_KEY))
+    adapter.chat(make_messages(), sentiment_schema, ChatOptions(model=model), _ctx())
+    payload = transport.requests[0]["body"]
+    assert payload["thinking"] == {"type": "adaptive"}
+    assert payload["output_config"] == {"effort": "low"}
+    # never the deprecated fixed-budget shape (rejected on current models)
+    assert "budget_tokens" not in payload["thinking"]
+
+
 def test_gemini_uses_system_instruction_and_model_role() -> None:
     model = _model_for("gemini")
     messages = make_messages() + [

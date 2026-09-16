@@ -11,6 +11,21 @@ Wire protocol (``POST {base}/v1/messages``):
 Model tiers mirror the harvested gmail-agent Claude client
 (sonnet/opus/haiku) mapped onto the issue-#9 tiers
 (``LOW`` -> haiku, ``MED``/``HIGH`` -> sonnet, ``MAX`` -> opus).
+
+Claude-specific capabilities (claude-anthropic module.json ``features``),
+both flag-gated OFF by default (GR-28) via ``ProviderConfig.provider_options``
+- a config with an empty/absent bag behaves exactly as before:
+
+- ``prompt_caching`` (bool) - marks the system prompt and the trailing
+  message content block ``cache_control: {"type": "ephemeral"}`` so a stable
+  prefix (tools -> system -> messages) is eligible for Anthropic's prompt
+  cache. See ``docs/CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md`` pattern + the
+  Claude API skill's prompt-caching reference.
+- ``thinking_effort`` (``"low"``/``"medium"``/``"high"``/``"xhigh"``/``"max"``)
+  - enables adaptive thinking (``thinking: {"type": "adaptive"}``) at the
+  given ``output_config.effort``. Current Claude models (Fable 5.1, Opus 5,
+  Sonnet 5) reject the deprecated ``budget_tokens`` shape; this adapter never
+  sends it.
 """
 
 from __future__ import annotations
@@ -59,19 +74,46 @@ class AnthropicProvider(HttpModelProvider):
         model: str,
         options: ChatOptions,
     ) -> dict[str, Any]:
+        caching = bool(self._config.provider_options.get("prompt_caching"))
+        chat_messages = [
+            {"role": m.role, "content": m.content} for m in _chat_roles(messages)
+        ]
+        if caching and chat_messages:
+            # Cache the stable prefix: everything up to and including the
+            # last message becomes eligible once marked. Only the trailing
+            # block needs the breakpoint (Anthropic caches the whole prefix
+            # up to it); render order is tools -> system -> messages.
+            last = chat_messages[-1]
+            last["content"] = [
+                {
+                    "type": "text",
+                    "text": last["content"],
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
         payload: dict[str, Any] = {
             "model": model,
             "max_tokens": options.max_tokens or 1024,
-            "messages": [
-                {"role": m.role, "content": m.content}
-                for m in _chat_roles(messages)
-            ],
+            "messages": chat_messages,
         }
         system = _system_text(messages)
         if system is not None:
-            payload["system"] = system
+            if caching:
+                payload["system"] = [
+                    {
+                        "type": "text",
+                        "text": system,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+            else:
+                payload["system"] = system
         if options.temperature is not None:
             payload["temperature"] = options.temperature
+        thinking_effort = self._config.provider_options.get("thinking_effort")
+        if thinking_effort:
+            payload["thinking"] = {"type": "adaptive"}
+            payload["output_config"] = {"effort": thinking_effort}
         return payload
 
     def parse_response(

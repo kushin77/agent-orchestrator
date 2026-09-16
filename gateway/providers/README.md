@@ -119,13 +119,29 @@ non-transient failures (bad key/request, invalid output) fail immediately.
 
 | Provider | Adapter | Protocol | Auth | Tier → model (default) |
 |---|---|---|---|---|
-| Claude | `anthropic.py` | `POST /v1/messages` | `x-api-key` | LOW→`claude-haiku-4-5`, MED/HIGH→`claude-sonnet-4-5`, MAX→`claude-opus-4-5` |
+| Claude | `anthropic.py` | `POST /v1/messages` | `x-api-key` | LOW→`claude-haiku-4-5-20251001`, MED/HIGH→`claude-sonnet-5`, MAX→`claude-opus-5` |
 | DeepSeek | `deepseek.py` | OpenAI-compatible `chat/completions` | Bearer | LOW/MED→`deepseek-chat`, HIGH/MAX→`deepseek-reasoner` |
 | OpenAI / Copilot / GPT | `openai.py` | OpenAI-compatible `chat/completions` | Bearer | LOW/MED→`gpt-4o-mini`, HIGH/MAX→`gpt-4o` |
 | Gemini | `gemini.py` | `models/{model}:generateContent` | `x-goog-api-key` | LOW/MED→`gemini-2.5-flash`, HIGH/MAX→`gemini-2.5-pro` |
 | Ollama (local) | `ollama.py` | `/api/chat` | none (keyless) | LOW/MED→`llama3.2`, HIGH/MAX→`qwen2.5` |
 | Paperclip | `paperclip.py` | OpenAI-compatible `chat/completions` | Bearer | `paperclip-planner` (all tiers) |
 | Hermes (local) | `hermes.py` | `/api/chat` (Ollama-compatible) | none (keyless) | `hermes3` (all tiers) |
+
+**Claude-specific capabilities (claude-anthropic module parity, flag-gated OFF
+by default — GR-28).** The `anthropic` adapter reads an optional
+`ProviderConfig.provider_options` bag (empty by default; every other adapter
+ignores it, so this is additive, not a contract change):
+
+- `provider_options={"prompt_caching": True}` — marks the system prompt and
+  the trailing message content block `cache_control: {"type": "ephemeral"}`
+  so a stable prefix is eligible for Anthropic's prompt cache.
+- `provider_options={"thinking_effort": "low"|"medium"|"high"|"xhigh"|"max"}`
+  — enables adaptive extended thinking (`thinking: {"type": "adaptive"}`) at
+  the given `output_config.effort`. Current Claude models reject the
+  deprecated `budget_tokens` shape; this adapter never sends it.
+
+Both are declared in `gateway/catalog/modules/claude-anthropic/module.json`
+as `prompt-caching` / `thinking-effort` features, `default: "off"`.
 
 Every adapter maps `system` messages per its wire protocol (Anthropic
 top-level `system`, Gemini `systemInstruction`, inline system role for the
@@ -160,7 +176,7 @@ tenants:
   - tenantId: acme
     mappings:
       LOW: anthropic                      # use anthropic's LOW-tier model
-      MAX: anthropic/claude-opus-4-5      # pin an exact model
+      MAX: anthropic/claude-opus-5         # pin an exact model
       summarize: ollama/llama3.2          # a tenant task key
 ```
 

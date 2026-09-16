@@ -84,6 +84,7 @@ from providers.registry import (
     DEFAULT_PROVIDER_BY_TIER,
     PROVIDER_CLASSES,
     PROVIDER_NAMES,
+    PROVIDER_TIER_LADDERS,
     ProviderClient,
     ProviderRegistry,
 )
@@ -129,6 +130,7 @@ __all__ = [
     "PROVIDER_NAMES",
     "PROVIDER_CLASSES",
     "DEFAULT_PROVIDER_BY_TIER",
+    "PROVIDER_TIER_LADDERS",
     # resilience
     "RetryPolicy",
     "CircuitBreaker",
