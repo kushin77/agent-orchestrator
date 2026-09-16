@@ -980,7 +980,7 @@ import pathlib, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
 text = text.replace('argv=("fleet/prune.py", "run"),', 'argv=("fleet/prune.py", "run", "--apply"),')
-text = text.replace("if FORBIDDEN_TOKEN in role.argv:", "if False:")
+text = text.replace("if FORBIDDEN_TOKEN in role.command:", "if False:")
 path.write_text(text)
 if 'run", "--apply"' not in text or "if False:" not in text:
     raise SystemExit("the mutation did not land")
