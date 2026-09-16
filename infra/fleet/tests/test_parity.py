@@ -207,7 +207,13 @@ def test_cron_disable_comments_lines_never_deletes(monkeypatch):
     sys.path.insert(0, str(REPO / "fleet"))
     cron = importlib.import_module("cron")
 
-    installed = [cron.line(2), cron.prune_line(), cron.reconcile_line(2), "0 0 * * * echo foreign # not-ours"]
+    # The foreign line's schedule is referenced from fleet/cron.py (the crontab's
+    # single owner), never a literal here: scripts/check-fleet-cron-image.sh
+    # refuses any file under infra/fleet/ that embeds a five-field crontab
+    # schedule. The line stays foreign because its marker is not one of
+    # fleet/cron.DECLARED_MARKERS.
+    foreign_line = f"{cron.PRUNE_SCHEDULE} echo foreign # not-ours"
+    installed = [cron.line(2), cron.prune_line(), cron.reconcile_line(2), foreign_line]
     written: dict[str, list[str]] = {}
 
     monkeypatch.setattr(cron, "read_crontab", lambda: list(installed))
@@ -217,7 +223,7 @@ def test_cron_disable_comments_lines_never_deletes(monkeypatch):
     assert rc == 0
     result = written["lines"]
     assert len(result) == len(installed), "disable must comment, never delete, a marked line"
-    assert result[-1] == "0 0 * * * echo foreign # not-ours", "a foreign crontab line is never touched"
+    assert result[-1] == foreign_line, "a foreign crontab line is never touched"
     for entry in result[:-1]:
         assert entry.startswith("# "), "every ao-fleet-* line must be commented out, not removed"
 
