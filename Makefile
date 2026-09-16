@@ -24,7 +24,7 @@ SHELL := /bin/bash
 CONSOLE_HOST ?= 127.0.0.1
 CONSOLE_PORT ?= 8787
 
-.PHONY: help verify lint gate merge-gate qa-loop tests e2e \
+.PHONY: help verify lint gate merge-gate qa-loop tests e2e fleet-parity \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
@@ -197,6 +197,14 @@ qa-loop:
 ## tests — run every declared pytest suite in isolation (per-suite, issue #29)
 tests:
 	@bash scripts/run-pytest-suites.sh
+
+## fleet-parity — fleet-cron dual-run parity harness + evidence (issue #714,
+## EPIC #706 D6): runs the pytest suite, then the real harness (local vs
+## container persona, dry-run watchdog/prune/reconcile, idempotency under a
+## simulated lost-lock race), and writes .verify/fleet-parity.json
+fleet-parity:
+	@env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q infra/fleet/tests
+	@python3 infra/fleet/parity.py --ticks 3
 
 ## e2e — the capstone end-to-end suite alone (issue #525). The identical command
 ## is an entry in `make verify` (scripts/verify.sh), so a red Definition-of-Done
