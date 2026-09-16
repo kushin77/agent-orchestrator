@@ -19,7 +19,7 @@
 # to be able to fail, and two are the planted fixture in section 3 -- one of
 # which is the line that is SUPPOSED to read as a comment (it begins with a
 # quote, so the counter sees it, which is the conservative direction).
-# measured: 2026-09-15T23:55:56Z -- 115 site(s) in 52 file(s)
+# measured: 2026-09-16T12:01:31Z -- 112 site(s) in 51 file(s)
 15	scripts/check-pr-contract.sh
 11	scripts/check-paperclip-skills.sh
 8	scripts/check-module-registry.sh
@@ -28,7 +28,6 @@
 3	scripts/check-conformance.sh
 3	scripts/check-control-functions.sh
 3	scripts/check-guardrail-controls.sh
-3	scripts/check-isolation-landed.sh
 3	scripts/check-paperclip-openapi.sh
 3	scripts/check-verdict-contains.sh
 2	scripts/check-agent-identity-parity.sh
