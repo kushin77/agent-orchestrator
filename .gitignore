@@ -44,6 +44,19 @@ governance/board/violations.jsonl
 # Claim locks are runtime state (the claim ledger itself is tracked evidence)
 .board/locks/
 
+# Claim EVENTS are runtime state too: one collision-proof file per event, written
+# by the tracked dispatcher (governance/dispatch/claims.py, DEFAULT_CLAIMS_DIR).
+# Every lane that follows AGENTS.md -- claim the issue, then gate -- writes one,
+# so without this rule a claiming lane worktree is red on check-gitignore.
+# The rule names the DIRECTORY (trailing slash), the precise form its siblings
+# above use; it is NOT what protects the frozen pre-#170 ledger
+# `.board/claims.jsonl` (MEASURED: `.board/claims` and `.board/claims/` both
+# leave that file alone, because the pattern names `claims`, not `claims.jsonl`).
+# What protects it is check-gitignore.sh check 4, which refuses any rule that
+# hides a TRACKED file -- the blanket `.board/` or the glob `.board/claims*` that
+# a "tidy-up" of this rule invites is exactly the regression it catches.
+.board/claims/
+
 # The out-of-epic pool rail is runtime state too (epic #707, lane F6/#721): it
 # records which issues the active focus parked and is rewritten on every
 # drain, so committing it would put a moving dispatch signal in the diff.
@@ -91,6 +104,29 @@ governance/board/violations.jsonl
 .fleet/*.jsonl.*
 .fleet/prune.log
 .fleet/watchdog.log
+# Runaway guard (tracked module: fleet/runaway.py, AO-GR-21): the persisted
+# per-directive attempt counter and the terminal dead-letter artifact. A refusal
+# is a state transition recorded here, not a reason to try again next tick, so
+# both are working state the loop rewrites.
+.fleet/attempts/
+.fleet/dead-letter/
+# Wave plans (tracked module: fleet/brain.py, WAVES): one JSON per parent issue,
+# rewritten as the wave advances. fleet/monitor.py and fleet/report.py read them;
+# the plan is working state, while the child issues it dispatches are the log.
+.fleet/waves/
+# The lifecycle/reconcile BoardReporter's dedupe ledger (tracked module:
+# governance/lifecycle/report.py, DEFAULT_LEDGER_RELPATH): rewritten on every
+# pass and keyed by finding fingerprint, so the local ledger moves as findings
+# are filed and resolved.
+.fleet/board-reports.json
+# Rung artifacts of tracked modules: the runner preflight's hold
+# (fleet/terminal.py, #733), the cron reconcile log (fleet/cron.py), the
+# monitor's queue-liveness signal (fleet/monitor.py, #695, its one write) and the
+# operator pause flag (fleet/terminal.py).
+.fleet/runner-hold.json
+.fleet/reconcile.log
+.fleet/queue-liveness.json
+.fleet/paused
 
 # Local environment / secrets
 .env
