@@ -631,14 +631,14 @@ is enforced by asking whether **the marker's own evidence** says a run is in fli
 It used to ask whether the marker's `pid` was alive. That `pid` is the **loop's**, and
 a loop outlives every run it dispatches, so a crashed run left a marker that read as
 "in flight" for as long as the loop lived. Measured 2026-09-14: three markers ~4.5h
-old, every one with `child_pid: null`, each naming the live sister loop's pid — so
-the sister's drift lock was held open on every tick while it executed code that
+old, every one with `child_pid: null`, each naming the live dispatcher loop's pid — so
+the dispatcher's drift lock was held open on every tick while it executed code that
 predated five merged fixes.
 
 Flight is exactly two things, and `governance/spawn/liveness.py` is the one place
 that decides them:
 
-* a **live `child_pid`** — the subagent itself, running; or
+* a **live `child_pid`** — the executor itself, running; or
 * a **beat no older than `AO_RUN_STALE_SECONDS`** (default **120**) — the run's own
   beater advanced it, which a crashed run cannot do. This is also what protects a run
   that has only just started, before any child exists (`mark_run` writes
@@ -658,7 +658,7 @@ The hold is a *policy*; making it a *bound* is the other half. A rung whose runs
 before they can report presents flight on **every** tick, so the hold is re-taken on
 every tick and the drift lock never opens —
 `drifted … a run is in flight — left alone` on each tick, from 21:32 onward, while
-the brain was respawned in the same tick.
+the director was respawned in the same tick.
 
 So the hold gets a budget of its own, counted in **respawns due**: every tick the rung
 is drifted (or `checkout-behind`) and the remedy is reached, whether it *runs* or is
@@ -671,7 +671,7 @@ crash loop, and the hold stops being honoured:
 ```
 
 Both constants are named on the line, because a bound whose numbers are not in the log
-cannot be audited by the operator reading it. Three properties keep it honest:
+cannot be audited by the principal reading it. Three properties keep it honest:
 
 * **it is not a second unbounded path.** The escape takes the ordinary remedy route,
   so the attempt cap, the backoff, the escalate-once and the park all still apply —
