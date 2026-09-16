@@ -33,9 +33,22 @@ edge from the rule to the control that actually runs. Measured on
 | AO-GR-19 | guard honesty: tri-state + negative controls | 12 checks |
 | AO-GR-20 | private by default | **none** |
 
-**7 of 9 rules had no control that named them.** The controls themselves largely
-exist — the map below binds them — but the traceability from *rule* to *control*
-did not, and a control nobody can find is a control a reviewer cannot credit.
+**7 of 9 rules were cited by no check at all** — but that is a *citation* count,
+not a coverage count, and reading it as coverage is the mistake this section's own
+first draft made. The controls largely exist — the map below binds them — but the
+traceability from *rule* to *control* did not, and a control nobody can find is a
+control a reviewer cannot credit.
+
+> **A correction worth keeping.** The first draft of this document recorded
+> **AO-GR-15** (tenant isolation) as a `GAP`, on the strength of an empty
+> `grep -rn test_tenant_isolation scripts/*.sh scripts/pytest-suites.txt`. The grep
+> really was empty; the conclusion was still false. `scripts/pytest-suites.txt`
+> declares **module directories** (`telemetry/ledger`, `guardrails/isolation`), never
+> test filenames, so a grep for a filename could not have matched it. Both suites are
+> declared and both are gate-run. **An empty grep for the wrong pattern is not
+> evidence of absence.** The remedy was structural rather than cosmetic: a suite
+> control is now asserted *against the manifest* instead of searched for by name, and
+> the assertion that would have caught it has its own provocation.
 
 Part C already had exactly this machinery for AO-GR-21…27
 (`scripts/check-fleet-durability-rules.sh`: every rule carries Rule/Why/Verify **and**
@@ -56,9 +69,9 @@ validates it against the repository, so the two cannot drift.
 | AO-GR-12 | Control plane never executes | `control-plane/` | `check-control-functions.sh`, `check-control-verbs.sh` | **ENFORCED** |
 | AO-GR-13 | Independent auditor | `governance/merge/`, `governance/lifecycle/` | `check-landing.sh` | **PARTIAL** |
 | AO-GR-14 | Separation of duties | `governance/merge/`, `identity/rbac/` | `check-authority.sh` | **ENFORCED** |
-| AO-GR-15 | Tenant isolation is structural | `telemetry/ledger/`, `identity/edges/` | — | **GAP** |
+| AO-GR-15 | Tenant isolation is structural | `guardrails/isolation/`, `telemetry/ledger/`, `identity/edges/` | `suite:guardrails/isolation`, `suite:telemetry/ledger` | **ENFORCED** |
 | AO-GR-16 | DLP + prompt-injection on every model interaction | `guardrails/dlp/`, `guardrails/chat/` | `check-chat-guardrails.sh` | **ENFORCED** |
-| AO-GR-17 | Tamper-evident audit ledger | `telemetry/ledger/`, `telemetry/audit/` | `check-audit-read-model.sh` | **ENFORCED** |
+| AO-GR-17 | Tamper-evident audit ledger | `telemetry/ledger/`, `telemetry/audit/` | `check-audit-read-model.sh`, `suite:telemetry/ledger` | **ENFORCED** |
 | AO-GR-18 | Per-tenant budgets, quotas, kill switch | `gateway/finops/`, `telemetry/chat/` | `check-chat-finops.sh`, `check-metering-parity.sh` | **ENFORCED** |
 | AO-GR-19 | Guard honesty: tri-state + negative controls | `guardrails/policy/`, `guardrails/honesty/` | `check-negative-controls.sh`, `check-guardrail-controls.sh`, `check-policy-schema.sh` | **ENFORCED** |
 | AO-GR-20 | Private by default | `infra/feature-flags/`, `portal/config/` | `check-feature-flags.py` | **ENFORCED** |
@@ -70,7 +83,17 @@ The bindings are not decorative. Each control's **own stated subject** is the ru
 - AO-GR-16 → `check-chat-guardrails.sh` — *"chat-turn guardrails: **DLP egress**,
   inbound re-validation and retrieval-**injection defense**"*.
 - AO-GR-17 → `check-audit-read-model.sh` — *"a real, read-only, filterable
-  projection over the **tamper-evident ledger**"*.
+  projection over the **tamper-evident ledger**"*, over the same suite that proves
+  the chain: `telemetry/ledger/tests/test_chain_integrity.py`.
+- AO-GR-15 → `suite:guardrails/isolation` — its scope-gate test states the rule in
+  the rule's own words (*"Cross-tenant access attempts must fail closed"*:
+  `test_foreign_only_row_returns_none`, `test_require_foreign_row_raises`,
+  `test_put_rejects_denormalized_tenant`, `test_no_unscoped_accessor_exists`), and the
+  rule's second `Verify.` clause — *"a known-bad probe fails it"* — is
+  `test_leaky_store_produces_probe_failures`, driven by a fixture whose own docstring
+  reads *"DELIBERATELY LEAKY store — planted cross-tenant isolation bugs …
+  NEGATIVE-test material"*. `suite:telemetry/ledger` covers the per-tenant ledger half
+  (`test_tenant_isolation.py`, `test_chain_integrity.py`).
 - AO-GR-18 → `check-chat-finops.sh` — *"the control that matters is the
   **refusal**: a turn over budget…"*.
 - AO-GR-20 → `check-feature-flags.py` — *"every control-plane surface **ships OFF
@@ -93,16 +116,26 @@ reason, in [`scripts/control-coverage-gaps.tsv`](../scripts/control-coverage-gap
 — a **shrink-only** record: `--record` lowers it, and **refuses to raise it**, so a
 new gap must be enforced rather than recorded.
 
+```
+$ bash scripts/check-control-coverage.sh
+== the control map ==
+  OK    every rule has a row, every module exists, every control is invoked by a gate
+== the shrink-only gap record ==
+  OK    every non-enforced rule is recorded
+  enforced: 8 of 9 rule(s)
+== vacuity control: a control nobody runs must be refused ==
+  OK    a control script that does not exist is refused
+  OK    a control script that exists but NO GATE runs is refused
+  OK    a suite the manifest does not declare is refused
+check-control-coverage: OK
+RC=0
+```
+
 - **AO-GR-13 — PARTIAL.** `check-landing.sh` proves the landing driver *refuses*
   without evidence, which is real and is the delivery half of "verify before done".
   It does not make the *auditor independent*: nothing yet proves, on the
   product-facing path, that the party verifying a change is not the party that
-  authored it.
-- **AO-GR-15 — GAP.** `telemetry/ledger/tests/test_tenant_isolation.py` exists and
-  **no gate runs it**. The multi-tenant integrity suite ships inert: measured
-  `grep -rn test_tenant_isolation scripts/*.sh scripts/pytest-suites.txt` → empty.
-  A test nobody runs is not a control. Tracked as
-  [#875](https://github.com/kushin77/agent-orchestrator/issues/875).
+  authored it. This is the epic's remaining item.
 
 ---
 
@@ -117,14 +150,28 @@ new gap must be enforced rather than recorded.
 3. a row names a **control that is not in `scripts/`, or that no gate runs** —
    "discovered by `scripts/discover-checks.sh`, or named in `scripts/verify.sh` /
    the `Makefile`", the same gate-invocation universe
-   `check-gate-coverage.sh` uses;
+   `check-gate-coverage.sh` uses. A control may also be a **suite**, written
+   `suite:<dir>`, which counts only when `scripts/pytest-suites.txt` *declares* that
+   directory — the manifest `scripts/run-pytest-suites.sh` executes — and when the
+   suite runner is itself shown to be invoked by a gate;
 4. a `GAP` row names a control, or a non-`GAP` row names none;
 5. `docs/CONTROL-COVERAGE.md` stops naming a Part B rule;
 6. a non-enforced rule is **not recorded** in the gap record.
 
-It also proves it can fail: the assertions are one function over a map file, run
-twice — against the real map, and against a copy pointing AO-GR-14 at a script
-nobody runs, which must be refused.
+It also proves it can fail. The assertions are one function over a map file, run
+against the real map and then against mutated copies — one provocation per
+assertion, each required to produce *the specific finding it is testing for*, because
+a refusal for the wrong reason would not show that the assertion works:
+
+| provocation | the assertion it exercises |
+|---|---|
+| a control script that does not exist | the control-exists assertion |
+| a real script in `scripts/` that no gate invokes | the control-is-run assertion |
+| `suite:docs` — a real directory the manifest does not declare | the suite-declaration assertion |
+
+The second provocation asserts its own precondition (that its target really is
+unwired), so if a later change wires that script into a gate the control fails with
+an explanation rather than silently weakening.
 
 ## 5. Closing a gap
 
@@ -134,4 +181,4 @@ nobody runs, which must be refused.
    record;
 4. the rule now appears in the map as a control a reviewer can run.
 
-Enforced rules: **7 of 9**. Two gaps are recorded, both with an owner.
+Enforced rules: **8 of 9**. One gap is recorded, with its owner.

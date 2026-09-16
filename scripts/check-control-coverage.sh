@@ -8,13 +8,28 @@
 #   auditor, separation of duties, tenant isolation, DLP/injection, tamper-evident
 #   audit, budgets/kill switch, guard honesty, private by default) declares a
 #   **Verify.** block for each rule — and, measured 2026-09-16 on origin/master,
-#   **7 of the 9 rules were cited by NO gate check at all**. The controls largely
-#   exist (check-authority.sh says "separation of duties"; check-chat-guardrails.sh
-#   says "DLP egress … injection defense"; check-audit-read-model.sh says
-#   "tamper-evident ledger"), but nothing connects a rule to the control that
-#   enforces it. An enterprise buyer does not purchase "we have tenant isolation";
-#   they purchase the control, its owner, and its test — and a control nobody runs
-#   is a formality.
+#   only 2 of the 9 rules were *cited by name* in a gate check.
+#
+#   That is a CITATION measure, not a COVERAGE measure, and the difference is the
+#   point. The controls largely exist: check-authority.sh says "separation of duties",
+#   check-chat-guardrails.sh says "DLP egress … injection defense",
+#   check-audit-read-model.sh says "tamper-evident ledger", and guardrails/isolation's
+#   scope-gate suite fails closed on a foreign row while its deliberately-leaky fixture
+#   proves the scanner reports a planted leak. What did not exist is the EDGE: nothing
+#   in the repository connected a rule to the control that enforces it, so no reviewer
+#   could walk from rule to control, and no gate could notice a rule losing its control.
+#   This check is that edge.
+#
+#   The first draft of this map got that wrong in an instructive way: it recorded
+#   AO-GR-15 (tenant isolation) as a GAP on the strength of an empty
+#   `grep test_tenant_isolation scripts/pytest-suites.txt` — a grep for the test's
+#   FILENAME against a manifest that declares MODULE DIRECTORIES (`telemetry/ledger`,
+#   `guardrails/isolation`). An empty grep for the wrong pattern is not evidence of
+#   absence. Both suites are declared and both are gate-run; that is why a suite
+#   control is now asserted against the manifest rather than grepped for by name.
+#
+#   An enterprise buyer does not purchase "we have tenant isolation"; they purchase the
+#   control, its owner, and its test — and a control nobody runs is a formality.
 #
 #   Part C already had this machinery for AO-GR-21…27
 #   (scripts/check-fleet-durability-rules.sh). This is the same idea for the
@@ -32,6 +47,13 @@
 #     denylist is why this matters: `negative-controls` and `policy-schema` are
 #     denylisted from `make verify` precisely because they are
 #     gate.sh / merge-gate.sh signals — still run by a gate, just not that one.
+#   * a control is EITHER a check script (a `check-*.sh`, or a name a gate invokes)
+#     OR a SUITE, written `suite:<dir>`. A suite control is enforced only when
+#     scripts/pytest-suites.txt DECLARES it: that manifest is authoritative and
+#     drift-checked (scripts/check-drift.sh warns on a suite that exists but was never
+#     declared), and scripts/run-pytest-suites.sh runs every declared suite in
+#     isolation. A suite that is not declared is a suite no gate runs — and a suite
+#     control is worth nothing until the runner itself is shown to be invoked.
 #   * docs/CONTROL-COVERAGE.md names every rule (the document cannot silently lose
 #     one), and is the human rendering of the same rows;
 #   * a rule that is not ENFORCED is recorded in scripts/control-coverage-gaps.tsv,
@@ -103,6 +125,20 @@ control_is_invoked() { # control_is_invoked <control-basename> <discovered-list>
   return 1
 }
 
+# A suite control is enforced when the manifest DECLARES it — matched as an exact
+# module-directory line, never as a substring, because `telemetry/ledger` and a test
+# file inside it are different claims and only the former is what a gate executes.
+suite_is_declared() { # suite_is_declared <module-dir>
+  local f="$root/scripts/pytest-suites.txt"
+  [ -r "$f" ] || return 1
+  awk -v want="$1" '
+    /^[[:space:]]*#/ { next }
+    { sub(/[[:space:]]+$/, "") }
+    $0 == want { found = 1 }
+    END { exit(found ? 0 : 1) }
+  ' "$f"
+}
+
 # The gate-invocation universe, exactly as scripts/check-gate-coverage.sh defines it
 # (#526): a control is invoked when a gate runs it, and a control denylisted from
 # `make verify` is still run by gate.sh / merge-gate.sh.
@@ -171,11 +207,28 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
     IFS=',' read -r -a ctrls <<< "$controls"
     for c in "${ctrls[@]}"; do
       c="${c%%[[:space:]]}"; [ -n "$c" ] || continue
-      if [ ! -e "$root/scripts/$c" ]; then
-        map_findings="$map_findings"$'\n'"  $label: $rule names control '$c', which is not in scripts/"
-      elif ! control_is_invoked "$c" "$list"; then
-        map_findings="$map_findings"$'\n'"  $label: $rule names control '$c', which NO GATE RUNS (a formality)"
-      fi
+      case "$c" in
+        suite:*)
+          # A suite control: the rule is enforced by a declared pytest suite rather
+          # than by one check script. Three things must hold, and the third is the
+          # same question the check-script path asks — does a gate RUN it?
+          local sd="${c#suite:}"
+          if [ ! -d "$root/$sd" ]; then
+            map_findings="$map_findings"$'\n'"  $label: $rule names suite '$sd', which is not a directory"
+          elif ! suite_is_declared "$sd"; then
+            map_findings="$map_findings"$'\n'"  $label: $rule names suite '$sd', which scripts/pytest-suites.txt does not declare (NO GATE RUNS it)"
+          elif ! control_is_invoked "run-pytest-suites.sh" "$list"; then
+            map_findings="$map_findings"$'\n'"  $label: $rule names suite '$sd', but no gate invokes the suite runner"
+          fi
+          ;;
+        *)
+          if [ ! -e "$root/scripts/$c" ]; then
+            map_findings="$map_findings"$'\n'"  $label: $rule names control '$c', which is not in scripts/"
+          elif ! control_is_invoked "$c" "$list"; then
+            map_findings="$map_findings"$'\n'"  $label: $rule names control '$c', which NO GATE RUNS (a formality)"
+          fi
+          ;;
+      esac
     done
   done < <(part_b_rules "$spine")
 
@@ -298,42 +351,75 @@ else
 fi
 
 # --- the vacuity control -----------------------------------------------------
+# A gate that cannot fail is a formality, so the assertions are run against MUTATED
+# COPIES of the map as well as against the real one. Each provocation also names the
+# finding it must produce: "the map was refused" is not sufficient evidence, because a
+# refusal for the wrong reason does not show that the assertion under test works.
 printf '\n== vacuity control: a control nobody runs must be refused ==\n'
 tmp="$(mktemp -d)" || { echo "check-control-coverage: CANNOT-ASSESS — mktemp failed" >&2; exit 2; }
 trap 'rm -rf "$tmp"' EXIT
-# Mutate a COPY of the map: point AO-GR-14 at a script that does not exist, which is
-# the shape of the defect this check exists for (a rule citing a control that is not
-# there, or that no gate runs).
-python3 - "$MAP" "$tmp/mutated.tsv" <<'PY'
+
+mutate() { # mutate <src> <dst> <rule> <new-controls-value>
+  python3 - "$1" "$2" "$3" "$4" <<'PY'
 import sys, pathlib
 src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+rule, value = sys.argv[3], sys.argv[4]
 lines = src.read_text().splitlines(keepends=True)
 out, hit = [], 0
 for line in lines:
-    if line.startswith("AO-GR-14\t"):
+    if line.startswith(rule + "\t"):
         parts = line.rstrip("\n").split("\t")
-        parts[-1] = "check-that-nobody-runs.sh"
+        parts[-1] = value
         line = "\t".join(parts) + "\n"
         hit += 1
     out.append(line)
 if hit != 1:
-    print(f"CONTROL-SETUP-BROKEN: AO-GR-14 row matched {hit} times", file=sys.stderr)
+    print(f"CONTROL-SETUP-BROKEN: {rule} row matched {hit} times", file=sys.stderr)
     raise SystemExit(3)
 dst.write_text("".join(out))
 PY
-setup=$?
-if [ "$setup" -ne 0 ]; then
-  printf '  FAIL  the control could not be built (rc=%s)\n' "$setup" >&2
-  exit 2
-fi
-assert_map "$tmp/mutated.tsv" "$SPINE" "control"
-if [ -n "$map_findings" ]; then
-  printf '  OK    the mutated map is refused — the assertions can fail\n'
-  printf '%s\n' "$map_findings" | sed '/^$/d' | head -2 | sed 's/^/        /'
-else
-  printf '  FAIL  a map naming a control NO GATE RUNS was accepted — this check cannot fail\n' >&2
+}
+
+provoke() { # provoke <label> <rule> <mutated-controls> <the-finding-it-must-produce>
+  local label="$1" rule="$2" value="$3" want="$4"
+  if ! mutate "$MAP" "$tmp/mutated.tsv" "$rule" "$value"; then
+    printf '  FAIL  the control could not be built (%s)\n' "$label" >&2
+    exit 2
+  fi
+  assert_map "$tmp/mutated.tsv" "$SPINE" "control"
+  if [ -n "$map_findings" ] && contains "$map_findings" "$want"; then
+    printf '  OK    %s\n' "$label"
+    printf '%s\n' "$map_findings" | sed '/^$/d' | head -1 | sed 's/^/        /'
+  else
+    printf '  FAIL  %s — accepted, so this check cannot fail\n' "$label" >&2
+    fail=1
+  fi
+}
+
+# The check-script path has TWO assertions — the control exists, and a gate runs it —
+# and each needs its own provocation. They are not interchangeable: naming a script
+# that is not there exercises the first, and a first draft of this control did exactly
+# that while claiming to exercise the second.
+provoke "a control script that does not exist is refused" AO-GR-14 "check-that-nobody-runs.sh" "not in scripts/"
+
+# The second assertion needs a REAL script that no gate happens to invoke. Its
+# precondition is asserted here, so that if a later change wires that script into a
+# gate, this fails with an explanation instead of silently testing the wrong thing.
+provocation_target="scan-pr-failures.sh"
+if [ ! -e "$root/scripts/$provocation_target" ]; then
+  printf '  FAIL  the invocation provocation has no target: scripts/%s is gone\n' "$provocation_target" >&2
   fail=1
+elif control_is_invoked "$provocation_target" "$(discovered)"; then
+  printf '  FAIL  the invocation provocation is vacuous: a gate now runs scripts/%s — choose another unwired script\n' "$provocation_target" >&2
+  fail=1
+else
+  provoke "a control script that exists but NO GATE runs is refused" AO-GR-14 "$provocation_target" "NO GATE RUNS"
 fi
+
+# the suite path: a rule citing a directory the manifest does not declare. `docs` is a
+# real directory and is deliberately not a pytest suite, so this exercises the
+# declaration assertion rather than the existence one.
+provoke "a suite the manifest does not declare is refused" AO-GR-15 "suite:docs" "does not declare"
 
 printf '\n'
 if [ "$fail" -ne 0 ]; then

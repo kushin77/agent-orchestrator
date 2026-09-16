@@ -4,9 +4,11 @@
 # `scripts/check-control-coverage.sh` validates every row against the repository:
 #   * the rule exists in the spine's Part B;
 #   * every module path exists;
-#   * every control named is INVOKED BY A GATE (discovered by
-#     scripts/discover-checks.sh, or named in scripts/verify.sh / the Makefile) —
-#     a control nobody runs is a formality;
+#   * every control named is INVOKED BY A GATE. A control is either a check script
+#     (discovered by scripts/discover-checks.sh, or named in scripts/verify.sh / the
+#     Makefile) or a SUITE, written `suite:<dir>` — and a suite counts only when
+#     scripts/pytest-suites.txt DECLARES it, because that manifest is what
+#     scripts/run-pytest-suites.sh executes. A control nobody runs is a formality.
 #   * a rule that is not ENFORCED is recorded in scripts/control-coverage-gaps.tsv,
 #     which is SHRINK-ONLY: a new gap is refused by name.
 #
@@ -26,9 +28,9 @@
 AO-GR-12	ENFORCED	control-plane/	check-control-functions.sh,check-control-verbs.sh
 AO-GR-13	PARTIAL	governance/merge/,governance/lifecycle/	check-landing.sh
 AO-GR-14	ENFORCED	governance/merge/,identity/rbac/	check-authority.sh
-AO-GR-15	GAP	telemetry/ledger/,identity/edges/	-
+AO-GR-15	ENFORCED	guardrails/isolation/,telemetry/ledger/,identity/edges/	suite:guardrails/isolation,suite:telemetry/ledger
 AO-GR-16	ENFORCED	guardrails/dlp/,guardrails/chat/	check-chat-guardrails.sh
-AO-GR-17	ENFORCED	telemetry/ledger/,telemetry/audit/	check-audit-read-model.sh
+AO-GR-17	ENFORCED	telemetry/ledger/,telemetry/audit/	check-audit-read-model.sh,suite:telemetry/ledger
 AO-GR-18	ENFORCED	gateway/finops/,telemetry/chat/	check-chat-finops.sh,check-metering-parity.sh
 AO-GR-19	ENFORCED	guardrails/policy/,guardrails/honesty/	check-negative-controls.sh,check-guardrail-controls.sh,check-policy-schema.sh
 AO-GR-20	ENFORCED	infra/feature-flags/,portal/config/	check-feature-flags.py
