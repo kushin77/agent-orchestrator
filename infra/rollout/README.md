@@ -36,7 +36,9 @@ itself still lands as a PR → gate → merge.
 | `live-state.yaml` | The committed record of what is actually promoted (issue #914: flag -> stage/since/approval-or-policy/audit_record), validated separately. |
 | `model.py` | Pure domain: stages, adjacency, audience, gates, rollback decision. |
 | `engine.py` | Promotion/rollback engine, approvals, hash-chained audit log. |
-| `cli.py` | Offline CLI the Cloud Build pipeline invokes (`python3 -m infra.rollout.cli`). |
+| `cli.py` | Offline CLI the Cloud Build pipeline invokes (`python3 -m infra.rollout.cli`) - one flag, ONE adjacent stage per invocation, with `--audit-log` and `--live-state-out`. |
+| `go_live.py` | The ordered, resumable, owner-gated **go-live driver** (issue #619): ONE command for the whole phase 0 -> 8 run, enforcing `strict-by-phase` and the declared 24h hold itself. |
+| `audit/` | One evidence record per transition plus the hash-chained `promotion-audit.jsonl`; format and rules in [`audit/README.md`](audit/README.md). |
 | `surface_guard.py` | The console surface's **rollback anchor** (issue #802): reads the surface's own readiness and withdraws it when the reading fails. |
 | `checks/check_rollout.py` | Honest offline gate (all checks can fail; `--self-test`). |
 | `tests/` | Pytest suite (stage model, default-OFF, gate, gradual, rollback, audit, plan, gate). |
@@ -175,6 +177,62 @@ flowchart LR
   rollback pipeline flips the flag OFF and the apply pipeline reverts the
   deployment.
 
+## The ordered go-live run — ONE command (issue #619)
+
+`cli.py` moves ONE flag ONE adjacent stage per invocation, which made a go-live
+~62-86 manual invocations plus a hand-edited trigger, with no phase awareness,
+no resume and no dry run. The driver is that run as a single, idempotent
+command:
+
+```bash
+python3 infra/rollout/go_live.py --preflight          # 0/1/2 - offline, writes nothing
+python3 infra/rollout/go_live.py --dry-run            # per-phase plan, writes nothing
+python3 infra/rollout/go_live.py --phase 0 --canary-health-ok \
+  --actor deployer-sa --approvals-dir infra/rollout/approvals
+python3 infra/rollout/go_live.py --phase 1-6 --canary-health-ok --actor deployer-sa
+python3 infra/rollout/go_live.py --phase 7 --canary-health-ok --actor deployer-sa
+```
+
+What it computes that nothing else did:
+
+* **`promotion_order: strict-by-phase`** - declared in `go-live-plan.yaml` and
+  read by NO code until this driver. Phase N+1 is refused while any earlier
+  phase's flag is short of its declared `go_live_stage`, and the refusal names
+  the blocking flag. Phases can also be driven in one pass (`--phase 0 --phase
+  1-6 --phase 7`).
+* **the declared 24h hold** - `stage-model.yaml` declares
+  `gradual.ramp.dwell: 24h`; only `ramp.steps` used to be parsed and
+  `gradual_complete` was a caller-supplied boolean. The driver DERIVES the hold
+  from the recorded `since` in `live-state.yaml` and refuses `gradual -> full`
+  before it elapses, so a real run cannot skip the hold: the first invocation
+  reports `waiting` with the earliest resumption time, and the next one (after
+  the hold) promotes and records.
+* **the owner's gate** - every transition the stage model requires an
+  `approval_code` for (the `full` promotion) must resolve to an approval-as-code
+  record whose approver differs from the executing actor. A missing or
+  self-granted approval refuses the run BEFORE anything is written.
+* **evidence per transition** - a real record file under `infra/rollout/audit/`
+  is written BEFORE the live-state entry that names it, and the hash-chained
+  audit log is persisted (`--audit-log`), so the gate can never find a promoted
+  flag with no provable trail.
+* **resumability** - the current stage is read from `live-state.yaml` (never
+  from the committed all-off defaults), a flag already at its target is skipped,
+  and a recorded stage ABOVE its declared target is refused by name.
+
+Exit codes are tri-state, like `surface_guard.py` and every `scripts/check-*.sh`:
+**0** the requested scope is complete (or, in a dry run, lawful and ready),
+**1** refused or incomplete (strict-by-phase, a non-forward move, a missing gate
+input, a hold still running), **2** CANNOT-ASSESS (a declaration is unreadable,
+correctness of the plan cannot be established, a live-state entry's audit record
+is missing, or the audit chain does not verify).
+
+```bash
+python3 infra/rollout/checks/check_rollout.py            # exit 0 = valid
+python3 infra/rollout/checks/check_rollout.py --self-test # negative probes
+pytest infra/rollout/tests -p no:cacheprovider            # this suite
+python3 -m infra.rollout.cli demo                         # E2E offline demo
+```
+
 ## Gate (this lane)
 
 ```bash
@@ -217,7 +275,9 @@ follow the #6 conventions.
    python3 -m infra.rollout.cli canary services.registry --health-ok false
    ```
 5. **Ramp and complete** once the canary is green, one gated step at a time
-   (each with its own approval + audit record).
+   (each with its own approval + audit record). Prefer the ordered driver
+   (`go_live.py`) above: it drives the whole ladder, enforces the phase order
+   and the declared hold, and writes the per-transition evidence records.
 
 The offline `demo` subcommand runs the whole loop (promote → canary-fail →
 auto rollback to off) against a temporary audit log and asserts the audit

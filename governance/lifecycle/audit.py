@@ -198,9 +198,19 @@ def _closure_findings(item: dict) -> list[Finding]:
 
     lane = item.get("lane") or {}
     if lane.get("present"):
-        problems.append(
-            Finding("LANE_NOT_RECLAIMED", subject, f"lane {lane.get('session_id') or '(unknown)'} is still provisioned")
-        )
+        # ``present`` means a lane *record* remains — live or dead (#834). The
+        # invariant demands the worktree AND the record be gone, so a record whose
+        # worktree a reaper already removed is still owed — and is reported with
+        # the same name the isolation audit gives it (``worktree-missing``) rather
+        # than being treated as nothing, which is how such a record came to shadow
+        # a live lane and refuse a close-out whose lane was there all along.
+        session = lane.get("session_id") or "(unknown)"
+        where = lane.get("worktree") or "(unknown path)"
+        if lane.get("worktree_exists", True):
+            detail = f"lane {session} is still provisioned at {where}"
+        else:
+            detail = f"lane record {session} remains with no worktree (worktree-missing: {where}); the record is not gone"
+        problems.append(Finding("LANE_NOT_RECLAIMED", subject, detail))
 
     if not item.get("closing_evidence", False):
         problems.append(Finding("CLOSING_EVIDENCE_MISSING", subject, "the issue was closed without recorded evidence"))

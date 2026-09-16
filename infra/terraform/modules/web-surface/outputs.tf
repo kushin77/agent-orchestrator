@@ -17,8 +17,13 @@ output "domain" {
 }
 
 output "domain_mapping_name" {
-  description = "Cloud Run domain mapping resource name, or null while the flag is OFF."
-  value       = var.enabled ? google_cloud_run_domain_mapping.web[0].name : null
+  description = "Cloud Run domain mapping resource name, or null when no mapping is created — the flag is OFF, or the retired GCP edge route is not declared."
+  # The splat is required, not stylistic (issue #731): `web[0]` is an INVALID
+  # INDEX as soon as `create_gcp_edge_route` gates this resource off, so the
+  # everyday promoted posture (enabled = true, route retired) would have failed
+  # at plan time. `one()` reads null for the mapping that was deliberately not
+  # created, which is the contract this file already states for a flag-OFF run.
+  value = one(google_cloud_run_domain_mapping.web[*].name)
 }
 
 output "runtime_service_account" {

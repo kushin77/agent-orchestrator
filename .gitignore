@@ -44,6 +44,16 @@ governance/board/violations.jsonl
 # Claim locks are runtime state (the claim ledger itself is tracked evidence)
 .board/locks/
 
+# The per-event claim DIRECTORY is runtime state too (issue #848). Rule 14 makes
+# `claim` mandatory, and `governance/dispatch/claims.py` writes one event file per
+# claim into `.board/claims/` — so a lane that merely obeyed the doctrine carried
+# an untracked, unignored path that `check-gitignore` refused by name, and could
+# not reach a green gate of record no matter what it changed. The frozen legacy
+# ledger `.board/claims.jsonl` stays TRACKED: it is the accumulated evidence the
+# per-event files are appended to, and ignoring it would take that evidence out of
+# review.
+/.board/claims/
+
 # The out-of-epic pool rail is runtime state too (epic #707, lane F6/#721): it
 # records which issues the active focus parked and is rewritten on every
 # drain, so committing it would put a moving dispatch signal in the diff.

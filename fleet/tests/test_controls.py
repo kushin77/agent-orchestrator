@@ -37,11 +37,11 @@ def test_the_control_vocabulary_covers_the_operator_list():
     assert '("start", cmd_start)' in control_source
 
 
-def test_only_the_brain_may_issue_control():
+def test_only_the_director_may_issue_control():
     problems = channel.validate(
         {"from": "sister", "to": "brain", "type": "directive", "control": "pause", "correlation_id": "x"}
     )
-    assert any("only the brain may issue control" in problem for problem in problems)
+    assert any("only the director may issue control" in problem for problem in problems)
 
 
 def test_an_unknown_control_is_refused():

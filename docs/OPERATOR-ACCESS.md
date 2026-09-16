@@ -1,13 +1,13 @@
-# Operator access — every way into the fleet, and what each one needs
+# Principal access — every way into the fleet, and what each one needs
 
 > **Status:** runbook (issue #763). Normative companion:
 > [`../fleet/CONTRACT.md`](../fleet/CONTRACT.md) §7.1 declares the steering
 > channel the **PRIMARY control plane**; the runbook
 > [`../fleet/README.md`](../fleet/README.md) describes the mechanics. This page
-> answers one question: **as the operator, which command reaches which surface —
+> answers one question: **as the principal, which command reaches which surface —
 > and from where.**
 
-An operator with no shell on the box used to have no stated path at all. This
+A principal with no shell on the box used to have no stated path at all. This
 page names every surface, gives the exact command for each, and says plainly
 which ones need a shell on the box and which do not. Nothing here is invented:
 every command below is the one the code implements, and the limits section
@@ -18,8 +18,8 @@ records what is **not** reachable today.
 | I want to… | Surface | Command | Needs |
 |---|---|---|---|
 | **order work** (the primary control plane) | A2A control channel | `python3 fleet/channel.py order --message <file-or-inline-json>` | shell on the box |
-| read the brain's replies | A2A control channel | `python3 fleet/channel.py brain-outbox` | shell on the box |
-| see the whole fleet on one screen | live operator view | `make operator` | shell on the box **+ tmux** |
+| read the director's replies | A2A control channel | `python3 fleet/channel.py brain-outbox` | shell on the box |
+| see the whole fleet on one screen | live principal view | `make operator` | shell on the box **+ tmux** |
 | read state, health, or debug one thing | override terminal (observe) | `python3 fleet/control.py status` / `health` / `debug` | shell on the box |
 | steer a running fleet (pause, poke, halt, refresh) | override terminal (steer) | `python3 fleet/control.py <verb>` | shell on the box |
 | start / stop the rungs | override terminal (lifecycle) | `python3 fleet/control.py start` / `stop` / `restart` | shell on the box |
@@ -31,21 +31,21 @@ records what is **not** reachable today.
 
 The steering channel is the fleet's primary control plane, not a fallback:
 `fleet/CONTRACT.md` §7.1 states it normatively, `fleet/directive.json` carries it
-into every subagent prompt, and
+into every executor prompt, and
 [`../scripts/check-fleet-contract.sh`](../scripts/check-fleet-contract.sh) — in
 `make verify` — fails by name when the declaration is removed. The transport is
 the file mailbox of `fleet/channel.py`; the chain is
-`operator → brain → sister → subagent`, and the transport refuses a skip.
+`principal → director → dispatcher → executor`, and the transport refuses a skip.
 
-The operator **orders the brain** — it never addresses the sister directly
-(`order` is the only way in; `send` refuses an operator sender):
+The principal **orders the director** — it never addresses the dispatcher directly
+(`order` is the only way in; `send` refuses a principal sender):
 
 ```bash
-# 1. order work — the order is a directive the brain turns into a dispatch
+# 1. order work — the order is a directive the director turns into a dispatch
 python3 fleet/channel.py order --message '{
   "type": "directive",
   "task": {"issue": 763, "lane": "fleet"},
-  "body": "dispatch one subagent for #763 and report the evidence"
+  "body": "dispatch one executor for #763 and report the evidence"
 }'
 
 # --message takes inline JSON or a path to a JSON file:
@@ -54,35 +54,35 @@ cat > /tmp/order-763.json <<'JSON'
 JSON
 python3 fleet/channel.py order --message /tmp/order-763.json
 
-# 2. read the brain's replies (acks and refusals), newest last
+# 2. read the director's replies (acks and refusals), newest last
 python3 fleet/channel.py brain-outbox
 python3 fleet/channel.py brain-outbox --limit 5
 
-# 3. watch the brain's own inbox — the oldest order still waiting for it
+# 3. watch the director's own inbox — the oldest order still waiting for it
 python3 fleet/channel.py brain-inbox --timeout-seconds 5    # exits 1 (IDLE) if none
 ```
 
 A worked example of ordering work, end to end:
 
-1. `order` writes the order into the brain's inbox and prints its message id.
+1. `order` writes the order into the director's inbox and prints its message id.
    The message is validated first: a bad tier/thinking, an unknown type, or a
    replayed `nonce` is **refused** before it moves.
-2. The brain (`bash fleet/brain.sh`) drains it with `brain-inbox`, signs a
-   directive for the sister, and reports what it did.
-3. `brain-outbox` is where the operator reads that answer — including a refusal,
+2. The director (`bash fleet/brain.sh`) drains it with `brain-inbox`, signs a
+   directive for the dispatcher, and reports what it did.
+3. `brain-outbox` is where the principal reads that answer — including a refusal,
    which names the contract rule it enforced.
 
 Two properties that matter when ordering work:
 
 - **A directive is the only authorisation for work** (§7.1 rule 1). An order is
-  how an operator starts work; a comment or a verbal hand-off is not.
+  how a principal starts work; a comment or a verbal hand-off is not.
 - **Superseding is explicit.** A new directive supersedes an earlier one for the
   same issue by its `supersedes` field or id — never by silent overwrite, so the
   order of orders is recorded in artifacts rather than reconstructed.
 
 ## 2. The human-override terminal — `python3 fleet/control.py <verb>`
 
-The override terminal is the operator's direct lever on the rungs. It has 18
+The override terminal is the principal's direct lever on the rungs. It has 18
 verbs; `python3 fleet/control.py --help` lists them, and
 `docs/REMOTE-CONTROL-GAP-ANALYSIS.md` §2.1 inventories each one's reach.
 
@@ -99,7 +99,7 @@ verbs; `python3 fleet/control.py --help` lists them, and
 
 | Verb | What it does |
 |---|---|
-| `poke` | ping the sister; it acks (liveness, without stopping it) |
+| `poke` | ping the dispatcher; it acks (liveness, without stopping it) |
 | `pause` / `resume` | hold the queue / release it (an in-flight run finishes) |
 | `override --issue N` | force `#N` past a live claim |
 | `refresh` | `git pull --ff-only` + board snapshot + `make verify` |
@@ -122,7 +122,7 @@ the box and `tmux`**: the session is a *view* over rungs that run detached, and
 without `tmux` the verb reports that it cannot host the view (exit 1) instead of
 pretending it did.
 
-## 3. The live operator view — `make operator`
+## 3. The live principal view — `make operator`
 
 ```bash
 make operator              # report the surfaces, then start/attach the live view
@@ -160,7 +160,7 @@ console: serving on http://127.0.0.1:8787 (loopback by default; FAILS CLOSED wit
 agent-orchestrator console listening on http://127.0.0.1:8787 (static root: ...)
 ```
 
-### 4.1 The working-directory trap (this bit an operator)
+### 4.1 The working-directory trap (this bit a principal)
 
 `python3 -m portal.server.main` resolves the `portal` package against the
 **current directory**, so it works only when the shell is already at the repo
@@ -191,7 +191,7 @@ server rather than of this document:
 
 1. **It binds loopback by default** (`127.0.0.1:8787`). Reaching it from
    elsewhere therefore requires deliberately binding a reachable interface
-   (`--host`), which is a decision an operator has to make, not a default.
+   (`--host`), which is a decision a principal has to make, not a default.
 2. **It has no login of its own.** It redirects an unauthenticated visitor to
    the shared auth gate and establishes a console session only from a verified
    auth-gate RS256 `os-session-token`. With no JWKS mirror configured it
@@ -219,7 +219,7 @@ address as a control. A tunnel or reverse proxy in front of the console is a
 (GR-5), and lands as a reviewed change — never a console click and never an
 ad-hoc `terraform apply`.
 
-## 5. What an operator with no shell on the box can and cannot do
+## 5. What a principal with no shell on the box can and cannot do
 
 Honest limits, measured (`docs/REMOTE-CONTROL-GAP-ANALYSIS.md` §2.4/§2.6):
 
@@ -233,7 +233,7 @@ Honest limits, measured (`docs/REMOTE-CONTROL-GAP-ANALYSIS.md` §2.4/§2.6):
   control path to authenticate. Stated as a surface, not as a promise.
 - **The declared graduation path** is the remote control API
   (`surfaces.remote_control`, RC-3 of EPIC #551, issue #554): the
-  operator→fleet command channel on the existing console app
+  principal→fleet command channel on the existing console app
   (`POST /api/control/<family>/<action>`), which consumes RC-2's closed verb
   declaration and re-implements no control action. It ships **flag-gated OFF**
   and the flag is checked **before** authentication, so while it is off the
@@ -247,7 +247,7 @@ Honest limits, measured (`docs/REMOTE-CONTROL-GAP-ANALYSIS.md` §2.4/§2.6):
 
 So: the fleet is **ordered** from a shell on the box (the primary control plane,
 §1), **watched** from a shell (`make operator`, §3) or a browser (`make console`,
-§4), and **steered** from the override terminal (§2). A remote operator's path is
+§4), and **steered** from the override terminal (§2). A remote principal's path is
 the console — read-only until the remote control API is promoted.
 
 §6 adds the *transport* that removes the first of those needs — a shell on the
@@ -261,7 +261,7 @@ Sections 1–5 all start from a shell on the host, or from a browser that can
 reach a console somebody with a shell already started. This section is the
 **transport** that removes that first need: the host's own sshd is published
 through the **existing** Cloudflare Tunnel with **Cloudflare Access** in front
-of it, so an operator reaches the host from anywhere without opening port 22 to
+of it, so a principal reaches the host from anywhere without opening port 22 to
 the internet.
 
 ```bash
@@ -284,7 +284,7 @@ four steps below and only the first has interesting logic:
 2. **Upsert the proxied CNAME** `<hostname>` → `<tunnel id>.cfargotunnel.com`
    (update the record that already carries the name, else create it).
 3. **Ensure the Cloudflare Access self-hosted application** for the hostname,
-   plus an allow-policy listing the operator emails.
+   plus an allow-policy listing the principal emails.
 4. **Verify** the rule is present in the live configuration, and that the name
    resolves (A/AAAA).
 
@@ -309,7 +309,7 @@ infra/cloudflare/ao-ssh-access.sh --provision --connector  # the full e2e
   re-running converges to one running connector. Without a connector the tunnel
   is a configuration that serves nothing; this is what actually joins it to the
   origin. The connector's tunnel token arrives from the environment only, and
-  the deploy is an **operator act** like `--apply`.
+  the deploy is a **principal act** like `--apply`.
 
 The provision and connector logic lives in a pure module,
 [`../infra/cloudflare/provision.py`](../infra/cloudflare/provision.py), so it is
@@ -337,7 +337,7 @@ ssh <user>@<the published hostname>
 ```
 
 connect with no browser and no cached login. The token is a separate, deliberate
-operator act on the same Access application.
+principal act on the same Access application.
 
 ### What it reads from the environment
 
@@ -349,7 +349,7 @@ operator act on the same Access application.
 | `AO_SSH_HOSTNAME` | the public hostname to publish |
 | `AO_SSH_ORIGIN_HOST` | the host (or address) the tunnel reaches sshd on |
 | `AO_SSH_ORIGIN_PORT` | the sshd port (default `22`) |
-| `AO_SSH_ACCESS_EMAILS` | comma-separated operator emails for the allow-policy |
+| `AO_SSH_ACCESS_EMAILS` | comma-separated principal emails for the allow-policy |
 | `AO_SSH_ACCESS_SESSION_DURATION` | the Access session lifetime (default `24h`) |
 | `CF_API_TOKEN` | the API token, **or** the two Secret Manager variables below |
 | `AO_CF_TOKEN_SECRET` / `AO_GCP_SECRET_PROJECT` | the GCP Secret Manager secret and project holding that token |
@@ -373,7 +373,7 @@ environment-first with a documented manager on each side of the fleet:
 - **the API token** (`CF_API_TOKEN`) is read from the environment, or from
   **GCP Secret Manager** (`AO_CF_TOKEN_SECRET` + `AO_GCP_SECRET_PROJECT`).
 - **the connector tunnel token** (`AO_SSH_CONNECTOR_TOKEN`) is read from the
-  environment only. The operator sources it upstream from whatever manager the
+  environment only. The principal sources it upstream from whatever manager the
   estate uses: on the **shared-services** (Vault) side that is a Vault KV read
   (`vault kv get -field=value <path>`), and on this repo's side GCP Secret
   Manager — either way it lands in the environment variable, never in a file and
@@ -400,7 +400,7 @@ all.
 (`surfaces.remote_ssh_access` in
 [`../infra/feature-flags/registry.yaml`](../infra/feature-flags/registry.yaml),
 OFF as delivered — check it before you start, and note that promotion is a
-reviewed change, not an environment variable). The apply itself is an **operator
+reviewed change, not an environment variable). The apply itself is a **principal
 act**: it changes an estate this repo does not own, which is exactly the kind of
 change an agent must not make.
 
@@ -408,7 +408,7 @@ change an agent must not make.
 
 It reaches the **host**, not the fleet console. The console still refuses every
 session until the auth-gate JWKS mirror is configured (issues #763 / #730), so
-this section is the transport half of the operator-access gap and not the whole
+this section is the transport half of the principal-access gap and not the whole
 path: once you have the shell, sections 1–3 are what you run in it.
 
 The route is proved offline — no estate, no credentials, no Cloudflare call — by
