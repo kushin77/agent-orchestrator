@@ -50,7 +50,7 @@ ladder:
       this tier.
     models:
       - { id: deepseek-v4-pro, provider: deepseek, costPerMTok: 0.28, role: primary }
-      - { id: claude-sonnet-4-5, provider: anthropic, costPerMTok: 3.00, role: fallback }
+      - { id: claude-sonnet-5, provider: anthropic, costPerMTok: 3.00, role: fallback }
   L2:
     label: architecture
     modelTierHint: high
@@ -63,7 +63,7 @@ ladder:
       out of scope for the chooser and is never returned as a routing target.
     models:
       - { id: deepseek-v4-pro-thinking, provider: deepseek, costPerMTok: 0.46, role: primary }
-      - { id: claude-opus-4-1, provider: anthropic, costPerMTok: 15.00, role: fallback }
+      - { id: claude-opus-5, provider: anthropic, costPerMTok: 15.00, role: fallback }
 
 # ── Task classes: cheapest-capable default tier + escalation cap ─────
 # capability references a registry/profiles catalog capability id (consumed,
