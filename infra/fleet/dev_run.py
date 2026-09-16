@@ -537,7 +537,29 @@ class DevRun:
         after = state_snapshot(roots)
         changes = classify_changes(before, after, permitted)
 
-        failed = [job for job in jobs if job["rc"] not in (0, None) or job["timed_out"]]
+        # A role that reports CANNOT_ASSESS (rc=2, this repo's own exit-code
+        # contract — see e.g. scripts/prune-worktrees.sh's header) has taken no
+        # action: it measured its environment and declined to guess, which is
+        # exactly the dry-run discipline this harness exists to prove. The
+        # `reap` role's dry-run form (scripts/prune-worktrees.sh) cannot see a
+        # `.git` directory in THIS image on purpose — `.dockerignore` excludes
+        # `.git` from the build context so the image stays reproducible — so a
+        # CANNOT-ASSESS here is the tool failing closed as designed, not a
+        # dispatch that misbehaved. It is still recorded, by code, so a reader
+        # sees it; it just does not fail the run the way a genuine NOT-OK (1)
+        # or an unexpected rc/timeout does.
+        cannot_assess = [job for job in jobs if job["rc"] == CANNOT_ASSESS and not job["timed_out"]]
+        for job in cannot_assess:
+            self.finding(
+                "role-cannot-assess",
+                f"role {job['role']!r} reported CANNOT-ASSESS (rc=2) and took no action "
+                f"({'; '.join(job['tail'][-2:]) if job['tail'] else 'no output'})",
+            )
+        failed = [
+            job
+            for job in jobs
+            if (job["rc"] not in (0, None, CANNOT_ASSESS)) or job["timed_out"]
+        ]
         for job in failed:
             self.finding(
                 "role-failed",
