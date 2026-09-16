@@ -17,6 +17,8 @@ Two configuration layers:
 
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -24,19 +26,25 @@ from providers.contract import DEFAULT_TIER
 from providers.resilience import CircuitBreakerSettings, RetryPolicy
 
 #: DEPRECATED - pre-parity (issue #894) Claude model ids that other pillars
-#: (``gateway/health/health.yaml`` + ``fallback.py`` + ``cli.py``,
-#: ``gateway/finops/tiers.yaml``) still reference directly, out of this
-#: lane's scope. Rather than edit those out-of-lane files, the old id is
-#: accepted here and normalised to its current replacement before the
-#: fail-closed ``model_supported`` check and before any request is built, so
-#: an old id still resolves to a real, currently-served model. Remove once
-#: health/finops migrate off the old ids.
-LEGACY_MODEL_ALIASES: Mapping[str, str] = {
-    "claude-haiku-4-5": "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-5": "claude-sonnet-5",
-    "claude-opus-4-5": "claude-opus-5",
-    "claude-opus-4-1": "claude-opus-5",
-}
+#: (``gateway/health/health.yaml`` + ``fallback.py`` + ``cli.py``) still
+#: reference directly, out of this lane's scope (``gateway/finops/tiers.yaml``
+#: migrated off the old ids in issue #971). Rather than edit those remaining
+#: out-of-lane files, the old id is accepted here and normalised to its
+#: current replacement before the fail-closed ``model_supported`` check and
+#: before any request is built, so an old id still resolves to a real,
+#: currently-served model. Remove once health/fallback migrate off the old
+#: ids.
+#:
+#: Canonical source (issue #971): the alias table itself lives in
+#: ``telemetry/metering/model_aliases.py`` so the gateway's fail-closed model
+#: check and the metering rate-card lookup resolve a legacy id through the
+#: exact same map. This module re-exports it rather than keeping its own
+#: copy that could drift.
+_repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
+from telemetry.metering.model_aliases import LEGACY_MODEL_ALIASES  # noqa: E402
 
 
 @dataclass(frozen=True)
