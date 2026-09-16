@@ -24,14 +24,25 @@ being silently dropped.
 WHAT IS MEASURED
 
 1. Two personas run the SAME dispatch, on the SAME snapshot of ``.fleet`` /
-   ``.board`` (taken once, copied twice) so a live lane's concurrent write
-   cannot be mistaken for a persona divergence:
+   ``.board`` (taken once, copied twice — each persona's own isolated copy, so
+   a live lane's concurrent write cannot be mistaken for a persona
+   divergence). Both personas necessarily point ``AO_FLEET_DIR`` /
+   ``AO_FLEET_BOARD_DIR`` at their OWN copy (that is the isolation), so what is
+   actually being compared is the rest of the environment each persona
+   dispatches under:
 
-   * ``local``     — the ambient host environment (no ``AO_FLEET_*`` overrides;
-     this is how ``fleet/cron.py``'s own crontab lines invoke each job today).
-   * ``container`` — ``infra/fleet/env_contract.py``'s resolved environment
-     (the same contract ``infra/fleet/entrypoint.sh`` enforces before it
-     installs the schedule), pointed at its own copy of the snapshot.
+   * ``local``     — the ambient host environment, unextended (no other
+     ``AO_FLEET_*`` variable set beyond the two isolation paths above) — this
+     is how ``fleet/cron.py``'s own crontab lines invoke each job today.
+   * ``container`` — ``infra/fleet/env_contract.py``'s full resolved
+     environment layered on top (``AO_FLEET_REPO``, ``AO_FLEET_DRY_RUN``,
+     ``AO_FLEET_CRON_INTERVAL``, ``AO_FLEET_PORT``, ``AO_FLEET_ROLE_TIMEOUT``,
+     …) — the same contract ``infra/fleet/entrypoint.sh`` enforces before it
+     installs the schedule.
+
+   A diff here is therefore a claim that one of the container contract's own
+   variables changes a dispatched role's DECISION — never a claim about the
+   state roots themselves, which are isolated by construction on both sides.
 
 2. Each persona's copy is dispatched **twice**, back to back, simulating a
    lost-lock race (the second dispatcher did not see the first's lock release

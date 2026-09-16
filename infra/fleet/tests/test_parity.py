@@ -198,6 +198,10 @@ def test_lease_asserted_is_false_when_fleet_lease_absent():
     assert parity.lease_asserted() is False
 
 
+class ArgparseNamespace:  # noqa: N801 — tiny stand-in, not a pytest fixture
+    pass
+
+
 def test_cron_disable_comments_lines_never_deletes(monkeypatch):
     """Issue #714's crontab acceptance box, exercised without touching the real crontab."""
     sys.path.insert(0, str(REPO / "fleet"))
@@ -209,7 +213,7 @@ def test_cron_disable_comments_lines_never_deletes(monkeypatch):
     monkeypatch.setattr(cron, "read_crontab", lambda: list(installed))
     monkeypatch.setattr(cron, "write_crontab", lambda lines: written.setdefault("lines", lines))
 
-    rc = cron.cmd_disable(argparse_namespace())
+    rc = cron.cmd_disable(ArgparseNamespace())
     assert rc == 0
     result = written["lines"]
     assert len(result) == len(installed), "disable must comment, never delete, a marked line"
@@ -218,22 +222,26 @@ def test_cron_disable_comments_lines_never_deletes(monkeypatch):
         assert entry.startswith("# "), "every ao-fleet-* line must be commented out, not removed"
 
 
-class argparse_namespace:  # noqa: N801 — tiny stand-in, not a pytest fixture
-    pass
-
-
 @pytest.mark.parametrize("module_name", ["fleet.prune", "governance.reconcile.cli"])
 def test_real_roles_dry_run_agrees(monkeypatch, tmp_path, module_name):
-    """One light real-dispatch check: the actual prune/reconcile dry-run forms agree
-    across personas on an isolated, empty snapshot. Bounded (single tick, small
-    timeout) — this is a smoke check, not a substitute for `make fleet-parity`.
+    """One light real-dispatch check: the actual prune/reconcile dry-run forms must
+    produce IDENTICAL normalized decisions across personas on an isolated, empty
+    snapshot — asserted, not merely "some rc came back" (a test that cannot fail
+    is the thing this repo's gates refuse by name). Bounded (single tick, small
+    timeout); this is a smoke check, not a substitute for `make fleet-parity`.
     """
     role_by_module = {
         "fleet.prune": parity.dev_run.ROLES[1],
         "governance.reconcile.cli": parity.dev_run.ROLES[2],
     }
     role = role_by_module[module_name]
+    try:
+        importlib.import_module(module_name)
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"{module_name} could not be imported in this environment: {exc}")
     rc, document = _run_with_roles(monkeypatch, tmp_path, [role], evidence_name=f"{role.name}.json")
-    assert rc in (parity.OK, parity.NOT_OK), "must produce a real verdict, never hang or crash"
     assert document["ticks"] == 1
-    assert "diffs" in document and "one_writer" in document
+    assert document["diffs"] == [], "local and container personas must agree on the real dry-run decision"
+    assert document["idempotency"] == [], "the real dry-run role must be a no-op on its lost-lock re-dispatch"
+    assert document["one_writer"] is True
+    assert rc == parity.OK

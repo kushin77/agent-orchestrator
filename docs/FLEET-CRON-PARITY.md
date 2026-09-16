@@ -12,11 +12,19 @@ is that measurement.
    role table — never a second copy). A schedule the two disagree about is
    refused by name (`role-table-drift`), the same rule D2 uses.
 2. Takes **one** snapshot of `.fleet`/`.board` and copies it into two isolated
-   tmp roots, one per persona:
-   - `local` — the ambient host environment (how `fleet/cron.py`'s own
-     crontab lines invoke each job today).
-   - `container` — `infra/fleet/env_contract.py`'s resolved environment (the
-     same contract `infra/fleet/entrypoint.sh` enforces).
+   tmp roots, one per persona. Both personas necessarily point
+   `AO_FLEET_DIR`/`AO_FLEET_BOARD_DIR` at their own copy (that is the
+   isolation); what differs between them is the rest of the environment:
+   - `local` — the ambient host environment, unextended beyond the two
+     isolation paths (how `fleet/cron.py`'s own crontab lines invoke each job
+     today).
+   - `container` — `infra/fleet/env_contract.py`'s full resolved environment
+     layered on top (`AO_FLEET_REPO`, `AO_FLEET_DRY_RUN`,
+     `AO_FLEET_CRON_INTERVAL`, `AO_FLEET_PORT`, `AO_FLEET_ROLE_TIMEOUT`, …) —
+     the same contract `infra/fleet/entrypoint.sh` enforces. A reported diff
+     is therefore a claim that one of those variables changes a role's
+     decision, never a claim about the state roots (isolated by construction
+     on both sides).
 3. Dispatches every role **twice** per persona, back to back, against the same
    copy — simulating a lost-lock race. The second pass's own manifest must be
    empty (no-op); a non-empty one is reported as `not-idempotent`.
