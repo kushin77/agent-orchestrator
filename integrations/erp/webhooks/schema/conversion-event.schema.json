@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.erp.webhooks/conversion-event/v1",
+  "title": "CRM conversion event",
+  "description": "The envelope a CRM conversion webhook posts to the bridge (issue #671). Pattern-shape only, harvested per docs/ERP-MODULE-GAP-ANALYSIS.md provenance; no upstream code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "hook",
+    "tenant",
+    "occurredAt",
+    "customerId",
+    "customerName",
+    "amount",
+    "currency",
+    "sourceDocument"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "eventId": { "type": "string", "minLength": 1 },
+    "hook": {
+      "type": "string",
+      "enum": ["erp.crm.lead-conversion", "erp.crm.opportunity-win"]
+    },
+    "tenant": { "type": "string", "minLength": 1 },
+    "occurredAt": { "type": "string", "minLength": 1 },
+    "customerId": { "type": "string", "minLength": 1 },
+    "customerName": { "type": "string", "minLength": 1 },
+    "amount": { "type": "number", "exclusiveMinimum": 0 },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+    "sourceDocument": { "type": "string", "minLength": 1 },
+    "idempotencyKey": { "type": "string" }
+  }
+}
