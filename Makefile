@@ -28,7 +28,7 @@ CONSOLE_PORT ?= 8787
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
-        tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety \
+        tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
         remediation remediation-scan remediation-dispatch \
         capacity-gate \
         control-verbs control-audit control-functions cockpit operator console operator-access operator-terminal
@@ -132,6 +132,7 @@ help:
 	@echo "                unpreserved worktrees; /tmp ones are the RAM hazard."
 	@echo "  feature-flags Feature-flag registry: every surface defaults OFF"
 	@echo "  cloudbuild    infra/cloudbuild YAML parses; triggers ship disabled"
+	@echo "  web-image-dryrun  Validate the web-surface image build (dry-run/local build only, no push)"
 	@echo "  terraform     infra/terraform fmt + offline validate (SKIP if absent)"
 	@echo "  tf-fmt        terraform fmt -check only"
 	@echo "  tf-validate   offline terraform validate only"
@@ -672,6 +673,25 @@ cloudbuild:
 ## terraform — infra/terraform fmt + offline validate (issue #6; SKIP if absent)
 terraform:
 	@bash scripts/check-terraform.sh all
+
+## web-image-dryrun — validate the web-surface image build config with no
+## push and no GCP mutation (issue #606/#607, gap 1). Prefers a real
+## `gcloud builds submit --dry-run` (renders the config + substitutions
+## against the local Dockerfile without submitting a build); falls back to a
+## local `docker build` (proves portal/Dockerfile actually builds) when
+## gcloud is unavailable. Never runs `gcloud builds submit` for real and
+## never pushes an image (GR-5 — no ad-hoc apply/deploy from this target).
+web-image-dryrun:
+	@if command -v gcloud >/dev/null 2>&1; then \
+		echo "== web-image-dryrun (gcloud --dry-run) =="; \
+		gcloud builds submit . \
+			--config=infra/cloudbuild/web-image.yaml \
+			--substitutions=_AR_REPO=us-central1-docker.pkg.dev/purebliss-ghl/ao-images,_IMAGE=portal,_TAG=dryrun-local \
+			--dry-run; \
+	else \
+		echo "== web-image-dryrun (gcloud absent; local docker build fallback) =="; \
+		docker build --file=portal/Dockerfile --tag=web-surface:dryrun-local .; \
+	fi
 
 ## tf-fmt — terraform fmt -check -recursive on infra/terraform
 ## (visible SKIP if the terraform binary is not installed)
