@@ -263,6 +263,12 @@ if [ "$record" -eq 1 ]; then
     printf 'Enforce the rule first (flip it to ENFORCED in %s), then re-run --record.\n' "scripts/control-coverage.tsv" >&2
     exit 1
   fi
+  # The existing rationales must be captured BEFORE the record is rewritten. The
+  # `> "$GAPS"` below truncates the very file the lookup used to read, which silently
+  # emptied every recorded reason when this first ran — a gap with no reason is a
+  # SILENT gap, so the verify path now refuses one.
+  prior=""
+  [ -r "$GAPS" ] && prior="$(cat "$GAPS")"
   {
     printf '%s\n' \
       '# Shrink-only record of the platform/SaaS spine rules that are NOT fully' \
@@ -274,7 +280,7 @@ if [ "$record" -eq 1 ]; then
     while IFS=$'\t' read -r rule status _rest; do
       [ -n "$rule" ] || continue
       [ "$status" = "ENFORCED" ] && continue
-      why="$(awk -F'\t' -v want="$rule" '$1 == want { print $2 }' "$GAPS" 2>/dev/null)"
+      why="$(printf '%s\n' "$prior" | awk -F'\t' -v want="$rule" '$1 == want { print $2; exit }')"
       printf '%s\t%s\n' "$rule" "$why"
     done < <(map_rows "$MAP")
   } > "$GAPS"
@@ -344,6 +350,20 @@ else
   fi
   if [ -n "$stale" ]; then
     printf '  NOTE  the record can be lowered — re-run with --record:%s\n' "$stale"
+  fi
+  # "A gap is never silent" is this file's whole purpose, so a recorded rule whose
+  # reason is missing IS the defect. The first version of --record truncated the
+  # record before reading it and emptied every reason; this is what turns that from a
+  # quietly thinner file into a failure.
+  silent=""
+  while IFS=$'\t' read -r grule gwhy; do
+    case "$grule" in ''|'#'*) continue ;; esac
+    [ -n "$gwhy" ] || silent="$silent $grule"
+  done < "$GAPS"
+  if [ -n "$silent" ]; then
+    printf '  FAIL  a recorded gap carries NO reason (a silent gap):%s\n' "$silent" >&2
+    printf '        A gap must name why it is not enforced, or be enforced and dropped.\n' >&2
+    fail=1
   fi
   printf '  enforced: %s of %s rule(s)\n' \
     "$(map_rows "$MAP" | awk -F'\t' '$2 == "ENFORCED"' | wc -l)" \

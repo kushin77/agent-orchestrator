@@ -3,5 +3,5 @@
 # refuses to add a rule this file does not already carry.
 #
 # Format: <rule><TAB><why it is not enforced>
-# recorded: 2026-09-16T12:31:50Z
-AO-GR-13	
+# recorded: 2026-09-16T12:37:19Z
+AO-GR-13	the ENFORCED half is real: check-landing.sh refuses a red attestation, refuses a green one naming ANOTHER commit, and returns CANNOT-ASSESS on none (so "never on self-report" holds), and governance/merge -- a declared suite -- is the state machine requiring verify-gate green + an independent SME reviewer + no self-merge, with the landing seam delegating to it and refusing if it cannot be loaded. What is NOT proven is the ATTRIBUTION: verdict.reviewer_id is Optional[str], and the attestation the landing gate actually judges carries no identity field at all (branch, check_count, checks, exit_code, gate, git_sha, host, mode, result, timestamp) -- so independence is guaranteed inside the merge model's state machine and is not observable on the landed artifact

@@ -26,7 +26,7 @@
 #
 # rule	status	modules	controls
 AO-GR-12	ENFORCED	control-plane/	check-control-functions.sh,check-control-verbs.sh
-AO-GR-13	PARTIAL	governance/merge/,governance/lifecycle/	check-landing.sh
+AO-GR-13	PARTIAL	governance/merge/,governance/lifecycle/	check-landing.sh,suite:governance/merge
 AO-GR-14	ENFORCED	governance/merge/,identity/rbac/	check-authority.sh
 AO-GR-15	ENFORCED	guardrails/isolation/,telemetry/ledger/,identity/edges/	suite:guardrails/isolation,suite:telemetry/ledger
 AO-GR-16	ENFORCED	guardrails/dlp/,guardrails/chat/	check-chat-guardrails.sh

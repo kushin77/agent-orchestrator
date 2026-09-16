@@ -49,6 +49,17 @@ control a reviewer cannot credit.
 > evidence of absence.** The remedy was structural rather than cosmetic: a suite
 > control is now asserted *against the manifest* instead of searched for by name, and
 > the assertion that would have caught it has its own provocation.
+>
+> The same blind spot produced a second error, in the **other** direction. This
+> document argued AO-GR-13 was `PARTIAL` on the reasoning that "nothing proves the
+> auditor independent" — without looking for suite controls at all. But
+> `governance/merge` **is** a declared suite, and it is the state machine that
+> requires a green verify-gate **+ an independent SME reviewer + no self-merge**, with
+> the landing seam delegating to it and refusing if it cannot be loaded. The rule was
+> better enforced than the first draft allowed; only the **attribution** is missing.
+> Both errors came from one habit — searching for a name instead of reading the
+> mechanism — which is why the map now records a control's *kind* and the gate
+> resolves it, rather than trusting a grep.
 
 Part C already had exactly this machinery for AO-GR-21…27
 (`scripts/check-fleet-durability-rules.sh`: every rule carries Rule/Why/Verify **and**
@@ -67,7 +78,7 @@ validates it against the repository, so the two cannot drift.
 | Rule | Subject (the spine's own heading) | Implementing module(s) | Enforcing control | Status |
 |---|---|---|---|---|
 | AO-GR-12 | Control plane never executes | `control-plane/` | `check-control-functions.sh`, `check-control-verbs.sh` | **ENFORCED** |
-| AO-GR-13 | Independent auditor | `governance/merge/`, `governance/lifecycle/` | `check-landing.sh` | **PARTIAL** |
+| AO-GR-13 | Independent auditor | `governance/merge/`, `governance/lifecycle/` | `check-landing.sh`, `suite:governance/merge` | **PARTIAL** |
 | AO-GR-14 | Separation of duties | `governance/merge/`, `identity/rbac/` | `check-authority.sh` | **ENFORCED** |
 | AO-GR-15 | Tenant isolation is structural | `guardrails/isolation/`, `telemetry/ledger/`, `identity/edges/` | `suite:guardrails/isolation`, `suite:telemetry/ledger` | **ENFORCED** |
 | AO-GR-16 | DLP + prompt-injection on every model interaction | `guardrails/dlp/`, `guardrails/chat/` | `check-chat-guardrails.sh` | **ENFORCED** |
@@ -78,6 +89,10 @@ validates it against the repository, so the two cannot drift.
 
 The bindings are not decorative. Each control's **own stated subject** is the rule:
 
+- AO-GR-13 → `check-landing.sh` **and** `suite:governance/merge` — the state
+  machine's own promise is *"A reviewer is never the author/executor of the work it
+  reviews"*, and the landing seam's is *"no local re-implementation of 'green +
+  reviewer + carve-out', and no fallback that decides on its own"*.
 - AO-GR-14 → `check-authority.sh` — *"authority-matrix gate … repo separation,
   scoped admin rights, **separation of duties**, end-to-end closure"*.
 - AO-GR-16 → `check-chat-guardrails.sh` — *"chat-turn guardrails: **DLP egress**,
@@ -131,11 +146,23 @@ check-control-coverage: OK
 RC=0
 ```
 
-- **AO-GR-13 — PARTIAL.** `check-landing.sh` proves the landing driver *refuses*
-  without evidence, which is real and is the delivery half of "verify before done".
-  It does not make the *auditor independent*: nothing yet proves, on the
-  product-facing path, that the party verifying a change is not the party that
-  authored it. This is the epic's remaining item.
+- **AO-GR-13 — PARTIAL, and the residual is now narrow enough to name.** The enforced
+  half is real and worth stating exactly. `check-landing.sh` proves the landing driver
+  refuses a **red** attestation, refuses a green one that names **another** commit, and
+  returns CANNOT-ASSESS when there is **no** attestation — so *"never on self-report"*
+  holds. The merge rule lives in exactly one place: `governance/landing/verdict.py`
+  loads `governance/merge` and hands it the decision, with no local re-implementation
+  and no fallback (*"a landing that cannot consult the verdict does not get to invent
+  one"*), and `governance/merge` — a declared suite, 79 tests — is the state machine
+  requiring verify-gate green + an **independent SME reviewer** + no self-merge.
+
+  What is not proven is the **attribution**. Nothing shows that the reviewer on a
+  given landing is a party distinct from the author: `verdict.reviewer_id` is
+  `Optional[str]`, and the attestation the landing gate actually judges carries **no
+  identity field at all** — `branch, check_count, checks, exit_code, gate, git_sha,
+  host, mode, result, timestamp`. Independence is guaranteed *inside the merge
+  model's state machine* and is not observable *on the landed artifact*. That is the
+  epic's remaining item, and it is now a named field rather than a suspicion.
 
 ---
 
