@@ -233,6 +233,76 @@ issue under a closed epic, a unit another lane holds, an unowned unit and a stal
 board must all be **refused** (naming their evidence), and a dispatchable unit must
 still be **granted with its provenance**.
 
+## The owner's committed queue (#928)
+
+`order.eligible`/`claims.arbitrate` refuse an out-of-order claim only when
+`Issue.blocked_by` is populated — but nothing populated that edge from the
+owner's actual intended order (posted as an advisory comment on #878,
+"Owner queue 2026-09-16"). `governance/dispatch/queue.py` closes that gap: it
+is a new EDGE SOURCE, not a new refusal reason.
+
+`governance/dispatch/queue.yaml` is the single committed source of truth —
+waves of issue numbers, in forced order:
+
+```yaml
+waves:
+  - name: wave-1-epic-878-lanes
+    issues: [880, 881, 882, 883, 884, 885, 886, 887, 888, 889, 890]
+  - name: wave-2-epic-706-residual-and-golive
+    issues: [902, 619, 731, 732]
+blocked_by: {}   # optional explicit overrides, unioned on top of wave edges
+```
+
+At claim/eligibility time (`cli._load_snapshot`, which every verb goes
+through), the queue is loaded and its IMPLIED order is unioned into
+`Issue.blocked_by` **before** the existing refusal path runs:
+
+* every issue is blocked by every EARLIER issue in the same wave that is
+  still open;
+* every issue is blocked by every issue of an EARLIER wave that is still
+  open;
+* only OPEN blockers are added — a closed issue drops out of the chain
+  automatically, so the queue self-shortens as the owner's real work lands.
+
+A `claim` on an out-of-order issue is refused with the existing `blocked`
+reason, plus a `queue:` detail naming the blocking issue(s):
+
+```
+$ python3 governance/dispatch/cli.py claim --issue 889 --agent me --lane hermes
+claim REFUSED: blocked — #889 is blocked by #880, #881, ..., #888 — evidence: ...
+  (queue: #880, #881, ..., #888 precede(s) #889 in governance/dispatch/queue.yaml)
+```
+
+### `queue` subcommand
+
+```bash
+python3 governance/dispatch/cli.py queue --next    # the next claimable issue(s) per the queue
+python3 governance/dispatch/cli.py queue --check   # validate the file (see below)
+```
+
+`--check` validates `governance/dispatch/queue.yaml` structurally (no
+duplicate issue numbers, no cycle in the `blocked_by` graph — including
+overrides) and, against a FRESH `.board/snapshot.json`, that every queued
+number exists and is open. Like every other verb here, `--check` is
+tri-state and fails CLOSED on a stale board: past `--stale-minutes` it
+reports `CANNOT-ASSESS` (exit 2) for the exists/open half rather than a false
+verdict, while the structural half (duplicates, cycles) still runs — that
+half needs no board at all.
+
+### The gate
+
+```bash
+bash scripts/check-dispatch-queue.sh   # part of `make verify` (dispatch-queue)
+```
+
+Runs `governance/dispatch/tests/test_queue.py` (out-of-order claim refused,
+in-order accepted, closed issues drop out of the chain, `--check` catches a
+cycle), validates the committed queue against the committed snapshot, and
+PROVOKES the cycle detector with a fixture queue whose `blocked_by` overrides
+form a 2-cycle — it must be refused by name (`cycle`), while a clean fixture
+of the same shape must still pass (GR-12 / AO-GR-19: a check that cannot fail
+is a formality).
+
 ## Layout
 
 | File | Role |
@@ -241,5 +311,7 @@ still be **granted with its provenance**.
 | `snapshot.py` | Snapshot build, load, hash, chain-marker parsing, `gh` fetch |
 | `order.py` | Eligibility rules (including a closed epic) and frontier/milestone resolution |
 | `claims.py` | Ledger (directory + frozen legacy file), single-claim lock, TTL take-over, snapshot-staleness refusal, A2A arbitration, audit, both self-controls |
-| `cli.py` | `status` / `eligible` / `dispatch` / `claim` / `release` / `held` / `reap` / `snapshot` / `audit` |
-| `tests/` | Eligibility, lock, TTL, audit, arbitration, the CLI refusal seam and the anti-formality controls |
+| `cli.py` | `status` / `eligible` / `dispatch` / `claim` / `release` / `held` / `reap` / `snapshot` / `audit` / `queue` |
+| `owner_queue.py` | Owner queue (#928): loads `queue.yaml`, overlays its implied `blocked_by` edges, validates, reports next-claimable |
+| `queue.yaml` | The owner's committed, ordered wave queue (#928) |
+| `tests/` | Eligibility, lock, TTL, audit, arbitration, the CLI refusal seam, the owner queue (`test_queue.py`) and the anti-formality controls |
