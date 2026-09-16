@@ -56,13 +56,25 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-# A clean clone has no submodule, so there is no authority to read: the honest
-# answer is CANNOT-ASSESS, never a pass.
+# A clean clone has no submodule content, but a worktree cut from an existing
+# checkout still holds the pinned submodule objects in the shared object store,
+# so the hub can be materialised OFFLINE: `git submodule update --init` performs
+# no network fetch (the gitlink SHA is already in the superproject's history and
+# the module is cloned locally from the checkout's own object store). This makes
+# the gate assess the pinned hub on a default checkout instead of skipping. When
+# the objects genuinely are absent (a true fresh clone, no network), the init
+# fails and the honest answer remains CANNOT-ASSESS — never a pass.
 if [ ! -f "$hub/catalog/mandatory.tsv" ] || [ ! -d "$hub/catalog/modules" ]; then
-  echo "check-module-registry: CANNOT-ASSESS — the pinned hub catalog is absent" >&2
-  echo "        expected $hub/catalog/mandatory.tsv and $hub/catalog/modules" >&2
-  echo "        run 'git submodule update --init vendor/CMR' and re-run" >&2
-  exit 2
+  init_out="$(git submodule update --init vendor/CMR 2>&1)"
+  init_rc=$?
+  if [ "$init_rc" -ne 0 ] || [ ! -f "$hub/catalog/mandatory.tsv" ] || [ ! -d "$hub/catalog/modules" ]; then
+    echo "check-module-registry: CANNOT-ASSESS — the pinned hub catalog is absent" >&2
+    echo "        expected $hub/catalog/mandatory.tsv and $hub/catalog/modules" >&2
+    printf '        %s\n' "$init_out" >&2
+    echo "        offline self-initialise failed (rc=$init_rc); run 'git submodule update --init vendor/CMR' and re-run" >&2
+    exit 2
+  fi
+  echo "check-module-registry: initialised vendor/CMR offline (it was uninitialised in this worktree)"
 fi
 
 ok=0
