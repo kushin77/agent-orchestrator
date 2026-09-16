@@ -43,8 +43,16 @@ class QueueError(ValueError):
     """The queue file itself is malformed: duplicates, unknown numbers, a cycle."""
 
 
-def load(path: Path | str = DEFAULT_PATH) -> dict[str, Any] | None:
-    """Parse the queue file. Returns ``None`` when it is absent (queue is optional)."""
+def load(path: Path | str | None = None) -> dict[str, Any] | None:
+    """Parse the queue file. Returns ``None`` when it is absent (queue is optional).
+
+    ``path`` defaults to ``None`` and is resolved to ``DEFAULT_PATH`` *at call
+    time* (not as a bound default argument): a default argument would freeze
+    the module constant at import, so a test that monkeypatches
+    ``owner_queue.DEFAULT_PATH`` would silently keep reading the old file.
+    """
+    if path is None:
+        path = DEFAULT_PATH
     path = Path(path)
     if not path.exists():
         return None

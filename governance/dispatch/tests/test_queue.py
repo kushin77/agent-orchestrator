@@ -9,9 +9,12 @@ overrides.
 
 from __future__ import annotations
 
+import json
+
 import claims
 import order
 import owner_queue as queue_mod
+import snapshot as snapshot_mod
 from model import REASON_BLOCKED, Issue, Snapshot
 
 
@@ -154,6 +157,46 @@ def test_next_claimable_returns_the_wave_0_front_only():
     )
     ready = queue_mod.next_claimable(snapshot, _two_wave_queue())
     assert ready == [101]
+
+
+def test_snapshot_load_applies_the_queue_overlay(tmp_path, monkeypatch):
+    """The overlay lives in snapshot.load() itself (not just cli._load_snapshot),
+    because fleet/brain.py -- the real dispatch loop -- calls snapshot.load()
+    directly. Deleting the overlay call from snapshot.load() must turn this red."""
+    board_path = tmp_path / "snapshot.json"
+    board_path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-09-16T00:00:00Z",
+                "source": "test",
+                "issues": [
+                    {"number": 701, "title": "wave 0 a", "state": "open"},
+                    {"number": 702, "title": "wave 0 b", "state": "open"},
+                    {"number": 703, "title": "wave 1", "state": "open"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    queue_path = tmp_path / "queue.yaml"
+    queue_path.write_text(
+        "waves:\n"
+        "  - name: w0\n"
+        "    issues: [701, 702]\n"
+        "  - name: w1\n"
+        "    issues: [703]\n",
+        encoding="utf-8",
+    )
+    # Patch the MODULE OBJECT, not the string "owner_queue.DEFAULT_PATH": this
+    # is a script package (bare-name import), so a string target can resolve
+    # to a different module instance than the one snapshot.load() imports.
+    monkeypatch.setattr(queue_mod, "DEFAULT_PATH", queue_path)
+
+    loaded = snapshot_mod.load(board_path)
+    assert set(loaded.get(703).blocked_by) == {701, 702}
+
+    raw = snapshot_mod.load(board_path, apply_queue=False)
+    assert raw.get(703).blocked_by == ()
 
 
 def test_next_claimable_advances_as_issues_close():
