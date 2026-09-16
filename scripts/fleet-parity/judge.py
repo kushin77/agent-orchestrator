@@ -414,11 +414,18 @@ def judge_isolation_audit(subject: dict) -> Verdict:
 
 
 def judge_branch(subject: dict) -> Verdict:
-    """The lane's branch was pushed (AO-GR-23) and is gone now (closure)."""
+    """The lane's branch was pushed (AO-GR-23) and is gone once the work landed.
+
+    The two halves are owed at different times, and conflating them makes an
+    in-flight lane read as a violation: a lane whose branch is pushed and still on
+    the remote is exactly right UNTIL its change lands, and the deletion is owed
+    only after the merge. Never-pushed is a violation at every moment (AO-GR-23).
+    """
     code = "branch-pushed-then-deleted"
     name = _text(subject, "branch.name") or "(unnamed)"
     pushed = _flag(subject, "branch.pushed")
     remote = _flag(subject, "branch.remote_exists")
+    merged = _flag(subject, "merge.merged")
     if pushed is None or remote is None:
         return Verdict(code, CANNOT, detail=f"the push/deletion state of {name} could not be read")
     if pushed is not True:
@@ -426,6 +433,15 @@ def judge_branch(subject: dict) -> Verdict:
             code,
             FAIL,
             evidence=f"{name} was never pushed — a commit that exists only locally is not work (AO-GR-23)",
+        )
+    if remote is True and merged is not True:
+        return Verdict(
+            code,
+            CANNOT,
+            detail=(
+                f"{name} is pushed and still on the remote, which is correct until the change lands — "
+                "the deletion is not yet owed, so this is not a verdict"
+            ),
         )
     if remote is True:
         return Verdict(
@@ -437,14 +453,28 @@ def judge_branch(subject: dict) -> Verdict:
 
 
 def judge_issue_closed(subject: dict) -> Verdict:
-    """The issue is closed, and a closing comment carries evidence — not an assertion."""
+    """The issue is closed, and a closing comment carries evidence — not an assertion.
+
+    Closure is owed only once the change has LANDED (the model's own
+    `owes_closure`, #821): an issue still open on an unmerged lane is normal, not a
+    violation, so it is CANNOT-ASSESS rather than FAIL. Once a pull request is
+    merged, an issue that is still open — or closed with an assertion instead of
+    evidence — is the violation.
+    """
     code = "issue-closed-with-evidence"
+    merged = _flag(subject, "merge.merged")
     state = _text(subject, "issue_state.state")
     comments = _rows(subject, "issue_state.comments")
+    if merged is not True:
+        return Verdict(
+            code,
+            CANNOT,
+            detail="no merged pull request, so the change has not landed and closure is not yet owed",
+        )
     if state is None:
         return Verdict(code, CANNOT, detail="the issue's state could not be read")
     if state.upper() != "CLOSED":
-        return Verdict(code, FAIL, evidence=f"the issue is {state.upper()}, not CLOSED")
+        return Verdict(code, FAIL, evidence=f"the change landed but the issue is {state.upper()}, not CLOSED")
     if comments is None:
         return Verdict(code, CANNOT, detail="the issue's comments could not be read, so 'closed with evidence' is unassessed")
     for comment in comments:
@@ -980,8 +1010,18 @@ def collect(repo_root: Path, issue: int, *, worktrees_root: Path | None = None, 
         "denylisted": sorted(denylist) if denylist is not None else None,
     }
 
-    rc, out = _run(["bash", "scripts/check-pr-contract.sh", "--pr", str(pull["number"])] if isinstance(pull, dict) else ["false"], cwd=repo_root)
-    subject["pr-contract"] = {"rc": rc, "output": out}
+    rc, out = _run(
+        ["bash", "scripts/check-pr-contract.sh", "--pr", str(pull["number"])] if isinstance(pull, dict)
+        else ["false"],
+        cwd=repo_root,
+    )
+    if isinstance(pull, dict):
+        subject["pr-contract"] = {"rc": rc, "output": out}
+    else:
+        # Checking a PR that does not exist would return the checker's own failure,
+        # and reporting THAT as the subject's violation is a false positive (measured:
+        # an in-flight lane scored FAIL here with an empty output).
+        subject["pr-contract"] = {"rc": None, "output": f"no pull request to check: {pr_basis}"}
 
     session, session_basis = _lane_session(main, lane, issue)
     subject["isolation_session"] = session
