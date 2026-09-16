@@ -53,6 +53,7 @@ import time
 import uuid
 from pathlib import Path
 
+import runaway
 import runtime
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -70,6 +71,20 @@ except ValueError:
     FLEET_SUBDIR = runtime.FLEET_DIR
 # The rungs the operator wants to see, in the order the windows are created.
 LIVE_RUNGS = ("brain", "sister", "monitor")
+
+# The mailboxes a directive can occupy, and the two terminal stores. The NAMES
+# are re-derived from the same runtime root `fleet/runaway.py`,
+# `fleet/channel.py` and `governance/lifecycle/directive.py` derive their own
+# from, so a drop acts on the file the drain path actually reads and there is no
+# second layout to keep in step (the reason `fleet/runtime.py` exists at all).
+INBOX_DIR = "inbox"
+SENT_DIR = "sent"
+DONE_DIR = "done"
+DEAD_LETTER_DIR = "dead-letter"
+
+#: The board snapshot the LANDED test reads (issue #821). Committed, so it is
+#: readable offline; refreshed by `governance/dispatch/cli.py snapshot`.
+SNAPSHOT = Path(".board") / "snapshot.json"
 
 
 def _run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -290,23 +305,220 @@ def cmd_halt(args: argparse.Namespace) -> int:
 
 
 def cmd_drop(args: argparse.Namespace) -> int:
-    """Operator lever: order the sister to dead-letter a named directive (#754).
+    """Operator lever: retire a wedged directive to the dead-letter mailbox.
 
-    This is the protocol route a `mv .fleet/inbox/<d>.json /tmp/...` used to
-    stand in for. The hierarchy holds — the operator orders the brain and the
-    brain issues the control — and the order travels the same `_send_control`
-    path as every other lever, so it is acked and recorded rather than reaching
-    into another process's queue.
+    THE DEFECT THIS ROUTE EXISTS FOR (#799, measured on 2026-09-15)
+    The verb used to *only* order the sister to dead-letter the directive, and
+    answered "the sister will dead-letter directive …". That is a message the loop
+    must PROCESS, so the remedy for a loop that cannot drain its mailbox had to
+    travel through the mailbox that loop was not draining: the operator issued the
+    drop and, 13 cycles later, the runaway guard retired the order instead — the
+    operator's own lever was redundant, and it failed with ``FileNotFoundError``
+    once the sister had consumed the message anyway. A control that only takes
+    effect once the loop is healthy is not a control.
+
+    THE ROUTE IS CHOSEN BY WHERE THE ORDER IS, because that is what decides
+    whether a message can have any effect at all:
+
+    * **in the inbox** — this process retires it *now*, through the ONE
+      implementation the automatic path uses (:func:`runaway.dead_letter`, issue
+      #754), which moves the order out of the inbox and stamps the terminal
+      artifact. It is effective with no loop running, and it is NOT relayed: a
+      relay would make the loop re-retire an already-retired order, and
+      ``dead_letter`` reads the envelope from the inbox — so the second write
+      would overwrite the artifact's ``envelope`` with null and destroy the
+      evidence of what the order carried. The mailbox is the interface, not the
+      message.
+    * **already in the dead-letter store** — terminal. Reported idempotently and
+      never rewritten, so a second drop cannot degrade the first's record.
+    * **a brain-minted authorisation** (``.fleet/sent/``) — this process will not
+      move that record: ``governance/lifecycle/directive.py`` is its single owner
+      and nothing else in this repository may move a directive between ``sent``
+      and ``done`` (#821). The verb therefore RELAYS the control over the channel
+      and says so, which is the one case where the mailbox message is still the
+      only route.
+    * **nowhere** — refused BY NAME. A drop naming an order that exists nowhere is
+      not a drop, and silently succeeding would be indistinguishable from a dead
+      loop.
+
+    THE #821 INVARIANT IS PRESERVED: a drop can never retire an order whose change
+    has already landed. Landed work is *finished*, not dead, and relabelling it a
+    dead-letter would record a failure for work that succeeded and mask the
+    authorisation path's own terminal move. Two hermetic sources answer it (the
+    directive already consumed into ``done/``; the issue CLOSED in the board
+    snapshot), and an undecidable subject is refused rather than defaulted to
+    allowed.
+
+    Exit codes are the repo tri-state: 0 retired / 1 refused (a measured reason) /
+    2 CANNOT-ASSESS (the landed state or the target cannot be established).
     """
-    task: dict = {"directive": args.directive}
+    fleet = ROOT / FLEET_SUBDIR
+    directive = args.directive
+
+    if not _directive_id_ok(directive):
+        print(f"drop REFUSED: {directive!r} is not a directive id", file=sys.stderr)
+        return 1
+
+    where, path = _directive_location(fleet, directive)
+    artifact = _dead_letter_artifact(fleet, directive)
+    if where == "nowhere" and not artifact.exists():
+        print(
+            f"drop REFUSED: no record of {directive} in {fleet / INBOX_DIR}, "
+            f"{fleet / SENT_DIR} or {fleet / DEAD_LETTER_DIR} — the named order "
+            "exists nowhere, so there is nothing to retire",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Already terminal: report it and touch nothing. Re-retiring an order is not
+    # "more dead", it is a second write over the evidence the first one produced.
+    if where == "dead-letter":
+        record = runaway.record_shape(fleet, directive)
+        print(
+            f"drop: {directive} was already dead-lettered at {record.get('ts')} "
+            f"(dropped_by={record.get('dropped_by')}) — terminal, nothing re-written"
+        )
+        return 0
+
+    issue = args.issue if args.issue is not None else _directive_issue(path)
+    landed = _order_landed(ROOT, issue, fleet, directive)
+    if landed is True:
+        print(
+            f"drop REFUSED: #{issue} has already landed — the order is FINISHED, not dead. "
+            "Dead-lettering it would record a failure for work that succeeded and mask the "
+            "authorisation path's terminal move (#821). Retire the record where it is owned: "
+            f"python3 governance/lifecycle/cli.py close --issue {issue}",
+            file=sys.stderr,
+        )
+        return 1
+    if landed is None:
+        print(
+            f"drop CANNOT-ASSESS: whether #{issue} has landed cannot be established, so refusing "
+            f"to guess (#821 never defaults to allowed). Refresh the board snapshot with "
+            "`python3 governance/dispatch/cli.py snapshot --from-github` and re-run",
+            file=sys.stderr,
+        )
+        return 2
+
+    if where == "inbox":
+        reason = args.reason or "operator dead-letter (control:drop)"
+        target = runaway.dead_letter(
+            directive,
+            reason,
+            base=fleet,
+            dropped_by=f"operator:{os.environ.get('AO_AGENT_ID') or 'unknown'}",
+        )
+        record = runaway.record_shape(fleet, directive)
+        print(f"drop RETIRED {directive} (#{issue}) — the order is out of the inbox and terminal")
+        print(f"  artifact: {target}")
+        print(f"  record:   dropped_by={record.get('dropped_by')} reason={record.get('reason')}")
+        print("  effective now, with no loop running; inspect with: python3 fleet/control.py dead-letter")
+        return 0
+
+    # A brain-minted authorisation: not this process's record to move (#821).
+    reason = args.reason or "operator dead-letter (control:drop)"
+    task: dict = {"directive": directive, "reason": reason}
     if args.issue is not None:
         task["issue"] = args.issue
-    reason = args.reason or "operator dead-letter (control:drop)"
-    task["reason"] = reason
-    _send_control("drop", task=task, body=f"control:drop — dead-letter {args.directive}: {reason}")
-    print(f"drop sent — the sister will dead-letter directive {args.directive} to the mailbox")
+    _send_control("drop", task=task, body=f"control:drop — dead-letter {directive}: {reason}")
+    print(
+        f"drop RELAYED: {directive} is a brain-minted authorisation in {fleet / SENT_DIR}, which no "
+        "verb but the lifecycle may move (#821) — the control went to the loop over the channel"
+    )
     print("inspect the mailbox with: python3 fleet/control.py dead-letter")
     return 0
+
+
+def _directive_id_ok(directive_id: str) -> bool:
+    """A directive id becomes a filename, so it must be a safe mailbox name.
+
+    The rule is the channel's own (`channel.DIRECTIVE_ID_RE`), imported lazily:
+    control.py otherwise talks to the channel by subprocess, and the validator
+    must be the SAME one the transport applies rather than a second copy that can
+    drift.
+    """
+    import channel
+
+    return bool(channel.DIRECTIVE_ID_RE.fullmatch(directive_id))
+
+
+def _directive_location(fleet: Path, directive_id: str) -> tuple[str, Path | None]:
+    """Where the named order sits: ``(inbox|sent|dead-letter|nowhere, path)``.
+
+    `dead-letter` is reported before `sent` so a retired order can never be read
+    as a live authorisation, and the inbox is checked first because that is the
+    mailbox the drain path reads — the one a refusal can leave re-drainable.
+    """
+    for label, directory in (
+        ("inbox", fleet / INBOX_DIR),
+        ("dead-letter", fleet / DEAD_LETTER_DIR),
+        ("sent", fleet / SENT_DIR),
+    ):
+        candidate = directory / f"{directive_id}.json"
+        if candidate.exists():
+            return label, candidate
+    return "nowhere", None
+
+
+def _dead_letter_artifact(fleet: Path, directive_id: str) -> Path:
+    return fleet / DEAD_LETTER_DIR / f"{directive_id}.json"
+
+
+def _read_json(path: Path | None) -> dict | None:
+    if path is None:
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _directive_issue(path: Path | None) -> int | None:
+    """The issue an order names, or None when it names none we can act on."""
+    payload = _read_json(path) or {}
+    try:
+        number = int((payload.get("task") or {}).get("issue") or 0)
+    except (TypeError, ValueError):
+        return None
+    return number or None
+
+
+def _order_landed(
+    root: Path, issue: int | None, fleet: Path, directive_id: str
+) -> bool | None:
+    """Whether the order's change has LANDED — the #821 fact a drop must respect.
+
+    Two hermetic sources, no network:
+
+    * an identical record already in ``<fleet>/done/`` — the authorisation path
+      consumed it, and `governance/lifecycle/directive.py` may only do that for a
+      landed change, so the order is finished;
+    * the issue is CLOSED in the committed board snapshot.
+
+    ``None`` means neither source can answer (no issue named, no readable
+    snapshot, an issue the snapshot does not carry), and the caller refuses: an
+    undecidable subject is never defaulted to allowed. NAMED LIMIT: the snapshot
+    carries issue state only, so a merged pull request on a still-open issue —
+    which `governance/lifecycle/model.py::owes_closure` also calls landed — is not
+    visible here; the check can therefore miss landed work that the lifecycle
+    record would catch, which is why the refusal names the lifecycle route.
+    """
+    if (fleet / DONE_DIR / f"{directive_id}.json").exists():
+        return True
+    if issue is None:
+        return None
+    snapshot = _read_json(root / SNAPSHOT)
+    if snapshot is None:
+        return None
+    for item in snapshot.get("issues") or []:
+        if not isinstance(item, dict) or item.get("number") != issue:
+            continue
+        state = str(item.get("state") or "").strip().upper()
+        if state == "CLOSED":
+            return True
+        return False if state == "OPEN" else None
+    return None
 
 
 def cmd_dead_letter(args: argparse.Namespace) -> int:
