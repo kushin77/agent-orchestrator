@@ -144,7 +144,9 @@ infra/fleet/
   env_contract.py                  the ONE declaration of the image's environment
   dev_run.py                       the dry-run dispatch: what runs in the container
   healthz.py                       the /healthz surface, answered from the decision
-  docker-compose.agent-cron.yml    dev-first: the image, its state mounts, its port
+  docker-compose.agent-cron.yml    dev-first + D3 (state-rw profile, flag-gated OFF)
+  secrets_contract.py              D3: the ONE declaration of the credential mounts
+  tests/                           D3: env_contract, secrets_contract, compose coverage
   (D1, unchanged in spirit)
   Dockerfile · entrypoint.sh · inventory.yaml · README.md
 ```
@@ -219,6 +221,83 @@ and the run then "passes" against a board that is not the board.
   it will make the edit visible instead of silent.
 * **The role table is keyed by the schedule's own markers.** A new job in
   `fleet/cron.py` without a dry-run form fails this gate, by design.
+
+## State volumes + secrets wiring (D3, issue #711), FLAG-GATED OFF
+
+D2 mounted `.fleet/` and `.board/` read-only and used no credential at all —
+the dry-run harness dispatches nothing that writes. D3 wires the posture an
+applying run will eventually need, and ships it **OFF by default**:
+
+* the dev-run service (`agent-cron`) is **unchanged** — both state roots stay
+  `read_only: true`, and `docker compose up` with no flags behaves exactly as
+  it did under D2;
+* a second, additive service (`agent-cron-rw`) is gated behind the compose
+  `profiles: [state-rw]` key. `docker compose -f infra/fleet/docker-compose.agent-cron.yml up -d`
+  never starts it; only an explicit
+  `docker compose -f infra/fleet/docker-compose.agent-cron.yml --profile state-rw up -d`
+  does. That profile IS the flag: `AO_FLEET_STATE_RW=1` (declared in
+  `env_contract.py`, default `"0"`) documents the same posture inside the
+  container's own environment contract for a reader of `env-contract print`,
+  but does not by itself turn anything on;
+* **`AO_FLEET_DRY_RUN` is unchanged and still pinned to `"1"`.** A writable
+  state mount is not permission to apply — D2's `dry-run-required` refusal is
+  untouched by this lane, deliberately, so a later lane that adds a real
+  applying mode must still edit that rule on purpose.
+
+Because compose merge keys do not deep-merge, `agent-cron-rw` **re-lists every
+volume it needs** rather than inheriting from its sibling: the repo bind
+(`<repo>:/repo`, read-only), `.fleet` and `.board` (read-write, still
+`create_host_path: false` — a missing state root is still an error, never a
+silently created root-owned empty one), and a named `fleet-logs` volume at
+`/var/log/fleet`.
+
+### Secrets: mounted from outside the repo, never `env_file` (GR-6)
+
+`infra/fleet/secrets_contract.py` is the ONE declaration of every credential
+surface the fleet's rungs use — `gh`, `gcloud`, `ssh` — mirroring
+`env_contract.py`'s shape. Each mount:
+
+* sources from an env-overridable host path defaulting under `${HOME}`
+  (never a path inside this checkout — `secrets_contract.validate()` refuses
+  a source that resolves inside the repo, by name: `secret-source-inside-repo`);
+* is bind-mounted **read-only** into the container;
+* carries no value anywhere in this module, this compose file, or this
+  README — only a *path* to a file that lives outside the repo.
+
+The issue's own acceptance grep (two named credential-variable literals,
+run against this directory) finds nothing, and
+`infra/fleet/tests/test_secrets_contract.py` proves the credential-VALUE
+scanner (`secrets_contract.scan_for_secret_values`) catches a credential-shaped
+name wherever it appears, including embedded inside a longer compound
+identifier — the failure mode a naive `\b...\b` regex misses.
+
+### What D3 does NOT ship
+
+**A Terraform-declared flag.** GR-5 asks for infrastructure to be declared,
+never clicked, and flag-gated OFF; this lane delivers the OFF-by-default flag
+at the layer it owns (the compose `profiles:` gate + `env_contract.py`'s
+`AO_FLEET_STATE_RW`), exactly as D2's own README states for its layer:
+*"the image is a build artifact, not a deployed surface... that is where the
+OFF-by-default flag belongs, alongside the resource it gates."* No
+`infra/terraform/*.tf` resource exists for fleet-cron yet — there is nothing
+deployed for a Terraform variable to gate. Declaring one is D4+'s work, when a
+scheduler surface is actually provisioned; `infra/terraform/variables.tf`'s
+own convention (`enable_*`, default `false`, kept in lock-step with
+`infra/feature-flags/registry.yaml` by `scripts/check-feature-flags.py`) is
+the pattern that lane should follow.
+
+### Gate coverage
+
+`scripts/check-fleet-cron-dev-run.sh` (auto-discovered into `make verify`,
+issue #698) was extended for D3: it exempts a writable state mount from the
+`state-mount-writable` refusal only when the service declares a non-empty
+`profiles:` list (`state-rw-not-gated` catches a service that claims the flag
+without one), validates `secrets_contract.py`, and scans the compose file's
+own text for a credential-shaped value. `infra/fleet/tests/` (27 tests
+across `test_env_contract_state_rw.py`, `test_secrets_contract.py` and
+`test_compose_state_rw.py`) is declared in `scripts/pytest-suites.txt` and
+named from inside that gate script, so it is covered by
+`scripts/check-gate-coverage.sh` rather than merely present.
 
 ## Provenance
 
