@@ -280,12 +280,17 @@ expect_code "VERIFY_EVIDENCE_MISSING" "$work/VERIFY_WRONG_COMMIT.json"
 # A dead lane record is a finding, named in the vocabulary the isolation audit
 # already uses for it (#834) — and the report must SAY it is a dead record, so the
 # operator does not go looking for a worktree that no longer exists.
+#
+# The containment test is `contains`, NOT `printf ... | grep -qF` (#852/#863): with
+# `set -o pipefail` a report bigger than the pipe buffer kills the producer by
+# SIGPIPE and the 141 becomes the pipeline's status, so the idiom reports ABSENT
+# for text that is PRESENT — negated here, that would be a false green.
 dead_output="$(audit "$work/LANE_DEAD_RECORD.json" "$work/empty-baseline.json")"
 dead_rc=$?
 if [ "$dead_rc" -eq 0 ]; then
   echo "  FAIL  a dead lane record went unreported (the audit passed a broken record)" >&2
   fail=$((fail + 1))
-elif ! printf '%s' "$dead_output" | grep -qF -- "worktree-missing"; then
+elif ! contains "$dead_output" "worktree-missing"; then
   echo "  FAIL  a dead lane record was reported without saying the worktree is gone" >&2
   printf '%s\n' "$dead_output" | sed 's/^/        /' >&2
   fail=$((fail + 1))
