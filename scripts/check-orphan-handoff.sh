@@ -130,9 +130,13 @@ assert_loop() { # assert_loop <root> <label>
     findings="$findings"$'\n'"  $label: the escalation was removed, so a shelved orphan would go silent"
   fi
 
-  # 7. the interface the loop depends on still exists
+  # 7. the interface the loop depends on still exists. The help text is captured
+  # and tested with the bash-native `contains` above: piping `python3 --help` into
+  # `grep -q` lets grep exit on its first match, SIGPIPEs the producer, and
+  # `pipefail` promotes that 141 -- so the control would report the interface gone
+  # (and fail OPEN) once the help text outgrows the pipe buffer.
   if [ -r "$r/governance/reconcile/cli.py" ] \
-     && python3 "$r/governance/reconcile/cli.py" sweep --help 2>/dev/null | grep -q -- '--apply'; then
+     && contains "$(python3 "$r/governance/reconcile/cli.py" sweep --help 2>/dev/null || true)" '--apply'; then
     printf '  OK    reconcile sweep still offers --apply (the interface the loop depends on)\n'
   else
     findings="$findings"$'\n'"  $label: reconcile sweep no longer offers --apply"

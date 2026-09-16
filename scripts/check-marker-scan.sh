@@ -186,9 +186,15 @@ else
 fi
 
 # --- 5. the wiring: this check must actually run in `make verify` ----------
+# The containment test is bash-native (`case`) rather than `printf ... | grep -q`:
+# a piped `grep -q` exits on its first match, SIGPIPEs the producer, and `pipefail`
+# promotes that 141 -- which would skip exactly the branch that proves the check is
+# wired, i.e. the control would fail OPEN once the list outgrows the pipe buffer.
 wired="$(bash -c 'source scripts/discover-checks.sh; discover_check_scripts' 2>/dev/null || true)"
-if grep -q 'discover-checks.sh' scripts/verify.sh \
-  && printf '%s\n' "$wired" | grep -qF 'marker-scan|bash scripts/check-marker-scan.sh'; then
+wired_needle='marker-scan|bash scripts/check-marker-scan.sh'
+wired_ok=1
+case "$wired" in *"$wired_needle"*) wired_ok=0 ;; esac
+if grep -q 'discover-checks.sh' scripts/verify.sh && [ "$wired_ok" -eq 0 ]; then
   echo "  OK  scripts/verify.sh discovers this check (marker-scan) — wired the moment it lands"
 else
   echo "check-marker-scan: FAIL — scripts/verify.sh does not discover this check; it would be inert" >&2

@@ -146,9 +146,17 @@ marker_self_test() {
   fi
 
   # Half 2: every real marker IS refused, by name.
+  # The containment test is bash-native and reads the report from a variable:
+  # `printf '%s' "$out" | grep -qF` would make `grep` exit on its first match and
+  # SIGPIPE the producer, and `pipefail` promotes that 141 to the pipeline's status
+  # -- so this half would report a marker ABSENT while it is present, once the
+  # report outgrows the pipe buffer (the defect #852 ratchets shut).
   out="$(marker_scan_files "$mk_pattern" "$d/one.sh" "$d/two.sh" "$d/three.sh" 2>&1)"; rc2=$?
   for f in one.sh two.sh three.sh; do
-    printf '%s' "$out" | grep -qF "$d/$f" || missing="$missing $f"
+    case "$out" in
+      *"$d/$f"*) ;;
+      *) missing="$missing $f" ;;
+    esac
   done
   if [ "$rc2" -eq 0 ]; then
     printf 'check-docs: FAIL — a real marker was NOT refused; the rule matches nothing\n' >&2
