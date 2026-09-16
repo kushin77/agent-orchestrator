@@ -197,9 +197,27 @@ out_of_scope:
     happens to contain a retired word is not a role name. Named concretely, so
     this exemption cannot be read as a licence: the channel's own subcommands
     `brain-inbox` and `brain-outbox`, the Makefile target `operator`, the
-    `--rung brain` / `--rung sister` values `fleet/watchdog.py` reports, and the
-    `[brain] ...` / `[sister] ...` lines those commands PRINT (which are recorded
-    evidence, and a rename would falsify it).
+    `--rung brain` / `--rung sister` values `fleet/watchdog.py` reports, the
+    `CAPABILITY_RUNGS = ("brain", "sister")` literal in `fleet/channel.py`, the
+    mailbox paths `FLEET_DIR / "brain" / "inbox"` and
+    `FLEET_DIR / "sister.heartbeat.json"`, and the `[brain] ...` / `[sister] ...`
+    lines those commands PRINT (which are recorded evidence, and a rename would
+    falsify it). These are filesystem and telemetry identities with their own
+    consumers — the watchdog, `governance/reconcile`, the heartbeats — so
+    renaming them is a separate migration, not this one.
+  - >
+    CODE PROSE — DECLARED, NOT SILENTLY DONE. Renaming one on ONE side only is
+    refused by this gate; leaving the words in code while the contract, the
+    envelope, the validator and the documents move is a real asymmetry, so it is
+    named here rather than left to be discovered. Measured on this commit: 107
+    lines in `fleet/channel.py`, 136 in `fleet/brain.py` and 112 in
+    `fleet/terminal.py` still carry a retired word, and the great majority are
+    comments and module docstrings describing the loop (e.g. the
+    `fleet/channel.py` docstring still says "the **brain** … the **sister**
+    session (a dumb terminal …)"). They are NOT names the transport reads. The
+    sweep is deliberately out of this lane: it is prose with no gate behind it,
+    and doing it inside a protocol migration would bury it in a diff whose
+    evidence is the protocol. It is a follow-up, and it is stated as one.
   - >
     RUNBOOK THE GATE MUST NOT LOSE. Three gates pin text in documents this lane
     does not own: `scripts/check-fleet-contract.sh` pins the four schema-1 trust
