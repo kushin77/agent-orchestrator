@@ -15,6 +15,7 @@
 | `web-image.yaml` | Build config: build `portal/Dockerfile` and push the web-surface image to Artifact Registry (fills the `web-surface.image` placeholder). |
 | `verify-trigger.yaml` | Importable pull_request trigger for `verify.yaml` (disabled by default). |
 | `apply-trigger.yaml`  | Importable push trigger for `apply.yaml` (disabled by default). |
+| `web-image-trigger.yaml` | Importable push trigger for `web-image.yaml` (disabled by default). |
 
 ## Flag-gate (GR-5) — everything ships OFF
 
@@ -68,6 +69,71 @@ pipeline: it is declared in Terraform and deployed by the flag-gated apply
 route like every other surface. There is no separate apply build config —
 `apply.yaml` remains the only apply route, and the web surface ships inert
 until its flag is promoted.
+
+## Portal go-live: build → promote (#607)
+
+Issue #607 (child of the #606 remediation) closes gap 1 of the #607/#606
+go-live: the web-surface (`portal/`) image build. This section is the map of
+what that build fills, what it does NOT do, and the exact human steps that
+remain — no step in this section runs or applies anything.
+
+### What `web-image.yaml` + `web-image-trigger.yaml` produce
+
+- `infra/cloudbuild/web-image.yaml` builds `portal/Dockerfile` and pushes
+  `$_AR_REPO/$_IMAGE:$_TAG` (and is invoked with `_AR_REPO=us-central1-docker.pkg.dev/purebliss-ghl/ao-images`,
+  `_IMAGE=portal`, `_TAG=$SHORT_SHA` at go-live) to Artifact Registry in
+  project `purebliss-ghl`. The tag gate refuses an empty or `latest` tag —
+  every pushed image is immutable and traceable to a commit.
+- `infra/cloudbuild/web-image-trigger.yaml` is the importable push trigger for
+  that build, mirroring `verify-trigger.yaml` / `apply-trigger.yaml`: ships
+  `disabled: true`, fires on push to `master` once imported.
+- The built reference fills `infra/terraform/modules/web-surface/variables.tf`
+  `image` (no default — required at apply), assembled in
+  `infra/terraform/main.tf` as `local.web_image` from `var.project_id` +
+  `var.web_image_tag`. `web_image_tag` currently defaults to
+  `"0000..."` — "no build promoted yet".
+
+### What this does NOT do
+
+- It does not deploy anything. `web-surface` stays `enabled: false`
+  (`infra/terraform/modules/web-surface/variables.tf`) until a reviewed
+  phase 7 go-live promotes `services.web` / `services.portal`.
+- It does not enable the apply trigger, promote any registry flag, or touch
+  `infra/rollout/rollout-state.yaml`.
+- Building the image is a prerequisite for the web-surface module to have a
+  real `image` value at apply time — it is not itself the go-live.
+
+### Validate locally, no GCP mutation
+
+```bash
+make web-image-dryrun   # gcloud builds submit --dry-run, or a local
+                         # `docker build -f portal/Dockerfile .` fallback
+```
+
+### Remaining human steps to go live (owner-approved only)
+
+1. Import `web-image-trigger.yaml` with `disabled: false` (or run the build
+   once manually with the deployer SA) so a real `$_AR_REPO/$_IMAGE:$SHORT_SHA`
+   image exists in Artifact Registry; set `web_image_tag` to that commit sha.
+2. Promote **phase 0** (`ci_cd.verify_trigger`, `ci_cd.apply_trigger`) through
+   `infra/rollout/stage-model.yaml`'s stages
+   (`off → canary → gradual → full`), each transition gated by
+   `verify_green` + `approval_code` + `audit_record`
+   (`to_canary`/`to_gradual`/`to_full` policy-auto-approve covers `canary`
+   and `gradual`; the final promotion to `full` is always human-approved —
+   `policy_auto_approve` deliberately excludes it).
+3. `infra/rollout/go-live-plan.yaml`'s `promotion_order: strict-by-phase`
+   requires phases 1-6 to have already gone live before **phase 7**
+   (`services.portal`, `services.web`) may promote — same
+   off→canary→gradual→full stage model, same `approval_code` requirement at
+   the final step.
+4. Only then import `apply-trigger.yaml` with `disabled: false` and
+   `_ENABLE_APPLY: "true"` so the deployer-SA `apply.yaml` pipeline (the only
+   apply route, GR-5) can materialize the enabled web-surface module with the
+   real image.
+
+None of the above runs from this lane; this lane only produces the
+flag-gated-OFF build config and its documentation.
 
 ## Apply (go-live only — never run from this task)
 
