@@ -227,6 +227,8 @@ def spawn_source_stub(tmp_path: Path):
                 "repo_slug": "kushin77/agent-orchestrator",
                 "author_name": f"agent-{agent}",
                 "author_email": f"agent+{agent}@agents.invalid",
+                "committer_name": f"agent-{agent}",
+                "committer_email": f"agent+{agent}@agents.invalid",
             },
             "trailer": f"Refs kushin77/agent-orchestrator#{issue}",
             "claim": {"owner": agent, "state": "claim", "lane": lane, "at": "2026-09-15T00:00:00Z"},
