@@ -1,0 +1,48 @@
+{
+  "doc": "Fleet cron as code (#241, parent #160). fleet/cron.py RENDERS the multi-job crontab from this file — never hand-edit the installed crontab lines; `fleet/cron.py install` / `reconcile` is the single writer. The pattern is harvested from kushin77/leaderboard config/fleet-jobs.json (see docs/CANNIBALIZATION.md §12 and docs/MECHANICAL-EXECUTION-LAYER.md §6 — REFERENCE, read for shape only; no source copied).",
+  "schema": "fleet-jobs-v1",
+  "issue": 241,
+  "parent": 160,
+  "jobs": [
+    {
+      "name": "watchdog",
+      "marker": "ao-fleet-watchdog",
+      "interval": 2,
+      "command": "/usr/bin/python3 fleet/watchdog.py run",
+      "user": "",
+      "log": "watchdog.log",
+      "singleton": true,
+      "enabled": true
+    },
+    {
+      "name": "prune",
+      "marker": "ao-fleet-prune",
+      "schedule": "23 4 * * *",
+      "command": "/usr/bin/python3 fleet/prune.py run --apply",
+      "user": "",
+      "log": "prune.log",
+      "singleton": true,
+      "enabled": true
+    },
+    {
+      "name": "reconcile",
+      "marker": "ao-fleet-reconcile",
+      "interval": 2,
+      "command": "/usr/bin/python3 governance/reconcile/cli.py watch --once --apply",
+      "user": "",
+      "log": "reconcile.log",
+      "singleton": true,
+      "enabled": true
+    },
+    {
+      "name": "snapshot-refresh",
+      "marker": "ao-fleet-snapshot-refresh",
+      "schedule": "*/10 * * * *",
+      "command": "/usr/bin/python3 governance/dispatch/cli.py snapshot --from-github",
+      "user": "",
+      "log": "snapshot-refresh.log",
+      "singleton": true,
+      "enabled": false
+    }
+  ]
+}
