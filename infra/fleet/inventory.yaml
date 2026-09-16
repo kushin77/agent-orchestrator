@@ -90,6 +90,11 @@ binaries:
   - git
   - gh
   - claude
+  # `ao-fleet-reap`'s crontab line (fleet/cron.py:reap_line) runs
+  # `bash scripts/prune-worktrees.sh`, the same literal `bash` invocation the
+  # dev-run role dispatches — same argument as `/usr/bin/python3` above: the
+  # image does not get to change what the schedule's owner writes.
+  - bash
 
 # 5. PACKAGES. Every package the image installs, with the reason it is there and
 # a marker of whether it is installed at build time only. Compared BOTH ways

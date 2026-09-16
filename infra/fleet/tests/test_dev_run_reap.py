@@ -86,7 +86,29 @@ def test_reap_role_never_carries_apply():
     findings = dev_run.check_no_apply()
     assert findings == []
     role = {r.marker: r for r in dev_run.ROLES}["ao-fleet-reap"]
-    assert dev_run.FORBIDDEN_TOKEN not in role.argv
+    assert dev_run.FORBIDDEN_TOKEN not in role.command
+
+
+def test_command_joins_interpreter_and_argv():
+    role = {r.marker: r for r in dev_run.ROLES}["ao-fleet-reap"]
+    assert role.command == ("bash", "scripts/prune-worktrees.sh")
+
+
+def test_check_no_apply_catches_apply_smuggled_into_the_interpreter():
+    """Negative control: `--apply` in `argv` alone used to be the only thing
+    checked. A token hidden in `interpreter` (e.g. a wrapper script invoked
+    with `--apply` baked in) must be caught too, since `command` — not `argv`
+    — is what actually runs.
+    """
+    poisoned = dev_run.Role(
+        marker="ao-fleet-poison",
+        name="poison",
+        argv=("scripts/prune-worktrees.sh",),
+        why="test-only: a role whose interpreter smuggles --apply",
+        interpreter=("bash", "--apply"),
+    )
+    assert dev_run.FORBIDDEN_TOKEN not in poisoned.argv  # the old, insufficient check
+    assert dev_run.FORBIDDEN_TOKEN in poisoned.command  # the real check must catch it
 
 
 def test_load_markers_reads_from_cron_module(tmp_path):

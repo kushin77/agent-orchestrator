@@ -101,6 +101,17 @@ class Role:
     def disposition(self) -> str:
         return "dry-run" if self.argv else "not-dispatched"
 
+    @property
+    def command(self) -> tuple[str, ...]:
+        """The full argv actually executed — interpreter plus argv, together.
+
+        Every `--apply` check must look here, not at `argv` alone: the
+        interpreter is as much a part of what runs as the arguments are, and a
+        check that inspects only `argv` would miss a forbidden token smuggled
+        into `interpreter`.
+        """
+        return (*self.interpreter, *self.argv)
+
 
 #: The role table, keyed by the schedule's own markers. ``fleet/cron.py`` owns
 #: the markers; the dry-run FORM of each job is this lane's business, and the
@@ -366,9 +377,9 @@ def check_role_table(markers: list[str]) -> list[str]:
 def check_no_apply() -> list[str]:
     findings: list[str] = []
     for role in ROLES:
-        if FORBIDDEN_TOKEN in role.argv:
+        if FORBIDDEN_TOKEN in role.command:
             findings.append(
-                f"role {role.name!r} would run {FORBIDDEN_TOKEN} ({' '.join(role.argv)}); "
+                f"role {role.name!r} would run {FORBIDDEN_TOKEN} ({' '.join(role.command)}); "
                 "the dev run dispatches no applying job"
             )
     return findings
@@ -376,7 +387,7 @@ def check_no_apply() -> list[str]:
 
 def dispatch(role: Role, repo: Path, environment: dict, timeout: int) -> dict:
     """Run one role, bounded, and record what it said (tail) and how it ended."""
-    argv = [*role.interpreter, *role.argv]
+    argv = list(role.command)
     started = time.time()
     record = {
         "marker": role.marker,
@@ -384,7 +395,7 @@ def dispatch(role: Role, repo: Path, environment: dict, timeout: int) -> dict:
         "disposition": role.disposition,
         "why": role.why,
         "argv": list(role.argv),
-        "apply": FORBIDDEN_TOKEN in role.argv,
+        "apply": FORBIDDEN_TOKEN in role.command,
         "rc": None,
         "timed_out": False,
         "seconds": None,
@@ -515,7 +526,7 @@ class DevRun:
         if refusals:
             return self.refuse("dispatch-refused", "; ".join(refusals))
 
-        applying = [role.name for role in ROLES if FORBIDDEN_TOKEN in role.argv]
+        applying = [role.name for role in ROLES if FORBIDDEN_TOKEN in role.command]
         log(
             f"DRY-RUN — dispatching {len([r for r in ROLES if r.argv])} of {len(ROLES)} role(s); "
             f"{len(applying)} with {FORBIDDEN_TOKEN}"
