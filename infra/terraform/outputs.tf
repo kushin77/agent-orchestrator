@@ -47,3 +47,15 @@ output "workbook_surface_flags" {
     sandbox_runtime = var.enable_sandbox_runtime
   }
 }
+
+# The ERP module's portal surface (ERP-07, issue #652). Its own output rather
+# than an extra key in `workbook_surface_flags`: that map is the workbook-13
+# set, and the ERP module is a different module's switch. This one keeps
+# `enable_erp_module` from being an inert variable — every plan and apply records
+# the exact posture it rendered, so a promotion that reached the pipeline and was
+# never rendered shows up as `false` in the deploy log instead of passing
+# unnoticed. False until a reviewed promotion.
+output "erp_module_enabled" {
+  description = "Rendered posture of the ERP module's portal switch (ERP-07, issue #652); false until promoted."
+  value       = var.enable_erp_module
+}

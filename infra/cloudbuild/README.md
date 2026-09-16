@@ -44,10 +44,12 @@ posture it was told to render instead of inheriting a default silently.
 | `_ENABLE_TASK_BOARD` | `services.task_board` | `enable_task_board` | `"false"` |
 | `_ENABLE_MCP_OUTBOUND` | `services.mcp_outbound` | `enable_mcp_outbound` | `"false"` |
 | `_ENABLE_SANDBOX_RUNTIME` | `services.sandbox_runtime` | `enable_sandbox_runtime` | `"false"` |
+| `_ENABLE_ERP_MODULE` | `services.erp_module` | `enable_erp_module` | `"false"` |
 
 The rendered posture is not taken on trust: the `workbook_surface_flags` output
-in `infra/terraform/outputs.tf` reports all five values in the plan/apply log,
-so a promotion that reached the trigger but not the plan is visible as `false`
+in `infra/terraform/outputs.tf` reports all five workbook values in the
+plan/apply log, and `erp_module_enabled` reports the ERP module's, so a
+promotion that reached the trigger but not the plan is visible as `false`
 in the deploy record. `_DEPLOYER_SA` is still supplied at import (never
 hard-coded, GR-6), and the apply stays fail-closed behind `_ENABLE_APPLY`.
 

@@ -61,6 +61,7 @@ steps:
           -var="enable_task_board=$_ENABLE_TASK_BOARD" \
           -var="enable_mcp_outbound=$_ENABLE_MCP_OUTBOUND" \
           -var="enable_sandbox_runtime=$_ENABLE_SANDBOX_RUNTIME" \
+          -var="enable_erp_module=$_ENABLE_ERP_MODULE" \
           -out=/workspace/tfplan
 
   - id: terraform-apply
