@@ -74,7 +74,10 @@ REQUIRED_FIELDS: tuple[str, ...] = (
 #: finding anyone can act on.
 NESTED_REQUIRED: Mapping[str, tuple[str, ...]] = {
     "spawn": ("path", "agent"),
-    "session": ("id", "branch", "agent", "repo_slug", "author_name", "author_email"),
+    "session": (
+        "id", "branch", "agent", "repo_slug", "author_name", "author_email",
+        "committer_name", "committer_email",
+    ),
     "claim": ("owner", "state"),
     "focus": ("epic", "source"),
     "capacity": ("effective", "binding", "permit", "assessed"),

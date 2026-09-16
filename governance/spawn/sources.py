@@ -242,6 +242,12 @@ def session_field(env: Mapping[str, str] | None) -> dict[str, Any]:
     already written into that worktree's config by the minting step, and a second
     mint would be a second identity for one lane — the exact violation
     `scripts/check-session-isolation.sh` refuses.
+
+    Both halves of the signature are projected: `governance/isolation` exports
+    `GIT_AUTHOR_*` AND `GIT_COMMITTER_*` (rule 15), and the envelope is the only
+    audit surface that can prove the committer half reached the child — so a
+    spawn that cannot show ``committer == author`` is one whose identity is only
+    half auditable.
     """
     source = dict(env or {})
     issue = source.get("AO_ISSUE", "")
@@ -256,6 +262,8 @@ def session_field(env: Mapping[str, str] | None) -> dict[str, Any]:
         "repo_slug": slug,
         "author_name": source.get("GIT_AUTHOR_NAME", ""),
         "author_email": source.get("GIT_AUTHOR_EMAIL", ""),
+        "committer_name": source.get("GIT_COMMITTER_NAME", ""),
+        "committer_email": source.get("GIT_COMMITTER_EMAIL", ""),
     }
 
 

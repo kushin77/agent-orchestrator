@@ -463,6 +463,81 @@ def validate_rollout_state_doc(doc: Mapping[str, object]) -> List[str]:
     return errors
 
 
+def validate_live_state_doc(
+    doc: Mapping[str, object],
+    known_flags: Sequence[str],
+    model: "StageModel",
+) -> List[str]:
+    """Structural + ordering errors for ``infra/rollout/live-state.yaml``.
+
+    ``live-state.yaml`` is the ONLY place a promoted stage may be committed;
+    ``rollout-state.yaml`` stays the declared-default document
+    (``validate_rollout_state_doc`` still refuses anything but ``off``
+    there - unchanged, GR-28). Every live-state entry must be a genuine,
+    ordered transition (never ``off`` - omit the row instead; never a
+    backward or skipped step relative to its own ``from_stage``) and must
+    carry exactly one of ``approval_id`` / ``policy``; ``full`` can only be
+    reached with a human ``approval_id`` (a policy auto-approval can never
+    reach ``full``, mirroring ``check_stage_model``'s own full-policy
+    refusal). Whether the referenced ``audit_record`` actually exists on
+    disk is an I/O concern left to the gate (``checks/check_rollout.py``),
+    not this pure model function.
+    """
+    errors: List[str] = []
+    if not isinstance(doc, dict):
+        return ["live-state document must be a mapping"]
+    if doc.get("schema_version") != 1:
+        errors.append("live-state schema_version must be 1")
+    flags = doc.get("flags")
+    if not isinstance(flags, dict):
+        errors.append("live-state.flags must be a mapping (empty is valid - nothing promoted yet)")
+        return errors
+    for name, raw in flags.items():
+        if name not in known_flags:
+            errors.append(f"live-state flag '{name}' is not declared in rollout-state.yaml")
+        if not isinstance(raw, dict):
+            errors.append(f"live-state flag '{name}' entry must be a mapping")
+            continue
+        try:
+            stage = RolloutStage.coerce(raw.get("stage"))
+        except ValueError as exc:
+            errors.append(f"live-state flag '{name}': {exc}")
+            continue
+        if stage is RolloutStage.OFF:
+            errors.append(f"live-state flag '{name}' must not record 'off' (omit the row instead)")
+            continue
+        try:
+            from_stage = RolloutStage.coerce(raw.get("from_stage", "off"))
+        except ValueError as exc:
+            errors.append(f"live-state flag '{name}' from_stage: {exc}")
+            continue
+        if not from_stage.can_promote_to(stage, jump_allowed=model.jump_allowed):
+            errors.append(
+                f"live-state flag '{name}' records {from_stage.value} -> {stage.value}, "
+                "which is not an allowed step"
+            )
+        since = raw.get("since")
+        if not isinstance(since, str) or not since:
+            errors.append(f"live-state flag '{name}' must carry a non-empty 'since'")
+        audit_record = raw.get("audit_record")
+        if not isinstance(audit_record, str) or not audit_record:
+            errors.append(f"live-state flag '{name}' must carry a non-empty 'audit_record'")
+        approval_id = raw.get("approval_id")
+        policy = raw.get("policy")
+        has_approval = isinstance(approval_id, str) and bool(approval_id)
+        has_policy = isinstance(policy, str) and bool(policy)
+        if has_approval and has_policy:
+            errors.append(f"live-state flag '{name}' must carry exactly one of approval_id/policy, not both")
+        elif not has_approval and not has_policy:
+            errors.append(f"live-state flag '{name}' must carry approval_id or policy")
+        if stage is RolloutStage.FULL and not has_approval:
+            errors.append(
+                f"live-state flag '{name}' is at full but has no human approval_id "
+                "(policy auto-approve is not accepted for full)"
+            )
+    return errors
+
+
 def validate_go_live_plan_doc(
     doc: Mapping[str, object],
     known_flags: Sequence[str],

@@ -49,12 +49,20 @@ def _rollout_dir(root: Path) -> Path:
     return root / "infra" / "rollout"
 
 
-def _load_engine(root: Path, audit_path: Optional[str] = None) -> RolloutEngine:
+def _live_state_path(root: Path) -> Path:
+    return _rollout_dir(root) / "live-state.yaml"
+
+
+def _load_engine(
+    root: Path, audit_path: Optional[str] = None, live_state_path: Optional[str] = None
+) -> RolloutEngine:
     rd = _rollout_dir(root)
+    live_state = live_state_path if live_state_path is not None else str(_live_state_path(root))
     return RolloutEngine.load(
         stage_model_path=str(rd / "stage-model.yaml"),
         rollout_state_path=str(rd / "rollout-state.yaml"),
         audit_path=audit_path,
+        live_state_path=live_state,
     )
 
 
@@ -139,6 +147,9 @@ def cmd_promote(root: Path, args: argparse.Namespace) -> int:
     if args.state_out:
         engine.write_state(args.state_out)
         print(f"state written to {args.state_out}")
+    if args.live_state_out:
+        engine.write_live_state(args.live_state_out, audit_record=args.audit_record or "")
+        print(f"live-state written to {args.live_state_out}")
     return 0
 
 
@@ -150,6 +161,9 @@ def cmd_canary(root: Path, args: argparse.Namespace) -> int:
         print(f"{args.flag}: health_ok={health_ok} -> stage off (rolled back)")
     else:
         print(f"{args.flag}: health_ok={health_ok} -> stage {state.stage.value} (no change)")
+    if args.live_state_out:
+        engine.write_live_state(args.live_state_out, audit_record=args.audit_record or "")
+        print(f"live-state written to {args.live_state_out}")
     return 0
 
 
@@ -164,6 +178,11 @@ def cmd_rollback(root: Path, args: argparse.Namespace) -> int:
     if args.state_out:
         engine.write_state(args.state_out)
         print(f"state written to {args.state_out}")
+    if args.live_state_out:
+        # The flag is off, so live_state_doc() simply omits it - a rollback
+        # never leaves a stale live-state entry behind.
+        engine.write_live_state(args.live_state_out, audit_record=args.audit_record or "")
+        print(f"live-state written to {args.live_state_out}")
     return 0
 
 
@@ -331,6 +350,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--gradual-complete", action="store_true", default=False)
     p.add_argument("--approvals-dir", default=None)
     p.add_argument("--state-out", default=None)
+    p.add_argument(
+        "--live-state-out", default=None,
+        help="write the promoted stage to this live-state.yaml (infra/rollout/live-state.yaml is the only "
+        "committed file that may ever record a non-off stage - rollout-state.yaml never does)",
+    )
+    p.add_argument("--audit-record", default=None, help="path (relative to infra/rollout/) recorded in live-state")
     p.set_defaults(func=cmd_promote)
 
     p = sub.add_parser("canary", help="record a canary health observation")
@@ -338,6 +363,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("flag")
     p.add_argument("--health-ok", required=True, choices=["true", "false", "ok", "fail", "1", "0", "yes", "no"])
     p.add_argument("--actor", default="health-monitor")
+    p.add_argument("--live-state-out", default=None)
+    p.add_argument("--audit-record", default=None)
     p.set_defaults(func=cmd_canary)
 
     p = sub.add_parser("rollback", help="manually roll a flag back to off")
@@ -346,6 +373,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--reason", default="manual_rollback")
     p.add_argument("--actor", default="deployer-sa")
     p.add_argument("--state-out", default=None)
+    p.add_argument("--live-state-out", default=None)
+    p.add_argument("--audit-record", default=None)
     p.set_defaults(func=cmd_rollback)
 
     p = sub.add_parser(
