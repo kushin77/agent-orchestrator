@@ -25,17 +25,49 @@ The model guarantees (each is tested):
   across calls.
 * **Rollback-to-OFF** - a failed canary/gradual health check must revert the
   flag to OFF; the model never returns "stay on" for a failed health signal.
+* **Declared holds are parsed, never dropped** - a stage declaring a dwell
+  (`gradual.ramp.dwell: 24h`) exposes it as ``StageSpec.dwell_seconds``, so a
+  driver can enforce the hold from a recorded timestamp rather than trusting a
+  caller-supplied boolean (#619).
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 # Canonical stage vocabulary in promotion order (index == stage order).
 STAGE_ORDER_KEYS: Tuple[str, ...] = ("off", "canary", "gradual", "full")
+
+#: Seconds per dwell unit (`24h`, `30m`, `45s`, `2d`).
+_DWELL_UNITS: Mapping[str, int] = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+
+
+def parse_dwell(value: object) -> int:
+    """Seconds for a declared dwell duration (`"24h"`, `"30m"`, `"45s"`).
+
+    A bare integer is read as seconds. Anything else — including a YAML 1.1
+    boolean — is a hard error rather than a silent "no dwell": a stage that
+    declares a hold the reader quietly discards is a gate that cannot fail
+    (GR-12), which is exactly the defect the go-live driver (#619) closes.
+    """
+    if isinstance(value, bool) or value is None:
+        raise ValueError(f"{value!r} is not a dwell duration")
+    if isinstance(value, int):
+        if value < 0:
+            raise ValueError(f"dwell must not be negative, got {value}")
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text.isdigit():
+            return int(text)
+        match = re.fullmatch(r"(\d+)\s*([smhd])", text)
+        if match:
+            return int(match.group(1)) * _DWELL_UNITS[match.group(2)]
+    raise ValueError(f"{value!r} is not a dwell duration (expected e.g. '24h', '30m', '45s')")
 
 
 class RolloutStage(str, Enum):
@@ -126,7 +158,14 @@ class Audience:
 
 @dataclass(frozen=True)
 class StageSpec:
-    """One stage's declarative spec."""
+    """One stage's declarative spec.
+
+    ``dwell_seconds`` is the minimum time a flag must be HELD at this stage
+    before it may promote out of it (``ramp.dwell`` in ``stage-model.yaml``,
+    e.g. `24h` on ``gradual``). ``0`` means no declared hold. It is parsed
+    (never dropped) so a caller can enforce the hold from a recorded
+    transition timestamp instead of trusting a caller-supplied boolean.
+    """
 
     stage: RolloutStage
     order: int
@@ -135,6 +174,7 @@ class StageSpec:
     description: str = ""
     audiences: Tuple[str, ...] = ()
     ramp_steps: Tuple[int, ...] = ()
+    dwell_seconds: int = 0
 
 
 @dataclass(frozen=True)
@@ -218,6 +258,15 @@ class StageModel:
                     raise ValueError(f"stage '{token}' ramp steps must be 1..100")
                 if tuple(sorted(ramp_steps)) != ramp_steps:
                     raise ValueError(f"stage '{token}' ramp steps must be ascending")
+            dwell_raw = spec_raw.get("dwell")
+            if dwell_raw is None and isinstance(ramp, dict):
+                dwell_raw = ramp.get("dwell")
+            dwell_seconds = 0
+            if dwell_raw is not None:
+                try:
+                    dwell_seconds = parse_dwell(dwell_raw)
+                except ValueError as exc:
+                    raise ValueError(f"stage '{token}' dwell: {exc}") from exc
             stages[stage] = StageSpec(
                 stage=stage,
                 order=order,
@@ -226,6 +275,7 @@ class StageModel:
                 description=str(spec_raw.get("description", "")),
                 audiences=tuple(str(a) for a in spec_raw.get("audiences", [])),
                 ramp_steps=ramp_steps,
+                dwell_seconds=dwell_seconds,
             )
 
         # Closed vocabulary: every stage in order must be present.

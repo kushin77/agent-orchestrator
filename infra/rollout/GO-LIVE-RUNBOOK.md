@@ -1,17 +1,37 @@
 # Go-live runbook — fleet surfaces to production at ai.purebliss.app
 
-The operator-facing runbook for epic #607. It turns the measured, verified
-deploy-side gaps into one mechanical, owner-approved sequence. Nothing in this
-file runs by itself; every promotion below is gated by the stage model
-(`infra/rollout/stage-model.yaml`: `verify_green` + `approval_code` +
-`audit_record` per transition) and the deployer-SA apply pipeline
-(`infra/cloudbuild/apply.yaml`) is the **only** apply route (GR-5 — no console
-clicks, no ad-hoc `terraform apply`).
+The operator-facing runbook for epic #607. It is ONE command per phase, not the
+~62-86 manual CLI invocations it used to be: the ordered driver
+[`go_live.py`](go_live.py) reads the plan, computes the phase order, enforces
+it, drives each flag through the adjacent stage ladder, refuses without the
+owner's approval codes, enforces the declared 24h hold, writes a real audit
+record per transition, and is safe to re-run after a partial run.
 
-Readiness evidence this runbook builds on: child #618's audit (rollout
-conformance `check-rollout: OK`, promotion-refusal negative controls proven,
-apply/web-image fail-closed configs quoted, `make verify` PASS 81 of 85 at the
-master head the audit named).
+## Hard floor — never violated by anything in this runbook
+
+- **No console clicks, no ad-hoc `terraform apply`** (GR-5). The only apply
+  route is [`infra/cloudbuild/apply.yaml`](../cloudbuild/apply.yaml) running as
+  the deployer service account.
+- **No credential or secret in the tree** — the pipelines resolve `$_DEPLOYER_SA`
+  by substitution at go-live; nothing here embeds one.
+- **No promotion without the owner's approval code.** The driver refuses BEFORE
+  it writes anything; a promotion is never "mostly approved".
+- **Nothing in this runbook has been executed for real.** Every command below is
+  prepared code; the offline rehearsal (`--preflight`, `--dry-run`) is what has
+  actually been run.
+
+## The ONE external boundary (what this repository cannot supply)
+
+1. **A GCP project with the deployer service account provisioned** and the
+   Cloud Build triggers imported (`infra/cloudbuild/*-trigger.yaml` ship
+   `disabled: true`; importing them enabled is a deliberate operator act).
+2. **The owner's approval codes** — one approval-as-code record per
+   (flag, target stage), granted by an approver **distinct** from the executing
+   actor (AO-GR-14). The driver resolves them from `infra/rollout/approvals/`;
+   nothing in this repository can mint one.
+3. **The operator's health verdict** for the canary (`--canary-health-ok`). The
+   driver does not measure health; it refuses to move a flag past canary
+   without that attestation.
 
 ## Pre-conditions (measure, do not assume)
 
@@ -20,50 +40,48 @@ master head the audit named).
       and `web_image_tag` is the documented commit-sha convention.
 - [ ] `make verify` PASS on `origin/master` at the go-live start commit
       (attestation `git_sha` quoted in the audit trail).
-- [ ] `infra/rollout/rollout-state.yaml`: every flag still `stage: "off"`
-      (this file stays the declared-default document forever - GR-28 - and
-      never records a promotion; see `infra/rollout/live-state.yaml` below).
-- [ ] `infra/rollout/live-state.yaml`: `flags: {}` (nothing promoted yet).
+- [ ] [`rollout-state.yaml`](rollout-state.yaml): every flag still `stage: "off"`
+      (this file stays the declared-default document forever — GR-28 — and
+      never records a promotion).
+- [ ] [`live-state.yaml`](live-state.yaml): `flags: {}` (nothing promoted yet).
 - [ ] `infra/cloudbuild/apply-trigger.yaml`: `disabled: true`.
 - [ ] `infra/feature-flags/registry.yaml`: `ci_cd.apply_trigger` off.
 
-## Promotion ladder (per flag)
-
-Every flag travels `off → canary → gradual → full` (strict-forward, no jumps,
-`infra/rollout/stage-model.yaml`). For each flag, for each step:
+## Step 0 — prove readiness offline (no writes, no cloud call)
 
 ```bash
-# 1. The operator grants an approval (the approval_code gate).
-python3 -m infra.rollout.cli grant-approval <flag> --to <stage> \
-  --approver <operator> --approval-id <unique-id> --approvals-dir <ledger-dir>
-
-# 2. The deployer consumes it; verify_green + audit_record are enforced here.
-#    --live-state-out is what persists the promoted stage (issue #914): the
-#    committed infra/rollout/rollout-state.yaml NEVER records a promotion
-#    (its validator still refuses any flag above off, unchanged) -
-#    infra/rollout/live-state.yaml is the only file that does, and its own
-#    validator requires --audit-record to point at a real file under
-#    infra/rollout/audit/ or infra/rollout/approvals/.
-python3 -m infra.rollout.cli promote <flag> --to <stage> \
-  --approval <unique-id> --actor deployer-sa \
-  [--canary-health-ok] [--gradual-complete] --verify-green \
-  --live-state-out infra/rollout/live-state.yaml \
-  --audit-record audit/<the-transition-audit-record>.md
+python3 infra/rollout/go_live.py --preflight
 ```
 
-- `→ gradual` additionally requires `--canary-health-ok` (measured, not claimed).
-- `→ full` additionally requires `--gradual-complete`; `gradual` dwells 24h
-  (ramp 10→25→50→100) per the stage model.
-- A promotion refused without an approval is the design working, not a defect:
-  `promote … → promote blocked: missing gate signal: approval_code` (proven in
-  #618).
+Exit codes are tri-state: **0** the run is ordered and lawful, **1** refused
+(strict-by-phase, a recorded stage above its declared target, or
+`--require-approvals` with a code missing), **2** a declaration or the recorded
+evidence cannot be assessed (unparseable plan, a live-state entry whose audit
+record is missing, a broken audit chain). The report lists every planned
+transition, the pending holds, and an `OWNER-GATED:` block naming each
+transition whose approval code is absent.
 
-## Phase 0 — foundations (IaC + CI/CD)
+## Step 1 — the owner grants the approval codes
 
-Promote through the ladder, in order:
+One record per (flag, target stage), in `infra/rollout/approvals/`:
 
-1. `ci_cd.verify_trigger` → full
-2. `ci_cd.apply_trigger` → full
+```bash
+python3 -m infra.rollout.cli grant-approval services.registry \
+  --to full --approver owner-kushin77 --approval-id ao-2026-09-16-registry-full \
+  --approvals-dir infra/rollout/approvals
+```
+
+`canary` and `gradual` are policy-auto-approved on green verification evidence
+([`stage-model.yaml`](stage-model.yaml) `policy_auto_approve`), so the owner
+writes only the codes that reach `full` — the human-gated final promotion. The
+approver must differ from the executing actor (`--actor deployer-sa`).
+
+## Step 2 — phase 0 (foundations: IaC + CI/CD)
+
+```bash
+python3 infra/rollout/go_live.py --phase 0 --canary-health-ok \
+  --actor deployer-sa --approvals-dir infra/rollout/approvals
+```
 
 Then, and only then, import the apply trigger with the apply path enabled:
 
@@ -75,45 +93,100 @@ Then, and only then, import the apply trigger with the apply path enabled:
 The apply pipeline stays fail-closed until `_ENABLE_APPLY` is deliberately
 `"true"` (its gate-flag step refuses otherwise — quoted in #618).
 
-## Phases 1–6 — service ladder (strict-by-phase)
+## Step 3 — phases 1-6 (the service ladder)
 
-`infra/rollout/go-live-plan.yaml` enforces `promotion_order: strict-by-phase`:
-phase 7 may not go-live before every earlier phase. Promote each to `full`
-through the same ladder, in order:
+```bash
+python3 infra/rollout/go_live.py --phase 1-6 --canary-health-ok \
+  --actor deployer-sa --approvals-dir infra/rollout/approvals
+```
 
-`services.registry` → `services.gateway` → `services.engine` →
-`services.guardrails` → `services.telemetry` → `services.identity`
+`promotion_order: strict-by-phase` is ENFORCED BY THE DRIVER: phase N+1 is
+refused while any earlier phase's flag is short of its declared go-live stage,
+and the refusal names the blocking flag. Phases 0-8 can also be driven in one
+pass (`--phase 0 --phase 1-6 --phase 7 --phase 8`), which is what the single
+command is for.
 
-## Phase 7 — control plane + portal + public web UI
+## Step 4 — phase 7 (control plane + portal + public web UI)
 
-1. `services.portal` → full
-2. `services.web` → full
+```bash
+python3 infra/rollout/go_live.py --phase 7 --canary-health-ok \
+  --actor deployer-sa --approvals-dir infra/rollout/approvals
+```
 
 The now-enabled web surface deploys through the deployer-SA apply pipeline;
 `infra/terraform` builds the web-surface service from the real image
 (`us-central1-docker.pkg.dev/<project>/ao-images/portal:<commit-sha>`, assembled
 from `project_id` + `web_image_tag` — see child #617).
 
+## Step 5 — the declared 24h hold: re-run the SAME command
+
+[`stage-model.yaml`](stage-model.yaml) declares `gradual.ramp.dwell: 24h`. The
+driver measures that hold from `since` — the timestamp of the recorded
+transition INTO `gradual` — so a run that enters a hold reports `waiting` with
+the exact earliest resumption time and exits 1 (the requested scope is not
+complete). Re-running the identical command after the hold resumes exactly
+where it stopped: a flag already at its target is skipped, and nothing is
+promoted twice.
+
+```bash
+# tomorrow, or any time after the reported "earliest" timestamp
+python3 infra/rollout/go_live.py --phase 0 --canary-health-ok \
+  --actor deployer-sa --approvals-dir infra/rollout/approvals
+```
+
 ## Acceptance (epic #607)
 
-- [ ] `grep -E 'stage: "full"' infra/rollout/live-state.yaml` shows every
-      promoted flag at `full` (issue #914: `rollout-state.yaml` stays the
-      declared-default document and never carries a promoted stage -
-      `live-state.yaml` is the committed record of what is actually live).
-- [ ] `grep -E "_ENABLE_APPLY" infra/cloudbuild/apply-trigger.yaml` shows
-      `"true"`.
-- [ ] `ai.purebliss.app` serves the fleet single-pane-of-glass
-      (`portal/server/fleet.py` routes), not the legacy seeded demo state.
+```bash
+# every promoted flag is recorded at full in the LIVE state (issue #914:
+# rollout-state.yaml stays the declared-default document and never carries a
+# promoted stage - live-state.yaml is the committed record of what is live)
+grep -nE '^[[:space:]]+stage: "?full"?$' infra/rollout/live-state.yaml
+
+# the driver agrees: every requested transition is promoted and recorded
+python3 infra/rollout/go_live.py --preflight
+
+# and this lane's own gate is green
+python3 infra/rollout/checks/check_rollout.py
+
+# the apply trigger is enabled only at this point
+grep -E "_ENABLE_APPLY" infra/cloudbuild/apply-trigger.yaml
+
+# the surface serves the fleet single-pane-of-glass, not the legacy seed
+# (portal/server/fleet.py routes)
+```
+
+**Corrected acceptance criterion.** #619's issue body asks for
+`grep -E 'stage: "full"' infra/rollout/rollout-state.yaml`. That grep became
+UNSATISFIABLE with #914: `rollout-state.yaml` is the declared-default document
+(GR-28) and its validator refuses any flag above `off`, so a grep that passed
+there would mean the run had corrupted the defaults file. The correct file is
+[`live-state.yaml`](live-state.yaml) — the only committed record of what is
+actually live — and the grep above is written to match what the writer actually
+emits (an unquoted `full`; `from_stage: 'off'` IS quoted, because YAML 1.1
+would otherwise read `off` as a boolean).
 
 ## Rollback
 
 `rollback_rules: mode auto, trigger health_failure, target "off"` — a health
-failure rolls the failed flag back to `off` automatically and audited. Manual
-rollback of any flag re-runs the same CLI in reverse direction, with its own
-approval + audit record (strict-forward blocks silent jumps).
+failure rolls the failed flag back to `off` automatically and audited, and the
+rolled-back flag's live-state entry is simply omitted (a rollback never leaves
+a stale exposure behind). Manual rollback re-runs the same CLI in reverse,
+with its own audit record; strict-forward blocks silent jumps.
+
+```bash
+python3 -m infra.rollout.cli rollback services.registry \
+  --reason manual_rollback --actor deployer-sa \
+  --audit-log infra/rollout/audit/promotion-audit.jsonl \
+  --live-state-out infra/rollout/live-state.yaml
+```
 
 ## Audit trail
 
-Every transition appends to the audit log. The go-live closes with the full
-trail quoted: approvals, promotions, the apply pipeline run log, and the
-acceptance greps above.
+Every transition appends to the hash-chained log
+(`infra/rollout/audit/promotion-audit.jsonl`) and writes a record file that the
+new live-state entry names — written BEFORE that entry, so the gate can never
+find a promoted flag with no provable trail. The format, the writers, and the
+rule that a record is evidence (command + real output) rather than a claim are
+in [`audit/README.md`](audit/README.md). The go-live closes with the full trail
+quoted: approvals, promotions, the apply pipeline run log, and the acceptance
+output above.
