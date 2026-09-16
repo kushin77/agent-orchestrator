@@ -31,6 +31,8 @@ Index of the repo's canonical documentation. Agents start at
 | [`CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md`](CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md) | DeepSeek and peer enhancements consumed/linked by the remote-control program (issue #549). |
 | [`AGENTCONSOLE-HOSTING.md`](AGENTCONSOLE-HOSTING.md) | Where the browser operator console (AgentConsole) runs and who makes it run — the source/run two-repo handoff, flag-gated OFF; §11 carries the module/catalog packaging (issue #801, packaged by #813). |
 | [`CANNIBALIZATION.md`](CANNIBALIZATION.md) | Harvest index — which harvested asset holds what, where the canonical copy of a duplicated asset belongs, and the per-lane provenance records (EPIC-00 phase 0, issue #8; the console entry is §17, issue #813). |
+| [`FLEET-CUTOVER.md`](FLEET-CUTOVER.md) | fleet-cron D7 runbook — cutover, rollback, decommission, the freeze/enable/decommission lifecycle (EPIC #706, issue #715). |
+| [`GIT-ENV-VARIABLES.md`](GIT-ENV-VARIABLES.md) | Canonical registry of the session env contract exported by governance/isolation/** and named in AGENTS.md golden rule 15 (issue #608 → EPIC #616). |
 | [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit (AgentConsole) — the operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, flag-gated OFF (EPIC #551, issue #566). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
