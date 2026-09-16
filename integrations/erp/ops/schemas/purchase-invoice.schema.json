@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/ops/schemas/purchase-invoice.schema.json",
+  "title": "Purchase Invoice — the supplier's bill",
+  "description": "The buying cycle's settlement step. Both back-references are required, and for the same reason the receipt requires its order: a bill that cites neither the commitment nor the receipt it settles is a journal entry, which the model expresses as a gl-posting instead. net_total and total are optional so a caller may send lines and taxes and let the posting layer derive them, but a total that disagrees with the lines is refused rather than silently preferred.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "supplier",
+    "against_purchase_order",
+    "against_purchase_receipt",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "purchase-invoice"
+    },
+    "id": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/isoDate"
+    },
+    "posting_date": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/isoDate",
+      "description": "The accounting date the ledger rows land in. Optional: the posting layer falls back to transaction_date, never to the wall clock."
+    },
+    "supplier": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "against_purchase_order": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The commitment this bill is against. Required: an uncommitted payable is not a purchase."
+    },
+    "against_purchase_receipt": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The receipt this bill settles. Required: the buying cycle is invoice-after-goods, and the goods arrival is the thing being billed."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "../../core/schemas/document.schema.json#/$defs/transactionLine"
+      }
+    },
+    "taxes": {
+      "type": "array",
+      "items": {
+        "$ref": "../../core/schemas/document.schema.json#/$defs/taxLine"
+      }
+    },
+    "net_total": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/money"
+    },
+    "total": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/money",
+      "description": "The grand total including taxes. Optional, and cross-checked against the lines when present."
+    },
+    "remarks": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/label"
+    }
+  },
+  "x-erp-document": "purchase-invoice",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#649",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/accounts/doctype/purchase_invoice",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Purchase Invoice",
+    "harvest": [
+      "the purchase invoice field surface (supplier, order and receipt back-references, posting date, taxes, totals)",
+      "the settlement step of the buying cycle and the documents it must cite"
+    ],
+    "note": "Field and lifecycle shapes from the upstream purchase invoice doctype, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

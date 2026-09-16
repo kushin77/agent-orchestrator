@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/ops/catalog/schema/catalog.schema.json",
+  "title": "ERP-04 ops lane — the catalogue declaration schema",
+  "description": "The frozen shape of catalog/ops-catalog.json, the ops lane's single declaration set. It is validated by the repository's own stdlib JSON-Schema subset (integrations.erp.core.schema), and the lane refuses to run a schema that uses a keyword the validator cannot enforce, so this file is a constraint rather than a decoration. Every kind names the family it belongs to and whether its schema is declared here (local) or consumed from ERP-02 (core); every posting rule names the stock purpose it posts under, the voucher family the ledger row cites and the account lines, each with the basis (net_total, taxes or total) its amount is derived from.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "lane",
+    "owning_issue",
+    "epic",
+    "module",
+    "flag",
+    "currency",
+    "kinds",
+    "vocabularies",
+    "stock_effects",
+    "stock_warehouses",
+    "postings",
+    "provenance"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ao.erp-ops-catalog/v1"
+    },
+    "lane": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owning_issue": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "epic": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "module": {
+      "type": "string",
+      "minLength": 1
+    },
+    "flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "default"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "default": {
+          "enum": ["on", "off"]
+        }
+      }
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "kinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "family", "source", "lifecycle", "role"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "enum": ["buying", "manufacturing", "stock", "accounting", "master"]
+          },
+          "source": {
+            "enum": ["local", "core"]
+          },
+          "lifecycle": {
+            "type": ["string", "null"]
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "vocabularies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "stock_effects": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "enum": [-1, 1]
+        }
+      }
+    },
+    "stock_warehouses": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "enum": ["from_warehouse", "to_warehouse"]
+        }
+      },
+      "description": "Which warehouse fields a purpose must NAME, separately from where the quantity moves. A manufacture adds only the produced item to `to_warehouse`, but ERP-02's stock-entry schema still requires the source warehouse on the document, so the two facts are declared apart rather than inferred from each other."
+    },
+    "postings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "document", "voucher_type", "gl"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "document": {
+            "type": "string",
+            "minLength": 1
+          },
+          "purpose": {
+            "type": ["string", "null"]
+          },
+          "voucher_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gl": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["account", "side", "basis"],
+              "properties": {
+                "account": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "side": {
+                  "enum": ["debit", "credit"]
+                },
+                "basis": {
+                  "enum": ["net_total", "taxes", "total"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upstream",
+        "license",
+        "pattern_source_only",
+        "code_copied",
+        "retrieved",
+        "source_doc"
+      ],
+      "properties": {
+        "upstream": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pattern_source_only": {
+          "const": true
+        },
+        "code_copied": {
+          "const": false
+        },
+        "retrieved": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_doc": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

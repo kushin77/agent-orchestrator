@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/ops/schemas/bom.schema.json",
+  "title": "Bill of Materials — what a produced item is made of",
+  "description": "A BOM is data an explosion walks, not a procedure someone remembers. quantity is the output the component list is stated for, so an explosion scales the component quantities by produced/quantity — which is why it is required and strictly positive rather than defaulted to one. A component that is itself produced (it has its own submitted BOM) is expanded further, and a BOM that transitively contains its own item is refused by name rather than looped over.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "item",
+    "quantity",
+    "components"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "bom"
+    },
+    "id": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "item": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The item this bill produces. A component that names its own BOM's output item is a cycle, refused at explosion."
+    },
+    "quantity": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/quantity",
+      "description": "The output quantity the component list below is stated for."
+    },
+    "rate": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/rate",
+      "description": "The finished item's valuation rate. Optional: the posting layer falls back to the item master's valuation_rate."
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_code", "qty"],
+        "properties": {
+          "item_code": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+          },
+          "qty": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/quantity"
+          },
+          "rate": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/rate"
+          },
+          "warehouse": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+            "description": "The warehouse this component is issued from. A sub-assembly is produced into one warehouse and consumed from it, which is not always the warehouse its parent's other components come from — so the source is declared per component and the work order's from_warehouse is only the default."
+          }
+        }
+      },
+      "description": "The components consumed to produce `quantity` of `item`. At least one: a bill of materials that requires nothing is a declaration, not a recipe."
+    },
+    "remarks": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/label"
+    }
+  },
+  "x-erp-document": "bom",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#649",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/manufacturing/doctype/bom",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "BOM",
+    "harvest": [
+      "the BOM field surface (produced item, output quantity, component lines, component rate)",
+      "a bill of materials as data an explosion walks rather than a procedure"
+    ],
+    "note": "Field and lifecycle shapes from the upstream BOM doctype, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}
