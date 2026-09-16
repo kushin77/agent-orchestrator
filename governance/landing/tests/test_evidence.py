@@ -39,6 +39,23 @@ class TestTheEvidenceGap:
         assert gap is not None and gap.code == ev.GAP_OTHER_COMMIT
         assert PARENT[:8] in str(gap) and HEAD[:8] in str(gap)
 
+    def test_a_green_named_but_unattributed_attestation_is_refused(self, tmp_path):
+        path = write_attestation(tmp_path / "att.json", commit=HEAD, verified_by=None)
+        gap = ev.evidence_gap(ev.read_attestation(path), HEAD)
+        assert gap is not None and gap.code == ev.GAP_UNATTRIBUTED
+        assert not gap.cannot_assess
+
+    def test_a_verifier_marked_unknown_reads_as_absent(self, tmp_path):
+        path = write_attestation(tmp_path / "att.json", commit=HEAD, verified_by="unknown")
+        gap = ev.evidence_gap(ev.read_attestation(path), HEAD)
+        assert gap is not None and gap.code == ev.GAP_UNATTRIBUTED
+
+    def test_the_verifier_is_read_back_and_satisfies_the_rule(self, tmp_path):
+        path = write_attestation(tmp_path / "att.json", commit=HEAD, verified_by="agent-copilot-brain")
+        attestation = ev.read_attestation(path)
+        assert attestation.verified_by == "agent-copilot-brain"
+        assert ev.evidence_gap(attestation, HEAD) is None
+
     def test_a_missing_attestation_is_cannot_assess_not_a_pass(self, tmp_path):
         gap = ev.evidence_gap(ev.read_attestation(tmp_path / "absent.json"), HEAD)
         assert gap is not None and gap.code == ev.GAP_ABSENT
