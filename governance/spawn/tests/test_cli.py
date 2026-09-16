@@ -129,6 +129,13 @@ def test_the_local_path_is_admitted_with_the_same_document(tmp_path: Path) -> No
     assert document["focus"]["epic"] == 708
     assert document["spawn"]["path"] == "local"
     assert document["trailer"].endswith("#793")
+    session = document["session"]
+    assert session["author_name"] and session["author_email"]
+    assert session["committer_name"] == session["author_name"], (
+        "the minted committer half must equal the author half"
+    )
+    assert session["committer_email"] == session["author_email"]
+    assert session["author_name"] == f"agent-{session['agent']}"
     assert (root / ".fleet" / "spawn" / f"{document['session']['id']}.json").exists()
 
 
