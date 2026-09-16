@@ -32,7 +32,8 @@ itself still lands as a PR → gate → merge.
 |------|---------|
 | `stage-model.yaml` | Canonical stage vocabulary + promotion/rollback rules (data). |
 | `go-live-plan.yaml` | Phase 0–8 surface → flag → go-live stage (declared intent). |
-| `rollout-state.yaml` | Current promotion state; every flag OFF until promoted. |
+| `rollout-state.yaml` | Declared-default state; every flag OFF, always (GR-28) - never records a promotion. |
+| `live-state.yaml` | The committed record of what is actually promoted (issue #914: flag -> stage/since/approval-or-policy/audit_record), validated separately. |
 | `model.py` | Pure domain: stages, adjacency, audience, gates, rollback decision. |
 | `engine.py` | Promotion/rollback engine, approvals, hash-chained audit log. |
 | `cli.py` | Offline CLI the Cloud Build pipeline invokes (`python3 -m infra.rollout.cli`). |
@@ -133,9 +134,12 @@ Three rules the anchor holds, each measurable:
 * **drift is named, not hidden.** `validate_rollout_state_doc` refuses a state
   document carrying a flag that is not `off`, so the committed
   `rollout-state.yaml` **cannot record an exposure** — it records the
-  *withdrawal*. A surface that is served while its rollout row reads `off` is
-  therefore normal, and the anchor names that disagreement in its report rather
-  than pretending the row was the source of the exposure.
+  *withdrawal*. The exposure itself, when real, is recorded in
+  `live-state.yaml` instead (issue #914) — its own validator, not this one,
+  enforces the audit trail a promoted entry there must carry. A surface that
+  is served while its `rollout-state.yaml` row reads `off` is therefore
+  normal, and the anchor names that disagreement in its report rather than
+  pretending the row was the source of the exposure.
 
 Without the `surfaces.operator_terminal` row in `rollout-state.yaml` the engine
 refuses the flag by name (`unknown flag ... (not declared in rollout state)`), so
@@ -156,7 +160,7 @@ flowchart LR
     PIPE --> V[make verify + check-rollout]
     V --> A[approval-as-code check]
     A --> E[rollout engine promotes flag]
-    E --> COMMIT[flipped rollout-state committed]
+    E --> COMMIT[flipped live-state.yaml committed - #914; rollout-state.yaml stays all-off]
     COMMIT --> APPLY[apply pipeline terraform apply as deployer SA]
 ```
 
@@ -201,8 +205,9 @@ follow the #6 conventions.
    on.
 3. The pipeline runs `check_rollout.py` + `make verify`, validates the
    approval (flag, target stage, distinct approver), then the engine promotes
-   the flag in `rollout-state.yaml` (audit-logged) and the apply pipeline
-   deploys.
+   the flag and persists the new stage to `live-state.yaml` (issue #914;
+   `rollout-state.yaml` is never touched - its validator still refuses any
+   flag above `off`), audit-logged, and the apply pipeline deploys.
 4. **Observe the canary.** Record health:
    ```bash
    python3 -m infra.rollout.cli canary services.registry --health-ok true
