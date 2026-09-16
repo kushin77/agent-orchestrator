@@ -104,7 +104,7 @@ def seeded_store():
                                    ts=T_SEP_08))
     # acme, anthropic, day 08 (different model/provider)
     intake.ingest(model_call_event(tenant="acme", agent="arch-1",
-                                   provider="anthropic", model="claude-haiku-4-5",
+                                   provider="anthropic", model="claude-haiku-4-5-20251001",
                                    input_tokens=2000, output_tokens=1000,
                                    ts=T_SEP_08))
     # globex, deepseek, day 08
