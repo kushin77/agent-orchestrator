@@ -183,13 +183,12 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
 
     # every named module path must exist
     local m
-    IFS=',' read -r -a mods <<< "$modules"
-    for m in "${mods[@]}"; do
+    while IFS= read -r m; do
       m="${m%%[[:space:]]}"; [ -n "$m" ] || continue
       if [ ! -e "$root/$m" ]; then
         map_findings="$map_findings"$'\n'"  $label: $rule names module '$m', which does not exist"
       fi
-    done
+    done < <(printf '%s\n' "$modules" | tr ',' '\n')
 
     # a non-ENFORCED rule must name no control; an ENFORCED one must name >= 1 that
     # a gate actually runs.
@@ -204,8 +203,7 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
       continue
     fi
     local c
-    IFS=',' read -r -a ctrls <<< "$controls"
-    for c in "${ctrls[@]}"; do
+    while IFS= read -r c; do
       c="${c%%[[:space:]]}"; [ -n "$c" ] || continue
       case "$c" in
         suite:*)
@@ -229,7 +227,7 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
           fi
           ;;
       esac
-    done
+    done < <(printf '%s\n' "$controls" | tr ',' '\n')
   done < <(part_b_rules "$spine")
 
   # a row for a rule that is not in Part B is a different rule's claim
