@@ -148,7 +148,14 @@ marker_self_test() {
   # Half 2: every real marker IS refused, by name.
   out="$(marker_scan_files "$mk_pattern" "$d/one.sh" "$d/two.sh" "$d/three.sh" 2>&1)"; rc2=$?
   for f in one.sh two.sh three.sh; do
-    printf '%s' "$out" | grep -qF "$d/$f" || missing="$missing $f"
+    # Bash-native (#868, the #843/#852 idiom): `printf '%s' "$out" | grep -qF` is not
+    # a containment test — `grep -q` exits on its first match, SIGPIPE kills the
+    # producer, and `set -o pipefail` promotes that 141 to the whole pipeline, so a
+    # large report makes this report a file that IS named as MISSING.
+    case "$out" in
+      *"$d/$f"*) ;;
+      *) missing="$missing $f" ;;
+    esac
   done
   if [ "$rc2" -eq 0 ]; then
     printf 'check-docs: FAIL — a real marker was NOT refused; the rule matches nothing\n' >&2
