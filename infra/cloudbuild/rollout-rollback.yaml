@@ -44,8 +44,10 @@ steps:
         echo "canary health FAILED for $_FLAG; auto-rolling back to off"
 
   # Auto-rollback: flip the flag OFF (audit-logged, reason
-  # canary_health_failure), persist the declarative state and commit the
-  # revert for the apply pipeline.
+  # canary_health_failure), persist the promoted live-state (the rolled-back
+  # flag's entry is simply absent - a rollback never leaves a stale exposure
+  # behind) and commit the revert for the apply pipeline. rollout-state.yaml
+  # stays the declared-default document (GR-28) and is never written here.
   - id: rollback
     name: 'python:3.12'
     entrypoint: 'bash'
@@ -54,8 +56,10 @@ steps:
       - |
         python3 -m infra.rollout.cli rollback "$_FLAG" \
           --reason canary_health_failure --actor deployer-sa \
-          --state-out infra/rollout/rollout-state.yaml || exit 1
-        git add infra/rollout/rollout-state.yaml
+          --audit-log infra/rollout/audit/promotion-audit.jsonl \
+          --live-state-out infra/rollout/live-state.yaml || exit 1
+        python3 infra/rollout/checks/check_rollout.py || exit 1
+        git add infra/rollout/live-state.yaml infra/rollout/audit
         git -c user.name=deployer-sa -c user.email=deployer-sa@agent-orchestrator \
           commit -m "rollout: auto-rollback $_FLAG to off (canary health failure) (issue #45)"
         echo "rollback committed; apply pipeline reverts the deployment"
