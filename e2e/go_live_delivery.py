@@ -333,17 +333,25 @@ def probe_refused(sandbox: Path, *, repo_root: Path | str = REPO_ROOT) -> Dict[s
     match = re.search(r"go-live driver: NOT-OK - (.*)", run["stderr"])
     if match:
         reason = match.group(1).splitlines()[0].strip()
-    blocks = [
+    # The refusal names one blocked transition per line; the PLAN section names
+    # them too, so counting stdout as well would double every one of them.
+    refusal_lines = [
         line.strip()
-        for line in (run["stderr"] + run["stdout"]).splitlines()
+        for line in run["stderr"].splitlines()
         if "blocked: missing gate signal" in line
     ]
     return {
         "argv": run["argv"],
         "rc": run["rc"],
         "reason": reason,
-        "blockingSignals": sorted({line.rsplit("missing gate signal", 1)[1].split(" -")[0].strip() for line in blocks}),
-        "blockedTransitions": len([line for line in (run["stderr"] + run["stdout"]).splitlines() if "blocked: missing gate signal" in line]),
+        "blockingSignals": sorted(
+            {line.rsplit("missing gate signal", 1)[1].split(" -")[0].strip() for line in refusal_lines}
+        ),
+        "blockedTransitions": len(refusal_lines),
+        "blockedFlags": sorted({line.split("->", 1)[0].strip() for line in refusal_lines}),
+        "planNamesThemToo": sum(
+            1 for line in run["stdout"].splitlines() if "blocked: missing gate signal" in line
+        ),
         "wroteNothing": tree_digest(sandbox) == before,
         "liveStateEmpty": not live_state_doc(sandbox),
         "auditRecordsWritten": len(list((sandbox_rollout(sandbox) / AUDIT_SUBDIR).glob("*.md"))),

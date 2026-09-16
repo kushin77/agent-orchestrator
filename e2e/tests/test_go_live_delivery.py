@@ -69,11 +69,17 @@ def test_the_run_is_declared_ordered_and_names_its_owner_gated_transitions(deliv
 def test_a_run_without_its_gate_inputs_is_refused_before_anything_is_written(delivery):
     """No health attestation, no approvals: the run stops and the tree is untouched."""
     refused = delivery.refused
+    full_targets = [
+        flag for flag, stage in delivery.promoted["planTargets"].items() if stage == "full"
+    ]
 
     assert refused["rc"] == 1, refused["reason"]
     assert "refused before promoting anything" in refused["reason"]
     assert "canary_health_ok" in refused["blockingSignals"]
-    assert refused["blockedTransitions"] > 0
+    # every `full`-target flag's canary -> gradual step is the one that is blocked
+    assert refused["blockedTransitions"] == len(full_targets) > 0
+    assert sorted(refused["blockedFlags"]) == sorted(full_targets)
+    assert refused["planNamesThemToo"] == len(full_targets)
     assert refused["wroteNothing"] is True
     assert refused["liveStateEmpty"] is True
     assert refused["auditRecordsWritten"] == 0
