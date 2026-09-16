@@ -239,6 +239,11 @@ checks=(
   'session-isolation|bash scripts/check-session-isolation.sh'
   'github-lifecycle|bash scripts/check-github-lifecycle.sh'
   'reconcile|bash scripts/check-reconcile.sh'
+  # fleet-freeze (issue #715/#902): the D7 cutover drain flag and the real
+  # crontab must never disagree — `.fleet/freeze.flag` set while a fleet-cron
+  # line is still active is the split-brain state the cutover policy forbids;
+  # the check's classifier is provoked with a synthetic active/commented pair.
+  'fleet-freeze|bash scripts/check-fleet-freeze.sh'
   # dispatch-reconcile (issue #796): `sent` was treated as `done` — a dispatched
   # directive's marker was permanent, so a directive that DIED (quarantined,
   # dead-lettered, a phantom run) suppressed its issue for ever while the brain
