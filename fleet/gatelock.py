@@ -36,6 +36,16 @@ its own record back and refuses to report a grant it cannot evidence, and a
 0-byte lock file is never read as an empty (free) slot: ``flock``, not the bytes,
 is the exclusion.
 
+**A leftover must not look like a live claim (#948).** A worktree whose holder
+exited leaves a lock file behind — 0 bytes on the normal release path, a stale
+record when the holder was killed outright. That leftover wedged #619's
+close-out: ``status`` reported the worktree free and ``release`` printed
+"already free" while the file survived, and a later close-out read the residue
+as a gate that held the worktree. So ``release`` now *reaps* a free lock file
+(holding the flock while it unlinks, so a genuinely held lock is never touched),
+``status`` names leftover worktree locks instead of omitting them, and a
+0-byte free file is reported as a leftover rather than silently as ``FREE``.
+
 Exit codes of ``scripts/gate-lock.sh`` are deliberately outside the gate's own
 0/1/2 vocabulary so a parked run can never be read as a pass or as a failure:
 
@@ -358,6 +368,49 @@ def truncate_record(path: str | os.PathLike[str]) -> None:
         raise StoreUnusable(f"cannot clear {path}: {exc.strerror or exc}") from exc
 
 
+def _reap_free_lock(path: Path) -> None:
+    """Remove a lock file whose flock is free, holding the flock while unlinking.
+
+    The flock — not the bytes — is the exclusion, so a reaper must take the
+    flock before it unlinks: a gate acquiring in the same instant would
+    otherwise be unlinked out from under a live holder, which is exactly the
+    "delete every file" regression #948 forbids. A held file is left alone.
+    """
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise StoreUnusable(f"cannot open {path}: {exc.strerror or exc}") from exc
+    try:
+        if not _try_lock(fd):
+            return
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise StoreUnusable(f"cannot remove {path}: {exc.strerror or exc}") from exc
+    finally:
+        os.close(fd)
+
+
+def _flock_fresh(fd: int, path: Path) -> bool:
+    """True when the fd we flocked is the file that is still at ``path``.
+
+    ``_reap_free_lock`` unlinks a lock it proved free, and that unlink can land
+    between this process's ``os.open`` and its ``flock``; the flock would then
+    sit on an inode no longer reachable at ``path``, and the next gate opening
+    the path again would admit concurrently. Comparing inodes after the flock
+    closes that window (issue #948).
+    """
+    try:
+        path_stat = os.stat(path)
+    except FileNotFoundError:
+        return False
+    return os.fstat(fd).st_ino == path_stat.st_ino
+
+
 # --- flock ------------------------------------------------------------------
 
 
@@ -460,6 +513,32 @@ def state_text(state: LockState) -> str:
     if state.record_bytes:
         return f"STALE (free, left by {owner_text(state)})"
     return "FREE"
+
+
+def _free_leftover_text(state: LockState) -> str | None:
+    """The status line for a free 0-byte leftover, or ``None`` when not one.
+
+    A queried worktree whose lock file is a 0-byte leftover IS free — ``release``
+    reaps it and ``acquire`` admits — so the ``--worktree`` line says FREE and
+    then names the file that makes it interesting (#948).
+    """
+    if not state.held and state.record_bytes == 0 and state.path.exists():
+        return "FREE (a 0-byte owner-less lock file is present — release reaps it)"
+    return None
+
+
+def _leftover_text(state: LockState) -> str:
+    """Name a lock that needs attention, never with the bare word FREE.
+
+    The ``--worktree`` line reports a queried free worktree as FREE; this listing
+    names leftover files for OTHER worktrees, where the word FREE would contradict
+    the assertion that a HELD worktree is never reported free (#948).
+    """
+    if state.held:
+        return f"HELD by {owner_text(state)}"
+    if state.record_bytes:
+        return f"STALE (left by {owner_text(state)})"
+    return "LEFTOVER (0-byte owner-less lock file)"
 
 
 # --- the holder -------------------------------------------------------------
@@ -611,14 +690,30 @@ def acquire(
     _ensure_dir(lock.parent)
     _ensure_dir(base / "permits")
 
-    try:
-        lock_fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o644)
-    except OSError as exc:
-        raise StoreUnusable(f"cannot open {lock}: {exc.strerror or exc}") from exc
-
-    if not _try_lock(lock_fd):
+    # Open, flock, and verify the flock is on the inode still at ``lock``. A
+    # concurrent release reaping a free lock (#948) can unlink the path between
+    # the open and the flock; without the re-check this gate would flock an inode
+    # no longer on the filesystem, and the next gate would open a fresh file and
+    # admit concurrently. Bounded: an unlink racing three opens in a row is a
+    # store that cannot be trusted.
+    lock_fd = -1
+    for _ in range(3):
+        try:
+            lock_fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o644)
+        except OSError as exc:
+            raise StoreUnusable(f"cannot open {lock}: {exc.strerror or exc}") from exc
+        if not _try_lock(lock_fd):
+            os.close(lock_fd)
+            raise Refused(probe(lock, held=True))
+        if _flock_fresh(lock_fd, lock):
+            break
         os.close(lock_fd)
-        raise Refused(probe(lock, held=True))
+        lock_fd = -1
+    else:
+        raise StoreUnusable(
+            f"cannot take {lock}: the lock file kept changing while it was opened "
+            f"(a release reaping a free lock racing this acquire)"
+        )
 
     # We hold the flock, so a record left in the file cannot belong to a running
     # gate: it is a stale record, and the receipt names who left it behind.
@@ -739,6 +834,7 @@ def release(
     lock = worktree_lock_path(resolved, base)
     state = probe(lock)
     if not state.held and state.record_bytes == 0:
+        _reap_free_lock(lock)
         return f"{MODULE}: RELEASED worktree={resolved} (already free)"
     if state.held and state.owner is None:
         raise StoreUnusable(
@@ -768,8 +864,11 @@ def release(
             _kill_holders([holder], timeout=timeout)
     if _is_held(lock):
         raise StoreUnusable(f"holder pid {holder} still holds {lock} after SIGKILL")
-    if _read_bytes(lock):
-        truncate_record(lock)
+    # The flock is free now. Remove the lock file outright, not merely its
+    # record: a 0-byte leftover is exactly the artifact that wedged #948's
+    # close-out, and a truncated-but-present file is the same wedge one release
+    # later. The file and the verdict must agree.
+    _reap_free_lock(lock)
     for candidate in permit_paths(base):
         holder_state = probe(candidate)
         if holder_state.record_bytes and not holder_state.held:
@@ -792,7 +891,7 @@ def status(
     if worktree is not None:
         resolved = str(Path(worktree).expanduser().resolve())
         state = probe(worktree_lock_path(resolved, base))
-        lines.append(f"  worktree {resolved}: {state_text(state)}")
+        lines.append(f"  worktree {resolved}: {_free_leftover_text(state) or state_text(state)}")
         lines.append(f"  worktree lock: {state.path}")
     live = 0
     for candidate in permit_paths(base):
@@ -801,6 +900,24 @@ def status(
             continue
         live += 1
         lines.append(f"  permit {candidate.stem}: {state_text(state)}")
+    # Leftover worktree locks are named, not omitted (#948). A cleanly-held lock
+    # is the normal state and is already named through its permit slot; anything
+    # else — a stale record, a 0-byte leftover, or a held lock whose owner cannot
+    # be read — is exactly what a wedged close-out must see in one command.
+    needing_attention = []
+    worktrees_dir = base / "worktrees"
+    if worktrees_dir.is_dir():
+        for candidate in sorted(worktrees_dir.glob("*.lock")):
+            candidate_state = probe(candidate)
+            if candidate_state.held and candidate_state.owner is not None:
+                continue
+            needing_attention.append(candidate_state)
+    if needing_attention:
+        lines.append(
+            f"  worktree locks needing attention ({len(needing_attention)}):"
+        )
+        for candidate_state in needing_attention:
+            lines.append(f"    {candidate_state.path.name}: {_leftover_text(candidate_state)}")
     lines.append(f"  permits in use: {live} of {max_concurrent()}")
     return "\n".join(lines)
 
