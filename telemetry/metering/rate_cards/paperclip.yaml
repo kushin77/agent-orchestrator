@@ -28,7 +28,7 @@
 # card. Re-source before relying on this figure for tenant billing.
 schemaVersion: 1
 provider: paperclip
-note: "unpriced — set from contract. Paperclip is an operator seam (per-ticket/heartbeat, docs/contracts/paperclip/{ticket,heartbeat,budget}.schema.json), not a per-token cloud model; 0.0 is a placeholder, not a sourced price. USD per 1M tokens shape kept for loader compatibility. Point-in-time 2026-09."
+note: "unpriced — set from contract. Paperclip operator seam, USD per 1M tokens shape kept for loader compatibility. Point-in-time 2026-09."
 models:
   paperclip-planner:
     standard:

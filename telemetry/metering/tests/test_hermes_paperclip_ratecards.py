@@ -17,7 +17,7 @@ load, validate, and estimate honestly:
 
 from __future__ import annotations
 
-from telemetry.metering.ratecards import RateCardStore
+from telemetry.metering.ratecards import DEFAULT_RATE_CARD_DIR, RateCardStore
 
 
 def test_hermes_and_paperclip_are_loaded():
@@ -51,13 +51,11 @@ def test_paperclip_model_is_unpriced_not_local():
 
 
 def test_paperclip_card_documents_the_unpriced_placeholder():
-    card = RateCardStore.load_dir().card("paperclip")
-    assert card is not None
     # The card's provenance note must say this is unpriced, not a sourced
     # local $0 -- otherwise a reader cannot tell the two apart.
     import yaml
 
-    raw = yaml.safe_load((__import__("telemetry.metering.ratecards", fromlist=["DEFAULT_RATE_CARD_DIR"]).DEFAULT_RATE_CARD_DIR / "paperclip.yaml").read_text(encoding="utf-8"))
+    raw = yaml.safe_load((DEFAULT_RATE_CARD_DIR / "paperclip.yaml").read_text(encoding="utf-8"))
     assert "unpriced" in raw["note"].lower()
 
 
