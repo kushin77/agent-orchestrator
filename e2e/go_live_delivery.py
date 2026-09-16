@@ -469,10 +469,10 @@ def probe_promoted(sandbox: Path, *, repo_root: Path | str = REPO_ROOT) -> Dict[
     for assessment in pass1.assessments:
         dispositions1[assessment.disposition] = dispositions1.get(assessment.disposition, 0) + 1
 
-    #: The state the run is in *between* the two passes: every flag at a stage
-    #: BELOW its declared target. The controls provoke here, because a guard that
-    #: is asked to refuse a transition that is already complete would report the
-    #: wrong refusal ("not forward") and prove nothing.
+    # The state the run is in *between* the two passes: every flag at a stage
+    # BELOW its declared target. The controls provoke here, because a guard that
+    # is asked to refuse a transition that is already complete would report the
+    # wrong refusal ("not forward") and prove nothing.
     mid_state = Path(sandbox).parent / "state-after-pass1"
     shutil.copytree(Path(sandbox), mid_state, dirs_exist_ok=True)
 
@@ -609,12 +609,21 @@ def project_registry(
     return {
         "path": target,
         "source": source,
+        "sourceRoot": str(Path(declarations_root)),
         "digest": hashlib.sha256(target.read_bytes()).hexdigest(),
         "sourceDigest": hashlib.sha256(source.read_bytes()).hexdigest(),
         "flipped": flipped,
         "shippedDefaults": shipped,
         "requiredDeclaredOn": declares_on(promoted.get(REQUIRED_SURFACE)),
     }
+
+
+def registry_declares_on(registry_path: Path | str, surface: str) -> bool:
+    """Does this declaration file promote ``surface``? (the reader's own predicate)."""
+    document = read_yaml(Path(registry_path)) or {}
+    surfaces = document.get("surfaces") if isinstance(document, Mapping) else None
+    entry = (surfaces or {}).get(surface) if isinstance(surfaces, Mapping) else None
+    return declares_on(entry)
 
 
 def shipped_registry_copy(
@@ -843,12 +852,12 @@ def probe_dark(sandbox: Path, *, declarations_root: Path | str = REPO_ROOT, repo
     """The surface as it SHIPS: absent, not merely unauthorised — and absent to all."""
     registry = shipped_registry_copy(sandbox, declarations_root=declarations_root)
     observation = observe_surface(sandbox, registry=registry, repo_root=repo_root)
-    document = read_yaml(registry)
-    entry = ((document.get("surfaces") or {}) or {}).get(REQUIRED_SURFACE) or {}
+    document = read_yaml(registry) or {}
+    entry = ((document.get("surfaces") or {}).get(REQUIRED_SURFACE) or {}) if isinstance(document, Mapping) else {}
     return {
         **observation,
         "verdict": served_verdict(observation),
-        "declaresOn": declares_on(entry),
+        "declaresOn": registry_declares_on(registry, REQUIRED_SURFACE),
         "declaredDefault": entry.get("default"),
     }
 
@@ -904,7 +913,7 @@ def probe_rolled_back(
         cwd=Path(repo_root),
     )
     after_stages = stages_of(live_state_doc(sandbox))
-    reprojected = project_registry(sandbox, declarations_root=Path(projection["source"]).parents[2])
+    reprojected = project_registry(sandbox, declarations_root=projection["sourceRoot"])
     ladder = observe_surface(sandbox, registry=Path(reprojected["path"]), repo_root=repo_root)
 
     # -- the runtime half: the declaration is unchanged, the surface is dark ----
@@ -936,9 +945,7 @@ def probe_rolled_back(
         "runtime": {
             "overlayPath": str(record),
             "declarationUsed": str(while_promoted),
-            "declarationDeclaresOn": declares_on(
-                ((read_yaml(while_promoted).get("surfaces") or {}).get(REQUIRED_SURFACE) or {})
-            ),
+            "declarationDeclaresOn": registry_declares_on(while_promoted, REQUIRED_SURFACE),
             "statusWithOverlayEngaged": with_overlay["status"],
             "codeWithOverlayEngaged": with_overlay["code"],
             "enabledWithOverlayEngaged": with_overlay["surfaceEnabled"],
