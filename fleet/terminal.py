@@ -1689,6 +1689,12 @@ def clear_reported(directive_id: str) -> None:
 # retires the order to `.fleet/dead-letter/`, where `channel watch` can never
 # return it again.
 #
+# Bounded is not the same as CLASSIFIED (#861): a refusal that is terminal by
+# definition — a closed issue, a closed epic, a unit no lane owns — cannot become
+# retryable by waiting, so it is retired on the FIRST refusal by
+# `guard_retire_refusal`, which reads the claim layer's own reason code and
+# records the named classification. Everything else keeps the bounded retry.
+#
 # The state directory is derived from RUNS — beside the run markers — and never
 # from `runtime.FLEET_DIR` directly: the fleet suite redirects `terminal.RUNS` to
 # a tmp directory, so driving this loop in a test cannot write guard state into
@@ -1754,6 +1760,53 @@ def guard_retire(directive_id: str, issue: int, reason: str) -> bool:
     )
 
 
+def guard_retire_refusal(directive_id: str, issue: int, refusal: str) -> bool:
+    """Retire a refused claim — on the FIRST refusal when it is terminal (#861).
+
+    ``guard_retire`` bounds a refusal; it does not ask whether the refusal was
+    worth retrying. A refusal for a **closed issue**, a **closed epic** or a unit
+    **no lane owns** cannot become retryable by waiting, so paying the budget for
+    it (30+60+120+240 ≈ 450s of a held queue slot at the documented defaults)
+    buys nothing: the order is retired on the first refusal, carrying the named
+    classification so the record and the escalation say *why* it was terminal.
+
+    Everything else keeps the bounded retry it had, because for those the passage
+    of time IS the remedy — a stale snapshot (#727's refresh exists for exactly
+    that), a blocked unit whose blocker closes, a child the snapshot does not
+    carry yet. An UNCLASSIFIABLE refusal is retried too: not knowing why a claim
+    was refused is never a licence to discard the order, and the classification
+    is read from the claim layer's own reason code rather than guessed from prose.
+
+    Returns True when the order is now terminal.
+    """
+    reason = runaway.refusal_reason(refusal)
+    classification = runaway.classify_refusal(reason)
+    if classification is None:
+        return guard_retire(directive_id, issue, f"claim refused: {refusal[-120:]}")
+    # The attempt is still counted, so the artifact reads `attempts: 1` and the
+    # audit can see that a terminal refusal cost ONE attempt rather than the cap.
+    # A misconfigured budget must not block a retirement that does not depend on
+    # it: `guard_attempt` returns None on an unreadable cap, and the order is
+    # retired anyway (the classification is the decision, not the budget).
+    record = guard_attempt(directive_id, f"{classification}: claim refused: {refusal[-160:]}")
+    attempts = record.attempts if record is not None else 1
+    return drop_directive(
+        directive_id,
+        issue,
+        (
+            f"{classification} — the claim refusal is terminal by definition (reason "
+            f"{reason!r}), so the order was retired on the FIRST refusal instead of consuming "
+            f"its retry budget: {refusal[-200:]}"
+        ),
+        dropped_by="runaway-guard",
+        terminal_class=classification,
+        report=(
+            f"#{issue} DEAD-LETTERED on the first refusal — terminal classification "
+            f"{classification} (reason {reason!r}, {attempts} attempt(s))."
+        ),
+    )
+
+
 def drop_directive(
     directive_id: str,
     issue: int | None,
@@ -1761,6 +1814,7 @@ def drop_directive(
     *,
     dropped_by: str,
     report: str | None = None,
+    terminal_class: str | None = None,
 ) -> bool:
     """Retire one directive to the dead-letter mailbox — the ONE implementation.
 
@@ -1770,12 +1824,21 @@ def drop_directive(
     come here, so the durable record, the reason and the ``dropped_by`` label are
     produced by one function and the shape is identical by construction.
 
+    ``terminal_class`` (#861) travels the same way for the same reason: the
+    automatic path's terminal-refusal branch names the classification, every
+    other caller passes none, and the record distinguishes the two by carrying
+    the class or null rather than by being a different shape.
+
     Returns True when the order is now terminal. The caller is responsible for
     the *envelope* — this function retires the work; it does not consume the
     control message that asked for it.
     """
     target = runaway.dead_letter(
-        directive_id, reason, base=guard_base(), dropped_by=dropped_by
+        directive_id,
+        reason,
+        base=guard_base(),
+        dropped_by=dropped_by,
+        terminal_class=terminal_class,
     )
     print(
         f"[terminal] directive {directive_id} DEAD-LETTERED by {dropped_by} — {reason}",
@@ -2946,6 +3009,12 @@ def loop(args: argparse.Namespace) -> int:
             # counted and the next one is spaced by the harvested backoff; once the
             # budget is exhausted the order is retired to the dead-letter store and
             # `channel watch` never returns it again (#723).
+            #
+            # The refusal is CLASSIFIED first (#861): a refusal for a closed issue,
+            # a closed epic or a unit no lane owns is terminal by definition, so it
+            # is retired on this first refusal with the classification recorded,
+            # instead of spending K attempts (≈450s held) to reach the same state.
+            # A refusal this build cannot classify keeps the bounded retry.
             print(f"[terminal] claim refused for #{issue}: {claim_output}", file=sys.stderr, flush=True)
             if "snapshot-stale" in claim_output:
                 # The refusal names its own remedy, so the loop TRIGGERS it
@@ -2954,7 +3023,7 @@ def loop(args: argparse.Namespace) -> int:
                 # instead of re-dispatched every cycle. The attempt below still
                 # counts, so the park and the budget compose rather than compete.
                 board_trigger(directive_id, issue)
-            guard_retire(directive_id, issue, f"claim refused: {claim_output[-120:]}")
+            guard_retire_refusal(directive_id, issue, claim_output)
             if args.once:
                 return 1
             continue

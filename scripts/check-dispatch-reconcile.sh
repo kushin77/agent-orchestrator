@@ -33,20 +33,35 @@
 #     * the live idle path (`advance_ready`) prints both a re-arm and a
 #       suppression naming the marker state — never a silent `continue`;
 #     * `.fleet/sent/` (an ARCHIVE) is never read as "still in flight" — reading
-#       it would suppress every order for ever.
+#       it would suppress every order for ever;
+#     * the LEDGER is asked in the funnel: an order for a unit a LIVE claim holds is
+#       refused by name and reaches neither the marker set nor the channel, while an
+#       open, unclaimed unit still dispatches (#861, acceptance item 3 of #366);
+#     * a stranded authorisation whose issue is CLOSED with no change of its own
+#       (superseded) is retirable and the move is STAMPED with the reason, the
+#       successor and the board edition — and an OPEN issue is still REFUSED, which
+#       is #821's invariant and the negative control that stops the new mode being a
+#       bypass (#861).
 #
 # PROVOCATION (the gate must be able to fail — GR-12, no-false-green)
-#   Two mutants, one per half, each applied by literal replacement to a scratch
-#   copy of the tree (the replacement is asserted to have happened, so a mutation
-#   that never applied cannot be reported as "the gate caught it"):
+#   Four mutants, each applied by literal replacement to a scratch copy of the tree
+#   (the replacement is asserted to have happened, so a mutation that never applied
+#   cannot be reported as "the gate caught it"):
 #     * NEVER-STALE     — the re-arm grace is set beyond any age, so nothing is
 #       ever stale; the driver MUST fail STALE-REARMED;
 #     * LIVENESS-IGNORED — the live evidence is ignored, so a running directive is
-#       re-armed; the driver MUST fail LIVE-SUPPRESSED.
-#   The mutant tree is a full layout (a copy of `fleet/` with `governance/` and
-#   `.board/` symlinked to the real ones), because `fleet/brain.py` resolves its
-#   own repo root from its file location — a flat copy would fail to import and
-#   the provocation would prove nothing.
+#       re-armed; the driver MUST fail LIVE-SUPPRESSED;
+#     * CLAIM-GUARD-REMOVED — the ledger guard is taken out of the funnel, so a
+#       second authorisation is minted for a unit another lane holds; the driver
+#       MUST fail DISPATCH-REFUSES-CLAIMED;
+#     * SUPERSESSION-BYPASS — the OPEN-issue refusal is removed from the retire
+#       mode's contract, so the new terminal verb retires live work; the driver MUST
+#       fail RETIRE-REFUSES-OPEN.
+#   The mutant tree is a full layout: `fleet/` is always a copy, the mutated file's
+#   own top-level directory (`fleet/` or `governance/`) is a copy too, and the rest
+#   is symlinked — because `fleet/brain.py` resolves its own repo root from its file
+#   location, so a flat copy would fail to import and the provocation would prove
+#   nothing.
 #
 # No network. No writes outside the scratch directory. Exit-code contract:
 # 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
@@ -63,7 +78,8 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 for required in fleet/markers.py fleet/brain.py fleet/channel.py fleet/runaway.py \
-                fleet/tests/test_dispatch_markers.py scripts/verify.sh; do
+                governance/lifecycle/directive.py fleet/tests/test_dispatch_markers.py \
+                scripts/verify.sh; do
   if [ ! -f "$required" ]; then
     echo "check-dispatch-reconcile: FAIL — $required is missing" >&2
     exit 1
@@ -102,6 +118,11 @@ plumbing=(
   "fleet/markers.py|TERMINAL_STATES = (COMPLETED, DEAD)|the terminal states are declared in one place"
   "fleet/markers.py|REARM_GRACE_SECONDS|delivery is not instantaneous: a fresh marker is not stale"
   "fleet/markers.py|def rearm(|a park is reversible BY NAME, never a weld"
+  "fleet/brain.py|def live_claim_refusal(|the brain asks the LEDGER before minting a second order (#861)"
+  "fleet/brain.py|refusal = live_claim_refusal(number)|and asks it in the funnel every directive passes through"
+  "governance/lifecycle/directive.py|def _supersession_refusal(|the retire mode's whole contract is one named refusal function (#861)"
+  "governance/lifecycle/directive.py|is OPEN on the board; a directive for live work is not retired by|the #821 negative control is enforced where it is declared"
+  "governance/lifecycle/directive.py|payload[\"retired\"] = stamp|a retirement is stamped into the record it moves"
 )
 for entry in "${plumbing[@]}"; do
   IFS='|' read -r file marker label <<< "$entry"
@@ -143,9 +164,11 @@ cat > "$driver" <<'PY'
 Run as: driver.py <fleet-root> <repo-root> <state-dir>
 
 `fleet-root` is the `fleet/` package under test (the real one, or a mutated copy);
-`repo-root` is the real repo (used for the channel and `governance/`); `state-dir`
-is the scratch `AO_FLEET_DIR`. Every probe prints PASS/FAIL BY NAME, so a mutant
-run shows exactly which property broke.
+`repo-root` is the real repo (used for the channel and for the flat `claims`/
+`snapshot` imports); `state-dir` is the scratch `AO_FLEET_DIR`; `gov-root` is the
+tree `governance/` is imported from — the real repo, or the scratch tree holding
+the mutated `governance/lifecycle/directive.py`. Every probe prints PASS/FAIL BY
+NAME, so a mutant run shows exactly which property broke.
 """
 
 import contextlib
@@ -161,6 +184,9 @@ from pathlib import Path
 fleet_root = Path(sys.argv[1]).resolve()
 repo_root = Path(sys.argv[2]).resolve()
 state = Path(sys.argv[3]).resolve()
+# Absent means "the real tree", so every existing caller of this driver keeps the
+# meaning it had; a mutant run passes the scratch tree instead.
+gov_root = Path(sys.argv[4]).resolve() if len(sys.argv) > 4 else repo_root
 state.mkdir(parents=True, exist_ok=True)
 # Every relative default in this driver (`.board/claims`, the marker directory)
 # must resolve INSIDE the scratch tree: a driver that read the live ledger would
@@ -171,6 +197,9 @@ sys.dont_write_bytecode = True
 shutil.rmtree(fleet_root / "__pycache__", ignore_errors=True)
 sys.path.insert(0, str(fleet_root))
 sys.path.insert(0, str(repo_root / "governance" / "dispatch"))
+# Last, so it is searched FIRST for the `governance` package while the flat
+# `claims`/`snapshot` modules still resolve from the dispatch directory above.
+sys.path.insert(0, str(gov_root))
 
 os.environ["AO_FLEET_DIR"] = str(state)
 os.environ["AO_RUNAWAY_ATTEMPTS"] = "3"
@@ -180,6 +209,10 @@ import brain  # noqa: E402
 import claims as claims_mod  # noqa: E402
 import markers  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
+
+# The mailbox that owns the retired order is imported from `gov_root`, so a mutant
+# of `governance/lifecycle/directive.py` is the module actually under test.
+from governance.lifecycle import directive as directive_mod  # noqa: E402
 
 CAP = int(os.environ["AO_RUNAWAY_ATTEMPTS"])
 OLD = 3600.0
@@ -283,7 +316,7 @@ def reconcile(*, references: set[str] | None = None, ledger: Path | None = None)
     return markers.reconcile(probe_, directory=MARKERS, references=references, cap=CAP, base=30)
 
 
-board(132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 143, closed=(142,))
+board(132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 143, 144, 145, 146, closed=(142, 147))
 # The board the probe reads is the SAME artifact the dispatch-time closure guard
 # reads (`brain.BOARD_PATH`), loaded through the real loader — so "open" here and
 # "may dispatch" there cannot disagree.
@@ -526,6 +559,158 @@ probe(
     f"advanced={advanced} queued={len(sent_directives()) - before} line={suppressed_line[:1]}",
 )
 
+# 13. the LEDGER guard in the funnel (#861, acceptance item 3 of #366): a unit a
+#     LIVE claim holds gets no second authorisation. The guard sits in
+#     `dispatch()` — the one funnel every directive passes through — so the wave
+#     path and an operator-called dispatch are covered, not only the idle path,
+#     which already filtered its own candidate list by the live claims.
+guard_ledger = state / "guard-claims"
+claims_mod.append_event(
+    claims_mod.ClaimEvent(
+        event="claim", issue=144, agent="subagent-861", at=markers.now_iso(), lane="lane-861"
+    ),
+    path=guard_ledger,
+)
+brain.CLAIMS_LEDGER = guard_ledger
+before = len(sent_directives())
+claimed = brain.dispatch(order("advance-144", 144))
+probe(
+    "DISPATCH-REFUSES-CLAIMED",
+    claimed[0] is False
+    and claimed[1].startswith(brain.ISSUE_CLAIMED)
+    and "#144" in claimed[1]
+    and "subagent-861" in claimed[1]
+    and "no sent-marker" in claimed[1]
+    and len(sent_directives()) == before
+    and not markers.path_for("advance-144", MARKERS).exists(),
+    f"refused={not claimed[0]} report={claimed[1][:90]} queued={len(sent_directives()) - before}",
+)
+
+#     ... and the SAME funnel still sends when no claim holds the unit. Without
+#     this half a guard that refused every order would satisfy the probe above —
+#     which is a weld, not a guard.
+unclaimed = brain.dispatch(order("advance-145", 145))
+probe(
+    "DISPATCH-SENDS-WHEN-UNCLAIMED",
+    unclaimed[0] is True and len(sent_directives()) == before + 1,
+    f"sent={unclaimed[0]} queued={len(sent_directives()) - before} report={unclaimed[1][:70]}",
+)
+
+# 14. the `.fleet/sent/` terminal mode, and the #821 invariant it must NOT bypass
+#     (#861). The lifecycle mailbox is separate from the fleet's own spool: it is
+#     written and moved only by `governance/lifecycle/directive.py`, and a stranded
+#     authorisation whose issue is closed WITH NO change of its own (superseded) is
+#     one no close-out run can ever collect. The mode added for it is deliberately
+#     NARROWER than the landed gate, and the refusal of an OPEN issue is the
+#     mandatory negative control: without it the new verb is a bypass.
+def strand(directive_id: str, issue: int) -> Path:
+    """A stranded authorisation: an order still sitting in `sent/`."""
+    sent, _ = directive_mod.mailboxes(state)
+    sent.mkdir(parents=True, exist_ok=True)
+    path = sent / f"{directive_id}.json"
+    path.write_text(
+        json.dumps(
+            {
+                "id": directive_id,
+                "ts": markers.now_iso(),
+                "type": "directive",
+                "from": "brain",
+                "to": "sister",
+                "task": {"kind": "work", "issue": issue, "lane": "lane-861"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+# The closure oracle is the REAL one, read from the board artifact this driver
+# planted, through the real freshness bar (`governance.policy.lease`).
+oracle = directive_mod.board_closure(state / "board.json")
+_, lifecycle_done = directive_mod.mailboxes(state)
+
+open_strand = strand("d-open", 146)  # #146 is OPEN on the board
+try:
+    directive_mod.retire_superseded(
+        state, "d-open", 147, landed={}, closed=oracle.closed, board=oracle.generated_at
+    )
+    bypass = ""
+except directive_mod.DirectiveRefused as exc:
+    bypass = str(exc)
+probe(
+    "RETIRE-REFUSES-OPEN",
+    "is OPEN" in bypass
+    and "#821" in bypass
+    and open_strand.exists()
+    and not (lifecycle_done / "d-open.json").exists(),
+    f"message={bypass[:110]}",
+)
+
+# The gate that was already there is unmoved: an order whose change has not landed
+# stays in `sent/` exactly as it did before this lane touched the module.
+live_strand = strand("d-live", 145)
+try:
+    directive_mod.consume(state, "d-live", {145: False})
+    gate_refusal = ""
+except directive_mod.DirectiveRefused as exc:
+    gate_refusal = str(exc)
+probe(
+    "ORDINARY-GATE-REFUSES-LIVE",
+    "has not landed" in gate_refusal
+    and live_strand.exists()
+    and not (lifecycle_done / "d-live.json").exists(),
+    f"message={gate_refusal[:110]}",
+)
+
+# ... and the case the mode EXISTS for: closed on the board with no change of its
+# own and a NAMED successor. The move is stamped, so the terminal copy is evidence
+# rather than an unexplained disappearance.
+superseded = strand("d-superseded", 147)  # #147 is CLOSED on the board
+try:
+    retired = directive_mod.retire_superseded(
+        state, "d-superseded", 148, landed={}, closed=oracle.closed, board=oracle.generated_at
+    )
+    retired_error = ""
+except directive_mod.DirectiveRefused as exc:
+    retired, retired_error = "", str(exc)
+moved = lifecycle_done / "d-superseded.json"
+stamp = json.loads(moved.read_text(encoding="utf-8")).get("retired", {}) if moved.exists() else {}
+probe(
+    "RETIRE-SUPERSEDED-PERMITS",
+    "retired 1 directive(s) for #147" in retired
+    and not superseded.exists()
+    and stamp.get("reason") == "superseded"
+    and stamp.get("superseded_by") == 148
+    and stamp.get("board") == oracle.generated_at,
+    f"detail={retired[:70] or retired_error} stamp={stamp}",
+)
+
+# A closure oracle that is STALE is CANNOT-ASSESS, never a closed issue: an oracle
+# that can be arbitrarily old fails OPEN, which is worse than having none.
+stale_board = state / "stale-board.json"
+stale_board.write_text(
+    json.dumps(
+        {
+            "generated_at": markers.now_iso(time.time() - 48 * 3600),
+            "source": "check-dispatch-reconcile",
+            "issues": [{"number": 147, "title": "#147", "state": "CLOSED"}],
+        }
+    )
+    + "\n",
+    encoding="utf-8",
+)
+try:
+    directive_mod.board_closure(stale_board)
+    stale_refusal = ""
+except directive_mod.DirectiveRefused as exc:
+    stale_refusal = str(exc)
+probe(
+    "RETIRE-REFUSES-STALE-BOARD",
+    "m old (bar" in stale_refusal and "snapshot --from-github" in stale_refusal,
+    f"message={stale_refusal[:110]}",
+)
+
 if failures:
     print(f"PROBES: FAIL ({', '.join(failures)})")
     raise SystemExit(1)
@@ -538,11 +723,15 @@ PY
 }
 
 # --- 3. the real tree --------------------------------------------------------
-sha_before="$(digest fleet/markers.py)"
+# Every file a mutant may touch is digested: a provocation that leaked into the
+# REAL tree would otherwise be reported as a clean run.
+mutated_files="fleet/markers.py fleet/brain.py governance/lifecycle/directive.py"
+digest_all() { for file in $mutated_files; do digest "$file"; done; }
+sha_before="$(digest_all)"
 echo "== dispatch reconcile: the real tree =="
 if python3 "$driver" "$root/fleet" "$root" "$work/state-real" > "$work/real.log" 2>&1; then
   grep -E "probe .*: (PASS|FAIL)|^  NOTE|PROBES:" "$work/real.log" || true
-  ok "the real tree re-arms a stale marker, suppresses a live one, and parks a spent budget"
+  ok "the real tree re-arms a stale marker, suppresses a live one, parks a spent budget, refuses a second order for a claimed unit, and retires a superseded strand while refusing a live one"
 else
   cat "$work/real.log" >&2
   bad "the reconciliation failed against the real tree (see the probes above)"
@@ -553,29 +742,36 @@ fi
 # `governance/` and `.board/`), because `fleet/brain.py` resolves its repo root
 # from its own file location: a flat copy could not import `claims`/`order`/
 # `snapshot` at all, and the provocation would prove nothing about this code.
-provoke() { # provoke <label> <anchor> <replacement> <expected-probe>
-  label="$1"; anchor="$2"; replacement="$3"; expected="$4"
+provoke() { # provoke <label> <target-rel-path> <anchor> <replacement> <expected-probe>
+  label="$1"; target="$2"; anchor="$3"; replacement="$4"; expected="$5"
   scratch="$work/tree-$label"
+  top="${target%%/*}"   # `fleet` or `governance`: the tree the mutation lives in
   mkdir -p "$scratch" 2>/dev/null
   cp -R "$root/fleet" "$scratch/fleet" 2>/dev/null
   # The rest of the layout is symlinked, never copied: `fleet/brain.py` imports
   # `governance/dispatch/{claims,order,snapshot}` and loads the routing policy from
   # `registry/`, and it resolves that root from its own file location — a flat copy
   # would fail to import at all, so the provocation would prove nothing about this
-  # code. Only `fleet/` is a copy, and only inside it is the mutation applied.
+  # code. `fleet/` is always a copy, and so is the mutated file's OWN top-level
+  # tree (a `governance/` mutant must be importable as the copy, or the driver
+  # would silently test the real module and report a clean run).
   for entry in "$root"/*; do
     name="$(basename "$entry")"
     [ "$name" = "fleet" ] && continue
+    [ "$name" = "$top" ] && continue
     ln -s "$entry" "$scratch/$name" 2>/dev/null
   done
+  if [ "$top" != "fleet" ]; then
+    cp -R "$root/$top" "$scratch/$top" 2>/dev/null
+  fi
   # Dotfiles are not globbed, and the committed board is one of the things the
   # dispatch-time closure guard reads through a relative root.
   ln -s "$root/.board" "$scratch/.board" 2>/dev/null
-  if [ ! -f "$scratch/fleet/markers.py" ]; then
-    bad "could not stage the $label mutant (no scratch copy of fleet/)"
+  if [ ! -f "$scratch/$target" ]; then
+    bad "could not stage the $label mutant (no scratch copy of $target)"
     return
   fi
-  if ! python3 - "$scratch/fleet/markers.py" "$anchor" "$replacement" <<'PY'
+  if ! python3 - "$scratch/$target" "$anchor" "$replacement" <<'PY'
 import sys
 from pathlib import Path
 
@@ -590,14 +786,18 @@ if mutated == source:
     print("the mutation did not change the source", file=sys.stderr)
     raise SystemExit(3)
 path.write_text(mutated, encoding="utf-8")
-print("MUTANT-APPLIED:", anchor, "->", replacement)
+print("MUTANT-APPLIED:", path.name, anchor.splitlines()[0], "->", replacement.splitlines()[0])
 PY
   then
     bad "the $label mutation could not be applied (see the reason above)"
     return
   fi
   echo "== dispatch reconcile: provocation $label (must fail $expected) =="
-  if python3 "$driver" "$scratch/fleet" "$root" "$work/state-$label" > "$work/$label.log" 2>&1; then
+  # `$scratch` is handed to the driver as the GOVERNANCE root as well, so a mutant
+  # of `governance/lifecycle/directive.py` is the module under test; for a
+  # `fleet/`-only mutant that path is a symlink to the real tree, so the call is
+  # the same one either way.
+  if python3 "$driver" "$scratch/fleet" "$root" "$work/state-$label" "$scratch" > "$work/$label.log" 2>&1; then
     bad "$label was NOT refused — the gate cannot see the defect it exists for"
   elif grep -q "probe $expected: FAIL" "$work/$label.log"; then
     grep -E "probe .*: (PASS|FAIL)|PROBES:" "$work/$label.log"
@@ -608,20 +808,50 @@ PY
   fi
 }
 
-provoke "NEVER-STALE" \
+provoke "NEVER-STALE" "fleet/markers.py" \
   'REARM_GRACE_SECONDS = 300.0' \
   'REARM_GRACE_SECONDS = 10 ** 12' \
   "STALE-REARMED"
 
-provoke "LIVENESS-IGNORED" \
+provoke "LIVENESS-IGNORED" "fleet/markers.py" \
   'if live_claim or live_run or in_flight:' \
   'if False:' \
   "LIVE-SUPPRESSED"
 
+# The ledger guard must be able to fail too (GR-12): with it taken out of the
+# funnel, a second authorisation is minted for a unit another lane is already
+# working — the duplicate order #861 exists to stop.
+provoke "CLAIM-GUARD-REMOVED" "fleet/brain.py" \
+  '        refusal = live_claim_refusal(number)
+        if refusal is not None:
+            return False, refusal' \
+  '        # MUTANT: the ledger guard is taken out of the funnel
+        pass' \
+  "DISPATCH-REFUSES-CLAIMED"
+
+# ... and so must the #821 negative control. With the OPEN-issue refusal removed,
+# the terminal verb retires work that is still live: the bypass the control exists
+# to make impossible, and the probe that names it is RETIRE-REFUSES-OPEN.
+provoke "SUPERSESSION-BYPASS" "governance/lifecycle/directive.py" \
+  '    if not state:
+        return (
+            f"#{issue} is OPEN on the board; a directive for live work is not retired by "' \
+  '    if False:  # MUTANT: the #821 negative control is removed
+        return (
+            f"#{issue} is OPEN on the board; a directive for live work is not retired by "' \
+  "RETIRE-REFUSES-OPEN"
+
+# The permit direction must be provable as well, or RETIRE-SUPERSEDED-PERMITS
+# could be satisfied by a mode that never retires anything.
+provoke "SUPERSESSION-NEVER-PERMITS" "governance/lifecycle/directive.py" \
+  'SUPERSESSION_REASONS = (REASON_SUPERSEDED,)' \
+  'SUPERSESSION_REASONS = ()' \
+  "RETIRE-SUPERSEDED-PERMITS"
+
 # --- 5. the real tree was never mutated, and the suite proves the same -------
-sha_after="$(digest fleet/markers.py)"
+sha_after="$(digest_all)"
 if [ "$sha_before" = "$sha_after" ]; then
-  ok "the real fleet/markers.py is byte-identical before and after the provocations"
+  ok "the real tree is byte-identical before and after the provocations ($mutated_files)"
 else
   bad "a provocation modified the real tree ($sha_before -> $sha_after)"
 fi

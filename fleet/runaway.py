@@ -99,6 +99,17 @@ the SAME :func:`dead_letter` used here: only the ``dropped_by`` label differs.
 :data:`RECORD_FIELDS` names the shape both callers produce, and
 ``scripts/check-dead-letter.sh`` asserts the two records are identical field-
 for-field, so a change to one path cannot silently miss the other.
+
+BOUNDED is not CLASSIFIED (issue #861)
+--------------------------------------
+The budget bounds a failure; it does not ask whether the failure was worth a
+retry. A refusal that is terminal BY DEFINITION — a closed issue, a closed epic,
+a unit no lane owns — paid the whole budget (≈450s of a held queue slot) to reach
+a state it was in on the first refusal. :data:`TERMINAL_REFUSAL_CLASSES` names
+those cases, :func:`refusal_reason` reads the claim layer's own reason code, and
+a terminal refusal is retired on the FIRST one carrying that classification into
+the record — so the artifact and the log say *why* it was terminal rather than
+only how many times it was tried.
 """
 
 from __future__ import annotations
@@ -141,6 +152,106 @@ EXIT_CANNOT_ASSESS = 2
 
 class RunawayConfigError(ValueError):
     """The declared budget cannot be read — refuse, never guess."""
+
+
+# --- why a refusal is terminal (issue #861) ----------------------------------
+#
+# THE DEFECT THIS EXISTS FOR (measured)
+#   The bound above is a bound, not a classification: it treats every refusal as
+#   worth retrying, so a refusal that is terminal BY DEFINITION pays the whole
+#   budget before it retires. At the documented defaults (K=5, base 30s, cap
+#   300s) that is 30+60+120+240 ≈ 450s of a held queue slot spent re-reading an
+#   order whose issue is CLOSED on the board of record — work that was dead on
+#   arrival. The terminal state was reached; it was just the slow road.
+#
+# THE CLASSIFICATION
+#   The vocabulary is harvested, not invented (GR-10): the keys are
+#   ``governance/dispatch/model.py``'s own ``REASON_*`` codes — the words the
+#   claim layer itself refuses with, printed by
+#   ``governance/dispatch/cli.py`` as ``claim REFUSED: <reason> — <detail>``.
+#   Restating them as a second vocabulary would let the two drift, so
+#   ``scripts/check-dead-letter.sh`` asserts every key here is still a reason code
+#   the claim layer raises.
+#
+#   What is IN and what is OUT is the whole judgement, so it is written down:
+#
+#   * ``issue-closed``      — the issue is closed. Nothing can claim it, ever.
+#   * ``epic-closed``       — its epic has closed, so the unit has no owner to
+#                             work under; the provenance cannot be proved again.
+#   * ``epic-not-workable`` — an epic is closed by its children; the board will
+#                             not stop saying so.
+#   * ``unowned``           — no lane owns it, and re-reading the same directive
+#                             names the same (empty) lane.
+#
+#   Deliberately OUT, because waiting IS their remedy:
+#
+#   * ``snapshot-stale`` — the reason #727's single bounded refresh exists;
+#   * ``blocked``        — a blocker closes and the unit becomes eligible;
+#   * ``unknown-issue``  — the snapshot may not carry a freshly filed child yet;
+#   * ``already-claimed``— a hold, not a refusal: the unit is being worked;
+#   * ``provenance-mismatch`` / ``invalid-directive`` — a data defect an operator
+#                             fixes, after which the same order is dispatchable.
+#: The claim layer's terminal reason codes, as its own vocabulary spells them.
+CLAIM_REASON_ISSUE_CLOSED = "issue-closed"
+CLAIM_REASON_EPIC_CLOSED = "epic-closed"
+CLAIM_REASON_EPIC_NOT_WORKABLE = "epic-not-workable"
+CLAIM_REASON_UNOWNED = "unowned"
+
+#: The named terminal classification a refusal carries into the record.
+CLASS_ISSUE_CLOSED = "issue-closed"
+CLASS_EPIC_CLOSED = "epic-closed"
+CLASS_NOT_A_UNIT = "not-a-unit"
+CLASS_UNOWNED_UNIT = "unowned-unit"
+
+#: Claim reason code -> the named classification the dead-letter record carries.
+TERMINAL_REFUSAL_CLASSES: dict[str, str] = {
+    CLAIM_REASON_ISSUE_CLOSED: CLASS_ISSUE_CLOSED,
+    CLAIM_REASON_EPIC_CLOSED: CLASS_EPIC_CLOSED,
+    CLAIM_REASON_EPIC_NOT_WORKABLE: CLASS_NOT_A_UNIT,
+    CLAIM_REASON_UNOWNED: CLASS_UNOWNED_UNIT,
+}
+
+#: The literal prefix ``governance/dispatch/cli.py`` prints its refusal with.
+REFUSAL_PREFIX = "claim REFUSED:"
+
+
+def refusal_reason(text: str) -> str | None:
+    """The reason code a claim refusal carries, or None when it carries none.
+
+    The structured line is read FIRST, because it is exact:
+    ``claim REFUSED: <reason> — <detail>``. Reading it beats scanning for a code
+    as a substring, which would classify a ``detail`` that merely *mentions* the
+    word "unowned". The substring scan is kept only as a fallback for a caller
+    that hands us the tail of the output rather than the whole of it — and a
+    fallback that finds nothing returns None, which the caller reads as
+    *retryable*, never as *terminal*: an unclassifiable refusal must not be
+    retired, because not knowing why a claim was refused is not a licence to
+    discard the order.
+    """
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped.startswith(REFUSAL_PREFIX):
+            continue
+        rest = stripped[len(REFUSAL_PREFIX) :].strip().lstrip("\u2014").strip()
+        token = rest.split()[0] if rest.split() else ""
+        token = token.rstrip("\u2014")
+        if token:
+            return token
+    for code in TERMINAL_REFUSAL_CLASSES:
+        if code in (text or ""):
+            return code
+    return None
+
+
+def classify_refusal(reason: str | None) -> str | None:
+    """The named terminal classification for a claim reason, or None.
+
+    None is the common answer and the safe one: everything this module does not
+    recognise keeps the bounded retry it had before #861.
+    """
+    if not reason:
+        return None
+    return TERMINAL_REFUSAL_CLASSES.get(str(reason).strip())
 
 
 # --- the harvested budget ----------------------------------------------------
@@ -365,6 +476,7 @@ RECORD_FIELDS = (
     "attempts",
     "dropped_by",
     "ts",
+    "terminal_class",
 )
 
 
@@ -377,6 +489,11 @@ def record_shape(base: Path | str | None = None, directive_id: str | None = None
     ``id``/``issue`` come from the stored envelope when it is present, so a
     dropped directive's issue is recorded even though the caller may only have
     had the directive id.
+
+    ``terminal_class`` is the named terminal classification (#861) — present and
+    null for an ordinary retirement, populated when the refusal that retired the
+    order was terminal by definition. It is a field of the ONE record both callers
+    write rather than a second record, so the shape cannot drift.
     """
     payload = _read_json(dead_letter_dir(base) / f"{directive_id or ''}.json") or {}
     envelope = payload.get("envelope") if isinstance(payload.get("envelope"), dict) else {}
@@ -388,6 +505,7 @@ def record_shape(base: Path | str | None = None, directive_id: str | None = None
         "attempts": payload.get("attempts"),
         "dropped_by": payload.get("dropped_by"),
         "ts": payload.get("dead_lettered_at"),
+        "terminal_class": payload.get("terminal_class"),
     }
 
 
@@ -492,6 +610,7 @@ def dead_letter(
     inbox: Path | str | None = None,
     now: float | None = None,
     dropped_by: str = "runaway-guard",
+    terminal_class: str | None = None,
 ) -> Path:
     """Retire a directive: stamp the terminal state, move the order, return the artifact.
 
@@ -507,6 +626,14 @@ def dead_letter(
     passes the sender. Because it is a *parameter of the one implementation*
     rather than a second implementation, the two records cannot drift in shape —
     which is the acceptance criterion, not a nicety.
+
+    ``terminal_class`` names WHY the retirement was terminal by definition (#861),
+    or is None for an ordinary exhaustion. It is a parameter here for the same
+    reason ``dropped_by`` is: the classification belongs to the decision, but the
+    record that carries it must be written in one place. A caller that retires an
+    order because its issue is closed passes the class; a caller that retires it
+    because the budget ran out passes nothing, and the record says so by carrying
+    null rather than an invented class.
     """
     epoch = _now_epoch(now)
     stamp = _iso(epoch)
@@ -532,13 +659,18 @@ def dead_letter(
         **terminal.as_dict(),
         "reason": reason,
         "dropped_by": dropped_by,
+        "terminal_class": terminal_class,
         "envelope": envelope,
     }
     target = dead_letter_dir(base) / f"{directive_id}.json"
     _write_json(target, payload)
+    # The counter file is stamped terminal too, and it is built FROM the artifact
+    # rather than beside it: one construction, minus the envelope, so a field can
+    # never reach the dead-letter record and miss the counter that a reader of
+    # `attempts/` sees.
     _write_json(
         attempts_dir(base) / f"{directive_id}.json",
-        {**terminal.as_dict(), "reason": reason, "dropped_by": dropped_by},
+        {key: value for key, value in payload.items() if key != "envelope"},
     )
     try:
         source.unlink()
@@ -657,7 +789,8 @@ def cmd_dead_letter(args: argparse.Namespace) -> int:
         record = record_shape(args.fleet_dir, directive_id)
         print(
             f"  {directive_id}  issue={record.get('issue')}  attempts={record.get('attempts')}  "
-            f"by={record.get('dropped_by')}  at={record.get('ts')}\n"
+            f"by={record.get('dropped_by')}  at={record.get('ts')}"
+            f"{'  class=' + str(record.get('terminal_class')) if record.get('terminal_class') else ''}\n"
             f"    reason: {record.get('reason')}"
         )
     return EXIT_OK

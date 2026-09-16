@@ -505,6 +505,59 @@ ISSUE_CLOSED = "issue-closed"
 ISSUE_UNKNOWN = "unknown-issue"
 BOARD_UNREADABLE = "cannot-assess"
 
+# -- the live-claim guard (issue #861, acceptance item 3 of #366) --------------
+# `closure_refusal` asks the BOARD whether an order is dead on arrival; it does not
+# ask the LEDGER whether the unit is already being worked. Measured: `dispatch()` had
+# no claim check at all. The idle path filtered its own candidate list by the live
+# claims (`advance_ready`), so that one path was safe — but every other caller was
+# not: the wave path (`dispatch_ready_children`) and any operator-called dispatch
+# would mint a second authorisation for a unit another lane already holds. Two
+# directives for one issue is a duplicate order, and the sister's second one pays the
+# whole runaway budget (≈450s of a held queue slot, #723) to be refused
+# `already-claimed` five times before it dead-letters (#861).
+ISSUE_CLAIMED = "issue-claimed"
+
+#: The ledger the guard reads. A module attribute — the same seam ``BOARD_PATH``
+#: is — so the guard can be driven against a scratch ledger, and so the file it
+#: reads is declared rather than implied by a default argument buried in
+#: ``claims.read_ledger``.
+CLAIMS_LEDGER = claims.DEFAULT_CLAIMS_DIR
+
+
+def live_claim_refusal(number: int, ledger: Path | str | None = None) -> str | None:
+    """Why no directive may be issued for this issue, or None when one may.
+
+    A live claim is a unit of work already owned: issuing a second authorisation for
+    it produces a directive whose claim can only be refused, so it is refused HERE —
+    before the sent-marker is written and before the channel is invoked, exactly like
+    the closure guard beside it, so nothing enters the sister's inbox.
+
+    An unreadable ledger is a refusal too, and it names itself the same way
+    ``closure_refusal`` names an unreadable board: not knowing whether a unit is held
+    is never a licence to issue a second order for it.
+
+    An EXPIRED claim is not a live claim (``claims.active_claims`` drops it, and the
+    TTL is what stops a dead agent wedging the unit forever), so this guard cannot
+    itself become the wedge it exists to prevent.
+    """
+    target = CLAIMS_LEDGER if ledger is None else ledger
+    try:
+        live = claims.active_claims(claims.read_ledger(target))
+    except (OSError, ValueError) as exc:
+        return (
+            f"{BOARD_UNREADABLE} — the claim ledger cannot be read ({exc}); the brain issued no "
+            f"directive for #{number}: refusing rather than minting a second order for a unit that "
+            "may already be held"
+        )
+    holder = live.get(number)
+    if holder is None:
+        return None
+    return (
+        f"{ISSUE_CLAIMED} — #{number} is held by {holder.agent} (lane {holder.lane or 'unstated'}) "
+        f"since {holder.at}; a second authorisation for a claimed unit is a duplicate order, so the "
+        "brain issued none: no sent-marker was written and the channel was not invoked"
+    )
+
 
 def board_issue_state(number: int) -> tuple[str, str]:
     """``(state, detail)`` for an issue, read from the COMMITTED board snapshot.
@@ -610,6 +663,13 @@ def dispatch(order: dict) -> tuple[bool, str]:
     number = order_issue(order)
     if number is not None:
         refusal = closure_refusal(number)
+        if refusal is not None:
+            return False, refusal
+        # ... and then the LEDGER (#861). The board says the order is not dead;
+        # the ledger says whether it is a duplicate. Both are refusals, both are
+        # asked in the one funnel every directive passes through, and neither
+        # writes a marker nor reaches the channel.
+        refusal = live_claim_refusal(number)
         if refusal is not None:
             return False, refusal
     if marker is not None:

@@ -99,6 +99,11 @@ plumbing=(
   "fleet/terminal.py|dropped_by=\"runaway-guard\"|the automatic path shares that implementation"
   "fleet/runaway.py|RECORD_FIELDS = (|the record shape both callers produce is declared once"
   "fleet/runaway.py|dropped_by: str = \"runaway-guard\"|the store takes the dropper as a parameter, not a second code path"
+  "fleet/runaway.py|TERMINAL_REFUSAL_CLASSES: dict[str, str] = {|the terminal-by-definition classes are declared in one place (#861)"
+  "fleet/runaway.py|def classify_refusal(|the classification is a named function, not an inline test at the call site"
+  "fleet/terminal.py|def guard_retire_refusal(|a refused claim is classified before it is counted"
+  "fleet/terminal.py|guard_retire_refusal(directive_id, issue, claim_output)|and the watch loop routes its refusal through it"
+  "fleet/terminal.py|terminal_class=classification|the classification travels into the ONE record both callers write"
   "fleet/control.py|cmd_drop|the operator verb is registered"
   "fleet/control.py|_send_control(\"drop\"|the verb travels the EXISTING control path"
 )
@@ -153,9 +158,14 @@ import runaway  # noqa: E402
 import terminal  # noqa: E402
 
 failures: list[str] = []
+#: Counted rather than hardcoded: a probe added without the tally following it is
+#: exactly the kind of stale claim this file exists to refuse.
+checks = 0
 
 
 def probe(name: str, hold: bool, detail: str = "") -> bool:
+    global checks
+    checks += 1
     print(f"  probe {name}: {'PASS' if hold else 'FAIL'}" + (f" — {detail}" if detail else ""))
     if not hold:
         failures.append(name)
@@ -290,8 +300,58 @@ printed = captured.getvalue()
 probe("MAILBOX-BY-VERB", rc == runaway.EXIT_OK and "d-wedged" in printed,
       f"dead-letter rc={rc}")
 
+# --- probe 6: a refusal that is TERMINAL BY DEFINITION retires on the FIRST
+# one, with the classification named; a retryable one does not (#861).
+#
+# The two halves are one probe each on purpose. A guard that dead-lettered every
+# refusal would satisfy the first and is not a classification at all — it would
+# retire the orders a stale snapshot is about to make dispatchable, which is the
+# whole subject of #727.
+#
+# The driver runs the guard at cap 1 (so a mutant retires on its first failure),
+# so the budget is restored to the DOCUMENTED default here: "one attempt, not K"
+# has to be measured against the real K, not against the driver's shortened one.
+clear_inbox()
+plant("d-terminal", issue=692)
+plant("d-retryable", issue=693)
+os.environ[runaway.ENV_ATTEMPT_CAP] = str(runaway.DEFAULT_ATTEMPT_CAP)
+terminal.guard_retire_refusal(
+    "d-terminal", 692, "claim REFUSED: issue-closed \u2014 #692 is closed \u2014 evidence: board"
+)
+terminal_record = runaway.record_shape(state, "d-terminal")
+probe(
+    "TERMINAL-FIRST-REFUSAL",
+    runaway.dead_lettered("d-terminal", base=state),
+    "a closed-issue refusal was not retired on its first refusal",
+)
+probe(
+    "TERMINAL-CLASS-NAMED",
+    terminal_record.get("terminal_class") == "issue-closed",
+    f"terminal_class={terminal_record.get('terminal_class')!r}",
+)
+probe(
+    "TERMINAL-COSTS-ONE-ATTEMPT",
+    terminal_record.get("attempts") == 1,
+    f"attempts={terminal_record.get('attempts')!r} of cap {runaway.DEFAULT_ATTEMPT_CAP}",
+)
+probe(
+    "TERMINAL-ORDER-LEAVES-INBOX",
+    not (state / "inbox" / "d-terminal.json").exists(),
+    "the retired order is still in the inbox — watch can return it again",
+)
+terminal.guard_retire_refusal(
+    "d-retryable", 693, "claim REFUSED: snapshot-stale \u2014 the board is 900m old"
+)
+probe(
+    "RETRYABLE-NOT-RETIRED",
+    not runaway.dead_lettered("d-retryable", base=state)
+    and (state / "inbox" / "d-retryable.json").exists(),
+    "a stale snapshot is retryable — the #727 refresh is its remedy, not the dead-letter store",
+)
+os.environ[runaway.ENV_ATTEMPT_CAP] = "1"
+
 print()
-print(f"PROBES: {len(failures)} failed of 13")
+print(f"PROBES: {len(failures)} failed of {checks}")
 if failures:
     print("FAILED: " + ", ".join(failures))
     raise SystemExit(1)
@@ -375,6 +435,21 @@ provoke "ORDER-NOT-MOVED" \
   '    return target' \
   "ORDER-LEAVES-INBOX"
 
+# The classification must be able to fail too (GR-12). An EMPTY table is the
+# mutant: `classify_refusal` then answers None for every refusal, the terminal
+# one keeps the bounded retry, and the order is re-read K times for work that was
+# dead on arrival. Nothing else in the record changes, so the probe that fails is
+# the classification's own — "the gate refused for some reason" is not proof.
+provoke "CODE-UNCLASSIFIED" \
+  'TERMINAL_REFUSAL_CLASSES: dict[str, str] = {
+    CLAIM_REASON_ISSUE_CLOSED: CLASS_ISSUE_CLOSED,
+    CLAIM_REASON_EPIC_CLOSED: CLASS_EPIC_CLOSED,
+    CLAIM_REASON_EPIC_NOT_WORKABLE: CLASS_NOT_A_UNIT,
+    CLAIM_REASON_UNOWNED: CLASS_UNOWNED_UNIT,
+}' \
+  'TERMINAL_REFUSAL_CLASSES: dict[str, str] = {}' \
+  "TERMINAL-FIRST-REFUSAL|TERMINAL-CLASS-NAMED"
+
 # --- 5. the tree was never mutated, and the suite proves the same -----------
 sha_after="$(digest fleet/runaway.py)"
 if [ "$sha_before" = "$sha_after" ]; then
@@ -384,11 +459,11 @@ else
 fi
 
 if env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
-     fleet/tests/test_dead_letter.py > "$work/pytest.log" 2>&1; then
-  ok "the dead-letter suite passes ($(tail -n 1 "$work/pytest.log" | tr -d '\r'))"
+     fleet/tests/test_dead_letter.py fleet/tests/test_refusal_classification.py > "$work/pytest.log" 2>&1; then
+  ok "the dead-letter and classification suites pass ($(tail -n 1 "$work/pytest.log" | tr -d '\r'))"
 else
   tail -n 20 "$work/pytest.log" >&2
-  bad "fleet/tests/test_dead_letter.py is not green"
+  bad "the dead-letter/classification suites are not green"
 fi
 
 # --- 6. the honest note about the wiring ------------------------------------
@@ -403,7 +478,7 @@ fi
 
 echo ""
 if [ "$fail" -eq 0 ]; then
-  echo "check-dead-letter: OK — drop retires by protocol, one record shape for both callers, and a disabled retire is refused"
+  echo "check-dead-letter: OK — drop retires by protocol, one record shape for both callers, a disabled retire is refused, and a terminal refusal is classified"
   exit 0
 fi
 echo "check-dead-letter: NOT-OK — $fail check(s) failed" >&2
