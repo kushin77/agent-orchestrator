@@ -37,6 +37,7 @@ from infra.rollout.model import (
     StageModel,
     check_promotion,
     rollback_decision,
+    validate_live_state_doc,
     validate_rollout_state_doc,
 )
 
@@ -237,8 +238,18 @@ class RolloutEngine:
         rollout_state_path: str,
         approvals_dir: Optional[str] = None,
         audit_path: Optional[str] = None,
+        live_state_path: Optional[str] = None,
     ) -> "RolloutEngine":
-        """Build an engine from the committed declarative YAML."""
+        """Build an engine from the committed declarative YAML.
+
+        ``rollout_state_path`` (``rollout-state.yaml``) stays the
+        declared-default document - every flag there must be ``off``
+        (GR-28, unchanged). When ``live_state_path`` is given and the file
+        exists, its validated, promoted entries are overlaid onto the
+        in-memory state (``load`` overlays live-state on defaults) so the
+        engine reflects the real, currently-promoted stage without ever
+        requiring a non-off flag to be committed to ``rollout-state.yaml``.
+        """
         with open(stage_model_path, encoding="utf-8") as fh:
             model = StageModel.load(yaml.safe_load(fh))
         with open(rollout_state_path, encoding="utf-8") as fh:
@@ -249,6 +260,17 @@ class RolloutEngine:
         flags: Dict[str, FlagState] = {}
         for name, raw in state_doc["flags"].items():
             flags[str(name)] = FlagState.from_doc(str(name), raw)
+        if live_state_path and os.path.isfile(live_state_path):
+            with open(live_state_path, encoding="utf-8") as fh:
+                live_doc = yaml.safe_load(fh) or {}
+            live_errors = validate_live_state_doc(live_doc, list(flags), model)
+            if live_errors:
+                raise RolloutError("; ".join(live_errors))
+            for name, raw in (live_doc.get("flags") or {}).items():
+                live_stage = RolloutStage.coerce(raw.get("stage"))
+                spec = model.spec(live_stage)
+                flags[name].stage = live_stage
+                flags[name].rollout_pct = spec.rollout_pct
         approvals = ApprovalLedger.load_dir(approvals_dir) if approvals_dir else ApprovalLedger()
         return cls(
             model=model,
@@ -277,6 +299,47 @@ class RolloutEngine:
         tmp = f"{path}.tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
             yaml.safe_dump(self.snapshot_doc(), fh, sort_keys=False, default_flow_style=False)
+        os.replace(tmp, path)
+
+    def live_state_doc(self, *, audit_record: str = "") -> Dict[str, object]:
+        """The live-state document - one entry per flag NOT at off.
+
+        Sourced from the audit log's most recent ``promote`` record into the
+        flag's current stage (the ``from_stage`` it actually transitioned
+        from, and whether it was a human or policy approval). A flag that
+        has since rolled back to off is simply absent here - rollback never
+        leaves a stale live-state entry behind.
+        """
+        last_promote: Dict[str, Dict[str, object]] = {}
+        for record in self.audit.records():
+            if record.get("action") == "promote":
+                last_promote[str(record["flag"])] = record
+
+        entries: Dict[str, object] = {}
+        for name, state in sorted(self.flags.items()):
+            if state.stage is RolloutStage.OFF:
+                continue
+            record = last_promote.get(name)
+            entry: Dict[str, object] = {
+                "stage": state.stage.value,
+                "from_stage": record["from_stage"] if record else "off",
+                "since": record["ts"] if record else time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "audit_record": audit_record,
+            }
+            if record and record.get("approval_kind") == "policy":
+                entry["policy"] = record.get("policy", "")
+            else:
+                entry["approval_id"] = (record.get("approval_id") if record else "") or ""
+            entries[name] = entry
+        return {"schema_version": 1, "flags": entries}
+
+    def write_live_state(self, path: str, *, audit_record: str = "") -> None:
+        """Atomically persist the live-state document (see ``live_state_doc``)."""
+        tmp = f"{path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(
+                self.live_state_doc(audit_record=audit_record), fh, sort_keys=False, default_flow_style=False
+            )
         os.replace(tmp, path)
 
     # -- transitions ------------------------------------------------------- #

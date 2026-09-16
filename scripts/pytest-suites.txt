@@ -150,3 +150,31 @@ integrations/erp/auth
 # a declared-but-unnamed suite is refused by check-gate-coverage, which never
 # grandfathers a newly declared one.
 governance/spawn
+# Issue #711 (EPIC #706 D3): fleet-cron state volumes + secrets wiring. The
+# suite proves the AO_FLEET_STATE_RW flag defaults OFF, the secrets contract
+# refuses a mount source resolving inside the checkout, the credential-value
+# scanner catches a name embedded in a compound identifier, and the compose
+# file's state-rw posture (profile-gated, explicit re-listed volumes) matches
+# what scripts/check-fleet-cron-dev-run.sh enforces. Named in
+# scripts/verify.sh via scripts/run-pytest-suites.sh (this manifest).
+infra/fleet
+e2e/erp
+# Issue #891 — three committed suites that NO gate ran: 162 passing tests, paid
+# for and never collected. Each was invisible for a different reason, and each is
+# registered here AND named as a pytest target from inside
+# scripts/check-ungated-suites.sh — which scripts/discover-checks.sh
+# auto-discovers into `make verify` (#698), so the gate of record RUNS them.
+# Declaring one of these alone would be refused by scripts/check-gate-coverage.sh,
+# which never grandfathers a newly declared suite that no gate names.
+#   control-plane/instructions/csuite  nested under a DECLARED module
+#     (`control-plane/instructions`): the runner executes "$mod/tests" —
+#     path-exact — so a nested suite is invisible while LOOKING covered, which
+#     is worse than being plainly absent.
+#   engine/core/tickets                the same nesting, under engine/core.
+#   governance/waves                   not declared at all, and named by no
+#     check: invisible to check-drift.sh, whose scope was a hardcoded six-prefix
+#     slice of the tree (`guardrails/*|gateway/*|registry/*|identity/*|
+#     engine/*|telemetry/*`) that excludes governance/* entirely.
+control-plane/instructions/csuite
+engine/core/tickets
+governance/waves

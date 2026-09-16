@@ -46,7 +46,7 @@ def test_missing_role_is_refused():
     message = valid_directive()
     del message["to"]
     problems = validate(message)
-    assert any("to must match" in problem for problem in problems)
+    assert any("to must name a role in a declared dialect" in problem for problem in problems)
 
 
 def test_a_sister_issued_directive_is_refused():
@@ -55,9 +55,9 @@ def test_a_sister_issued_directive_is_refused():
 
 
 def test_a_directive_the_hierarchy_cannot_carry_is_refused():
-    """A directive reaches the sister (from the brain) or the brain (from the operator)."""
+    """A directive reaches the dispatcher (from the director) or the director."""
     problems = validate(valid_directive(to="subagent-x"))
-    assert any("addressed to the sister" in problem for problem in problems)
+    assert any("addressed to the dispatcher" in problem for problem in problems)
 
 
 def test_a_halting_message_needs_no_task():
@@ -127,11 +127,20 @@ def test_send_refuses_an_invalid_message(tmp_path):
 
 
 def test_standing_directive_on_disk_carries_dsv4fnone():
+    """The standing order is a schema-2 document (issue #777).
+
+    It is a NORMATIVE surface, so it emits the current role names — and it
+    declares its envelope version, which is what makes the migration visible in
+    the one artifact every executor is handed.
+    """
     directive_path = channel.ROOT / "fleet" / "directive.json"
     data = json.loads(directive_path.read_text(encoding="utf-8"))
     assert validate(data) == []
-    assert data["from"] == "brain"
-    assert data["to"] == "sister"
+    assert data["schema"] == channel.SCHEMA_VERSION_CURRENT
+    assert data["from"] == channel.ROLE_DIRECTOR
+    assert data["to"] == channel.ROLE_DISPATCHER
+    assert not channel.is_retired_role(data["from"])
+    assert not channel.is_retired_role(data["to"])
     assert data["model"] == {"tier": "flash", "thinking": "none", "budget_hint": data["model"]["budget_hint"]}
     assert data["model"]["tier"] == "flash"
     assert data["model"]["thinking"] == "none"
@@ -149,10 +158,10 @@ def test_the_brain_cannot_ack_its_own_directives():
     assert any("does not ack" in problem for problem in problems)
 
 
-def test_halt_may_only_come_from_the_brain():
+def test_halt_may_only_come_from_the_director():
     assert validate({"from": "brain", "to": "sister", "type": "halt"}) == []
     problems = validate({"from": "sister", "to": "brain", "type": "halt"})
-    assert any("only the brain" in problem for problem in problems)
+    assert any("only the director" in problem for problem in problems)
 
 
 def test_wait_triggers_when_the_result_lands(tmp_path, monkeypatch):
@@ -495,12 +504,12 @@ def test_escalate_requires_a_correlation_id():
     assert any("correlation_id" in problem for problem in problems)
 
 
-def test_the_brain_escalates_up_to_the_operator_never_sideways():
-    """The brain is not the top of the chain — the operator is."""
+def test_the_director_escalates_up_to_the_principal_never_sideways():
+    """The director is not the top of the chain — the principal is."""
     problems = validate(
         {"from": "brain", "to": "sister", "type": "escalate", "correlation_id": "d-1", "severity": "warn"}
     )
-    assert any("addressed to the operator" in problem for problem in problems)
+    assert any("addressed to the principal" in problem for problem in problems)
     assert (
         validate(
             {"from": "brain", "to": "operator", "type": "escalate", "correlation_id": "d-1", "severity": "warn"}
@@ -576,9 +585,9 @@ def test_listen_tails_from_now_by_default(tmp_path, monkeypatch, capsys):
     assert "ancient history" not in capsys.readouterr().out
 
 
-def test_control_may_only_come_from_the_brain():
+def test_control_may_only_come_from_the_director():
     problems = validate({"from": "sister", "to": "brain", "type": "directive", "control": "poke"})
-    assert any("only the brain may issue control" in problem for problem in problems)
+    assert any("only the director may issue control" in problem for problem in problems)
 
 
 def test_control_with_a_bad_action_is_refused():
@@ -588,3 +597,141 @@ def test_control_with_a_bad_action_is_refused():
 
 def test_a_valid_control_directive_passes():
     assert validate({"from": "brain", "to": "sister", "type": "directive", "control": "refresh"}) == []
+
+
+# --- the versioned role vocabulary (issue #777) ------------------------------
+# The role names are WIRE VALUES, so renaming them is a protocol migration: the
+# RUNNING fleet reads these names and cannot be restarted for the rename. These
+# tests pin the three properties that make it a migration rather than a
+# find-and-replace — dual-accept on READ, a refusal of the MIXTURE, and
+# single-emit on WRITE negotiated from the recipient's own declaration.
+
+
+def test_both_declared_dialects_are_accepted_on_read():
+    """Dual-accept: a message in either dialect validates, in its own envelope."""
+    assert validate({"schema": 1, "from": "brain", "to": "sister", "type": "halt"}) == []
+    assert validate(
+        {"schema": 2, "from": "director", "to": "dispatcher", "type": "halt"}
+    ) == []
+    # An absent `schema` is schema 1 — every message that predates the field.
+    assert validate({"from": "brain", "to": "sister", "type": "halt"}) == []
+
+
+def test_an_instance_form_is_a_role_and_its_suffix_is_kept():
+    assert validate(
+        {"schema": 2, "from": "executor-42", "to": "director", "type": "result", "correlation_id": "d-1"}
+    ) == []
+    assert channel.current_role("subagent-42") == "executor-42"
+    assert channel.current_role("executor-42") == "executor-42"
+
+
+def test_a_retired_role_in_a_current_envelope_is_refused_by_name():
+    """The mixture is the thing this migration exists to forbid.
+
+    Two vocabularies both being quietly authoritative is the failure ADR-0012
+    names, so a schema-2 envelope carrying a schema-1 role is refused — and the
+    finding names BOTH the offending token and the current spelling, so the
+    operator is told what to write rather than only that something is wrong.
+    """
+    problems = validate(
+        {"schema": 2, "from": "brain", "to": "director", "type": "directive", "task": {"issue": 777}}
+    )
+    assert any(
+        "from is 'brain'" in problem and "retired" in problem and "emits 'director'" in problem
+        for problem in problems
+    ), problems
+
+
+def test_an_undeclared_envelope_version_is_refused():
+    problems = validate({"schema": 3, "from": "director", "to": "dispatcher", "type": "halt"})
+    assert any("schema must be one of 1, 2" in problem for problem in problems), problems
+
+
+def test_the_trust_rules_apply_to_the_current_dialect():
+    """A rule that only knew the retired spelling would be bypassable.
+
+    Every refusal below is stated on the current names and reached with a
+    schema-2 envelope, so a rename that had left the rules comparing literals
+    from the old dialect would pass the message instead.
+    """
+    assert validate(
+        {"schema": 2, "from": "director", "to": "dispatcher", "type": "directive", "task": {"issue": 777}}
+    ) == []
+    problems = validate(
+        {"schema": 2, "from": "dispatcher", "to": "director", "type": "directive", "task": {"issue": 777}}
+    )
+    assert any("the dispatcher never picks work" in problem for problem in problems), problems
+    problems = validate(
+        {"schema": 2, "from": "executor-1", "to": "dispatcher", "type": "directive", "task": {"issue": 777}}
+    )
+    assert any("only the director may issue directives to the dispatcher" in problem for problem in problems), problems
+    problems = validate(
+        {"schema": 2, "from": "principal", "to": "dispatcher", "type": "directive", "task": {"issue": 777}}
+    )
+    assert any("the principal does not address the dispatcher" in problem for problem in problems), problems
+
+
+def _declare_envelope_schema(tmp_path, version: int) -> None:
+    """Make the (already redirected) dispatcher beat declare what it can read."""
+    channel.HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
+    channel.HEARTBEAT.write_text(json.dumps({"commit": "abc1234", "envelope_schema": version}), encoding="utf-8")
+
+
+def test_a_recipient_that_declares_schema_two_gets_schema_two_only(tmp_path, capsys):
+    """Single-emit, negotiated from the recipient — not from the emitter's taste.
+
+    The dispatcher's beat is the declaration, so a rung that restarts on this
+    build starts receiving the current names with no operator step. The written
+    envelope is asserted, not the internal decision: what matters is what lands
+    in the mailbox.
+    """
+    _declare_envelope_schema(tmp_path, 2)
+    message = channel.stamp_envelope(valid_directive())
+    assert message["schema"] == 2
+    assert (message["from"], message["to"]) == ("director", "dispatcher")
+    assert not channel.is_retired_role(message["from"])
+    assert not channel.is_retired_role(message["to"])
+    assert validate(message) == []
+    assert "legacy-dialect" not in capsys.readouterr().err
+
+
+def test_a_recipient_that_declares_nothing_gets_the_retired_spelling_and_is_told(tmp_path, capsys):
+    """The deprecation window, and the reason a running loop keeps working.
+
+    A rung whose beat predates the declaration cannot read schema 2, so it gets
+    the spelling it was built with — and the downgrade is REPORTED by name rather
+    than made silently, because a silent downgrade is how a system ends up with
+    two vocabularies and no idea which one is authoritative.
+    """
+    assert not channel.HEARTBEAT.exists(), "the beat must be absent for this case"
+    message = channel.stamp_envelope(valid_directive())
+    assert message["schema"] == 1
+    assert (message["from"], message["to"]) == ("brain", "sister")
+    assert validate(message) == []
+    err = capsys.readouterr().err
+    assert "legacy-dialect" in err and "dispatcher" in err, err
+
+
+def test_the_env_seam_pins_the_emitting_dialect(tmp_path, monkeypatch, capsys):
+    """A gate (or an operator) can pin one dialect end to end, with no beat."""
+    monkeypatch.setenv(channel.ENVELOPE_SCHEMA_ENV, "2")
+    message = channel.stamp_envelope(valid_directive())
+    assert message["schema"] == 2 and message["to"] == "dispatcher"
+    monkeypatch.setenv(channel.ENVELOPE_SCHEMA_ENV, "1")
+    message = channel.stamp_envelope({"from": "director", "to": "dispatcher", "type": "halt"})
+    assert message["schema"] == 1 and message["from"] == "brain"
+    assert "legacy-dialect" in capsys.readouterr().err
+
+
+def test_a_beat_the_emitter_cannot_read_is_never_read_as_current(tmp_path):
+    """Unreadable is CANNOT-ASSESS, never "assume current".
+
+    A downgrade to the retired dialect is readable by both builds; the reverse is
+    not, so an unreadable beat must never select schema 2 (AO-GR-25's rule, at the
+    vocabulary seam).
+    """
+    channel.HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
+    channel.HEARTBEAT.write_text("{ not json", encoding="utf-8")
+    assert channel.declared_envelope_schema("dispatcher") is None
+    assert channel.dialect_for("dispatcher")[0] == 1
+

@@ -646,6 +646,8 @@ export ATTEST_BRANCH="$(git branch --show-current 2>/dev/null || echo unknown)"
 export ATTEST_HOST="$(hostname 2>/dev/null || echo unknown)"
 export ATTEST_RESULT="$overall"
 export ATTEST_MODE="$mode"
+export ATTEST_VERIFIED_BY="${AO_AGENT_ID:-$(id -un 2>/dev/null || echo unknown)}"
+export ATTEST_VERIFICATION_SESSION="${AO_SESSION_ID:-}"
 export ATTEST_RESULTS_TSV="$results_tsv"
 export ATTEST_DUPLICATES_TSV="$duplicates_tsv"
 python3 - <<'PY'
@@ -688,6 +690,8 @@ attestation = {
     "host": os.environ["ATTEST_HOST"],
     "git_sha": os.environ["ATTEST_SHA"],
     "branch": os.environ["ATTEST_BRANCH"],
+    "verified_by": os.environ["ATTEST_VERIFIED_BY"],
+    "verification_session": os.environ["ATTEST_VERIFICATION_SESSION"],
     "check_count": len(checks),
     "skipped": len(skipped),
     "skipped_checks": skipped,
