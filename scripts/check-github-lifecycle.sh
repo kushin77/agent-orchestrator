@@ -26,6 +26,19 @@
 # Usage: bash scripts/check-github-lifecycle.sh
 set -uo pipefail
 
+# Every "does this report contain this string?" test below is bash-native (#852).
+# `printf '%s' "$output" | grep -qF -- "$s"` is NOT the same test: `grep -q` exits
+# on its first match, SIGPIPE then kills the producer, and `set -o pipefail`
+# promotes that 141 to the status of the whole pipeline — so a *large* report
+# reports ABSENT for text that is PRESENT. Negated, that is a false red; positive,
+# the control silently stops controlling and the check fails OPEN.
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
 
@@ -225,7 +238,7 @@ expect_code() { # expect_code <code> <record> [baseline]
     fail=$((fail + 1))
     return
   fi
-  if ! printf '%s' "$output" | grep -qF -- "\"$1\""; then
+  if ! contains "$output" "\"$1\""; then
     echo "  FAIL  $1 was not named in the report" >&2
     printf '%s\n' "$output" | sed 's/^/        /' >&2
     fail=$((fail + 1))
@@ -273,7 +286,7 @@ rc=$?
 if [ "$rc" -eq 0 ]; then
   echo "  FAIL  a child whose edge cannot be established went unreported" >&2
   fail=$((fail + 1))
-elif ! printf '%s' "$output" | grep -qF -- "#300"; then
+elif ! contains "$output" "#300"; then
   echo "  FAIL  the unedged child was not named in the report" >&2
   printf '%s\n' "$output" | sed 's/^/        /' >&2
   fail=$((fail + 1))

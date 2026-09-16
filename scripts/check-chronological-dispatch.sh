@@ -21,6 +21,19 @@
 # Usage: bash scripts/check-chronological-dispatch.sh
 set -uo pipefail
 
+# Every "does this report contain this string?" test below is bash-native (#852).
+# `printf '%s' "$out" | grep -qF -- "$s"` is NOT the same test: `grep -q` exits on
+# its first match, SIGPIPE then kills the producer, and `set -o pipefail` promotes
+# that 141 to the status of the whole pipeline — so a *large* report reports
+# ABSENT for text that is PRESENT. Negated, that is a false red; positive, the
+# control silently stops controlling and the check fails OPEN.
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 1
 
@@ -140,7 +153,7 @@ expect_refusal() {
     fail=1
     return
   fi
-  if ! printf '%s' "$out" | grep -qF -- "$reason"; then
+  if ! contains "$out" "$reason"; then
     printf '  FAIL  %s (exit %s but not refused as %s)\n' "$name" "$rc" "$reason"
     printf '%s\n' "$out" | tail -3 | sed 's/^/        /'
     fail=1
@@ -148,7 +161,7 @@ expect_refusal() {
   fi
   IFS='|' read -r -a wanted <<< "$markers"
   for marker in "${wanted[@]}"; do
-    if ! printf '%s' "$out" | grep -qF -- "$marker"; then
+    if ! contains "$out" "$marker"; then
       printf '  FAIL  %s (refused as %s but never named the evidence %s)\n' "$name" "$reason" "$marker"
       printf '%s\n' "$out" | tail -3 | sed 's/^/        /'
       fail=1
@@ -180,7 +193,7 @@ if [ "$grant_rc" -ne 0 ]; then
   printf '  FAIL  a dispatchable unit was refused (exit %s)\n' "$grant_rc"
   printf '%s\n' "$grant_out" | tail -3 | sed 's/^/        /'
   fail=1
-elif ! printf '%s' "$grant_out" | grep -qF -- '"provenance"'; then
+elif ! contains "$grant_out" '"provenance"'; then
   printf '  FAIL  the granted dispatch recorded no issue -> epic -> lane provenance\n'
   printf '%s\n' "$grant_out" | tail -3 | sed 's/^/        /'
   fail=1
