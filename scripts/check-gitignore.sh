@@ -25,21 +25,32 @@
 #      covered list. Each offender is named; that path is what `git add -A`
 #      would commit.
 #   3. HISTORY — a root declared wholly generated may hold no tracked file at
-#      all. A tracked file under `.verify/` is runtime state already committed.
+#      all. A tracked file under `.verify/` or `.board/claims/` is runtime state
+#      already committed. This is the half that keeps an ignore rule honest: an
+#      ignored path is still committed when it is force-added, so the directory
+#      that #848 made ignorable is also the directory that may hold no tracked
+#      file.
 #
-# MEASURED CONSEQUENCE (2026-09-15, `master` @ 84afa90, worktree ao-625-08cee8aa)
+# MEASURED CONSEQUENCE (2026-09-15, `master` @ 84afa90, worktree ao-625-08cee8aa;
+#   resolved for `.board/claims/` by issue #848)
 #   Tracked code writes runtime state to `.board/claims/`, `.fleet/waves/` and
-#   `.fleet/board-reports.json`, and `.gitignore` covers none of the three. They
-#   are deliberately NOT on the declared coverage list: a gate that declares them
-#   required while their rules are absent could never be green, and this gate's
-#   own lane owns the gate, not `.gitignore`. They are caught by check 2 the
-#   moment such a file exists, by name — which is what happens on a tree where
-#   the state is live. Extending `.gitignore` to cover them is a `.gitignore`
-#   change and belongs to a different lane.
+#   `.fleet/board-reports.json`. `.board/claims/` is now covered BY NAME: the
+#   `.gitignore` rule and this declaration landed together with #848, so deleting
+#   the rule fails check 1 by name instead of shrinking the declared list along
+#   with itself. A lane that follows AGENTS.md and claims locally
+#   (`.board/claims/<ns>-<issue>-<agent>-claim.json`) is therefore clean — which
+#   is the state this gate expects. The ignore rule is paired with check 3 so it
+#   cannot be used to smuggle a claim event INTO history: a tracked file under
+#   `.board/claims/` is refused by name, which is what makes the two halves of
+#   #848 one change rather than a blanket `.board/` exclusion. `.fleet/waves/` and
+#   `.fleet/board-reports.json` remain deliberately NOT declared: a gate that
+#   declares a rule required while the rule is absent could never be green, so
+#   they are caught by check 2 the moment such a file exists, by name.
 #
 #   Check 2 also means this gate is only green on a tree whose runtime state is
-#   actually ignored: a shared dev checkout carrying an uncovered `.board/claims/`
-#   correctly reports NOT-OK. A lane worktree cut from `master` is clean.
+#   actually ignored. A lane worktree cut from `master` is clean; a shared dev
+#   checkout is clean only if EVERY runtime path it carries is covered, which is
+#   why check 2 prints each offender instead of a count.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. No network access.
 #   CANNOT-ASSESS (2) is reserved for an input that cannot be read at all — no
@@ -48,9 +59,11 @@
 #   property under test is definitively false when there is no `.gitignore`, so
 #   that is NOT-OK. No branch of this script returns 2 for "could not tell".
 #
-# NOT YET WIRED INTO `make verify`: `scripts/verify.sh` iterates an explicit
-# check list, so a new `scripts/check-*.sh` does not run on its own. Adding this
-# one to that list is issue #630's lane; until then this gate is run directly.
+# WIRED INTO `make verify` BY DISCOVERY: `scripts/discover-checks.sh` (#698)
+# derives a check's name from its filename, so this script runs in the composite
+# gate as `gitignore` unless it is denylisted by name in
+# `scripts/check-denylist.txt` — where it is not. That is why a lane that claims
+# locally reddened `make verify`, not just this script (#848).
 #
 # Usage: bash scripts/check-gitignore.sh
 #   AO_GITIGNORE_ROOT=<dir> assesses <dir> instead of the tree this script lives
@@ -67,6 +80,7 @@ set -u
 state_dirs=(
   .verify
   .board/locks
+  .board/claims
   .fleet/inbox
   .fleet/outbox
   .fleet/sent
@@ -86,8 +100,12 @@ state_dirs=(
 runtime_roots=(.board .fleet .verify)
 
 # Roots whose entire content is generated, so a tracked file under one is
-# runtime state that already reached history.
-wholly_generated=(.verify)
+# runtime state that already reached history. `.board/claims/` joined `.verify/`
+# with #848: covering the directory with an ignore rule is exactly what would
+# make a force-added event silent, so the history half is what keeps the ignore
+# from being a way to commit a claim ledger. `.board/claims.jsonl` is a SIBLING
+# file, not a member of this directory, and stays tracked as the legacy ledger.
+wholly_generated=(.verify .board/claims)
 
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 root="$script_root"

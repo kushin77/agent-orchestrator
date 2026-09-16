@@ -44,6 +44,15 @@ governance/board/violations.jsonl
 # Claim locks are runtime state (the claim ledger itself is tracked evidence)
 .board/locks/
 
+# The per-event claim ledger is runtime state too (issue #848): tracked code
+# (`governance/dispatch/claims.py`, `DEFAULT_CLAIMS_DIR = .board/claims`) writes
+# one collision-proof file per claim/release/reap, so a lane that follows
+# AGENTS.md and claims locally has live dispatch state in its worktree — state no
+# commit records, which the gate of record correctly refuses. `.board/claims.jsonl`
+# stays TRACKED: it is the frozen legacy ledger, and this rule (trailing slash)
+# covers only the per-event directory.
+/.board/claims/
+
 # The out-of-epic pool rail is runtime state too (epic #707, lane F6/#721): it
 # records which issues the active focus parked and is rewritten on every
 # drain, so committing it would put a moving dispatch signal in the diff.
