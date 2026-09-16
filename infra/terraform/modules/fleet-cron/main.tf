@@ -22,6 +22,19 @@
 #     <secret_ref>`, where the ref is a path resolved and populated node-side,
 #     out of band.
 #
+# GR-17 (local-code-first): the container's own health probe and port
+# variable follow OUR image's contract (infra/fleet/env_contract.py,
+# infra/fleet/docker-compose.agent-cron.yml, issue #710), not the peer
+# cronrunner's — they are two different images. `AO_FLEET_PORT` is our port
+# variable (not the Go cronrunner's `HTTP_ADDR`), the probe path defaults to
+# `/healthz` (our `infra/fleet/healthz.py`, and #706's own acceptance
+# criteria: `curl -fsS http://localhost:<port>/healthz`) rather than the
+# peer's `/health`, and the probe command is a `python3 -c
+# urllib.request...` one-liner (matching the compose file's own probe)
+# rather than `wget`: the compose file records that this image "ships no
+# curl it may rely on" and the same applies to wget — python3 is what the
+# image is guaranteed to have.
+#
 # Every resource is for_each-gated on var.enabled (via local.nodes), so with
 # the flag closed (the committed default) this module is inert — a plan with
 # `enable_fleet_cron = false` shows zero resources, matching
@@ -47,6 +60,7 @@ resource "null_resource" "fleet_cron" {
     cpus                = var.cpus
     memory              = var.memory
     health_start_period = var.health_start_period
+    health_path         = var.health_path
     ssh_key_path        = var.ssh_private_key_path
   }
 
@@ -63,10 +77,10 @@ resource "null_resource" "fleet_cron" {
         "--memory ${var.memory}",
         "-p 0.0.0.0:${var.port}:${var.port}",
         "--env-file ${var.keydb_password_secret_ref}",
+        "-e AO_FLEET_PORT=${var.port}",
         "-e KEYDB_HOST=${var.keydb_host}",
         "-e KEYDB_PORT=${var.keydb_port}",
-        "-e HTTP_ADDR=:${var.port}",
-        "--health-cmd='wget -qO- http://localhost:${var.port}/health || exit 1'",
+        "--health-cmd=python3 -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:${var.port}${var.health_path}',timeout=3).status==200 else 1)\"",
         "--health-interval=30s",
         "--health-timeout=10s",
         "--health-retries=3",

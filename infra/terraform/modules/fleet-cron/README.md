@@ -45,9 +45,23 @@ it.
 
 ## Health
 
-Each replica is health-checked on `GET /health` (peer contract) via Docker's
-built-in `--health-cmd`; `/metrics` is exposed on the same port per the peer
-contract but is not separately probed here.
+Each replica is health-checked on `GET /healthz` (this repo's own fleet-cron
+image contract — `infra/fleet/healthz.py`, `infra/fleet/docker-compose.agent-cron.yml`,
+EPIC #706's own acceptance criteria) via Docker's built-in `--health-cmd`,
+using a `python3 -c urllib.request...` probe rather than `wget`/`curl`: the
+compose file records that this image "ships no curl it may rely on", and the
+same applies to `wget` — python3 is the interpreter guaranteed present.
+`/healthz` is deliberately NOT the peer cronrunner's `/health` path (GR-17,
+local-code-first) — the two are different images with different contracts,
+even though both run on the same shared-services cluster.
+
+## Out of scope (deferred to #706's later phases)
+
+This module declares the container pair only. It does not (yet) declare the
+`.fleet`/`.board` state bind-mounts, node-side auth/secret provisioning, or
+the dual-run/cutover machinery — those are #706's D3+ acceptance criteria,
+not #900's. #900's acceptance is `terraform validate` + plan-no-diff +
+flag-OFF.
 
 ## Variables
 

@@ -107,3 +107,9 @@ variable "health_start_period" {
   type        = string
   default     = "30s"
 }
+
+variable "health_path" {
+  description = "HTTP path probed by the healthcheck. Defaults to `/healthz` (this repo's own fleet-cron image contract: infra/fleet/healthz.py, EPIC #706's own acceptance criteria) — deliberately NOT the peer cronrunner's `/health` (GR-17, local-code-first: the two images have different contracts)."
+  type        = string
+  default     = "/healthz"
+}
