@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/integrations/erp/ops/schemas/subcontracting-note.schema.json",
+  "title": "Subcontracting Note — material issued to a subcontractor",
+  "description": "The buying side's stock movement: components leave a warehouse of ours and go out to be worked on. It is a document of its own rather than a stock entry purpose because it cites a commitment (the subcontracting purchase order) and a supplier, which a bare stock movement does not — and because the material is still ours while the subcontractor holds it, so the note is what the reconciliation reads.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doctype",
+    "id",
+    "state",
+    "docstatus",
+    "company",
+    "currency",
+    "transaction_date",
+    "supplier",
+    "against_purchase_order",
+    "from_warehouse",
+    "lines"
+  ],
+  "properties": {
+    "doctype": {
+      "const": "subcontracting-note"
+    },
+    "id": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "state": {
+      "enum": ["draft", "submitted", "completed", "cancelled"]
+    },
+    "docstatus": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/docstatus"
+    },
+    "company": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+    },
+    "currency": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/currencyCode"
+    },
+    "transaction_date": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/isoDate"
+    },
+    "supplier": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The subcontractor the material is issued to. It is the same party family as any other supplier, because it is paid on a purchase order like any other."
+    },
+    "against_purchase_order": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The subcontracting order the issue is against. Required: material leaves only against a commitment."
+    },
+    "from_warehouse": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The warehouse of ours the material is issued from."
+    },
+    "to_warehouse": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/identifier",
+      "description": "The subcontractor's location, when the model tracks it. Absent means the material is held at the subcontractor outside our warehouses."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_code", "qty"],
+        "properties": {
+          "item_code": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/identifier"
+          },
+          "qty": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/quantity"
+          },
+          "rate": {
+            "$ref": "../../core/schemas/document.schema.json#/$defs/rate",
+            "description": "The valuation the issue is written at. Optional: the posting layer falls back to the item master's valuation rate."
+          }
+        }
+      }
+    },
+    "remarks": {
+      "$ref": "../../core/schemas/document.schema.json#/$defs/label"
+    }
+  },
+  "x-erp-document": "subcontracting-note",
+  "x-erp-lifecycle": true,
+  "x-erp-provenance": {
+    "issue": "kushin77/agent-orchestrator#649",
+    "source": {
+      "repo": "frappe/erpnext",
+      "path": "erpnext/subcontracting/doctype/subcontracting_order",
+      "license": "GPL-3.0",
+      "mode": "pattern-only"
+    },
+    "upstream_doctype": "Subcontracting Order",
+    "harvest": [
+      "material issued to a subcontractor against a purchase order",
+      "the source warehouse a subcontracting issue moves stock out of"
+    ],
+    "note": "Field and lifecycle shapes from the upstream subcontracting surface, re-expressed as our own schema and workflow data. No upstream file was read into this repository; no upstream code, schema or text is copied."
+  }
+}

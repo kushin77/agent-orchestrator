@@ -1,0 +1,48 @@
+# Purchase invoice lifecycle — ERP-04 procurement (issue #649).
+#
+# A bill is a document of its own here because it happens at a different moment
+# from the goods: the receipt commits stock, the invoice commits the payable.
+# `complete` is labelled Paid, and it is terminal — a paid bill is a closed
+# settlement, and a credit note against it would be a new document rather than a
+# transition on this one.
+schema: erp.workflow/v1
+workflow: purchase-invoice-lifecycle
+document: purchase-invoice
+version: 1
+initial: draft
+
+states:
+  - name: draft
+    docstatus: 0
+    label: Draft
+    terminal: false
+  - name: submitted
+    docstatus: 1
+    label: Posted
+    terminal: false
+  - name: completed
+    docstatus: 1
+    label: Paid
+    terminal: true
+  - name: cancelled
+    docstatus: 2
+    label: Cancelled
+    terminal: true
+
+transitions:
+  - action: submit
+    from: draft
+    to: submitted
+    label: Post
+  - action: complete
+    from: submitted
+    to: completed
+    label: Mark Paid
+  - action: cancel
+    from: draft
+    to: cancelled
+    label: Cancel
+  - action: cancel
+    from: submitted
+    to: cancelled
+    label: Cancel

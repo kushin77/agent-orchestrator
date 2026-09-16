@@ -1,0 +1,60 @@
+{
+  "upstream": {
+    "repo": "frappe/erpnext",
+    "license": "GPL-3.0",
+    "pattern_source_only": true,
+    "code_copied": false,
+    "retrieved": "2026-09-15",
+    "source_doc": "docs/ERP-MODULE-GAP-ANALYSIS.md"
+  },
+  "schemas": {
+    "rfq.schema.json": {
+      "upstream_doctype": "Request for Quotation",
+      "harvest": [
+        "the request-for-quotation field surface (supplier set, item lines, validity)",
+        "price discovery as the step that precedes a commitment rather than a commitment itself"
+      ],
+      "note": "Field and lifecycle shapes from the upstream request-for-quotation doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+    },
+    "purchase-invoice.schema.json": {
+      "upstream_doctype": "Purchase Invoice",
+      "harvest": [
+        "the purchase invoice field surface (supplier, order and receipt back-references, posting date, taxes, totals)",
+        "the buying cycle's settlement step: a bill cites the receipt it settles"
+      ],
+      "note": "Field and lifecycle shapes from the upstream purchase invoice doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+    },
+    "subcontracting-note.schema.json": {
+      "upstream_doctype": "Subcontracting Order",
+      "harvest": [
+        "material issued to a subcontractor against a purchase order",
+        "the source warehouse a subcontracting issue moves stock out of"
+      ],
+      "note": "Field and lifecycle shapes from the upstream subcontracting surface, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+    },
+    "bom.schema.json": {
+      "upstream_doctype": "BOM",
+      "harvest": [
+        "the BOM field surface (produced item, output quantity, component lines, component rate)",
+        "a bill of materials as data an explosion walks, not a procedure someone remembers"
+      ],
+      "note": "Field and lifecycle shapes from the upstream BOM doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+    },
+    "work-order.schema.json": {
+      "upstream_doctype": "Work Order",
+      "harvest": [
+        "the work order field surface (bom link, produced item, quantity, source and target warehouse)",
+        "a production order as the document that consumes a bill of materials exactly once"
+      ],
+      "note": "Field and lifecycle shapes from the upstream work order doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+    },
+    "production-plan.schema.json": {
+      "upstream_doctype": "Production Plan",
+      "harvest": [
+        "the production plan field surface (planned entries of item and quantity for a date)",
+        "a plan as a dated run of intended output that is raised into work orders"
+      ],
+      "note": "Field and lifecycle shapes from the upstream production plan doctype, re-expressed. No upstream file was read into this repository; no upstream code, schema or text is copied."
+    }
+  }
+}
