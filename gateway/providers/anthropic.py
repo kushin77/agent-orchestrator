@@ -21,11 +21,16 @@ both flag-gated OFF by default (GR-28) via ``ProviderConfig.provider_options``
   prefix (tools -> system -> messages) is eligible for Anthropic's prompt
   cache. See ``docs/CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md`` pattern + the
   Claude API skill's prompt-caching reference.
-- ``thinking_effort`` (``"low"``/``"medium"``/``"high"``/``"xhigh"``/``"max"``)
-  - enables adaptive thinking (``thinking: {"type": "adaptive"}``) at the
-  given ``output_config.effort``. Current Claude models (Fable 5.1, Opus 5,
-  Sonnet 5) reject the deprecated ``budget_tokens`` shape; this adapter never
-  sends it.
+- ``thinking_effort`` (``"low"``/``"medium"``/``"high"``/``"xhigh"``/``"max"``,
+  validated at adapter construction time - an unrecognized value raises
+  ``ProviderConfigurationError`` immediately rather than on the first
+  ``chat()`` call) - enables adaptive thinking (``thinking:
+  {"type": "adaptive"}``) at the given ``output_config.effort``. Current
+  Claude models (Fable 5.1, Opus 5, Sonnet 5) reject the deprecated
+  ``budget_tokens`` shape; this adapter never sends it. Once thinking is
+  enabled the adapter never also sends ``temperature`` - the two are
+  rejected together (400) on current models, so a per-call
+  ``ChatOptions.temperature`` is deliberately dropped, not silently ignored.
 """
 
 from __future__ import annotations
@@ -41,8 +46,14 @@ from providers.base import (
 )
 from providers.config import ProviderConfig
 from providers.contract import ChatMessage, ChatOptions, Usage
-from providers.errors import ProviderError
+from providers.errors import ProviderConfigurationError, ProviderError
 from providers.transport import HttpTransport, HttpResponse
+
+#: Valid ``output_config.effort`` values (claude-api skill reference: Opus 5
+#: / Sonnet 5 / Fable 5 / Fable 5.1 support all five; older/other models
+#: support a subset, but the adapter fails closed on the full current set
+#: rather than silently degrading per-model).
+_THINKING_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 
 class AnthropicProvider(HttpModelProvider):
@@ -57,6 +68,13 @@ class AnthropicProvider(HttpModelProvider):
         credentials=None,
     ) -> None:
         super().__init__(config, transport, credentials)
+        thinking_effort = config.provider_options.get("thinking_effort")
+        if thinking_effort is not None and thinking_effort not in _THINKING_EFFORT_LEVELS:
+            raise ProviderConfigurationError(
+                f"invalid thinking_effort {thinking_effort!r}; expected one of "
+                f"{sorted(_THINKING_EFFORT_LEVELS)}",
+                provider=self.name,
+            )
 
     def build_headers(self) -> dict[str, str]:
         headers: dict[str, str] = {
@@ -108,12 +126,17 @@ class AnthropicProvider(HttpModelProvider):
                 ]
             else:
                 payload["system"] = system
-        if options.temperature is not None:
-            payload["temperature"] = options.temperature
         thinking_effort = self._config.provider_options.get("thinking_effort")
         if thinking_effort:
             payload["thinking"] = {"type": "adaptive"}
             payload["output_config"] = {"effort": thinking_effort}
+            # Adaptive thinking + a fixed `temperature` are rejected together
+            # on current Claude models (400) - never send temperature once
+            # thinking is enabled. Deliberate drop, not an oversight: the
+            # config-level thinking_effort knob wins over a per-call
+            # ChatOptions.temperature when both are set.
+        elif options.temperature is not None:
+            payload["temperature"] = options.temperature
         return payload
 
     def parse_response(

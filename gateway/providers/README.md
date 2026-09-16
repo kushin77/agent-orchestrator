@@ -138,10 +138,25 @@ ignores it, so this is additive, not a contract change):
 - `provider_options={"thinking_effort": "low"|"medium"|"high"|"xhigh"|"max"}`
   — enables adaptive extended thinking (`thinking: {"type": "adaptive"}`) at
   the given `output_config.effort`. Current Claude models reject the
-  deprecated `budget_tokens` shape; this adapter never sends it.
+  deprecated `budget_tokens` shape; this adapter never sends it. An
+  unrecognized `thinking_effort` value raises `ProviderConfigurationError`
+  at adapter construction (fail closed, before any request). Once thinking
+  is enabled the adapter never also sends `temperature` — the two are
+  rejected together (400) on current Claude models.
 
 Both are declared in `gateway/catalog/modules/claude-anthropic/module.json`
 as `prompt-caching` / `thinking-effort` features, `default: "off"`.
+
+**Deprecated model-id aliases.** `config.LEGACY_MODEL_ALIASES` maps the old
+Claude ids (`claude-haiku-4-5`, `claude-sonnet-4-5`, `claude-opus-4-5`,
+`claude-opus-4-1`) to their current replacements. It exists only because
+`gateway/health/health.yaml` + `fallback.py` + `cli.py` and
+`gateway/finops/tiers.yaml` (other pillars, out of this lane's scope) still
+reference the old ids directly; `ProviderConfig.model_supported` /
+`normalize_model` accept an aliased id and the registry resolves it to the
+current one before any request is built, so those files keep working
+unedited. Do not add new callers of the old ids — this map is deprecated and
+should shrink to nothing as health/finops migrate.
 
 Every adapter maps `system` messages per its wire protocol (Anthropic
 top-level `system`, Gemini `systemInstruction`, inline system role for the

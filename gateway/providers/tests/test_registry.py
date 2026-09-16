@@ -70,12 +70,23 @@ def test_claude_tier_ladder_is_selectable_without_changing_default(tier, model) 
     ladder (PROVIDER_TIER_LADDERS); the platform default stays deepseek."""
     registry = _registry(tier_ladder="claude")
     assert registry.resolve_route("acme", tier) == ("anthropic", model)
-    # The bare default (no tier_ladder kwarg) is unchanged: deepseek.
-    default_registry = _registry()
-    assert default_registry.resolve_route("acme", tier) == (
-        "deepseek",
-        default_registry.config_for("deepseek").tier_model_for(tier),
-    )
+
+
+@pytest.mark.parametrize(
+    "tier,model",
+    [
+        ("LOW", "deepseek-chat"),
+        ("MED", "deepseek-chat"),
+        ("HIGH", "deepseek-reasoner"),
+        ("MAX", "deepseek-reasoner"),
+    ],
+)
+def test_bare_default_tier_ladder_is_unchanged_deepseek(tier, model) -> None:
+    """The bare default (no ``tier_ladder`` kwarg) is unchanged: deepseek.
+    Asserted against literal model ids (not ``config_for(...).tier_model_for``
+    - that would assert the code under test against itself)."""
+    registry = _registry()
+    assert registry.resolve_route("acme", tier) == ("deepseek", model)
 
 
 def test_unknown_tier_ladder_is_rejected() -> None:
@@ -101,6 +112,25 @@ def test_tenant_override_explicit_model() -> None:
     registry = _registry()
     registry.set_tenant_mapping("acme", {"MAX": "anthropic/claude-opus-5"})
     assert registry.resolve_route("acme", "MAX") == ("anthropic", "claude-opus-5")
+
+
+@pytest.mark.parametrize(
+    "legacy_id,current_id",
+    [
+        ("claude-haiku-4-5", "claude-haiku-4-5-20251001"),
+        ("claude-sonnet-4-5", "claude-sonnet-5"),
+        ("claude-opus-4-5", "claude-opus-5"),
+        ("claude-opus-4-1", "claude-opus-5"),
+    ],
+)
+def test_legacy_model_alias_still_resolves(legacy_id, current_id) -> None:
+    """gateway/health + gateway/finops (out of this lane's scope) still pin
+    some old Claude ids directly; a tenant/override pinning one must still
+    resolve - to the CURRENT id, never the deprecated one - rather than be
+    rejected by the fail-closed model check (issue #894 review)."""
+    registry = _registry()
+    registry.set_tenant_mapping("acme", {"MAX": f"anthropic/{legacy_id}"})
+    assert registry.resolve_route("acme", "MAX") == ("anthropic", current_id)
 
 
 def test_copilot_provider_is_registered_and_routable() -> None:

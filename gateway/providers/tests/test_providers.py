@@ -160,10 +160,60 @@ def test_anthropic_thinking_effort_is_off_by_default_and_opt_in(sentiment_schema
     adapter = PROVIDER_CLASSES["anthropic"](cfg, transport, Credentials(api_key=FAKE_KEY))
     adapter.chat(make_messages(), sentiment_schema, ChatOptions(model=model), _ctx())
     payload = transport.requests[0]["body"]
+    # the exact request shape - never the deprecated fixed-budget shape
+    # (rejected on current models), asserted by equality rather than a
+    # tautological "not in" on a dict this same call constructs.
     assert payload["thinking"] == {"type": "adaptive"}
     assert payload["output_config"] == {"effort": "low"}
-    # never the deprecated fixed-budget shape (rejected on current models)
-    assert "budget_tokens" not in payload["thinking"]
+
+
+@pytest.mark.parametrize("bad_effort", ["", "EXTREME", "budget_tokens", "med"])
+def test_anthropic_rejects_invalid_thinking_effort_at_construction(bad_effort) -> None:
+    """Fail closed at adapter construction, not on the first ``chat()`` call."""
+    from dataclasses import replace
+
+    from providers.errors import ProviderConfigurationError
+
+    cfg = replace(config_for("anthropic"), provider_options={"thinking_effort": bad_effort})
+    with pytest.raises(ProviderConfigurationError):
+        PROVIDER_CLASSES["anthropic"](cfg, RecordingTransport([]), Credentials(api_key=FAKE_KEY))
+
+
+def test_anthropic_drops_temperature_when_thinking_effort_is_enabled(sentiment_schema) -> None:
+    """Adaptive thinking + a fixed ``temperature`` are rejected together (400)
+    on current Claude models - the adapter must never send both."""
+    from dataclasses import replace
+
+    model = _model_for("anthropic")
+    cfg = replace(config_for("anthropic"), provider_options={"thinking_effort": "high"})
+    transport = RecordingTransport([ok_response("anthropic", model, VALID_CONTENT)])
+    adapter = PROVIDER_CLASSES["anthropic"](cfg, transport, Credentials(api_key=FAKE_KEY))
+    adapter.chat(
+        make_messages(),
+        sentiment_schema,
+        ChatOptions(model=model, temperature=0.7),
+        _ctx(),
+    )
+    payload = transport.requests[0]["body"]
+    assert payload["thinking"] == {"type": "adaptive"}
+    assert "temperature" not in payload
+
+
+def test_anthropic_sends_temperature_when_thinking_effort_is_not_set(sentiment_schema) -> None:
+    model = _model_for("anthropic")
+    transport = RecordingTransport([ok_response("anthropic", model, VALID_CONTENT)])
+    adapter = PROVIDER_CLASSES["anthropic"](
+        config_for("anthropic"), transport, Credentials(api_key=FAKE_KEY)
+    )
+    adapter.chat(
+        make_messages(),
+        sentiment_schema,
+        ChatOptions(model=model, temperature=0.7),
+        _ctx(),
+    )
+    payload = transport.requests[0]["body"]
+    assert payload["temperature"] == 0.7
+    assert "thinking" not in payload
 
 
 def test_gemini_uses_system_instruction_and_model_role() -> None:

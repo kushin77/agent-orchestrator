@@ -4,18 +4,29 @@
 # for COST ESTIMATION ONLY — not live pricing, not customer billing.
 # Providers change prices without notice; re-verify before relying on this.
 #
-# Provenance:
-# - claude-haiku-4-5-20251001, claude-sonnet-5 and claude-opus-5 rates taken
-#   verbatim from the bundled claude-api skill's cached first-party Anthropic
-#   API pricing table (cached 2026-06-24; re-verify against
-#   https://platform.claude.com/docs/en/about-claude/pricing before relying
-#   on this for billing).
-# - claude-fable-5-1 (Anthropic's most capable, highest-cost model; not
-#   tier-mapped, opt-in tenant pin only — see gateway/providers/config.py)
-#   rate is the same cached table, same provenance.
+# Provenance (issue #894 review): the PR's first pass cited the bundled
+# claude-api skill's cached pricing table, but that table lives in the
+# harness's skill cache, NOT in this git checkout — there is no
+# claude-api skill reference file under this repo to cite a path for, so
+# per review it is NOT used as a source here. Reverted to this rate card's
+# PREVIOUS price figures (unchanged since before issue #894), carried over
+# onto the new model ids (config.py / issue #894 renamed
+# claude-haiku-4-5 -> claude-haiku-4-5-20251001,
+# claude-sonnet-4-5 -> claude-sonnet-5, claude-opus-4-5 -> claude-opus-5):
+# - claude-haiku-4-5-20251001 and claude-sonnet-5 rates are the values this
+#   file already carried for claude-haiku-4-5 / claude-sonnet-4-5, adapted
+#   verbatim from capital-underwriting apps/server/src/lib/aiCostRates.ts
+#   (point-in-time sourced 2026-08-27).
+# - claude-opus-5 is the same Opus-class point-in-time ESTIMATE this file
+#   already carried for claude-opus-4-5 ($15/$75 per 1M, the Opus 4/4.1
+#   list shape); verify against platform.claude.com pricing.
+# claude-fable-5-1 is NOT listed: it is a new model id (issue #894 added it
+# to config.py as a supported, opt-in tenant-pin model) with no prior rate
+# in this file and no in-checkout source to price it from — add a row once
+# one is sourced, rather than invent a number.
 schemaVersion: 1
 provider: anthropic
-note: "Anthropic Claude, USD per 1M tokens. Point-in-time 2026-06-24 (claude-api skill cache)."
+note: "Anthropic Claude, USD per 1M tokens. Point-in-time 2026-09 (unchanged from pre-#894; re-verify)."
 models:
   claude-haiku-4-5-20251001:
     standard:
@@ -23,13 +34,9 @@ models:
       outputUsdPerMillion: 5.00
   claude-sonnet-5:
     standard:
-      inputUsdPerMillion: 2.00
-      outputUsdPerMillion: 10.00
+      inputUsdPerMillion: 3.00
+      outputUsdPerMillion: 15.00
   claude-opus-5:
     standard:
-      inputUsdPerMillion: 5.00
-      outputUsdPerMillion: 25.00
-  claude-fable-5-1:
-    standard:
-      inputUsdPerMillion: 10.00
-      outputUsdPerMillion: 50.00
+      inputUsdPerMillion: 15.00
+      outputUsdPerMillion: 75.00

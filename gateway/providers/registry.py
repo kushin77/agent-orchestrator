@@ -342,7 +342,12 @@ class ProviderRegistry:
                 provider=provider,
                 model=model,
             )
-        return Route(provider=provider, model=model)
+        # A deprecated (LEGACY_MODEL_ALIASES) id is accepted above but never
+        # sent on the wire: normalise to the current id before returning the
+        # route, so a caller pinning an old id (e.g. health/finops YAML
+        # still on ``claude-sonnet-4-5``) still reaches a real, currently
+        # served model.
+        return Route(provider=provider, model=config.normalize_model(model))
 
     # -- calling ------------------------------------------------------------ #
     def chat(

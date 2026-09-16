@@ -23,6 +23,21 @@ from typing import Any, Mapping
 from providers.contract import DEFAULT_TIER
 from providers.resilience import CircuitBreakerSettings, RetryPolicy
 
+#: DEPRECATED - pre-parity (issue #894) Claude model ids that other pillars
+#: (``gateway/health/health.yaml`` + ``fallback.py`` + ``cli.py``,
+#: ``gateway/finops/tiers.yaml``) still reference directly, out of this
+#: lane's scope. Rather than edit those out-of-lane files, the old id is
+#: accepted here and normalised to its current replacement before the
+#: fail-closed ``model_supported`` check and before any request is built, so
+#: an old id still resolves to a real, currently-served model. Remove once
+#: health/finops migrate off the old ids.
+LEGACY_MODEL_ALIASES: Mapping[str, str] = {
+    "claude-haiku-4-5": "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-5": "claude-sonnet-5",
+    "claude-opus-4-5": "claude-opus-5",
+    "claude-opus-4-1": "claude-opus-5",
+}
+
 
 @dataclass(frozen=True)
 class ProviderConfig:
@@ -61,10 +76,16 @@ class ProviderConfig:
         """Resolve a logical tier to this provider's model id for that tier."""
         return self.tier_models.get(tier) or self.default_model
 
+    def normalize_model(self, model: str) -> str:
+        """Map a deprecated ``LEGACY_MODEL_ALIASES`` id to its current
+        replacement; any other id (including one already current) passes
+        through unchanged."""
+        return LEGACY_MODEL_ALIASES.get(model, model)
+
     def model_supported(self, model: str) -> bool:
         if not self.supported_models:
             return True  # adapter accepts arbitrary model ids (endpoint passthrough)
-        return model in self.supported_models
+        return self.normalize_model(model) in self.supported_models
 
 
 def _base(name: str, base_url: str, api_path: str, tier_models: Mapping[str, str]) -> ProviderConfig:
