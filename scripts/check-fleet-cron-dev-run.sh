@@ -660,16 +660,24 @@ fi
 # resolves back to the file's shared `agent-fleet-cron`, two lanes share it
 # again, and this assertion names that. `--format json` is compose v2's own
 # view of the project, so what is asserted is what compose will group by.
+#
+# `${COMPOSE_PROJECT_NAME:-<unset>}` rather than the bare variable: this script
+# runs under `set -u`, so the first version of this control died with
+# `COMPOSE_PROJECT_NAME: unbound variable` instead of reporting the finding in
+# its own words (measured by provoking exactly that). A control that crashes
+# still exits non-zero, but a crash does not NAME the regression, and naming it
+# is the whole point of the assertion.
+expected_project="${COMPOSE_PROJECT_NAME:-<unset>}"
 resolved_project="$(docker compose -f "$COMPOSE" config --format json 2>/dev/null \
   | python3 -c 'import json, sys
 try:
     print((json.load(sys.stdin) or {}).get("name", ""))
 except Exception:
     print("")' 2>/dev/null)"
-if [ "$resolved_project" = "$COMPOSE_PROJECT_NAME" ]; then
+if [ "$resolved_project" = "$expected_project" ]; then
   ok "this gate's compose project is its own ($resolved_project), not the file's shared 'agent-fleet-cron'"
 else
-  bad "the gate's compose project resolved to '${resolved_project:-none}', not '$COMPOSE_PROJECT_NAME' — a concurrent lane would share, and then destroy, its container"
+  bad "the gate's compose project resolved to '${resolved_project:-none}', not '$expected_project' — a concurrent lane would share that project, and its own \`up -d\` would recreate — i.e. destroy — this gate's container mid-run"
 fi
 
 # --- the default port, without starting anything ---------------------------
