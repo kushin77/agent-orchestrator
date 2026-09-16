@@ -71,7 +71,7 @@ SOURCES: dict[str, set[str]] = {
     },
     "governance/dispatch/cli.py": {
         "audit", "eligible", "claim", "dispatch", "release", "status", "held",
-        "reap", "snapshot", "focus", "pool", "trigger",
+        "reap", "snapshot", "focus", "pool", "trigger", "queue",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
     "governance/lifecycle/cli.py": {"audit", "status", "close", "collect"},
