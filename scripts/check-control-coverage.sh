@@ -183,7 +183,7 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
 
     # every named module path must exist
     local m
-    IFS=',' read -r -a mods <<< "$modules"
+    mapfile -t mods < <(tr ',' '\n' <<<"$modules")
     for m in "${mods[@]}"; do
       m="${m%%[[:space:]]}"; [ -n "$m" ] || continue
       if [ ! -e "$root/$m" ]; then
@@ -204,7 +204,7 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
       continue
     fi
     local c
-    IFS=',' read -r -a ctrls <<< "$controls"
+    mapfile -t ctrls < <(tr ',' '\n' <<<"$controls")
     for c in "${ctrls[@]}"; do
       c="${c%%[[:space:]]}"; [ -n "$c" ] || continue
       case "$c" in
