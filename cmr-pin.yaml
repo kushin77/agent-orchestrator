@@ -1,0 +1,24 @@
+# Spoke-side standards pin (EPIC-26/M23, GH #453; schema: cmr.standards-pin/v1
+# in vendor/CMR/sync/cmr-pin.schema.json, seeded from
+# vendor/CMR/templates/module/cmr-pin.yaml). Records which CMR standards
+# bundle this repo (agent-orchestrator, kushin77/CMR spoke) last synced.
+#
+# First real pin for this repo (issue #949, parent #878): the template seed's
+# all-zero placeholder values were never written here before. Values below are
+# computed against the pinned hub submodule commit (`vendor/CMR` gitlink,
+# recorded in `.gitmodules`), not guessed:
+#   - bundle_ref    = `git -C vendor/CMR rev-parse HEAD` at pin time
+#   - manifest_sha  = sha256 of vendor/CMR/controller/standards-manifest.txt
+#                     at bundle_ref
+#   - bundle_digest = sha256 over the sorted "path:sha256(content)\n" lines
+#                     for every non-comment file path listed in that manifest,
+#                     read at bundle_ref (per the algorithm the schema
+#                     describes; recomputation/health-state comparison against
+#                     a live CMR ref is out of scope here, same as
+#                     sync/validate-cmr-pin.py — Phase 1 only validates shape)
+schema: cmr.standards-pin/v1
+bundle_ref: "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+manifest_sha: "35d395611d775cc06d9a27da715345f6002dfef8b86f959777fe19841862060c"
+bundle_digest: "00cf63e270059480a5207ff43ecb4ff1f629a90a91b7db66c682493ddbd19ca0"
+delivered_at: "2026-09-16T19:56:47Z"
+delivered_by: "https://github.com/kushin77/agent-orchestrator/issues/949"
