@@ -76,6 +76,17 @@ LIFECYCLE_CLI = str(ROOT / "governance" / "lifecycle" / "cli.py")
 #: is visible as a dead lane rather than as work in progress.
 sys.path.insert(0, str(ROOT))
 from governance.reconcile.heartbeat import DEFAULT_BEAT_SECONDS, Beater as SessionBeater  # noqa: E402
+#: The reconciler's own vocabulary for "the sweep ENDED this orphan" (issue #694).
+#: Its `Action.touched` is `outcome in {RECLAIMED, PARKED}`, and the loop reads the
+#: same constants rather than restating the strings, so a change on the
+#: reconciler's side cannot silently re-label the loop's decision about its own.
+#:
+#: The names are imported FROM THE SUBMODULE deliberately: `governance.reconcile`
+#: re-exports a *function* called `sweep` from its `__init__`, so
+#: `from governance.reconcile import sweep` binds that function and the constants
+#: would only surface as an AttributeError at the first real orphan.
+from governance.reconcile.sweep import PARKED as RECONCILE_PARKED  # noqa: E402
+from governance.reconcile.sweep import RECLAIMED as RECONCILE_RECLAIMED  # noqa: E402
 #: The board trigger (issue #727): on a `snapshot-stale` refusal the loop runs
 #: ONE bounded refresh, and when freshness does not return it PARKS the
 #: directive instead of re-dispatching it every cycle.
@@ -1790,6 +1801,152 @@ def drop_directive(
     return True
 
 
+# --- the orphan handoff (issue #694) -----------------------------------------
+#
+# `held_action` returns `orphaned` when a claim is held by someone else and no
+# live run is tracking it. Until #694 the loop answered that with an escalation
+# and an attempt count — "escalating, left pending" — and the claim stayed
+# wedged: the reconciler that OWNS orphan teardown (issue #304 — per-session
+# heartbeat, TTL sweep, worktree/branch teardown, lock release) was never asked
+# to do its job. A claim whose lane is already gone is precisely the wedge that
+# worker exists to clear (`sweep._teardown`: no worktree -> forget-lane,
+# release-claim, clear-heartbeat).
+#
+# So the orphan is HANDED OVER before the escalation:
+#
+#   * one sweep per orphan EPISODE per directive. A sweep on every poll would be
+#     its own runaway — the thing the guard exists to bound — so the episode is
+#     marked once, and the mark is cleared only when the handoff ended the
+#     orphan, i.e. when a fresh episode would be a genuinely new one;
+#   * the handoff DECIDES nothing. The reconciler keeps the claim when the orphan
+#     carries unmerged work (`SHELVED_OUTCOME`: "keep the lane, keep the claim,
+#     escalate"), and reclaims or releases only when that work is safe. The
+#     loop's bounded escalation therefore still runs, unchanged, in that case;
+#   * "the reconciler ended it" is read from the reconciler's own vocabulary,
+#     never restated here.
+
+ORPHAN_HANDOFFS = "orphan-handoffs"
+RECONCILE_CLI = str(ROOT / "governance" / "reconcile" / "cli.py")
+#: How long one handoff may take. The sweep is local (git plus the repo's own
+#: CLIs) but the loop must not block on it: a timeout is a failure to hand over,
+#: never a reason to skip the escalation that follows.
+ORPHAN_HANDOFF_TIMEOUT = float(os.environ.get("AO_ORPHAN_HANDOFF_TIMEOUT", "120"))
+
+
+def orphan_handoff_path(directive_id: str) -> Path:
+    """Where one directive's orphan handoff is recorded.
+
+    Beside the guard's state (``RUNS.parent``) and never ``runtime.FLEET_DIR``
+    directly, for the same reason the guard does it: the fleet suite redirects
+    ``terminal.RUNS`` to a tmp directory, so driving this loop in a test cannot
+    write handoff state into the live fleet's ``.fleet/``.
+    """
+    return guard_base() / ORPHAN_HANDOFFS / f"{directive_id}.json"
+
+
+def orphan_handoff_done(directive_id: str) -> dict | None:
+    """The recorded handoff for this directive, or None when there is none."""
+    try:
+        return json.loads(orphan_handoff_path(directive_id).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def record_orphan_handoff(directive_id: str, record: dict) -> None:
+    """Persist one handoff. A failure to write is printed, never raised: the
+    loop's next act is either a re-dispatch or a bounded escalation, and losing
+    the mark must not cost the directive its only report."""
+    path = orphan_handoff_path(directive_id)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"[terminal] could not record the orphan handoff for {directive_id}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+def clear_orphan_handoff(directive_id: str) -> None:
+    """Forget the episode mark, so a NEW orphan episode may hand over again."""
+    try:
+        orphan_handoff_path(directive_id).unlink()
+    except OSError:
+        pass
+
+
+def hand_orphan_to_reconciler(
+    directive_id: str, issue: int, holder: str, *, timeout: float | None = None
+) -> tuple[bool, str]:
+    """Ask the reconciler to end one orphaned claim: ``(ended, detail)``.
+
+    ``ended`` is True only when the sweep's own report says this issue's session
+    was reclaimed or parked — read from ``governance.reconcile``'s vocabulary.
+    False means either that the reconciler ran and deliberately kept the claim
+    (unmerged work: shelved) or that it could not run; the caller escalates in
+    both cases, so a broken reconciler degrades to the pre-#694 behaviour rather
+    than to silence.
+
+    One call per episode: a mark is written on the first attempt, and every later
+    call returns False without sweeping, so the handoff can never become the
+    runaway that the guard exists to bound.
+    """
+    already = orphan_handoff_done(directive_id)
+    if already is not None:
+        return False, (
+            f"already handed over once for this episode ({already.get('detail') or 'no detail'})"
+            " — the bound is one handoff per episode"
+        )
+    budget = ORPHAN_HANDOFF_TIMEOUT if timeout is None else timeout
+    try:
+        result = subprocess.run(
+            ["python3", RECONCILE_CLI, "sweep", "--apply", "--json"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=budget,
+        )
+    except subprocess.TimeoutExpired:
+        detail = f"the reconciler did not answer within {budget:g}s"
+        record_orphan_handoff(directive_id, {"ended": False, "detail": detail, "at": _now()})
+        return False, detail
+    except OSError as exc:
+        detail = f"the reconciler could not be run: {exc}"
+        record_orphan_handoff(directive_id, {"ended": False, "detail": detail, "at": _now()})
+        return False, detail
+
+    report = extract_json(result.stdout or "")
+    actions = report.get("actions") if isinstance(report, dict) else None
+    if not actions:
+        detail = (
+            f"the reconciler reported no action for #{issue} (rc={result.returncode})"
+            f"{(result.stderr or '').strip() and ' — ' + (result.stderr or '').strip()[-160:]}"
+        )
+        record_orphan_handoff(directive_id, {"ended": False, "detail": detail, "at": _now()})
+        return False, detail
+
+    action = next(
+        (a for a in actions if isinstance(a, dict) and a.get("issue") == issue), None
+    )
+    if action is None:
+        detail = f"the sweep judged no session for #{issue} (rc={result.returncode})"
+        record_orphan_handoff(directive_id, {"ended": False, "detail": detail, "at": _now()})
+        return False, detail
+
+    outcome = str(action.get("outcome") or "")
+    ended = outcome in {RECONCILE_RECLAIMED, RECONCILE_PARKED}
+    detail = (
+        f"reconcile sweep: #{issue} {outcome or 'no outcome'} for session "
+        f"{action.get('session_id') or 'unknown'} — {action.get('reason') or 'no reason given'}"
+    )
+    record_orphan_handoff(
+        directive_id,
+        {"ended": ended, "outcome": outcome, "holder": holder, "detail": detail, "at": _now()},
+    )
+    return ended, detail
+
+
 def dead_letter_inventory() -> list[dict]:
     """Every retired directive's normalised record, newest first (the list verb).
 
@@ -2718,10 +2875,40 @@ def loop(args: argparse.Namespace) -> int:
                     continue
                 clear_reported(directive_id)
             else:
-                # A claim nobody is tracking, held by someone else: the brain decides.
-                # Counted (#723) — an orphan nobody reaps is another pending-forever
-                # directive, and the guard is what bounds it.
-                print(f"[terminal] #{issue} held by {holder} with no live run — escalating, left pending", flush=True)
+                # A claim nobody is tracking, held by someone else (#694): hand the
+                # orphan to the reconciler that owns orphan teardown (#304) — once per
+                # episode — and escalate only when it does not end it. Counted (#723):
+                # an orphan nobody reaps is another pending-forever directive, and the
+                # guard is what bounds it.
+                ended, detail = hand_orphan_to_reconciler(directive_id, issue, holder)
+                if ended:
+                    print(
+                        f"[terminal] #{issue} held by {holder} with no live run — the "
+                        f"reconciler ended the orphan ({detail}); re-dispatching next cycle",
+                        flush=True,
+                    )
+                    report_once(
+                        directive_id,
+                        key="orphan-reconciled",
+                        message_type="escalate",
+                        body=(
+                            f"#{issue} was held by {holder} with no live run. The reconciliation "
+                            f"sweep ended the orphan, so the order can be dispatched again "
+                            f"instead of waiting on the brain — {detail}."
+                        ),
+                    )
+                    # The episode is over, so a fresh orphan may hand over again; the
+                    # report mark goes too, because the next cycle re-dispatches.
+                    clear_orphan_handoff(directive_id)
+                    clear_reported(directive_id)
+                    if args.once:
+                        return 0
+                    continue
+                print(
+                    f"[terminal] #{issue} held by {holder} with no live run — escalating, "
+                    f"left pending ({detail})",
+                    flush=True,
+                )
                 guard_retire(directive_id, issue, f"orphaned claim held by {holder}, no live run")
                 if args.once:
                     return 0
