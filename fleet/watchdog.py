@@ -167,6 +167,76 @@ BACKOFF_CAP_SECONDS = 300
 #: recorded as a failed attempt. A blocked network must not stall the pass.
 FAST_FORWARD_TIMEOUT_SECONDS = 60
 
+# ── the remedy that does not live in the checkout (issue #780, AO-GR-25) ─────
+# The `checkout-behind` remedy above is right, and it could not run: cron ran the
+# CHECKOUT's copy of this module, so a stale checkout ran a stale watchdog and the
+# fast-forward that would have repaired it lived in the code that copy could not
+# see. Measured 2026-09-15: the sister ran `592b132` for ~5.5 hours while
+# `origin/master` was `3a44f27`, and a HUMAN ran the fast-forward.
+#
+# So the remedy is now executed from a PINNED path OUTSIDE every checkout —
+# `scripts/checkout-bootstrap.sh --install` writes it there, from the REMOTE's
+# bytes — and this module PREFERS it whenever it exists. The pinned copy is not
+# moved by a fast-forward, and it re-executes the remote's copy when it has itself
+# fallen behind, so no copy of the fleet code has to be current for the checkout
+# to be brought forward. When no pinned copy is installed this module falls back
+# to the in-process remedy below, unchanged, and the returned detail says which
+# one ran — a remedy whose provenance is unstated is a remedy nobody can audit.
+ENV_BOOTSTRAP = "AO_FLEET_BOOTSTRAP"
+#: The pinned bootstrap's default home, deliberately outside any checkout.
+DEFAULT_BOOTSTRAP = Path.home() / ".ao-fleet" / "checkout-bootstrap.sh"
+
+
+def checkout_bootstrap_path() -> Path | None:
+    """The PINNED bootstrap, or None when this host has not installed one.
+
+    Resolution is one honoured override plus one default, never a search of the
+    checkout: a candidate inside the checkout would be the stale copy again, which
+    is the defect this exists to remove. A pinned path that is present but not
+    executable is still returned — the caller runs it through `bash`, so the
+    executable bit is not a way for the remedy to silently disappear.
+    """
+    override = os.environ.get(ENV_BOOTSTRAP, "").strip()
+    candidate = Path(override) if override else DEFAULT_BOOTSTRAP
+    return candidate if candidate.is_file() else None
+
+
+def _last_line(text: str) -> str:
+    """The last non-empty line of a command's output — the bootstrap's own verdict."""
+    lines = [line for line in text.splitlines() if line.strip()]
+    return lines[-1].strip() if lines else "no output"
+
+
+def _fast_forward_via_bootstrap(
+    target: Path, script: Path, remote: str, before: str
+) -> tuple[bool, str, str]:
+    """Run the PINNED bootstrap and translate its tri-state into our tuple.
+
+    The bootstrap's exit code is the verdict (0 current/moved, 1 refused, 2
+    cannot-assess) and its last line names both commits, so the detail this module
+    returns is the bootstrap's own finding rather than a re-derivation of it. A
+    refusal keeps the word `refused`: the attempt counter and the escalation text
+    downstream both read it.
+    """
+    try:
+        result = subprocess.run(
+            ["bash", str(script), str(target), "--ref", remote],
+            capture_output=True,
+            text=True,
+            timeout=FAST_FORWARD_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, before, f"the pinned bootstrap {script} failed ({type(exc).__name__}: {exc})"
+    after = _git_head(target)
+    finding = _last_line(f"{result.stdout}\n{result.stderr}")
+    if result.returncode == 0:
+        if before != "unknown" and after != before:
+            return True, after, f"fast-forwarded {before} -> {after} (pinned bootstrap: {finding})"
+        return False, after, f"the checkout is already at {after} (pinned bootstrap: {finding})"
+    if result.returncode == 2:
+        return False, after, f"cannot-assess — the pinned bootstrap could not read the checkout ({finding})"
+    return False, after, f"the pinned bootstrap refused the fast-forward ({finding})"
+
 
 class WatchdogConfigError(RuntimeError):
     """A configured remedy budget is unusable — refuse rather than disarm."""
@@ -275,7 +345,9 @@ def fast_forward_checkout(
 
     This is the `checkout-behind` remedy (#773): when the rung already runs the
     local HEAD, a respawn cannot change the compared commit, so the *checkout*
-    is what must move. `git fetch origin` first (the fetched ref is what the
+    is what must move. It is executed by the PINNED bootstrap when one is
+    installed (#780: the remedy must not be the stale copy of this file), and
+    in-process otherwise — `git fetch origin` first (the fetched ref is what the
     drift baseline reads), then `git merge --ff-only`. A refusal is reported, not
     swallowed: a diverged branch is `cannot fast-forward`, and the caller counts
     the attempt so the bound still applies.
@@ -285,6 +357,9 @@ def fast_forward_checkout(
     """
     target = Path(root) if root is not None else ROOT
     before = _git_head(target)
+    pinned = checkout_bootstrap_path()
+    if pinned is not None:
+        return _fast_forward_via_bootstrap(target, pinned, remote, before)
     try:
         fetched = _git(target, ["fetch", "origin"])
     except (OSError, subprocess.SubprocessError) as exc:

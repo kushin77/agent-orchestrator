@@ -552,6 +552,15 @@ remote, the rung is **drifted** — and *which* commit is stale decides the reme
   (`checkout-behind`) ⇒ **fast-forward the checkout** (`git fetch` +
   `git merge --ff-only`), then one respawn. A respawn alone re-executes the same
   checkout and cannot change the compared value (#773, AO-GR-21).
+* the **remedy** must not be the stale copy of the code it repairs: it is
+  **installed outside every checkout** (`bash scripts/checkout-bootstrap.sh
+  --install`, pinned at `~/.ao-fleet/checkout-bootstrap.sh`, overridable with
+  `AO_FLEET_BOOTSTRAP`) and re-executes `origin/master`'s copy of itself when it
+  has itself fallen behind, so no copy of the fleet code has to be current for
+  the checkout to be brought forward (#780). A dirty tree is neither a reason to
+  give up nor a licence to discard: the fast-forward is retried **once** with the
+  uncommitted work stashed under a **recorded reason**, and the stash is named in
+  the finding.
 
 **Why.** `fleet/watchdog.py` compared the loop's heartbeat commit to
 `channel.head_commit()`, which reads the **shared checkout**. With the checkout
@@ -578,6 +587,13 @@ control that fails *open* is worse than none.
   drift* instead of being dropped every tick. `bash
   scripts/check-watchdog-bounded.sh` proves it against a real scratch repository
   and two mutants of the real source, and is wired as `watchdog-bounded`.
+- The remedy cannot be the code it repairs (#780): a checkout deliberately set
+  behind `origin/master` is brought forward **with its own in-tree copy
+  sabotaged**, both commits are named, a dirty tree is moved with the
+  uncommitted work recoverable from a named stash, and a check that only ever
+  looked at a clean tree cannot pass. `bash scripts/check-checkout-bootstrap.sh`
+  is that control — it asserts the staleness before the run, mutation-proves the
+  watchdog's pinned-remedy preference, and is wired as `checkout-bootstrap`.
 
 **Baseline tradeoff.** The baseline is the *fetched* `origin/master`
 remote-tracking ref; the watchdog does **not** fetch on every tick (a 2-minute

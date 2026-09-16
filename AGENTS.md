@@ -202,7 +202,12 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     **fast-forward**, never a respawn that re-executes the same checkout; no
     remedy is retried past its attempt cap, exhaustion escalates **once** and
     **parks** the rung, and a busy rung is recorded as *pending drift* rather
-    than dropped every tick. (Spine: AO-GR-25.)
+    than dropped every tick. And the remedy is **installed outside every
+    checkout** (`bash scripts/checkout-bootstrap.sh --install`) because the code
+    that repairs a stale checkout cannot be the stale copy that needs repairing:
+    the pinned copy re-executes `origin/master`'s copy of itself when it has
+    fallen behind, and a dirty tree is retried with the uncommitted work stashed
+    under a recorded reason (#780). (Spine: AO-GR-25.)
 23. **A loop resolves its own dependencies before taking work (fleet, issue
     #733).** A loop preflights its runner and required binaries at startup and
     on every respawn, **before** reading its queue; an unresolvable dependency
