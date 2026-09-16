@@ -37,6 +37,21 @@ WORKTREE_PREFIX = "ao"
 #: Reserved TLD (RFC 2606) — a signature that can never be a human address.
 IDENTITY_DOMAIN = "agents.invalid"
 
+#: The four variables that make git sign as this session — and that therefore must
+#: never be exported into a shell shared with another lane (issue #934). Measured
+#: with git 2.53.0: they outrank BOTH `git config user.email` and a per-commit
+#: `git -c user.email=`, so an ambient pair does not merely win by default — it
+#: cannot be overridden from the command line. In a shared shell it authors every
+#: commit made in it as whatever session exported it last, which is why
+#: :meth:`SessionIdentity.shared_shell_env` withholds them and
+#: :meth:`SessionIdentity.commit_form` prefixes them onto a single command instead.
+GIT_IDENTITY_VARS = (
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+)
+
 #: Trailer that ties a commit back to its ticket (GR-2).
 COMMIT_TRAILER = "Refs {slug}#{issue}"
 
@@ -136,17 +151,32 @@ class SessionIdentity:
         """A reserved-TLD address that can never resolve to a person."""
         return f"agent+{self.agent_id}@{IDENTITY_DOMAIN}"
 
+    def git_signature(self) -> dict[str, str]:
+        """The pair git must sign as, as DATA — never as exported variables.
+
+        Deliberately not keyed ``GIT_AUTHOR_*``: a mapping with those keys invites
+        ``export``, and exporting them is the defect this shape exists to make
+        hard (issue #934). Apply them to one commit with :meth:`commit_form`.
+        """
+        return {"name": self.author_name, "email": self.author_email}
+
     @property
     def trailer(self) -> str:
         return commit_trailer(self.issue, self.repo_slug)
 
     def env(self) -> dict[str, str]:
-        """The environment the agent runs under.
+        """The complete environment for a process this session owns.
 
         Both halves matter: ``AO_*`` tells the agent *who it is* (so its tooling
         can be audited), and ``GIT_*`` makes git sign correctly **even if the
         worktree config is lost**, so a correct signature does not depend on one
         mechanism staying intact.
+
+        What this must not be used for is a shell shared with another lane: the
+        ``GIT_*`` half outranks every config-based identity, so exporting it there
+        authors the *next* commit in that shell — whichever lane makes it — as this
+        session (issue #934). Use :meth:`shared_shell_env` and
+        :meth:`commit_form` for that case.
         """
         return {
             "AO_SESSION_ID": self.session_id,
@@ -161,6 +191,32 @@ class SessionIdentity:
             "GIT_COMMITTER_NAME": self.author_name,
             "GIT_COMMITTER_EMAIL": self.author_email,
         }
+
+    def shared_shell_env(self) -> dict[str, str]:
+        """The identity as environment, minus the four variables that outrank config.
+
+        Safe to export in a shell several lanes share: it names the session without
+        arming a signature that would leak onto whoever commits next.
+        """
+        return {
+            name: value for name, value in self.env().items() if name not in GIT_IDENTITY_VARS
+        }
+
+    def commit_form(self, message_file: str = "<message-file>") -> str:
+        """The command that signs one commit as this session in a shared shell.
+
+        The signature is PREFIXED onto the commit rather than exported, because
+        that is the only form an ambient value cannot defeat: the assignment is
+        scoped to this one process, so it replaces whatever the shell was carrying
+        instead of being overridden by it. Committing with a bare ``git commit`` is
+        equally correct — ``git config --worktree`` already holds this signature —
+        but only while the shell carries no *other* session's pair.
+        """
+        signature = " ".join(
+            f"{name}={self.author_name if name.endswith('_NAME') else self.author_email}"
+            for name in GIT_IDENTITY_VARS
+        )
+        return f"{signature} git commit -F {message_file}"
 
     def shell_env(self) -> str:
         """``export`` lines, for ``eval "$(… session env)"`` in a shell."""

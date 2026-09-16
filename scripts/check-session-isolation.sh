@@ -27,6 +27,29 @@
 # It also pins that the execution loop provisions through this module, so the
 # isolation is applied to dispatched agents rather than only available to them.
 #
+# THE AMBIENT IDENTITY MUST NOT DECIDE THIS GATE'S VERDICT (issue #934)
+#   Rule 15 tells every session to load its identity, and
+#   `governance/isolation/cli.py env` emits four `GIT_*` variables alongside the
+#   `AO_*` ones. Measured with git 2.53.0, those four OUTRANK `git config
+#   --worktree` *and* a per-commit `git -c user.email=` override — so in a lane
+#   that followed the doctrine they, not the lane's signature, author the commit.
+#   Letting that reach this gate broke it two ways, and the second is the serious
+#   one:
+#     * its own scratch commits were authored by the ambient session, so the
+#       author assertion in section 3 failed while every lane was in fact isolated;
+#     * worse, `governance/isolation/audit.py` selects a lane's commits BY AUTHOR
+#       ADDRESS. The provoked violations were authored by the ambient identity, so
+#       the audit found nothing to refuse and four controls reported "the violation
+#       went undetected". The gate was not merely red — it was BLINDED, and a gate
+#       that is blind on the day it matters is worse than no gate.
+#   This gate's work is not the agent's work: it provisions throwaway scratch lanes
+#   and re-derives every signature from `git config --worktree`, so it needs no
+#   ambient identity. The variables are removed below. That is NOT the same as
+#   absorbing the defect — the contamination is re-provoked deliberately in lane I,
+#   where a commit made UNDER a foreign identity in a correctly signed lane must
+#   still be refused by name. The clearing removes the ambient value; the lane-I
+#   provocation proves the rule still bites without it.
+#
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. A control whose report
 # the audit declined to produce (its own rc 2, or a signal death) is NOT-OK for
 # nothing: it is CANNOT-ASSESS, and the run says so rather than reporting FAIL
@@ -37,6 +60,12 @@ set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
+
+# The ambient identity is removed before anything else runs (issue #934; the
+# reasoning is in the header). `GIT_IDENTITY_VARS` in governance/isolation/identity.py
+# is the same four names, and this gate's own lanes are signed by
+# `git config --worktree` — never by the caller's environment.
+unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
 
 cli="governance/isolation/cli.py"
 terminal="fleet/terminal.py"
@@ -362,6 +391,21 @@ else
   fail=$((fail + 1))
 fi
 
+# --- 3b. the audit does not read the ambient identity -----------------------
+# The control that makes the clearing at the top of this file an assertion rather
+# than a hope (issue #934). The same lane, audited from a shell that exports a
+# FOREIGN pair, must reach the same verdict: the audit re-derives the signature
+# from `git config --worktree`, so the caller's environment is not an input. If
+# this ever goes red, the verdict of every lane in this gate depends on who ran it.
+if env GIT_AUTHOR_NAME=agent-someone-else GIT_AUTHOR_EMAIL="agent+someone-else@agents.invalid" \
+    GIT_COMMITTER_NAME=agent-someone-else GIT_COMMITTER_EMAIL="agent+someone-else@agents.invalid" \
+    python3 "$cli" audit --main "$scratch" --session "$a_sid" >/dev/null 2>&1; then
+  echo "  OK    the audit's verdict for a lane is independent of the ambient identity env"
+else
+  echo "  FAIL  the audit's verdict changed when the caller exported a foreign identity" >&2
+  fail=$((fail + 1))
+fi
+
 # Lane B — a commit that never references its ticket.
 read -r b_sid b_wt < <(lane_session 264 gate-agent foundation)
 commit_in "$b_wt" "untraced.txt" ""
@@ -414,6 +458,33 @@ git -C "$h_wt" commit -q -m "work on prose.txt" \
   -m "Co-authored-by: gate <gate@example.invalid>" >/dev/null 2>&1
 expect_fail "a reference buried in prose is refused" "$h_sid" \
   "commit-missing-ticket-trailer" "commit-ref-outside-the-trailer-block"
+
+# Lane I — the contamination the ambient identity USED to cause, provoked on
+# purpose (issue #934). The lane's own signature is correct in
+# `git config --worktree`; only the COMMIT was made under another session's pair,
+# which is exactly the shape a shell shared between lanes produces. The message
+# carries a perfectly good ticket trailer, so the trailer rule is satisfied and
+# AUTHORSHIP is the only defect — if the audit reports this lane isolated, the
+# contamination has been absorbed rather than trapped.
+foreign_identity_email="agent+someone-else@agents.invalid"
+read -r i_sid i_wt < <(lane_session 271 gate-agent foundation)
+echo "contaminated.txt" > "$i_wt/contaminated.txt"
+git -C "$i_wt" add contaminated.txt >/dev/null 2>&1
+env GIT_AUTHOR_NAME=agent-someone-else GIT_AUTHOR_EMAIL="$foreign_identity_email" \
+  GIT_COMMITTER_NAME=agent-someone-else GIT_COMMITTER_EMAIL="$foreign_identity_email" \
+  git -C "$i_wt" commit -q -m "work on contaminated.txt" \
+  -m "Refs kushin77/agent-orchestrator#271" >/dev/null 2>&1
+expect_fail "a commit another session authored inside the lane is refused" "$i_sid" \
+  "commit-authored-by-another-session"
+# ...and the lane's own signature was NOT the defect, so the refusal above came
+# from authorship alone and not from a config mismatch the audit already knew.
+if [ "$(git -C "$i_wt" log --format=%ae -1 2>/dev/null)" = "$foreign_identity_email" ] &&
+  [ "$(git -C "$i_wt" config --worktree --get user.email 2>/dev/null)" = "agent+gate-agent@agents.invalid" ]; then
+  echo "  OK    the contaminated lane's worktree signature is still the session's — authorship is the only defect"
+else
+  echo "  FAIL  the contaminated lane does not hold the shape under test" >&2
+  fail=$((fail + 1))
+fi
 
 # Lane E — the lane's signature leaked into the shared config, where every other
 # lane would inherit it. Done last-but-one: it makes the shared config agent-owned.

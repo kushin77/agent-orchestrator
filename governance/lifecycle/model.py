@@ -72,7 +72,13 @@ INVARIANTS: Tuple[Invariant, ...] = (
     Invariant(
         code="VERIFY_EVIDENCE_MISSING",
         requires="a green verification attestation naming the pull request's head commit - the tree that was verified and then merged",
-        remediation="run `make verify` on the branch head before merging and record its attestation; evidence names a commit, and a summary is not evidence",
+        remediation=(
+            "run `make verify` on the branch head before merging and record its attestation; evidence "
+            "names a commit, and a summary is not evidence. Close out BEFORE the lane is torn down "
+            "(`governance/lifecycle/cli.py close --issue <n>`), or keep the verified commit reachable: "
+            "the attestation is measured from one of the two, and the driver refuses to reclaim a lane "
+            "while this invariant is unsatisfied (#786)"
+        ),
     ),
     Invariant(
         code="BRANCH_NOT_DELETED",
@@ -91,8 +97,8 @@ INVARIANTS: Tuple[Invariant, ...] = (
     ),
     Invariant(
         code="LANE_NOT_RECLAIMED",
-        requires="the item's lane worktree and session record are gone",
-        remediation="close the lane (`governance/isolation/cli.py close --session <id>`), committing or discarding its work first",
+        requires="the item's lane worktree AND its session record are gone - a record whose worktree a reaper already removed is still a record, and the invariant is owed until the record is retired",
+        remediation="close the lane (`governance/isolation/cli.py close --session <id>`), committing or discarding its work first; machine-managed board state (`.board/focus.json`) is ignored by that test and reported, never silently discarded",
     ),
     Invariant(
         code="CLOSING_EVIDENCE_MISSING",

@@ -59,8 +59,22 @@
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
+# THE AMBIENT IDENTITY IS NOT AN INPUT (issue #934)
+#   This gate commits into scratch lanes, and `GIT_AUTHOR_*`/`GIT_COMMITTER_*`
+#   outrank `git config --worktree` (measured, git 2.53.0) — so with rule 15's
+#   identity env exported, its own provoked "a commit with no ticket reference"
+#   was authored by the ambient session instead of the lane session. The audit
+#   selects a lane's commits BY AUTHOR ADDRESS, found none of them, and answered
+#   OK where the rule requires NOT-OK: the control was blinded, not merely red.
+#   The four variables are therefore removed at the top, and the contamination is
+#   re-provoked as the second half of section A so the clearing cannot stand in
+#   for the rule.
+#
 # Usage: bash scripts/check-isolation-landed.sh [--range <git-range>]
 set -uo pipefail
+
+# `GIT_IDENTITY_VARS` in governance/isolation/identity.py is the same four names.
+unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
@@ -261,6 +275,33 @@ git -C "$bad_wt" add work.txt >/dev/null 2>&1
 git -C "$bad_wt" commit -q -m "work on work.txt" >/dev/null 2>&1
 expect_rc_named "a recorded lane whose commit omits the trailer is NOT-OK" \
   1 "commit-missing-ticket-trailer" python3 "$cli" audit --main "$lanes_repo" --session "$bad_sid"
+
+# A30 — the contamination, provoked rather than assumed (issue #934). The lane's
+#       worktree signature is the session's; only the COMMIT was made under another
+#       session's pair, which is what a shell shared between lanes produces. Its
+#       message carries a proper trailer, so authorship is the only defect, and the
+#       lane must NOT be reported isolated — that report is exactly what the
+#       ambient env used to produce for every lane in this gate.
+read -r foreign_sid foreign_wt < <(open_lane 271) || {
+  echo "check-isolation-landed: CANNOT-ASSESS — could not provision a scratch lane" >&2
+  exit 2
+}
+foreign_email="agent+someone-else@agents.invalid"
+printf 'work\n' >"$foreign_wt/work.txt"
+git -C "$foreign_wt" add work.txt >/dev/null 2>&1
+env GIT_AUTHOR_NAME=agent-someone-else GIT_AUTHOR_EMAIL="$foreign_email" \
+  GIT_COMMITTER_NAME=agent-someone-else GIT_COMMITTER_EMAIL="$foreign_email" \
+  git -C "$foreign_wt" commit -q -m "work on work.txt" \
+  -m "Refs kushin77/agent-orchestrator#271" >/dev/null 2>&1
+if [ "$(git -C "$foreign_wt" config --worktree --get user.email 2>/dev/null)" = "agent+gate-agent@agents.invalid" ] &&
+  [ "$(git -C "$foreign_wt" log --format=%ae -1 2>/dev/null)" = "$foreign_email" ]; then
+  printf '  OK    the contamination under test holds: session signature, foreign author\n'
+else
+  printf '  FAIL  the contamination under test does not hold (signature or author is wrong)\n' >&2
+  fail=$((fail + 1))
+fi
+expect_rc_named "a commit another session authored inside the lane is NOT-OK" \
+  1 "commit-authored-by-another-session" python3 "$cli" audit --main "$lanes_repo" --session "$foreign_sid"
 
 # --- B. real landed history, through the enforcement surface -----------------
 real_out="$(python3 "$cli" enforce --main "$root" --range "$real_range" 2>&1)"
