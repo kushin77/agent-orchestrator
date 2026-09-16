@@ -352,6 +352,125 @@ def test_a_busy_drifted_rung_is_recorded_pending_and_acted_on_when_the_run_ends(
     assert "respawned" in idle
 
 
+# --- the crash-loop escape (#366) ---------------------------------------------
+#
+# The measured deadlock: the hold in `rung_action` — "never restart a run just to
+# update code" — was taken on EVERY tick, because a rung whose runs die before they
+# can report presents flight every time it is asked. `.fleet/watchdog.log` shows
+# the sister holding its own drift lock from 21:32 onward on code that predated
+# five merged fixes, while the brain was respawned in the same tick. A hold that
+# can be re-taken without bound is a policy, not a control. These tests pin the
+# budget that ends it, the constants it names, and — just as important — that it
+# did not become a second unbounded path.
+
+
+def test_a_crash_looping_rung_is_respawned_despite_a_run_appearing_in_flight(monkeypatch):
+    """THE regression test: N holds inside the window, no progress ⇒ the remedy proceeds."""
+    _drift_env(monkeypatch)
+    lines = []
+    held_respawns = 0
+    total_respawns = 0
+    for step in range(watchdog.CRASH_LOOP_RESPAWNS + 1):
+        line, calls = _act(monkeypatch, commit="other22", when=step * 10, inflight=True)
+        if step < watchdog.CRASH_LOOP_RESPAWNS:
+            held_respawns += len(calls)
+        lines.append(line)
+        total_respawns += len(calls)
+    held = ["left alone" in line for line in lines[: watchdog.CRASH_LOOP_RESPAWNS]]
+    assert held == [True] * watchdog.CRASH_LOOP_RESPAWNS, "the safety rule holds until the budget is spent"
+    assert held_respawns == 0, "a run in flight is still not restarted just to update code — until it is looping"
+    escape = lines[-1]
+    assert "left alone" not in escape, "the hold must not be re-taken for a crash loop"
+    assert total_respawns == 1 and "respawned" in escape
+    assert f"N={watchdog.CRASH_LOOP_RESPAWNS}" in escape, "the line names N"
+    assert str(int(watchdog.CRASH_LOOP_WINDOW_SECONDS)) in escape, "and the window"
+
+
+def test_a_busy_rung_whose_holds_fall_outside_the_window_is_still_held(monkeypatch):
+    """The budget is a window, not a lifetime tally: a slow hold never arms it."""
+    _drift_env(monkeypatch)
+    spacing = int(watchdog.CRASH_LOOP_WINDOW_SECONDS) + 1
+    respawns = 0
+    line = ""
+    for step in range(watchdog.CRASH_LOOP_RESPAWNS + 2):
+        line, calls = _act(monkeypatch, commit="other22", when=step * spacing, inflight=True)
+        respawns += len(calls)
+    assert respawns == 0, "holds spread wider than the window are not a crash loop"
+    assert "left alone" in line
+
+
+def test_a_busy_rung_that_makes_progress_never_arms_the_crash_loop_escape(monkeypatch):
+    """A hold whose observation MOVES is progress: no budget is spent, nothing is respawned."""
+    _drift_env(monkeypatch)
+    respawns = 0
+    line = ""
+    for step in range(6):
+        line, calls = _act(monkeypatch, commit=f"old{step}", when=step * 5, inflight=True)
+        respawns += len(calls)
+    assert respawns == 0
+    assert "left alone" in line
+    record = watchdog.load_drift_record("sister") or {}
+    assert len(record.get("respawns") or []) == 1, "progress restarts the ledger, so it cannot accumulate"
+
+
+def test_the_crash_loop_escape_is_bounded_by_the_attempt_cap(monkeypatch):
+    """AO-GR-21: #366 must not open a second unbounded path to respawn."""
+    _drift_env(monkeypatch, attempts=2)
+    lines = []
+    respawns = 0
+    for step in range(8):
+        line, calls = _act(monkeypatch, commit="other22", when=step * 5, inflight=True)
+        lines.append(line)
+        respawns += len(calls)
+    assert respawns <= 2, "the escape goes through bounded_remedy, so the cap still applies"
+    assert sum(1 for line in lines if "ESCALATED ONCE" in line) == 1, "and it escalates exactly once"
+    assert any("PARKED" in line for line in lines), "then it parks instead of respawning forever"
+
+
+def test_the_in_flight_hold_cannot_un_park_a_rung_the_remedy_already_parked(monkeypatch):
+    """A deferral must not resurrect a park #773 has closed.
+
+    Found by this lane's own gate probe rather than by reasoning: the escape's
+    ledger is a sliding window, so the first tick after the park whose stamps had
+    aged out of the window took the HOLD again — `record_pending` flipped the record
+    back to `pending` and a crash loop that had already been escalated and parked
+    would have been resurrected, one deferral at a time, by the check that bounds it.
+    """
+    _drift_env(monkeypatch, attempts=2)
+    lines = []
+    for step in range(8):
+        line, _calls = _act(monkeypatch, commit="other22", when=step * 5, inflight=True)
+        lines.append(line)
+    assert any("ESCALATED ONCE" in line for line in lines), "the escape is still the bounded remedy"
+    assert len([line for line in lines if "PARKED" in line]) == 2, "and the park is then terminal"
+    record = watchdog.load_drift_record("sister") or {}
+    assert record.get("phase") == "parked", "the hold must not flip the phase back to pending"
+    assert len(list(watchdog.escalation_dir().glob("sister.*.json"))) == 1
+
+
+def test_crash_loop_verdict_names_the_constants_it_counted():
+    """A bound whose numbers are not in the log cannot be audited by the operator reading it."""
+    stamp = 1000.0
+    record = {"state": "drifted", "running": "other22", "respawns": [stamp, stamp + 1, stamp + 2]}
+    looping, note = watchdog.crash_loop_verdict("sister", stamp + 3, record)
+    assert looping is True
+    assert f"N={watchdog.CRASH_LOOP_RESPAWNS}" in note
+    assert str(int(watchdog.CRASH_LOOP_WINDOW_SECONDS)) in note
+
+
+def test_crash_loop_verdict_counts_only_stamps_inside_the_window():
+    """Two in the window are two: the verdict may not round a budget up or down."""
+    stamp = 1000.0
+    window = watchdog.CRASH_LOOP_WINDOW_SECONDS
+    record = {"state": "drifted", "running": "other22"}
+    two_recent = {**record, "respawns": [stamp, stamp + 1, stamp + window + 1]}
+    looping, note = watchdog.crash_loop_verdict("sister", stamp + window + 2, two_recent)
+    assert looping is False and note == "", "a stamp past the window does not count"
+    three_recent = {**record, "respawns": [stamp, stamp + 1, stamp + 2]}
+    assert watchdog.crash_loop_verdict("sister", stamp + 2, three_recent)[0] is True
+    assert watchdog.crash_loop_verdict("sister", stamp, {})[0] is False, "no ledger is not a crash loop"
+
+
 def test_a_healthy_rung_clears_the_record_so_a_fixed_rung_keeps_no_budget(monkeypatch):
     _drift_env(monkeypatch)
     _act(monkeypatch, commit="other22", when=0)

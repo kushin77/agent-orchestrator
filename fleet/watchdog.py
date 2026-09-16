@@ -223,6 +223,41 @@ BACKOFF_CAP_SECONDS = 300
 #: recorded as a failed attempt. A blocked network must not stall the pass.
 FAST_FORWARD_TIMEOUT_SECONDS = 60
 
+# ── the crash-loop escape (issue #366, AO-GR-21) ─────────────────────────────
+# The safety rule "never restart a run just to update code" is enforced by an
+# in-flight hold: a drifted rung whose run appears in flight is RECORDED as pending
+# drift and acted on once the run completes. The hold is right. It is also not a
+# bound — a rung whose runs die before they can report presents flight on every
+# tick, so the hold is re-taken on every tick and the drift lock never opens.
+# Measured 2026-09-14: the sister held its own drift lock from 21:32 onward,
+# executing code that predated five merged fixes, while the watchdog respawned the
+# brain in the same tick and wrote the hold into `.fleet/watchdog.log` each time.
+#
+# So the hold gets a budget of its own, counted in respawns DUE. A respawn is due
+# on every tick the rung is drifted (or checkout-behind) and the remedy is reached:
+# either it RUNS (`bounded_remedy`) or it is WITHHELD because a run appeared in
+# flight (`record_pending`). Both are the same measurement — the rung was due a
+# respawn and the observation did not move. `CRASH_LOOP_RESPAWNS` of those inside
+# `CRASH_LOOP_WINDOW_SECONDS`, with nothing changing, is a crash loop, and the hold
+# stops being honoured. The escape is not a second unbounded path: it goes through
+# `bounded_remedy` like every other remedy, so the attempt cap, the backoff, the
+# escalate-once and the park all still apply — which is what #773 is for.
+#
+# The ledger is reset the moment the observation moves, so the count can only ever
+# describe respawns that changed NOTHING. That is what makes the number a bound
+# rather than a tally: a fleet that is healing can never arm it.
+
+#: N — how many respawns a rung may be DUE, on one unchanged observation, before
+#: the watchdog calls it crash-looping and stops honouring the in-flight hold.
+CRASH_LOOP_RESPAWNS = 3
+#: The window, in seconds, those respawns are counted in.
+CRASH_LOOP_WINDOW_SECONDS = 600.0
+#: How many entries the per-rung respawn ledger keeps, so the remedy record — read
+#: on every tick — stays bounded.
+CRASH_LOOP_LEDGER_MAX = 16
+#: The record key the ledger is stored under.
+CRASH_LOOP_LEDGER_KEY = "respawns"
+
 
 class WatchdogConfigError(RuntimeError):
     """A configured remedy budget is unusable — refuse rather than disarm."""
@@ -305,6 +340,93 @@ def clear_drift_record(rung: str) -> None:
         drift_record_path(rung).unlink()
     except OSError:
         pass
+
+
+def observation_changed(record: dict | None, state: str, running: str) -> bool:
+    """Did the rung's observation MOVE since `record` was written?
+
+    Progress is the thing the drift lock protects, so it is measured the same way
+    in both places that need it — the attempt counter (`bounded_remedy`) and the
+    crash-loop ledger. A rung that is seen for the first time has no record, so
+    nothing has moved yet: the first sighting is its own baseline.
+    """
+    if not record:
+        return True
+    return not (record.get("state") == state and record.get("running") == running)
+
+
+def respawn_ledger(record: dict | None, when: float, *, changed: bool) -> list[float]:
+    """The rung's respawn ledger, extended by the respawn that is due now (#366).
+
+    "Due" is the watchdog's own decision on this tick, and it has exactly two
+    outcomes: the respawn RUNS (`bounded_remedy`), or it is WITHHELD because a run
+    appeared in flight (`record_pending`). Both are recorded, because a withheld
+    respawn and a performed one that changed nothing are the same measurement — the
+    rung was due a respawn, and the observation did not move.
+
+    `changed` says whether the observation moved since the last entry. When it did,
+    the rung made progress and the ledger restarts, so the count can only ever
+    describe consecutive respawns that changed nothing.
+    """
+    source = record or {}
+    previous = [
+        float(item)
+        for item in (source.get(CRASH_LOOP_LEDGER_KEY) or [])
+        if isinstance(item, (int, float)) and not isinstance(item, bool)
+    ]
+    kept = [] if changed else previous
+    return [*kept, float(when)][-CRASH_LOOP_LEDGER_MAX:]
+
+
+def crash_loop_verdict(name: str, when: float, record: dict | None = None) -> tuple[bool, str]:
+    """Is this rung crash-looping — `CRASH_LOOP_RESPAWNS` inside the window, changing nothing?
+
+    Returns `(crash-looping, why)`. The reason NAMES both constants, because a bound
+    whose numbers are not in the log cannot be audited by the operator reading it.
+
+    This is the distinction #366 is about. A run appearing in flight is evidence
+    that a run EXISTS; it is not evidence that the run is making progress, and the
+    drift lock exists to protect progress. A rung that has been due
+    `CRASH_LOOP_RESPAWNS` respawns inside `CRASH_LOOP_WINDOW_SECONDS` without the
+    observation ever moving has demonstrated the opposite: neither the respawns it
+    got nor the run it was waiting for produced anything, and holding the lock open
+    for it one more tick is the same defect one level down — a guard that protects a
+    corpse. The escape is bounded all the same: it takes the ordinary remedy path,
+    so the attempt cap, the backoff, the escalate-once and the park still apply.
+    """
+    source = load_drift_record(name) if record is None else record
+    window = float(CRASH_LOOP_WINDOW_SECONDS)
+    stamps = [
+        float(item)
+        for item in ((source or {}).get(CRASH_LOOP_LEDGER_KEY) or [])
+        if isinstance(item, (int, float)) and not isinstance(item, bool)
+    ]
+    recent = [stamp for stamp in stamps if 0.0 <= when - stamp <= window]
+    if len(recent) < CRASH_LOOP_RESPAWNS:
+        return False, ""
+    return True, (
+        f"crash-looping: {len(recent)} respawns due within {int(window)}s and none of them moved it "
+        f"(N={CRASH_LOOP_RESPAWNS})"
+    )
+
+
+def remedy_parked(name: str, state: str, running: str) -> bool:
+    """Has the remedy already PARKED this rung on this observation (#773, #366)?
+
+    A park is terminal for the incident — the watchdog stops retrying until an
+    operator rearms it — and `bounded_remedy` is the only thing allowed to decide
+    that. So the in-flight hold must not be able to re-take a parked rung: the hold
+    is a deferral, and a deferral that overwrites a park quietly un-parks the rung
+    and lets it be acted on again.
+
+    Measured by this lane's own probe rather than argued: with the escape's ledger
+    counting in a sliding window, the tick at which the ledger had aged out of the
+    window re-took the hold on a PARKED rung and flipped its phase back to
+    `pending` — a crash loop that had already been parked would have been
+    resurrected, one tick at a time, by the very check that bounds it.
+    """
+    record = load_drift_record(name) or {}
+    return record.get("phase") == "parked" and not observation_changed(record, state, running)
 
 
 def _git(target: Path, argv: list[str]) -> subprocess.CompletedProcess:
@@ -895,6 +1017,12 @@ def record_pending(
     finished. The protection (never restart a run to update code) is right and is
     kept; dropping the finding is not. The record carries no `next_attempt_at`, so
     the first pass after the run completes acts on it immediately.
+
+    Issue #366: this is also where a WITHHELD respawn lands, in the same ledger a
+    performed one lands in. A hold is a respawn the rung was due and did not get, so
+    it has to count towards the budget that eventually stops the hold — otherwise
+    the check that makes the hold safe is invisible to the bound that makes it
+    finite.
     """
     record = load_drift_record(name) or {}
     record.update(
@@ -910,6 +1038,9 @@ def record_pending(
             "attempts": int(record.get("attempts") or 0),
             "first_seen": float(record.get("first_seen") or when),
             "last_seen": when,
+            CRASH_LOOP_LEDGER_KEY: respawn_ledger(
+                record, when, changed=observation_changed(record, state, running)
+            ),
         }
     )
     save_drift_record(name, record)
@@ -962,9 +1093,15 @@ def bounded_remedy(
     checkout = str(Path(checkout_root) if checkout_root is not None else ROOT)
     record = load_drift_record(name) or {}
     first_seen = float(record.get("first_seen") or when)
-    same_observation = record.get("state") == state and record.get("running") == running
+    changed = observation_changed(record, state, running)
+    same_observation = not changed
     previous_attempts = int(record.get("attempts") or 0)
     attempts = previous_attempts + 1 if (same_observation and previous_attempts > 0) else 1
+    # #366: the respawn due on this tick goes into the rung's respawn ledger, on the
+    # same "did anything move?" test the attempt counter uses. The ledger is what
+    # tells a later tick whether the in-flight hold is protecting progress or
+    # protecting a corpse.
+    ledger = respawn_ledger(record, when, changed=changed)
 
     if record.get("phase") == "parked" and same_observation:
         return (
@@ -1070,6 +1207,7 @@ def bounded_remedy(
             "first_seen": first_seen,
             "last_seen": when,
             "next_attempt_at": when + respawn_backoff_seconds(attempts),
+            CRASH_LOOP_LEDGER_KEY: ledger,
         },
     )
     return outcome, ok
@@ -1105,6 +1243,15 @@ def rung_action(
     Issue #773: every acting path goes through `bounded_remedy`, so no remedy is
     repeated indefinitely, and the `checkout-behind` case is repaired by moving
     the CHECKOUT rather than by respawning a rung that is already on its HEAD.
+
+    Issue #366: the hold itself is bounded. "Never restart a run just to update
+    code" is enforced by asking `run_in_flight`, and a rung whose runs die before
+    they can report answers True on every tick — so the hold was re-taken forever
+    and the drift lock never opened. `crash_loop_verdict` counts how many respawns
+    this rung has been DUE (performed or withheld) inside `CRASH_LOOP_WINDOW_SECONDS`
+    on an unchanged observation; once that reaches `CRASH_LOOP_RESPAWNS` the hold is
+    not honoured, the remedy proceeds through `bounded_remedy` like every other, and
+    the line names the constants that decided it.
     """
     moment = time.time() if when is None else when
     if local_head is None:
@@ -1130,12 +1277,29 @@ def rung_action(
         except RespawnRefused as exc:
             clear_drift_record(name)
             return f"{name}: forced (operator asked to respawn) — REFUSED (frozen) — {exc} | {capability}"
-    if state in (DRIFTED, CHECKOUT_BEHIND) and name == "sister" and run_in_flight():
-        record_pending(name, state, reason, running, baseline, baseline_name, local_head, moment)
-        return (
-            f"{name}: {state} ({reason}) — recorded as pending drift, {flight_evidence()} — left alone "
-            f"until it completes, then acted on | {capability}"
-        )
+    if (
+        state in (DRIFTED, CHECKOUT_BEHIND)
+        and name == "sister"
+        and run_in_flight()
+        and not remedy_parked(name, state, running)
+    ):
+        # #366: the hold is a bound, not a policy. A rung whose runs die before they
+        # can report presents flight on every tick, so the hold would be re-taken
+        # forever and the drift lock would never open — measured: the sister held its
+        # own lock with nothing running. `crash_loop_verdict` is the budget that ends
+        # it, and it names N and the window when it does. A rung the remedy has
+        # already PARKED is excluded first: a deferral must not un-park an incident
+        # #773 has closed.
+        looping, loop_note = crash_loop_verdict(name, moment)
+        if not looping:
+            record_pending(name, state, reason, running, baseline, baseline_name, local_head, moment)
+            return (
+                f"{name}: {state} ({reason}) — recorded as pending drift, {flight_evidence()} — left alone "
+                f"until it completes, then acted on | {capability}"
+            )
+        escape = f" — {loop_note} — the drift lock cannot clear, so this respawn is NOT withheld"
+    else:
+        escape = ""
     # CANNOT_ASSESS respawns too: the watchdog cannot certify the rung, and a
     # respawn is the only action that can restore a readable comparison. It is
     # reported with its reason so the operator sees WHY it could not be judged —
@@ -1153,7 +1317,7 @@ def rung_action(
         moment,
         checkout_root,
     )
-    return f"{name}: {state} ({reason}) — {outcome} | {capability}"
+    return f"{name}: {state} ({reason}) — {outcome}{escape} | {capability}"
 
 
 def monitor_missing() -> bool:
