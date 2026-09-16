@@ -2220,6 +2220,11 @@ def write_heartbeat(
         "state": state,
         "started_at": started_at,
         "commit": commit,
+        # What this build can READ on the envelope (issue #777). An emitter asks
+        # the recipient's beat before choosing a dialect, so a rung that restarts
+        # on this build switches the fleet's traffic to the current role names by
+        # declaring it here — the deprecation window's terminus is this field.
+        channel.ENVELOPE_SCHEMA_BEAT_KEY: channel.SCHEMA_VERSION_CURRENT,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     if issue is not None:

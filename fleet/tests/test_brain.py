@@ -39,9 +39,9 @@ def test_an_operator_order_to_the_brain_is_valid():
     assert validate(order()) == []
 
 
-def test_the_brain_takes_orders_only_from_the_operator():
+def test_the_director_takes_orders_only_from_the_principal():
     problems = validate(order(**{"from": "sister"}))
-    assert any("only from the operator" in problem for problem in problems)
+    assert any("only from the principal" in problem for problem in problems)
 
 
 def test_an_order_to_the_brain_must_be_a_directive():
@@ -49,17 +49,17 @@ def test_an_order_to_the_brain_must_be_a_directive():
     assert any("must be a directive" in problem for problem in problems)
 
 
-def test_the_operator_cannot_address_the_sister_directly():
-    """The regression this rule exists for: bypassing the brain entirely."""
+def test_the_principal_cannot_address_the_dispatcher_directly():
+    """The regression this rule exists for: bypassing the director entirely."""
     problems = validate({"from": "operator", "to": "sister", "type": "result", "correlation_id": "x"})
-    assert any("the operator does not address the sister" in problem for problem in problems)
+    assert any("the principal does not address the dispatcher" in problem for problem in problems)
 
 
-def test_only_the_brain_may_issue_directives_to_the_sister():
+def test_only_the_director_may_issue_directives_to_the_dispatcher():
     problems = validate(
         {"from": "subagent-x", "to": "sister", "type": "directive", "task": {"issue": 5}}
     )
-    assert any("only the brain may issue directives to the sister" in problem for problem in problems)
+    assert any("only the director may issue directives to the dispatcher" in problem for problem in problems)
 
 
 def test_the_brain_reports_back_to_the_operator():
@@ -71,14 +71,14 @@ def test_the_brain_does_not_ack_the_sister():
     assert any("does not ack or report on its own directives" in problem for problem in problems)
 
 
-def test_a_brain_escalation_goes_to_the_operator():
+def test_a_director_escalation_goes_to_the_principal():
     assert validate(
         {"from": "brain", "to": "operator", "type": "escalate", "severity": "warn", "correlation_id": "o-1"}
     ) == []
     problems = validate(
         {"from": "brain", "to": "sister", "type": "escalate", "severity": "warn", "correlation_id": "o-1"}
     )
-    assert any("addressed to the operator" in problem for problem in problems)
+    assert any("addressed to the principal" in problem for problem in problems)
 
 
 def test_the_sister_still_escalates_to_the_brain():
