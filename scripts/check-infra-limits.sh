@@ -267,13 +267,26 @@ guard_orphan_hogs() { # guard_orphan_hogs [dir] [max_mb]
 
 # --- controls ----------------------------------------------------------------
 
+# Substring matching in bash, never `printf ... | grep -q`: `grep -q` exits on
+# its first match, which SIGPIPEs the producer while it is still writing, and
+# `set -o pipefail` promotes that 141 to the pipeline's status — a containment
+# test that can kill its own producer, latent until the report outgrows the pipe
+# buffer. Bash cannot fail that way, so this control always can be measured
+# (`scripts/check-verdict-contains.sh`, #843 / #852).
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 expect_fail() { # expect_fail <control> <needle> <rc> <output>
   local id="$1" needle="$2" rc="$3" out="$4"
   if [ "$rc" -eq 0 ]; then
     bad "$id: NOT PROVOKED — the guard passed when it was supposed to fail"
     return 0
   fi
-  if printf '%s\n' "$out" | grep -qF -- "$needle"; then
+  if contains "$out" "$needle"; then
     ok "$id: refused by name — $(printf '%s' "$out" | head -1 | sed 's/^  FAIL  //')"
   else
     bad "$id: the guard failed without naming $needle"
