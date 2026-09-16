@@ -37,6 +37,21 @@
 #   they are absent and the verdict says so. After making its change (if any)
 #   bootstrap mode re-runs the three checks and exits with their verdict.
 #
+# GATE-MODE SELF-HEAL (issue #974)
+#   A fresh/plain checkout — a lane worktree cut from origin/master — inherits
+#   no `commit.template`, so check 2 reds it until a human runs `--bootstrap`.
+#   That red is the drift this gate exists to catch, not a defect in the
+#   checkout, and a human round-trip is not the governed state. In gate mode
+#   (no `--bootstrap`), when `.gitmessage` exists at the repo root and
+#   `commit.template` is unset or resolves elsewhere, the gate applies the SAME
+#   bootstrap `--bootstrap` performs — the same scope decision (`--worktree`
+#   when `extensions.worktreeConfig` is enabled, else `--local`), the same
+#   `SET` line on stdout, never silent — then re-evaluates check 2. Check 3
+#   (identity) is never auto-supplied: it is a person's identity, so a
+#   worktree with no own `user.name`/`user.email` still fails, and a missing
+#   `.gitmessage` still fails — nothing for the template to resolve to. Those
+#   are the gate's remaining teeth.
+#
 # NEGATIVE CONTROL
 #   AO_GIT_CONFIG_ROOT=<dir> assesses <dir> instead of the tree this script
 #   lives in, so the gate can be provoked against a scratch repo (unset
@@ -93,8 +108,10 @@ if [ "$overridden" = "1" ]; then
   printf 'check-git-config: NOTE — root overridden by AO_GIT_CONFIG_ROOT: %s\n' "$root" >&2
 fi
 
-if [ "$bootstrap" = "1" ]; then
-  echo "== bootstrap =="
+# The bootstrap, in ONE place so `--bootstrap` and gate mode share it. With $1
+# = "quiet", the "already resolves" line is suppressed (gate mode prints only a
+# change or a skip). Returns 0 changed / 1 already correct / 2 no .gitmessage.
+apply_template_bootstrap() {
   if [ -f "$root/.gitmessage" ]; then
     current_template="$(git -C "$root" config --get commit.template 2>/dev/null || true)"
     want="$root/.gitmessage"
@@ -115,12 +132,20 @@ if [ "$bootstrap" = "1" ]; then
       git -C "$root" config "$bootstrap_scope" commit.template .gitmessage
       printf '  SET   commit.template -> .gitmessage (git -C %s config %s commit.template .gitmessage)\n' \
         "$root" "$bootstrap_scope"
-    else
+      return 0
+    fi
+    if [ "${1:-}" != "quiet" ]; then
       printf '  OK    commit.template already resolves to .gitmessage — no change\n'
     fi
-  else
-    printf '  SKIP  no .gitmessage at repo root — cannot bootstrap a template that does not exist\n' >&2
+    return 1
   fi
+  printf '  SKIP  no .gitmessage at repo root — cannot bootstrap a template that does not exist\n' >&2
+  return 2
+}
+
+if [ "$bootstrap" = "1" ]; then
+  echo "== bootstrap =="
+  apply_template_bootstrap
   echo
 fi
 
@@ -145,6 +170,15 @@ else
     printf '  FAIL  .gitattributes marks no path linguist-generated\n' >&2
     fail=$((fail + 1))
   fi
+fi
+
+# Gate mode is self-healing for check 2 only (issue #974): a fresh/plain
+# checkout inherits no `commit.template`, so check 2 reds it until a human runs
+# `--bootstrap`. When .gitmessage exists at the repo root and commit.template is
+# unset or resolves elsewhere, apply the SAME bootstrap above (same scope
+# decision) and re-evaluate — never silently. Check 3 is never auto-supplied.
+if [ "$bootstrap" = "0" ] && [ -f "$root/.gitmessage" ]; then
+  apply_template_bootstrap quiet
 fi
 
 # --- 2. commit.template -------------------------------------------------
