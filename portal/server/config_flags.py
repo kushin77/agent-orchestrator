@@ -10,8 +10,12 @@ target — cannot be declared there without either inventing a variable or
 breaking the checker.
 
 The three workbook-11 surfaces are therefore declared in the portal's own
-``portal/config/feature-flags.yaml`` and read here. The contract is exactly the
-fleet reader's, because the failure mode it guards against is the same one:
+``portal/config/feature-flags.yaml`` and read here. The same reasoning covers the
+ERP module's portal surface (ERP-07, issue #652): it is a view inside the portal
+service, and its own manifest (``integrations/erp/module.yaml``) ships no central
+promotion row until the surface that becomes reachable lands. The contract is
+exactly the fleet reader's, because the failure mode it guards against is the
+same one:
 
 * **fail closed.** A missing file, an unreadable file, invalid YAML, a document
   that is not a mapping, a missing ``surfaces`` section, a missing entry, or an
@@ -39,10 +43,25 @@ CONFIG_RELATIVE = Path("portal") / "config" / "feature-flags.yaml"
 ORG_CHART_SURFACE = "org_chart"
 SKILL_STUDIO_SURFACE = "skill_studio"
 TASK_BOARD_SURFACE = "task_board"
+#: The ERP module's portal surface (ERP-07, issue #652). Its in-module switch is
+#: declared here rather than in the control-plane registry's ``services`` section
+#: because it is a view inside the portal service that adds no service, no
+#: terraform resource and no deploy target; the central row
+#: (``services.erp_module`` / ``surfaces.erp_module`` in
+#: ``infra/feature-flags/registry.yaml``) is the *promotion* record the module's
+#: own manifest (``integrations/erp/module.yaml``) says lands with this surface,
+#: and this key is the id that manifest declares (``erp-module``), underscored
+#: exactly as ``infra/feature-flags/registry.yaml`` spells its own surface keys.
+ERP_MODULE_SURFACE = "erp_module"
 
 #: Every surface this module knows about, so a test can assert the set is closed.
 DECLARED_SURFACES = frozenset(
-    {ORG_CHART_SURFACE, SKILL_STUDIO_SURFACE, TASK_BOARD_SURFACE}
+    {
+        ORG_CHART_SURFACE,
+        SKILL_STUDIO_SURFACE,
+        TASK_BOARD_SURFACE,
+        ERP_MODULE_SURFACE,
+    }
 )
 
 
@@ -68,7 +87,13 @@ def read_config_default(
         return "off"
     try:
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, yaml.YAMLError):
+        # `yaml.YAMLError` is NOT a `ValueError` — a malformed declaration
+        # (`yaml.parser.ParserError`, measured) escaped this reader and left it
+        # raising, which is the opposite of the contract above: a boot with a
+        # broken config would crash instead of serving a dark console. The set is
+        # the sibling reader's (`portal.server.fleet.read_registry_surfaces`),
+        # which had it right; this reader is now its twin.
         return "off"
     if not isinstance(document, dict):
         return "off"

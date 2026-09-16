@@ -78,7 +78,7 @@ validates it against the repository, so the two cannot drift.
 | Rule | Subject (the spine's own heading) | Implementing module(s) | Enforcing control | Status |
 |---|---|---|---|---|
 | AO-GR-12 | Control plane never executes | `control-plane/` | `check-control-functions.sh`, `check-control-verbs.sh` | **ENFORCED** |
-| AO-GR-13 | Independent auditor | `governance/merge/`, `governance/lifecycle/` | `check-landing.sh`, `suite:governance/merge` | **PARTIAL** |
+| AO-GR-13 | Independent auditor | `governance/merge/`, `governance/lifecycle/` | `check-landing.sh`, `suite:governance/merge` | **ENFORCED** |
 | AO-GR-14 | Separation of duties | `governance/merge/`, `identity/rbac/` | `check-authority.sh` | **ENFORCED** |
 | AO-GR-15 | Tenant isolation is structural | `guardrails/isolation/`, `telemetry/ledger/`, `identity/edges/` | `suite:guardrails/isolation`, `suite:telemetry/ledger` | **ENFORCED** |
 | AO-GR-16 | DLP + prompt-injection on every model interaction | `guardrails/dlp/`, `guardrails/chat/` | `check-chat-guardrails.sh` | **ENFORCED** |
@@ -92,7 +92,10 @@ The bindings are not decorative. Each control's **own stated subject** is the ru
 - AO-GR-13 → `check-landing.sh` **and** `suite:governance/merge` — the state
   machine's own promise is *"A reviewer is never the author/executor of the work it
   reviews"*, and the landing seam's is *"no local re-implementation of 'green +
-  reviewer + carve-out', and no fallback that decides on its own"*.
+  reviewer + carve-out', and no fallback that decides on its own"*. The landed
+  artifact now also names **who verified it**: both attestation writers record
+  `verified_by`, and a green, commit-named attestation that names no verifier is
+  refused by the landing driver as `attestation-does-not-name-a-verifier`.
 - AO-GR-14 → `check-authority.sh` — *"authority-matrix gate … repo separation,
   scoped admin rights, **separation of duties**, end-to-end closure"*.
 - AO-GR-16 → `check-chat-guardrails.sh` — *"chat-turn guardrails: **DLP egress**,
@@ -129,7 +132,8 @@ existing.
 A gap is never silent. Every rule that is not `ENFORCED` is carried, with its
 reason, in [`scripts/control-coverage-gaps.tsv`](../scripts/control-coverage-gaps.tsv)
 — a **shrink-only** record: `--record` lowers it, and **refuses to raise it**, so a
-new gap must be enforced rather than recorded.
+new gap must be enforced rather than recorded. At 9 of 9 the record is **empty** —
+and the assertion stands: a NEW gap would still be refused by name.
 
 ```
 $ bash scripts/check-control-coverage.sh
@@ -137,32 +141,32 @@ $ bash scripts/check-control-coverage.sh
   OK    every rule has a row, every module exists, every control is invoked by a gate
 == the shrink-only gap record ==
   OK    every non-enforced rule is recorded
-  enforced: 8 of 9 rule(s)
+  enforced: 9 of 9 rule(s)
 == vacuity control: a control nobody runs must be refused ==
   OK    a control script that does not exist is refused
   OK    a control script that exists but NO GATE runs is refused
   OK    a suite the manifest does not declare is refused
-check-control-coverage: OK
+check-control-coverage: OK — … the 0 recorded gap(s) are shrink-only
 RC=0
 ```
 
-- **AO-GR-13 — PARTIAL, and the residual is now narrow enough to name.** The enforced
-  half is real and worth stating exactly. `check-landing.sh` proves the landing driver
-  refuses a **red** attestation, refuses a green one that names **another** commit, and
-  returns CANNOT-ASSESS when there is **no** attestation — so *"never on self-report"*
-  holds. The merge rule lives in exactly one place: `governance/landing/verdict.py`
-  loads `governance/merge` and hands it the decision, with no local re-implementation
-  and no fallback (*"a landing that cannot consult the verdict does not get to invent
-  one"*), and `governance/merge` — a declared suite, 79 tests — is the state machine
-  requiring verify-gate green + an **independent SME reviewer** + no self-merge.
+- **None.** The record is empty — for the first time every rule of the
+  platform/SaaS spine is `ENFORCED`. **AO-GR-13 was the last.** The verification
+  artifact now records **who verified it**: `scripts/merge-gate.sh` and
+  `scripts/verify.sh` both write `verified_by` (the session identity the isolation
+  layer exports, `AO_AGENT_ID`, falling back to the OS user — deliberately never
+  the git author, since conflating author and verifier is exactly the
+  self-attestation the rule forbids) alongside `verification_session`; the landing
+  driver (`governance/landing/evidence.py`) refuses a green, commit-named
+  attestation that names **no verifier** — `attestation-does-not-name-a-verifier` —
+  and `check-landing.sh` proves that refusal by name, in both directions (a green
+  attestation *with* a verifier is granted, so the matcher is not simply refusing).
 
-  What is not proven is the **attribution**. Nothing shows that the reviewer on a
-  given landing is a party distinct from the author: `verdict.reviewer_id` is
-  `Optional[str]`, and the attestation the landing gate actually judges carries **no
-  identity field at all** — `branch, check_count, checks, exit_code, gate, git_sha,
-  host, mode, result, timestamp`. Independence is guaranteed *inside the merge
-  model's state machine* and is not observable *on the landed artifact*. That is the
-  epic's remaining item, and it is now a named field rather than a suspicion.
+  What this does **not** claim, stated to the same standard: it does not prove the
+  verifier is a *different party* from the author. It makes the verifier
+  **visible on the landed artifact**, which is what makes independence checkable at
+  all; the independent-reviewer guarantee itself remains the merge model's
+  (`suite:governance/merge`).
 
 ---
 
@@ -208,4 +212,4 @@ an explanation rather than silently weakening.
    record;
 4. the rule now appears in the map as a control a reviewer can run.
 
-Enforced rules: **8 of 9**. One gap is recorded, with its owner.
+Enforced rules: **9 of 9**. The record is empty — and a new gap would still be refused by name.

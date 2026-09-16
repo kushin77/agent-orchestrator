@@ -123,6 +123,13 @@ run_contract() {
   elif [ "$result" = "CANNOT-ASSESS" ]; then exit_code=2
   else exit_code=0; fi
 
+  # The attestation must say WHO verified (AO-GR-13): the session identity the
+  # isolation layer exports, falling back to the OS user — never the git author,
+  # because conflating author and verifier is exactly the self-attestation the
+  # rule forbids. A run outside a lane still records *some* accountable identity.
+  verified_by="${AO_AGENT_ID:-$(id -un 2>/dev/null || echo unknown)}"
+  verification_session="${AO_SESSION_ID:-}"
+
   cat > "$verify_dir/merge-attestation.json" <<EOF
 {
   "gate": "merge-gate",
@@ -131,6 +138,8 @@ run_contract() {
   "commit": "$sha",
   "branch": "$branch",
   "timestamp": "$ts",
+  "verified_by": "$verified_by",
+  "verification_session": "$verification_session",
   "checks": [
 $(for i in "${!names[@]}"; do
   printf '    {"name": "%s", "rc": %s, "status": "%s"}' "${names[$i]}" "${rcs[$i]}" "${statuses[$i]}"

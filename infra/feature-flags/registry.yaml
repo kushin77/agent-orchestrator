@@ -204,6 +204,37 @@ services:
       turns "flag on" into a fabricated execution. Portal-independent by
       construction: no portal route and no portal flag participates in it.
 
+  # The ERP module's portal surface (ERP-07, issue #652, EPIC #645). Its own
+  # promotion unit, for the reason the module's manifest
+  # (integrations/erp/module.yaml) records: that file deliberately ships no
+  # central row with the foundation, because infra/terraform/variables.tf is kept
+  # in lock-step with `services` by scripts/check-feature-flags.py and a row here
+  # therefore gates a *reachable* surface. This is that surface, so the row lands
+  # here — and with its own `enable_erp_module` rather than `enable_portal`, so
+  # promoting (or killing) the module neither implies nor requires promoting the
+  # portal around it (the `services.chat` precedent).
+  erp_module:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_erp_module
+    description: >
+      ERP module portal surface (ERP-07, issue #652; EPIC #645): the module's
+      dashboards, document lists/forms and reports, mounted into the console
+      behind the switch the module's own manifest declares
+      (`features[].id: erp-module`). Served by `portal/server/erp.py` at
+      GET /api/erp/module|dashboard|reports[<id>], by the verbatim proxy of
+      ERP-06's own routes (/api/erp/documents/... and
+      /api/erp/openapi.json|health), and by the module's frame at
+      /erp/module.html. The in-module switch is `surfaces.erp_module` in
+      `portal/config/feature-flags.yaml`, read fail-closed by
+      `portal/server/config_flags.py`. It adds no service, no terraform resource
+      and no deploy target: the code ships inside the existing portal. Nothing
+      the views render is re-derived — the family vocabulary, each family's
+      states and legal moves and the fields a form offers are read from ERP-06's
+      served contract, documents are ERP-06's own answers, and the
+      authorization decision stays ERP-08's.
+
 # Endpoint-level surfaces: a single endpoint family inside a service that is
 # promoted independently of the service flag around it (the service flag alone
 # is not enough — GR-5: a new surface ships OFF until a reviewed go-live).
@@ -498,4 +529,23 @@ surfaces:
       that flips this flag (and independently promotes `fleet_projection` and
       `remote_control` for the two halves it composes), runs `make verify` +
       `terraform plan`, then applies via the deployer SA.
+  erp_module:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_erp_module
+    description: >
+      ERP module portal surface (ERP-07, issue #652). Routes
+      GET /api/erp/module, GET /api/erp/dashboard, GET /api/erp/reports[<id>],
+      the proxy of ERP-06's own routes under /api/erp/, and the module's frame
+      and script at /erp/module.html and /erp/module.js — all served by
+      `portal/server/erp.py`. Fail-closed reader:
+      `portal/server/config_flags.py` over `portal/config/feature-flags.yaml`,
+      so a missing, unreadable or malformed declaration reads as OFF rather than
+      serving a half-rendered module. The gate is checked BEFORE AuthN for the
+      API family and for the module's documents alike, so while it is off the
+      whole surface is *absent* — 404 `feature_disabled` rather than 401 — which
+      is what stops a probe enumerating a module that does not exist yet. Own
+      `tf_flag` rather than `enable_portal`: the module is independently
+      promotable and independently killable.
 

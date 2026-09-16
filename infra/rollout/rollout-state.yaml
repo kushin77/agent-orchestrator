@@ -82,6 +82,15 @@ flags:
     stage: "off"
     rollout_pct: 0
     targeted: []
+  # The ERP module's portal surface (ERP-07, issue #652). The registry row is
+  # what declares the promotion unit; this row is what makes it **drivable** —
+  # the engine refuses a flag this file does not carry (`unknown flag
+  # 'services.erp_module' (not declared in rollout state)`), so without it a
+  # promoted module could be taken dark only by hand.
+  services.erp_module:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
   # The AgentConsole (issue #802, child of EPIC #800). The registry row declares
   # WHAT is gated; this row is what makes the surface **withdrawable**. Measured:
   # the engine refuses a flag this file does not carry (`unknown flag
@@ -91,6 +100,14 @@ flags:
   # and `check_rollout.py`'s parity keeps this row lock-stepped with the
   # registry's own `surfaces` section so the two declarations cannot drift.
   surfaces.operator_terminal:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
+  # The ERP module's portal surface (issue #652) under its own key, for the same
+  # reason the terminal has one: the registry declares WHAT is gated and this
+  # row is what makes the surface withdrawable, with check_rollout.py's parity
+  # keeping the two declarations from drifting apart.
+  surfaces.erp_module:
     stage: "off"
     rollout_pct: 0
     targeted: []

@@ -18,7 +18,10 @@ refusal reason ("an attestation names a COMMIT"):
 * present with a nonzero verdict    -> NOT-OK (a red lane must not merge);
 * green but naming no commit        -> NOT-OK (an attestation names a COMMIT);
 * green, naming a different commit  -> NOT-OK (the attestation must name the
-  commit actually being merged, not merely some commit).
+  commit actually being merged, not merely some commit);
+* green and commit-named but naming NO verifier -> NOT-OK: the attestation must
+  say WHO verified it (AO-GR-13 — "never by the author alone", which is
+  checkable only if the artifact records the verifying party).
 
 The commit comparison tolerates a short SHA either side (GitHub prints short
 SHAs; the gate writes the full one) but never a *different* commit.
@@ -44,6 +47,7 @@ GAP_NO_VERDICT = "attestation-has-no-verdict"
 GAP_NOT_GREEN = "attestation-not-green"
 GAP_UNNAMED_COMMIT = "attestation-does-not-name-a-commit"
 GAP_OTHER_COMMIT = "attestation-names-another-commit"
+GAP_UNATTRIBUTED = "attestation-does-not-name-a-verifier"
 
 #: The result string the merge gate writes -> the exit code it means.
 RESULTS = {"PASS": 0, "NOT-OK": 1, "CANNOT-ASSESS": 2}
@@ -65,6 +69,7 @@ class Attestation:
     commit: Optional[str] = None
     branch: str = ""
     timestamp: str = ""
+    verified_by: str = ""
     detail: str = ""
 
     @property
@@ -84,6 +89,7 @@ class Attestation:
             "commit": self.commit,
             "branch": self.branch,
             "timestamp": self.timestamp,
+            "verified_by": self.verified_by,
             "detail": self.detail,
         }
 
@@ -137,6 +143,10 @@ def read_attestation(path: Path) -> Attestation:
             detail=f"expected a JSON object, found {type(payload).__name__}",
         )
     commit, commit_note = _commit_from_payload(payload)
+    raw_verifier = payload.get("verified_by")
+    verified_by = raw_verifier.strip() if isinstance(raw_verifier, str) else ""
+    if verified_by.lower() == "unknown":
+        verified_by = ""
     detail = "" if commit is not None else f"commit field read as {commit_note or 'absent'}"
     return Attestation(
         path=path,
@@ -146,6 +156,7 @@ def read_attestation(path: Path) -> Attestation:
         commit=commit,
         branch=str(payload.get("branch") or ""),
         timestamp=str(payload.get("timestamp") or ""),
+        verified_by=verified_by,
         detail=detail,
     )
 
@@ -210,5 +221,11 @@ def evidence_gap(attestation: Attestation, commit: str) -> Optional[Gap]:
         return Gap(
             GAP_OTHER_COMMIT,
             f"the attestation names {attestation.commit} but the lane is landing {commit}",
+        )
+    if not attestation.verified_by:
+        return Gap(
+            GAP_UNATTRIBUTED,
+            "the attestation is green and names the commit but names NO verifier — "
+            "an attestation must say who verified it (AO-GR-13: never by the author alone)",
         )
     return None
