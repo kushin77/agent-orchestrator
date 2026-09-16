@@ -36,6 +36,24 @@
       "default": "on",
       "flags": ["anthropic.fallback"],
       "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    },
+    {
+      "id": "tier-routing",
+      "default": "on",
+      "flags": ["anthropic.tiers"],
+      "desc": "LOW routes to claude-haiku-4-5-20251001, MED/HIGH to claude-sonnet-5, MAX to claude-opus-5, chosen from the issue-#9 tier ladder (parity with the deepseek module's tier-routing capability)."
+    },
+    {
+      "id": "prompt-caching",
+      "default": "off",
+      "flags": ["anthropic.prompt_caching"],
+      "desc": "Marks the system prompt and trailing message content block cache_control:ephemeral so a stable prefix is eligible for Anthropic's prompt cache. Claude-specific improvement over the deepseek module; flag-gated OFF by default (GR-28) - enable per provider config via provider_options.prompt_caching."
+    },
+    {
+      "id": "thinking-effort",
+      "default": "off",
+      "flags": ["anthropic.thinking_effort"],
+      "desc": "Enables adaptive extended thinking (thinking:{type:adaptive}) at a chosen output_config.effort (low/medium/high/xhigh/max). Claude-specific improvement over the deepseek module; flag-gated OFF by default (GR-28) - enable per provider config via provider_options.thinking_effort."
     }
   ],
   "integrations": [

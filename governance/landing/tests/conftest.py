@@ -26,20 +26,25 @@ HEAD = "a" * 40
 PARENT = "b" * 40
 
 
-def write_attestation(path: Path, *, result: str = "PASS", rc: int = 0, commit: str = HEAD) -> Path:
-    """Write a merge attestation in the shape ``scripts/merge-gate.sh`` writes."""
+def write_attestation(path: Path, *, result: str = "PASS", rc: int = 0, commit: str = HEAD, verified_by: str | None = "the-verifying-agent") -> Path:
+    """Write a merge attestation in the shape ``scripts/merge-gate.sh`` writes.
+
+    ``verified_by=None`` omits the field, which is the negative-control shape:
+    an attestation that names no verifier must be refused (AO-GR-13).
+    """
+    payload = {
+        "gate": "merge-gate",
+        "result": result,
+        "exit_code": rc,
+        "commit": commit,
+        "branch": "issue-764",
+        "timestamp": "2026-09-14T00:00:00Z",
+    }
+    if verified_by is not None:
+        payload["verified_by"] = verified_by
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(
-            {
-                "gate": "merge-gate",
-                "result": result,
-                "exit_code": rc,
-                "commit": commit,
-                "branch": "issue-764",
-                "timestamp": "2026-09-14T00:00:00Z",
-            }
-        )
+        json.dumps(payload)
         + "\n",
         encoding="utf-8",
     )

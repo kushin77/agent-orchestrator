@@ -20,7 +20,10 @@ master head the audit named).
       and `web_image_tag` is the documented commit-sha convention.
 - [ ] `make verify` PASS on `origin/master` at the go-live start commit
       (attestation `git_sha` quoted in the audit trail).
-- [ ] `infra/rollout/rollout-state.yaml`: every flag still `stage: "off"`.
+- [ ] `infra/rollout/rollout-state.yaml`: every flag still `stage: "off"`
+      (this file stays the declared-default document forever - GR-28 - and
+      never records a promotion; see `infra/rollout/live-state.yaml` below).
+- [ ] `infra/rollout/live-state.yaml`: `flags: {}` (nothing promoted yet).
 - [ ] `infra/cloudbuild/apply-trigger.yaml`: `disabled: true`.
 - [ ] `infra/feature-flags/registry.yaml`: `ci_cd.apply_trigger` off.
 
@@ -35,9 +38,17 @@ python3 -m infra.rollout.cli grant-approval <flag> --to <stage> \
   --approver <operator> --approval-id <unique-id> --approvals-dir <ledger-dir>
 
 # 2. The deployer consumes it; verify_green + audit_record are enforced here.
+#    --live-state-out is what persists the promoted stage (issue #914): the
+#    committed infra/rollout/rollout-state.yaml NEVER records a promotion
+#    (its validator still refuses any flag above off, unchanged) -
+#    infra/rollout/live-state.yaml is the only file that does, and its own
+#    validator requires --audit-record to point at a real file under
+#    infra/rollout/audit/ or infra/rollout/approvals/.
 python3 -m infra.rollout.cli promote <flag> --to <stage> \
   --approval <unique-id> --actor deployer-sa \
-  [--canary-health-ok] [--gradual-complete] --verify-green
+  [--canary-health-ok] [--gradual-complete] --verify-green \
+  --live-state-out infra/rollout/live-state.yaml \
+  --audit-record audit/<the-transition-audit-record>.md
 ```
 
 - `→ gradual` additionally requires `--canary-health-ok` (measured, not claimed).
@@ -85,8 +96,10 @@ from `project_id` + `web_image_tag` — see child #617).
 
 ## Acceptance (epic #607)
 
-- [ ] `grep -E 'stage: "full"' infra/rollout/rollout-state.yaml` shows every
-      promoted flag at `full`.
+- [ ] `grep -E 'stage: "full"' infra/rollout/live-state.yaml` shows every
+      promoted flag at `full` (issue #914: `rollout-state.yaml` stays the
+      declared-default document and never carries a promoted stage -
+      `live-state.yaml` is the committed record of what is actually live).
 - [ ] `grep -E "_ENABLE_APPLY" infra/cloudbuild/apply-trigger.yaml` shows
       `"true"`.
 - [ ] `ai.purebliss.app` serves the fleet single-pane-of-glass

@@ -25,6 +25,11 @@
 #   5. NO attestation is CANNOT-ASSESS (rc 2) — never a pass.
 #   6. a GREEN attestation naming the head is GRANTED in dry run (rc 0): the
 #      ordered plan is printed, and nothing remote changes (no push, no PR).
+#  13. a GREEN attestation naming the head but naming NO VERIFIER is REFUSED
+#      (rc 1), naming `attestation-does-not-name-a-verifier` — the artifact must
+#      say who verified it (AO-GR-13, "never by the author alone"), and the
+#      grant case carries a verifier so the matcher is not simply always
+#      refusing.
 #   7. apply, end to end over the stubs, performs the ordered effects —
 #      push -> open PR -> contract -> merge -> delete branch -> closure — with the
 #      push proved server-side by the origin's own pre-receive hook and the branch
@@ -157,6 +162,11 @@ if compgen -G ".github/workflows/*land*" >/dev/null; then
 else
   ok "no landing workflow file: the automation path is make + scripts/ (GR-15)"
 fi
+if grep -q '"verified_by"' scripts/merge-gate.sh; then
+  ok "the merge gate records who verified (verified_by in the merge attestation)"
+else
+  fail "scripts/merge-gate.sh does not write verified_by — a landed attestation would name no verifier"
+fi
 bash "$entry" >/dev/null 2>&1
 entry_rc=$?
 if [ "$entry_rc" -eq 2 ]; then
@@ -213,7 +223,7 @@ case "${CONTRACT_MODE:-green}" in
   red)   commit="$head";                            result=NOT-OK; rc=1 ;;
   *)     commit="$head";                            result=PASS;   rc=0 ;;
 esac
-printf '{"gate":"merge-gate","result":"%s","exit_code":%s,"commit":"%s","branch":"issue-764","timestamp":"fixture"}\n' \
+printf '{"gate":"merge-gate","result":"%s","exit_code":%s,"commit":"%s","branch":"issue-764","timestamp":"fixture","verified_by":"the-verifying-agent"}\n' \
   "$result" "$rc" "$commit" > "$lane/.verify/merge-attestation.json"
 # The real contract writes its OWN per-signal record (the `checks` array). The
 # attribution reads it to decide which red may be re-scored — so the fixture can
@@ -296,10 +306,15 @@ origin_has_branch() { git -C "$1.origin.git" rev-parse --verify --quiet "refs/he
 lane_listing() { (cd "$1/lane" && git status --porcelain -uall | LC_ALL=C sort); }
 event_count() { grep -c "$1" "$EVENTS" 2>/dev/null || true; }
 
-attest() { # <file> <result> <rc> <commit-json>
+attest() { # <file> <result> <rc> <commit-json> [verified-by-json | "-"]
   mkdir -p "$(dirname "$1")"
-  printf '{"gate":"merge-gate","result":"%s","exit_code":%s,"commit":%s,"branch":"issue-764","timestamp":"fixture"}\n' \
-    "$2" "$3" "$4" > "$1"
+  if [ "${5:-}" = "-" ]; then
+    printf '{"gate":"merge-gate","result":"%s","exit_code":%s,"commit":%s,"branch":"issue-764","timestamp":"fixture"}\n' \
+      "$2" "$3" "$4" > "$1"
+  else
+    printf '{"gate":"merge-gate","result":"%s","exit_code":%s,"commit":%s,"branch":"issue-764","timestamp":"fixture","verified_by":%s}\n' \
+      "$2" "$3" "$4" "${5:-\"the-verifying-agent\"}" > "$1"
+  fi
 }
 
 # A sweep record in the exact shape scripts/run-pytest-suites.sh writes (#29).
@@ -351,6 +366,7 @@ with open(out, "w", encoding="utf-8") as handle:
             "commit": commit,
             "branch": "issue-764",
             "timestamp": "fixture",
+            "verified_by": "the-verifying-agent",
             "checks": [
                 {"name": name, "rc": code, "status": "OK" if code == 0 else "NOT-OK"}
                 for name, code in zip(names, codes)
@@ -449,6 +465,18 @@ assert_no_remote_change "$fx" "no attestation"
 attest "$work/att/green.json" "PASS" 0 "\"$head\""
 run_driver "$work/out-green.txt" "$fx/lane" --attestation "$work/att/green.json"; green_rc=$?
 [ "$green_rc" -eq 0 ] || fail "green attestation: rc=$green_rc, expected 0 (grantable in dry run)"
+if grep -q 'does-not-name-a-verifier' "$work/out-green.txt"; then
+  fail "a green, commit-named attestation WITH a verifier was refused — the attribution matcher is not directional"
+fi
+
+# A GREEN attestation naming the head but naming NO VERIFIER is refused by name:
+# the artifact must say who verified it, or "verified by an independent party" is
+# uncheckable (AO-GR-13).
+attest "$work/att/unattributed.json" "PASS" 0 "\"$head\"" -
+run_driver "$work/out-unattributed.txt" "$fx/lane" --attestation "$work/att/unattributed.json"; unattributed_rc=$?
+[ "$unattributed_rc" -eq 1 ] || fail "unattributed attestation: rc=$unattributed_rc, expected 1 (NOT-OK)"
+assert_named "$work/out-unattributed.txt" "attestation-does-not-name-a-verifier" "green attestation with no verifier"
+assert_no_remote_change "$fx" "unattributed attestation"
 if grep -q 'DRY RUN' "$work/out-green.txt" && grep -q 'gh pr merge <n> --squash' "$work/out-green.txt"; then
   ok "green attestation: granted in dry run, with the ordered plan printed"
 else

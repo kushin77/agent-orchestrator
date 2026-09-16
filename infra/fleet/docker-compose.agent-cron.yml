@@ -127,3 +127,118 @@ services:
       ao.module: fleet-cron
       ao.issue: "710"
       ao.epic: "706"
+
+  # agent-cron-rw — D3 (issue #711, EPIC #706): state volumes + secrets wiring,
+  # FLAG-GATED OFF.
+  #
+  # The flag is the compose `profiles:` key below: `docker compose up` (no
+  # `--profile`) NEVER starts this service, so the dev-run posture above stays
+  # the default and stays read-only. Opting in is explicit and named:
+  #
+  #   docker compose -f infra/fleet/docker-compose.agent-cron.yml --profile state-rw up -d
+  #
+  # `AO_FLEET_STATE_RW=1` (env_contract.py) documents the same posture inside
+  # the container's own environment contract, so a reader of `env-contract
+  # print` inside this service sees the flag that explains why its mounts
+  # differ from its sibling's — it does NOT, by itself, turn anything on;
+  # `AO_FLEET_DRY_RUN` is still pinned to "1" (`dry-run-required` in
+  # env_contract.py is unchanged by this lane) so a writable mount is never
+  # permission to apply.
+  #
+  # Compose merge keys do NOT deep-merge (the issue's own warning): every
+  # volume this service needs is RE-LISTED here in full, none inherited from
+  # `agent-cron` above.
+  agent-cron-rw:
+    image: ${AO_FLEET_CRON_IMAGE:-agent-fleet-cron:dev}
+    build:
+      context: ../..
+      dockerfile: infra/fleet/Dockerfile
+    container_name: ${AO_FLEET_CRON_RW_CONTAINER:-agent-orchestrator-fleet-cron-rw}
+    profiles:
+      - state-rw
+    command: ["python3", "/repo/infra/fleet/dev_run.py"]
+    environment:
+      AO_FLEET_REPO: /repo
+      AO_FLEET_DIR: /repo/.fleet
+      AO_FLEET_BOARD_DIR: /repo/.board
+      AO_FLEET_CRON_NO_INSTALL: "0"
+      AO_FLEET_DRY_RUN: "1"
+      AO_FLEET_STATE_RW: "1"
+      AO_FLEET_CRON_INTERVAL: "${AO_FLEET_CRON_INTERVAL:-2}"
+      # Same port literal as the sibling service, deliberately: EPIC #706
+      # mandates a single writer, so the two services cannot both bind
+      # 127.0.0.1:8790 at once. That collision is the crude mutual exclusion
+      # until D4+'s real single-writer lease lands — not an oversight.
+      AO_FLEET_PORT: "${AO_FLEET_CRON_PORT:-8790}"
+      AO_FLEET_ROLE_TIMEOUT: "${AO_FLEET_ROLE_TIMEOUT:-120}"
+    ports:
+      - "127.0.0.1:${AO_FLEET_CRON_PORT:-8790}:${AO_FLEET_CRON_PORT:-8790}"
+    volumes:
+      # The checkout itself, explicit and read-only (the issue's own `<repo>:/repo`
+      # bind). Unlike the sibling service, which only runs the image's COPY'd
+      # `/repo`, this profile-gated service binds the live checkout over it so
+      # an operator on the `state-rw` profile is working against code that
+      # matches the state it is about to touch, not a build-time snapshot.
+      - type: bind
+        source: ${AO_FLEET_HOST_REPO:-../..}
+        target: /repo
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AO_FLEET_HOST_REPO:-../..}/.fleet
+        target: /repo/.fleet
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AO_FLEET_HOST_REPO:-../..}/.board
+        target: /repo/.board
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: volume
+        source: fleet-logs
+        target: /var/log/fleet
+      # Secrets — mounted from OUTSIDE the repo, read-only, never `env_file`
+      # (GR-6). Paths are overridable per-host via the env vars
+      # infra/fleet/secrets_contract.py declares; the defaults live under
+      # ${HOME}, never under this checkout.
+      - type: bind
+        source: ${AO_FLEET_GH_CONFIG:-${HOME}/.config/gh}
+        target: /root/.config/gh
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AO_FLEET_GCLOUD_CONFIG:-${HOME}/.config/gcloud}
+        target: /root/.config/gcloud
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AO_FLEET_SSH_DIR:-${HOME}/.ssh}
+        target: /root/.ssh
+        read_only: true
+        bind:
+          create_host_path: false
+    cpus: 1.0
+    mem_limit: 512m
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c "import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:${AO_FLEET_CRON_PORT:-8790}/healthz',timeout=3).status==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    labels:
+      ao.module: fleet-cron
+      ao.issue: "711"
+      ao.epic: "706"
+
+volumes:
+  fleet-logs: {}
