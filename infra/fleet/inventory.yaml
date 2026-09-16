@@ -138,3 +138,44 @@ packages:
     platform: linux-x64
     url: https://downloads.claude.ai/claude-code-releases
     integrity: sha256 from the release manifest, verified at build time
+
+# 6. THE DEV-FIRST RUN — D2 (issue #710). The image boots HERE, on the box the
+# schedule was written on, and dispatches its roles with every job in dry-run.
+#
+# `roles` is the DRY-RUN FORM of each job, keyed by the schedule's own marker:
+# the markers belong to `fleet/cron.py` (section 1) and the dry-run discipline of
+# each one is declared here, so the two are checkable against each other rather
+# than against a reader's memory. A job with no dry-run form is declared
+# `not-dispatched` WITH its reason — the watchdog's pass spawns the rungs, so a
+# dry-run of it is a contradiction rather than a flag, and saying so is what
+# keeps the third job present in the evidence instead of quietly absent.
+#
+# The state mounts are read-only, and that is a MEASUREMENT in the decision
+# document: each root's flags are read from /proc/self/mountinfo, and the
+# attribution rule follows from them (a read-only root cannot have been written
+# by the container; a writable one can, so a permitted path that moved is ours).
+dev_run:
+  issue: 710
+  parent_issue: 709
+  compose: infra/fleet/docker-compose.agent-cron.yml
+  harness: infra/fleet/dev_run.py
+  env_contract: infra/fleet/env_contract.py
+  health_surface: infra/fleet/healthz.py
+  decision_document: .verify/dev-run/decision.json
+  port: 8790
+  state_mounts: read-only
+  roles:
+    - marker: ao-fleet-watchdog
+      role: watchdog
+      discipline: not-dispatched
+      why: "fleet/watchdog.py's pass SPAWNS the rungs; it has no planning mode."
+    - marker: ao-fleet-prune
+      role: prune
+      discipline: dry-run
+      command: "fleet/prune.py run"
+      why: "the retention planner is dry-run by default; --apply is what acts."
+    - marker: ao-fleet-reconcile
+      role: reconcile
+      discipline: dry-run
+      command: "governance/reconcile/cli.py watch --once"
+      why: "one reconciliation pass without --apply: it names the orphans it would act on."

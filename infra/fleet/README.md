@@ -121,13 +121,111 @@ belongs, alongside the resource it gates.
   provoked control in the gate that removes it from a one-line derived image and
   requires the result to be reported broken.
 
+## Dev-first: the dry run (D2, issue #710)
+
+D1 built the image. D2 starts it **here**, on the box the schedule was written
+on, with every job in dry-run — because the first porting step must not be an
+experiment on production: `.fleet/` is the fleet's mailbox, heartbeat and audit
+rail, and `.board/` is the claim ledger every other lane reads.
+
+```bash
+docker compose -f infra/fleet/docker-compose.agent-cron.yml up -d
+curl -fsS http://localhost:8790/healthz
+docker compose -f infra/fleet/docker-compose.agent-cron.yml logs --no-color | grep -c 'dry-run'
+docker compose -f infra/fleet/docker-compose.agent-cron.yml down
+```
+
+`-f` is on every line on purpose: this repository has no default
+`docker-compose.yml` at its root, so a bare `docker compose logs` resolves a file
+that does not exist. The three commands above are the ones the gate runs.
+
+```
+infra/fleet/
+  env_contract.py                  the ONE declaration of the image's environment
+  dev_run.py                       the dry-run dispatch: what runs in the container
+  healthz.py                       the /healthz surface, answered from the decision
+  docker-compose.agent-cron.yml    dev-first: the image, its state mounts, its port
+  (D1, unchanged in spirit)
+  Dockerfile · entrypoint.sh · inventory.yaml · README.md
+```
+
+### Four measurements, not four claims
+
+**1. The schedule is read from its owner, and a role table that drifts fails.**
+`dev_run.py` asks `fleet/cron.py` for `MARKERS` — there is no second list of the
+jobs — and REFUSES (`role-table-drift`) when its own role table does not cover
+them exactly, so a fourth scheduled job with no declared dry-run form fails here
+instead of being silently skipped.
+
+**2. A dispatch cannot carry `--apply`.** Every argv is checked and the token is
+refused by name (`apply-in-dispatch`); the environment cannot turn it on either,
+because `env_contract.py` refuses any `AO_FLEET_DRY_RUN` other than `1`
+(`dry-run-required`). The watchdog is not dispatched at all, and the decision
+document says so *with its reason*: `fleet/watchdog.py`'s pass spawns the rungs,
+so a dry-run of it is a contradiction rather than a flag — which keeps the third
+job present in the evidence instead of quietly absent.
+
+**3. The state is checksummed before and after, and WHO is blamed is decided by
+the measured mount.** Each root's flags are read from `/proc/self/mountinfo` on
+every run, so "read-only" is in the evidence rather than in this sentence:
+
+* a root mounted **read-only** cannot be written by the container at all, so a
+  change under it is a **concurrent writer** — the live fleet is still running on
+  this box, and its own heartbeat must never read as "the dry run applied";
+* a root mounted **writable** has this container as its only writer, so a change
+  at a path the dispatched roles may write **fails the run**, naming the file.
+
+The permitted set is read from `fleet/prune.py` (`PRUNABLE_DIRS` + `LOGS`), the
+module that owns the retention policy — never restated here. Its scope is stated
+as what it is: it is exact for the retention rail, the role whose *scheduled*
+form carries `--apply`; the reconcile rail is covered structurally, by the
+read-only mount measured per root.
+
+**4. The stop is clean, and the probe can fail.** The SIGTERM/SIGINT handler is
+installed *before* the first role runs, so `docker compose down` is a handled
+stop and `docker inspect` records exit code 0 — an operator can tell it apart
+from a crash. `/healthz` answers **200** only for a run whose verdict is `ok`
+and which left the permitted paths alone; a run that wrote answers **503** with
+the file it moved, and any other path is a 404. Both are provoked in the gate: a
+one-line mutant image whose prune role carries `--apply` (with the argv check
+disabled, so only the state guard can catch it) must be reported broken, naming
+the file, and its `/healthz` must answer 503.
+
+### Where the state comes from
+
+The compose file mounts the two state roots of **the checkout it lives in**,
+read-only, and `create_host_path: false` means a missing root is an error rather
+than a silently created, empty, root-owned directory. Point it at another
+checkout when the state lives elsewhere — a lane worktree reading the shared
+one, or the gate's snapshot of the live state:
+
+```bash
+AO_FLEET_HOST_REPO=/home/akushnir/agent-orchestrator \
+  docker compose -f infra/fleet/docker-compose.agent-cron.yml up -d
+```
+
+`create_host_path: false` (and not the default) is the deliberate choice: with
+the default, a checkout that has no `.fleet/` yet gets one created as root, empty,
+and the run then "passes" against a board that is not the board.
+
+### What D3+ inherits from here
+
+* **The environment contract is the seam.** A new variable is a line in
+  `env_contract.py` and nothing else; the entrypoint and the harness both read
+  that one declaration.
+* **The dry-run refusal is deliberate, not incidental.** `dry-run-required`
+  refuses `AO_FLEET_DRY_RUN=0` because *this* lane is the dry-run harness. A lane
+  that adds an applying mode must edit that rule — and the gate's provocation for
+  it will make the edit visible instead of silent.
+* **The role table is keyed by the schedule's own markers.** A new job in
+  `fleet/cron.py` without a dry-run form fails this gate, by design.
+
 ## Provenance
 
 The image was written for this repository against the issue's own inventory; no
 file was copied from anywhere. Four *patterns* were adopted after reading the
 sibling fleet's images (GR-10 — the source is recorded because the shape is not
 invented here):
-
 | Pattern | Source (repo · path) | Note |
 |---------|----------------------|------|
 | `tini` as PID 1 in front of an `entrypoint.sh`, and a dependency-pinning posture (`ARG <TOOL>_VERSION=<exact>`) | `kushin77/leaderboard` · `docker/worker-fleet/Dockerfile` | the sibling image runs `/usr/bin/tini -- /entrypoint.sh`; this one pins the CLAUDE release and verifies its checksum instead of pinning apt versions, because the release manifest carries one |
