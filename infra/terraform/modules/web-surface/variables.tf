@@ -16,6 +16,14 @@ variable "name" {
   description = "Cloud Run service name for the public web surface."
   type        = string
   default     = "web"
+
+  # The runtime service account is `<name>-runtime` (see google_service_account
+  # in main.tf), and GCP caps an account id at 30 characters, so the name is
+  # bounded here rather than failing at apply with a length error.
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{1,22}$", var.name))
+    error_message = "name must be 2-23 lowercase letters, digits or hyphens starting with a letter, so the runtime service account id (<name>-runtime) fits GCP's 30-character limit."
+  }
 }
 
 variable "project_id" {

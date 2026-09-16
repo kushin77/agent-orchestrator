@@ -159,6 +159,49 @@ environment-only, sourced by the run half at `up` time:
   holds them: every `${...}` in it either has an empty default (so an unconfigured
   bring-up fails closed) or is a public path, port or image tag.
 
+### 5b. The deploy route takes the same two variables from Secret Manager (#730)
+
+The compose handoff above gets its two variables from the run half's shell. The
+**deployed** surface cannot: a variable exported on a box is configuration nobody
+can audit, and an unset one is a console that refuses every session. So the Cloud
+Run service declared by `infra/terraform/modules/web-surface` is wired to Secret
+Manager, and the wiring is **declared once** in `auth-env.json`, shipped inside
+that module (`infra/terraform/modules/web-surface/auth-env.json`), and projected
+into the service — the env names exist in one non-code place, and
+`scripts/check-portal-auth-env.sh` refuses a name restated in the Terraform.
+
+| Variable | Secret Manager secret | How it reaches the container |
+|---|---|---|
+| `PORTAL_AUTH_GATE_JWKS_FILE` | `portal-auth-gate-jwks` | **a mounted file** at `/etc/ao/auth-gate-jwks.json` — the console *opens* that variable, so a payload injected as its value makes the console exit 1 at boot (rows 2-3 of the table above) |
+| `ROOT_ADMIN_EMAILS` | `portal-root-admin-emails` | an injected secret **version** (the allowlist is a value) |
+
+Both references are `latest`: a key rollover publishes a new version of the
+mirror and the next revision mounts it. The runtime identity is a dedicated
+service account whose only grants are reads on those two secrets.
+
+The path is deliberately the same one the compose route mounts
+(`/etc/ao/auth-gate-jwks.json`), so an operator reads one path and not two. The
+full procedure, the refusal classes and the reasons are in
+[`../infra/portal/README.md`](../infra/portal/README.md); the mirror job that
+fetches the gate's published key set, validates it with the console's own
+predicate and publishes it **on stdin** is
+[`../infra/portal/mirror-auth-gate-jwks.sh`](../infra/portal/mirror-auth-gate-jwks.sh).
+
+**Ordered, because the container is not the pipeline's to invent:** create the
+two secret containers and publish the mirror *before* the surface is promoted
+(`gcloud secrets create … --replication-policy=automatic`, then
+`mirror-auth-gate-jwks.sh … --apply`). A container with no version makes the
+revision fail to start, and the gate refuses a mirror with no usable signing key
+before it is published rather than after it has refused every session.
+
+`make verify` runs that gate, and the gate provokes each of its refusals against
+a mutated copy whose unmodified twin it accepts — including the mirror's publish
+path, driven with a real generated key set and a stub `gcloud` whose recorded argv
+must not contain the payload. The offline reproduction of the deploy's own
+success criterion (a signed-in session reaching `/api/console/me` with **HTTP
+200**, read from the mounted mirror) is
+`portal/tests/test_auth_gate_secret_env.py`.
+
 ## 6. Where the console sits relative to the other live surfaces
 
 | Surface | What it is | Live host / port |
@@ -216,6 +259,9 @@ that repo):
       audit gap).
 - [ ] Fetch the auth-gate JWKS mirror to the mounted path and export
       `PORTAL_AUTH_GATE_JWKS_FILE` for it; export `ROOT_ADMIN_EMAILS`.
+      (On the **deploy** route this is §5b's Secret Manager wiring instead:
+      publish the mirror into `portal-auth-gate-jwks` and the allowlist into
+      `portal-root-admin-emails` before flipping `enable_web`.)
 - [ ] Wire DNS + the Cloudflare tunnel ingress rule to `192.168.168.42:<port>`.
 - [ ] Confirm `/api/healthz` answers and that an unauthenticated visit to
       `/console` redirects to the gate rather than serving the console.
