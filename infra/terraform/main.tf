@@ -54,6 +54,10 @@ resource "google_artifact_registry_repository" "ao_images" {
     product    = "agent-orchestrator"
     surface    = "web"
   }
+
+  docker_config {
+    immutable_tags = true
+  }
 }
 
 module "control_plane_service" {
