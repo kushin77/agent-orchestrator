@@ -44,6 +44,8 @@ def envelope_fields(tmp_path: Path) -> dict[str, Any]:
             "repo_slug": "kushin77/agent-orchestrator",
             "author_name": "agent-fixture-agent",
             "author_email": "agent+fixture-agent@agents.invalid",
+            "committer_name": "agent-fixture-agent",
+            "committer_email": "agent+fixture-agent@agents.invalid",
         },
         "trailer": "Refs kushin77/agent-orchestrator#793",
         "claim": {"owner": "fixture-agent", "state": "claim", "lane": "spawn-envelope", "at": "2026-09-15T00:00:00Z"},

@@ -88,14 +88,31 @@ PROVIDER_CLASSES: dict[str, type] = {
 
 PROVIDER_NAMES: tuple[str, ...] = tuple(sorted(PROVIDER_CLASSES))
 
-# Platform default provider per tier (the issue-#9 ladder). Tenants override
-# via TenantModelMapping (see example-tenant-overrides.yaml).
-DEFAULT_PROVIDER_BY_TIER: Mapping[str, str] = {
-    "LOW": "deepseek",
-    "MED": "deepseek",
-    "HIGH": "deepseek",
-    "MAX": "deepseek",
+# Named provider-per-tier ladders (issue #9 tiers) a FinOps chooser can
+# select at registry construction time (``ProviderRegistry(tier_ladder=...)``).
+# ``deepseek`` remains the platform default - adding ``claude`` here does NOT
+# change it. The claude-anthropic module parity gap this closes: deepseek had
+# a selectable tier ladder (module.json ``tier-routing`` feature); anthropic
+# had none (registry.py had only the deepseek-only default).
+PROVIDER_TIER_LADDERS: Mapping[str, Mapping[str, str]] = {
+    "deepseek": {
+        "LOW": "deepseek",
+        "MED": "deepseek",
+        "HIGH": "deepseek",
+        "MAX": "deepseek",
+    },
+    "claude": {
+        "LOW": "anthropic",
+        "MED": "anthropic",
+        "HIGH": "anthropic",
+        "MAX": "anthropic",
+    },
 }
+
+# Platform default provider per tier (the issue-#9 ladder). Tenants override
+# via TenantModelMapping (see example-tenant-overrides.yaml). Unchanged
+# default: the ``deepseek`` ladder.
+DEFAULT_PROVIDER_BY_TIER: Mapping[str, str] = PROVIDER_TIER_LADDERS["deepseek"]
 
 
 class Route(NamedTuple):
@@ -231,11 +248,22 @@ class ProviderRegistry:
         credentials_factory: Callable[[str, str], Credentials] | None = None,
         vault: ApiKeyVault | None = None,
         router: EventRouter | None = None,
+        tier_ladder: str | Mapping[str, str] = "deepseek",
     ) -> None:
         configs = configs or default_provider_configs()
         self._configs: dict[str, ProviderConfig] = dict(configs)
         self._overrides = TenantOverrides()
         self._router = router or EventRouter()
+        if isinstance(tier_ladder, str):
+            try:
+                self._tier_ladder: Mapping[str, str] = PROVIDER_TIER_LADDERS[tier_ladder]
+            except KeyError:
+                raise ProviderConfigurationError(
+                    f"unknown tier ladder {tier_ladder!r}; known: "
+                    f"{', '.join(sorted(PROVIDER_TIER_LADDERS))}"
+                ) from None
+        else:
+            self._tier_ladder = dict(tier_ladder)
         self._breakers = CircuitBreakerManager()
         self._clients: dict[tuple[str, str], ProviderClient] = {}
         self._transport_factory = transport_factory or (
@@ -285,7 +313,7 @@ class ProviderRegistry:
         mapping = self._overrides.mapping_for(tenant_id)
         target = mapping.target_for(logical_key) if mapping is not None else None
         if target is None:
-            provider = DEFAULT_PROVIDER_BY_TIER.get(logical_key)
+            provider = self._tier_ladder.get(logical_key)
             if provider is None:
                 raise ProviderConfigurationError(
                     f"no default route for logical key {logical_key!r}; expected a "
@@ -314,7 +342,12 @@ class ProviderRegistry:
                 provider=provider,
                 model=model,
             )
-        return Route(provider=provider, model=model)
+        # A deprecated (LEGACY_MODEL_ALIASES) id is accepted above but never
+        # sent on the wire: normalise to the current id before returning the
+        # route, so a caller pinning an old id (e.g. health/finops YAML
+        # still on ``claude-sonnet-4-5``) still reaches a real, currently
+        # served model.
+        return Route(provider=provider, model=config.normalize_model(model))
 
     # -- calling ------------------------------------------------------------ #
     def chat(

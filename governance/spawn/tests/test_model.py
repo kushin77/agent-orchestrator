@@ -97,6 +97,30 @@ def test_a_branch_that_does_not_name_the_issue_is_refused(envelope: dict) -> Non
     assert [r.field for r in refusals] == ["session.branch"]
 
 
+def test_a_well_formed_session_carries_both_halves_of_the_identity(envelope: dict) -> None:
+    """committer == author == session agent is the proof-of-isolation seam (#918)."""
+    session = envelope["session"]
+
+    for field in ("author_name", "author_email", "committer_name", "committer_email"):
+        assert session[field], f"session.{field} is empty"
+    assert session["committer_name"] == session["author_name"]
+    assert session["committer_email"] == session["author_email"]
+    assert session["author_name"] == f"agent-{session['agent']}"
+
+
+@pytest.mark.parametrize("field", ["committer_name", "committer_email"])
+def test_the_committer_half_is_refused_by_name_when_absent(field: str, envelope: dict) -> None:
+    """A session whose committer identity never reached the envelope is refused."""
+    document = dict(envelope)
+    document["session"] = {
+        key: value for key, value in document["session"].items() if key != field
+    }
+
+    refusals = model.validate(document)
+
+    assert f"session.{field}" in [refusal.field for refusal in refusals]
+
+
 def test_a_claim_on_another_lane_is_refused(envelope: dict) -> None:
     """One issue = one lane = one claim; a claim for a sibling lane is not a claim."""
     document = dict(envelope)
