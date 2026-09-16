@@ -327,6 +327,8 @@ sources.collect = lambda **_: {
         "repo_slug": "kushin77/agent-orchestrator",
         "author_name": f"agent-{_AGENT}",
         "author_email": f"agent+{_AGENT}@agents.invalid",
+        "committer_name": f"agent-{_AGENT}",
+        "committer_email": f"agent+{_AGENT}@agents.invalid",
     },
     "trailer": "Refs kushin77/agent-orchestrator#900001",
     "claim": {"owner": _AGENT, "state": "claim", "lane": "fleet", "at": "2026-09-15T00:00:00Z"},
