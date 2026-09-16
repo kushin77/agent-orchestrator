@@ -544,7 +544,26 @@ elif case == "env-contract-not-called":
 elif case == "decision-in-a-state-root":
     patch(dev_run, 'DECISION_RELATIVE = Path(".verify/dev-run/decision.json")', 'DECISION_RELATIVE = Path(".fleet/dev-run/decision.json")')
 elif case == "health-path-drift":
-    patch(image / "healthz.py", 'HEALTH_PATH = "/healthz"', 'HEALTH_PATH = "/health"')
+    # The path declaration has TWO shapes in this tree's history, and the
+    # mutation must LAND against whichever the tree ships — otherwise the control
+    # silently stops measuring anything and the gate degrades to CANNOT-ASSESS
+    # rather than reporting a finding. Measured while rebasing #939 onto #909
+    # (D4): that commit replaced the bare literal with a tuple whose FIRST entry
+    # is the canonical path, the old anchor missed, and this gate went from OK to
+    # `CANNOT-ASSESS — the mutation for health-path-drift did not land`.
+    #
+    # Both shapes are mutated to the SAME property — the surface answers
+    # something other than '/healthz' — so the rule that catches them is
+    # unchanged and still load-bearing.
+    drift = image / "healthz.py"
+    if 'HEALTH_PATH = "/healthz"' in drift.read_text():
+        patch(drift, 'HEALTH_PATH = "/healthz"', 'HEALTH_PATH = "/health"')
+    else:
+        patch(
+            drift,
+            'HEALTH_PATHS = ("/healthz", "/health")',
+            'HEALTH_PATHS = ("/health", "/healthz")',
+        )
 elif case == "env-port-drift":
     # ONLY the contract's default moves: the inventory keeps the port it declares,
     # so the finding checked here is the drift BETWEEN the two declarations and
