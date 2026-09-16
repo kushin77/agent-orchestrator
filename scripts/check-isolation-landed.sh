@@ -106,6 +106,21 @@ fi
 trap 'rm -rf "$work"' EXIT
 
 # --- helpers ----------------------------------------------------------------
+# Bash-native containment, not a pipe (#871). `printf '%s' "$out" | grep -qF -- "$s"`
+# is NOT the same test: `grep -q` exits on its first match, the producer is then
+# killed by SIGPIPE while still writing, and `set -o pipefail` promotes that 141 to
+# the status of the whole pipeline — so a report past the 64 KiB pipe buffer reports
+# ABSENT for text that is PRESENT. In this polarity that is a FALSE RED, and it is
+# not hypothetical: this file's own line below produced one in the gate of record,
+# where the check printed the output as evidence with the name it claimed was
+# missing visible in it twice.
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 expect_rc() { # expect_rc <label> <want-rc> <cmd...>
   local label="$1" want="$2" out rc
   shift 2
@@ -133,7 +148,7 @@ expect_rc_named() { # expect_rc_named <label> <want-rc> <code> <cmd...>
     printf '  FAIL  %s — expected rc=%s, got rc=%s\n' "$label" "$want" "$rc" >&2
     printf '%s\n' "$out" | sed 's/^/        /' >&2
     fail=$((fail + 1))
-  elif ! printf '%s' "$out" | grep -qF -- "$name"; then
+  elif ! contains "$out" "$name"; then
     printf '  FAIL  %s (rc=%s but %s was never named)\n' "$label" "$rc" "$name" >&2
     printf '%s\n' "$out" | sed 's/^/        /' >&2
     fail=$((fail + 1))
@@ -194,6 +209,26 @@ seed_repo "$lanes_repo" >/dev/null || {
 }
 lanes_root="$work/lanes"
 
+printf '\n== the containment test at the size that broke it (#871) ==\n'
+# The form this file used, `printf '%s' "$out" | grep -qF -- "$name"`, reported a name
+# ABSENT in a report the size of the one this check builds on a busy box — and it did so
+# in the gate of record, printing the name as evidence while claiming it was missing. The
+# replacement is only a fix if it holds at that size, so it is asserted rather than assumed.
+big_report="$(printf 'filler-line-%s\n' $(seq 1 30000))"
+big_report="$(printf 'the-name-it-must-find\n%s\n' "$big_report")"
+if contains "$big_report" 'the-name-it-must-find'; then
+  printf '  OK    a name is found in a %s-byte report (past the 64 KiB pipe buffer)\n' "${#big_report}"
+else
+  printf '  FAIL  the containment test lost a name in a %s-byte report\n' "${#big_report}" >&2
+  fail=$((fail + 1))
+fi
+if ! contains "$big_report" 'a-name-that-is-not-there'; then
+  printf '  OK    ... and a name that is absent is still reported absent (vacuity)\n'
+else
+  printf '  FAIL  the containment test matched text that is not in the report\n' >&2
+  fail=$((fail + 1))
+fi
+
 expect_rc_named "no lane records is CANNOT-ASSESS, never OK" \
   2 "CANNOT-ASSESS" python3 "$cli" audit --main "$lanes_repo"
 
@@ -232,7 +267,8 @@ real_out="$(python3 "$cli" enforce --main "$root" --range "$real_range" 2>&1)"
 real_rc=$?
 printf '%s\n' "$real_out" | sed 's/^/        /'
 if [ "$real_rc" -eq 0 ]; then
-  if printf '%s' "$real_out" | grep -qE 'INFO  [1-9][0-9]* non-merge commit\(s\) reachable'; then
+  landed_re='INFO  [1-9][0-9]* non-merge commit\(s\) reachable'
+  if [[ $real_out =~ $landed_re ]]; then
     printf '  OK    real landed history is enforced over %s with a non-zero commit count\n' "$real_range"
   else
     printf '  FAIL  the landed enforcement reported OK without assessing a single commit\n' >&2
@@ -296,7 +332,7 @@ git -C "$c3" commit -q -m "a commit that never references its ticket" >/dev/null
 write_baseline "$work/c3.json" "$(sha_of "$c3")"
 c3_out="$(python3 "$cli" enforce --main "$c3" --range "$c3_base..HEAD" --gate "$c3_base" \
   --baseline "$work/c3.json" 2>&1)"
-if [ $? -eq 0 ] && printf '%s' "$c3_out" | grep -qF "recorded legacy"; then
+if [ $? -eq 0 ] && contains "$c3_out" "recorded legacy"; then
   printf '  OK    a recorded legacy commit is accepted and reported as recorded\n'
 else
   printf '  FAIL  a recorded legacy commit was not accepted and reported\n' >&2
