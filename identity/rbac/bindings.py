@@ -22,7 +22,7 @@ a caller retrying an uncertain request never has to tell "already done" from
 
 from __future__ import annotations
 
-from rbac.model import DEFAULT_ROLE_ADMIN_PERMISSION, role_grants
+from .model import DEFAULT_ROLE_ADMIN_PERMISSION, role_grants
 
 
 class UnknownRoleError(ValueError):
