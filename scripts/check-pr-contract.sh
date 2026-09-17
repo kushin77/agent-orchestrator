@@ -823,7 +823,7 @@ AI-assistance: Copilot (Relentless, flash/LOW)
 None
 MD
   out="$(run_checks "$no_gate_body" "$base..$a_sha" 2>&1)"
-  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "pr-body-missing-gate-changing"; then
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-missing-gate-changing"* ]]; then
     printf '  OK    plant (a): a missing Gate-changing line is refused by name\n'
   else
     printf '  FAIL  plant (a) went undetected\n%s\n' "$out" >&2
@@ -850,7 +850,7 @@ AI-assistance: Copilot (Relentless, flash/LOW)
 None
 MD
   out="$(run_checks "$placeholder_gate_body" "$base..$a_sha" 2>&1)"
-  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "pr-body-missing-gate-changing"; then
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-missing-gate-changing"* ]]; then
     printf '  OK    plant (a): the unfilled Gate-changing placeholder is refused by name\n'
   else
     printf '  FAIL  the Gate-changing placeholder went undetected\n%s\n' "$out" >&2
@@ -884,7 +884,7 @@ AI-assistance: Copilot (Relentless, flash/LOW)
 None
 MD
   out="$(run_checks "$gate_no_body" "${plantb_sha}^..$plantb_sha" 2>&1)"
-  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "pr-body-gate-changing-mismatch-no"; then
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-no"* ]]; then
     printf '  OK    plant (b): declared no while touching a gate path is refused by name\n'
   else
     printf '  FAIL  plant (b) went undetected\n%s\n' "$out" >&2
@@ -911,7 +911,7 @@ AI-assistance: Copilot (Relentless, flash/LOW)
 None
 MD
   out="$(run_checks "$gate_yes_body" "$base..$a_sha" 2>&1)"
-  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "pr-body-gate-changing-mismatch-yes"; then
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-yes"* ]]; then
     printf '  OK    plant (c): declared yes while touching no gate path is refused by name\n'
   else
     printf '  FAIL  plant (c) went undetected\n%s\n' "$out" >&2
@@ -938,7 +938,7 @@ AI-assistance: Copilot (Relentless, flash/LOW)
 None
 MD
   out="$(run_checks "$gate_ok_body" "${plantb_sha}^..$plantb_sha" 2>&1)"
-  if [ $? -eq 0 ] && printf '%s' "$out" | grep -qF "check-pr-contract: OK"; then
+  if [ $? -eq 0 ] && [[ "$out" == *"check-pr-contract: OK"* ]]; then
     printf '  OK    a correctly declared Gate-changing: yes passes\n'
   else
     printf '  FAIL  a correct Gate-changing declaration was refused\n%s\n' "$out" >&2
