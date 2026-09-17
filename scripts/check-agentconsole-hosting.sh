@@ -218,7 +218,19 @@ PY
       *) echo "SELFTEST FAIL: $prop mutation could not be applied"; rm -rf "$dir"; return 1 ;;
     esac
     local out; out="$(analyze "$dir")"; rm -rf "$dir"
-    if ! printf '%s\n' "$out" | grep -q "^$prop:"; then
+    # Line-anchored containment, bash-native: a piped quiet test (`grep -q`) is
+    # killed by SIGPIPE on its first match, and with `set -o pipefail` that
+    # promotes to the whole pipeline's exit status -- so a report larger than
+    # the pipe buffer can report a verdict that IS present as absent (issue
+    # #1006). A plain substring test would also accept "x$prop:" or match
+    # inside another line, so this keeps the start-of-line anchor.
+    local moved=0 line
+    while IFS= read -r line; do
+      case "$line" in
+        "$prop":*) moved=1; break ;;
+      esac
+    done <<< "$out"
+    if [ "$moved" -eq 0 ]; then
       echo "SELFTEST FAIL: the $prop mutation did not move the verdict (got: ${out:-<none>})"
       return 1
     fi
