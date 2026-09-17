@@ -63,6 +63,8 @@ from governance.reconcile.heartbeat import (
     now_epoch,
     stamp,
 )
+from governance.reconcile import ledger as reconcile_ledger
+from governance.reconcile import policy as reconcile_policy
 
 PERFORMED = "performed"
 SKIPPED = "skipped"
@@ -73,6 +75,14 @@ PARKED = "parked"
 SHELVED_OUTCOME = "shelved"
 REPORTED = "reported"
 FAILED_OUTCOME = "failed"
+#: A destructive decision the batch-limit control (`policy.py`,
+#: `controls.yaml`: `sweep.max_actions_per_pass`) refused to act on this pass.
+#: Re-evaluated next pass, never dropped.
+REFUSED_OUTCOME = "refused"
+
+#: The outcomes a batch-limit accounting counts as "acted on" — a REPORTED
+#: session was never going to touch the disk, so it never consumes the budget.
+_DESTRUCTIVE_OUTCOMES = frozenset({RECLAIMED, PARKED, SHELVED_OUTCOME, FAILED_OUTCOME})
 
 
 @dataclass
@@ -275,6 +285,7 @@ def sweep(
     alive: dict[str, bool] | None = None,
     ops: ReconcileOps | None = None,
     reporter: BoardReporter | None = None,
+    controls: "reconcile_policy.Controls | None" = None,
 ) -> SweepReport:
     """One reconciliation pass over every session with a heartbeat.
 
@@ -285,12 +296,21 @@ def sweep(
     shelved, failed or suspect finding is filed on the board (idempotently, and
     only when ``apply`` is true), and a shelved lane whose work has since landed
     is resolved. The gate never passes one, so its offline proofs are untouched.
+
+    ``controls`` is the batch-limit seam (issue #885, `policy.py`): defaults to
+    the declared ``controls.yaml``. On an ``apply`` pass, once
+    ``sweep.max_actions_per_pass`` destructive teardowns have been performed,
+    every further orphaned session this pass is REFUSED rather than acted on —
+    re-evaluated next pass, never dropped. Every decision (including a refusal)
+    is written to the append-only ledger (`ledger.py`).
     """
     if ops is None:
         raise ValueError("sweep requires an operations port (see RepoOps)")
+    resolved_controls = controls if controls is not None else reconcile_policy.load()
     moment = now_epoch() if at is None else at
     report = SweepReport(applied=apply, at=moment)
 
+    destructive_count = 0
     for session in list_sessions(root):
         verdict = judge(
             session,
@@ -301,7 +321,25 @@ def sweep(
         # A shelved lane is re-evaluated every pass, not written off: once its
         # work lands or is pushed, the next sweep reclaims it.
         if verdict.reclaimable or session.state == SHELVED:
-            action = _teardown(session, verdict, ops, apply)
+            if apply and destructive_count >= resolved_controls.max_actions_per_pass:
+                action = Action(
+                    session_id=session.session_id,
+                    issue=session.issue,
+                    agent=session.agent,
+                    status=verdict.status,
+                    reason=verdict.reason,
+                    outcome=REFUSED_OUTCOME,
+                    steps=[Step(
+                        "refuse",
+                        SKIPPED,
+                        f"sweep.max_actions_per_pass ({resolved_controls.max_actions_per_pass}) "
+                        "reached this pass; re-evaluated next pass",
+                    )],
+                )
+            else:
+                action = _teardown(session, verdict, ops, apply)
+                if apply and action.outcome in _DESTRUCTIVE_OUTCOMES:
+                    destructive_count += 1
         else:
             action = Action(
                 session_id=session.session_id,
@@ -313,6 +351,24 @@ def sweep(
                 steps=[Step("report", SKIPPED, "session is active; left alone")],
             )
         report.actions.append(action)
+        try:
+            reconcile_ledger.record_sweep_decision(
+                root,
+                session_id=action.session_id,
+                issue=action.issue,
+                agent=action.agent,
+                outcome=action.outcome,
+                code=resolved_controls.code_for(action.outcome),
+                reason=action.reason,
+                at=moment,
+            )
+        except reconcile_ledger.LedgerUnavailable:
+            # The ledger records; it must never be the thing that stops a
+            # reconciliation pass from protecting live work (fail-open only on
+            # the *bookkeeping*, never on the destructive decision itself).
+            # `ledger.verify()` (the gate's schema-invalid provocation) is how
+            # this failure mode is made visible instead.
+            pass
         if reporter is not None:
             report.board_reports.extend(board_report_action(reporter, session, action, apply))
     return report

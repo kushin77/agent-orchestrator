@@ -54,6 +54,7 @@ from governance.lifecycle.report import (  # noqa: E402
     GhFiler,
 )
 from governance.reconcile.audit import audit, describe as describe_audit  # noqa: E402
+from governance.reconcile.live import describe as describe_live, project as project_live  # noqa: E402
 from governance.reconcile.heartbeat import (  # noqa: E402
     DEFAULT_BEAT_SECONDS,
     DEFAULT_TTL_MINUTES,
@@ -147,6 +148,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             }
         )
     disk = audit(args.root, ops=RepoOps(args.root)) if args.disk else None
+    live_rows = project_live(args.root) if getattr(args, "live", False) else None
     orphans = [row for row in rows if row["status"] == ORPHAN]
     summary = f"reconcile-status: {len(rows)} session(s), {len(orphans)} orphan(s)"
     if args.json:
@@ -157,6 +159,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         payload: dict = {"sessions": rows, "session_count": len(rows), "orphan_count": len(orphans)}
         if disk is not None:
             payload["disk"] = disk.to_json()
+        if live_rows is not None:
+            payload["live"] = [row.to_json() for row in live_rows]
         print(json.dumps(payload, indent=2))
         print(summary, file=sys.stderr)
     else:
@@ -164,6 +168,8 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(f"  {row['status']:<8} #{row['issue']:<5} {row['session_id']} {row['agent']} ({row['age_seconds']}s) {row['reason']}")
         if disk is not None:
             print(describe_audit(disk))
+        if live_rows is not None:
+            print(describe_live(live_rows))
         print(summary)
     if disk is not None:
         # The disk audit reports; it never removes. Its refusal is named here in
@@ -181,7 +187,16 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "claim record or landing record explains (reported, not removed)",
                 file=sys.stderr,
             )
-    if orphans or (disk is not None and disk.unmatched):
+    drifted = [row for row in (live_rows or []) if row.match != "matched"]
+    if live_rows is not None and drifted:
+        for row in drifted:
+            print(f"reconcile-live: drift {row.session_id} — {row.detail}", file=sys.stderr)
+        print(
+            f"reconcile-live: NOT-OK — {len(drifted)} session(s) whose heartbeat and the real "
+            "disk disagree",
+            file=sys.stderr,
+        )
+    if orphans or (disk is not None and disk.unmatched) or drifted:
         return EXIT_NOT_OK
     return EXIT_OK
 
@@ -319,6 +334,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--disk",
         action="store_true",
         help="also audit the disk: report every worktree/branch no record explains (#628)",
+    )
+    status_cmd.add_argument(
+        "--live",
+        action="store_true",
+        help=(
+            "also project every session's heartbeat against the real disk and flag "
+            "drift (#885) — a session whose recorded worktree is gone"
+        ),
     )
     status_cmd.add_argument(
         "--real-tree-baseline",
