@@ -8,11 +8,12 @@
 name: control-plane-apply
 disabled: true
 description: Flag-gated terraform apply as the deployer SA (only apply route).
-github:
-  owner: kushin77
-  name: agent-orchestrator
+repositoryEventConfig:
   push:
     branch: ^master$
+  repository: projects/purebliss-ghl/locations/us-central1/connections/capital-gh/repositories/agent-orchestrator
+  repositoryType: GITHUB
+serviceAccount: projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com
 filename: infra/cloudbuild/apply.yaml
 # The FULL service ladder (core services + paperclip/chat surfaces +
 # workbook/ERP switches), the promoted web image tag and the project id are
