@@ -20,6 +20,14 @@ REPO_ROOT = PACKAGE.parents[1]
 if str(PACKAGE) not in sys.path:
     sys.path.insert(0, str(PACKAGE))
 
+# governance/ticket shares the bare basenames "model", "cli" and "sources"
+# with sibling governance/* suites. Evict any stale sys.modules entry from an
+# earlier-collected suite before this directory's test modules do their own
+# bare imports, so they resolve against THIS package's files (issues #699,
+# #702, #1042).
+for _name in ("model", "cli", "sources"):
+    sys.modules.pop(_name, None)
+
 SCHEMA_RELPATH = Path("docs/contracts/paperclip/ticket.schema.json")
 
 

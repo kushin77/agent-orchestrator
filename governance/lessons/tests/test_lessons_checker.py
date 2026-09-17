@@ -23,21 +23,35 @@ from checker import (
     load_snapshot,
     parse_ledger_text,
     relpath,
+    write_report,
 )
-from conftest import (
-    AREA_LABEL,
-    ARTIFACT,
-    INCIDENT_LABEL,
-    REPO_ROOT,
-    StubProbe,
-    action,
-    board,
-    board_issue,
-    incident,
-    lesson,
-    rca,
-    suggestion,
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_lessons_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
 )
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+AREA_LABEL = _conftest.AREA_LABEL
+ARTIFACT = _conftest.ARTIFACT
+INCIDENT_LABEL = _conftest.INCIDENT_LABEL
+REPO_ROOT = _conftest.REPO_ROOT
+StubProbe = _conftest.StubProbe
+action = _conftest.action
+board = _conftest.board
+board_issue = _conftest.board_issue
+incident = _conftest.incident
+lesson = _conftest.lesson
+rca = _conftest.rca
+suggestion = _conftest.suggestion
 from model import (
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
@@ -651,8 +665,6 @@ def test_git_probe_reports_unavailable_outside_a_work_tree(tmp_path):
 
 
 def test_report_is_written_as_json(report_factory, tmp_path, clean_records):
-    from checker import write_report
-
     report = report_factory(clean_records)
     path = write_report(report, tmp_path / "out" / "lessons-report.json")
     assert path.is_file()
