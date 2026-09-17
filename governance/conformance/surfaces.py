@@ -19,6 +19,18 @@ Three ideas stay separate, the same discipline `model.py` applies:
 
 The ladder vocabulary is closed and identical to `model.py` / `policy.yaml`.
 
+Two additions from issue #883 (ADR-0031):
+
+* **class ceiling** — a row may declare `class_ceiling` (with a `ceiling_reason`)
+  when its shape cannot honestly reach the top rung (a static asset bundle, a
+  single file). The ceiling is REPORTED on every run, never silently waived; a
+  declaration above it, or a ceiling the evidence has already exceeded, is an
+  ERROR. Rows with a ceiling are non-product rows.
+* **module declared class** — `module.json` `solution_class` declares the
+  module's own rung. It may never exceed the floor: the lowest measured class
+  over the product rows (every row without a ceiling). Silent when there is no
+  manifest under the root; an ERROR when the manifest is present and above.
+
 Exit-code contract (repo convention, GR-12): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 
 Usage::
@@ -26,6 +38,7 @@ Usage::
     python3 governance/conformance/surfaces.py check
     python3 governance/conformance/surfaces.py check --root . --policy <path>
     python3 governance/conformance/surfaces.py check --json
+    python3 governance/conformance/surfaces.py check --module <path/to/module.json>
 """
 
 from __future__ import annotations
@@ -47,6 +60,8 @@ from model import SEVERITY_ERROR, SEVERITY_WARNING, Finding  # noqa: E402
 
 SURFACES_RELPATH = Path("governance") / "conformance" / "surfaces.yaml"
 SURFACES_SCHEMA = "cmr.surface-class/policy-v1"
+MODULE_RELPATH = Path("module.json")
+MODULE_CLASS_KEY = "solution_class"
 
 KIND_MACHINE = "machine"
 KIND_MANUAL = "manual"
@@ -59,6 +74,13 @@ CODE_PATH_ESCAPES = "surface-path-escapes-root"
 CODE_UNDECLARED = "surface-undeclared"
 CODE_DUPLICATE = "surface-duplicate"
 CODE_MANUAL = "surface-manual-requirement"
+CODE_CEILING = "surface-class-ceiling"
+CODE_ABOVE_CEILING = "surface-above-class-ceiling"
+CODE_CEILING_STALE = "surface-class-ceiling-stale"
+CODE_MODULE_UNREADABLE = "module-manifest-unreadable"
+CODE_MODULE_UNDECLARED = "module-class-undeclared"
+CODE_MODULE_UNKNOWN = "module-class-unknown"
+CODE_MODULE_ABOVE_FLOOR = "module-class-above-floor"
 
 # -- evidence vocabulary ------------------------------------------------------
 E_CONTRACT = "contract"
@@ -154,6 +176,13 @@ class SurfaceSpec:
     path: str
     declared_class: str
     notes: str = ""
+    class_ceiling: str = ""
+    ceiling_reason: str = ""
+
+    @property
+    def is_product(self) -> bool:
+        """A row without a ceiling is a product surface and counts toward the floor."""
+        return not self.class_ceiling
 
 
 @dataclass(frozen=True)
@@ -295,12 +324,35 @@ def load_surface_policy(path: Path) -> SurfacePolicy:
                 "surface %r declares class %r, which is not a rung of the ladder"
                 % (name, declared)
             )
+        ceiling = ""
+        ceiling_reason = ""
+        if "class_ceiling" in entry:
+            ceiling = str(entry.get("class_ceiling") or "")
+            if ceiling not in ladder:
+                raise SurfacePolicyUnavailable(
+                    "surface %r declares class_ceiling %r, which is not a rung of "
+                    "the ladder" % (name, ceiling)
+                )
+            if ceiling == ladder[-1]:
+                raise SurfacePolicyUnavailable(
+                    "surface %r declares class_ceiling %r, the top rung: a ceiling "
+                    "at the top is not a ceiling" % (name, ceiling)
+                )
+            ceiling_reason = str(entry.get("ceiling_reason") or "").strip()
+            if not ceiling_reason:
+                # A ceiling without a reason is a silent waiver; refused.
+                raise SurfacePolicyUnavailable(
+                    "surface %r declares class_ceiling %r without a ceiling_reason"
+                    % (name, ceiling)
+                )
         surfaces.append(
             SurfaceSpec(
                 surface=name,
                 path=spath,
                 declared_class=declared,
                 notes=str(entry.get("notes") or ""),
+                class_ceiling=ceiling,
+                ceiling_reason=ceiling_reason,
             )
         )
     if not surfaces:
@@ -432,6 +484,11 @@ class SurfaceRow:
     measured_class: str = ""
     evidence: Mapping[str, bool] = None  # type: ignore[assignment]
     missing: Tuple[str, ...] = ()
+    class_ceiling: str = ""
+
+    @property
+    def is_product(self) -> bool:
+        return not self.class_ceiling
 
     def as_dict(self) -> Dict[str, object]:
         return {
@@ -439,6 +496,7 @@ class SurfaceRow:
             "path": self.path,
             "declared_class": self.declared_class,
             "measured_class": self.measured_class,
+            "class_ceiling": self.class_ceiling,
             "evidence": dict(self.evidence or {}),
             "missing": list(self.missing),
         }
@@ -522,8 +580,55 @@ def evaluate_surfaces(
                 measured_class=measured,
                 evidence=evidence,
                 missing=missing,
+                class_ceiling=spec.class_ceiling,
             )
         )
+
+        if spec.class_ceiling:
+            # Reported on every run: a ceiling is an explicit, owner-confirmed
+            # limit on what this row's shape can reach, never a silent waiver.
+            findings.append(
+                Finding(
+                    code=CODE_CEILING,
+                    message="surface '%s' carries class ceiling '%s' (declared '%s', "
+                    "measured '%s'): %s"
+                    % (
+                        spec.surface,
+                        spec.class_ceiling,
+                        spec.declared_class,
+                        measured,
+                        spec.ceiling_reason,
+                    ),
+                    severity=SEVERITY_WARNING,
+                    subject=subject,
+                    remediation="the ceiling is a non-product row's honest limit; "
+                    "remove it only when the row's shape changes",
+                )
+            )
+            if policy.rank(spec.declared_class) > policy.rank(spec.class_ceiling):
+                findings.append(
+                    Finding(
+                        code=CODE_ABOVE_CEILING,
+                        message="surface '%s' declares class '%s' above its class "
+                        "ceiling '%s'"
+                        % (spec.surface, spec.declared_class, spec.class_ceiling),
+                        subject=subject,
+                        remediation="lower the declared class to the ceiling, or "
+                        "raise the ceiling with a reason the owner confirms",
+                    )
+                )
+            if policy.rank(measured) > policy.rank(spec.class_ceiling):
+                findings.append(
+                    Finding(
+                        code=CODE_CEILING_STALE,
+                        message="surface '%s' measures '%s', above its class ceiling "
+                        "'%s': the ceiling no longer describes the row"
+                        % (spec.surface, measured, spec.class_ceiling),
+                        subject=subject,
+                        remediation="raise or remove the ceiling (with a reason) so "
+                        "the row is measured honestly",
+                    )
+                )
 
         if policy.rank(spec.declared_class) > policy.rank(measured):
             findings.append(
@@ -588,16 +693,141 @@ def check_surfaces(policy: SurfacePolicy, root: Path) -> List[Finding]:
     return evaluate_surfaces(policy, root)[1]
 
 
+# -- module declared class ----------------------------------------------------
+
+
+def product_floor(
+    policy: SurfacePolicy, rows: Sequence[SurfaceRow]
+) -> Tuple[str, Tuple[str, ...]]:
+    """The lowest measured class over the product rows, and who holds it.
+
+    Product rows are the rows without a ``class_ceiling``. Returns ``("", ())``
+    when there is no product row to measure.
+    """
+    product = [row for row in rows if row.is_product and row.measured_class]
+    if not product:
+        return "", ()
+    lowest = min(policy.rank(row.measured_class) for row in product)
+    floor = policy.ladder[lowest]
+    holders = tuple(row.surface for row in product if row.measured_class == floor)
+    return floor, holders
+
+
+def evaluate_module_class(
+    policy: SurfacePolicy, rows: Sequence[SurfaceRow], module_path: Path
+) -> List[Finding]:
+    """Hold ``module.json``'s declared class to the product floor.
+
+    Silent when no manifest exists at ``module_path`` (a scratch root). When one
+    does, its ``solution_class`` must be a rung at or below the floor, so the
+    module never claims more than its weakest product surface measures.
+    """
+    module_path = Path(module_path)
+    if not module_path.is_file():
+        return []
+    subject = str(module_path.name)
+    try:
+        manifest = json.loads(module_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return [
+            Finding(
+                code=CODE_MODULE_UNREADABLE,
+                message="module manifest %s cannot be read: %s" % (module_path, exc),
+                subject=subject,
+                remediation="fix the manifest so it is valid JSON",
+            )
+        ]
+    if not isinstance(manifest, Mapping) or MODULE_CLASS_KEY not in manifest:
+        return [
+            Finding(
+                code=CODE_MODULE_UNDECLARED,
+                message="module manifest %s declares no '%s'"
+                % (module_path, MODULE_CLASS_KEY),
+                subject=subject,
+                remediation="declare '%s' as the lowest measured product-surface "
+                "class (ADR-0031)" % MODULE_CLASS_KEY,
+            )
+        ]
+    declared = str(manifest.get(MODULE_CLASS_KEY) or "")
+    if policy.rank(declared) < 0:
+        return [
+            Finding(
+                code=CODE_MODULE_UNKNOWN,
+                message="module manifest %s declares '%s' as '%s', which is not a "
+                "rung of the ladder" % (module_path, MODULE_CLASS_KEY, declared),
+                subject=subject,
+                remediation="use one of: %s" % ", ".join(policy.ladder),
+            )
+        ]
+    floor, holders = product_floor(policy, rows)
+    if not floor:
+        return [
+            Finding(
+                code=CODE_MODULE_ABOVE_FLOOR,
+                message="module manifest %s declares '%s' but no product surface "
+                "was measured, so no floor exists to hold it to"
+                % (module_path, declared),
+                subject=subject,
+                remediation="declare at least one product surface (a row without "
+                "a class_ceiling)",
+            )
+        ]
+    if policy.rank(declared) > policy.rank(floor):
+        return [
+            Finding(
+                code=CODE_MODULE_ABOVE_FLOOR,
+                message="module manifest %s declares class '%s' above the product "
+                "floor '%s' (held by: %s)"
+                % (module_path, declared, floor, ", ".join(holders)),
+                subject=subject,
+                remediation="lower '%s' to the floor, or raise the floor surface(s) "
+                "first (one flip PR per wave, docs/SURFACE-CLASS.md)"
+                % MODULE_CLASS_KEY,
+            )
+        ]
+    return []
+
+
 # -- CLI ----------------------------------------------------------------------
 
 
 def _print_rows(rows: Sequence[SurfaceRow]) -> None:
-    print("%-10s %-16s %-12s %-12s" % ("surface", "path", "declared", "measured"))
+    print(
+        "%-10s %-16s %-12s %-12s %s"
+        % ("surface", "path", "declared", "measured", "ceiling")
+    )
     for row in rows:
         print(
-            "%-10s %-16s %-12s %-12s"
-            % (row.surface, row.path, row.declared_class, row.measured_class)
+            "%-10s %-16s %-12s %-12s %s"
+            % (
+                row.surface,
+                row.path,
+                row.declared_class,
+                row.measured_class,
+                row.class_ceiling or "-",
+            )
         )
+
+
+def _module_summary(
+    policy: SurfacePolicy, rows: Sequence[SurfaceRow], module_path: Path
+) -> Dict[str, object]:
+    floor, holders = product_floor(policy, rows)
+    declared = ""
+    if module_path.is_file():
+        try:
+            manifest = json.loads(module_path.read_text(encoding="utf-8"))
+            if isinstance(manifest, Mapping):
+                declared = str(manifest.get(MODULE_CLASS_KEY) or "")
+        except (OSError, ValueError):
+            declared = ""
+    return {
+        "path": str(module_path),
+        "present": module_path.is_file(),
+        "declared_class": declared,
+        "floor_class": floor,
+        "floor_surfaces": list(holders),
+    }
 
 
 def cmd_check(args: argparse.Namespace) -> int:
@@ -614,6 +844,9 @@ def cmd_check(args: argparse.Namespace) -> int:
         return 2
 
     rows, findings = evaluate_surfaces(policy, root)
+    module_path = Path(args.module) if args.module else root / MODULE_RELPATH
+    findings.extend(evaluate_module_class(policy, rows, module_path))
+    module = _module_summary(policy, rows, module_path)
     hard = [f for f in findings if f.severity == SEVERITY_ERROR]
     soft = [f for f in findings if f.severity == SEVERITY_WARNING]
 
@@ -623,6 +856,7 @@ def cmd_check(args: argparse.Namespace) -> int:
                 {
                     "schema": SURFACES_SCHEMA,
                     "surfaces": [row.as_dict() for row in rows],
+                    "module": module,
                     "error_count": len(hard),
                     "warning_count": len(soft),
                     "findings": [f.as_dict() for f in findings],
@@ -633,6 +867,16 @@ def cmd_check(args: argparse.Namespace) -> int:
         )
     else:
         _print_rows(rows)
+        if module["present"]:
+            print(
+                "module     %-16s %-12s floor=%s (%s)"
+                % (
+                    module_path.name,
+                    module["declared_class"] or "(undeclared)",
+                    module["floor_class"] or "(none)",
+                    ", ".join(module["floor_surfaces"]) or "no product row",
+                )
+            )
         if findings:
             for finding in findings:
                 print(
@@ -644,13 +888,13 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     if hard:
         print(
-            "surface-class: FAIL (%d error(s), %d manual report(s))"
+            "surface-class: FAIL (%d error(s), %d reported (manual requirements + ceilings))"
             % (len(hard), len(soft)),
             file=sys.stderr,
         )
         return 1
     summary = (
-        "surface-class: OK (%d surface(s) meet their declared class, %d manual "
+        "surface-class: OK (%d surface(s) meet their declared class, %d manual/ceiling "
         "requirement(s) reported)" % (len(rows), len(soft))
     )
     # Under --json stdout stays a single JSON document, so the human summary
@@ -670,6 +914,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument("--root", default=".")
     p_check.add_argument("--policy", default=None)
     p_check.add_argument("--json", action="store_true")
+    p_check.add_argument(
+        "--module",
+        default=None,
+        help="module manifest to hold to the product floor (default: <root>/module.json)",
+    )
     p_check.set_defaults(func=cmd_check)
     return parser
 

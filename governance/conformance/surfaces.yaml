@@ -124,10 +124,26 @@ surface_roots:
 waived_roots: []
 
 # The declared surfaces. `declared_class` is measured, never aspirational.
+#
+# Class ceilings (issue #883, ADR-0031). A row whose *shape* cannot honestly
+# reach the top rung — a static asset bundle, a single file — may carry
+# `class_ceiling: <rung>` plus a mandatory `ceiling_reason`. The ceiling is
+# REPORTED on every run (surface-class-ceiling), never silently waived; a
+# declared class above it is refused (surface-above-class-ceiling), and a
+# ceiling the evidence has already exceeded is refused as stale
+# (surface-class-ceiling-stale). Rows with a ceiling are the NON-product rows:
+# they are excluded from the product floor that module.json's `solution_class`
+# is held to. The three ceilings below are proposed for the OWNER to confirm.
 surfaces:
   - surface: shell
     path: portal/static
     declared_class: template
+    class_ceiling: pattern
+    ceiling_reason: >-
+      A static asset bundle (HTML/JS/CSS/tokens): a README.md and a suite under
+      the path are the most it can honestly carry. Controls, an audit trail, a
+      schema and a live-sync .py module are server-side artifacts that belong
+      to the `portal` row, not to its client assets. Owner to confirm.
     notes: >-
       The console *client* shell this repo hosts: the framed shell view, the
       console JS, the views and the design tokens it renders. Held at
@@ -208,6 +224,13 @@ surfaces:
   - surface: github
     path: .github
     declared_class: template
+    class_ceiling: pattern
+    ceiling_reason: >-
+      Repository metadata (issue forms, PR template, dependabot.yml): a
+      README.md and a suite under the path are the most it can honestly carry.
+      Its real gates live in scripts/ and the machine `gate` evidence already
+      matches by name; controls, audit, schema and live-sync artifacts under
+      .github would be decorative (no-false-green). Owner to confirm.
     notes: >-
       The repository's GitHub surface: the issue forms
       (.github/ISSUE_TEMPLATE/), the PR template
@@ -221,6 +244,11 @@ surfaces:
   - surface: commit-contract
     path: .gitmessage
     declared_class: template
+    class_ceiling: template
+    ceiling_reason: >-
+      The path is a single file; every rung above `template` requires an
+      artifact *under* the path, which a file cannot hold. The contract is
+      enforced by scripts/check-pr-contract.sh instead. Owner to confirm.
     notes: >-
       The commit-message contract (issue #5, content lane #623, bootstrap lane
       #624) parsed by scripts/check-pr-contract.sh. The path is a single file, so
