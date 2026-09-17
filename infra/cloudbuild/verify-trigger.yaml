@@ -1,8 +1,11 @@
 # Importable Cloud Build pull_request trigger for the control-plane verify build.
 #
-# Ships DISABLED (GR-5 / flag-gated OFF): nothing fires until a reviewed go-live
-# imports this trigger with `disabled: false` and flips ci_cd.verify_trigger on
-# in infra/feature-flags/registry.yaml. Never imported ad-hoc.
+# Ships DISABLED (GR-5 / flag-gated OFF), and check-cloudbuild.sh enforces that
+# permanently: this file must always declare disabled: true and
+# _ENABLE_VERIFY: "false", exactly like every enable_* Terraform default.
+# Promotion (ci_cd.verify_trigger: promoted true in the registry) is a live,
+# out-of-band `gcloud builds triggers update --no-disabled` — never a commit
+# to this file.
 name: control-plane-verify
 disabled: true
 description: Run make verify on pull requests against master (code-native CI status).
