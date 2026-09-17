@@ -14,7 +14,7 @@ It polls every ``POLL_SECONDS`` and appends ONE timestamped line to
 tick (sister/brain state, held claims, wave dispatch list, git HEAD, and — since
 issue #695 — the queue's liveness). Every tick it rewrites
 ``.fleet/monitor.heartbeat.json`` with a JSON liveness beat in the
-same shape the brain and sister publish (``pid``, ``state``, ``commit``, ``ts``),
+same shape the director and dispatcher publish (``pid``, ``state``, ``commit``, ``ts``),
 so the dashboard's RUNGS row reads the monitor the same way it reads its sibling
 rungs. It exits cleanly on SIGTERM/SIGINT. Runtime output lives entirely under
 the gitignored ``.fleet/`` directory; this module itself is tracked.
@@ -30,7 +30,7 @@ healthy. This module is that missing measurement.
 
 It is derived from the fleet's own stores, and it only reads them:
 
-* ``.fleet/inbox/`` — the mailbox the sister drains, one JSON per pending
+* ``.fleet/inbox/`` — the mailbox the dispatcher drains, one JSON per pending
   directive. ``inbox_depth`` and ``oldest_directive_age`` come from here.
 * ``.fleet/attempts/`` — the runaway guard's persisted retry counter, one small
   JSON per directive that has failed at least once (``fleet/runaway.py``,
@@ -122,11 +122,11 @@ LABELS = {HEALTHY: "healthy", DEGRADED: "degraded", FAILING: "failing", NO_DATA_
 #: Consecutive attempts at the SAME stage that make a directive wedged. Three is
 #: chosen against the guard's budget: `runaway.DEFAULT_ATTEMPT_CAP` is 5, so three
 #: identical outcomes is past the midpoint of a directive's budget and still two
-#: attempts short of retirement — the signal fires while an operator can still act
+#: attempts short of retirement — the signal fires while a principal can still act
 #: on the directive rather than after the guard has already dead-lettered it.
 WEDGE_RETRY_THRESHOLD = 3
 
-#: A directive the sister never consumed is abandoned after this long. Imported
+#: A directive the dispatcher never consumed is abandoned after this long. Imported
 #: from its declaration site (`governance/policy/lease.py`, whose ordering
 #: invariants constrain it) rather than re-declared, so `channel status`,
 #: `channel.expired_directives` and this signal can never disagree about when a
@@ -506,9 +506,9 @@ def queue_liveness(
         )
     if wedge_arm:
         # The directive's own `state` rides in the reason, not only in the JSON: a
-        # `dead-letter` wedge needs an operator to decide whether to re-arm or drop
+        # `dead-letter` wedge needs a principal to decide whether to re-arm or drop
         # it, while a re-armable one needs whatever its stage names fixed. A reason
-        # that cannot tell the two apart sends the operator to the wrong command.
+        # that cannot tell the two apart sends the principal to the wrong command.
         named = ", ".join(
             f"{wedge.directive} [{wedge.state}, {wedge.attempts}/{wedge.cap} attempts, "
             f"{wedge.retries} at one stage: {wedge.stage}]"
@@ -611,7 +611,7 @@ def run() -> int:
             if liveness.level != HEALTHY:
                 # Say WHY, on the same stdout the watchdog captures to
                 # `.fleet/monitor.log` and the dashboard's monitor window tails: a
-                # state whose reason the operator cannot read is a light with no
+                # state whose reason the principal cannot read is a light with no
                 # label, which is how the wedge stayed invisible.
                 for reason in liveness.reasons:
                     print(f"[monitor] {reason}", flush=True)

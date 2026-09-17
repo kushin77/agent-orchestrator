@@ -2,7 +2,7 @@
 
 WHY THIS FILE EXISTS
 --------------------
-Measured 2026-09-15 on ``master`` @ ``dd8cbfc``: **every subagent run the fleet
+Measured 2026-09-15 on ``master`` @ ``dd8cbfc``: **every executor run the fleet
 dispatched died about ten seconds after it started.**
 
     [subagent] [claude-code:unrecognized_model] {"model":"deepseek-v4-flash","query_source":"sdk"}
@@ -63,9 +63,9 @@ import os
 from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
-#: The environment variable an operator sets to pin the profile explicitly, when
+#: The environment variable a principal sets to pin the profile explicitly, when
 #: the runner's own executable name does not identify it (a wrapper, say). Naming
-#: the profile is the operator's escape from "cannot verify what this is".
+#: the profile is the principal's escape from "cannot verify what this is".
 PROFILE_ENV = "FLEET_RUNNER_PROFILE"
 
 
@@ -101,7 +101,7 @@ class RunnerProfile:
 
 #: The Anthropic-compatible surface DeepSeek exposes, which is what makes
 #: ``claude --model deepseek-v4-flash`` meaningful at all. The variable names are
-#: the contract; the values are the operator's.
+#: the contract; the values are the principal's.
 CLAUDE_BYOK = RunnerProfile(
     id="claude-byok",
     executable="claude",
@@ -153,7 +153,7 @@ PROFILES: dict[str, RunnerProfile] = {
 def profile_for(runner: str, *, profile_id: str | None = None) -> RunnerProfile | None:
     """The profile that governs ``runner``, or ``None`` when nothing can say.
 
-    An explicit ``profile_id`` (the operator's ``FLEET_RUNNER_PROFILE``) wins over
+    An explicit ``profile_id`` (the principal's ``FLEET_RUNNER_PROFILE``) wins over
     inference, because a wrapper's filename cannot identify it and guessing would be
     the silent default this module refuses. Inference matches the *executable name*
     (``argv[0]``'s basename, so a resolved absolute path still matches), never a
@@ -228,7 +228,7 @@ def capability_gap(
 
 
 def describe(profile: RunnerProfile | None, tier: str, *, env: Mapping[str, str] | None = None) -> str:
-    """One line for an operator: the quadruple, and the verdict on it."""
+    """One line for a principal: the quadruple, and the verdict on it."""
     if profile is None:
         return "no known runner profile"
     model = profile.model_for(tier) or "<tier unmapped>"

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Steering channel CLI — the transport between the brain and the fleet.
+"""Steering channel CLI — the transport between the director and the fleet.
 
-Operating model (M26, issue #160): the **brain** (advisor session) issues
-directives; the **sister** session (a dumb terminal on DeepSeek v4.1 Flash, no
-thinking) executes them by spawning epic-focused subagents; subagents report
-results back through the sister. This CLI is the file-mailbox transport for
+Operating model (M26, issue #160): the **director** (advisor session) issues
+directives; the **dispatcher** session (a dumb terminal on DeepSeek v4.1 Flash, no
+thinking) executes them by spawning epic-focused executors; executors report
+results back through the dispatcher. This CLI is the file-mailbox transport for
 that loop — localhost mechanics (GR-21), no network, no daemons.
 
 Mailbox layout (runtime state, gitignored):
 
-    .fleet/inbox/    messages for the sister to drain (written by brain send)
-    .fleet/sent/     the brain's own copy of everything it sent
-    .fleet/outbox/   acks and results written back for the brain
+    .fleet/inbox/    messages for the dispatcher to drain (written by director send)
+    .fleet/sent/     the director's own copy of everything it sent
+    .fleet/outbox/   acks and results written back for the director
     .fleet/done/     directives answered and consumed
 
 Messages are validated against `fleet/schema/message.schema.json` semantics
@@ -21,7 +21,7 @@ transport itself is decided by ADR-0011 (docs/decision-records/) — this module
 the machine that runs that contract. Issue #367 extends the machine additively
 with three live capabilities over the same mailbox: per-directive live log
 streams (`log` / `follow`), KB access (`kb`, against governance/knowledge/), and
-mid-run steering (`steer`, drained by the sister loop each cycle). Exit codes
+mid-run steering (`steer`, drained by the dispatcher loop each cycle). Exit codes
 are the repo tri-state: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 """
 
@@ -52,7 +52,7 @@ from governance.policy import lease  # noqa: E402
 
 # The stale-snapshot trigger's deferred queue (issue #727). `watch` holds a
 # PARKED directive exactly as it already holds a backoff or a dead letter, and
-# releases it with no operator action the moment the board is fresh again.
+# releases it with no principal action the moment the board is fresh again.
 #
 # The module is resolved LAZILY, through a function rather than a module-level
 # `import`: the trigger is one verb on a large CLI, and a hard import would make
@@ -121,9 +121,9 @@ BRAIN_HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
 #
 # ``LOGS`` holds one append-only JSONL stream per directive
 # (`.fleet/runs/<directive>.log`, beside the run marker), written by the loop
-# that owns the run and tailed by the `follow` verb. ``STEERS`` is the brain's
+# that owns the run and tailed by the `follow` verb. ``STEERS`` is the director's
 # outbound steering queue (`.fleet/brain/steer/<directive>.json`): one pending
-# steer per in-flight directive, drained by the sister loop every cycle.
+# steer per in-flight directive, drained by the dispatcher loop every cycle.
 LOGS = FLEET_DIR / "runs"
 STEERS = FLEET_DIR / "brain" / "steer"
 # A directive id becomes a mailbox filename component, so a steer/log/follow
@@ -151,7 +151,7 @@ CONTROL_ACTIONS = (
     # Dead-lettering by protocol (issue #754). `drop` retires a NAMED directive
     # to the terminal mailbox through the same implementation the automatic
     # budget-exhaustion path uses; `dead-letter` reads the mailbox back. They
-    # exist because the alternative — an operator or peer `mv`-ing a file out of
+    # exist because the alternative — a principal or peer `mv`-ing a file out of
     # `.fleet/inbox/` while the loop reads it — races the reader, loses the
     # attempt history, bypasses the channel and cannot be done by an agent at all.
     "drop",
@@ -166,7 +166,7 @@ DIRECTIVE_CONTROLS = ("drop",)
 MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
 # Order kinds (schema v1, additive): `work` needs an issue; the others are
-# answered by the brain without dispatching anything to the sister.
+# answered by the director without dispatching anything to the dispatcher.
 TASK_KINDS = ("work", "status", "report", "ping", "steer")
 NON_WORK_KINDS = ("status", "report", "ping", "steer")
 
@@ -179,7 +179,7 @@ NON_WORK_KINDS = ("status", "report", "ping", "steer")
 #
 # So the migration is versioned, and the two dialects are named here:
 #
-#   schema 1 (retired): operator · brain · sister · subagent[-<name>]
+#   schema 1 (retired): principal · director · dispatcher · executor[-<name>]
 #   schema 2 (current): principal · director · dispatcher · executor[-<name>]
 #
 # The SINGLE AUTHORITY for this vocabulary is `governance/vocabulary/fleet.yaml`
@@ -236,7 +236,7 @@ _CURRENT_ROLE_RE = re.compile("^" + _role_pattern(ROLES_CURRENT) + "$")
 
 #: The env seam that forces an emitting dialect. `auto` (the default) negotiates
 #: from the recipient rung's live heartbeat; `1`/`2` pin it, which is what a gate
-#: or an operator uses to prove a single dialect end to end.
+#: or a principal uses to prove a single dialect end to end.
 ENVELOPE_SCHEMA_ENV = "AO_FLEET_ENVELOPE_SCHEMA"
 ENVELOPE_SCHEMA_AUTO = "auto"
 
@@ -281,7 +281,7 @@ EXIT_CANNOT_ASSESS = 2
 # is declared once in governance/policy/lease.py with its ordering invariants.
 STALE_HEARTBEAT_SECONDS = lease.RUNG_HEARTBEAT_SECONDS
 
-# A directive the sister never drains is abandoned after this long; `status`
+# A directive the dispatcher never drains is abandoned after this long; `status`
 # reports the abandoned ones rather than counting them as queued.
 DIRECTIVE_LIFETIME_SECONDS = lease.DIRECTIVE_LIFETIME_SECONDS
 
@@ -289,9 +289,9 @@ DIRECTIVE_LIFETIME_SECONDS = lease.DIRECTIVE_LIFETIME_SECONDS
 # ── the declared capability set (issue #319) ────────────────────────────────
 # A control that ships but is not live is a silently absent control: after
 # isolation (#263), lifecycle (#269) and reconciliation (#304) merged, the
-# running sister kept executing pre-merge code and the only signal was
+# running dispatcher kept executing pre-merge code and the only signal was
 # `watchdog decide() == "drifted"` — which compares *commits*, is reported per
-# rung, and never says WHICH capability is missing. An operator cannot tell
+# rung, and never says WHICH capability is missing. A principal cannot tell
 # "the loop is old" from "the loop is old and therefore lanes are not being
 # beat, so orphans will never be flagged".
 #
@@ -379,7 +379,7 @@ CAPABILITIES: tuple[Capability, ...] = (
 )
 
 # The three cases the signal must separate, each with its OWN remediation (the
-# issue's acceptance criterion). A case label is part of the operator contract:
+# issue's acceptance criterion). A case label is part of the principal contract:
 # `scripts/check-fleet-runbook.sh` requires each one to appear in a provoked
 # report, so a label cannot be renamed out of existence silently.
 KIND_CURRENT = "current"
@@ -617,7 +617,7 @@ def capability_finding(
 
 
 def capability_line(finding: CapabilityFinding) -> str:
-    """One operator line per rung: the case, every missing capability, the fix."""
+    """One principal line per rung: the case, every missing capability, the fix."""
     prefix = f"{finding.rung}: {finding.case}"
     if finding.kind == KIND_CURRENT:
         extra = ""
@@ -707,7 +707,7 @@ def dialect_for(recipient: str) -> tuple[int, str]:
     """The envelope schema this emitter must use for ``recipient``, and why.
 
     Returns ``(schema, reason)``. ``AO_FLEET_ENVELOPE_SCHEMA`` pins the answer
-    (a gate or an operator proving one dialect end to end); ``auto`` — the default
+    (a gate or a principal proving one dialect end to end); ``auto`` — the default
     — negotiates it from the recipient's beat.
     """
     pinned = (os.environ.get(ENVELOPE_SCHEMA_ENV) or "").strip()
@@ -960,7 +960,7 @@ def validate(message: dict) -> list[str]:
 def load_message(source: Path | str) -> dict:
     """Accept a path to a JSON file *or* inline JSON.
 
-    The brain is a live terminal, so forcing it to write a temp file for every
+    The director is a live terminal, so forcing it to write a temp file for every
     directive is pure friction — and a bare JSON argument was previously read as
     a filename (``File name too long``). Inline JSON is the natural form.
     """
@@ -1011,7 +1011,7 @@ def append_directive_log(directive_id: str, line: str, source: str = "sister") -
 
 
 def pending_steers() -> list[Path]:
-    """The brain's undelivered steering messages, oldest first."""
+    """The director's undelivered steering messages, oldest first."""
     if not STEERS.exists():
         return []
     return sorted(STEERS.glob("*.json"), key=lambda path: path.stat().st_mtime)
@@ -1039,7 +1039,7 @@ def cmd_follow(args: argparse.Namespace) -> int:
     """Tail one directive's live log stream — the `follow`/`listen` verb (#367).
 
     Prints what the stream already holds, then keeps printing new lines as the
-    run writes them. ``--timeout-seconds 0`` follows forever (the operator's
+    run writes them. ``--timeout-seconds 0`` follows forever (the principal's
     live view); ``--max-lines`` bounds it for tests.
     """
     if not DIRECTIVE_ID_RE.fullmatch(args.directive):
@@ -1124,9 +1124,9 @@ def cmd_kb(args: argparse.Namespace) -> int:
 
 
 def cmd_steer(args: argparse.Namespace) -> int:
-    """Brain side: queue a mid-run steering hint for one in-flight directive (#367).
+    """Director side: queue a mid-run steering hint for one in-flight directive (#367).
 
-    The sister loop drains the queue every cycle and delivers the hint to the
+    The dispatcher loop drains the queue every cycle and delivers the hint to the
     live run (its stdin and its log stream) without killing or re-dispatching
     anything. One pending steer per directive: a newer hint replaces an
     undelivered older one, and every steer is audited in the slog.
@@ -1183,11 +1183,11 @@ def replay_conflict(message: dict, directories: tuple[Path, ...] | None = None) 
     refuses rather than silently overwriting the queued copy.
 
     The mailbox set is a parameter, not a constant, because the two paths write to
-    *different* mailboxes: ``send`` (brain → sister) writes ``SENT``/``INBOX`` and
-    ``order`` (operator → brain) writes ``BRAIN_SENT``/``BRAIN_INBOX``. Scanning
-    the sister's mailboxes from ``order`` made that guard unreachable — measured,
-    an identical operator order was accepted twice (#278). ``None`` keeps the
-    default a run-time lookup of the sister's mailboxes.
+    *different* mailboxes: ``send`` (director → dispatcher) writes ``SENT``/``INBOX`` and
+    ``order`` (principal → director) writes ``BRAIN_SENT``/``BRAIN_INBOX``. Scanning
+    the dispatcher's mailboxes from ``order`` made that guard unreachable — measured,
+    an identical principal order was accepted twice (#278). ``None`` keeps the
+    default a run-time lookup of the dispatcher's mailboxes.
     """
     if not message.get("id") and not message.get("nonce"):
         return None
@@ -1312,7 +1312,7 @@ def remote_head_commit(revision: str = "origin/master") -> str:
     it cuts a worktree (and `governance/isolation ... --fetch`), so the ref
     tracks the remote as closely as the fleet actually pulls. The staleness of
     this ref is therefore bounded by "how recently a lane fetched", and it is
-    named in the watchdog line so an operator can see which two commits were
+    named in the watchdog line so a principal can see which two commits were
     compared. A ref that cannot be read yields "unknown", which the caller MUST
     treat as CANNOT-ASSESS — never as healthy.
     """
@@ -1416,7 +1416,7 @@ def running_loop_pids() -> list[int]:
 def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -> bool:
     """Report one rung's liveness, code drift and capability set; True when it is live and current.
 
-    Shared by the brain and the sister so neither can be silently absent from
+    Shared by the director and the dispatcher so neither can be silently absent from
     `status`, and so a rung running merged-but-unrestarted code is reported as
     such instead of looking dead. Issue #319 adds the third question a commit
     comparison cannot answer: does the running rung implement the controls the
@@ -1483,7 +1483,7 @@ def report_rung(name: str, heartbeat_path: Path, process: str, start_cmd: str) -
 def expired_directives(directory: Path, moment: float | None = None) -> list[Path]:
     """Pending directives older than the declared directive lifetime.
 
-    A directive the sister never consumes is abandoned after
+    A directive the dispatcher never consumes is abandoned after
     `DIRECTIVE_LIFETIME_SECONDS` (governance/policy/lease.py). Past that age it is
     stale mail, not queued work, and `status` says so.
     """
@@ -1537,15 +1537,15 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_order(args: argparse.Namespace) -> int:
-    """Top of the hierarchy: the operator orders the *brain*, never the sister.
+    """Top of the hierarchy: the principal orders the *director*, never the dispatcher.
 
-    The operator trigger exists so the chain is real code — operator → brain →
-    sister — rather than a convention the transport cannot enforce. `send` is
-    brain→sister and refuses an operator sender, so this is the only way in.
+    The principal trigger exists so the chain is real code — principal → director →
+    dispatcher — rather than a convention the transport cannot enforce. `send` is
+    director→dispatcher and refuses a principal sender, so this is the only way in.
 
     The anti-replay scan covers the mailboxes *this* path writes
     (``BRAIN_SENT``/``BRAIN_INBOX``/``BRAIN_DONE``): the shared default scans the
-    sister's mailboxes, so the guard could never fire here and an identical order
+    dispatcher's mailboxes, so the guard could never fire here and an identical order
     was accepted twice (#278).
     """
     message = load_message(args.message)
@@ -1580,7 +1580,7 @@ def cmd_order(args: argparse.Namespace) -> int:
 
 
 def cmd_brain_inbox(args: argparse.Namespace) -> int:
-    """The brain's own watch: the oldest order from the operator, if any."""
+    """The director's own watch: the oldest order from the principal, if any."""
     deadline = time.monotonic() + args.timeout_seconds if args.timeout_seconds > 0 else None
     while True:
         pending = sorted(BRAIN_INBOX.glob("*.json")) if BRAIN_INBOX.exists() else []
@@ -1594,7 +1594,7 @@ def cmd_brain_inbox(args: argparse.Namespace) -> int:
 
 
 def consume_order(message_id: str) -> bool:
-    """The brain has dispatched (or refused) the order: move it to done/."""
+    """The director has dispatched (or refused) the order: move it to done/."""
     source = BRAIN_INBOX / f"{message_id}.json"
     if not source.exists():
         return False
@@ -1604,7 +1604,7 @@ def consume_order(message_id: str) -> bool:
 
 
 def brain_reply(order: dict, message_type: str, body: str) -> None:
-    """Answer the operator in the brain outbox — the report the operator reads."""
+    """Answer the principal in the director outbox — the report the principal reads."""
     message = {
         "from": ROLE_DIRECTOR,
         "to": ROLE_PRINCIPAL,
@@ -1622,10 +1622,10 @@ def brain_reply(order: dict, message_type: str, body: str) -> None:
 
 
 def cmd_brain_outbox(args: argparse.Namespace) -> int:
-    """Operator side: read the brain's replies (acks and refusals), newest last.
+    """Principal side: read the director's replies (acks and refusals), newest last.
 
     Ordered by the message timestamp, not by filename: ids are uuid4, so a
-    filename sort returns the replies in arbitrary order and the operator reads
+    filename sort returns the replies in arbitrary order and the principal reads
     a stale answer as if it were the current one (observed live).
     """
 
@@ -1688,7 +1688,7 @@ def consume_directive(message_id: str) -> bool:
     The directive's runaway-guard counter is dropped with it (issue #723): the
     order is finished, so its budget is history. The TERMINAL artifact of a
     retired directive is deliberately NOT dropped — a dead letter is evidence,
-    and the guard keeps it until an operator re-arms the directive by name.
+    and the guard keeps it until a principal re-arms the directive by name.
     """
     source = INBOX / f"{message_id}.json"
     if not source.exists():
@@ -1728,7 +1728,7 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 def cmd_escalate(args: argparse.Namespace) -> int:
-    """Sister/subagent side: raise a problem to the brain for elite steering."""
+    """Sister/subagent side: raise a problem to the director for elite steering."""
     message = {
         "from": args.from_role,
         "to": ROLE_DIRECTOR,
@@ -1755,11 +1755,11 @@ def cmd_escalate(args: argparse.Namespace) -> int:
 
 
 def cmd_listen(args: argparse.Namespace) -> int:
-    """Brain side: tail the slog stream, printing each message as it flows through.
+    """Director side: tail the slog stream, printing each message as it flows through.
 
     This is the idle-watch: run with `--timeout-seconds 0` and the terminal
     blocks, printing every directive/ack/result/escalate the moment it lands —
-    an escalation from the sister pings the brain here. `--max-messages` bounds
+    an escalation from the dispatcher pings the director here. `--max-messages` bounds
     it for tests.
 
     Issue #367 extends the verb additively: `listen --directive <id>` switches
@@ -1814,7 +1814,7 @@ def cmd_listen(args: argparse.Namespace) -> int:
 
 
 def cmd_wait(args: argparse.Namespace) -> int:
-    """Brain side: block until a result for this id (or correlation) lands in the outbox.
+    """Director side: block until a result for this id (or correlation) lands in the outbox.
 
     This is the completion trigger of the operating model: push a directive with
     ``send``, then ``wait`` until the executor answers. A timeout is NOT-OK (1),
@@ -1845,7 +1845,7 @@ def cmd_wait(args: argparse.Namespace) -> int:
 def ordered_by_time(directory: Path) -> list[Path]:
     """Messages in the order they were sent, not in uuid order.
 
-    Ids are uuid4, so a filename sort is arbitrary: measured, the sister took a
+    Ids are uuid4, so a filename sort is arbitrary: measured, the dispatcher took a
     `resume` before the `pause` it was meant to lift and the fetched order changed
     run to run. The envelope's `ts` is the only ordering the transport has.
     """
@@ -1861,9 +1861,9 @@ def ordered_by_time(directory: Path) -> list[Path]:
 
 
 def cmd_watch(args: argparse.Namespace) -> int:
-    """Sister side listener: return the oldest pending directive, or block for one.
+    """Dispatcher side listener: return the oldest pending directive, or block for one.
 
-    This is what makes the sister a dumb terminal with a pulse: it runs
+    This is what makes the dispatcher a dumb terminal with a pulse: it runs
     ``watch`` in a loop, executes the directive it prints, reports the result
     (which consumes the directive), then runs ``watch`` again. Exit 0 = a
     directive was returned; 1 = IDLE (nothing arrived before the timeout);
@@ -1877,14 +1877,14 @@ def cmd_watch(args: argparse.Namespace) -> int:
     The runaway guard (issue #723) filters on the same seam: a directive whose
     order was RETIRED to ``<fleet>/dead-letter/`` is never returned again, and
     one whose exponential backoff has not elapsed is held — still in the inbox,
-    still the operator's record that the work was ordered, but not dispatched
+    still the principal's record that the work was ordered, but not dispatched
     early. That is what stops a refused or crashed order from being re-read every
     cycle, without the loop sleeping on it.
 
     The board trigger (issue #727) filters on it too: a directive PARKED because
-    the board snapshot was stale is the operator's live order waiting on the
+    the board snapshot was stale is the principal's live order waiting on the
     board, so it is held while the snapshot is stale and released the moment
-    freshness returns — no operator action, and never a re-dispatch per cycle.
+    freshness returns — no principal action, and never a re-dispatch per cycle.
     """
     INBOX.mkdir(parents=True, exist_ok=True)
     skip = set(getattr(args, "skip", None) or [])

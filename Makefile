@@ -26,7 +26,7 @@ CONSOLE_PORT ?= 8787
 
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e fleet-parity \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
-issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
+issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
         remediation remediation-scan remediation-dispatch \
@@ -174,7 +174,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal
 	@echo ""
 	@echo "lint: OK"
 
@@ -278,6 +278,15 @@ fleet-channel:
 ## choice is refused (all mutants must be refused)
 finops-chooser:
 	@bash scripts/check-finops-chooser.sh
+
+## fleet-vocabulary — the fleet's role-vocabulary gate (issue #777, code prose
+## swept by #923): the glossary, the code's constants and the envelope schema
+## must agree; a retired role in a schema-2 envelope is refused by name; the
+## write seam is single-emit and negotiated; the normative surfaces AND
+## fleet/*.py comments/docstrings use the current terms, with a retired name
+## permitted only inside a marked legacy-gloss region or as an artifact name
+fleet-vocabulary:
+	@bash scripts/check-fleet-vocabulary.sh
 
 
 ## fleet-contract — session-fleet steering contract (M26, issue #161): the

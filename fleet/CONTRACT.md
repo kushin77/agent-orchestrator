@@ -404,7 +404,7 @@ directives than the depth cap; an oldest pending directive older than the age
 cap; a dead-letter count at or above the dead-letter cap. When one holds, the
 alarm is RAISED and the raise is persisted at `<fleet>/health/alarm.json`
 (`runtime.HEALTH` / `runtime.ALARM`). It then stays raised — through the next
-measurement, and the next — until an operator acknowledges it. A later
+measurement, and the next — until a principal acknowledges it. A later
 measurement that no longer sees the condition does **not** clear it: the second
 read is still raised, still naming the moment the condition began and the
 directives and worktrees responsible.
@@ -435,7 +435,7 @@ defaulted — the same asymmetry `fleet/runaway.py` declares):
 **The names do not travel as metrics.** Per-session identity — a directive id, a
 worktree path — is refused as a label by name in `fleet/health_signals.py`
 (ADR-0022 D5 / `kushin77/monitoring-stack#178`), so the alarm names the culprit
-in the local signal and its latch artifact, where the operator reads it, and the
+in the local signal and its latch artifact, where the principal reads it, and the
 exported family carries only counts. `check` reports the latch read-only; the
 `alarm` verb raises it. Neither writes outside the fleet directory it was given,
 and neither writes at all when the condition is clear.

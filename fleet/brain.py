@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""The brain loop — the middle rung of the hierarchy (M26, issue #160).
+"""The director loop — the middle rung of the hierarchy (M26, issue #160).
 
-    operator  →  BRAIN  →  sister  →  subagents
+    principal  →  DIRECTOR  →  dispatcher  →  executors
     (orders)     (this)    (executes)  (build)
 
-Issue #160's operating model named three rungs but only shipped two: the sister
-loop and the transport. The brain was an interactive session a human had to
-type into, so the operator's only working trigger was to write directives into
-the sister's inbox — which *is* the brain's job, and which the channel now
-refuses (`operator → sister` bypasses the brain). This module makes the middle
+Issue #160's operating model named three rungs but only shipped two: the dispatcher
+loop and the transport. The director was an interactive session a human had to
+type into, so the principal's only working trigger was to write directives into
+the dispatcher's inbox — which *is* the director's job, and which the channel now
+refuses (`operator → sister` bypasses the director). This module makes the middle
 rung a real process:
 
-* it watches `.fleet/brain/inbox` for the operator's orders and never idles;
-* it turns each order into a brain-signed directive for the sister, deriving the
+* it watches `.fleet/brain/inbox` for the principal's orders and never idles;
+* it turns each order into a brain-signed directive for the dispatcher, deriving the
   FinOps block from the order (and refusing a tier/thinking outside the
   contract's allowlist);
 * it routes the order by the capability the work needs, through the routing
   policy that consumes the vendored orchestration contract (ADR-0012; #300,
-  #301) — the brain keeps no second copy of that vocabulary, so dispatch and the
+  #301) — the director keeps no second copy of that vocabulary, so dispatch and the
   declared contract cannot drift apart;
-* it answers the operator in `.fleet/brain/outbox` — an `ack` naming the
+* it answers the principal in `.fleet/brain/outbox` — an `ack` naming the
   directive it issued, or a `result` reporting a refusal with the exact reason;
 * it publishes `.fleet/brain.heartbeat.json` so `status`/`health` can tell a
-  live brain from a dead one and catch code drift, and it keeps that beat fresh
+  live director from a dead one and catch code drift, and it keeps that beat fresh
   *while an order is being handled* — a decomposition files N child issues and
   refreshes the board, which outlives the watchdog's stale threshold (#274);
 * it stops cleanly on SIGTERM/SIGINT (the watchdog's kill) instead of dying
@@ -36,8 +36,8 @@ rung a real process:
   names an issue the committed board says is already closed (or absent from it),
   or asks for a tier below the floor that work requires.
 
-It reaches the sister only through `channel.py send`, so the contract's trust
-rules (only a brain-signed directive reaches the sister) hold by construction.
+It reaches the dispatcher only through `channel.py send`, so the contract's trust
+rules (only a brain-signed directive reaches the dispatcher) hold by construction.
 
 Usage:
     python3 fleet/brain.py run [--once]
@@ -82,12 +82,12 @@ FLEET_DIR = runtime.FLEET_DIR
 HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
 # Where this process's stdout is captured. The watchdog owns the spawn and opens
 # exactly this path (`fleet/watchdog.py`); it is named here only so the startup
-# header can tell the operator where the stream they are reading came from.
+# header can tell the principal where the stream they are reading came from.
 LOG_PATH = FLEET_DIR / "brain.log"
 CHANNEL = str(ROOT / "fleet" / "channel.py")
 PROFILE_PATH = ROOT / "fleet" / "profiles" / "brain.profile.json"
-# Where the brain records that a directive has been *sent* for an order. The
-# marker is written BEFORE the channel is invoked (#274): a brain killed between
+# Where the director records that a directive has been *sent* for an order. The
+# marker is written BEFORE the channel is invoked (#274): a director killed between
 # the dispatch and `channel.consume_order` used to re-read the order on restart
 # and send it a second time (measured: `['4242', '4242']`). On restart the marker
 # suppresses the duplicate instead of repeating it.
@@ -103,12 +103,12 @@ DUPLICATE_SUPPRESSED = "duplicate suppressed"
 # The prefix `dispatch()` returns when the marker is TERMINAL — the order
 # completed, or its directive was retired / its re-arm budget was exhausted
 # (#796). Distinct from DUPLICATE_SUPPRESSED on purpose: "already sent" and
-# "finished, parked" are different facts and the operator must see which one
+# "finished, parked" are different facts and the principal must see which one
 # holds, with the issue named and the verb that lifts it.
 PARKED_SUPPRESSED = "terminal marker"
-# The committed board the brain routes against, and the SAME artifact a claim is
+# The committed board the director routes against, and the SAME artifact a claim is
 # validated against (`governance/dispatch/snapshot.py`). Reading it here is what
-# makes the brain's answer agree with the claim layer's: an issue this file says
+# makes the director's answer agree with the claim layer's: an issue this file says
 # is closed is an issue `claim` refuses, so a directive for it could never start
 # (#693). It is refreshed explicitly by `python3 governance/dispatch/cli.py
 # snapshot --from-github` — the only network-touching board read.
@@ -127,22 +127,22 @@ def suppressed(message: str) -> bool:
 
 # How often the beat is refreshed while an order is being handled. The watchdog
 # SIGTERMs a rung whose beat is older than `channel.STALE_HEARTBEAT_SECONDS`
-# (120s), and a decompose order outlives that easily; the sister beats every 15s
+# (120s), and a decompose order outlives that easily; the dispatcher beats every 15s
 # for the same reason (`fleet/terminal.py`).
 HEARTBEAT_INTERVAL_SECONDS = 15.0
 # How often the idle path repeats its heartbeat line. The loop blocks up to
 # `--watch-timeout` (30s) on each poll, so one line per idle tick is one line per
-# ~30s: enough to prove the brain is alive, not enough to bury an order in noise.
+# ~30s: enough to prove the director is alive, not enough to bury an order in noise.
 IDLE_HEARTBEAT_SECONDS = 30.0
 
 
 def load_profile(path: Path | None = None) -> dict:
-    """The brain's elite profile: mission, KB, controls, FinOps floors, anti-patterns.
+    """The director's elite profile: mission, KB, controls, FinOps floors, anti-patterns.
 
-    A profile that is missing or malformed is a REFUSAL, not a default: the brain
-    steering a fleet on a half-loaded doctrine is worse than a brain that will
+    A profile that is missing or malformed is a REFUSAL, not a default: the director
+    steering a fleet on a half-loaded doctrine is worse than a director that will
     not start. The floor vocabulary below is derived from it, so the profile is
-    the single source for what the brain enforces.
+    the single source for what the director enforces.
     """
     target = path or PROFILE_PATH
     try:
@@ -161,7 +161,7 @@ PROFILE = load_profile()
 # Capability routing is a CONSUMPTION of the vendored orchestration contract
 # (ADR-0012; #300, #301), not a dialect grown here: the vocabulary lives in
 # `fleet/profiles/routing.policy.json` and `fleet/routing.py` is its only reader.
-# The brain consults that module and keeps NO second copy of the mapping — the
+# The director consults that module and keeps NO second copy of the mapping — the
 # floors and defaults below are DERIVED from it, and the profile's own
 # declaration is checked against the policy, so the doctrine and the machine
 # cannot drift apart (the parity idiom the registry uses for its catalog and
@@ -172,7 +172,7 @@ try:
 except routing.RoutingRefusal as exc:
     raise SystemExit(f"[brain] REFUSED — cannot load the routing policy: {exc}")
 
-# The FinOps floor the brain enforces when it dispatches. Security, secrets,
+# The FinOps floor the director enforces when it dispatches. Security, secrets,
 # auth, identity and production-IaC work never drops below the high floor (fleet
 # doctrine), so a lane whose name says so is escalated rather than accepted at
 # flash/none. The vocabulary is the routing policy's, not this file's.
@@ -205,10 +205,10 @@ if _PROFILE_FLOOR_BLOCK != ROUTING.high_floor_block:
 
 
 def kb_sources(profile: dict) -> tuple[str, ...]:
-    """The KB list a directive hands to the subagent.
+    """The KB list a directive hands to the executor.
 
     ``own_repo`` paths are repo-relative (loadable from the worktree root);
-    ``enterprise_instructions`` carry the operator's own instruction stack
+    ``enterprise_instructions`` carry the principal's own instruction stack
     (home-relative, ``~``-prefixed) and are expanded here to real, openable
     paths; ``fleet_modules`` pointers are kept last as provenance (descriptive,
     not file paths).
@@ -223,7 +223,7 @@ def kb_sources(profile: dict) -> tuple[str, ...]:
 
 KB_SOURCES = kb_sources(PROFILE)
 
-# Order kinds that are not work: the operator may ask the brain to report or to
+# Order kinds that are not work: the principal may ask the director to report or to
 # ping instead of dispatching an issue (the vocabulary lives in the channel).
 NON_WORK_KINDS = channel.NON_WORK_KINDS
 
@@ -254,12 +254,12 @@ def write_heartbeat(state: str, *, started_at: str, commit: str) -> None:
 class OrderBeater:
     """Keeps the beat fresh while one order is handled; `stop()` joins.
 
-    The brain used to beat only once per poll and once *before* `handle_order`,
+    The director used to beat only once per poll and once *before* `handle_order`,
     so a long order looked dead: the watchdog treats a beat older than
     `channel.STALE_HEARTBEAT_SECONDS` as stale and SIGTERMs the rung — killing
-    the brain mid-order. `stop()` sets the flag *and* joins, because a beater
+    the director mid-order. `stop()` sets the flag *and* joins, because a beater
     that outlives its owner would write its owner's last idea of the world over
-    the next iteration's beat (the sister learned this the hard way, #281).
+    the next iteration's beat (the dispatcher learned this the hard way, #281).
     """
 
     def __init__(
@@ -292,7 +292,7 @@ class OrderBeater:
 
 
 def handle_stop(signum: int, frame: object) -> None:
-    """A stopped brain exits; it does not die mid-order.
+    """A stopped director exits; it does not die mid-order.
 
     Without a handler the watchdog's SIGTERM killed the process outright, leaving
     whatever was half-written exactly as it fell. Raising `SystemExit` unwinds
@@ -338,7 +338,7 @@ def choose_model(order: dict) -> tuple[str, str]:
 
     The base block is the policy's answer for the capability the work needs —
     resolved through the registry persona that owns that capability — and the
-    operator's own `model` block may raise either value. The risk floor is applied
+    principal's own `model` block may raise either value. The risk floor is applied
     last, so it can never be lowered (escalation is a floor, never a ceiling,
     ADR-0012 decision (b)). A capability claim the registry cannot back raises
     `RoutingRefusal`, which `handle_order` reports by name instead of dispatching
@@ -361,7 +361,7 @@ def routing_summary(order: dict) -> str:
     ADR-0012 decision (b): dispatch is capability-routed from the registry
     personas that are actually dispatched. The directive therefore names the
     persona the work resolves to and the registry card that backed it, so the
-    subagent sees the decision rather than inferring it. A task whose lane and
+    executor sees the decision rather than inferring it. A task whose lane and
     title claim no capability says exactly that instead of inventing one.
     """
     decision = ROUTING.route(order.get("task") or {})
@@ -375,12 +375,12 @@ def routing_summary(order: dict) -> str:
 
 
 def order_reference(order: dict) -> str:
-    """The id the operator can correlate on: the order's id, else its own reference."""
+    """The id the principal can correlate on: the order's id, else its own reference."""
     return str(order.get("id") or order.get("correlation_id") or "")
 
 
 # Characters that may not appear in a marker filename. The reference arrives in
-# operator-supplied JSON and becomes a path component, so `../` must not be able
+# principal-supplied JSON and becomes a path component, so `../` must not be able
 # to walk out of the marker directory. The rule lives with the state machine that
 # builds the path (`markers.safe_reference`, #796) — one sanitizer, one spelling.
 
@@ -389,7 +389,7 @@ def order_marker(order: dict) -> Path | None:
     """The marker path for an order, or None when it carries no reference.
 
     The sanitizer lives with the state machine (`fleet/markers.py`): the reference
-    arrives in operator-supplied JSON and becomes a path component, so `../` must
+    arrives in principal-supplied JSON and becomes a path component, so `../` must
     not be able to walk out of the marker directory — and the reconciler, which
     derives the same path from the same reference, must agree byte for byte.
     """
@@ -400,10 +400,10 @@ def order_marker(order: dict) -> Path | None:
 
 
 def write_marker(marker: Path, order: dict, state: str, previous: markers.Marker | None = None) -> None:
-    """Persist (atomically) what the brain has done with this order so far.
+    """Persist (atomically) what the director has done with this order so far.
 
     One writer for the marker set: the schema and the atomic write live in
-    `fleet/markers.py`, so the brain cannot drift from the reconciler that reads
+    `fleet/markers.py`, so the director cannot drift from the reconciler that reads
     what it writes.
 
     Two fields are carried across a send and are NOT the sender's business:
@@ -451,13 +451,13 @@ def directive_identity(order: dict) -> tuple[str | None, str | None]:
 
 
 def build_directive(order: dict) -> dict:
-    """Compose the brain-signed directive the sister will execute."""
+    """Compose the brain-signed directive the dispatcher will execute."""
     task = dict(order.get("task") or {})
     tier, thinking = choose_model(order)
     body = order.get("body") or ""
-    # The profile travels with the order: the subagent gets the KB it must read
+    # The profile travels with the order: the executor gets the KB it must read
     # and the evidence it must return, so dispatch quality does not depend on the
-    # operator remembering to say it.
+    # principal remembering to say it.
     kb = "\n".join(f"  - {source}" for source in KB_SOURCES)
     directive = {
         "from": channel.ROLE_DIRECTOR,
@@ -475,7 +475,7 @@ def build_directive(order: dict) -> dict:
         ),
     }
     if order.get("control") == "override" or task.get("override"):
-        # The operator's override still travels the hierarchy: the principal orders
+        # The principal's override still travels the hierarchy: the principal orders
         # the director, and the director issues the control to the dispatcher.
         directive["control"] = "override"
     # Single-emit (issue #777): the dialect is the RECIPIENT's, negotiated from
@@ -493,11 +493,11 @@ def build_directive(order: dict) -> dict:
 
 
 # -- the closure guard (issue #693) -------------------------------------------
-# The brain could compose a directive, mark it sent and hand it to the sister for
+# The director could compose a directive, mark it sent and hand it to the dispatcher for
 # an issue that was already CLOSED. Measured: 17 such directives accumulated in
 # the inbox and wedged the terminal loop — every one of them naming work the claim
 # layer refuses `issue-closed` (`governance/dispatch/order.py`), i.e. a run that
-# could never start. The board the brain already holds answers the question, so it
+# could never start. The board the director already holds answers the question, so it
 # is asked HERE, in the one funnel every directive passes through — before the
 # sent-marker is written and before the channel is invoked — and the refusal is
 # reported instead of a directive being issued.
@@ -519,7 +519,7 @@ def board_issue_state(number: int) -> tuple[str, str]:
       from the snapshot "would be refused `unknown-issue` the moment the wave
       arrives"), so a directive for it is dead on arrival. The detail names the
       remedy: refresh the snapshot.
-    * ``cannot-assess`` — the snapshot itself cannot be read. The brain does not
+    * ``cannot-assess`` — the snapshot itself cannot be read. The director does not
       know the state, and not knowing is never a licence to dispatch: the same
       posture as ``advance_ready``, which dispatches nothing when its board fetch
       fails.
@@ -545,7 +545,7 @@ def closure_refusal(number: int) -> str | None:
     """Why no directive may be issued for this issue, or None when one may.
 
     The state is read from the committed board snapshot once per dispatch. The
-    refusal names the state it read, so the operator sees WHICH board said so
+    refusal names the state it read, so the principal sees WHICH board said so
     rather than a bare "refused".
     """
     state, detail = board_issue_state(number)
@@ -561,7 +561,7 @@ def dispatch(order: dict) -> tuple[bool, str]:
     """Send the composed directive through the channel; return (ok, message).
 
     Restart-safe by construction: the sent-marker is persisted *before* the
-    channel is invoked, so a brain killed mid-send finds it on restart and
+    channel is invoked, so a director killed mid-send finds it on restart and
     refuses to send the same order twice. Marker first, send second — the reverse
     order loses the at-most-once property this exists for. `(False, ...)` with a
     `DUPLICATE_SUPPRESSED` prefix means "already sent", not "send failed".
@@ -575,7 +575,7 @@ def dispatch(order: dict) -> tuple[bool, str]:
     which one holds. A marker whose state is terminal, or whose reality the
     reconciler has not examined, still refuses — at-most-once is intact. Only a
     marker carrying the reconciler's one-shot `rearm` token is sent past, and this
-    call consumes it: a restart re-reading a plan, or an operator re-ordering the
+    call consumes it: a restart re-reading a plan, or a principal re-ordering the
     same order, finds no token and is still suppressed.
     """
     marker = order_marker(order)
@@ -606,7 +606,7 @@ def dispatch(order: dict) -> tuple[bool, str]:
     # (can the registry back the capability it claims?); this one asks about the
     # BOARD. Both are refusals, and neither writes a marker nor reaches the
     # channel — so no directive for a closed (or unassessable) issue can enter the
-    # sister's inbox. An order that names no issue has no state to look up.
+    # dispatcher's inbox. An order that names no issue has no state to look up.
     number = order_issue(order)
     if number is not None:
         refusal = closure_refusal(number)
@@ -644,7 +644,7 @@ def dispatch(order: dict) -> tuple[bool, str]:
             )
         else:
             # The channel answered non-zero, and `cmd_send` refuses *before* it
-            # queues anything: nothing left the brain, so the marker is dropped
+            # queues anything: nothing left the director, so the marker is dropped
             # (a corrected order must still be able to go out). The pathological
             # "queued, then exited non-zero" case stays covered by the
             # directive's deterministic id, which the channel refuses on replay.
@@ -658,9 +658,9 @@ def dispatch(order: dict) -> tuple[bool, str]:
 WAVES = FLEET_DIR / "waves"
 
 # -- the filing seam (issue #320) --------------------------------------------
-# Every issue the brain files goes through `governance/conformance/filing.py`,
+# Every issue the director files goes through `governance/conformance/filing.py`,
 # which derives the declaring labels from the conformance policy and REFUSES a
-# filing that cannot derive them — so the brain can no longer create an issue the
+# filing that cannot derive them — so the director can no longer create an issue the
 # conformance gate rejects afterwards (`governance/lifecycle`'s
 # `FILING_LABELS_MISSING` only *detects* that result; #174 repairs the legacy
 # issues that were filed unclassified, this issue prevents the next one).
@@ -681,7 +681,7 @@ def _conformance():
     the package's flat names against that one would make the seam import the wrong
     model, so the conformance directory goes first, the flat names are taken for the
     duration of the load, and every name the process already had is restored
-    afterwards — the filing seam must not depend on, or change, the brain's import
+    afterwards — the filing seam must not depend on, or change, the director's import
     order. The result is cached, so `FilingRefused` keeps one identity per process
     (a caller must be able to catch the refusal the seam raised).
     """
@@ -764,7 +764,7 @@ def file_child_issue(title: str, body: str, declaring: dict) -> int:
 
 
 # -- the micro-decomposition POLICY (epic #707 lane F4 / issue #719) -----------
-# The brain could already *file* a decomposition; what it could not do was refuse
+# The director could already *file* a decomposition; what it could not do was refuse
 # one that was not a decomposition at all. What follows are the board FACTS the
 # policy needs — the rule itself is pure and offline (`fleet/decompose_policy.py`)
 # — and every guard runs BEFORE the first `gh issue create`, so a refused wave
@@ -780,7 +780,7 @@ def resolve_active_epic() -> tuple[int | None, str]:
     to name: filing a child against a closed epic — or against nothing — is the
     orphan the single-epic focus exists to prevent. Offline: the committed board
     snapshot plus the pinned focus, both read from the repo root so the answer does
-    not depend on the brain's working directory.
+    not depend on the director's working directory.
     """
     try:
         board = snapshot_mod.load(BOARD_PATH)
@@ -808,7 +808,7 @@ def _pinned_wave_cap() -> int | None:
 
 
 # -- the epic-close ADVANCE (epic #707 lane F5 / issue #720) --------------------
-# The brain could already decompose the ACTIVE epic into micro-children (F4/#719);
+# The director could already decompose the ACTIVE epic into micro-children (F4/#719);
 # what it could not do was *leave* an epic. A pinned focus outlives the epic it
 # pins — `focus.resolve` falls back to the lowest workable epic only when the
 # pinned one has closed — so nothing moved the pin, and a fleet that finished 707
@@ -841,7 +841,7 @@ def advance_focus(
        non-empty pool means carry on; with neither, there is nothing to focus on
        and the board is complete.
     2. **The pinned epic is still open.** The focus does not move on its own — not
-       even when no child is open *right now*. The snapshot the brain holds has
+       even when no child is open *right now*. The snapshot the director holds has
        already been measured with an empty child set at a legitimate moment (#719's
        seam was tested exactly there), so advancing on "no open children today"
        would drop an epic mid-flight. The advance is driven by the epic's CLOSURE,
@@ -939,7 +939,7 @@ def decompose_problem(spec: object) -> str | None:
 
     Validating up front is the point: `handle_decompose` used a bare subscript for
     `parent_issue`, so a spec that omitted it raised `KeyError` out of `loop` and
-    killed the brain process (#275) — and `gh_issue_create` raises `RuntimeError`
+    killed the director process (#275) — and `gh_issue_create` raises `RuntimeError`
     on any `gh` failure, the same escape. A malformed order is a refusal.
     """
     if not isinstance(spec, dict):
@@ -963,7 +963,7 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
 
     Micro-decomposition: one parent issue becomes N small, collision-free child
     issues (the pmo-sme discipline), filed with a `Parent: #N` marker so the chain
-    gate recognises them, and the ready wave is dispatched immediately — the brain
+    gate recognises them, and the ready wave is dispatched immediately — the director
     prepares the next waves in advance instead of waiting for the parent.
 
     The wave is bound to the ACTIVE epic and must pass the micro-decomposition
@@ -1027,7 +1027,7 @@ def handle_decompose(order: dict) -> tuple[bool, str]:
         try:
             number = file_child_issue(title, body, declaring)
         except _filing_exception() as exc:
-            # An explicit refusal, reported to the operator, is the whole point: the
+            # An explicit refusal, reported to the principal, is the whole point: the
             # alternative is filing an issue the conformance gate rejects later.
             return False, exc.loud_message
         plan["children"].append(
@@ -1100,7 +1100,7 @@ def dispatch_ready_children(parent: int, plan: dict, probe: markers.Probe | None
         order = {
             "type": "directive",
             # A stable reference per child: it becomes the directive's identity (and
-            # its correlation id), so a brain restarted mid-wave suppresses the
+            # its correlation id), so a director restarted mid-wave suppresses the
             # duplicate instead of dispatching the child a second time.
             "id": f"child-{parent}-{child['issue']}",
             "task": {
@@ -1118,7 +1118,7 @@ def dispatch_ready_children(parent: int, plan: dict, probe: markers.Probe | None
         ok, message = dispatch(order)
         if suppressed(message):
             # Already out, or finished and parked — either way the plan must stop
-            # retrying it, and the operator must SEE which of the two it is (#796).
+            # retrying it, and the principal must SEE which of the two it is (#796).
             plan["dispatched"].append(child["issue"])
             print(f"[brain] wave #{parent}: micro-task #{child['issue']} not dispatched — {message}", flush=True)
         elif ok:
@@ -1148,10 +1148,10 @@ def advance_ready() -> list[int]:
     """Dispatch the dependency-free ready set a completion just unlocked (#701).
 
     The completion signal is the board itself: an issue's parent or blocker has
-    closed. The brain fetches the live board (the only way it sees a closure),
+    closed. The director fetches the live board (the only way it sees a closure),
     recomputes the ready set through the dispatch order rules — graph advance,
     not kanban scavenging (GR-20) — and dispatches each newly-ready issue to the
-    sister in the same cycle, so the pipeline stays full without the brain acting
+    dispatcher in the same cycle, so the pipeline stays full without the director acting
     as a serial queue. Each dispatch carries a stable marker, so a later tick
     never re-dispatches an issue that is already out.
 
@@ -1182,7 +1182,7 @@ def advance_ready() -> list[int]:
         directive_order = {
             "type": "directive",
             # A stable reference per issue: it becomes the directive's identity
-            # (and marker), so a brain that re-runs the advance on a later tick
+            # (and marker), so a director that re-runs the advance on a later tick
             # suppresses the duplicate instead of dispatching it a second time.
             "id": f"advance-{issue.number}",
             "task": {"issue": issue.number, "lane": "", "title": issue.title},
@@ -1245,12 +1245,12 @@ def handle_order(order: dict) -> tuple[bool, str]:
 
 
 def handle_steer(order: dict) -> tuple[bool, str]:
-    """Relay an operator steer order to the sister through the channel (#367).
+    """Relay a principal steer order to the dispatcher through the channel (#367).
 
-    The hierarchy stays intact: the operator never addresses the sister, so a
-    mid-run hint travels operator → brain → sister as a `steer` message the
+    The hierarchy stays intact: the principal never addresses the dispatcher, so a
+    mid-run hint travels principal → director → dispatcher as a `steer` message the
     channel validates (brain-signed, correlated to an in-flight directive) and
-    the running loop delivers. The brain adds no content of its own — it
+    the running loop delivers. The director adds no content of its own — it
     authenticates and forwards the order, nothing more.
     """
     task = order.get("task") or {}
@@ -1276,9 +1276,9 @@ def handle_steer(order: dict) -> tuple[bool, str]:
 def safe_handle_order(order: dict) -> tuple[bool, str]:
     """Run `handle_order`, turning ANY handler error into a refusal.
 
-    The brain is the fleet's middle rung: a malformed order must cost one
+    The director is the fleet's middle rung: a malformed order must cost one
     refusal, not the process. Measured (#275): a decompose order without
-    `parent_issue` raised `KeyError` straight out of `loop` and killed the brain,
+    `parent_issue` raised `KeyError` straight out of `loop` and killed the director,
     and nothing restarted it until the next watchdog tick. `SystemExit` — the stop
     handler — is deliberately NOT caught: a stop is a stop.
     """
@@ -1308,15 +1308,15 @@ def _health() -> tuple[int, list[str]]:
     return result.returncode, [payload.get("status", "unknown")] + list(payload.get("reasons") or [])
 
 
-# --- the context stream (what the operator's brain window shows) -------------
+# --- the context stream (what the principal's director window shows) -------------
 #
-# The brain runs detached and this process's stdout is captured to
+# The director runs detached and this process's stdout is captured to
 # `.fleet/brain.log`, which is what the `brain` window in the `fleet` tmux
 # session tails. Without this block that file is empty: the loop printed nothing
 # at startup, nothing that identified the order it was handling, and nothing
-# while idle — so a working brain and a wedged one looked identical from the
-# operator's side. Every line below is built by a pure function over plain data,
-# so the tests assert the text instead of the operator having to eyeball it.
+# while idle — so a working director and a wedged one looked identical from the
+# principal's side. Every line below is built by a pure function over plain data,
+# so the tests assert the text instead of the principal having to eyeball it.
 
 
 def read_json(path: Path) -> dict | None:
@@ -1406,7 +1406,7 @@ def status_line(facts: dict, *, idle_seconds: int | None = None) -> str:
     """One compact context line: the startup form, or the idle heartbeat.
 
     `idle_seconds=None` renders the startup form (`up`); a number renders the
-    idle form the brain repeats every IDLE_HEARTBEAT_SECONDS.
+    idle form the director repeats every IDLE_HEARTBEAT_SECONDS.
     """
     position = "up" if idle_seconds is None else f"idle {idle_seconds}s"
     return (
@@ -1448,7 +1448,7 @@ def order_line(order: dict) -> str:
 
 
 def outcome_line(order: dict, ok: bool, report: str) -> str:
-    """What the brain did with the order: dispatched, ack, or the refusal itself."""
+    """What the director did with the order: dispatched, ack, or the refusal itself."""
     reference = order_reference(order) or "-"
     if not ok:
         return f"[brain] {reference}: → refused: {report}"
@@ -1499,8 +1499,8 @@ def loop(args: argparse.Namespace) -> int:
             moment = time.monotonic()
             if idle_since is None:
                 idle_since = moment
-            # One heartbeat as soon as the brain goes idle, then one every
-            # IDLE_HEARTBEAT_SECONDS: the operator can tell "waiting for an
+            # One heartbeat as soon as the director goes idle, then one every
+            # IDLE_HEARTBEAT_SECONDS: the principal can tell "waiting for an
             # order" from "stuck" without the log becoming a wall of timestamps.
             if last_idle_line == 0.0 or moment - last_idle_line >= IDLE_HEARTBEAT_SECONDS:
                 print(status_line(fleet_facts(), idle_seconds=int(moment - idle_since)), flush=True)
@@ -1521,7 +1521,7 @@ def loop(args: argparse.Namespace) -> int:
         write_heartbeat("dispatching", started_at=started_at, commit=commit)
         # Beat while the handler runs: a decompose order files N child issues and
         # refreshes the board, which outlives the watchdog's stale threshold — and a
-        # stale brain is SIGTERMd (#274). `finally` stops the beater before the next
+        # stale director is SIGTERMd (#274). `finally` stops the beater before the next
         # iteration's own beat, so the thread cannot outlive its owner.
         beater = OrderBeater(
             "dispatching",

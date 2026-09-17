@@ -26,7 +26,7 @@ and an orphan with unmerged work leaves as **`shelved`**, never as `reclaimed`.
 
 **No new always-on service** (GR-5). There is no daemon here: the pass is one
 invocation, run by the same code-native cron that owns reconcile/watchdog, and it
-is inert until an operator promotes the surface's flag.
+is inert until a principal promotes the surface's flag.
 
 Usage::
 

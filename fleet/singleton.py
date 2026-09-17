@@ -1,6 +1,6 @@
 """Singleton guard: one loop per rung, or the fleet double-dispatches.
 
-Observed live (2026-09-13): two sister loops were running at once — `cmd_watch`
+Observed live (2026-09-13): two dispatcher loops were running at once — `cmd_watch`
 returns the oldest pending directive without removing it, so both loops picked up
 the same order, both tried to claim the same issue, and the channel logged every
 escalation twice. Nothing in the transport prevents it: the mailbox is a

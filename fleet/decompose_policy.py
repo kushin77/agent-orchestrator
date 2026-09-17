@@ -21,7 +21,7 @@ instead of being asserted in a docstring:
 * :func:`effective_cap` — ``FLEET_DECOMPOSE_CAP``, else the focus ``wave_cap``,
   else :data:`DEFAULT_CAP`.
 
-The caller (the brain) supplies both the candidate children and the OPEN issues
+The caller (the director) supplies both the candidate children and the OPEN issues
 they are compared against. That is what keeps the duplicate guard honest: it
 never consults the network, so the verdict does not change with whichever board
 happened to be reachable at the moment.
@@ -153,7 +153,7 @@ def sizing_problem(child: Any, *, depth: int = 1) -> str | None:
     """Why ``child`` is not a MICRO child, or ``None`` when it is.
 
     The one place the sizing rule lives. Every refusal names the child (by title,
-    so the operator can find it) and, for a child that is too *big*, names the
+    so the principal can find it) and, for a child that is too *big*, names the
     parent seam to decompose instead (``RESPLITTABLE``).
     """
     if not isinstance(child, Mapping):
@@ -203,7 +203,7 @@ def _open_tuple(entry: Any) -> tuple[int | None, str, str, str]:
 
     A caller may pass the documented ``(number, title, lane)`` tuple, a longer
     tuple that also carries the ``Verify:`` line, or a mapping with those keys —
-    a board snapshot gives the brain titles and no lane, a live board gives it
+    a board snapshot gives the director titles and no lane, a live board gives it
     everything, and neither shape should force the guard to change.
     """
     if isinstance(entry, Mapping):
@@ -261,7 +261,7 @@ def wave_problems(
 ) -> list[str]:
     """Every reason this WAVE cannot be filed — empty when it can.
 
-    All guards run (rather than stopping at the first), so an operator fixing a
+    All guards run (rather than stopping at the first), so a principal fixing a
     wave sees everything wrong with it in one refusal instead of one per round
     trip. The guards are: the per-child sizing rule, intra-wave duplicates, the
     duplicate guard against the open board, and the wave cap.
@@ -310,13 +310,13 @@ def effective_cap(env: Mapping[str, str] | None = None, *, focus_wave_cap: int |
 
     **The precedence is deliberate and stated here** (the issue allows the focus
     fallback only if it is documented): an explicit ``FLEET_DECOMPOSE_CAP``
-    always wins, because that is the operator speaking *now*; an unset variable
+    always wins, because that is the principal speaking *now*; an unset variable
     defers to the pinned focus's ``wave_cap``, because that is the board speaking
     for this epic; with neither, the module default of 12 applies.
 
     A variable that is *set* but not a positive integer raises ``ValueError``
     instead of falling back: a misconfigured cap is a refusal, never silently
-    defaulted to 12 (the brain reports it and files nothing).
+    defaulted to 12 (the director reports it and files nothing).
     """
     source = os.environ if env is None else env
     raw = str((source or {}).get(CAP_ENV, "") or "").strip()

@@ -166,6 +166,7 @@ checks=(
   'fleet-channel|bash scripts/check-fleet-channel.sh'
   'fleet-contract|bash scripts/check-fleet-contract.sh'
   'fleet-runbook|bash scripts/check-fleet-runbook.sh'
+  'fleet-vocabulary|bash scripts/check-fleet-vocabulary.sh'
   # operator-access (issue #763): every surface an operator can use existed but
   # was undiscoverable — A2A read as an optional "extension", the 18 override
   # verbs were unnamed as an operator surface, and the console binds loopback so

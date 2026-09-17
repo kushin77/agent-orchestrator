@@ -87,7 +87,7 @@ REAP_SCHEDULE = "47 3 * * *"
 
 # The fifth job the manifest declares, ship-gated OFF (issue #241): refreshing
 # the committed board snapshot is the one network-touching cron path, so it does
-# not change installed behaviour until an operator flips `enabled: true`.
+# not change installed behaviour until a principal flips `enabled: true`.
 SNAPSHOT_REFRESH_MARKER = "ao-fleet-snapshot-refresh"
 
 #: The enabled jobs' markers — the lines `install` writes and the image's

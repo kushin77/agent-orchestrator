@@ -840,8 +840,8 @@ The runaway that motivated the attempt cap (#723) — 49 concurrent `make verify
 runs on one box — was caught by a human *noticing* it. Detection is a signal,
 and a signal has to be an alarm: an excursion that clears itself before anyone
 looks is indistinguishable from one that never happened. `fleet/health.py`
-therefore reports the work queue's liveness and **latches** a runaway until an
-operator acknowledges it. Contract: [`CONTRACT.md`](CONTRACT.md) §9.
+therefore reports the work queue's liveness and **latches** a runaway until a
+principal acknowledges it. Contract: [`CONTRACT.md`](CONTRACT.md) §9.
 
 ```bash
 python3 fleet/health.py check   # full signal: rungs + queue + the latch (read-only)

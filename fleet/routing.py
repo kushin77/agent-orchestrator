@@ -13,7 +13,7 @@ capability the work needs, and the registry personas that are actually dispatche
 are the resolver's source of truth.
 
 This module is that consumption, as a **port**: one declarative policy
-(``fleet/profiles/routing.policy.json``) plus a small pure API over it. The brain
+(``fleet/profiles/routing.policy.json``) plus a small pure API over it. The director
 asks this module instead of keeping a second copy of the dialect, and the registry
 cards are read and cross-checked at load — a policy that drifts from the registry
 fails closed *by name* rather than dispatching on a stale vocabulary.
@@ -64,7 +64,7 @@ NORMAL = "normal"
 class RoutingRefusal(Exception):
     """A refusal with a stable code and a reason — never a silent default persona.
 
-    The brain turns one of these into a named refusal for the operator (the same
+    The director turns one of these into a named refusal for the principal (the same
     posture as the channel's own refusals): routing that cannot be justified is
     reported, not guessed.
     """
@@ -295,7 +295,7 @@ class RoutingPolicy:
         return NORMAL
 
     def needs_high_floor(self, lane: str | None, title: str | None) -> bool:
-        """The boolean form of :meth:`risk_for` — the brain's old question."""
+        """The boolean form of :meth:`risk_for` — the director's old question."""
         return self.risk_for(lane, title) == HIGH
 
     def tier_for(self, capability: str | None, risk: str | None = None) -> tuple[str, str]:
@@ -365,7 +365,7 @@ class RoutingPolicy:
     def route(self, task: dict, risk: str | None = None) -> dict:
         """The whole routing decision, including the registry card that backed it.
 
-        This is what the brain reports into the directive: the capability, the
+        This is what the director reports into the directive: the capability, the
         persona, the card path it read, and the FinOps block — one call, one
         deterministic answer.
         """
