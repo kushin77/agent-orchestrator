@@ -678,13 +678,21 @@ if [ -s "$duplicates_tsv" ]; then
   overall=1
 fi
 
+check_out_dir="$verify_dir/.check-out"
+mkdir -p "$check_out_dir"
 for entry in "${checks[@]}"; do
   name="${entry%%|*}"
   cmd="${entry#*|}"
   printf '\n== %s ==\n' "$name" | tee -a "$log"
-  bash -c "$cmd" 2>&1 | tee -a "$log"
+  # Per-check output is captured separately (issue #882) so the attestation can
+  # carry an evidence tail for THIS check, not the whole run's log.
+  check_out="$check_out_dir/${name//\//_}.txt"
+  check_start="$(date +%s)"
+  bash -c "$cmd" 2>&1 | tee -a "$log" "$check_out"
   rc="${PIPESTATUS[0]}"
-  printf '%s\t%s\n' "$name" "$rc" >> "$results_tsv"
+  check_end="$(date +%s)"
+  duration=$((check_end - check_start))
+  printf '%s\t%s\t%s\t%s\n' "$name" "$rc" "$duration" "$check_out" >> "$results_tsv"
   # Honest tri-state (GR-12 / guardrails/honesty). 0 = PASS; 1 = NOT-OK, a real
   # defect, and the run fails; 2 = CANNOT-ASSESS -> SKIP. A check that says it
   # genuinely could not assess (e.g. the pinned vendor/CMR submodule is absent in
@@ -709,6 +717,7 @@ export ATTEST_VERIFIED_BY="${AO_AGENT_ID:-$(id -un 2>/dev/null || echo unknown)}
 export ATTEST_VERIFICATION_SESSION="${AO_SESSION_ID:-}"
 export ATTEST_RESULTS_TSV="$results_tsv"
 export ATTEST_DUPLICATES_TSV="$duplicates_tsv"
+export ATTEST_RUN_ID="${ATTEST_TS}-$$"
 python3 - <<'PY'
 import json, os
 
@@ -716,17 +725,56 @@ attest_dir = os.environ["ATTEST_DIR"]
 results_tsv = os.environ["ATTEST_RESULTS_TSV"]
 duplicates_tsv = os.environ["ATTEST_DUPLICATES_TSV"]
 
+# Tri-state per check (issue #882, same rc contract as the gate loop itself):
+# rc 0 -> OK, rc 2 -> WARN (CANNOT-ASSESS, never reported as a pass), anything
+# else -> FAIL. A red is never reported OK -- that mapping is enforced here,
+# not left to a caller to get right later.
+_VERDICT = {"0": "OK", "2": "WARN"}
+
+
+def verdict_for(rc: str) -> str:
+    return _VERDICT.get(rc, "FAIL")
+
+
 checks = []
 with open(results_tsv, encoding="utf-8") as fh:
     for line in fh:
         line = line.rstrip("\n")
         if not line:
             continue
-        name, rc = line.split("\t", 1)
+        fields = line.split("\t")
+        name, rc = fields[0], fields[1]
+        duration = float(fields[2]) if len(fields) > 2 and fields[2] else 0.0
+        out_path = fields[3] if len(fields) > 3 else ""
         status = "PASS" if rc == "0" else ("SKIP" if rc == "2" else "FAIL")
-        checks.append({"name": name, "rc": int(rc), "status": status})
+        evidence_tail = ""
+        if out_path and os.path.isfile(out_path):
+            try:
+                with open(out_path, encoding="utf-8", errors="replace") as ofh:
+                    tail_lines = ofh.readlines()[-20:]
+                evidence_tail = "".join(tail_lines)
+            except OSError:
+                evidence_tail = ""
+        checks.append(
+            {
+                "name": name,
+                "rc": int(rc),
+                "status": status,
+                "verdict": verdict_for(rc),
+                "duration": duration,
+                "evidence_tail": evidence_tail,
+            }
+        )
 
 skipped = [c["name"] for c in checks if c["status"] == "SKIP"]
+
+# Overall verdict = the worst of the per-check verdicts, never better than any
+# check it ran (issue #882's no-false-green requirement).
+_RANK = {"OK": 0, "WARN": 1, "FAIL": 2}
+overall_verdict = "OK"
+for c in checks:
+    if _RANK[c["verdict"]] > _RANK[overall_verdict]:
+        overall_verdict = c["verdict"]
 
 # Duplicate check names: a name registered twice is a gate defect (two lanes
 # wrote the same surface), so it is recorded here verbatim -- {} when clean.
@@ -741,9 +789,11 @@ with open(duplicates_tsv, encoding="utf-8") as fh:
 
 overall = int(os.environ["ATTEST_RESULT"])
 attestation = {
+    "run_id": os.environ["ATTEST_RUN_ID"],
     "gate": "verify",
     "mode": os.environ["ATTEST_MODE"],
     "result": "PASS" if overall == 0 else "FAIL",
+    "overall_verdict": overall_verdict,
     "exit_code": overall,
     "timestamp": os.environ["ATTEST_TS"],
     "host": os.environ["ATTEST_HOST"],
@@ -762,6 +812,20 @@ with open(path, "w", encoding="utf-8") as fh:
     json.dump(attestation, fh, indent=2)
     fh.write("\n")
 PY
+
+# --- attestation self-validation (issue #882) --------------------------------
+# Written EVEN ON FAILURE (above) so a red run still carries evidence; validated
+# here so a malformed attestation is itself a gate defect, not a silent hole. A
+# schema violation here is not allowed to hide behind an otherwise-green run:
+# it forces the whole gate to FAIL (no-false-green doctrine, GR-12).
+attestation_schema="$root/.verify/attestation.schema.json"
+if [ -f "$attestation_schema" ] && command -v python3 >/dev/null 2>&1; then
+  if ! python3 "$root/scripts/lib/validate-attestation.py" \
+      "$verify_dir/attestation.json" "$attestation_schema" >>"$log" 2>&1; then
+    echo "verify: attestation.json failed schema validation (see $log) -- the gate cannot attest a shape it did not itself produce correctly" >&2
+    overall=1
+  fi
+fi
 
 # --- summary ----------------------------------------------------------------
 # A SKIP is counted and named here so it can never hide (a skip is not a pass).
