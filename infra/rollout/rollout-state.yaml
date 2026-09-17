@@ -91,6 +91,10 @@ flags:
     stage: "off"
     rollout_pct: 0
     targeted: []
+  services.erp_webhooks_bridge:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
   # The AgentConsole (issue #802, child of EPIC #800). The registry row declares
   # WHAT is gated; this row is what makes the surface **withdrawable**. Measured:
   # the engine refuses a flag this file does not carry (`unknown flag

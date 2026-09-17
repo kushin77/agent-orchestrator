@@ -149,6 +149,12 @@ variable "enable_erp_module" {
   default     = false
 }
 
+variable "enable_erp_webhooks_bridge" {
+  description = "Enable the CRM→ERPNext webhook bridge (issue #671, EPIC #665). In-module switch: FLAG_ID 'erp-webhooks-bridge' in integrations/erp/webhooks/flags.py. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
 # --- Deployer service account (the ONLY apply route) ------------------------
 
 variable "deployer_enabled" {
