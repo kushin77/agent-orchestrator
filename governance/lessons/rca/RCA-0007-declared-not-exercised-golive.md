@@ -85,3 +85,9 @@ notice.
 - The retired GCP route's `apply.yaml` still defaults `_PROJECT_ID: "false"`
   (found during this work) — harmless while the route is retired, but wrong if
   it is ever revived.
+
+- **Evidence-SHA caveat:** the lesson's commit evidence names the lane
+  commit that ships the gate (`4e7684bcefeb3f7bbbf275474ea1a684063ec25f`). If #1029 lands by squash, that
+  commit is not an ancestor of `master`; append the merge commit (the
+  ledger resolves evidence with `git cat-file -e`, so the object must be
+  present in a fresh clone).
