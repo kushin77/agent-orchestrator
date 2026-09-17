@@ -149,7 +149,17 @@ if [ "$probe_rc" -ne 0 ]; then
   echo "check-rbac-head-binding: CANNOT-ASSESS — the in-process probe crashed (rc=$probe_rc)" >&2
   exit 2
 fi
-if ! printf '%s\n' "$probe_out" | grep -q '^PROBE_RESULT=OK$'; then
+# Line-anchored containment, bash-native: a piped quiet test can be killed by
+# SIGPIPE and report text that IS present as absent -- the check then fails OPEN
+# on exactly the branch that proves a control works (issue #1006).
+probe_ok=0
+while IFS= read -r line; do
+  if [ "$line" = "PROBE_RESULT=OK" ]; then
+    probe_ok=1
+  fi
+done <<< "$probe_out"
+
+if [ "$probe_ok" -eq 0 ]; then
   echo "check-rbac-head-binding: NOT-OK — default-off or the provoked negative control failed (see above)" >&2
   fail=1
 fi
