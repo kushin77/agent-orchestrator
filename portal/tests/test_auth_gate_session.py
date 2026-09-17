@@ -65,6 +65,42 @@ def test_verified_session_opens_the_shell(app):
     assert api.header("Location") == "/views/shell.html"
 
 
+def test_gate_accurate_token_without_tenant_claim_is_accepted(app):
+    """The **real** shared-frontend gate mints the ``os-session-token``
+    tenant-agnostic — ``{purpose, sub, email, name, role}`` and no ``tenantId``
+    (one gate serves every portal origin; the consumer maps tenants from its own
+    org directory, never the token).
+
+    This is the regression guard for the live redirect loop: the console once
+    hard-required a ``tenantId`` claim the gate never sends, so a genuine gate
+    token was refused and the browser bounced ``/`` → ``/auth/login`` → ``/``
+    forever. The token is minted here in the gate's exact shape (no tenant) and
+    the console must accept it and open the shell.
+    """
+    now = int(time.time())
+    token = AUTH_GATE.sign(
+        {
+            "purpose": CONSOLE_TOKEN_PURPOSE,
+            "sub": SCOPED_USER_EMAIL,
+            "email": SCOPED_USER_EMAIL,
+            "name": "Alice",
+            "role": "user",
+            "iat": now,
+            "exp": now + 600,
+            # deliberately NO tenantId — the shared-frontend gate has none.
+        }
+    )
+    api = _presenting(app, token)
+    status, payload = api.get("/api/console/me")
+    assert status == 200, payload
+    assert payload["data"]["email"] == SCOPED_USER_EMAIL
+
+    # ...and the same gate-shaped token opens the shell (the loop's exit).
+    status, _ = api.get("/")
+    assert status == 302
+    assert api.header("Location") == "/views/shell.html"
+
+
 # -- the front door: unauthenticated document requests -> the OS auth gate ----
 
 def test_unauthenticated_document_request_redirects_to_the_os_gate(client):
@@ -190,14 +226,8 @@ def test_rs256_token_with_the_wrong_purpose_is_refused(app, purpose):
     _assert_unauthorized(_presenting(app, token))
 
 
-def test_token_without_a_tenant_claim_is_refused(app):
-    """A console token must carry its tenant claim (no anonymous scope)."""
-    claims = AUTH_GATE.claims(SCOPED_USER_EMAIL, "acme")
-    claims.pop("tenantId")
-    _assert_unauthorized(_presenting(app, AUTH_GATE.sign(claims)))
-
-
-def test_allowlist_only_console_refuses_a_verified_non_allowlisted_identity():
+def test_allowlist_only_console_refuses_a_verified_non_allowlisted_identity(
+):
     """In allowlist-only mode a verified token for a non-allowlisted email is
     refused: the gate's allowlist is enforced again at the module boundary."""
     app = build_app(sso=console_sso(allowlist_only=True))
