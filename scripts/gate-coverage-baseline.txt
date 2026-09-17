@@ -79,7 +79,6 @@ suite	registry/events	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	registry/service	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	registry/packs	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/onboarding	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	identity/rbac	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/cpapi	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/edges	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/entitlements	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
