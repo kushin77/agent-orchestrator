@@ -54,7 +54,20 @@ Exit codes of ``scripts/gate-lock.sh`` are deliberately outside the gate's own
 10       REFUSED — another gate already holds this worktree (PARKED, not started)
 11       PARKED — every box-wide permit slot is taken (PARKED, not started)
 12       CANNOT-ASSESS — the permit store cannot be trusted
+13       HEALTH-ATTENTION — ``doctor`` found a leftover lock (alert-only, see below)
 =====  =========================================================================
+
+**Proactive health sweep (RCA-0007, the #948 follow-up).** #948 fixed the
+reactive half — ``release`` reaps its own free lock, and a queried ``status``
+names every leftover it finds box-wide — but nothing called ``status`` on a
+schedule, so a leftover for a worktree nobody happened to query sat invisible,
+starving the concurrency cap with unrelated "PARKED (rc 10/rc 11)" contention
+for hours before it was traced to one file. ``gate-lock.sh doctor``
+(``gatelock.health``) runs the same sweep from cron/the watchdog and exits 13
+when it finds one. It is alert-only, not auto-heal: reaping a lock the caller
+does not own is the "delete every file" regression #948's own fix forbids, so
+this reports by name and leaves removal to the one path already proven
+safe — a worktree's own ``release``.
 """
 
 from __future__ import annotations
@@ -84,6 +97,7 @@ EXIT_ADMIT = 0
 EXIT_REFUSED = 10
 EXIT_PARKED = 11
 EXIT_STORE_UNUSABLE = 12
+EXIT_HEALTH_ATTENTION = 13
 
 
 class GateLockError(Exception):
@@ -928,6 +942,33 @@ def status(
     return "\n".join(lines)
 
 
+def health(*, root: str | os.PathLike[str] | None = None) -> tuple[str, bool]:
+    """Proactively sweep every worktree lock for a leftover (RCA-0007, #948).
+
+    ``status()`` already lists every worktree lock "needing attention" — a
+    stale record, a 0-byte owner-less file, a held lock whose owner cannot be
+    read — but only when a HUMAN happens to run ``status``. That is exactly
+    the gap #948 exposed: the leftover that wedged #619's close-out sat
+    undetected across a box-wide verify-gate concurrency cap (4 slots) for
+    hours before anyone traced the "PARKED (rc 10/rc 11)" contention on
+    unrelated PRs back to one file. This is the same sweep, callable from a
+    schedule (cron / the watchdog) instead of waiting for a human to ask.
+
+    Alert-only, deliberately: ``release`` already reaps a lock it PROVES is
+    free by holding the flock while it unlinks (``_reap_free_lock``), so a
+    holder cleaning up after itself is safe. A box-wide sweep reaping a lock
+    for a worktree it does not own is a different risk class — the exact
+    "delete every file" regression #948's own fix forbids — so this reports
+    by name and never removes. Auto-heal stays on the one path that is
+    already proven safe: a worktree's own ``release``.
+
+    Returns ``(report, needs_attention)``.
+    """
+    report = status(root=root)
+    needs_attention = "needing attention" in report
+    return report, needs_attention
+
+
 def status_code(
     worktree: str | os.PathLike[str] | None = None,
     *,
@@ -983,6 +1024,15 @@ def _parser() -> argparse.ArgumentParser:
     status_cmd.add_argument("--worktree", default=None)
     status_cmd.add_argument("--root", default=None)
 
+    doctor_cmd = commands.add_parser(
+        "doctor",
+        help=(
+            "proactively sweep every worktree lock for a zero-byte/owner-less "
+            "leftover (RCA-0007, #948); alert-only, exits 13 when one is found"
+        ),
+    )
+    doctor_cmd.add_argument("--root", default=None)
+
     return parser
 
 
@@ -1004,6 +1054,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "release":
             print(release(args.worktree, root=args.root, caller_pid=args.owner_pid))
             return EXIT_ADMIT
+        if args.command == "doctor":
+            report, needs_attention = health(root=args.root)
+            print(report)
+            return EXIT_HEALTH_ATTENTION if needs_attention else EXIT_ADMIT
         print(status(args.worktree, root=args.root))
         return status_code(args.worktree, root=args.root)
     except Refused as exc:
