@@ -1,0 +1,58 @@
+# Owner-committed dispatch queue (issue #928, seeded from the "Owner queue
+# 2026-09-16" comment on #878).
+#
+# Schema:
+#   waves: an ordered list of {name, issues}. Issues are the owner's forced
+#   order WITHIN a wave (each issue is implicitly blocked_by every earlier
+#   issue in the same wave's list); every issue in a LATER wave is implicitly
+#   blocked_by every issue in an EARLIER wave. Only issue numbers that are
+#   still OPEN act as blockers (governance/dispatch/queue.py filters closed
+#   ones out against the live snapshot).
+#
+#   blocked_by (optional): explicit overrides/additions, {issue: [issue, ...]},
+#   unioned in on top of the implied wave edges. Use sparingly — most ordering
+#   should come from wave placement, not a hand-written override.
+#
+# PR-merge-only entries from the owner comment (items whose action is "merge
+# PR #NNN", not a claimable issue) are excluded: they are not dispatch units.
+#
+# Wave 0 (owner comment: "merge what's already green") lists PR numbers, not
+# claimable issue numbers ("#906 (issue-830, ...)" etc.) — each is translated
+# here to its underlying issue number, PR framing dropped, order preserved.
+# #913 is informational only (a refusal-path proof, not a unit of work) and is
+# excluded; the other seven are the real #706/#607 chain items.
+#
+# item 13 of the owner comment's forced order ("#884 L5: IaC — depends on
+# #900/#901/#902 (Wave 0) landing first") makes #902 a WAVE-0-class blocker of
+# #884 (wave 1) — #902 cannot be placed after #884 (that would invert the
+# owner's own stated dependency and, worked out as an override, cycles with
+# the wave-1 edges). #902 is therefore seeded here in wave 0, ahead of #884,
+# and dropped from its wave-2 slot (item 20) to avoid listing it twice.
+
+waves:
+  - name: wave-0-golive-chain-and-cron-path
+    # #706 chain to D7 + #900/#901/#902 cron container path (owner queue
+    # comment, section B, items 1-7, PR numbers translated to issue numbers;
+    # #902 pulled forward from item 20 — see note above). #606 (item 7,
+    # web-image build trigger) is already closed as of the seed date and is
+    # therefore omitted — a closed issue can never be a live queue blocker
+    # (governance/dispatch/owner_queue.py only unions OPEN blockers anyway).
+    issues: [830, 714, 712, 900, 715, 713, 902]
+
+  - name: wave-1-epic-878-lanes
+    # EPIC #878 lanes L1-L11, forced order by dependency shape (owner queue
+    # comment, section B, items 9-19).
+    issues: [880, 881, 882, 883, 884, 885, 886, 887, 888, 889, 890]
+
+  - name: wave-2-epic-706-residual-and-golive
+    # #706 residual + go-live #607 (owner queue comment, section B, items
+    # 21-26). PR-merge entries #927/#926/#924 excluded; #902 moved to wave 0
+    # (see note above).
+    issues: [619, 731, 732]
+
+  - name: wave-3-active-governance-bugs
+    # Active bugs/governance blocking the ratchet itself (owner queue
+    # comment, section B, items 27-30).
+    issues: [865, 866, 786, 928]
+
+blocked_by: {}

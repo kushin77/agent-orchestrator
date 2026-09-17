@@ -25,7 +25,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import focus
+import owner_queue as queue_mod
 from model import (
+    MISSING,
     REASON_ACTIVE_EPIC_CHILD,
     REASON_ALREADY_CLAIMED,
     REASON_BLOCKED,
@@ -77,6 +79,7 @@ def eligible(
     agent_history: frozenset[int] = frozenset(),
     claimed_by_others: frozenset[int] = frozenset(),
     focus_path: Path | str | None = None,
+    queue_data: dict | None | object = MISSING,
 ) -> Eligibility:
     """Decide whether ``issue_number`` is the next eligible step for this agent.
 
@@ -85,9 +88,20 @@ def eligible(
     ``None`` and is resolved to ``focus.DEFAULT_PATH`` *at call time*: a default
     argument would freeze the module constant at import, so a test (or a caller)
     that repoints the focus would silently keep judging against the old file.
+
+    ``queue_data`` is the parsed owner queue (``owner_queue.load()``, #928),
+    used only to name a queue-sourced blocker in the ``blocked`` detail — the
+    refusal itself is decided by ``snapshot.blockers_open()``, which already
+    carries the queue's edges once the caller has overlaid them (see
+    ``owner_queue.overlay`` / ``cli._load_snapshot``). The sentinel default
+    ``model.MISSING`` sentinel (rather than ``None``) lets a caller explicitly
+    pass ``None`` to mean "no queue" without it being confused with "use the
+    committed file".
     """
     if focus_path is None:
         focus_path = focus.DEFAULT_PATH
+    if queue_data is MISSING:
+        queue_data = queue_mod.load()
     issue = snapshot.get(issue_number)
     if issue is None:
         return Eligibility(issue_number, False, REASON_UNKNOWN_ISSUE, "not present in .board/snapshot.json")
@@ -117,7 +131,11 @@ def eligible(
     open_blockers = snapshot.blockers_open(issue)
     if open_blockers:
         listed = ", ".join(f"#{number}" for number in open_blockers)
-        return Eligibility(issue_number, False, REASON_BLOCKED, f"blocked by {listed}")
+        detail = f"blocked by {listed}"
+        queue_note = queue_mod.queue_detail(issue_number, queue_data, snapshot)
+        if queue_note is not None:
+            detail = f"{detail} ({queue_note})"
+        return Eligibility(issue_number, False, REASON_BLOCKED, detail)
 
     if issue.parent is not None and issue.parent in active_claims:
         return Eligibility(

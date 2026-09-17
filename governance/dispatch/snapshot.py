@@ -218,8 +218,17 @@ def save(snapshot: Snapshot, path: Path | str = DEFAULT_PATH) -> Path:
     return target
 
 
-def load(path: Path | str = DEFAULT_PATH) -> Snapshot:
-    """Load the committed snapshot. Raises FileNotFoundError/ValueError if unusable."""
+def load(path: Path | str = DEFAULT_PATH, apply_queue: bool = True) -> Snapshot:
+    """Load the committed snapshot. Raises FileNotFoundError/ValueError if unusable.
+
+    ``apply_queue`` overlays the owner's committed dispatch queue (#928,
+    ``governance/dispatch/owner_queue.py``) into ``Issue.blocked_by`` before
+    returning — this is THE seam every caller shares (``cli.py``'s verbs and
+    ``fleet/brain.py``'s live dispatch loop alike both call ``snapshot.load``
+    directly), so the queue's implied order cannot be bypassed by a caller
+    that loads the board its own way. Pass ``False`` only for a caller that
+    must see the raw, un-overlaid board (e.g. re-serializing it unchanged).
+    """
     target = Path(path)
     raw = target.read_text(encoding="utf-8")
     data = json.loads(raw)
@@ -242,11 +251,16 @@ def load(path: Path | str = DEFAULT_PATH) -> Snapshot:
             blocked_by=tuple(sorted(int(number) for number in blocked)),
             cross_refs=tuple(sorted(str(ref) for ref in cross_refs)),
         )
-    return Snapshot(
+    snapshot = Snapshot(
         generated_at=str(data.get("generated_at", "") or ""),
         source=str(data.get("source", "") or ""),
         issues=issues,
     )
+    if apply_queue:
+        import owner_queue  # local import: avoids a load-time cycle (#928)
+
+        snapshot = owner_queue.overlay(snapshot, owner_queue.load())
+    return snapshot
 
 
 def content_sha256(path: Path | str = DEFAULT_PATH) -> str:

@@ -53,8 +53,10 @@ import runtime  # noqa: E402
 import order
 import focus
 import pool
+import owner_queue as queue_mod
 from model import (
     ALLOWED_CLAIM_REASONS,
+    MISSING,
     ARBITRATION_REFUSALS,
     REASON_ACTIVE_EPIC_CHILD,
     REASON_ALREADY_CLAIMED,
@@ -438,8 +440,14 @@ def arbitrate(
     snapshot_sha256: str = "",
     now: datetime | None = None,
     stale_minutes: int = DEFAULT_STALENESS_MINUTES,
+    queue_data: dict | None | object = MISSING,
 ) -> Arbitration:
     """Prove issue -> epic -> lane ownership before a unit is dispatched (#726).
+
+    ``queue_data`` is the parsed owner queue (``owner_queue.load()``, #928),
+    used only to name a queue-sourced blocker in the ``blocked`` refusal
+    detail. The sentinel default ``model.MISSING`` resolves to the committed file at
+    call time; pass ``None`` explicitly to mean "no queue" in a test.
 
     Returns the granted arbitration, or raises ``ClaimRefused`` naming the reason
     *and the evidence it checked*: the board snapshot (source, generation, digest)
@@ -453,6 +461,8 @@ def arbitrate(
     would refuse.
     """
     moment = now or datetime.now(timezone.utc)
+    if queue_data is MISSING:
+        queue_data = queue_mod.load()
     board = _board_evidence(snapshot, snapshot_path, snapshot_sha256)
 
     issue = snapshot.get(issue_number)
@@ -484,7 +494,11 @@ def arbitrate(
     open_blockers = snapshot.blockers_open(issue)
     if open_blockers:
         listed = ", ".join(f"#{number}" for number in open_blockers)
-        raise ClaimRefused(REASON_BLOCKED, f"#{issue_number} is blocked by {listed} — evidence: {board}")
+        detail = f"#{issue_number} is blocked by {listed} — evidence: {board}"
+        queue_note = queue_mod.queue_detail(issue_number, queue_data, snapshot)
+        if queue_note is not None:
+            detail = f"{detail} ({queue_note})"
+        raise ClaimRefused(REASON_BLOCKED, detail)
 
     # The lane half: a second live claim on a held unit is refused, naming the
     # holder and the records that prove it.

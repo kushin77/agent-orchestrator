@@ -41,6 +41,7 @@ import claims  # noqa: E402
 import focus as focus_mod  # noqa: E402
 import order  # noqa: E402
 import pool as pool_mod  # noqa: E402
+import owner_queue as queue_mod  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 
 EXIT_OK = 0
@@ -64,6 +65,10 @@ def _capacity_module():
 
 
 def _load_snapshot(path: Path) -> snapshot_mod.Snapshot:
+    """Load the board snapshot. ``snapshot_mod.load`` overlays the owner's
+    committed queue (#928) by default — this wrapper exists only so every
+    verb reads the board through one seam.
+    """
     return snapshot_mod.load(path)
 
 
@@ -451,6 +456,71 @@ def cmd_trigger(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_queue(args: argparse.Namespace) -> int:
+    """Report/validate the owner's committed queue (#928)."""
+    queue_path = Path(args.queue)
+    try:
+        data = queue_mod.load(queue_path)
+    except queue_mod.QueueError as exc:
+        print(f"queue: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if data is None:
+        print(f"queue: CANNOT-ASSESS — {queue_path} is missing", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    if args.check:
+        snapshot_path = Path(args.snapshot)
+        snapshot = None
+        if snapshot_path.exists():
+            snapshot = snapshot_mod.load(snapshot_path)
+            if snapshot_mod.is_stale(snapshot, args.stale_minutes):
+                age = snapshot_mod.age_minutes(snapshot)
+                print(
+                    f"queue --check: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m); "
+                    "'exists/open' checks need a fresh board — refresh first: "
+                    "python3 governance/dispatch/cli.py snapshot --from-github "
+                    "(structural checks — duplicates, cycles — do not need the board and still ran)",
+                    file=sys.stderr,
+                )
+                structural = queue_mod.validate(data, snapshot=None)
+                if structural:
+                    print(f"queue: FAIL ({len(structural)} structural problem(s))", file=sys.stderr)
+                    for problem in structural:
+                        print(f"  - {problem}", file=sys.stderr)
+                    return EXIT_NOT_OK
+                return EXIT_CANNOT_ASSESS
+        else:
+            print(f"queue --check: {snapshot_path} is missing — validating structure only", file=sys.stderr)
+        problems = queue_mod.validate(data, snapshot)
+        if problems:
+            print(f"queue: FAIL ({len(problems)} problem(s))", file=sys.stderr)
+            for problem in problems:
+                print(f"  - {problem}", file=sys.stderr)
+            return EXIT_NOT_OK
+        print("queue: OK (no duplicates, all numbers known, no cycles)")
+        return EXIT_OK
+
+    if args.next:
+        snapshot_path = Path(args.snapshot)
+        if not snapshot_path.exists():
+            print(f"queue --next: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        snapshot = snapshot_mod.load(snapshot_path)
+        held = claims.active_claims(claims.read_ledger(args.ledger))
+        ready = [n for n in queue_mod.next_claimable(snapshot, data) if n not in held]
+        if not ready:
+            print("queue --next: <none> (every queued issue is closed, live-claimed, or blocked)")
+            return EXIT_OK
+        for number in ready:
+            issue = snapshot.get(number)
+            title = issue.title if issue else ""
+            print(f"#{number} {title}")
+        return EXIT_OK
+
+    print(f"queue: {args.queue} not validated — pass --next or --check")
+    return EXIT_OK
+
+
 def add_paths(parser: argparse.ArgumentParser) -> None:
     """Board artifacts every subcommand reads (after the subcommand, e.g. `audit --ledger x`)."""
     parser.add_argument("--snapshot", default=str(snapshot_mod.DEFAULT_PATH))
@@ -551,6 +621,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="the fleet runtime dir holding parked/ (default AO_FLEET_DIR, else <repo>/.fleet)",
     )
     trigger.set_defaults(func=cmd_trigger)
+
+    queue_cmd = sub.add_parser(
+        "queue", help="the owner's committed dispatch queue (#928): next claimable / validate"
+    )
+    queue_cmd.add_argument("--queue", default=str(queue_mod.DEFAULT_PATH))
+    queue_cmd.add_argument("--snapshot", default=str(snapshot_mod.DEFAULT_PATH))
+    queue_cmd.add_argument("--ledger", default=str(claims.DEFAULT_CLAIMS_DIR))
+    queue_cmd.add_argument("--stale-minutes", type=int, default=snapshot_mod.DEFAULT_STALENESS_MINUTES)
+    queue_cmd.add_argument("--next", action="store_true", help="print the next claimable issue(s)")
+    queue_cmd.add_argument(
+        "--check", action="store_true", help="validate the file: no duplicates, all numbers known, no cycles"
+    )
+    queue_cmd.set_defaults(func=cmd_queue)
     return parser
 
 

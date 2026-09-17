@@ -20,6 +20,7 @@ if PKG_DIR not in sys.path:
 
 from model import Issue, Snapshot  # noqa: E402
 import focus  # noqa: E402
+import owner_queue  # noqa: E402
 import pool  # noqa: E402
 
 BASE_TIME = datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc)
@@ -64,6 +65,11 @@ def no_ambient_focus(tmp_path, monkeypatch) -> None:
     """
     monkeypatch.setattr(focus, "DEFAULT_PATH", _absent_focus_file(tmp_path))
     monkeypatch.setattr(pool, "POOL_PATH", tmp_path / "no-pool.jsonl")
+    # Same reasoning for the owner queue (#928): without this, every test that
+    # does not ask for a queue fixture would read the repository's own
+    # committed governance/dispatch/queue.yaml, so adding a number to it could
+    # move an unrelated test's blocked_by set.
+    monkeypatch.setattr(owner_queue, "DEFAULT_PATH", tmp_path / "no-queue.yaml")
 
 
 @pytest.fixture

@@ -149,6 +149,7 @@ checks=(
   'cpapi-spec-drift|bash scripts/check-cpapi-spec-drift.sh'
   'chronological-dispatch|bash scripts/check-chronological-dispatch.sh'
   'issue-claims|bash scripts/check-issue-claims.sh'
+  'dispatch-queue|bash scripts/check-dispatch-queue.sh'
   'epic-focus|bash scripts/check-epic-focus.sh'
   # capacity-gate (epic #707, lane F3/#718): the fan-out default is the MAXIMUM,
   # bounded by three real limits — effective = min(pool, disjoint ready lanes,
