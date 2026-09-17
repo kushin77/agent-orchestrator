@@ -618,9 +618,9 @@ PYEOF
   else
     plant_rc=$?
     if [ "$plant_rc" -eq 1 ] \
-      && printf '%s' "$plant_out" | grep -qE "$plant_py:1: retired term 'sister'" \
-      && printf '%s' "$plant_out" | grep -qE "$plant_py:5: retired term 'sister'" \
-      && printf '%s' "$plant_out" | grep -qE "$plant_py:5: retired term 'brain'"; then
+      && [[ "$plant_out" == *"$plant_py:1: retired term 'sister'"* ]] \
+      && [[ "$plant_out" == *"$plant_py:5: retired term 'sister'"* ]] \
+      && [[ "$plant_out" == *"$plant_py:5: retired term 'brain'"* ]]; then
       ok "a retired name planted in a docstring and a comment is refused by file, line and word"
     else
       bad "the planted retired name was refused but not named by file+line+word: $plant_out"

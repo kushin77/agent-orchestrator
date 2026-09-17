@@ -121,7 +121,7 @@ PYEOF
     exit 1
   fi
 
-  if ! printf '%s' "$nc_out" | grep -q "CMR-PIN-DRIFT"; then
+  if [[ "$nc_out" != *"CMR-PIN-DRIFT"* ]]; then
     echo "check-cmr-pin: NOT-OK — negative control: mutant was refused (rc $nc_rc) but not by name (CMR-PIN-DRIFT missing):" >&2
     echo "$nc_out" >&2
     exit 1
