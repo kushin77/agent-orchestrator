@@ -23,7 +23,9 @@ touching the API version field; it requires the *exit criteria* in §4 below.
 ## 2. Surfaces under SemVer contract
 
 Only surfaces with a verified defining artifact **and** a verified defending
-gate are listed. Each path below was confirmed present with `test -e` (§7).
+gate are listed. Each path below was confirmed present with `test -e` on this
+branch; the full existence check is pasted as PR evidence
+(kushin77/agent-orchestrator#1075).
 
 | Surface | Defining artifact | Defending gate | Current version |
 |---|---|---|---|
