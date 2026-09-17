@@ -403,6 +403,16 @@ gateway-catalog-parity:
 agent-identity-parity:
 	@bash scripts/check-agent-identity-parity.sh
 
+## provider-parity — flag UNEXPLAINED Claude/DeepSeek capability drift (issue
+## #1194): does not force literal parity (Claude=orchestrator,
+## DeepSeek=analytics worker differ by design) but requires every asymmetric
+## flag-gated module.json feature and every asymmetric capabilitySet/
+## toolAllowlist entry in the seeds/persona cards to carry an inline rationale
+## marker; the check mutates a scratch copy with an unmarked item and requires
+## it to be refused by name, so it cannot pass vacuously
+provider-parity:
+	@bash scripts/check-provider-parity.sh
+
 ## guardrail-controls — server-side guardrail control semantics (issue #343):
 ## every control defaults OFF, an unknown control is refused, a toggle writes
 ## exactly one append-only audit record and flips observable state a second

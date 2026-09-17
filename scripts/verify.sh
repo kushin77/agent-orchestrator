@@ -331,6 +331,12 @@ checks=(
   # every seed must validate as a projected identity; the check mutates its own
   # input, so it cannot pass vacuously.
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
+  # provider-parity (issue #1194): flag UNEXPLAINED Claude/DeepSeek capability
+  # drift without forcing literal parity (roles differ by design); every
+  # asymmetric flag-gated module.json feature and capabilitySet/toolAllowlist
+  # entry must carry an inline rationale marker, and the check mutates a
+  # scratch copy with an unmarked item, so it cannot pass vacuously.
+  'provider-parity|bash scripts/check-provider-parity.sh'
   # rbac-head-binding (issue #952): tenant/RBAC binding for the head-of-org
   # personas (hermes, paperclip) — identity/rbac/presets/head-agents.yaml +
   # identity/rbac/head_bindings.py; GR-28 default-off is asserted live and the
