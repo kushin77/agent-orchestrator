@@ -123,14 +123,49 @@ BOARD_PATH = ROOT / ".board" / "snapshot.json"
 # Where the cheap, cached master-health verdict lives (RCA 2026-09-17 fix #5).
 # It is the SAME attestation shape landing reads (`governance/landing/evidence.py`
 # — `rc`/`commit`/`result`/`timestamp`), just written for `origin/master`'s own
-# head instead of a lane's; whatever refreshes it (a cron rung, `make verify`
-# on master) writes with `scripts/merge-gate.sh`'s own writer so both readers
-# agree on one schema. This module never runs verify itself — it only reads
-# the cached verdict, which is what keeps the pre-check cheap.
+# head instead of a lane's. WHO WRITES IT: `governance/landing/engine.py`'s
+# `land()`, right after a successful squash-merge (engine.py, the
+# `master-attestation` step right after the `merge` step) — every landed lane
+# publishes master's own just-measured health at exactly the commit that
+# lands, via `governance.landing.evidence.write_master_attestation` (the same
+# schema, atomic tmp+rename write). This module never runs verify itself and
+# never writes this file — it only reads the cached verdict, which is what
+# keeps the pre-check cheap.
 MASTER_ATTESTATION = FLEET_DIR / "master-attestation.json"
-# A cached verdict older than this is stale — treated as no fresher than an
-# absent one (CANNOT-ASSESS), never silently trusted as still green.
-MASTER_ATTESTATION_TTL_SECONDS = 900.0
+# The backstop only: an attestation whose COMMIT still matches origin/master's
+# current head (the normal case between merges) never goes stale from wall
+# clock alone — see `master_health_refusal` below. This cap exists only for
+# the degenerate case of a head that has not moved in a very long time (a
+# quiet repo, or a stopped landing driver), so a fact from a week ago is never
+# silently trusted just because nothing has landed since. Generous on
+# purpose: freshness is normally decided by the commit match, not the clock.
+MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS = 86400.0
+
+
+def current_master_head() -> str | None:
+    """`origin/master`'s head SHA, read with NO fetch and NO verify.
+
+    `git rev-parse` here only resolves whatever ref this checkout already has
+    for `origin/master` (a plain local ref lookup — packed or loose, same as
+    reading `.git/refs/remotes/origin/master`); it never reaches the network
+    and never invokes `scripts/verify.sh` or `scripts/merge-gate.sh`, which is
+    what keeps this pre-check as cheap as the reader it borrows from. `None`
+    when the ref cannot be resolved at all (an unborn repo, no such remote) —
+    that is a CANNOT-ASSESS input, same posture as an unreadable attestation.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--verify", "-q", "origin/master"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha or None
 
 
 def master_health_refusal(order: dict) -> str | None:
@@ -144,39 +179,21 @@ def master_health_refusal(order: dict) -> str | None:
     uses (`landing_evidence.read_attestation`), so "green" means one thing in
     this fleet.
 
+    Freshness is HEAD-BOUND, not wall-clock: the attestation is fresh exactly
+    when its `commit` names `origin/master`'s current head (`same_commit`,
+    landing's own short-SHA-tolerant comparison) — an attestation for the
+    current head never goes stale merely because time passed between merges,
+    and one for an older head is CANNOT-ASSESS the instant a newer commit
+    lands, however recently it was written. `MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS`
+    (24h) is only the backstop for a head that has not moved in a long time.
+
     A lane explicitly fixing a red master is exempt — `task.allow_red_master`
     (a directive flag) or `task.master_red_fix` (an issue labelled as the fix
     itself) — otherwise nothing could ever repair master. Every other order is
-    admitted only when the cached verdict is fresh AND green; absent, stale,
-    unreadable, or red all refuse (CANNOT-ASSESS is never a pass, mirroring
-    the honesty tri-state `governance/landing/evidence.py` already uses).
-
-    WHO WRITES `MASTER_ATTESTATION`, AND HOW OFTEN (tracked as a KNOWN GAP —
-    #1114 follow-up): as of this change, **nothing writes it yet**. Searched
-    for an existing periodic writer first (per RCA fix #5's own acceptance
-    note, "refreshed on a short TTL"): no fleet cron rung
-    (`fleet/cron.py`'s `_LEGACY_JOBS` / the fleet-jobs manifest) or watchdog
-    pass (`fleet/watchdog.py`) runs `scripts/merge-gate.sh` or
-    `scripts/verify.sh` against `origin/master` on any schedule — the only
-    things that currently run either are a lane's own pre-merge contract and
-    an operator's ad-hoc `make verify`. The one seam that DOES have the right
-    data in hand at the right moment is `governance/landing/engine.py`'s
-    `land()`, right after a successful squash-merge
-    (`governance/landing/engine.py:715-717`, immediately after
-    `self.ops.merge_pr(...)` succeeds): `result.attestation` there is already
-    a fresh, green, commit-named attestation in this SAME schema, and the
-    commit it names is about to become (or just became) `origin/master`'s
-    head. That module is out of this lane's ownership (sibling lane,
-    read-only reuse), so the write is not implemented here — until it lands,
-    every non-exempt dispatch reads `MASTER_ATTESTATION` as absent and
-    refuses CANNOT-ASSESS. Whatever writes it must refresh more often than
-    `MASTER_ATTESTATION_TTL_SECONDS` (900s) actually lands merges, or must
-    raise that TTL to match its real cadence — a periodic cron rung would
-    need to run at least every ~900s; a landing-triggered write instead
-    refreshes on every merge, which is usually far more often than that on a
-    healthy fleet and far less often exactly when it matters (master just
-    went red), so the TTL should stay short rather than being raised to fit
-    a slow writer.
+    admitted only when the cached verdict is head-fresh AND green; absent,
+    unreadable, head-stale, or red all refuse (CANNOT-ASSESS is never a pass,
+    mirroring the honesty tri-state `governance/landing/evidence.py` already
+    uses).
     """
     task = order.get("task") or {}
     if task.get("allow_red_master") or task.get("master_red_fix"):
@@ -187,12 +204,24 @@ def master_health_refusal(order: dict) -> str | None:
             f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} is {attestation.state} "
             f"({attestation.detail}); dispatch refuses rather than assume master is green"
         )
-    age = time.time() - _attestation_epoch(attestation.timestamp)
-    if age > MASTER_ATTESTATION_TTL_SECONDS:
+    head = current_master_head()
+    if head is None:
         return (
-            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} is stale "
-            f"({age:.0f}s old, ttl={MASTER_ATTESTATION_TTL_SECONDS:.0f}s); dispatch refuses "
-            "rather than trust an expired verdict"
+            f"master-health CANNOT-ASSESS — origin/master's head could not be resolved "
+            f"(no fetch, no verify was run); dispatch refuses rather than assume master is green"
+        )
+    if not landing_evidence.same_commit(attestation.commit, head):
+        return (
+            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} names commit "
+            f"{attestation.commit or 'none'}, but origin/master's head is now {head}; dispatch "
+            "refuses a verdict for a commit master has since moved past"
+        )
+    age = time.time() - _attestation_epoch(attestation.timestamp)
+    if age > MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS:
+        return (
+            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} matches origin/master's head but "
+            f"is {age:.0f}s old (> the {MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS:.0f}s backstop cap); "
+            "dispatch refuses rather than trust a verdict this old even at the right commit"
         )
     if not attestation.green:
         return (

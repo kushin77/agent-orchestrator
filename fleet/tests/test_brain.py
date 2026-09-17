@@ -630,9 +630,6 @@ def test_a_restart_does_not_dispatch_the_same_order_twice(tmp_path, monkeypatch)
     here is marker ordering, never the board's state.
     """
     monkeypatch.setattr(brain, "board_issue_state", lambda number: ("open", f"#{number} is open (stubbed)"))
-    attestation = tmp_path / "master-attestation.json"
-    _write_master_attestation(attestation, result="PASS", rc=0)
-    monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
     log = tmp_path / "sends.txt"
     marker = brain.DISPATCH_MARKERS / "4242.json"
     stub = tmp_path / "probe-channel.py"
@@ -852,7 +849,13 @@ def test_a_completion_with_no_ready_set_dispatches_nothing(monkeypatch):
 # reads for landing, so "green" is one fact in this fleet, never two.
 
 
-def _write_master_attestation(path: Path, *, result: str, rc: int, age_seconds: float = 0.0) -> None:
+MASTER_HEAD = "f" * 40
+OLD_MASTER_HEAD = "e" * 40
+
+
+def _write_master_attestation(
+    path: Path, *, result: str, rc: int, age_seconds: float = 0.0, commit: str = MASTER_HEAD
+) -> None:
     stamp = time.time() - age_seconds
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -860,7 +863,7 @@ def _write_master_attestation(path: Path, *, result: str, rc: int, age_seconds: 
             {
                 "result": result,
                 "exit_code": rc,
-                "commit": "deadbeef",
+                "commit": commit,
                 "timestamp": brain.datetime.fromtimestamp(stamp, tz=brain.timezone.utc).isoformat(),
             }
         ),
@@ -868,18 +871,29 @@ def _write_master_attestation(path: Path, *, result: str, rc: int, age_seconds: 
     )
 
 
-def test_master_health_refusal_is_none_when_master_is_freshly_green(tmp_path, monkeypatch):
+def _stub_master_head(monkeypatch, head: str = MASTER_HEAD) -> None:
+    """Freshness is head-bound (fix #5 follow-up, #1114): the real
+    `current_master_head` shells out to `git rev-parse`, which these tests
+    replace with a fixed answer so they never depend on this checkout's own
+    `origin/master`, and never race the `subprocess.run` monkeypatches some of
+    them also install for the channel."""
+    monkeypatch.setattr(brain, "current_master_head", lambda: head)
+
+
+def test_master_health_refusal_is_none_when_master_is_freshly_green_at_the_current_head(tmp_path, monkeypatch):
     attestation = tmp_path / "master-attestation.json"
-    _write_master_attestation(attestation, result="PASS", rc=0)
+    _write_master_attestation(attestation, result="PASS", rc=0, commit=MASTER_HEAD)
     monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    _stub_master_head(monkeypatch)
 
     assert brain.master_health_refusal(order()) is None
 
 
 def test_master_health_refusal_names_the_reason_when_master_is_red(tmp_path, monkeypatch):
     attestation = tmp_path / "master-attestation.json"
-    _write_master_attestation(attestation, result="NOT-OK", rc=1)
+    _write_master_attestation(attestation, result="NOT-OK", rc=1, commit=MASTER_HEAD)
     monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    _stub_master_head(monkeypatch)
 
     refusal = brain.master_health_refusal(order())
 
@@ -890,6 +904,7 @@ def test_master_health_refusal_names_the_reason_when_master_is_red(tmp_path, mon
 
 def test_master_health_refusal_is_cannot_assess_when_no_attestation_exists(tmp_path, monkeypatch):
     monkeypatch.setattr(brain, "MASTER_ATTESTATION", tmp_path / "no-such-file.json")
+    _stub_master_head(monkeypatch)
 
     refusal = brain.master_health_refusal(order())
 
@@ -897,22 +912,64 @@ def test_master_health_refusal_is_cannot_assess_when_no_attestation_exists(tmp_p
     assert "CANNOT-ASSESS" in refusal
 
 
-def test_master_health_refusal_is_cannot_assess_when_the_attestation_is_stale(tmp_path, monkeypatch):
+def test_master_health_refusal_is_cannot_assess_when_the_attestation_names_an_older_head(tmp_path, monkeypatch):
+    """Head-binding, not wall-clock: a *fresh* (age_seconds=0) attestation still
+    refuses once master has moved past the commit it names."""
     attestation = tmp_path / "master-attestation.json"
-    _write_master_attestation(attestation, result="PASS", rc=0, age_seconds=10_000.0)
+    _write_master_attestation(attestation, result="PASS", rc=0, commit=OLD_MASTER_HEAD)
     monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
-    monkeypatch.setattr(brain, "MASTER_ATTESTATION_TTL_SECONDS", 900.0)
+    _stub_master_head(monkeypatch, MASTER_HEAD)
 
     refusal = brain.master_health_refusal(order())
 
     assert refusal is not None
-    assert "stale" in refusal
+    assert "CANNOT-ASSESS" in refusal
+    assert OLD_MASTER_HEAD in refusal and MASTER_HEAD in refusal
+
+
+def test_master_health_refusal_is_cannot_assess_when_the_wallclock_backstop_expires(tmp_path, monkeypatch):
+    """Even at the right commit, a verdict old enough trips the 24h backstop —
+    the degenerate case of a head that has not moved in a very long time."""
+    attestation = tmp_path / "master-attestation.json"
+    _write_master_attestation(attestation, result="PASS", rc=0, commit=MASTER_HEAD, age_seconds=100_000.0)
+    monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    monkeypatch.setattr(brain, "MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS", 900.0)
+    _stub_master_head(monkeypatch)
+
+    refusal = brain.master_health_refusal(order())
+
+    assert refusal is not None
+    assert "CANNOT-ASSESS" in refusal and "backstop" in refusal
+
+
+def test_master_health_refusal_is_none_when_master_has_not_moved_within_the_backstop_cap(tmp_path, monkeypatch):
+    """The backstop is generous, not a short TTL: a same-head verdict a few
+    minutes old is fine — this is what tells the two mechanisms apart."""
+    attestation = tmp_path / "master-attestation.json"
+    _write_master_attestation(attestation, result="PASS", rc=0, commit=MASTER_HEAD, age_seconds=3_000.0)
+    monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    _stub_master_head(monkeypatch)
+
+    assert brain.master_health_refusal(order()) is None
+
+
+def test_master_health_refusal_is_cannot_assess_when_the_head_cannot_be_resolved(tmp_path, monkeypatch):
+    attestation = tmp_path / "master-attestation.json"
+    _write_master_attestation(attestation, result="PASS", rc=0, commit=MASTER_HEAD)
+    monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    monkeypatch.setattr(brain, "current_master_head", lambda: None)
+
+    refusal = brain.master_health_refusal(order())
+
+    assert refusal is not None
+    assert "CANNOT-ASSESS" in refusal
 
 
 def test_master_health_refusal_exempts_a_lane_flagged_to_fix_a_red_master(tmp_path, monkeypatch):
     attestation = tmp_path / "master-attestation.json"
-    _write_master_attestation(attestation, result="NOT-OK", rc=1)
+    _write_master_attestation(attestation, result="NOT-OK", rc=1, commit=MASTER_HEAD)
     monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    _stub_master_head(monkeypatch)
 
     allowed = order(task={"issue": 5, "lane": "fleet", "allow_red_master": True})
     labelled = order(task={"issue": 5, "lane": "fleet", "master_red_fix": True})
@@ -924,8 +981,9 @@ def test_master_health_refusal_exempts_a_lane_flagged_to_fix_a_red_master(tmp_pa
 def test_dispatch_refuses_to_send_when_master_is_red(tmp_path, monkeypatch):
     monkeypatch.setattr(brain, "board_issue_state", lambda number: ("open", f"#{number} is open (stubbed)"))
     attestation = tmp_path / "master-attestation.json"
-    _write_master_attestation(attestation, result="NOT-OK", rc=1)
+    _write_master_attestation(attestation, result="NOT-OK", rc=1, commit=MASTER_HEAD)
     monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    _stub_master_head(monkeypatch)
     sent = {"called": False}
 
     def forbidden_send(*args, **kwargs):
@@ -941,12 +999,31 @@ def test_dispatch_refuses_to_send_when_master_is_red(tmp_path, monkeypatch):
     assert sent["called"] is False
 
 
+def test_dispatch_refuses_when_the_attestation_names_a_commit_master_has_moved_past(tmp_path, monkeypatch):
+    monkeypatch.setattr(brain, "board_issue_state", lambda number: ("open", f"#{number} is open (stubbed)"))
+    attestation = tmp_path / "master-attestation.json"
+    _write_master_attestation(attestation, result="PASS", rc=0, commit=OLD_MASTER_HEAD)
+    monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    _stub_master_head(monkeypatch, MASTER_HEAD)
+
+    def forbidden_send(*args, **kwargs):
+        raise AssertionError("the channel must never be invoked for a head-stale attestation")
+
+    monkeypatch.setattr(brain.subprocess, "run", forbidden_send)
+
+    ok, message = brain.dispatch(order())
+
+    assert ok is False
+    assert "CANNOT-ASSESS" in message
+
+
 def test_dispatch_admits_the_same_order_once_master_reports_green(tmp_path, monkeypatch):
     monkeypatch.setattr(brain, "board_issue_state", lambda number: ("open", f"#{number} is open (stubbed)"))
     monkeypatch.setattr(brain, "DISPATCH_MARKERS", tmp_path / "dispatched")
     attestation = tmp_path / "master-attestation.json"
-    _write_master_attestation(attestation, result="PASS", rc=0)
+    _write_master_attestation(attestation, result="PASS", rc=0, commit=MASTER_HEAD)
     monkeypatch.setattr(brain, "MASTER_ATTESTATION", attestation)
+    _stub_master_head(monkeypatch)
     stub = tmp_path / "ok-channel.py"
     stub.write_text("print('channel send: OK')\n", encoding="utf-8")
     monkeypatch.setattr(brain, "CHANNEL", str(stub))
