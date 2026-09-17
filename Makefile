@@ -25,7 +25,7 @@ CONSOLE_HOST ?= 127.0.0.1
 CONSOLE_PORT ?= 8787
 
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e fleet-parity \
-        shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage chronological-dispatch \
+        shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage codeowners chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
@@ -71,6 +71,8 @@ help:
 	@echo "  yaml-lint     Parse every .yml/.yaml outside vendor/ (PyYAML)"
 	@echo "  json-lint     Validate every *.json outside vendor/"
 	@echo "  docs-lint     Foundation files + md links + whitespace + markers"
+	@echo "  codeowners    Declared ownership map (#1073): default + one rule per"
+	@echo "                pillar/cross-cutting dir, every rule naming a real path"
 	@echo "  chronological-dispatch  Governance docs declare dependency-ordered"
 	@echo "                issue selection (GR-20, cannot drift to kanban picking)"
 	@echo "  issue-claims  Claim-time order enforcement (#157): ledger replayed"
@@ -174,7 +176,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners
 	@echo ""
 	@echo "lint: OK"
 
@@ -227,6 +229,11 @@ json-lint:
 ## docs-lint — foundation files, markdown links, whitespace, unfinished markers
 docs-lint:
 	@bash scripts/check-docs.sh
+
+## codeowners — declared ownership map (issue #1073): default + one rule per
+## pillar/cross-cutting dir, every rule naming a real path, PROVOKED
+codeowners:
+	@bash scripts/check-codeowners.sh
 
 ## gate-coverage — every delivered artifact must be invoked by a gate (issue
 ## #526): a scripts/check-*.sh no gate file names, or a declared pytest suite no

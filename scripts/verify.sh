@@ -613,6 +613,17 @@ checks=(
   # being recorded as CANNOT-ASSESS.
   'erp-core-model|bash scripts/check-erp-core-model.sh'
   'lane-collision|bash scripts/check-lane-collision.sh'
+  # codeowners (issue #1073, cites #803 row 12 — platform-level enforcement of a
+  # declared control): `.github/CODEOWNERS` did not exist, so the five-pillar +
+  # cross-cutting map AGENTS.md and docs/ARCHITECTURE.md declare had no reviewer
+  # mapping and nothing would notice drift — a new pillar with no rule, a rule
+  # left behind naming a renamed/removed directory, or a typo'd owner token
+  # GitHub silently ignores. This check is STRUCTURAL (default rule present,
+  # every pillar present in the tree has an explicit rule, every rule names a
+  # real path, every owner token well-formed) and PROVOKED against the same
+  # comparator function with four fixtures (valid / missing-pillar /
+  # stale-path / malformed-owner), each required to fail BY NAME.
+  'codeowners|bash scripts/check-codeowners.sh'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------
