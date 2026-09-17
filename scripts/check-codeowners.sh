@@ -76,7 +76,7 @@ compare_codeowners() {
 
     owners="$(printf '%s' "$line" | awk '{$1=""; print $0}')"
     for owner in $owners; do
-      if ! printf '%s' "$owner" | grep -qE '^@[A-Za-z0-9-]+(/[A-Za-z0-9._-]+)?$'; then
+      if ! [[ "$owner" =~ ^@[A-Za-z0-9-]+(/[A-Za-z0-9._-]+)?$ ]]; then
         echo "  FAIL  malformed owner token '$owner' on rule '$path'"
         fail=1
       fi
@@ -169,7 +169,7 @@ rc=$?
 if [ "$rc" -eq 0 ]; then
   echo "check-codeowners: FAIL — a MISSING pillar rule (gateway) was NOT detected" >&2
   fail=1
-elif ! printf '%s' "$out" | grep -q "pillar 'gateway'"; then
+elif ! [[ "$out" == *"pillar 'gateway'"* ]]; then
   echo "check-codeowners: FAIL — the missing pillar was detected but NOT NAMED" >&2
   printf '%s\n' "$out" | sed 's/^/    /' >&2
   fail=1
@@ -193,7 +193,7 @@ rc=$?
 if [ "$rc" -eq 0 ]; then
   echo "check-codeowners: FAIL — a STALE rule (/retired-pillar/) was NOT detected" >&2
   fail=1
-elif ! printf '%s' "$out" | grep -q "retired-pillar"; then
+elif ! [[ "$out" == *"retired-pillar"* ]]; then
   echo "check-codeowners: FAIL — the stale rule was detected but NOT NAMED" >&2
   printf '%s\n' "$out" | sed 's/^/    /' >&2
   fail=1
@@ -215,7 +215,7 @@ rc=$?
 if [ "$rc" -eq 0 ]; then
   echo "check-codeowners: FAIL — a MALFORMED owner token was NOT detected" >&2
   fail=1
-elif ! printf '%s' "$out" | grep -q "not-an-owner"; then
+elif ! [[ "$out" == *"not-an-owner"* ]]; then
   echo "check-codeowners: FAIL — the malformed owner was detected but NOT NAMED" >&2
   printf '%s\n' "$out" | sed 's/^/    /' >&2
   fail=1
