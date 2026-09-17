@@ -41,7 +41,7 @@ import runaway
 import runners
 import runtime
 import singleton
-import telemetry
+import runslog
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -1591,12 +1591,12 @@ def record_run(
     The FinOps block the run actually dispatched at rides here too (#218) so the
     claim is measurable rather than asserted: `tier`, `thinking` and `runner` are
     the very field names `fleet/summary.py` (#219/#234) already aggregates, and
-    `model` names the model the tier selected. `telemetry.build_record` fixes the
+    `model` names the model the tier selected. `runslog.build_record` fixes the
     schema's REQUIRED fields; these are additive, so an older reader is unaffected.
     """
     try:
         with RECORD_LOCK:
-            record = telemetry.build_record(
+            record = runslog.build_record(
                 run_id=directive_id,
                 issue=str(issue),
                 agent=agent_id,
@@ -1610,8 +1610,8 @@ def record_run(
                 record["thinking"] = dispatch.get("thinking")
                 record["model"] = dispatch.get("model")
                 record["runner"] = dispatch.get("runner")
-            telemetry.append_record(telemetry.RUNS_LOG, record)
-    except (telemetry.TelemetryError, OSError) as exc:
+            runslog.append_record(runslog.RUNS_LOG, record)
+    except (runslog.TelemetryError, OSError) as exc:
         print(f"[terminal] telemetry record for {directive_id} rejected: {exc}", file=sys.stderr, flush=True)
 
 
@@ -2403,8 +2403,8 @@ def loop(args: argparse.Namespace) -> int:
         closeout = closeout_issue(issue) if (rc == 0 and gate_ok) else f"SKIPPED (gate {gate_outcome})"
         landed, landing_detail = landed_evidence(issue)
         run_status, prose_hint = verdict(rc, output, gate_ok, landed)
-        # `run_status` stays in telemetry's own vocabulary (started/done/failed —
-        # fleet/telemetry.py), so a run the loop could not assess is recorded
+        # `run_status` stays in runslog's own vocabulary (started/done/failed —
+        # fleet/runslog.py), so a run the loop could not assess is recorded
         # `failed`, never `done`, with CANNOT-ASSESS named in the detail.
         tail = (
             f"{tail} | gate-outcome: {gate_outcome} | {gate_detail} | {landing_detail} | "

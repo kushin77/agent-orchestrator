@@ -351,7 +351,19 @@ def test_terminal_reports_the_transition_once_with_generated_at_and_threshold(
 
 def test_the_trigger_verb_parks_through_the_cli(tmp_path, monkeypatch, capsys):
     """The contract is invocable: `dispatch trigger` refreshes once, else parks."""
-    import cli as dispatch_cli
+    # A bare ``import cli`` is not safe when this suite is collected alongside
+    # `control-plane`: `control-plane/functions/tests/test_functions.py` also
+    # inserts its own directory (which has its own unrelated `cli.py`) at the
+    # front of `sys.path` during collection, and whichever insert happened
+    # LAST wins the front slot by the time this test executes — so the bare
+    # name can resolve to the wrong `cli.py` depending on collection order
+    # (issue #1014). Loading `governance/dispatch/cli.py` by its absolute path
+    # sidesteps the shared bare name entirely.
+    _dispatch_cli_spec = importlib.util.spec_from_file_location(
+        "governance_dispatch_cli", DISPATCH_DIR / "cli.py"
+    )
+    dispatch_cli = importlib.util.module_from_spec(_dispatch_cli_spec)
+    _dispatch_cli_spec.loader.exec_module(dispatch_cli)
 
     state = wire_scratch(tmp_path, monkeypatch)
     snapshot = write_snapshot(tmp_path / "snapshot.json", STALE_STAMP)
