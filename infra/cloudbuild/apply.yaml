@@ -8,17 +8,22 @@
 #
 # Never run by hand. Never applied from a console. Ships OFF.
 
-# The workbook-surface switches (issue #644, workbook-13). Each is a declared
-# pair — services.<name> in infra/feature-flags/registry.yaml and its own
+# The FULL service ladder is rendered from substitutions here, never from
+# terraform's committed defaults: the core services (registry → gateway →
+# engine → guardrails → telemetry → identity → portal → web, EPIC-00 issue #4),
+# the independently-promotable surfaces (paperclip #411, chat #503), the
+# workbook/ERP switches (issue #644 workbook-13, ERP-07 issue #652), the
+# promoted web image tag (issue #606) and the project id. Each flag is its own
+# declared pair — services.<name> in infra/feature-flags/registry.yaml and its
 # enable_<name> variable in infra/terraform/variables.tf — and this is where the
 # pair reaches the only apply route: the plan below renders each one from its
 # substitution instead of letting terraform fall back to the committed default.
 # A promotion can therefore be applied by flipping one substitution, and the
-# apply log records the posture it rendered (the `workbook_surface_flags`
-# output), so "promoted but never rendered" is visible rather than silent.
-# The substitutions are declared in apply-trigger.yaml (all "false"), exactly as
-# _ENABLE_APPLY is: the trigger is the only entry point, so there is one place
-# to read the route's posture and one place to flip it.
+# apply log records the posture it rendered, so "promoted but never rendered"
+# is visible rather than silent. The substitutions are declared in
+# apply-trigger.yaml (all "false"/sentinel), exactly as _ENABLE_APPLY is: the
+# trigger is the only entry point, so there is one place to read the route's
+# posture and one place to flip it. Nothing turns on by default.
 
 options:
   # Run as the deployer SA (created by modules/deployer-sa at promotion).
@@ -56,6 +61,18 @@ steps:
       - |
         cd infra/terraform
         terraform plan -input=false \
+          -var="project_id=$_PROJECT_ID" \
+          -var="enable_registry=$_ENABLE_REGISTRY" \
+          -var="enable_gateway=$_ENABLE_GATEWAY" \
+          -var="enable_engine=$_ENABLE_ENGINE" \
+          -var="enable_guardrails=$_ENABLE_GUARDRAILS" \
+          -var="enable_telemetry=$_ENABLE_TELEMETRY" \
+          -var="enable_identity=$_ENABLE_IDENTITY" \
+          -var="enable_portal=$_ENABLE_PORTAL" \
+          -var="enable_web=$_ENABLE_WEB" \
+          -var="web_image_tag=$_WEB_IMAGE_TAG" \
+          -var="enable_paperclip=$_ENABLE_PAPERCLIP" \
+          -var="enable_chat=$_ENABLE_CHAT" \
           -var="enable_org_chart=$_ENABLE_ORG_CHART" \
           -var="enable_skill_studio=$_ENABLE_SKILL_STUDIO" \
           -var="enable_task_board=$_ENABLE_TASK_BOARD" \
