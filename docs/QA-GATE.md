@@ -203,9 +203,9 @@ are asserted before this stack is merged.
 Every `scripts/verify.sh` run writes `.verify/attestation.json` — on FAIL as
 well as PASS, because a gate that only attests when it is green cannot be
 trusted to have run at all (GR-12, no-false-green). The shape it must conform
-to is `.verify/attestation.schema.json` (the one entry `.gitignore` carves out
-of the otherwise-ignored `.verify/`, since the artifacts it validates are
-generated but the contract itself is checked in):
+to is `governance/isolation/attestation.schema.json`: the contract lives
+outside the wholly-generated `.verify/` root, so `.verify/` stays a plain,
+un-negated `.gitignore` entry while the schema itself is checked in.
 
 * `run_id`, `git_sha`, `overall_verdict` at the top level;
 * `checks[]`, one entry per gate, each carrying `name`, `verdict`

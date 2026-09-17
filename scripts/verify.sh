@@ -837,7 +837,7 @@ PY
 # here so a malformed attestation is itself a gate defect, not a silent hole. A
 # schema violation here is not allowed to hide behind an otherwise-green run:
 # it forces the whole gate to FAIL (no-false-green doctrine, GR-12).
-attestation_schema="$root/.verify/attestation.schema.json"
+attestation_schema="$root/governance/isolation/attestation.schema.json"
 if [ -f "$attestation_schema" ] && command -v python3 >/dev/null 2>&1; then
   if ! python3 "$root/scripts/lib/validate-attestation.py" \
       "$verify_dir/attestation.json" "$attestation_schema" >>"$log" 2>&1; then
