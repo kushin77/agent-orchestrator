@@ -447,11 +447,25 @@ if ! command -v pytest >/dev/null 2>&1 && ! python3 -m pytest --version >/dev/nu
   echo "check-portal-auth-env: CANNOT-ASSESS — pytest is not available" >&2
   exit 2
 fi
+# Suite exit codes are NOT all the same verdict (pytest's own contract):
+#   0 passed   1 FAILED tests   2 INTERRUPTED (SIGINT / KeyboardInterrupt)
+#   3 internal error   4 usage error   5 no tests collected
+# Only `1` is "the product failed". An INTERRUPTED run assessed nothing — this
+# box's shell is shared by every lane and a neighbour's Ctrl-C reaches a
+# foreground gate — so mapping rc 2 to FAIL reported a red the check could not
+# evidence, sending an operator after a defect that was not there (issue #1082).
+# A run that cannot be assessed is CANNOT-ASSESS, and CANNOT-ASSESS is never a
+# pass: this exits 2, it does not exit 0.
+#
 # The verdict is pytest's OWN exit code: piping into `tail` would report tail's.
 suite_rc=0
 suite_out="$(env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
   portal/tests/test_auth_gate_secret_env.py 2>&1)" || suite_rc=$?
 printf '%s\n' "$suite_out" | tail -3
+if [ "$suite_rc" -eq 2 ] && [ "$fail" -eq 0 ]; then
+  echo "check-portal-auth-env: CANNOT-ASSESS — the offline reproduction of the post-deploy criterion was INTERRUPTED (rc=2), so the criterion was not assessed; this is not a product failure" >&2
+  exit 2
+fi
 if [ "$suite_rc" -eq 0 ]; then
   echo "  OK    the mirror reaches the mount path and a real session reaches /api/console/me"
 else

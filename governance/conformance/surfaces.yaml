@@ -121,7 +121,33 @@ surface_roots:
   # A root is covered by any declared surface path at or below it.
   - governance
   - integrations
-waived_roots: []
+  # Added by issue #944. `infra/` is where every deploy variable and every env
+  # seam lives, and it was previously neither declared nor waived — and because
+  # this gate only considers the roots LISTED here, not listing it meant the root
+  # was invisible to the gate rather than reported: exactly the "unclassified by
+  # omission" the rule above forbids. It is now in scope and waived BY NAME, with
+  # its reason recorded below.
+  - infra
+
+# Roots that exist and are deliberately held to no class, each with the reason.
+# A waiver is a decision recorded in the open; an absent root is a decision made
+# by forgetting, which is what this list exists to prevent.
+waived_roots:
+  # `infra/` is not a product surface. The ladder classifies what the product
+  # ships to a tenant (portal, gateway, telemetry, registry, governance,
+  # integrations); `infra/` is the IaC and declaration layer behind those
+  # surfaces. Its artifacts are held by their own gates rather than by this
+  # ladder: scripts/check-terraform.sh and scripts/check-cloudbuild.sh for the
+  # declarations, scripts/check-feature-flags.py for the flag registry's parity
+  # with `infra/terraform/variables.tf`, and scripts/check-env-surface.sh, which
+  # holds the declared environment-variable surface
+  # (`infra/env/registry.yaml`) to the code that reads it.
+  #
+  # The declared environment-variable surface is what makes this waiver safe: the
+  # one thing about `infra/` that a class gate would have caught — an undeclared
+  # seam reaching production — is now a gate with its refusals provoked, rather
+  # than an omission nobody measured.
+  - infra
 
 # The declared surfaces. `declared_class` is measured, never aspirational.
 surfaces:
