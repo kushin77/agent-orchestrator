@@ -308,6 +308,81 @@ commit_in() { # commit_in <worktree> <file> <trailer-or-empty>
   fi
 }
 
+# --- 3a2. the speculative-base re-verify gate (issue #699, DG-3) ------------
+# A lane blocked only by file ownership may be cut from the UPSTREAM LANE's
+# branch instead of waiting for its squash-merge (speculative execution). The
+# one new risk that creates is a PR whose attestation still names a stale
+# base — checked here with a real upstream/downstream pair, a real squash
+# landing, and the record file proven byte-identical across every read-only
+# provocation (governance/isolation/speculative.py never mutates on `verify`).
+sha256_of() { # sha256_of <file> — empty string if it does not exist
+  [ -f "$1" ] && sha256sum "$1" | awk '{print $1}'
+}
+
+up_session="$(open_lane 645645 spec-copilot erp-upstream)" || {
+  echo "  CANNOT-ASSESS  speculative-base fixture (could not open the upstream lane)" >&2
+  cannot=$((cannot + 1))
+}
+if [ -n "${up_session:-}" ]; then
+  up_sid="$(printf '%s' "$up_session" | jfield session_id)"
+  up_branch="$(printf '%s' "$up_session" | jfield branch)"
+  up_worktree="$(printf '%s' "$up_session" | jfield worktree)"
+  commit_in "$up_worktree" erp.txt "Refs kushin77/agent-orchestrator#645645"
+
+  down_payload="$(python3 "$cli" open --issue 671671 --agent spec-copilot --lane erp-downstream \
+    --main "$scratch" --root "$lanes" --base "$up_branch" --speculative-base "$up_branch" \
+    --allow-tmpfs-root 2>/dev/null)"
+  down_sid="$(printf '%s' "$down_payload" | jfield session_id)"
+  down_worktree="$(printf '%s' "$down_payload" | jfield worktree)"
+  commit_in "$down_worktree" consumer.txt "Refs kushin77/agent-orchestrator#671671"
+
+  record="$scratch/.fleet/lanes/speculative/$down_sid.json"
+  if [ -z "$down_sid" ] || [ ! -f "$record" ]; then
+    echo "  CANNOT-ASSESS  speculative-base fixture (no attestation was recorded for the downstream lane)" >&2
+    cannot=$((cannot + 1))
+  else
+    expect_fail "speculative lane, upstream not yet landed" "$down_sid" "speculative-base-not-landed"
+    before_sha="$(sha256_of "$record")"
+    expect_fail "speculative lane, re-provoked (attestation must not mutate on a read-only audit)" \
+      "$down_sid" "speculative-base-not-landed"
+    after_sha="$(sha256_of "$record")"
+    if [ "$before_sha" != "$after_sha" ]; then
+      echo "  FAIL  speculative-base attestation changed across a read-only audit ($before_sha -> $after_sha)" >&2
+      fail=$((fail + 1))
+    else
+      echo "  OK    speculative-base attestation is sha256-identical across the read-only audit ($before_sha)"
+    fi
+
+    # The upstream lane lands (squash, exactly as this repo's own landing path
+    # does it), and the downstream lane pulls the now-landed master into its
+    # own branch — the ordinary way a speculative lane picks up a real landing.
+    git -C "$scratch" merge --squash "$up_branch" >/dev/null 2>&1
+    git -C "$scratch" commit -q -m "erp integration (squash)" -m "Refs kushin77/agent-orchestrator#645645" >/dev/null 2>&1
+    git -C "$down_worktree" merge -q master -m "merge landed master" >/dev/null 2>&1
+
+    stale_before_sha="$(sha256_of "$record")"
+    expect_fail "speculative lane, landed but not re-verified (stale merge_base)" \
+      "$down_sid" "speculative-base-stale-merge-base"
+    stale_after_sha="$(sha256_of "$record")"
+    if [ "$stale_before_sha" != "$stale_after_sha" ]; then
+      echo "  FAIL  speculative-base attestation changed across the stale-merge-base audit ($stale_before_sha -> $stale_after_sha)" >&2
+      fail=$((fail + 1))
+    else
+      echo "  OK    speculative-base attestation is sha256-identical across the stale-merge-base audit"
+    fi
+
+    reverify_out="$(python3 "$cli" audit --main "$scratch" --session "$down_sid" --reverify-speculative-base 2>&1)"
+    reverify_rc=$?
+    if [ "$reverify_rc" -ne 0 ]; then
+      echo "  FAIL  speculative lane did not become OK after re-verifying against the final merge base (rc=$reverify_rc)" >&2
+      printf '%s\n' "$reverify_out" | sed 's/^/        /' >&2
+      fail=$((fail + 1))
+    else
+      echo "  OK    speculative lane accepted once its attestation names the final merge base"
+    fi
+  fi
+fi
+
 # --- 3b. the tmpfs refusal (issue #516) -------------------------------------
 # A lane rooted on a RAM-backed filesystem costs RAM and inodes instead of disk
 # and is lost on reboot, so it must be refused BY NAME — and before

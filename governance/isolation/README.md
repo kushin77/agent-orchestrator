@@ -434,6 +434,64 @@ even on a commit this gate accepts (`bdce21d5` prints only its `Co-authored-by:`
 trailer), so it shows an empty block for a compliant message and would send a lane
 to "fix" a commit the gate already accepts.
 
+## 7.1 Speculative execution — branch-stacking (issue #699, DG-3, ISOLATION half)
+
+A lane blocked only by file *ownership* (not by an unresolved question) does
+not have to wait for the upstream lane's squash-merge before it starts: it may
+cut its worktree from the **upstream lane's branch** instead of `master`. That
+is speculative execution, and it creates exactly one new risk this module
+closes: a PR whose merge base is still the pre-landing branch, checked against
+a version of `master` that no longer exists.
+
+[`speculative.py`](speculative.py) records two things, in the same
+evidence-first spirit as `guardrails/honesty/attestation.py`'s verify
+attestation (`git_sha`, never invented from whole cloth):
+
+* the **speculative base** — the upstream branch (and the exact commit) the
+  lane was cut from. Recorded once, at claim time, and never rewritten: it is
+  the historical fact of where the lane started.
+* the **final merge base** — `git merge-base <base> <branch>`, recorded fresh
+  every time the lane re-verifies. This is the number the gate actually
+  checks: it must equal what git computes *right now*.
+
+```bash
+# 1. Claim: cut from the upstream lane's branch instead of master, and record it.
+python3 governance/isolation/cli.py open --issue 671 --agent copilot-brain --lane erp-consumer \
+  --base issue-645 --speculative-base issue-645
+
+# 2. Work. The gate refuses this lane's PR the whole time issue-645 hasn't landed:
+python3 governance/isolation/cli.py audit --session <session_id>
+# audit: NOT-OK — speculative-base-not-landed: ...
+
+# 3. Once issue-645 lands (squash-merged into master) and this lane has pulled
+#    that master into its own branch, re-verify — mandatory before opening a PR:
+python3 governance/isolation/cli.py audit --session <session_id> --reverify-speculative-base
+```
+
+Refused by name, both checked against **git right now**, never a cached guess:
+
+| Violation | Raised when |
+|---|---|
+| `speculative-base-not-landed` | The speculative base has not reached `master` yet. Landedness is checked the same way the rest of this repository recognises landed work — the ticket trailer (`Refs <slug>#<issue>`) in `master`'s own log — because `git merge --squash` (the landing path `landed.py` documents) drops the original commit's parent link, so raw SHA ancestry is always false after a normal squash-landing. Ancestry is the fallback only when the speculative base's branch does not encode an issue at all. |
+| `speculative-base-stale-merge-base` | The attestation's `merge_base` no longer equals `git merge-base <base> <branch>` computed now — master (or the lane) moved since the last re-verify. |
+| `speculative-base-unmeasurable` | The speculative base cannot be resolved at all (rewritten history). Unproven, never a pass (GR-12). |
+
+A lane with **no** speculative-base claim on record is out of scope for this
+check entirely — every other ownership/dispatch gate still applies to it
+unchanged; this module only ever constrains a lane that opted in.
+
+**Dispatch-side API, for the `claim --base <upstream-branch>` follow-up lane**
+(issue #699 DG-3 dispatch half, `governance/dispatch/**` — not implemented
+here): call `governance.isolation.speculative.claim(main, identity,
+upstream_branch, base="master")` at the moment dispatch decides a lane is
+*speculative* rather than *out-of-order* (i.e. exactly the distinction issue
+#699's acceptance criteria require), and
+`governance.isolation.speculative.reverify(main, identity, base="master")`
+once, right before the lane opens its PR. `verify(main, identity, base=...)`
+is what the gate calls — a lane should never call it against itself to
+"pre-clear" a stale claim, since it only reads what `claim`/`reverify` already
+wrote.
+
 ## 8. Tests
 
 `governance/isolation/tests` (declared in [`scripts/pytest-suites.txt`](../../scripts/pytest-suites.txt),

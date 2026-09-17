@@ -32,11 +32,12 @@ one.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
+from . import speculative
 from .identity import SessionIdentity, branch_issue
 from .trailer import PredicateUnavailable, classify_commit
+from .violation import Violation
 from .worktree import (
     git,
     is_linked_worktree,
@@ -45,19 +46,10 @@ from .worktree import (
     shared_identity,
 )
 
+__all__ = ["Violation", "audit_lane", "audit_all", "authored_commits", "trailer_violations"]
+
 FIELD = "\x1f"
 RECORD = "\x1e"
-
-
-@dataclass(frozen=True)
-class Violation:
-    """One broken isolation property, named so it can be quoted as evidence."""
-
-    code: str
-    detail: str
-
-    def __str__(self) -> str:
-        return f"{self.code}: {self.detail}"
 
 
 def _current_branch(worktree: Path) -> str:
@@ -200,6 +192,7 @@ def audit_lane(identity: SessionIdentity, main: Path | str) -> list[Violation]:
         )
 
     problems.extend(trailer_violations(worktree, identity))
+    problems.extend(speculative.verify(main_repo_root(main), identity))
     return problems
 
 
