@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from governance.lifecycle import ledger, policy
 from governance.lifecycle.model import owes_closure
 
 #: The two mailboxes a directive can occupy. ``sent`` is where the brain mints an
@@ -169,6 +170,27 @@ def _collision(record: Directive, done: Path) -> Path | None:
 
 
 def consume(root: Path, directive_id: str, landed: Mapping[int, bool] | None = None) -> str:
+    """Retire the order; record the outcome to the append-only decision ledger.
+
+    Exactly one ledger record per call (issue #885): the terminal move — and
+    every refusal along the way — is a decision this package made, so it is
+    recorded once, here, at the single call site every caller (``cli.py``,
+    ``closeout.py``) already goes through, rather than at each of the many
+    ``DirectiveRefused`` raise sites inside :func:`_consume_impl`.
+    """
+    try:
+        detail = _consume_impl(root, directive_id, landed)
+    except DirectiveRefused as exc:
+        ledger.record_decision(
+            root, action="consume", subject=directive_id, outcome=ledger.OUTCOME_REFUSED,
+            detail=str(exc), code="DIRECTIVE_NOT_CONSUMED",
+        )
+        raise
+    ledger.record_decision(root, action="consume", subject=directive_id, outcome=ledger.OUTCOME_OK, detail=detail)
+    return detail
+
+
+def _consume_impl(root: Path, directive_id: str, landed: Mapping[int, bool] | None = None) -> str:
     """Retire the order: move its stranded record(s) from ``sent`` to ``done``.
 
     Terminal, idempotent, and refused **by name** rather than defaulted, in every
@@ -250,6 +272,32 @@ def retire(
     reason: str,
     superseded_by: Sequence[int],
 ) -> str:
+    """Retire a stranded order; record the outcome to the append-only decision ledger.
+
+    One ledger record per call, mirroring :func:`consume` — the terminal move
+    (or its refusal) is recorded once at this single call site rather than at
+    each raise inside :func:`_retire_impl`.
+    """
+    try:
+        detail = _retire_impl(root, directive_id, closed=closed, reason=reason, superseded_by=superseded_by)
+    except DirectiveRefused as exc:
+        ledger.record_decision(
+            root, action="retire", subject=directive_id, outcome=ledger.OUTCOME_REFUSED,
+            detail=str(exc), code="DIRECTIVE_NOT_CONSUMED",
+        )
+        raise
+    ledger.record_decision(root, action="retire", subject=directive_id, outcome=ledger.OUTCOME_OK, detail=detail)
+    return detail
+
+
+def _retire_impl(
+    root: Path,
+    directive_id: str,
+    *,
+    closed: bool,
+    reason: str,
+    superseded_by: Sequence[int],
+) -> str:
     """Retire a stranded order whose issue is **closed without a change of its own**.
 
     This is the second terminal mode (#861), distinct from :func:`consume`. A
@@ -303,14 +351,12 @@ def retire(
             "'has it landed' gate)"
         )
     superseded = tuple(int(number) for number in superseded_by)
-    if not superseded:
+    try:
+        policy.load_for_model().check_retire(reason=reason, superseded_by=superseded)
+    except policy.PolicyUnavailable as exc:
         raise DirectiveRefused(
-            f"directive {record.id} orders #{issue}; refusing to retire without at least one superseding "
-            "issue in superseded_by — an unattributed retirement is indistinguishable from a hand-edit of "
-            f"{SENT_DIR}/"
-        )
-    if not reason or not reason.strip():
-        raise DirectiveRefused(f"directive {record.id} orders #{issue}; refusing to retire without a reason")
+            f"directive {record.id} orders #{issue}; refusing to retire — {exc}"
+        ) from exc
 
     payload = _read(record.path)
     if payload is None:

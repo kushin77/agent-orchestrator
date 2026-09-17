@@ -222,3 +222,25 @@ def stage_of(item: dict) -> str:
     if (item.get("claim") or {}).get("live") or (item.get("lane") or {}).get("present"):
         return "closed"
     return TERMINAL_STAGE
+
+
+def _validate_against_policy() -> None:
+    """Refuse, at import time, a closure vocabulary that has drifted from
+    ``controls.yaml`` (issue #885). The check runs exactly once, when this
+    module is first imported — the same "read at load time, refuse
+    immediately" posture ``governance/modules/policy.py`` established for the
+    module registry: a rule this file can emit that ``controls.yaml`` does not
+    declare (or vice versa) is a policy defect, not a silent gap, so it is
+    refused before a single audit or close-out runs against it.
+
+    A gate provocation that wants a mutated policy to be read instead of the
+    packaged one points ``AO_LIFECYCLE_CONTROLS`` (``policy.CONTROLS_ENV``) at
+    its scratch copy; this import-time check then refuses with that file's
+    problem, by name, before any audit or close-out runs.
+    """
+    from governance.lifecycle import policy as _policy  # noqa: PLC0415 - avoids a cycle
+
+    _policy.load_for_model()
+
+
+_validate_against_policy()
