@@ -1,0 +1,375 @@
+# governance/controls/spine-coverage.yaml — full spine → control map (#890,
+# lane L11 of EPIC #878).
+#
+# THE DEFECT THIS EXISTS FOR
+#   scripts/control-coverage.tsv (#874) maps only Part B (AO-GR-12..20) of
+#   docs/GOLDEN-RULES.md. Part A (AO-GR-1..11), Part C (AO-GR-21..27), and the
+#   hub rules this repo cites by number (CMR `GR-2`..`GR-10`, `GR-12`) had no
+#   machine-readable row anywhere: a reviewer could not walk from ANY rule id
+#   in the spine to the control that enforces it and the gate that runs it.
+#   This file is that map, for every rule id in scope, not just Part B.
+#
+#   #803 (branch protection, required checks, CODEOWNERS as delivery controls)
+#   is included explicitly (rows tagged `delivery: true`) so the coverage map
+#   does not silently omit the controls #803 is about, even though #803 itself
+#   is a separate open EPIC this lane does not close (see docs/GOVERNANCE.md
+#   "Spine coverage map" residuals).
+#
+# SCOPE
+#   * AO-GR-1..27  — this repo's own spine (docs/GOLDEN-RULES.md Parts A/B/C).
+#   * GR-2/3/4/5/6/7/8/9/10/12 — hub (kushin77/CMR) rules this repo's spine
+#     explicitly cites by number (docs/GOLDEN-RULES.md line ~690 table and the
+#     per-rule "Why." citations). Each is recorded as `origin: hub-cited`,
+#     mapped to the LOCAL control that operationalizes it in this repo (the
+#     same control the citing AO-GR-x row uses, since the citation exists
+#     precisely because the local rule implements the hub rule here).
+#   * GR-1 and GR-24 appear in the docs only as the endpoints of the general
+#     "hub golden rules bind (GR-1...GR-24)" range statement (AGENTS.md line
+#     9) — not as a specific rule cited by number for a local decision — so
+#     they are recorded `origin: hub-uncited` with `status: not-applicable`
+#     (do not confuse hub GR-24 here with the local AO-GR-24 row above, which
+#     IS a cited, enforced local rule). GR-11 is not textually cited anywhere
+#     in this repo's spine and therefore has no row at all (a row for an
+#     uncited id would itself be a row-for-unknown-rule finding).
+#
+# STATUS VOCABULARY (same three-state honesty as scripts/control-coverage.tsv)
+#   ENFORCED          a gate control exists whose stated subject is this rule,
+#                      the control file exists, and it is executable or is a
+#                      suite scripts/pytest-suites.txt declares.
+#   PARTIAL           a control exists and runs, but its own text says it
+#                      checks less than the full rule (recorded verbatim).
+#   GAP               no control enforces the rule today, OR the row names a
+#                      control file that does not exist in the repository —
+#                      the second case is recorded, never silently dropped.
+#   not-applicable    hub rule this repo's spine does not cite; out of scope.
+#
+# `governance/controls/check_spine_coverage.py` validates every row below:
+# every rule id parsed out of AGENTS.md/docs/GOLDEN-RULES.md has exactly one
+# row; every `gate` path that is not literally "-" must exist AND be
+# executable; a row claiming `covered: true` without an existing gate is
+# refused BY NAME (its own negative control mutates a copy of this file).
+#
+# Format is YAML; each entry: rule id -> {status, covered, origin, modules,
+# gate (comma-separated control files or suite:<dir>, "-" for none), note}.
+
+version: 1
+source_spine: docs/GOLDEN-RULES.md
+generated_for_issue: 890
+
+rules:
+  # ---- Part A — delivery & repo spine ----------------------------------
+  AO-GR-1:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/dispatch/]
+    gate: scripts/check-pr-contract.sh,scripts/check-issue-claims.sh
+    note: "Refs/Closes chain + claim ledger."
+  AO-GR-2:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/dispatch/]
+    gate: scripts/check-lane-collision.sh
+    note: "Disjoint-file lane enforcement."
+  AO-GR-3:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [scripts/]
+    gate: scripts/check-lifecycle-verify-order.sh,scripts/check-verdict-contains.sh
+    note: "Verify-before-done ordering + evidence text presence."
+  AO-GR-4:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [scripts/]
+    gate: scripts/check-negative-controls.sh
+    note: "No-false-green: every new check is provoked on a known-bad input."
+  AO-GR-5:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [infra/terraform/, infra/cloudbuild/]
+    gate: scripts/check-terraform.sh,scripts/check-cloudbuild.sh
+    note: "IaC-only infra; no ad-hoc apply."
+  AO-GR-6:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [infra/feature-flags/]
+    gate: scripts/check-feature-flags.py
+    note: "New surfaces default OFF."
+  AO-GR-7:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [scripts/]
+    gate: scripts/check-secrets.sh
+    note: "Mechanical secret scan, always-on in verify."
+  AO-GR-8:
+    status: PARTIAL
+    covered: true
+    origin: local
+    modules: [scripts/]
+    gate: scripts/check-branch-protection.sh
+    note: "Covers no-force-push-to-master. No local gate asserts annotated vX.Y.Z tags are gate-green at tag time (release-time check, not a repo-state gate) — recorded honestly, not claimed ENFORCED."
+  AO-GR-9:
+    status: PARTIAL
+    covered: true
+    origin: local
+    modules: [scripts/]
+    gate: scripts/check-docs.sh
+    note: "check-docs.sh asserts AGENTS.md/CLAUDE.md/.cursorrules/.gitmessage/.gitleaks.toml exist. It does not assert the mirrors AGREE with the spine (a content-drift check) — that half of the rule is a GAP, recorded verbatim rather than rounded up to ENFORCED."
+  AO-GR-10:
+    status: GAP
+    covered: false
+    origin: local
+    modules: []
+    gate: "-"
+    note: "No scripts/check-*.sh asserts new harvested assets appear in CANNIBALIZATION.md before reuse. Real gap, not a citation miss."
+  AO-GR-11:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [scripts/]
+    gate: scripts/check-pr-contract.sh,scripts/check-branch-protection.sh,scripts/check-gate-status.sh
+    note: "Squash-PR-only, no direct push, green-evidence-before-merge."
+
+  # ---- Part B — platform & SaaS spine (mirrors scripts/control-coverage.tsv,
+  #      #874 — this file re-states those rows so the FULL spine lives in one
+  #      map; scripts/control-coverage.tsv remains the authoritative source
+  #      check-control-coverage.sh validates against, per its own header) ----
+  AO-GR-12:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [control-plane/]
+    gate: scripts/check-control-functions.sh,scripts/check-control-verbs.sh
+  AO-GR-13:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/merge/, governance/lifecycle/]
+    gate: scripts/check-landing.sh,suite:governance/merge
+  AO-GR-14:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/merge/, identity/rbac/]
+    gate: scripts/check-authority.sh
+  AO-GR-15:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [guardrails/isolation/, telemetry/ledger/, identity/edges/]
+    gate: suite:guardrails/isolation,suite:telemetry/ledger
+  AO-GR-16:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [guardrails/dlp/, guardrails/chat/]
+    gate: scripts/check-chat-guardrails.sh
+  AO-GR-17:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [telemetry/ledger/, telemetry/audit/]
+    gate: scripts/check-audit-read-model.sh,suite:telemetry/ledger
+  AO-GR-18:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [gateway/finops/, telemetry/chat/]
+    gate: scripts/check-chat-finops.sh,scripts/check-metering-parity.sh
+  AO-GR-19:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [guardrails/policy/, guardrails/honesty/]
+    gate: scripts/check-negative-controls.sh,scripts/check-guardrail-controls.sh,scripts/check-policy-schema.sh
+  AO-GR-20:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [infra/feature-flags/, portal/config/]
+    gate: scripts/check-feature-flags.py
+
+  # ---- Part C — fleet autonomy spine ------------------------------------
+  AO-GR-21:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/dispatch/, fleet/]
+    gate: scripts/check-runaway-guard.sh,scripts/check-dead-letter.sh
+  AO-GR-22:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/lifecycle/]
+    gate: scripts/check-gate-lock.sh,scripts/check-gate-lock-stale.sh
+  AO-GR-23:
+    status: GAP
+    covered: false
+    origin: local
+    modules: [fleet/]
+    gate: "-"
+    note: "docs/GOLDEN-RULES.md AO-GR-23 Verify. names `scripts/check-lane-stranded.sh` — that file does not exist in the repository. Recorded as a GAP naming the missing file rather than rounded up to ENFORCED (a row claiming a nonexistent gate is exactly what the checker's negative control refuses)."
+  AO-GR-24:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/dispatch/]
+    gate: scripts/check-epic-focus.sh,scripts/check-capacity-gate.sh
+  AO-GR-25:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [fleet/]
+    gate: scripts/check-fleet-drift.sh,scripts/check-watchdog-bounded.sh
+  AO-GR-26:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [fleet/]
+    gate: scripts/check-fleet-runner-preflight.sh,scripts/check-runner-capability.sh
+  AO-GR-27:
+    status: PARTIAL
+    covered: true
+    origin: local
+    modules: [fleet/]
+    gate: scripts/check-fleet-durability-rules.sh
+    note: "check-fleet-durability-rules.sh asserts the rule text and its named control exist in the doctrine docs. No dedicated script asserts the runbook names SIGTERM as the clean restart signal and SIGHUP as documented-unhandled at the process level — recorded PARTIAL, not ENFORCED."
+
+  # ---- Hub (kushin77/CMR) rules this repo's spine cites by number --------
+  GR-2:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [governance/dispatch/]
+    gate: scripts/check-pr-contract.sh,scripts/check-issue-claims.sh
+    note: "Cited by AO-GR-1 (\"not a judgement call (CMR GR-2 / XR-004)\"); same local control."
+  GR-3:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [governance/dispatch/]
+    gate: scripts/check-lane-collision.sh
+    note: "Cited by AO-GR-2 (\"dispatch safe (CMR GR-3)\")."
+  GR-4:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [scripts/]
+    gate: scripts/check-pr-contract.sh,scripts/check-branch-protection.sh,scripts/check-gate-status.sh
+    note: "Cited by AO-GR-11 (\"CMR GR-4 adapted\")."
+  GR-5:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [infra/terraform/, infra/cloudbuild/]
+    gate: scripts/check-terraform.sh,scripts/check-cloudbuild.sh
+    note: "Cited by AO-GR-5 (\"CMR GR-5\")."
+  GR-6:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [scripts/]
+    gate: scripts/check-secrets.sh
+    note: "Cited by AO-GR-7 (\"CMR GR-6\")."
+  GR-7:
+    status: PARTIAL
+    covered: true
+    origin: hub-cited
+    modules: [scripts/]
+    gate: scripts/check-branch-protection.sh
+    note: "Cited by AO-GR-8 (\"CMR GR-7\"); same AO-GR-8 tag/SemVer gap applies here."
+  GR-8:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [infra/feature-flags/]
+    gate: scripts/check-feature-flags.py
+    note: "Cited by AO-GR-6 (\"SaaS escape-hatch ADR-0010\" / CMR GR-8)."
+  GR-9:
+    status: PARTIAL
+    covered: true
+    origin: hub-cited
+    modules: [scripts/]
+    gate: scripts/check-docs.sh
+    note: "Cited by AO-GR-9 (\"CMR GR-9\"); same AO-GR-9 content-drift gap applies here."
+  GR-10:
+    status: GAP
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "Cited by AO-GR-10 (\"CMR GR-10\"); same AO-GR-10 gap."
+  GR-12:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [scripts/]
+    gate: scripts/check-lifecycle-verify-order.sh,scripts/check-verdict-contains.sh
+    note: "Cited by AO-GR-3 (\"CMR GR-12\")."
+  GR-1:
+    status: not-applicable
+    covered: false
+    origin: hub-uncited
+    modules: []
+    gate: "-"
+    note: "Cited only as the range endpoint in AGENTS.md line 9 (\"GR-1..GR-24 in\"), never as a specific local rule. Out of local scope — hub repo owns its control."
+  GR-24:
+    status: not-applicable
+    covered: false
+    origin: hub-uncited
+    modules: []
+    gate: "-"
+    note: "Cited only as the range endpoint in AGENTS.md line 9 (\"GR-1..GR-24\"), not as a specific local rule (do not confuse with AO-GR-24, which IS a local rule with its own row above)."
+  GR-17:
+    status: GAP
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "Cited in AGENTS.md numbered doctrine item 11, \"Local-code-first (GR-17)\": debug against this checkout first. No scripts/check-*.sh mechanically asserts an agent consulted local code before guessing — this is agent-behavior guidance, not a repo-state invariant a gate can check today. Honest GAP, not rounded to PARTIAL."
+  GR-20:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [governance/dispatch/]
+    gate: scripts/check-chronological-dispatch.sh
+    note: "Cited in AGENTS.md numbered doctrine item 14, \"Chronological, dependency-gated issue selection (GR-20)\"."
+  GR-22:
+    status: GAP
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "Cited in AGENTS.md numbered doctrine item 12, \"No-questions (GR-22)\": apply the documented default, escalate only when genuinely absent. No scripts/check-*.sh asserts this behavioral default. Honest GAP."
+
+# ---- #803 delivery controls (branch protection, required checks, CODEOWNERS) ----
+# #803 is an open EPIC (PR #1075 in flight) that this lane does not close.
+# These rows record the delivery controls #803 is about as present controls in
+# THIS repo today, so the coverage map does not silently omit them while #803
+# itself stays open for the branch-protection-as-code / required-checks-as-code
+# work #803 tracks.
+delivery_controls:
+  branch_protection:
+    status: ENFORCED
+    covered: true
+    delivery: true
+    gate: scripts/check-branch-protection.sh
+    note: "Local, convention-level check that master rejects direct/force pushes. #803 tracks making the GitHub-side branch protection ITSELF IaC-declared (issue #6 / #1075) — that is the residual, not this row."
+  required_checks:
+    status: ENFORCED
+    covered: true
+    delivery: true
+    gate: scripts/check-gate-status.sh,scripts/check-gate-coverage.sh
+    note: "Required-check status is read back and asserted gate-green before merge (AO-GR-11)."
+  codeowners:
+    status: ENFORCED
+    covered: true
+    delivery: true
+    gate: scripts/check-codeowners.sh
+    note: "CODEOWNERS file presence + shape asserted; wired into Makefile (make verify)."
