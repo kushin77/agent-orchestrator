@@ -50,7 +50,8 @@
         "ok": {"type": "boolean"},
         "new_violations": {"type": "integer"},
         "stale_entries": {"type": "integer"},
-        "young": {"type": "integer"}
+        "young": {"type": "integer"},
+        "vanished": {"type": "integer"}
       },
       "additionalProperties": false
     },

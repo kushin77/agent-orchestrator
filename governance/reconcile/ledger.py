@@ -155,6 +155,7 @@ def record_real_tree_verdict(root: Path | str, verdict, *, at: float | None = No
             "new_violations": len(verdict.new_violations),
             "stale_entries": len(verdict.stale_entries),
             "young": len(verdict.young),
+            "vanished": len(getattr(verdict, "vanished", ()) or ()),
         },
     )
 
