@@ -65,6 +65,18 @@ Every rule has exactly three parts:
   must ship it with the surface — a rule whose verification "cannot run yet" is
   stated honestly as such, never silently assumed green.
 
+Part B rules (AO-GR-12…20, the platform/SaaS spine) carry a fourth part:
+
+- **Control** — `**Control.** modules: `a/`, `b/` — controls: `check-x.sh`,
+  `suite:dir``. Names the enforcing gate control(s) and the implementing
+  module(s). It is machine-checked: `scripts/check-control-coverage.sh`
+  parses this line and requires its modules and controls to be the exact same
+  set as the rule's row in `scripts/control-coverage.tsv`, in both
+  directions, so the spine line and the map cannot drift apart (#873).
+
+Part C rules also carry a fourth part, **Origin**, unrelated to Control (see
+Part C below).
+
 ## Policy spine (adopted policies)
 
 Issue #7 mandates that the policy spine explicitly adopt six policies. They are
@@ -271,6 +283,8 @@ not write the code").
 - A control-plane change that adds an "execute work" path fails review
   (structural/static check once CI lands, issue #6).
 
+**Control.** modules: `control-plane/` — controls: `check-control-functions.sh`, `check-control-verbs.sh`
+
 ### AO-GR-13 — Independent auditor
 
 **Rule.** AI/agent output is verified by an **independent** party that executes
@@ -288,6 +302,8 @@ artifact's boundary, not its prose.
 - Audit verdicts are published and reference the command that proves them.
 - The audit log is consulted **before** retrying failed work (leaderboard R12) —
   a published re-check command outranks any agent's reading of the code.
+
+**Control.** modules: `governance/merge/`, `governance/lifecycle/` — controls: `check-landing.sh`, `suite:governance/merge`
 
 ### AO-GR-14 — Separation of duties
 
@@ -308,6 +324,8 @@ approval-gate & agent-orchestration-model; leaderboard R5).
   under autonomous merge the *independent* verification evidence is the second
   party (AO-GR-3/AO-GR-11).
 
+**Control.** modules: `governance/merge/`, `identity/rbac/` — controls: `check-authority.sh`
+
 ### AO-GR-15 — Tenant isolation is structural
 
 **Rule.** Tenants are hard-isolated across data, model routing, budgets, audit,
@@ -323,6 +341,8 @@ discovered months later (issue #30, tenant-isolation integrity).
   access attempt is denied (fail-closed).
 - A cross-tenant isolation test suite ships with the tenancy surface and a
   known-bad probe fails it (issue #30).
+
+**Control.** modules: `guardrails/isolation/`, `telemetry/ledger/`, `identity/edges/` — controls: `suite:guardrails/isolation`, `suite:telemetry/ledger`
 
 ### AO-GR-16 — DLP + prompt-injection defense on every model interaction
 
@@ -341,6 +361,8 @@ external-llm-egress-policy; issue #27).
 - Injection-defense tests include **negative controls** — a probe proven to fire
   (issue #27; AO-GR-4).
 
+**Control.** modules: `guardrails/dlp/`, `guardrails/chat/` — controls: `check-chat-guardrails.sh`
+
 ### AO-GR-17 — Tamper-evident audit ledger
 
 **Rule.** Every agent action and policy decision is recorded on an
@@ -357,6 +379,8 @@ telemetry contracts).
 - Append-only is enforced at the storage layer; a tamper attempt breaks the
   chain and fails the check (issue #31).
 
+**Control.** modules: `telemetry/ledger/`, `telemetry/audit/` — controls: `check-audit-read-model.sh`, `suite:telemetry/ledger`
+
 ### AO-GR-18 — Per-tenant budgets, quotas, and a kill switch
 
 **Rule.** Every tenant/agent runs within declared budgets and quotas with a
@@ -370,6 +394,8 @@ runaway must be containable by a single switch, not a support ticket
 - Metering → budget-enforcement path is exercised: a budget-violating call is
   blocked and metered.
 - The global kill switch halts the tenant/agent end-to-end (issue #34).
+
+**Control.** modules: `gateway/finops/`, `telemetry/chat/` — controls: `check-chat-finops.sh`, `check-metering-parity.sh`
 
 ### AO-GR-19 — Guard honesty: tri-state + negative controls
 
@@ -387,6 +413,8 @@ control doctrine).
 - Each guard has a negative-control fixture (a probe proven to fire it) in its
   test suite (issue #28).
 
+**Control.** modules: `guardrails/policy/`, `guardrails/honesty/` — controls: `check-negative-controls.sh`, `check-guardrail-controls.sh`, `check-policy-schema.sh`
+
 ### AO-GR-20 — Private by default
 
 **Rule.** Tenant data, agent orgs, and platform surfaces are **private by
@@ -402,6 +430,8 @@ into, not stumbled into (CMR GR-8 / SaaS escape-hatch ADR-0010).
   surface requires an explicit flag + separate security review.
 - Public/private posture is part of the surface's gate (issue #37 proxy
   allowlist boundary).
+
+**Control.** modules: `infra/feature-flags/`, `portal/config/` — controls: `check-feature-flags.py`
 
 ---
 
