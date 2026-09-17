@@ -164,6 +164,24 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     decoration: containing *a* landing is not the claim, containing *the verified
     work* is. (`scripts/check-lifecycle-verify-order.sh` provokes all three shapes
     against a real squash merge, plus a mutant that removes each half.)
+
+    **The evidence subject is the tree that landed (#1149).** *Which* commit the
+    evidence names is the third half of the same invariant, and it was still taken
+    from the **live** pull request. For a branch that received commits *after* the
+    squash that is a tree that never landed and never gated — measured on #977/#978
+    through PR #984: the live head is 54 files and 4731 insertions away from the
+    commit the squash landed as, and is not an ancestor of it — so the item was
+    structurally unclosable and `REMAINS VERIFY_EVIDENCE_MISSING` could never clear.
+    `closeout.evidence_subject` therefore resolves the subject to the commit whose
+    tree is the tree that landed: the head commit when its tree *is* the landed one
+    (unchanged, so no correctly-merged item is failed), the **landing** when it is
+    demonstrably not, and the head commit again when the comparison cannot be read —
+    nothing is claimed about a tree nobody read. The drifted head is **disclosed**
+    (`drifted_head`), never silently substituted, and `_admissible`'s tree half is
+    untouched: the fix is which commit is asked about, never what is accepted about
+    it. (`scripts/check-lifecycle-verify-order.sh` closes a drifted branch out green
+    on the landed tree, provokes the port's distinct refusal of that drifted subject,
+    and mutants the resolution away to red the first case.)
 17. **Orphan reconciliation (institutional, issue #304).** A session records a
     **heartbeat** in `.fleet/sessions/<session_id>.json` while it runs, refreshed
     on an interval. A session whose beat passes the TTL (15 minutes) is orphaned;
