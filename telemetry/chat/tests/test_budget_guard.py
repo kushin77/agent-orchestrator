@@ -3,6 +3,13 @@
 The refusal paths are asserted against a counting provider (``call_count == 0``)
 *and* against the metering row (``billable=False``, ``metered=True``) — a guard
 that stopped refusing, or one that refused silently, fails both ways.
+
+Every rail in this module is seeded on a bucket taken from the ``world`` fixture
+(``world.day`` / ``world.month``) and every verdict is asserted to have been
+judged in that same bucket.  The seed alone is not enough: a rail given no
+bucket resolves it from the *live* clock, so a seed pinned to a fixture's day
+used to match only while the suite happened to run on that day — the green
+expired with the calendar, which is the #506 date bomb.
 """
 
 from __future__ import annotations
@@ -26,6 +33,20 @@ from telemetry.budgets.quota import (
 from telemetry.chat.budget_guard import GuardedTurnRunner, TurnBudgetGuard
 from telemetry.chat.model import LEDGER_ACTION_REFUSED, ChatTurn
 from telemetry.metering.model import NON_BILLABLE_OUTCOMES
+
+
+def assert_judged_in_the_turns_own_bucket(result, world) -> None:
+    """The rail's seed bucket and the evaluation bucket are the same instant.
+
+    The assertion #506 was missing: the fixture pins the *seed* and the turn
+    pins the *evaluation*, so the two agree because of what the turn says, and
+    never because of which day the suite happens to run on.
+    """
+    judged = (result.outcome.day, result.outcome.month)
+    assert judged == (world.day, world.month), (
+        f"the turn must be judged in its own bucket {world.day}/{world.month}, "
+        f"not the live clock's — the verdict reports {judged}"
+    )
 
 
 def paused_controller(world) -> KillSwitchController:
@@ -94,7 +115,10 @@ def test_an_over_cap_tenant_is_blocked_and_still_metered(
     world, turn, attributor, usage_store, spy_provider
 ):
     # acme's shipped policy is enforce with a 120 USD monthly cap: seeded at the
-    # cap, the next turn is refused by the budget rail.
+    # cap, the next turn is refused by the budget rail.  The seed is a *month*
+    # bucket, which resolves to this_month_utc() when nothing pins it — so
+    # without the turn's own month this test would expire on the 1st of the
+    # next month, #506's bomb with a longer fuse.
     guard = TurnBudgetGuard(budget=budget_with_shipped_policies(world.month, 120.0))
     runner = GuardedTurnRunner(guard, attributor)
     provider = spy_provider()
@@ -103,6 +127,7 @@ def test_an_over_cap_tenant_is_blocked_and_still_metered(
 
     assert result.allowed is False
     assert result.outcome.decision == "block"
+    assert_judged_in_the_turns_own_bucket(result, world)
     assert provider.call_count == 0
     assert usage_store.count() == 1
     assert usage_store.read()[0].metered is True
@@ -112,6 +137,12 @@ def test_an_over_cap_tenant_is_blocked_and_still_metered(
 def test_a_quota_exhausted_tenant_never_reaches_the_provider(
     world, turn, attributor, usage_store, spy_provider
 ):
+    """The #506 acceptance proof, now pinned by the turn instead of the run date.
+
+    The quota rail is a *daily* bucket: seeded for ``world.day``, it can only
+    refuse when the evaluation day is that day.  Asserting the verdict's own
+    bucket is what makes this test independent of when it runs.
+    """
     guard = TurnBudgetGuard(quota=tight_quota_rail(world, calls=20))
     runner = GuardedTurnRunner(guard, attributor)
     provider = spy_provider()
@@ -120,6 +151,7 @@ def test_a_quota_exhausted_tenant_never_reaches_the_provider(
 
     assert result.allowed is False
     assert result.outcome.outcome in NON_BILLABLE_OUTCOMES
+    assert_judged_in_the_turns_own_bucket(result, world)
     assert provider.call_count == 0
     assert usage_store.count() == 1
     assert usage_store.read()[0].billable is False
@@ -137,6 +169,7 @@ def test_a_soft_warning_allows_the_turn_and_is_reported(
 
     assert result.outcome.soft_warning is True
     assert result.allowed is True
+    assert_judged_in_the_turns_own_bucket(result, world)
     assert provider.call_count == 1
     assert result.attribution.billable is True
     assert result.attribution.cost_usd is not None
@@ -179,6 +212,7 @@ def test_observe_mode_reports_would_block_but_never_refuses(
 
     assert result.outcome.decision in {"would_block", "would_warn"}
     assert result.allowed is True
+    assert_judged_in_the_turns_own_bucket(result, world)
     assert provider.call_count == 1
 
 

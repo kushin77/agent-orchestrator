@@ -18,10 +18,19 @@
 #   * a REAL gateway/proxy ``GatewayCallRecord`` object (built out-of-process
 #     with ``gateway/`` on sys.path) is consumed by the attributor's parser, so
 #     the two sides of the record contract cannot drift apart silently;
-#   * and the refusals are provably sensitive: the refusal branch in
-#     ``budget_guard.py`` is mutated in a scratch copy of the tree, and the
-#     gate FAILS if the mutated guard is not caught.  A control that cannot
-#     fail is a formality (GR-12 / AO-GR-4 / AO-GR-19).
+#   * a turn dated in the PAST is judged in ITS OWN day/month.  This is the
+#     #506 date bomb: a rail given no bucket resolves it from the *live* clock,
+#     so a fixture seeded on the turn's own day used to miss, an exhausted
+#     tenant was silently ALLOWED, and the acceptance proof expired with the
+#     calendar.  C1 refuses the past-dated turn against the rail exhausted in
+#     that same bucket; C3 serves the same turn against a FRESH rail there, so
+#     C1 cannot be satisfied by a guard that refuses everything.  Every instant
+#     is a literal pinned in the probe — this control never reads the clock;
+#   * and the refusals are provably sensitive: the refusal branch AND the
+#     turn-date derivation in ``budget_guard.py`` are each mutated in a scratch
+#     copy of the tree, and the gate FAILS, BY NAME, if the mutated guard is
+#     not caught.  A control that cannot fail is a formality (GR-12 / AO-GR-4 /
+#     AO-GR-19).
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
@@ -85,7 +94,6 @@ scratch mutant copy), so nothing here reads the working tree implicitly.
 import hashlib
 import os
 import sys
-from datetime import UTC, datetime
 
 root, mode = sys.argv[1], sys.argv[2]
 sys.path.insert(0, root)
@@ -101,8 +109,15 @@ STATIC_PREFIX = (
     "Cite the memory entry key for every factual claim you make."
 )
 USER_DELTA = "How do I rotate an API key for my organisation?"
-DAY = datetime.now(UTC).strftime("%Y-%m-%d")
-MONTH = datetime.now(UTC).strftime("%Y-%m")
+# The turn's OWN bucket, taken from the literal above and never from the clock:
+# the guard evaluates a turn in its own window, so a rail seeded on "today" is
+# the #506 date bomb itself — it matches only while the gate happens to run on
+# the day this fixture names.
+TURN_DAY = TS[:10]
+TURN_MONTH = TS[:7]
+# A day the fixture names nothing at all in: the fresh-rail half (C3) is seeded
+# here so "no spend" cannot be confused with "spend on another day".
+OTHER_DAY = "2026-08-01"
 
 
 def make_key(seed: str) -> bytes:
@@ -173,30 +188,8 @@ class Spy:
         return gateway_record(turn.turn_id)
 
 
-def guard_for(rail: str):
-    """The shipped rails, seeded so that ``rail`` refuses the next turn."""
-    from telemetry.chat.budget_guard import TurnBudgetGuard
-
-    if rail == "killswitch":
-        from telemetry.budgets.killswitch import (
-            KillSwitchController,
-            KillSwitchState,
-        )
-
-        return TurnBudgetGuard(
-            killswitch=KillSwitchController(
-                initial=KillSwitchState(
-                    global_pause=True, reason="incident-1", paused_by="ops"
-                )
-            )
-        )
-    if rail == "budget":
-        from telemetry.budgets.budget import BudgetEnforcer, load_budget_policies
-        from telemetry.budgets.ledger import StaticLedger
-
-        # acme's shipped policy is enforce with a 120 USD monthly cap.
-        ledger = StaticLedger(costs={(TENANT, MONTH): 120.0})
-        return TurnBudgetGuard(budget=BudgetEnforcer(ledger, load_budget_policies()))
+def quota_rail(day: str, calls: int):
+    """The daily request rail (soft 10, hard 20) with ``calls`` spent in ``day``."""
     from telemetry.budgets.ledger import StaticLedger
     from telemetry.budgets.model import RESOURCE_REQUESTS, WINDOW_DAY
     from telemetry.budgets.quota import (
@@ -218,10 +211,41 @@ def guard_for(rail: str):
             )
         },
     )
-    ledger = StaticLedger(calls={(TENANT, DAY): 20})
-    return TurnBudgetGuard(
-        quota=QuotaEnforcer(ledger, {TENANT: policy}, probe=StaticProbe())
-    )
+    ledger = StaticLedger(calls={(TENANT, day): calls})
+    return QuotaEnforcer(ledger, {TENANT: policy}, probe=StaticProbe())
+
+
+def guard_for(rail: str):
+    """The shipped rails, seeded so that ``rail`` refuses the next turn.
+
+    Every seed lands in the TURN'S OWN bucket (``TURN_DAY`` / ``TURN_MONTH``,
+    taken from the literal turn timestamp): the guard judges a turn in its own
+    window, so a rail seeded on "today" would be the #506 date bomb again — it
+    would match only while the gate happened to run on the day it names.
+    """
+    from telemetry.chat.budget_guard import TurnBudgetGuard
+
+    if rail == "killswitch":
+        from telemetry.budgets.killswitch import (
+            KillSwitchController,
+            KillSwitchState,
+        )
+
+        return TurnBudgetGuard(
+            killswitch=KillSwitchController(
+                initial=KillSwitchState(
+                    global_pause=True, reason="incident-1", paused_by="ops"
+                )
+            )
+        )
+    if rail == "budget":
+        from telemetry.budgets.budget import BudgetEnforcer, load_budget_policies
+        from telemetry.budgets.ledger import StaticLedger
+
+        # acme's shipped policy is enforce with a 120 USD monthly cap.
+        ledger = StaticLedger(costs={(TENANT, TURN_MONTH): 120.0})
+        return TurnBudgetGuard(budget=BudgetEnforcer(ledger, load_budget_policies()))
+    return TurnBudgetGuard(quota=quota_rail(TURN_DAY, 20))
 
 
 def check_refusal(rail: str):
@@ -352,6 +376,65 @@ def check_real_record():
     return problems
 
 
+def check_turn_date_scope():
+    """A past-dated turn is judged in ITS OWN bucket — C1 refuses, C3 serves.
+
+    C1: the turn (dated ``TS``) against the rail exhausted in *its own* day is
+        refused, and never reaches a provider.
+    C3: the same turn against a rail exhausted in a DIFFERENT day is served —
+        so a guard that refused everything would fail here instead of passing
+        C1, and "exhausted elsewhere" is shown not to refuse this turn.
+
+    Every instant is a literal pinned at the top of this probe (the turn's own
+    timestamp and two day buckets); nothing here reads the clock, so the control
+    cannot rot into the next #506.  Under the pre-fix guard the bucket came from
+    the live clock, so C1's seed misses on every day the clock is not on
+    ``TURN_DAY`` and the refusal is reported BY NAME.
+    """
+    from telemetry.chat.budget_guard import GuardedTurnRunner, TurnBudgetGuard
+
+    exhausted_spy = Spy()
+    other_day_spy = Spy()
+    refused_turn, refused_attributor, _u1, _l1 = build()
+    served_turn, served_attributor, _u2, _l2 = build()
+
+    refused = GuardedTurnRunner(
+        TurnBudgetGuard(quota=quota_rail(TURN_DAY, 20)), refused_attributor
+    ).run(refused_turn, exhausted_spy, estimated_cost_usd=0.01)
+    served = GuardedTurnRunner(
+        TurnBudgetGuard(quota=quota_rail(OTHER_DAY, 20)), served_attributor
+    ).run(served_turn, other_day_spy, estimated_cost_usd=0.01)
+
+    problems = []
+    if refused.allowed:
+        problems.append(
+            f"a turn dated {TS} was ALLOWED against a rail exhausted in its own "
+            f"bucket {TURN_DAY}: the evaluation bucket is not the turn's own "
+            f"(#506), so a refusal rail can never bite on a past-dated turn"
+        )
+    elif (refused.outcome.day, refused.outcome.month) != (TURN_DAY, TURN_MONTH):
+        problems.append(
+            "the refusal was judged in "
+            f"{(refused.outcome.day, refused.outcome.month)}, not the turn's own "
+            f"{TURN_DAY}/{TURN_MONTH}"
+        )
+    if exhausted_spy.calls != 0:
+        problems.append(
+            f"the provider was called {exhausted_spy.calls} time(s) for a refused turn"
+        )
+    if not served.allowed:
+        problems.append(
+            f"a turn dated {TS} was refused because {OTHER_DAY} is exhausted — the "
+            f"guard is refusing on a day that is not the turn's own"
+        )
+    if other_day_spy.calls != 1:
+        problems.append(
+            f"the served turn reached the provider {other_day_spy.calls} time(s), "
+            f"expected 1"
+        )
+    return problems
+
+
 CHECKS = {
     "allow": check_allow,
     "killswitch": lambda: check_refusal("killswitch"),
@@ -359,6 +442,7 @@ CHECKS = {
     "quota": lambda: check_refusal("quota"),
     "cache-impossible": check_cache_impossible,
     "real-record": check_real_record,
+    "turn-date-scope": check_turn_date_scope,
 }
 
 problems = CHECKS[mode]()
@@ -381,6 +465,72 @@ expect_probe() { # expect_probe <mode> <description>
   fi
 }
 
+stage_mutant() { # stage_mutant <dir> -- a self-contained copy the probe can import
+  local dir="$1"
+  mkdir "$dir" || exit 2
+  # The mutant root must be self-contained: every package the probe imports is
+  # copied, so the mutant run can never "fail" merely because an import was
+  # missing (which would look exactly like a caught mutation).
+  cp -R "$root/telemetry" "$dir/telemetry"
+  cp -R "$root/engine" "$dir/engine"
+  find "$dir" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null
+}
+
+mutate() { # mutate <file> <old-text> <new-text> -- a no-op is never a mutation
+  python3 - "$1" "$2" "$3" <<'PY'
+"""Apply one textual mutation to a scratch copy, or refuse to pretend.
+
+A mutation that never landed, or that changed nothing, makes the control that
+consumes it vacuous -- so both are refused here rather than reported as a
+passing provocation (AO-GR-4).
+"""
+
+import sys
+
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path, encoding="utf-8").read()
+seen = text.count(old)
+if seen != 1:
+    print(
+        f"MUTATION-UNREACHABLE: the anchor appears {seen} time(s), not exactly once",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+mutated = text.replace(old, new, 1)
+if mutated == text:
+    print("MUTATION-NOOP: the mutation changed nothing", file=sys.stderr)
+    raise SystemExit(2)
+open(path, "w", encoding="utf-8").write(mutated)
+print("mutation applied to a scratch copy")
+PY
+}
+
+expect_mutant_caught() { # expect_mutant_caught <label> <dir> <mode> <needle> <message>
+  local label="$1" dir="$2" mode="$3" needle="$4" message="$5" out rc
+  out="$(python3 "$work/probe.py" "$dir" "$mode" 2>&1)"; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "  FAIL  $label: the mutated guard still passed — the control is insensitive" >&2
+    fail=$((fail + 1))
+    return 0
+  fi
+  # Bash-native containment, never a pipe into a quiet `grep`: a pipe would let
+  # `grep -q` exit on its first match and kill the producer mid-write, so a large
+  # report can read as ABSENT and the check would fail OPEN (check-verdict-contains).
+  case "$out" in
+    *"$needle"*)
+      echo "  OK    $label: $message"
+      printf '%s\n' "$out" | sed 's/^/        /'
+      ;;
+    *)
+      # A crash is NOT a caught mutation: the mutated guard must have actually
+      # run and been observed failing for the reason the control names.
+      echo "  FAIL  $label: the mutated guard was never exercised (the mutant did not run, or it failed for another reason)" >&2
+      printf '%s\n' "$out" | sed 's/^/        /' >&2
+      fail=$((fail + 1))
+      ;;
+  esac
+}
+
 echo "== accept control =="
 expect_probe allow "a funded turn is served once, billed and audited once"
 
@@ -393,54 +543,48 @@ echo "== accounting + contract controls =="
 expect_probe cache-impossible "an impossible prompt-cache report is refused"
 expect_probe real-record "a real GatewayCallRecord is consumed by the attribution"
 
-echo "== mutation control (a control that cannot fail is a formality) =="
-mutant="$work/mutant"
-mkdir "$mutant" || exit 2
-# The mutant root must be self-contained: every package the probe imports is
-# copied, so the mutant run can never "fail" merely because an import was
-# missing (which would look exactly like a caught mutation).
-cp -R "$root/telemetry" "$mutant/telemetry"
-cp -R "$root/engine" "$mutant/engine"
-find "$mutant" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null
+echo "== the turn's own bucket (the #506 date bomb) =="
+expect_probe turn-date-scope "a past-dated turn is refused in its own bucket (C1) and served there against another day's rail (C3)"
 
+echo "== mutation controls (a control that cannot fail is a formality) =="
+
+# (1) the refusal branch — the regression every refusal control above must catch.
+refusal_mutant="$work/mutant-refusal"
+stage_mutant "$refusal_mutant"
 mutate_rc=0
-python3 - "$mutant/telemetry/chat/budget_guard.py" <<'PY' || mutate_rc=$?
-"""Remove the refusal branch — the regression these controls must catch."""
-import sys
-
-path = sys.argv[1]
-text = open(path, encoding="utf-8").read()
-old = "        if not outcome.allowed:"
-new = "        if False and not outcome.allowed:"
-if old not in text:
-    print("MUTATION-UNREACHABLE: refusal branch not found", file=sys.stderr)
-    raise SystemExit(2)
-mutated = text.replace(old, new, 1)
-if mutated == text:
-    print("MUTATION-NOOP: the mutation changed nothing", file=sys.stderr)
-    raise SystemExit(2)
-open(path, "w", encoding="utf-8").write(mutated)
-print("mutation applied to a scratch copy")
-PY
-
+mutate "$refusal_mutant/telemetry/chat/budget_guard.py" \
+  "        if not outcome.allowed:" \
+  "        if False and not outcome.allowed:" || mutate_rc=$?
 if [ "$mutate_rc" -ne 0 ]; then
-  echo "  FAIL  the mutation could not be applied (rc=$mutate_rc) — the control cannot be proven" >&2
+  echo "  FAIL  the refusal mutation could not be applied (rc=$mutate_rc) — the control cannot be proven" >&2
   fail=$((fail + 1))
 else
-  out="$(python3 "$work/probe.py" "$mutant" killswitch 2>&1)"; rc=$?
-  if [ "$rc" -eq 0 ]; then
-    echo "  FAIL  a guard with no refusal branch still 'refused' — the control is insensitive" >&2
-    fail=$((fail + 1))
-  elif printf '%s' "$out" | grep -q "the provider was called"; then
-    echo "  OK    the refusal control catches a guard whose refusal branch is gone"
-    printf '%s\n' "$out" | sed 's/^/        /'
-  else
-    # A crash is NOT a caught mutation: the mutated guard must have actually
-    # run and been observed letting the turn through.
-    echo "  FAIL  the mutated guard was never exercised (the mutant did not run)" >&2
-    printf '%s\n' "$out" | sed 's/^/        /' >&2
-    fail=$((fail + 1))
-  fi
+  expect_mutant_caught "a guard with no refusal branch" "$refusal_mutant" killswitch \
+    "the provider was called" "the refusal controls caught it letting the turn through"
+fi
+
+# (2) the turn-date derivation — the regression the date-scope control must catch.
+# The anchor is the whole derivation as ONE block, so the mutant's guard really
+# does judge against the clock rather than merely holding unreachable lines.
+derivation_anchor='        if day is None:
+            day = day_bucket(turn_ts)
+        if month is None:
+            month = month_bucket(turn_ts)
+'
+date_mutant="$work/mutant-date"
+stage_mutant "$date_mutant"
+mutate_rc=0
+mutate "$date_mutant/telemetry/chat/budget_guard.py" "$derivation_anchor" "" || mutate_rc=$?
+if [ "$mutate_rc" -ne 0 ]; then
+  echo "  FAIL  the date mutation could not be applied (rc=$mutate_rc) — the control cannot be proven" >&2
+  fail=$((fail + 1))
+elif grep -q "day_bucket(turn_ts)" "$date_mutant/telemetry/chat/budget_guard.py"; then
+  echo "  FAIL  the date mutant still derives the turn's bucket — the mutation did not land" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    the date mutant's guard no longer derives the turn's own bucket"
+  expect_mutant_caught "a guard that judges against the live clock" "$date_mutant" turn-date-scope \
+    "the evaluation bucket is not the turn's own" "the past-dated turn was ALLOWED past an exhausted rail, as the control requires"
 fi
 
 echo
@@ -448,5 +592,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-chat-finops: FAIL ($fail check(s) failed)" >&2
   exit 1
 fi
-echo "check-chat-finops: OK — per-turn attribution, budget caps and cache accounting hold"
+echo "check-chat-finops: OK — per-turn attribution, budget caps, the turn's own bucket and cache accounting hold"
 exit 0

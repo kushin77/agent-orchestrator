@@ -2,9 +2,12 @@
 
 Every refusal rail is provoked here, and each control asserts three things at
 once: the provider was never called, the ledger shows the refusal, and the
-turn is still metered as a non-billable event.  A control that cannot fail is
-a formality, so the last test *neutters* the guard the same way a regression
-would and proves these controls notice.
+turn is still metered as a non-billable event.  It also asserts the **bucket**
+the verdict names: each rail is seeded on the turn's own day/month, so a verdict
+judged against the live clock would make these controls expire with the calendar
+(#506) instead of failing for the right reason.  A control that cannot fail is a
+formality, so ``test_the_same_control_notices_a_guard_that_stopped_refusing``
+*neutters* the guard the same way a regression would and proves they notice.
 """
 
 from __future__ import annotations
@@ -83,6 +86,13 @@ def test_each_refusal_path_refuses_and_still_meters(
 
     assert result.allowed is False, f"{path}: the turn must be refused"
     assert result.outcome.hard_stop is True, f"{path}: a hard stop is expected"
+    assert (result.outcome.day, result.outcome.month) == (world.day, world.month), (
+        f"{path}: the rail is seeded on the turn's own bucket "
+        f"({world.day}/{world.month}), so the verdict must name that bucket — "
+        f"a verdict judged against the live clock makes this control expire with "
+        f"the calendar (#506); it reports "
+        f"{result.outcome.day}/{result.outcome.month}"
+    )
     assert provider.call_count == 0, f"{path}: the provider must never be called"
     assert result.provider_called is False
 

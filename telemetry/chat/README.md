@@ -45,7 +45,7 @@ plain scripts that require their own directory on `sys.path` — so the chooser
 is **injected** where it is needed (`tiering.escalate_on_observed_failure`), and
 the wrapped gate exercises the real chooser out-of-process.
 
-## Contract, in five rules
+## Contract, in six rules
 
 1. **One attribution per turn.** Identity and the routing stamp
    (`tier`/`provider`/`model`), tokens and latency are *promoted* from the
@@ -66,6 +66,16 @@ the wrapped gate exercises the real chooser out-of-process.
 5. **A cache report must be possible.** `cached_tokens` may not exceed the
    cacheable prefix; a prefix carrying run identity (a session id, a timestamp)
    is accounted **uncacheable**, not credited with a hit.
+6. **A turn is judged in its own window** (#506). The evaluation day and month
+   are derived from the turn's own timestamp (`turn.normalized_ts`) unless the
+   caller pins them, and the verdict names the bucket it used
+   (`TurnBudgetOutcome.day` / `.month`). A rail handed no bucket resolves it
+   from the *live* clock instead, so a turn dated in the past was measured
+   against today's spend: a fixture seeded on the turn's own day matched only
+   on the day it was written, and the acceptance proof expired with the
+   calendar. Deriving the bucket from the turn is what makes a pinned fixture
+   correct by construction; a live turn carries `ts == now`, so its derived
+   bucket is today's and its behaviour is unchanged.
 
 ## Public surface
 
@@ -113,6 +123,11 @@ python3 -m pytest telemetry/chat -q -p no:cacheprovider   # the unit/contract su
 bash scripts/check-chat-finops.sh                        # the wrapped gate (0/1/2)
 ```
 
-Wiring this gate into `scripts/verify.sh` and `scripts/pytest-suites.txt` is
-owned by issue **#502** (the gate-of-record lane); this lane ships the check
-and runs it directly.
+`scripts/check-chat-finops.sh` **is** wired into the gate of record (check name
+`chat-finops`, `scripts/verify.sh`), and this suite **is** declared in
+`scripts/pytest-suites.txt` — but the manifest is swept by `make gate` /
+`make tests` (`scripts/run-pytest-suites.sh`), never by `make verify`, whose
+`pytest-chat` check runs `gateway/chat/tests`. So the gate of record does not
+execute this directory: what protects it from rotting behind a green composite
+is the date-scope control inside `check-chat-finops.sh`, which exercises this
+turn/bucket contract from the gate itself.
