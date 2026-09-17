@@ -1,0 +1,49 @@
+# Declared repo merge-message policy — the platform-level enforcement that the
+# squash-merge commit landing on `master` carries its ticket trailer (issue
+# #1138, parent #803).
+#
+# WHY THIS FILE EXISTS
+# Every squash merge by a session using `gh pr merge --squash` was producing a
+# master commit whose ticket trailer was buried mid-body, because the repo
+# setting `squash_merge_commit_message=COMMIT_MESSAGES` concatenates every
+# per-commit message onto the squash commit instead of using the PR body —
+# so `check-isolation-landed` went red on a fresh set of commits after every
+# wave (4 baselined in #1130, then #1119 #1044 #1121 #1126 #1103 immediately
+# after). #1009 enforces the trailer only on the landing driver's own path;
+# nothing enforced it for the *setting itself*, so a manual `gh pr merge
+# --squash` or an operator API call could silently put it back.
+#
+# The setting was applied 2026-09-17 by an OPERATOR API call and read back:
+#     {"squash_merge_commit_message":"PR_BODY","squash_merge_commit_title":"PR_TITLE"}
+# That is itself a GR-5 breach (infrastructure is declared, never clicked),
+# same class as branch-protection.yaml's own history. This file is the
+# declaration, and `scripts/repo-settings.sh` is the thing that makes it
+# reproducible and keeps it honest.
+#
+# WHY PR_BODY, NOT PR_TITLE
+# With PR_BODY the squash message ends with the PR body's own trailer block
+# (`Refs kushin77/agent-orchestrator#<n>` / `Closes #<n>`) — the contract
+# `scripts/check-pr-contract.sh` already enforces on the body. `PR_TITLE` for
+# the commit TITLE is independent and unrelated to the trailer question; it is
+# declared here as the field's current, unchanged, live value.
+#
+# WHAT IS DELIBERATELY *NOT* CHANGED, AND WHY
+# `allow_merge_commit`, `allow_rebase_merge` and `delete_branch_on_merge` are
+# declared as they ARE MEASURED live today (`gh api repos/kushin77/agent-
+# orchestrator`), not as a new opinion this issue introduces. Changing them is
+# out of scope for #1138 — the defect this file fixes is the message policy,
+# and widening the diff into unrelated merge-strategy toggles would make a
+# drift report on THIS file noisy with unrelated intent.
+
+schema: ao.repo-settings/v1
+repo: kushin77/agent-orchestrator
+
+# Exactly the fields the GitHub repos API returns, so `verify` can diff the
+# declared state against the live state without a translation layer inventing
+# differences of its own.
+settings:
+  squash_merge_commit_title: PR_TITLE
+  squash_merge_commit_message: PR_BODY
+  allow_merge_commit: true
+  allow_rebase_merge: true
+  delete_branch_on_merge: false
