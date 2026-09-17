@@ -4,8 +4,8 @@ schema (issue #882).
 
 Prefers `jsonschema` when it is importable (the general validator); falls back
 to a small hand-rolled STRICT validator that checks exactly the same required
-shape as `.verify/attestation.schema.json` so the gate is never disabled by a
-missing optional dependency (no-false-green doctrine, GR-12).
+shape as `governance/isolation/attestation.schema.json` so the gate is never
+disabled by a missing optional dependency (no-false-green doctrine, GR-12).
 
 The negative control this exists to refuse: a fabricated attestation that
 marks a FAILING check OK. That is not a schema-shape defect (the fabricated

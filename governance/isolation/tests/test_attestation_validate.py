@@ -1,5 +1,5 @@
-"""`scripts/lib/validate-attestation.py` against `.verify/attestation.schema.json`
-(issue #882, lane L3 of #878).
+"""`scripts/lib/validate-attestation.py` against
+`governance/isolation/attestation.schema.json` (issue #882, lane L3 of #878).
 
 Every `scripts/verify.sh` run writes `.verify/attestation.json` — on FAIL as
 well as PASS — and this validator is what proves the file it wrote actually
@@ -9,8 +9,8 @@ whose verdict was fabricated as OK. The negative control below is exactly
 that fabrication — the class of bug that makes a gate a false green.
 
 This suite is placed under `governance/isolation/tests/` per this lane's file
-ownership even though the subject is `.verify/` attestation, not isolation;
-it is added, not a rename of an existing file.
+ownership even though the subject is the `.verify/attestation.json` gate
+output, not isolation; it is added, not a rename of an existing file.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "scripts" / "lib" / "validate-attestation.py"
-SCHEMA = REPO_ROOT / ".verify" / "attestation.schema.json"
+SCHEMA = REPO_ROOT / "governance" / "isolation" / "attestation.schema.json"
 
 
 def _run(*args: str) -> subprocess.CompletedProcess:
