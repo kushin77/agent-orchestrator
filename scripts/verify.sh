@@ -87,6 +87,11 @@ checks=(
   'yaml-lint|python3 scripts/check-yaml.py'
   'json-lint|bash scripts/check-json.sh'
   'docs-lint|bash scripts/check-docs.sh'
+  # squash-message (issue #1102, parent #878): a detector nothing calls is
+  # advisory. This self-test proves scripts/check-squash-message.sh can fail
+  # before the merge-path refusal (governance/lifecycle/cli.py,
+  # scripts/pr-queue.sh) is trusted to call it for real.
+  'squash-message|bash scripts/check-squash-message.sh --self-test'
   # gate-coverage (issue #526, RCA of EPIC #524): the gate registry was not
   # self-checking. A new `scripts/check-*.sh` that nobody registers is inert,
   # and a suite declared in scripts/pytest-suites.txt that no gate names is only

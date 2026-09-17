@@ -25,7 +25,7 @@ CONSOLE_HOST ?= 127.0.0.1
 CONSOLE_PORT ?= 8787
 
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e fleet-parity \
-        shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage codeowners chronological-dispatch \
+        shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage codeowners squash-message chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
@@ -176,7 +176,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint squash-message chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners
 	@echo ""
 	@echo "lint: OK"
 
@@ -242,6 +242,15 @@ codeowners:
 ## directions, so a stale entry fails too)
 gate-coverage:
 	@bash scripts/check-gate-coverage.sh
+
+## squash-message — refuse a squash-merge message that would drop the ticket
+## trailer (issue #1102, parent #878): renders the SAME message `gh pr merge
+## --squash` would compose and runs it through the shared trailer predicate
+## (governance/isolation/trailer.py) via a passing fixture + two failing
+## mutants, so it cannot pass vacuously
+squash-message:
+	@bash scripts/check-squash-message.sh --self-test
+	@bash scripts/check-pr-queue-squash-guard.sh
 
 ## chronological-dispatch — governance docs must declare dependency-ordered
 ## issue selection (GR-20); a doc-only rule is advisory, so this gate fails it

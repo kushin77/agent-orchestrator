@@ -247,8 +247,8 @@ rules:
     covered: true
     origin: hub-cited
     modules: [governance/dispatch/]
-    gate: scripts/check-pr-contract.sh,scripts/check-issue-claims.sh
-    note: "Cited by AO-GR-1 (\"not a judgement call (CMR GR-2 / XR-004)\"); same local control."
+    gate: scripts/check-pr-contract.sh,scripts/check-issue-claims.sh,scripts/check-squash-message.sh
+    note: "Cited by AO-GR-1 (\"not a judgement call (CMR GR-2 / XR-004)\"); same local control. scripts/check-squash-message.sh (#1102) refuses the merge itself (governance/lifecycle/cli.py merge_pull_request, scripts/pr-queue.sh) when the composed squash message would drop the trailer, closing the detect-only gap check-pr-contract.sh alone left open."
   GR-3:
     status: ENFORCED
     covered: true
