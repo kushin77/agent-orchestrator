@@ -88,6 +88,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from governance.policy import lease
+from governance.reconcile import ledger as reconcile_ledger
 from governance.reconcile.audit import AuditReport, audit as run_audit
 
 #: kind/name pairs the baseline can carry entries for.
@@ -273,7 +274,7 @@ def check_real_tree(
         baseline_by_key[key] for key in sorted(set(baseline_by_key) - unmatched_keys)
     )
 
-    return RealTreeVerdict(
+    verdict = RealTreeVerdict(
         assessable=True,
         new_violations=tuple(new_violations),
         stale_entries=stale_entries,
@@ -282,6 +283,14 @@ def check_real_tree(
         unmatched_count=len(unmatched_keys),
         grace_hours=resolved_grace_hours,
     )
+    try:
+        reconcile_ledger.record_real_tree_verdict(root, verdict, at=now)
+    except reconcile_ledger.LedgerUnavailable:
+        # Recording is bookkeeping, not the verdict itself (#885): the ledger
+        # never turns a real disk verdict into CANNOT-ASSESS. `ledger.verify()`
+        # is how a corrupt/missing record is made visible.
+        pass
+    return verdict
 
 
 def prune_stale(baseline_path: Path | str, verdict: RealTreeVerdict) -> int:
