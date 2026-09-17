@@ -31,6 +31,24 @@ Closes #<n>
 
 <The substance: what this changes and why, in a paragraph or two. Not a diff.>
 
+## Merge order
+
+<!--
+Declare whether this PR's diff touches a gate script (a merge-order-sensitive
+change should land LAST so it does not re-judge PRs queued ahead of it). The
+path list `scripts/check-pr-contract.sh` cross-checks this declaration against
+is `scripts/lib/gate-paths.txt`. Pick exactly one line, replacing the
+`<paths>` placeholder with the touched gate path(s) when the answer is `yes`:
+
+    Gate-changing: no
+    Gate-changing: yes — scripts/check-pr-contract.sh
+
+A declared `no` whose diff touches a gate path, or a declared `yes` whose diff
+touches none, is refused by name.
+-->
+
+Gate-changing: <no | yes — paths>
+
 ## Evidence
 
 ```
