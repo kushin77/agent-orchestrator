@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-17T16:25:50Z",
+  "generated_at": "2026-09-17T18:42:35Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1635,6 +1635,7 @@
         "area:fleet",
         "class:enterprise",
         "gdc:enterprise",
+        "incident",
         "priority:P1",
         "source:cannibalized",
         "type:feature"
@@ -1747,6 +1748,7 @@
       "labels": [
         "area:board",
         "class:enterprise",
+        "incident",
         "phase:8-autonomous-ops",
         "pillar:governance",
         "priority:P1",
@@ -4963,6 +4965,7 @@
       "labels": [
         "class:elite",
         "gdc:enterprise",
+        "incident",
         "phase:5-observability-finops",
         "pillar:observability-finops",
         "priority:P2",
@@ -8097,7 +8100,9 @@
       "title": "EPIC: AgentConsole \u2014 the enterprise operator console product",
       "state": "CLOSED",
       "milestone": "",
-      "labels": [],
+      "labels": [
+        "incident"
+      ],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
@@ -10384,7 +10389,7 @@
     {
       "number": 1154,
       "title": "master red: check-isolation-landed \u2014 origin/master's own tip d3eb77f carries no trailer and is not recorded in governance/isolation/landed-baseline.json",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -10398,13 +10403,13 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T17:41:56Z",
       "files": []
     },
     {
       "number": 1156,
       "title": "Measured E2E gap analysis: system-app + app-model + governance (declared to implemented to gated to exercised)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:board",
@@ -10417,7 +10422,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T18:28:51Z",
       "files": []
     },
     {
@@ -10441,7 +10446,7 @@
     {
       "number": 1158,
       "title": "PMO: board metadata conformance pass \u2014 labels, milestones, epic membership, chain edges (open board)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:board",
@@ -10455,7 +10460,7 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T18:13:58Z",
       "files": []
     },
     {
@@ -10565,6 +10570,150 @@
         "type:bug"
       ],
       "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1168,
+      "title": "governance/dispatch: frontier() names an epic-closed issue that claim refuses (measured: status says #132, eligible refuses it)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1170,
+      "title": "gate-lock: 160 zero-byte leftover worktree locks accumulate; doctor sits permanently at rc 13 and no safe prune verb exists",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1172,
+      "title": "master red (recurrence): check-isolation-landed refuses origin/master again \u2014 0aa836c (#1171) landed direct with no trailer, 3 min after #1169 cleared the previous one",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T17:57:18Z",
+      "files": []
+    },
+    {
+      "number": 1174,
+      "title": "bootstrap .fleet/master-attestation.json once the box gate cap frees (follow-up to #1114/#1119/#1136)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1175,
+      "title": "e2e tagging: one declared tag authority, tag -> gate derivation, and a gate that can fail",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1176,
+      "title": "check-paperclip-routines is CANNOT-ASSESS on master (rc 2) and is skipped by the composite: ao-fleet-reap is scheduled but no routine claims it",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1178,
+      "title": "Lessons ledger -> board: make every record's linkage real, and provable on real data",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:lessons",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1179,
+      "title": "governance/dispatch: the entry point is dead by construction \u2014 no producer for the board liveness contract, silent epic-closed dead-end, and frontier() naming work claim refuses",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
