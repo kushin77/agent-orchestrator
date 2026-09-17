@@ -21,12 +21,56 @@ An issue is claimable only when one of these holds:
 | `successor-of-claim` | It declares `Blocked-by: #n` and the agent already advanced #n. |
 | `active-epic-child` | It declares `Parent: #n` and #n is the **active epic** (`.board/focus.json`, epic #707). Stricter than the frontier, never a relaxation. |
 | `brain-directed` | A brain directive recorded in `.fleet/sent` names exactly this issue (`claim --directive <id>`). The brain is the chain. |
+| `speculative_base` | It is `blocked` by an in-flight upstream lane, and `claim --base <upstream-branch>` names that upstream's OWN branch (verified against the issue's actual `blocked_by` edges — see "Branch-stacking" below). |
 
 Everything else is refused with a reason: `unknown-issue`, `issue-closed`,
 `epic-closed`, `blocked`, `already-claimed`, `epic-not-workable`,
 `provenance-mismatch`, `unowned`, `out-of-epic-pooled` (outside the active epic —
-parked, see below), or `no-chain-edge` — the last being kanban scavenging. Epics
-are never claim targets: an epic closes with its children.
+parked, see below), `speculative-base-not-upstream` (`--base` named a branch
+that is not the blocking issue's own — see below), or `no-chain-edge` — the
+last being kanban scavenging. Epics are never claim targets: an epic closes
+with its children.
+
+## Branch-stacking: `claim --base <upstream-branch>` (DG-3, issue #699)
+
+The DISPATCH half of DG-3 (the ISOLATION half is
+`governance/isolation/speculative.py`, documented in
+`governance/isolation/README.md` §7.1). A lane blocked only by file
+*ownership* — not by an unresolved question — does not have to wait for the
+upstream lane's squash-merge: it may cut its worktree from the **upstream
+lane's own branch** instead of waiting for `blocked` to clear, and claim it as
+SPECULATIVE:
+
+```bash
+python3 governance/dispatch/cli.py claim --issue 671 --agent copilot-brain \
+  --lane erp-consumer --base issue-645
+```
+
+`--base` is consulted **only** when the claim would otherwise be refused
+`blocked`, and only when it names the branch of one of the issue's own open
+blockers (`Snapshot.blockers_open`, checked against real board state — never
+taken on the caller's say-so). When it matches, the claim is accepted with
+reason `speculative_base`, and
+`governance.isolation.speculative.claim(main, identity, upstream_branch,
+base="master")` is called so the isolation gate enforces the mandatory
+re-verify before this lane opens its PR.
+
+`--base` never widens any *other* refusal:
+
+* an issue that is not actually `blocked` (wrong milestone frontier, no chain
+  edge, already claimed by another lane, a conflicting file-region lease) is
+  refused with its own reason exactly as it would be without `--base`;
+* `--base` naming a real branch that is **not** the blocking issue's own is
+  refused by name, `speculative-base-not-upstream`, never silently ignored or
+  treated as a plain `blocked`.
+
+`--main <path>` names the repository the isolation attestation is written
+into (default: this checkout). See
+`governance/dispatch/tests/test_speculative_claim.py` for the end-to-end
+fixture (claim → upstream squash-lands → `speculative.reverify` → isolation
+audit accepts) and its negative controls, and
+`scripts/check-dispatch-reconcile.sh` §7 for the gate's own mutation
+provocation.
 
 ## The out-of-epic pool (#707 lane F6 / #721)
 

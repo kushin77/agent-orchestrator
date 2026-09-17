@@ -39,6 +39,7 @@ What is asserted here
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import signal
 import sys
@@ -47,9 +48,24 @@ from pathlib import Path
 import pytest
 
 import channel
-import conftest
-import telemetry
+import runslog
 import terminal
+
+# A bare ``import conftest`` is not safe here: when this suite is collected
+# alongside other suites that each carry their own directory-local
+# ``conftest.py`` (none of them package-qualified — this repo's test dirs are
+# not Python packages), pytest's default "prepend" import mode caches every
+# one of them under the same ``sys.modules["conftest"]`` key, so whichever
+# suite's conftest is imported LAST silently wins the name for the rest of the
+# session (issue #1014 fact (a): measured as 9 failures — 1 here, 8 in this
+# file — only when collected together with ``governance/lifecycle/tests``,
+# never when this suite runs alone). Loading this file's own ``conftest.py``
+# by its absolute path sidesteps the shared name entirely, so this module
+# always gets ITS directory's conftest regardless of collection order.
+_CONFTEST_PATH = Path(__file__).with_name("conftest.py")
+_conftest_spec = importlib.util.spec_from_file_location("fleet_tests_conftest", _CONFTEST_PATH)
+conftest = importlib.util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(conftest)
 
 
 # --------------------------------------------------------------------------
@@ -284,7 +300,7 @@ def test_loop_wires_record_run_into_the_run_path(monkeypatch):
         "the loop never reached the dispatch stage, so the start record proves nothing"
     )
 
-    records = telemetry.read_records(telemetry.RUNS_LOG)
+    records = runslog.read_records(runslog.RUNS_LOG)
     statuses = [record["status"] for record in records]
     assert {record["run_id"] for record in records} == {DIRECTIVE_ID}, (
         f"the run path wrote records for other runs: {records}"

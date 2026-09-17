@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 import runtime
-import telemetry
+import runslog
 
 ROOT = Path(__file__).resolve().parent.parent
 TELEMETRY_LOG = runtime.FLEET_DIR / "telemetry.jsonl"
@@ -159,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
     """Read the log and print the summary; 0 on success, 1 on an unreadable log."""
     args = build_parser().parse_args(argv)
     try:
-        records = telemetry.read_records(args.log)
+        records = runslog.read_records(args.log)
     except (OSError, ValueError) as exc:
         print(f"fleet-summary: unreadable log {args.log}: {exc}", file=sys.stderr)
         return 1

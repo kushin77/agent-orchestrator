@@ -14,15 +14,28 @@ github:
   push:
     branch: ^master$
 filename: infra/cloudbuild/apply.yaml
-# The workbook-surface switches (issue #644, workbook-13) are declared here and
-# consumed by apply.yaml's plan step, so the posture of the only apply route is
-# readable in one place: every one of them is "false" until a reviewed
-# promotion flips it.
+# The FULL service ladder (core services + paperclip/chat surfaces +
+# workbook/ERP switches), the promoted web image tag and the project id are
+# declared here and consumed by apply.yaml's plan step, so the posture of the
+# only apply route is readable in one place: every flag is "false" (and the web
+# image tag the all-zero sentinel) until a reviewed promotion flips it.
 substitutions:
   _ENABLE_APPLY: "false"
+  _ENABLE_REGISTRY: "false"
+  _ENABLE_GATEWAY: "false"
+  _ENABLE_ENGINE: "false"
+  _ENABLE_GUARDRAILS: "false"
+  _ENABLE_TELEMETRY: "false"
+  _ENABLE_IDENTITY: "false"
+  _ENABLE_PORTAL: "false"
+  _ENABLE_WEB: "false"
+  _ENABLE_PAPERCLIP: "false"
+  _ENABLE_CHAT: "false"
   _ENABLE_ORG_CHART: "false"
   _ENABLE_SKILL_STUDIO: "false"
   _ENABLE_TASK_BOARD: "false"
   _ENABLE_MCP_OUTBOUND: "false"
   _ENABLE_SANDBOX_RUNTIME: "false"
   _ENABLE_ERP_MODULE: "false"
+  _WEB_IMAGE_TAG: "0000000000000000000000000000000000000000"
+  _PROJECT_ID: "false"

@@ -1,11 +1,18 @@
 # AgentConsole hosting — where the operator console runs, and who makes it run
 
-> **Status: declaration, not a deployment** (issue #801, EPIC #800 lane A).
-> This page is the handoff between the two halves of the fleet's live-hosting
-> contract. It declares the console as a shared-services compose service and
-> names exactly what is still owed by the run half. **Nothing described here is
-> live**: the surface ships flag-gated OFF (see [Rollout](#5-rollout-rollback-and-the-flag-posture))
-> and the overlay is not lifted into the shared-services repo yet. Companion
+> **Status: LIVE** — go-live 2026-09-17 (epic #607). The console runs as the
+> declared **shared-services** compose service (`shared-services-agentconsole`,
+> `0.0.0.0:18286`) and `ai.purebliss.app` is cut over to it by a merged
+> Cloudflare tunnel ingress rule. Measured at the edge: `GET /api/healthz` →
+> **200**, `GET /api/fleet/snapshot` → **401** `missing console session token`
+> (the console's own contract — not the legacy `302`), `GET /console` → **302**
+> → `/auth/login`. The GCP Cloud Run route stays the **RETIRED** route.
+> The repeatable go-live recipe is
+> [`AGENTCONSOLE-GOLIVE.md`](AGENTCONSOLE-GOLIVE.md); the mechanical gate that
+> keeps this contract from regressing is `scripts/check-agentconsole-hosting.sh`
+> (issue #1029). This page is the handoff between the two halves of the fleet's
+> live-hosting contract: it declares the console as a shared-services compose
+> service and names what the run half still owes. Companion
 > pages: [`OPERATOR-ACCESS.md`](OPERATOR-ACCESS.md) (which command reaches which
 > surface), [`../fleet/CONTRACT.md`](../fleet/CONTRACT.md) (the control-plane
 > contract), [`../portal/README.md`](../portal/README.md) (the portal half) and

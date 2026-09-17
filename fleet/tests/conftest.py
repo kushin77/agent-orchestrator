@@ -61,7 +61,7 @@ RUNTIME_PATHS = {
     # set, the run registry and the dead-letter store, so a test that reconciles
     # must land in `tmp_path` — the same cover, for the newest runtime tree.
     "markers": ("DISPATCHED", "RUNS", "DEAD_LETTER"),
-    "telemetry": ("RUNS_LOG",),
+    "runslog": ("RUNS_LOG",),
     # `watchdog.spawn` OPENS a file named after FLEET_DIR, and `console` reads
     # the same tree — without these three lines a test would create real
     # `.fleet/*.log` files and read the live fleet's state, which is the

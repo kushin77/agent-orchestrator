@@ -190,6 +190,20 @@ checks=(
   # and an allowed steer lands on the audit rail. The flag gate is
   # mutation-proved (flipping the flag to "on" makes the reader say "on").
   'operator-terminal|bash scripts/check-operator-terminal.sh'
+  # agentconsole-hosting (issue #1029, parent #607): the go-live was DECLARED for
+  # months and never EXERCISED — the declarations said "nothing is live" and the
+  # image recipe had never been run (its only builder was the retired Cloud Run
+  # route), so a defect INSIDE the artifact was invisible (portal/Dockerfile
+  # installed PyYAML but not cryptography, so the container exited 1 at boot
+  # instead of serving its own CMD). This check asserts the hosting contract
+  # offline — the image recipe's deps + CMD, the overlay's declared
+  # container/port/network/health/mounts, the three composed surfaces promoted
+  # TOGETHER (a partial promotion 404s half the console), the hosting doc naming
+  # the LIVE host and the retirement (and no longer claiming it is undeployed),
+  # and the fail-closed env contract — and proves it can fail by mutating one
+  # property per rule on every run. Registered here deliberately: the array is
+  # explicit, so the gate is itself inert until it is named.
+  'agentconsole-hosting|bash scripts/check-agentconsole-hosting.sh'
   # runner-preflight (issue #733): the fleet could not spawn a single subagent
   # because the loop inherited cron's minimal PATH, and it failed per directive
   # per cycle (a runaway amplifier). The check names the resolution, the hold and

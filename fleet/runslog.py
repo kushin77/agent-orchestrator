@@ -15,10 +15,10 @@ Record shape (all fields required unless noted):
     detail      str   optional free-text note (default "")
 
 Usage:
-    import telemetry
-    record = telemetry.build_record(run_id="...", issue="232", agent="subagent-x",
-                                     status="done", started_at="...", finished_at="...")
-    telemetry.append_record(telemetry.RUNS_LOG, record)
+    import runslog
+    record = runslog.build_record(run_id="...", issue="232", agent="subagent-x",
+                                   status="done", started_at="...", finished_at="...")
+    runslog.append_record(runslog.RUNS_LOG, record)
 """
 
 from __future__ import annotations
