@@ -1,0 +1,130 @@
+{
+  "why": "One plant per dimension, each a ONE-FIELD mutation of healthy.json. A plant is only ever reported as provocation if (a) its mutation is asserted to have LANDED (the value really changed) and (b) the SAME dimension is still OK on the healthy subject — so a judge that fails everything cannot satisfy the suite.",
+  "plants": [
+    {
+      "name": "verify-output-not-recorded",
+      "dimension": "verify-output",
+      "expect": "CANNOT-ASSESS",
+      "why": "an unreadable Verify: input is not a pass — the harness must say so rather than reporting OK",
+      "mutate": {"verify_output": null}
+    },
+    {
+      "name": "verify-output-claimed-not-quoted",
+      "dimension": "verify-output",
+      "expect": "CANNOT-ASSESS",
+      "why": "a prose claim with no composite verdict line is a claim, not a measurement — and an interrupted run is not a violation either, so it is CANNOT-ASSESS",
+      "mutate": {"verify_output": "the gate passed, I read the log and it was green"}
+    },
+    {
+      "name": "verify-output-composite-failed",
+      "dimension": "verify-output",
+      "expect": "FAIL",
+      "why": "a quoted COMPOSITE verdict that says FAIL is a measured violation, and must not be read as 'the output was quoted, so OK'",
+      "mutate": {"verify_output": "verify: FAIL (3 of 130 checks failed)"}
+    },
+    {
+      "name": "attestation-not-recorded",
+      "dimension": "attestation-sha",
+      "expect": "CANNOT-ASSESS",
+      "why": "with no attestation there is no sha to compare, and a missing input is not agreement",
+      "mutate": {"attestation": null}
+    },
+    {
+      "name": "attestation-covers-a-different-tree",
+      "dimension": "attestation-sha",
+      "expect": "FAIL",
+      "why": "the evidence must cover what MERGED; a different commit with a different tree is a measured violation",
+      "mutate": {
+        "attestation.git_sha": "d1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d",
+        "merge.tree_match": false
+      }
+    },
+    {
+      "name": "gate-present-but-not-discovered",
+      "dimension": "gate-wired",
+      "expect": "FAIL",
+      "why": "a delivered scripts/check-*.sh that the discovery layer does not return is inert, not wired",
+      "mutate": {"gate.discovered": ["shell-syntax", "docs-lint"]}
+    },
+    {
+      "name": "gate-disabled-by-name",
+      "dimension": "gate-wired",
+      "expect": "FAIL",
+      "why": "a denylisted check is present, discovered, and switched off — the sharpest form of 'not wired'",
+      "mutate": {"gate.denylisted": ["drift", "negative-controls", "fleet-parity"]}
+    },
+    {
+      "name": "instrument-not-provoked",
+      "dimension": "provoked",
+      "expect": "FAIL",
+      "why": "a dimension with no planted subject is an unfalsifiable verdict; the instrument must refuse to score with it",
+      "mutate": {"provocation.coverage.branch-pushed-then-deleted": 0}
+    },
+    {
+      "name": "trailer-in-the-subject-line",
+      "dimension": "commit-trailer",
+      "expect": "FAIL",
+      "why": "the reference in the subject line is the exact shape the convention forbids",
+      "mutate": {
+        "commit.message": "feat(fleet): parity harness Refs kushin77/agent-orchestrator#799\n\nThe body sits here."
+      }
+    },
+    {
+      "name": "trailer-not-the-trailing-paragraph",
+      "dimension": "commit-trailer",
+      "expect": "FAIL",
+      "why": "the reference buried in a body paragraph is not a trailer block at all",
+      "mutate": {
+        "commit.message": "feat(fleet): the parity harness (#799)\n\nRefs kushin77/agent-orchestrator#799\n\nAI-assistance: Copilot (qa-sme, L1)"
+      }
+    },
+    {
+      "name": "pr-contract-violated",
+      "dimension": "pr-contract",
+      "expect": "FAIL",
+      "why": "the repo's own PR contract checker said no, by name: that is a measured violation, not a CANNOT-ASSESS",
+      "mutate": {
+        "pr-contract.rc": 1,
+        "pr-contract.output": "FAIL  pr-body-unreproduced-pre-existing-red: the PR claims pre-existing red without a reproduction"
+      }
+    },
+    {
+      "name": "isolation-audit-violated",
+      "dimension": "isolation-audit",
+      "expect": "FAIL",
+      "why": "the isolation audit names a broken property (a lane whose signature leaked into the shared config)",
+      "mutate": {
+        "isolation-audit.rc": 1,
+        "isolation-audit.output": "isolation audit: NOT-OK — session 0269e4b6 wrote into the shared repository config"
+      }
+    },
+    {
+      "name": "branch-never-pushed",
+      "dimension": "branch-pushed-then-deleted",
+      "expect": "FAIL",
+      "why": "AO-GR-23: a commit that exists only in a local worktree is not work, and it is invisible to the board",
+      "mutate": {"branch.pushed": false}
+    },
+    {
+      "name": "branch-still-on-the-remote",
+      "dimension": "branch-pushed-then-deleted",
+      "expect": "FAIL",
+      "why": "the closure invariant: the source branch must be gone once the work has landed",
+      "mutate": {"branch.remote_exists": true}
+    },
+    {
+      "name": "issue-still-open",
+      "dimension": "issue-closed-with-evidence",
+      "expect": "FAIL",
+      "why": "a lane whose issue is still open has not closed hygienically, whatever the PR did",
+      "mutate": {"issue_state.state": "OPEN"}
+    },
+    {
+      "name": "issue-closed-without-evidence",
+      "dimension": "issue-closed-with-evidence",
+      "expect": "FAIL",
+      "why": "an assertion is not evidence: closed is half the acceptance test, and the evidence comment is the other half",
+      "mutate": {"issue_state.comments": [{"body": "Done! Everything checks out."}]}
+    }
+  ]
+}

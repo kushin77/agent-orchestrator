@@ -1,0 +1,66 @@
+{
+  "why": "The NEGATIVE CONTROL for the whole probe suite. Every dimension must be OK on this subject: a judge that failed everything (or defaulted to CANNOT-ASSESS) would otherwise satisfy every failing plant. The values are a plausible RECORDED subject, not a claim about a live lane — `judge.py --issue <n>` overwrites every field here with what it actually reads, and a field it cannot read becomes null (CANNOT-ASSESS), never this fixture's value.",
+  "subject": {
+    "issue": 799,
+    "repo_slug": "kushin77/agent-orchestrator",
+    "verify_command": "bash scripts/check-fleet-parity.sh --issue 799 && make verify",
+    "verify_output": "fleet-parity: PASS — every dimension measured and holding (10)\nverify: PASS (133 of 133 checks)",
+    "attestation": {
+      "git_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d",
+      "result": "PASS",
+      "check_count": 133,
+      "branch": "issue-799-w2"
+    },
+    "merge": {
+      "pr": 900,
+      "merged": true,
+      "commit_sha": "b1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d",
+      "tree_match": true
+    },
+    "gate": {
+      "added_checks": ["scripts/check-fleet-parity.sh"],
+      "discovered": ["fleet-parity", "shell-syntax", "docs-lint"],
+      "denylisted": ["drift", "negative-controls"]
+    },
+    "commit": {
+      "sha": "c1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d",
+      "message": "feat(fleet): the fleet acceptance test as a runnable instrument (#799)\n\nThe verdict used to be scored by an operator reading logs; this makes it an instrument.\n\nRefs kushin77/agent-orchestrator#799\nAI-assistance: Copilot (qa-sme, L1)"
+    },
+    "pr-contract": {
+      "rc": 0,
+      "output": "check-pr-contract: OK — every rule satisfied for PR #900"
+    },
+    "isolation-audit": {
+      "rc": 0,
+      "output": "isolation audit: OK — 3 session(s) checked, 0 violations"
+    },
+    "branch": {
+      "name": "issue-799-w2",
+      "pushed": true,
+      "remote_exists": false
+    },
+    "issue_state": {
+      "state": "CLOSED",
+      "comments": [
+        {
+          "body": "Closed with evidence. `bash scripts/check-fleet-parity.sh --issue 799` -> `fleet-parity: PASS — every dimension measured and holding (10)`."
+        }
+      ]
+    },
+    "provocation": {
+      "coverage": {
+        "verify-output": 3,
+        "attestation-sha": 2,
+        "gate-wired": 2,
+        "provoked": 1,
+        "commit-trailer": 2,
+        "pr-contract": 1,
+        "isolation-audit": 1,
+        "branch-pushed-then-deleted": 2,
+        "issue-closed-with-evidence": 2,
+        "measurement": 1
+      },
+      "plants_run": 16
+    }
+  }
+}
