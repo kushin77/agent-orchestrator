@@ -25,6 +25,10 @@ Public surface
 - ``skills`` - org-wide skill sharing semantics (issue #638):
   ``SkillShareRegistry`` with platform read-only sharing and cross-tenant
   invisibility.
+- ``head_bindings`` - tenant/RBAC binding for the head-of-org personas (issue
+  #952): the ``head-agents`` preset pack (``hermes-head`` / ``paperclip-head``)
+  plus ``bind_persona_to_tenant`` / ``unbind_persona_from_tenant`` /
+  ``is_persona_bound``, opt-in only per tenant (GR-28: no default binding).
 """
 
 from rbac.model import (
@@ -130,6 +134,22 @@ from rbac.skills import (
     partition_by_visibility,
 )
 
+from rbac.head_bindings import (
+    FORBIDDEN_PERMISSIONS,
+    HEAD_AGENTS_PACK_KEY,
+    HERMES_PERSONA_ID,
+    KNOWN_PERSONAS,
+    PAPERCLIP_PERSONA_ID,
+    ROLE_KEY_FOR_PERSONA,
+    UnknownPersonaError,
+    bind_persona_to_tenant,
+    guard_persona,
+    is_persona_bound,
+    load_head_agents_pack,
+    persona_subject,
+    unbind_persona_from_tenant,
+)
+
 __all__ = [
     # model
     "DEFAULT_ROLE_ADMIN_PERMISSION",
@@ -220,4 +240,18 @@ __all__ = [
     "SkillShareRegistry",
     "UnknownSkillError",
     "partition_by_visibility",
+    # head_bindings (issue #952)
+    "FORBIDDEN_PERMISSIONS",
+    "HEAD_AGENTS_PACK_KEY",
+    "HERMES_PERSONA_ID",
+    "KNOWN_PERSONAS",
+    "PAPERCLIP_PERSONA_ID",
+    "ROLE_KEY_FOR_PERSONA",
+    "UnknownPersonaError",
+    "bind_persona_to_tenant",
+    "guard_persona",
+    "is_persona_bound",
+    "load_head_agents_pack",
+    "persona_subject",
+    "unbind_persona_from_tenant",
 ]
