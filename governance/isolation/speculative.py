@@ -58,10 +58,11 @@ here):
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .identity import SessionIdentity, branch_issue
+from .identity import SessionIdentity, branch_issue, commit_trailer
 from .violation import Violation
 from .worktree import git
 
@@ -214,7 +215,12 @@ def reverify(
     return attestation
 
 
-def _landed_by_trailer(main: Path | str, speculative_base: str, base: str) -> bool | None:
+def _landed_by_trailer(
+    main: Path | str,
+    speculative_base: str,
+    base: str,
+    repo_slug: str,
+) -> bool | None:
     """Squash-safe landed check: did ``base`` acquire the upstream issue's commit?
 
     ``git merge --squash`` (the landing path this repository uses,
@@ -222,19 +228,35 @@ def _landed_by_trailer(main: Path | str, speculative_base: str, base: str) -> bo
     link, so ``git merge-base --is-ancestor <sha> <base>`` is **always** false
     after a squash-landing even though the work plainly landed — checking raw
     ancestry would refuse every speculative lane the instant its upstream
-    landed the normal way. Landed history is instead recognised the same way
-    the rest of this repository recognises it: by the ticket trailer the
-    landing path composes (``Refs <slug>#<issue>``), searched for in ``base``'s
-    own log. Returns ``None`` when the branch does not encode an issue at all
-    (nothing to search for), so the caller falls back to ancestry.
+    landed the normal way.
+
+    This is deliberately NOT the positional trailer predicate
+    (``governance/isolation/trailer.py`` -> ``scripts/check-pr-contract.sh``,
+    issue #288): that rule classifies one commit's trailer block, and asking
+    it "does ANY commit in this whole range mention the ticket" is not the
+    question it answers. What is checked here is narrower and cheaper: does
+    ``base``'s log contain the exact string ``commit_trailer(issue, slug)``
+    (``Refs <slug>#<issue>``) with a non-digit (or nothing) immediately after
+    it — so a landing for issue 6450 cannot satisfy a claim on issue 645, and
+    a bare mention like "blocked on #645" (no ``Refs <slug>`` prefix) cannot
+    either. It is still a substring search, not a trailer-block parse, and is
+    named as such rather than claimed to be the shared predicate.
+
+    Returns ``None`` when the branch does not encode an issue at all (nothing
+    to search the log for), so the caller falls back to raw ancestry.
     """
     issue = branch_issue(speculative_base)
     if issue is None:
         return None
-    found = git(main, "log", base, "--fixed-strings", f"--grep=#{issue}", "-1", "--format=%H")
-    if found.returncode != 0:
+    needle = commit_trailer(issue, repo_slug)
+    pattern = re.compile(re.escape(needle) + r"(?!\d)")
+    log = git(main, "log", base, "--format=%x1e%B")
+    if log.returncode != 0:
         return None
-    return bool(found.stdout.strip())
+    for message in log.stdout.split("\x1e"):
+        if pattern.search(message):
+            return True
+    return False
 
 
 def verify(
@@ -254,7 +276,7 @@ def verify(
     if attestation is None:
         return []
 
-    by_trailer = _landed_by_trailer(main, attestation.speculative_base, base)
+    by_trailer = _landed_by_trailer(main, attestation.speculative_base, base, identity.repo_slug)
     if by_trailer is not None:
         landed_ok = by_trailer
     else:

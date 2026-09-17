@@ -158,6 +158,46 @@ def test_unresolvable_speculative_base_is_unmeasurable_not_a_pass(repo: Path, tm
     assert "speculative-base-unmeasurable" in codes(problems)
 
 
+def test_landed_check_is_not_a_bare_substring_of_the_issue_number(repo: Path, tmp_path: Path, mounts: Path):
+    """A squash-landing of a NEIGHBOURING issue must not satisfy this lane's claim.
+
+    `#645` is a substring of `#6450`: a naive `--grep=#645` (or any bare
+    `#<issue>` search) is satisfied by a commit that actually landed issue
+    6450, which is exactly the false-green the positional trailer rule (#287)
+    exists to rule out elsewhere in this module. The landed check here must
+    match the full canonical trailer string with a digit boundary, not a
+    fragment of it.
+    """
+    upstream = _upstream_lane(repo, tmp_path, mounts)
+    downstream = _downstream_lane(repo, tmp_path, upstream.branch, mounts)
+    speculative.claim(repo, downstream, upstream.branch, base="master")
+
+    # Land an UNRELATED issue (6450) whose number collides as a substring of 645.
+    git(repo, "checkout", "-q", "master")
+    (repo / "unrelated.txt").write_text("unrelated\n", encoding="utf-8")
+    git(repo, "add", "unrelated.txt")
+    git(repo, "commit", "-q", "-m", "unrelated work", "-m", "Refs kushin77/agent-orchestrator#6450")
+
+    problems = speculative.verify(repo, downstream, base="master")
+    assert "speculative-base-not-landed" in codes(problems)
+
+
+def test_landed_check_is_not_satisfied_by_a_bare_prose_mention(repo: Path, tmp_path: Path, mounts: Path):
+    """A commit that merely MENTIONS the issue number (no `Refs <slug>` prefix)
+    must not be read as evidence that the speculative base landed."""
+    upstream = _upstream_lane(repo, tmp_path, mounts)
+    downstream = _downstream_lane(repo, tmp_path, upstream.branch, mounts)
+    speculative.claim(repo, downstream, upstream.branch, base="master")
+
+    git(repo, "checkout", "-q", "master")
+    (repo / "note.txt").write_text("note\n", encoding="utf-8")
+    git(repo, "add", "note.txt")
+    git(repo, "commit", "-q", "-m", "still blocked on #645", "-m", "no trailer here, just a mention")
+
+    problems = speculative.verify(repo, downstream, base="master")
+    assert "speculative-base-not-landed" in codes(problems)
+
+
 def test_audit_lane_surfaces_the_speculative_finding(repo: Path, tmp_path: Path, mounts: Path):
     """The lane audit (governance/isolation/audit.py) reports this by name too,
     so `cli.py audit` — the surface the gate script drives — refuses it."""
