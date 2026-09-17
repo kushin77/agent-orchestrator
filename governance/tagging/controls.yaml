@@ -1,0 +1,87 @@
+# governance/tagging/controls.yaml — the tag authority's declared controls (issue #1175).
+#
+# The taxonomy says what a tag may BE and the rules say what it IMPLIES. This file
+# says how the authority itself is governed — and every control below is READ by
+# `policy.py` and asserted against `taxonomy.yaml` / `rules.yaml` by the gate, so
+# a control here is a constraint that can fail rather than a paragraph of intent.
+#
+# The split follows the sibling governance surfaces (dispatch / isolation /
+# lifecycle / reconcile, raised to `elite` by #1064–#1066): the *policy* is
+# declared as data, the *reader* (`policy.py`) enforces it, and the frozen record
+# shapes live in `tagging.schema.json`. A controls file nothing reads is
+# decoration, which is the failure mode this split exists to avoid.
+
+schema: ao.tagging/controls-v1
+apiVersion: agent-orchestrator/v1
+kind: TagControls
+
+controls:
+
+  # The required/recommended sets are RESTATED here rather than read from the
+  # taxonomy. That is deliberate: reading them would make the agreement vacuous,
+  # whereas restating them means a lane that relaxes the taxonomy without
+  # touching the controls is refused by name.
+  - id: required-by-target
+    rule: >-
+      A tag set for a target must declare every dimension listed for that
+      target. Missing one is an ERROR: an unclassified artifact cannot be held
+      to any standard at all.
+    severity: error
+    required:
+      issue: [class, type, priority, area]
+      pr: [class]
+      surface: [class]
+
+  - id: recommended-by-target
+    rule: >-
+      Declared as a DEVIATION, not an error. The two dimensions this issue adds
+      postdate the board, so enforcing them outright would paint the gate red
+      for reasons no lane can fix by working its own issue; `--strict` escalates
+      them once the board has caught up.
+    severity: warning
+    recommended:
+      issue: [lifecycle, posture]
+
+  - id: refusal-severity
+    rule: >-
+      Every refusal declared in taxonomy.yaml is an ERROR. A refusal that only
+      warns is a preference, and a preference is not a gate (GR-12).
+    severity: error
+
+  - id: finops-floors
+    rule: >-
+      A declared tier may never sit below the floor its own tags require, and
+      the two are compared BY RANK — never by string order, which would invert
+      the moment a tier is renamed.
+    severity: error
+    floors_by_rank:
+      flash: 1
+      pro: 2
+      auditor: 3
+
+  - id: contradiction-refused
+    rule: >-
+      Mutually exclusive values are refused BY NAME. A contradiction is not a
+      preference to be resolved by precedence: silently picking a winner is how
+      a plan becomes a guess.
+    severity: error
+    dimension: posture
+    pairs:
+      - [no-human-needed, human-gated]
+
+  - id: gate-resolution
+    rule: >-
+      Every gate a rule names must resolve — make:<target> against the
+      Makefile's targets, check:<name> against the check registry
+      scripts/verify.sh builds. A plan naming a renamed gate must fail BY NAME
+      rather than describe a pipeline that no longer exists.
+    severity: error
+    prefixes: ["make:", "check:"]
+
+# Ceilings the authority is held to. Read and enforced by policy.py, so crossing
+# one is a refusal and not a surprise. They exist because a tagging system that
+# grows without bound stops being a closed vocabulary — the whole point.
+limits:
+  max_dimensions: 32
+  max_rules: 64
+  max_refusals: 32

@@ -1,0 +1,304 @@
+# governance/tagging/taxonomy.yaml — the tag authority (issue #1175).
+#
+# ONE declared vocabulary for every tag this repository puts on a governed
+# artifact, so that classification stops being a convention spread across five
+# files and becomes a thing a gate can enforce.
+#
+# This file follows the repository's own declared-vocabulary pattern — the same
+# mechanism `governance/vocabulary/fleet.yaml` (fleet roles) and
+# `governance/finops/policy.json` (FinOps tiers) already use. The pattern has
+# three parts, and skipping any of them is what produces the failure mode
+# ADR-0012 names (`two things quietly both being authoritative`):
+#
+#   1. the vocabulary is DECLARED once, here;
+#   2. it is BORROWED, never re-declared, wherever an authority already exists
+#      (`kind: borrowed` + `borrowed_from`), so there is exactly one source;
+#   3. a gate PROVES the two sides still agree — `scripts/check-tagging.sh`,
+#      wired into `make verify` by auto-discovery (#698), fails when a borrowed
+#      vocabulary drifts from its authority, when a rule names a gate that does
+#      not exist, or when a refusal in this file stops being refused.
+#
+# Calibration (measured 2026-09-17, issue #1175). The `required` set below is the
+# set the board already satisfies, so enforcing it is green today and binds new
+# work. The dimensions this issue ADDS (`posture`, `lifecycle`) are deliberately
+# in `recommended`, not `required`: they are reported as deviations with a named
+# remediation and escalate to errors only under `--strict` — the same discipline
+# `governance/conformance/policy.yaml` documents for its own `expectations`.
+# Enforcing a brand-new dimension against a legacy board would paint the gate red
+# for reasons no lane can fix by working its own issue.
+
+schema: ao.tagging/taxonomy-v1
+apiVersion: agent-orchestrator/v1
+kind: TagTaxonomy
+
+# The artifacts a tag may classify. A dimension declares which of these it
+# applies to; `check` refuses a tag on an artifact the dimension does not cover.
+targets:
+  - issue
+  - pr
+  - branch
+  - commit
+  - surface
+  - release
+
+# What must be declared for a tag set to be derivable at all. Order is the
+# declaration order used by the `labels` verb and by the plan output.
+required:
+  issue:
+    - class
+    - type
+    - priority
+    - area
+  pr:
+    - class
+  surface:
+    - class
+
+# Reported as deviations (warning), escalated to errors by --strict. These are
+# the dimensions this authority adds; the legacy board predates them.
+recommended:
+  issue:
+    - lifecycle
+    - posture
+
+# ---------------------------------------------------------------------------
+# The dimensions. `kind` decides how a value is judged:
+#
+#   borrowed — the value must be in the declared set AND that set must equal the
+#              vocabulary at `borrowed_from`. This is the anti-drift kind.
+#   closed   — the value must be in the declared set.
+#   pattern  — the value must match `pattern`; the SET is governed elsewhere
+#              (the board), and this file governs only its shape.
+#
+# `multi: true` allows several values on one artifact; `mutually_exclusive`
+# refuses a combination BY NAME (a contradiction is an error, not a preference).
+# ---------------------------------------------------------------------------
+dimensions:
+
+  # -- the CMR quality ladder. BORROWED: `governance/conformance/policy.yaml`
+  #    already declares it, and `governance/conformance/surfaces.yaml` declares
+  #    it a second time for surfaces. This authority adds no third copy — it
+  #    points at the first and the gate fails when the two stop agreeing.
+  class:
+    kind: borrowed
+    multi: false
+    applies_to: [issue, pr, surface, release]
+    description: >-
+      The rung of the CMR quality ladder this work is held to. Drives the FinOps
+      floor and the review depth (docs/SOLUTION-CLASSES.md).
+    # MIRRORED ON PURPOSE. The values are written out here as well as borrowed,
+    # because a borrow that reads its values out of the authority can never fail:
+    # drift would be vacuous. Declaring the set here and proving it EQUALS the
+    # authority's is the repository's own mirrored-constant pattern
+    # (`governance/vocabulary/fleet.yaml` <-> `fleet/channel.py`), and it is what
+    # makes a lane unable to mint a rung by editing one side.
+    values: [template, class, pattern, enterprise, faang, elite]
+    borrowed_from:
+      path: governance/conformance/policy.yaml
+      pointer: ladder
+      # The borrowed set must EQUAL the authority's set. A subset is refused too:
+      # dropping a rung here would silently make it undeclarable.
+      drift: exact-set
+
+  # -- board classification names whose authority is `policy.yaml`; the VALUES
+  #    are declared here because `policy.yaml` governs which label NAMES are
+  #    declaring, not which values are legal. The `name_authority` anchor below
+  #    makes that split mechanical: the name must still be one policy.yaml lists.
+  type:
+    kind: closed
+    multi: false
+    applies_to: [issue]
+    name_authority:
+      path: governance/conformance/policy.yaml
+      pointer: required
+    values: [feature, bug, task, spike, research, epic, automation, governance]
+
+  priority:
+    kind: closed
+    multi: false
+    applies_to: [issue]
+    ordered: true
+    name_authority:
+      path: governance/conformance/policy.yaml
+      pointer: required
+    values: [P0, P1, P2, P3]
+
+  # -- the board's area set is OPEN by design: areas are minted as surfaces
+  #    appear, and an offline gate cannot see a label that does not exist yet.
+  #    Claiming a closed set here would be a lie the first time someone adds one,
+  #    so this dimension governs the SHAPE and says so.
+  area:
+    kind: pattern
+    multi: false
+    applies_to: [issue]
+    pattern: '^[a-z][a-z0-9-]{1,40}$'
+    name_authority:
+      path: governance/conformance/policy.yaml
+      pointer: required
+
+  pillar:
+    kind: closed
+    multi: false
+    applies_to: [issue]
+    values:
+      - registry-profiling
+      - model-gateway
+      - state-machine
+      - guardrails-security
+      - observability-finops
+      - identity-rbac
+      - control-plane
+      - autonomous-ops
+      - governance
+
+  phase:
+    kind: closed
+    multi: false
+    applies_to: [issue]
+    values:
+      - 0-foundations
+      - 1-agent-registry
+      - 2-model-gateway
+      - 3-state-machine
+      - 4-guardrails-security
+      - 5-observability-finops
+      - 6-identity-rbac
+      - 7-control-plane
+      - 8-autonomous-ops
+
+  gdc:
+    kind: closed
+    multi: false
+    applies_to: [issue]
+    values: [enterprise]
+
+  source:
+    kind: closed
+    multi: false
+    applies_to: [issue]
+    values: [cannibalized, decision]
+
+  # -- epic membership tags are slug-shaped and minted per epic.
+  epic:
+    kind: pattern
+    multi: false
+    applies_to: [issue]
+    pattern: '^[a-z][a-z0-9-]{1,60}$'
+
+  # -- FinOps tier. BORROWED from the machine authority (the same one
+  #    `scripts/check-finops-chooser.sh` pins), so a lane cannot mint a fourth
+  #    tier by editing one side.
+  finops:
+    kind: borrowed
+    multi: false
+    applies_to: [issue]
+    description: >-
+      The model tier the work starts at. The floor is a floor, not a preference:
+      a lane may escalate on observed difficulty and may not start below it.
+    # MIRRORED ON PURPOSE — see the note on `class` above.
+    values: [flash, pro, auditor]
+    borrowed_from:
+      path: governance/finops/policy.json
+      pointer: vocabulary.tiers
+      drift: exact-set
+
+  # -------------------------------------------------------------------------
+  # NEW (issue #1175). The delivery posture of the work — the dimension the
+  # operator asked for by name ("overall / saas / iac / no-human-needed").
+  # Posture is MULTI-VALUED because these are genuinely orthogonal properties:
+  # a SaaS surface can also be IaC-declared. The one thing that is not a
+  # preference is a contradiction, so the two autonomy claims are mutually
+  # exclusive and refused by name.
+  # -------------------------------------------------------------------------
+  posture:
+    kind: closed
+    multi: true
+    applies_to: [issue, pr]
+    description: >-
+      How the work is delivered. Drives which extra gates the plan requires:
+      `iac` is declared-never-clicked, `saas` owes the tenant/RBAC evidence,
+      `no-human-needed` must complete with no operator input at all.
+    values:
+      - overall
+      - saas
+      - iac
+      - no-human-needed
+      - human-gated
+    mutually_exclusive:
+      # A lane cannot both complete unattended and require an operator gate. The
+      # refusal is named (`posture-contradiction`), not resolved by precedence —
+      # silently picking a winner is how a plan becomes a guess.
+      - [no-human-needed, human-gated]
+
+  # -------------------------------------------------------------------------
+  # NEW (issue #1175). The SDLC stage the work is in. This is what makes the
+  # taxonomy end-to-end rather than a label list: the stage decides which half
+  # of the lifecycle's gates apply (build vs release vs operate vs retire).
+  # Ordered: `retire` is downstream of `operate` is downstream of `release`.
+  # -------------------------------------------------------------------------
+  lifecycle:
+    kind: closed
+    multi: false
+    applies_to: [issue, pr]
+    ordered: true
+    description: >-
+      The SDLC stage. plan -> build -> verify -> release -> operate -> retire.
+      Drives the stage-specific gate set in rules.yaml.
+    values:
+      - plan
+      - build
+      - verify
+      - release
+      - operate
+      - retire
+
+# ---------------------------------------------------------------------------
+# What the taxonomy REFUSES, by the name it reports. Each refusal below is
+# provoked by `scripts/check-tagging.sh`, because a rule a gate cannot fail on
+# is a formality (GR-12).
+# ---------------------------------------------------------------------------
+refusals:
+  - id: unknown-dimension
+    rule: every tag's dimension must be declared here
+    names_in_the_finding: the offending dimension
+    provoked_by: scripts/check-tagging.sh
+  - id: unknown-value
+    rule: a `closed`/`borrowed` value must be in the dimension's declared set
+    names_in_the_finding: the dimension and the offending value
+    provoked_by: scripts/check-tagging.sh
+  - id: value-pattern
+    rule: a `pattern` dimension's value must match its declared pattern
+    names_in_the_finding: the dimension, the value and the pattern
+    provoked_by: scripts/check-tagging.sh
+  - id: vocabulary-drift
+    rule: a `borrowed` set must EQUAL its authority's set
+    names_in_the_finding: the dimension, the authority path and the differing values
+    provoked_by: scripts/check-tagging.sh
+  - id: name-authority-drift
+    rule: a `name_authority` anchor must still be declared by that authority
+    names_in_the_finding: the dimension, the authority path and the missing name
+    provoked_by: scripts/check-tagging.sh
+  - id: posture-contradiction
+    rule: mutually exclusive postures must not both be set
+    names_in_the_finding: both offending values
+    provoked_by: scripts/check-tagging.sh
+  - id: required-missing
+    rule: every `required` dimension for the target must be declared
+    names_in_the_finding: the target and the missing dimension
+    provoked_by: scripts/check-tagging.sh
+  - id: unknown-target
+    rule: a tag must be declared for a target the dimension `applies_to`
+    names_in_the_finding: the dimension and the target
+    provoked_by: scripts/check-tagging.sh
+  - id: unknown-gate
+    rule: every gate a rule names must resolve to a real make target or check
+    names_in_the_finding: the rule id and the unresolvable gate
+    provoked_by: scripts/check-tagging.sh
+  - id: rule-unknown-dimension
+    rule: a rule's `when` clause must name a declared dimension and legal values
+    names_in_the_finding: the rule id and the offending clause
+    provoked_by: scripts/check-tagging.sh
+  - id: finops-floor-unmet
+    rule: a declared FinOps tier must not sit below the floor its tags require
+    names_in_the_finding: the declared tier and the floor
+    provoked_by: scripts/check-tagging.sh
