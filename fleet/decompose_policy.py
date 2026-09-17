@@ -40,7 +40,19 @@ from __future__ import annotations
 
 import os
 import re
+import sys
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
+
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT / "governance" / "dispatch") not in sys.path:
+    sys.path.insert(0, str(_ROOT / "governance" / "dispatch"))
+
+# Reused, not re-declared (issue #740): the SAME whole-file overlap predicate
+# the claim-time path (`claims.find_file_conflict`) and the ready-wave planner
+# (`order.wave_plan`) use, so "these two lanes collide" cannot drift into three
+# different answers across filing, dispatch and reconcile.
+from model import FileClaim, file_claims_conflict  # noqa: E402
 
 #: The environment knob a wave's size can be pinned with.
 CAP_ENV = "FLEET_DECOMPOSE_CAP"
@@ -253,6 +265,37 @@ def duplicate_problem(child: Any, open_issues: Iterable[Any]) -> str | None:
     return None
 
 
+def file_collision_problems(children: Sequence[Any]) -> list[str]:
+    """Every pairwise file collision within ``children`` — empty when the wave
+    is provably file-disjoint (issue #740, dispatch half).
+
+    A child with no ``Files:`` declaration is already refused by
+    :func:`sizing_problem` ("names no Files:"), so it never reaches here as a
+    silent pass — this function only ever compares children that DID declare a
+    file set. The predicate is :func:`model.file_claims_conflict` (whole-file,
+    no regions), the same one the claim-time and dispatch-time paths use.
+    """
+    problems: list[str] = []
+    owner: dict[str, int] = {}
+    for index, child in enumerate(children or ()):
+        if not isinstance(child, Mapping):
+            continue
+        title = str(child.get("title", "") or "").strip() or "(untitled)"
+        for path in files(child):
+            holder = owner.get(path)
+            if holder is not None:
+                mine = FileClaim(path=path, regions=None)
+                theirs = FileClaim(path=path, regions=None)
+                if file_claims_conflict(mine, theirs):
+                    problems.append(
+                        f"lane-file-collision: {path} already owned by child {holder} "
+                        f"('{title}' at position {index})"
+                    )
+                    continue
+            owner.setdefault(path, index)
+    return problems
+
+
 def wave_problems(
     children: Sequence[Any],
     *,
@@ -297,6 +340,8 @@ def wave_problems(
         if problem:
             problems.append(problem)
 
+    problems.extend(file_collision_problems(candidates))
+
     if len(candidates) > cap:
         problems.append(
             f"the wave mints {len(candidates)} children, over the cap of {cap} "
@@ -333,8 +378,16 @@ def effective_cap(env: Mapping[str, str] | None = None, *, focus_wave_cap: int |
     return DEFAULT_CAP
 
 
-def _micro(title: str, *, files: Sequence[str] = ("fleet/x.py",)) -> dict[str, Any]:
-    """A well-sized child, for the self-control below."""
+def _micro(title: str, *, files: Sequence[str] | None = None) -> dict[str, Any]:
+    """A well-sized child, for the self-control below.
+
+    The default file is derived from the title (issue #740): two synthetic
+    children with the module's OLD shared default (``fleet/x.py``) would now be
+    a real, provable collision, not a harmless self-control fixture.
+    """
+    if files is None:
+        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or "child"
+        files = (f"fleet/x-{slug}.py",)
     return {
         "title": title,
         "lane": "fleet",

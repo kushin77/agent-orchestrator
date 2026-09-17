@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import re
+
 import pytest
 
 import brain
@@ -38,13 +40,19 @@ def _no_live_cap_env(monkeypatch):
 
 
 def micro(title: str = "a micro child", **overrides) -> dict:
-    """A child that satisfies the sizing rule; `overrides` mutates it."""
+    """A child that satisfies the sizing rule; `overrides` mutates it.
+
+    The default file is DERIVED from the title (issue #740's collision check
+    means two default fixtures can no longer share one literal path — that
+    would be a real, provable collision, not a fixture convenience).
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or "child"
     child = {
         "title": title,
         "lane": "fleet",
         "verify": "pytest -q fleet/tests",
         "criterion": "the guard fires",
-        "files": ["fleet/decompose_policy.py"],
+        "files": [f"fleet/tests/fixtures/{slug}.py"],
     }
     child.update(overrides)
     return child
@@ -370,3 +378,27 @@ def test_a_malformed_spec_is_still_refused_before_any_policy_work(tmp_path, monk
 
     assert ok is False and "carries no children" in report
     assert filed == []
+
+
+# --- collision-aware wave planning (issue #740, dispatch half) --------------
+
+
+def test_wave_problems_refuses_the_second_child_sharing_a_file_by_name():
+    """Negative control: two ready children (a wave) share a file."""
+    a = micro("first lane", files=["Makefile", "scripts/verify.sh"])
+    b = micro("second lane", files=["Makefile"])
+    problems = decompose_policy.wave_problems([a, b], cap=12)
+    assert any(p.startswith("lane-file-collision: Makefile already owned by child 0") for p in problems), problems
+
+
+def test_wave_problems_is_clean_for_pairwise_disjoint_children():
+    a = micro("first lane", files=["a.py"])
+    b = micro("second lane", files=["b.py"])
+    assert decompose_policy.wave_problems([a, b], cap=12) == []
+
+
+def test_file_collision_problems_never_silently_passes_undeclared_children():
+    """A child with no Files: is reported by sizing_problem, not silently OK'd."""
+    undeclared = micro("no files", files=[])
+    problems = decompose_policy.wave_problems([undeclared], cap=12)
+    assert any("names no Files:" in p for p in problems)

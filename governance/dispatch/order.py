@@ -26,6 +26,9 @@ from pathlib import Path
 
 import focus
 import owner_queue as queue_mod
+from dataclasses import dataclass
+from typing import Sequence
+
 from model import (
     MISSING,
     REASON_ACTIVE_EPIC_CHILD,
@@ -41,8 +44,10 @@ from model import (
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_UNKNOWN_ISSUE,
     Eligibility,
+    FileClaim,
     Issue,
     Snapshot,
+    file_claims_conflict,
 )
 
 
@@ -240,3 +245,66 @@ def advance_candidates(
         ready.append(issue)
     ready.sort(key=lambda issue: issue.number)
     return ready
+
+
+@dataclass(frozen=True)
+class WavePlan:
+    """A collision-aware ready wave (issue #740, dispatch half).
+
+    ``admitted`` is provably pairwise file-disjoint: no two issues in it name an
+    overlapping file. ``refusals`` names, BY the losing issue and the file and
+    the winning issue, every candidate held back for a collision — never a
+    silent drop. ``unverifiable`` names every candidate that declared no
+    ``Files:`` line at all: it is admitted (an undeclared issue cannot be
+    proven to collide with anything), but it is reported by name rather than
+    silently treated as disjoint.
+    """
+
+    admitted: tuple[int, ...]
+    refusals: tuple[str, ...]
+    unverifiable: tuple[int, ...]
+
+
+def wave_plan(candidates: Sequence[Issue]) -> WavePlan:
+    """Greedy, deterministic, pairwise-disjoint subset of ``candidates``.
+
+    The predicate is ``model.file_claims_conflict`` — the SAME function the
+    claim-time (reconcile) path uses (``claims.find_file_conflict``), so the
+    dispatch-time and claim-time notions of "these two lanes collide" cannot
+    drift apart. Region-aware: an issue whose ``Files:`` line named per-file
+    regions is *not* re-implemented here — declared files are whole-file
+    ``FileClaim`` records (``regions=None``), which is the strict/conservative
+    reading a wave-planning pass wants (it never speculatively admits two
+    candidates that both touch a file just because their regions might not
+    overlap once written).
+    """
+    admitted: list[int] = []
+    unverifiable: list[int] = []
+    refusals: list[str] = []
+    owner: dict[str, int] = {}
+    for issue in candidates:
+        if not issue.files:
+            unverifiable.append(issue.number)
+            admitted.append(issue.number)
+            continue
+        collided = False
+        for path in issue.files:
+            holder = owner.get(path)
+            if holder is not None:
+                mine = FileClaim(path=path, regions=None)
+                theirs = FileClaim(path=path, regions=None)
+                if file_claims_conflict(mine, theirs):
+                    refusals.append(
+                        f"lane-file-collision: {path} already owned by #{holder}"
+                    )
+                    collided = True
+        if collided:
+            continue
+        for path in issue.files:
+            owner.setdefault(path, issue.number)
+        admitted.append(issue.number)
+    return WavePlan(
+        admitted=tuple(admitted),
+        refusals=tuple(refusals),
+        unverifiable=tuple(unverifiable),
+    )

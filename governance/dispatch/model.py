@@ -144,6 +144,11 @@ class Issue:
     # wave-bootstrap report and the triage lane to act on.
     cross_refs: tuple[str, ...] = ()
     closed_at: str = ""
+    # Declared file ownership (issue #740, dispatch half): the `Files: a, b` /
+    # `Files owned (disjoint): …` convention in the issue body. Empty means the
+    # issue declared no files — UNVERIFIABLE for the collision check, never the
+    # same as "declared to own nothing" (mirrors `capacity.declared_files`).
+    files: tuple[str, ...] = ()
 
     @property
     def closed(self) -> bool:
@@ -165,6 +170,7 @@ class Issue:
             "blocked_by": list(self.blocked_by),
             "cross_refs": list(self.cross_refs),
             "closed_at": self.closed_at,
+            "files": list(self.files),
         }
 
 

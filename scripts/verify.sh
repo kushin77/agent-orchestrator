@@ -610,6 +610,7 @@ checks=(
   # deterministic — no network, no vendor seed — so it RUNS for real rather than
   # being recorded as CANNOT-ASSESS.
   'erp-core-model|bash scripts/check-erp-core-model.sh'
+  'lane-collision|bash scripts/check-lane-collision.sh'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------

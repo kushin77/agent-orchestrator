@@ -63,8 +63,31 @@ _EDGE_LINE_RE = re.compile(
 )
 
 
+_FILES_RE = re.compile(
+    r"^[ \t]*Files(?:[ \t]+owned)?(?:[ \t]*\(disjoint\))?[ \t]*:[ \t]*(.+?)[ \t]*$", re.I | re.M
+)
+
+
 def _numbers(blob: str) -> list[int]:
     return [int(part) for part in re.findall(r"[0-9]+", blob)]
+
+
+def parse_files(body: str) -> tuple[str, ...]:
+    """Extract the declared ``Files: a, b`` / ``Files owned (disjoint): a, b``
+    convention from an issue body (issue #740, dispatch half).
+
+    Every ``Files:``-shaped line in the body is unioned (a child may restate
+    ownership in more than one place), order-preserved, de-duplicated. An issue
+    with no such line returns an empty tuple — UNVERIFIABLE, not "owns nothing".
+    """
+    text = body or ""
+    found: list[str] = []
+    for match in _FILES_RE.finditer(text):
+        for part in match.group(1).replace(",", "\n").splitlines():
+            candidate = part.strip().strip("`")
+            if candidate and candidate not in found:
+                found.append(candidate)
+    return tuple(found)
 
 
 def parse_edges(body: str) -> tuple[int | None, tuple[int, ...], tuple[str, ...]]:
@@ -143,7 +166,9 @@ def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at:
     issues: dict[int, Issue] = {}
     for record in records:
         number = int(record["number"])
-        parent, blocked, cross_refs = parse_edges(str(record.get("body", "") or ""))
+        body_text = str(record.get("body", "") or "")
+        parent, blocked, cross_refs = parse_edges(body_text)
+        declared_files = parse_files(body_text)
         milestone = record.get("milestone") or {}
         milestone_title = milestone.get("title", "") if isinstance(milestone, dict) else str(milestone or "")
         labels = record.get("labels") or []
@@ -160,6 +185,7 @@ def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at:
             blocked_by=blocked,
             cross_refs=cross_refs,
             closed_at=str(record.get("closedAt") or ""),
+            files=declared_files,
         )
     return Snapshot(generated_at=generated_at or now_iso(), source=source, issues=issues)
 
@@ -241,6 +267,7 @@ def load(path: Path | str = DEFAULT_PATH, apply_queue: bool = True) -> Snapshot:
         number = int(entry["number"])
         blocked = entry.get("blocked_by") or []
         cross_refs = entry.get("cross_refs") or []
+        declared_files = entry.get("files") or []
         issues[number] = Issue(
             number=number,
             title=str(entry.get("title", "") or ""),
@@ -250,6 +277,7 @@ def load(path: Path | str = DEFAULT_PATH, apply_queue: bool = True) -> Snapshot:
             parent=int(entry["parent"]) if entry.get("parent") is not None else None,
             blocked_by=tuple(sorted(int(number) for number in blocked)),
             cross_refs=tuple(sorted(str(ref) for ref in cross_refs)),
+            files=tuple(str(f) for f in declared_files),
         )
     snapshot = Snapshot(
         generated_at=str(data.get("generated_at", "") or ""),
