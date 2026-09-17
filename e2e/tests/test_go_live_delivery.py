@@ -60,6 +60,7 @@ from e2e.go_live_delivery import (
     Delivery,
     project_registry,
     probe_delivery,
+    registry_declares_on,
     serves_the_client,
     served_verdict,
 )
@@ -93,7 +94,7 @@ def fixture_declarations_root(tmp_path_factory) -> object:
     assert REQUIRED_SURFACE in surfaces, (
         f"fixture setup: {REQUIRED_SURFACE!r} is not declared in {registry_src}"
     )
-    surfaces[REQUIRED_SURFACE]["default"] = "off"
+    surfaces[REQUIRED_SURFACE]["default"] = False
     surfaces[REQUIRED_SURFACE]["promoted"] = False
     (flags_dir / "registry.yaml").write_text(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
@@ -255,6 +256,32 @@ def test_the_promoted_surface_is_served_to_an_authenticated_client_only(delivery
     # a promoted surface is access-controlled, not merely gated
     assert served["statusAnonymous"] == 401
     assert served["codeAnonymous"] == "unauthorized"
+
+
+# --------------------------------------------------------------------------- #
+# Stage 4.5 — the shipped, promoted posture itself (#1043)
+# --------------------------------------------------------------------------- #
+def test_the_required_surface_ships_promoted_in_the_committed_registry():
+    """The premise the fixture above exists BECAUSE of: measured on the real file.
+
+    Not delivery-derived, not fixture-derived — read straight off the checkout's
+    own ``infra/feature-flags/registry.yaml``, the same file ``dark``'s fixture
+    deliberately does NOT use below. #1027 (commit 32e8c24, the #607 go-live)
+    promoted this surface for real; if that promotion were ever reverted the
+    fixture-based tests below would keep passing on the fixture alone and this
+    is the one assertion that would catch it — the capstone still asserts the
+    promoted posture, just not by making the dark/rollback claims depend on it.
+    """
+    committed = Path(REPO_ROOT) / "infra" / "feature-flags" / "registry.yaml"
+    document = yaml.safe_load(committed.read_text(encoding="utf-8"))
+    entry = document["surfaces"][REQUIRED_SURFACE]
+
+    assert registry_declares_on(committed, REQUIRED_SURFACE) is True, (
+        f"{REQUIRED_SURFACE} no longer ships promoted in {committed} — "
+        "the #1027 go-live this suite is named after has been reverted"
+    )
+    assert entry.get("promoted") is True
+    assert entry.get("default") in (True, "on")
 
 
 # --------------------------------------------------------------------------- #
