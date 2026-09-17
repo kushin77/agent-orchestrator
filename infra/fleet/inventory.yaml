@@ -135,6 +135,12 @@ packages:
     stage: runtime
     gives: gh
     why: "the fleet's issue and PR surface — the GitHub CLI, from GitHub's own apt repository."
+  - install: PyYAML
+    via: pip
+    stage: runtime
+    gives: yaml
+    why: "the reconcile rung imports governance.lifecycle, which reads governance/lifecycle/controls.yaml at import time (#885/#1065) and needs PyYAML to parse it (issue #1034)."
+    version: "6.0.2"
   - install: claude
     via: release
     stage: runtime
