@@ -202,12 +202,154 @@ else
   grants=$((grants + 1))
 fi
 
+
+# --- artifact provocations (issue #885): controls, audit, schema, live -------
+# One provocation per artifact this surface added to raise its measured class
+# to `elite` (governance/conformance/surfaces.py): each must be genuinely
+# load-bearing, so each is mutated (or drifted) here and must be REFUSED by
+# name — never silently accepted.
+artifact_provocations=0
+
+sha() { sha256sum "$1" | cut -d' ' -f1; }
+
+# 1) controls: a controls.yaml that drops a real claim reason is refused by
+#    policy.load() as a policy defect, never a silent pass (no-false-green).
+#    sha256-restore: the committed file is mutated in place and restored byte
+#    for byte, verified by digest, even if the check below fails.
+controls_file="governance/dispatch/controls.yaml"
+controls_backup="$work/controls.yaml.orig"
+cp "$controls_file" "$controls_backup"
+controls_before_sha="$(sha "$controls_file")"
+restore_controls() { cp "$controls_backup" "$controls_file"; }
+trap 'restore_controls; rm -rf "$work"' EXIT
+
+python3 - "$controls_file" <<'PY'
+import sys
+import yaml
+path = sys.argv[1]
+data = yaml.safe_load(open(path, encoding="utf-8"))
+data["allowed_claim_reasons"] = data["allowed_claim_reasons"][:-1]
+with open(path, "w", encoding="utf-8") as fh:
+    yaml.safe_dump(data, fh)
+PY
+controls_out="$(cd governance/dispatch && python3 -c 'import policy; policy.load()' 2>&1)"; controls_rc=$?
+restore_controls
+controls_after_sha="$(sha "$controls_file")"
+artifact_provocations=$((artifact_provocations + 1))
+if [ "$controls_rc" -eq 0 ]; then
+  printf '  FAIL  controls: a dropped claim reason was NOT refused (exit 0)\n'
+  fail=1
+elif ! contains "$controls_out" "allowed_claim_reasons"; then
+  printf '  FAIL  controls: refused, but not by name (allowed_claim_reasons)\n'
+  printf '%s\n' "$controls_out" | tail -3 | sed 's/^/        /'
+  fail=1
+elif [ "$controls_after_sha" != "$controls_before_sha" ]; then
+  printf '  FAIL  controls: %s was not byte-for-byte restored after the mutation\n' "$controls_file"
+  fail=1
+else
+  printf '  ok    controls: dropped claim reason refused by name, file restored (sha256 %s)\n' "$controls_before_sha"
+fi
+
+# 2) audit: a refusal must produce exactly one valid record in the trail
+#    adjacent to the fixture ledger above, and a record carrying the wrong
+#    schema tag must be refused when read back.
+audit_out="$(cd governance/dispatch && python3 - "$work" <<'PY' 2>&1
+import sys
+from pathlib import Path
+sys.path.insert(0, ".")
+import audit
+work = Path(sys.argv[1])
+trail = work / "audit-trail.jsonl"
+audit.append(audit.record_refusal(issue=614, agent="agent-b", at="2026-01-01T00:00:00Z",
+                                   reason="already-claimed", detail="held"), path=trail)
+records = audit.read(trail)
+assert len(records) == 1, f"expected exactly 1 record, found {len(records)}"
+trail.write_text(trail.read_text() + '{"schema": "wrong-schema", "kind": "grant"}\n', encoding="utf-8")
+try:
+    audit.read(trail)
+    print("NOT-REFUSED: a wrong-schema record was accepted")
+    sys.exit(1)
+except audit.AuditUnavailable as exc:
+    print(f"REFUSED: {exc}")
+PY
+)"; audit_rc=$?
+artifact_provocations=$((artifact_provocations + 1))
+if [ "$audit_rc" -ne 0 ] || ! contains "$audit_out" "REFUSED:"; then
+  printf '  FAIL  audit: a wrong-schema record was not refused on read\n'
+  printf '%s\n' "$audit_out" | tail -5 | sed 's/^/        /'
+  fail=1
+else
+  printf '  ok    audit: exactly one record per refusal, wrong-schema record refused on read\n'
+fi
+
+# 3) schema: a claim event with a bogus `event` value must be refused by the
+#    frozen shape, naming the field.
+schema_out="$(cd governance/dispatch && python3 -c '
+import schema
+try:
+    schema.validate({"event": "bogus", "issue": 1, "agent": "a", "at": "t"}, schema.SHAPE_CLAIM_EVENT)
+    print("NOT-REFUSED")
+except schema.SchemaViolation as exc:
+    print(f"REFUSED: {exc}")
+' 2>&1)"; schema_rc=$?
+artifact_provocations=$((artifact_provocations + 1))
+if ! contains "$schema_out" "REFUSED:" || ! contains "$schema_out" "event"; then
+  printf '  FAIL  schema: an invalid ClaimEvent was not refused by name\n'
+  printf '%s\n' "$schema_out" | tail -5 | sed 's/^/        /'
+  fail=1
+else
+  printf '  ok    schema: an invalid ClaimEvent is refused, naming the field\n'
+fi
+
+# 4) live: the live projection must reflect a claim written to the real ledger
+#    AFTER the first read — a stale/cached projection (drift) would miss it.
+live_out="$(cd governance/dispatch && python3 - "$work" <<'PY' 2>&1
+import sys
+from pathlib import Path
+from datetime import datetime, timezone
+sys.path.insert(0, ".")
+import claims
+import live
+from model import Issue, Snapshot
+
+work = Path(sys.argv[1])
+now = datetime.now(timezone.utc)
+board = Snapshot(generated_at=now.strftime("%Y-%m-%dT%H:%M:%SZ"), source="gate",
+                  issues={9001: Issue(9001, "gate-fixture", milestone="GATE")})
+ledger = work / "live-ledger"
+queue_path = work / "no-queue.yaml"
+
+before = live.project(board, ledger=ledger, queue_path=queue_path)
+if before["live_claims"]:
+    print("NOT-REFUSED: projection saw a claim before one was written")
+    sys.exit(1)
+
+claims.claim(9001, "agent-live", "lane-live", board, ledger=ledger, lock_dir=work / "live-locks", now=now)
+after = live.project(board, ledger=ledger, queue_path=queue_path)
+if after == before:
+    print("DRIFT: the live projection did not change after the real store did")
+    sys.exit(1)
+if len(after["live_claims"]) != 1 or after["live_claims"][0]["issue"] != 9001:
+    print(f"DRIFT: the live projection does not reflect the real claim: {after}")
+    sys.exit(1)
+print("REFUSED-DRIFT-N/A: projection tracks the real store live")
+PY
+)"; live_rc=$?
+artifact_provocations=$((artifact_provocations + 1))
+if [ "$live_rc" -ne 0 ]; then
+  printf '  FAIL  live: the projection drifted from the real ledger/snapshot store\n'
+  printf '%s\n' "$live_out" | tail -5 | sed 's/^/        /'
+  fail=1
+else
+  printf '  ok    live: the projection tracks the real store (no drift between two reads)\n'
+fi
+
 if [ "$fail" -ne 0 ]; then
-  printf 'chronological-dispatch: FAIL (%d of %d contract doc(s) non-conforming; %d of %d refusal(s) provoked; %d grant(s) accepted)\n' \
-    "$nonconforming" "${#docs[@]}" "$provoked" "$refusals" "$grants" >&2
+  printf 'chronological-dispatch: FAIL (%d of %d contract doc(s) non-conforming; %d of %d refusal(s) provoked; %d grant(s) accepted; %d artifact provocation(s))\n' \
+    "$nonconforming" "${#docs[@]}" "$provoked" "$refusals" "$grants" "$artifact_provocations" >&2
   exit 1
 fi
 
-printf 'chronological-dispatch: OK (%d contract doc(s) declare dependency-ordered selection; %d refusal(s) provoked each naming its evidence; %d dispatch granted with its provenance)\n' \
-  "$checked" "$provoked" "$grants"
+printf 'chronological-dispatch: OK (%d contract doc(s) declare dependency-ordered selection; %d refusal(s) provoked each naming its evidence; %d dispatch granted with its provenance; %d artifact provocation(s) (controls/audit/schema/live) all refused/verified)\n' \
+  "$checked" "$provoked" "$grants" "$artifact_provocations"
 exit 0
