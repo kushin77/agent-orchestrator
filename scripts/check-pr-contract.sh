@@ -1073,8 +1073,13 @@ MD
 
   # 12. the lane own diff touches NO gate path while the base moved with one: the
   #     declared `no` is CORRECT, so it must pass. Two-dot, this was refused.
+  #     The assertion is the bash-native containment test, never
+  #     `… | grep -q` — a quiet grep exits on its first match and SIGPIPEs the
+  #     producer, which `set -o pipefail` turns into a status for the whole
+  #     pipeline, so that idiom fails OPEN on a large report
+  #     (`scripts/check-verdict-contains.sh`, whose record is shrink-only).
   out="$(run_checks "$gate_no_body" "$moved_range" 2>&1)"
-  if [ $? -eq 0 ] && printf '%s' "$out" | grep -qF "check-pr-contract: OK"; then
+  if [ $? -eq 0 ] && [[ "$out" == *"check-pr-contract: OK"* ]]; then
     printf '  OK    a moved base does not vote — the lane diff decides Gate-changing\n'
   else
     printf '  FAIL  a moved base was judged as the lane diff\n%s\n' "$out" >&2
@@ -1098,7 +1103,7 @@ MD
   else
     mutant_out="$(bash "$moved_mutant" --repo "$scratch" --body-file "$gate_no_body" --range "$moved_range" 2>&1)"
     mutant_rc=$?
-    if [ "$mutant_rc" -ne 0 ] && printf '%s' "$mutant_out" | grep -qF "pr-body-gate-changing-mismatch-no"; then
+    if [ "$mutant_rc" -ne 0 ] && [[ "$mutant_out" == *"pr-body-gate-changing-mismatch-no"* ]]; then
       printf '  OK    the two-dot mutant refuses it; case 12 measures the merge-base fix\n'
     else
       printf '  FAIL  the two-dot mutant did not refuse the moved-base case (rc=%s)\n%s\n' "$mutant_rc" "$mutant_out" >&2
@@ -1118,7 +1123,7 @@ MD
     -m "Refs kushin77/agent-orchestrator#1147" >/dev/null 2>&1
   lane_touch_sha="$(git -C "$scratch" rev-parse HEAD)"
   out="$(run_checks "$gate_no_body" "$moved_base_sha..$lane_touch_sha" 2>&1)"
-  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "pr-body-gate-changing-mismatch-no"; then
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-no"* ]]; then
     printf '  OK    a lane that really touches a gate path is still refused (declared no)\n'
   else
     printf '  FAIL  the merge-base range blinded the Gate-changing check\n%s\n' "$out" >&2
@@ -1129,7 +1134,7 @@ MD
   #     wrong `yes` is still refused. (A diff resolved down to nothing would
   #     accept both declarations, which is the other way to make case 12 pass.)
   out="$(run_checks "$gate_yes_body" "$moved_range" 2>&1)"
-  if [ $? -ne 0 ] && printf '%s' "$out" | grep -qF "pr-body-gate-changing-mismatch-yes"; then
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-yes"* ]]; then
     printf '  OK    a wrong yes is still refused against the lane diff\n'
   else
     printf '  FAIL  a wrong yes was accepted after the merge-base resolution\n%s\n' "$out" >&2
