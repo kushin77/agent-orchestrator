@@ -1173,6 +1173,48 @@ def live_issue_body(issue: int) -> str | None:
     return gh_issue_field(issue, ".body")
 
 
+#: Push-on-commit (issue #740, dispatch half): a lane that commits and is never
+#: pushed is how #708's 31-lane, 46-commit stranding happened — the loop's
+#: success path required the gate to pass first, and a gate that never ran (or
+#: never passed) meant the push step, which lived AFTER the gate, never ran
+#: either. The fix pushes immediately after the runner exits, BEFORE gating, so
+#: the branch survives on the remote regardless of what the gate later decides.
+PUSH_STRANDED = "stranded"
+PUSH_OK = "pushed"
+PUSH_SKIPPED = "skipped"
+
+
+def push_lane_branch(
+    branch: str | None, worktree: Path | None, timeout: float, directive_id: str = ""
+) -> tuple[str, str]:
+    """Push ``branch`` from ``worktree`` to its remote right after the run.
+
+    Returns ``(outcome, detail)`` with outcome one of ``PUSH_OK``,
+    ``PUSH_SKIPPED`` (no isolated lane / no branch — nothing to push) or
+    ``PUSH_STRANDED`` (a push that was owed and failed). ``PUSH_STRANDED`` is
+    NEVER silent: the caller names it, by directive, in the run record.
+    """
+    if not branch or worktree is None:
+        return PUSH_SKIPPED, "no isolated lane branch to push"
+    cwd = str(worktree)
+    try:
+        done = subprocess.run(
+            ["git", "push", "--set-upstream", "origin", branch],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return PUSH_STRANDED, f"stranded: `git push origin {branch}` timed out after {timeout}s"
+    except (OSError, subprocess.SubprocessError) as exc:
+        return PUSH_STRANDED, f"stranded: `git push origin {branch}` could not run ({exc})"
+    if done.returncode == 0:
+        return PUSH_OK, f"pushed {branch} to origin"
+    tail = ((done.stdout or "") + (done.stderr or "")).strip()[-300:]
+    return PUSH_STRANDED, f"stranded: `git push origin {branch}` rc={done.returncode}: {tail or 'no output'}"
+
+
 def run_gate(command: str, cwd: str, timeout: float) -> tuple[str, str]:
     """Run one gate the loop owns; its exit code — not the prose — is the signal.
 
@@ -2372,6 +2414,7 @@ def loop(args: argparse.Namespace) -> int:
         lane_env: dict[str, str],
         run_started_at: str,
         dispatch: dict | None = None,
+        branch: str | None = None,
     ) -> None:
         """One worker's full life: run the executor, then derive and report the verdict.
 
@@ -2391,6 +2434,18 @@ def loop(args: argparse.Namespace) -> int:
         # The FinOps block leads the report: the director's record of the run names
         # the tier the runner actually executed at, not the tier it asked for.
         tail = f"[{where}] {finops_line(dispatch)} | {tail}"
+        # Push-on-commit (#740): immediately after the runner exits and BEFORE
+        # gating, so a lane's commit survives on the remote regardless of what
+        # the gate later decides. A failed/impossible push is named as
+        # `stranded` in the run record — never silent (the #708 incident this
+        # closes was 31 lanes, 46 commits, exactly none of them pushed).
+        push_outcome, push_detail = push_lane_branch(branch, worktree, args.timeout, directive_id)
+        tail = f"{tail} | push: {push_outcome} ({push_detail})"
+        if push_outcome == PUSH_STRANDED:
+            # Never silent (#740): a stranded push is streamed by directive NAME
+            # the moment it is known, independent of any later truncation of the
+            # run record's 200-char tail.
+            stream_run_event(directive_id, f"{PUSH_STRANDED}: directive {directive_id} — {push_detail}")
         # The verdict comes from evidence the loop runs itself — the issue's own
         # Verify: command, `make verify`, and the real board state — never from
         # the runner's prose (#279).
@@ -3005,7 +3060,7 @@ def loop(args: argparse.Namespace) -> int:
             stream_run_event(directive_id, f"no isolated lane for #{issue} — shared checkout")
         else:
             stream_run_event(directive_id, f"isolated lane provisioned for #{issue}: {tree[0]}")
-        worktree, _branch, lane_env = tree if tree else (None, None, {})
+        worktree, lane_branch, lane_env = tree if tree else (None, None, {})
         # One worker = one lane = one claim = one run marker = one report. The
         # claim is taken here (by the loop) and released in the worker's `finally`,
         # so a dead child can never strand an issue.
@@ -3021,7 +3076,7 @@ def loop(args: argparse.Namespace) -> int:
         slot["dispatch"] = dispatch
         worker = threading.Thread(
             target=run_worker,
-            args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at, dispatch),
+            args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at, dispatch, lane_branch),
             name=f"fleet-run-{directive_id}",
             daemon=True,
         )
