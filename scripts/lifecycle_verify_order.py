@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
-"""Drive the close-out's verification ordering against a real repository (#786).
+"""Drive the close-out's verification ordering against a real repository (#786, #1098).
 
 Invoked by ``scripts/check-lifecycle-verify-order.sh``; not a check itself. It exists
 as a file rather than an inline heredoc because it is the largest body of logic in the
 script family and a heredoc inside the gate is a syntax error waiting for a stray
 word — the shared shell's own failure mode.
+
+Two halves of one invariant are provoked here. #786 is the **gone lane**: the record
+must be re-measured from the verified commit rather than mourned. #1098 is the **squash
+merge**: the commit the merge landed as is not the commit the branch was verified at, so
+a lane cut from the default branch can never be *at* the verified head — it may only be
+admitted by containing the landing, and only when that landing carries the verified
+tree. Both halves fail the same way if they regress, and both are measured from real
+git in a real repository, so neither can be satisfied by a fixture that merely looks
+like the incident.
 
 Everything that decides the answer here is the shipping code:
 
@@ -18,8 +27,8 @@ Everything that decides the answer here is the shipping code:
 Exactly two things are not: ``make`` on ``PATH`` (the repo's established seam — a gate
 may not run the composite gate twice per case), and the board read, which a gate may not
 make at all. Both are named on every line they affect, and neither can manufacture a
-green: the stub's outcomes are read by the shipping consumer, and cases 2 and 3 below
-are the negative controls that prove it.
+green: the stub's outcomes are read by the shipping consumer, and cases 2, 3, 5, 8b and
+8c below are the negative controls that prove it.
 """
 
 from __future__ import annotations
@@ -40,6 +49,7 @@ from governance.lifecycle import cli as lifecycle_cli  # noqa: E402
 from governance.lifecycle.cli import GhOps, journal_path  # noqa: E402
 from governance.lifecycle.closeout import (  # noqa: E402
     CANNOT_ASSESS,
+    FAILED,
     OK,
     REFUSED,
     closeout,
@@ -131,6 +141,13 @@ def git(cwd: Path, *args: str, check: bool = True) -> str:
     if check and result.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed in {cwd}: {result.stderr.strip()[-300:]}")
     return result.stdout.strip()
+
+
+def git_rc(cwd: Path, *args: str) -> int:
+    """A git exit code, for the questions whose *answer* is the code (ancestry, tree equality)."""
+    return subprocess.run(
+        ["git", "-C", str(cwd), *args], capture_output=True, text=True, env=_GIT_ENV
+    ).returncode
 
 
 def write_stub() -> None:
@@ -239,13 +256,124 @@ def world(name: str, issue: int, *, reclaim: bool) -> tuple[Path, Path, str]:
     return repo, lane, head
 
 
-def item_for(issue: int, head: str, *, lane_present: bool, session: str = "") -> dict:
+#: The three real squash-merge shapes #1098 is about, built by real git in ``world_squash``.
+SQUASH_VARIANTS = ("descends", "pre_merge", "different_tree")
+
+
+def world_squash(name: str, issue: int, *, variant: str) -> tuple[Path, Path, str, str, str]:
+    """A real **squash-merged** pull request, and a real lane, in one of three shapes.
+
+    This is the shape ``world()`` cannot build and the incident was measured in
+    (#714, #977, #978): the verified head commit is **not** an ancestor of anything on
+    the default branch, because a squash merge creates a *new* commit. The branch tip
+    the merge replaced is therefore unreachable from the default branch, while the
+    commit the merge *landed as* is on it and carries the very same tree.
+
+    Returns ``(repo, lane, verified, landing, lane_head)``.
+
+    * ``descends`` — the lane is a worktree of the default branch *after* later work
+      landed there. It contains the landing and the landing carries the verified tree:
+      the shape that must be **admitted**.
+    * ``pre_merge`` — the lane is a worktree of the default branch from **before** the
+      landing. It contains nothing of this item, so it must be **refused** — the shape
+      of the original complaint (a lane cut from ``origin/master``, rule 15, refused
+      because it is not *at* the verified head).
+    * ``different_tree`` — the branch got one more commit than the squash carried, so
+      the landing is contained but its tree is **not** the verified one. Must be
+      **refused**: containing *a* landing must never stand in for containing the
+      verified work.
+    """
+    if variant not in SQUASH_VARIANTS:
+        raise AssertionError(f"unknown squash variant {variant!r}")
+
+    base = WORK / name
+    repo = base / "repo"
+    lane = base / "lane"
+    repo.mkdir(parents=True)
+    git(repo, "init", "-q", "-b", "master")
+    (repo / "README.md").write_text("the repository\n", encoding="utf-8")
+    git(repo, "add", "README.md")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "base")
+    before = git(repo, "rev-parse", "HEAD")
+
+    # The branch: the pull request's own head, which the squash merge will replace.
+    git(repo, "checkout", "-q", "-b", f"issue-{issue}")
+    (repo / "verified.txt").write_text("the verified work\n", encoding="utf-8")
+    git(repo, "add", "verified.txt")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "the verified head")
+    verified = git(repo, "rev-parse", "HEAD")
+
+    # The squash merge: a NEW commit on the default branch carrying the SAME tree.
+    git(repo, "checkout", "-q", "master")
+    git(repo, "merge", "--squash", "-q", f"issue-{issue}")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", f"the squash landing (#{issue})")
+    landing = git(repo, "rev-parse", "HEAD")
+
+    if variant == "different_tree":
+        # One commit the squash did not carry, so the landing's tree stops being the
+        # verified tree while still being contained by the default branch.
+        git(repo, "checkout", "-q", f"issue-{issue}")
+        (repo / "unsquashed.txt").write_text("content the squash did not carry\n", encoding="utf-8")
+        git(repo, "add", "unsquashed.txt")
+        git(repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "a commit the squash did not carry")
+        verified = git(repo, "rev-parse", "HEAD")
+        git(repo, "checkout", "-q", "master")
+
+    # Later work on the default branch, so a lane cut from it strictly *contains* the
+    # landing rather than equalling it — the containment arm, not the equality arm.
+    (repo / "later.txt").write_text("later work on the default branch\n", encoding="utf-8")
+    git(repo, "add", "later.txt")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "later work on the default branch")
+
+    # The shape itself is asserted here, so a builder that stopped producing a squash
+    # merge would fail loudly instead of quietly passing the cases below.
+    if git_rc(repo, "merge-base", "--is-ancestor", verified, landing) == 0:
+        raise RuntimeError("the fixture is not a squash merge: the verified head IS an ancestor of the landing")
+    if git_rc(repo, "merge-base", "--is-ancestor", verified, "master") == 0:
+        raise RuntimeError("the fixture is not a squash merge: the verified head IS an ancestor of master")
+    same_tree = git_rc(repo, "diff", "--quiet", verified, landing) == 0
+    if same_tree and variant == "different_tree":
+        raise RuntimeError("the different_tree fixture's landing carries the verified tree after all")
+    if not same_tree and variant != "different_tree":
+        raise RuntimeError(f"the {variant} fixture's landing does not carry the verified tree")
+
+    if variant == "pre_merge":
+        # A lane of the default branch as it was *before* this item landed: it is not at
+        # the verified head, and it contains no landing of this item's.
+        git(repo, "worktree", "add", "-q", "--detach", str(lane), before)
+    else:
+        git(repo, "worktree", "add", "-q", "-b", f"lane-{issue}", str(lane), "master")
+    lane_head = git(lane, "rev-parse", "HEAD")
+    if variant == "pre_merge" and git_rc(repo, "merge-base", "--is-ancestor", landing, lane_head) == 0:
+        raise RuntimeError("the pre_merge lane unexpectedly contains the landing")
+
+    session = f"s-{issue}"
+    identity = write_record(
+        SessionIdentity(
+            session_id=session,
+            issue=issue,
+            agent_id=f"gate-{issue}",
+            lane=f"lifecycle-{issue}",
+            branch=f"lane-{issue}",
+            worktree=lane,
+        ),
+        repo,
+    )
+    if not identity.exists():
+        raise RuntimeError(f"the lane record was not written to {identity}")
+    return repo, lane, verified, landing, lane_head
+
+
+def item_for(issue: int, head: str, *, lane_present: bool, session: str = "", merge_commit: str = "") -> dict:
     """The lifecycle item, with every GitHub-derived fact already terminal.
 
     A merge, a deleted branch, a released claim and a consumed order are *not* the
     subject here, and leaving them terminal means the driver skips them — so a gate
     never reaches the network. The two facts that are the subject, the lane and the
     verification record, are the ones left open.
+
+    ``merge_commit`` is the commit a **squash merge** landed as, and it differs from
+    ``head`` in exactly the case the squash half of this invariant exists for (#1098).
     """
     return {
         "issue": issue,
@@ -258,7 +386,7 @@ def item_for(issue: int, head: str, *, lane_present: bool, session: str = "") ->
             "state": "merged",
             "branch": f"issue-{issue}",
             "head_commit": head,
-            "merge_commit": head,
+            "merge_commit": merge_commit or head,
         },
         "branch_deleted": True,
         "claim": {"agent": None, "live": False},
@@ -578,6 +706,155 @@ def case_unrelated_failure_still_reclaims() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 8. the SQUASH half of the same invariant (#1098)
+# ---------------------------------------------------------------------------
+
+
+def case_squash_lane_from_the_default_branch() -> None:
+    """A squash merge creates a new commit; a lane cut from the branch must still count."""
+    stage("a lane cut from the default branch after a SQUASH merge is measured, not refused (#1098)")
+    repo, lane, verified, landing, lane_head = world_squash("squash-descends", 793, variant="descends")
+    outcome("passed")
+    print(
+        f"  measured: verified head {verified[:12]} is NOT an ancestor of master; the squash landed as "
+        f"{landing[:12]} carrying the same tree; the lane is at {lane_head[:12]}, which contains it"
+    )
+
+    item = item_for(793, verified, lane_present=True, merge_commit=landing)
+    ops = OfflineOps(repo, item)
+    result = closeout(item, ops)
+    print(describe(result))
+
+    recorded = journal_verify(repo, 793)
+    ok(
+        "the invariant is SATISFIED — no REMAINS VERIFY_EVIDENCE_MISSING for a squash-merged item",
+        VERIFY_INVARIANT not in {finding.code for finding in result.remaining},
+        f"remaining={[f.code for f in result.remaining]}",
+    )
+    ok("the item reaches a terminal verdict", result.verdict == OK, f"verdict={result.verdict}")
+    ok(
+        "the record names the VERIFIED head commit the evidence is against",
+        recorded.get("commit") == verified,
+        f"recorded={recorded}",
+    )
+    ok("the record names the LANDING it stands for", recorded.get("landing") == landing, f"recorded={recorded}")
+    ok(
+        "the record names the tree the gate actually ran in",
+        recorded.get("measured") == lane_head,
+        f"recorded={recorded}",
+    )
+    ok("the record says HOW it stands for it", recorded.get("via") == "contains", f"recorded={recorded}")
+    ok("the record still names its provenance", recorded.get("source") == "lane", f"recorded={recorded}")
+    ran = gate_ran()
+    ok("the gate really ran", ran is not None, "no gate run recorded")
+    if ran is not None:
+        _where, measured = ran
+        ok(
+            "the gate ran at the LANE's head — the current tree — not at the obsolete head",
+            measured == lane_head,
+            f"measured {measured[:12]} vs lane head {lane_head[:12]}",
+        )
+        ok("the gate did NOT run at the replaced branch tip", measured != verified, measured[:12])
+    ok(
+        "no network-facing step was reached",
+        not [call for call in ops.calls if call in OfflineOps.NETWORK_STEPS],
+        f"calls={ops.calls}",
+    )
+    ok(
+        "the lane was reclaimed once its record existed",
+        "reclaim-lane" in ops.calls and not lane.exists(),
+        f"calls={ops.calls} lane_exists={lane.exists()}",
+    )
+
+
+def case_squash_lane_predating_the_landing_is_refused() -> None:
+    """The original complaint: a lane of the default branch that carries none of this item."""
+    stage("negative control — a lane that does not contain the landing is still REFUSED, by name (#1098)")
+    repo, _lane, verified, landing, lane_head = world_squash("squash-premerge", 794, variant="pre_merge")
+    outcome("passed")
+    print(
+        f"  measured: the lane is at {lane_head[:12]} (the default branch before this item landed); "
+        f"the verified head {verified[:12]} and the landing {landing[:12]} are both absent from it"
+    )
+
+    item = item_for(794, verified, lane_present=True, merge_commit=landing)
+    ops = OfflineOps(repo, item)
+    result = closeout(item, ops)
+
+    verification = step(result, "record-verification")
+    detail = verification.detail if verification else ""
+    ok(
+        "the invariant is still broken and still NAMED",
+        VERIFY_INVARIANT in {finding.code for finding in result.remaining},
+        f"remaining={[f.code for f in result.remaining]}",
+    )
+    ok(
+        "the record-verification step FAILED — nothing green was recorded",
+        verification is not None and verification.outcome == FAILED,
+        f"outcome={verification.outcome if verification else 'no step'} detail={detail[:200]}",
+    )
+    # The exact refusal clause — not a substring over a message that *contains* the
+    # lane head's sha, which a green message would satisfy too. That vacuity is the
+    # failure mode this control exists to avoid.
+    ok(
+        "the refusal is the refusal, naming the lane head and the verified commit",
+        f"lane head {lane_head[:12]} is not the verified commit {verified[:12]} and does not contain it" in detail,
+        detail[:300],
+    )
+    ok("nothing green was reported for it", "verify green" not in detail, detail[:300])
+    ok(
+        "the refusal names the landing that could not license the lane",
+        f"landing {landing[:12]}" in detail,
+        detail[:300],
+    )
+    ok("the gate never ran in that lane", gate_ran() is None, "a gate run was recorded")
+    ok("no record was written for a tree that carries none of this item's work", journal_verify(repo, 794) == {}, "a journal exists")
+    ok("the lane is kept, not reclaimed over the missing evidence", "reclaim-lane" not in ops.calls, f"calls={ops.calls}")
+
+
+def case_squash_different_tree_is_refused() -> None:
+    """Containing *a* landing is not the claim; containing *the verified tree* is."""
+    stage("negative control — a contained landing whose tree is NOT the verified tree is REFUSED (#1098)")
+    repo, _lane, verified, landing, lane_head = world_squash("squash-difftree", 795, variant="different_tree")
+    outcome("passed")
+    print(
+        f"  measured: the lane at {lane_head[:12]} contains the landing {landing[:12]}, but the verified "
+        f"head {verified[:12]} carries a commit the squash did not"
+    )
+
+    item = item_for(795, verified, lane_present=True, merge_commit=landing)
+    ops = OfflineOps(repo, item)
+    result = closeout(item, ops)
+
+    verification = step(result, "record-verification")
+    detail = verification.detail if verification else ""
+    ok(
+        "the invariant is still broken and still NAMED",
+        VERIFY_INVARIANT in {finding.code for finding in result.remaining},
+        f"remaining={[f.code for f in result.remaining]}",
+    )
+    ok(
+        "the record-verification step FAILED — nothing green was recorded",
+        verification is not None and verification.outcome == FAILED,
+        f"outcome={verification.outcome if verification else 'no step'} detail={detail[:200]}",
+    )
+    ok(
+        "the refusal opens by naming the lane head and the verified commit",
+        f"lane head {lane_head[:12]} is not the verified commit {verified[:12]} and does not contain it" in detail,
+        detail[:300],
+    )
+    ok("nothing green was reported for it", "verify green" not in detail, detail[:300])
+    ok(
+        "the refusal names the landing the lane DOES contain, so the operator sees why it was not enough",
+        f"landing {landing[:12]}" in detail,
+        detail[:300],
+    )
+    ok("the gate never ran in that lane", gate_ran() is None, "a gate run was recorded")
+    ok("no record was written", journal_verify(repo, 795) == {}, "a journal exists")
+    ok("the lane is kept, not reclaimed over the missing evidence", "reclaim-lane" not in ops.calls, f"calls={ops.calls}")
+
+
+# ---------------------------------------------------------------------------
 # 6/7. the fix is load-bearing: disable each half and watch its case go red
 # ---------------------------------------------------------------------------
 
@@ -587,6 +864,7 @@ def case_mutants() -> None:
 
     original_remeasure = GhOps._remeasure
     original_owed = closeout_module._verification_owed
+    original_admissible = GhOps._admissible
     try:
         # MUTANT 1 — the port's re-measurement, i.e. the pre-#786 code exactly.
         # The signature tracks the shipping one: #834 added ``dead`` (so the refusal can
@@ -630,9 +908,62 @@ def case_mutants() -> None:
             result.withheld == [],
             f"withheld={result.withheld}",
         )
+        closeout_module._verification_owed = original_owed  # type: ignore[assignment]
+
+        # MUTANT 3 — the containment arm removed, i.e. the pre-#1098 port exactly. The
+        # equality arm is left intact, so the ONLY thing this disables is the squash half.
+        def equality_only(self, worktree: Path, head: str, commit: str, landing: str) -> str:
+            if not commit or head == commit:
+                return "equals"
+            return ""
+
+        GhOps._admissible = equality_only  # type: ignore[method-assign]
+        repo, _lane, verified, landing, _lane_head = world_squash("mutant-3", 796, variant="descends")
+        outcome("passed")
+        item = item_for(796, verified, lane_present=True, merge_commit=landing)
+        result = closeout(item, OfflineOps(repo, item))
+        ok(
+            "with the containment arm removed the SQUASH wedge RETURNS, so its case is load-bearing",
+            VERIFY_INVARIANT in {finding.code for finding in result.remaining},
+            "the mutant still satisfied the invariant, so the containment arm proves nothing",
+        )
+        ok(
+            "and the wedge returns as the recorded pre-#1098 message",
+            "is not the verified commit" in (step(result, "record-verification").detail if step(result, "record-verification") else ""),
+            "the mutant did not reproduce the measured message",
+        )
+        GhOps._admissible = original_admissible  # type: ignore[method-assign]
+
+        # MUTANT 4 — containment without the tree check: the arm is *nearly* right, and a
+        # landing built from other content is admitted. Without this the tree half of the
+        # rule would be a formality nobody had provoked.
+        def containment_without_the_tree_check(self, worktree: Path, head: str, commit: str, landing: str) -> str:
+            if not commit or head == commit:
+                return "equals"
+            if landing and lifecycle_cli.commit_is_contained(worktree, landing, head):
+                return "contains"
+            return ""
+
+        GhOps._admissible = containment_without_the_tree_check  # type: ignore[method-assign]
+        repo, _lane, verified, landing, _lane_head = world_squash("mutant-4", 797, variant="different_tree")
+        outcome("passed")
+        item = item_for(797, verified, lane_present=True, merge_commit=landing)
+        result = closeout(item, OfflineOps(repo, item))
+        ok(
+            "with the TREE check removed a landing built from other content is ADMITTED, so its case is load-bearing",
+            VERIFY_INVARIANT not in {finding.code for finding in result.remaining},
+            "the mutant still refused, so the tree half of the rule proves nothing",
+        )
+        ok(
+            "and an attestation is written for a tree the item was never verified in",
+            journal_verify(repo, 797).get("ok") is True,
+            f"recorded={journal_verify(repo, 797)}",
+        )
+        GhOps._admissible = original_admissible  # type: ignore[method-assign]
     finally:
         GhOps._remeasure = original_remeasure  # type: ignore[method-assign]
         closeout_module._verification_owed = original_owed  # type: ignore[assignment]
+        GhOps._admissible = original_admissible  # type: ignore[method-assign]
 
 
 # ---------------------------------------------------------------------------
@@ -679,12 +1010,15 @@ def case_declarations() -> None:
 
 def main() -> int:
     write_stub()
-    print("== the close-out's verification ordering, provoked (#786) ==")
+    print("== the close-out's verification ordering, provoked (#786, #1098) ==")
     case_reclaimed_lane_green()
     case_reclaimed_lane_red()
     case_reclaimed_lane_unreachable()
     case_parked_keeps_the_lane()
     case_unrelated_failure_still_reclaims()
+    case_squash_lane_from_the_default_branch()
+    case_squash_lane_predating_the_landing_is_refused()
+    case_squash_different_tree_is_refused()
     case_mutants()
     case_declarations()
 
