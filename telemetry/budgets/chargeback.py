@@ -172,6 +172,7 @@ class ChargebackReportGenerator:
 
 
 def _now_utc() -> str:
-    from datetime import UTC, datetime
+    """The one clock seam (``telemetry/clock.py``, issue #1025)."""
+    from telemetry.clock import now_utc_iso
 
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return now_utc_iso()

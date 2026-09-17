@@ -20,8 +20,10 @@ from __future__ import annotations
 import math
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Mapping, Optional
+
+from telemetry.clock import now_utc_iso  # noqa: F401  (re-exported: the seam)
 
 # --------------------------------------------------------------------------- #
 # Outcome vocabulary (CONSUMED from gateway/proxy/contract.py, issue #16)
@@ -132,9 +134,8 @@ def new_id() -> str:
     return uuid.uuid4().hex
 
 
-def now_utc_iso() -> str:
-    """UTC timestamp in the ISO-8601 shape used across the repo's records."""
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+# ``now_utc_iso`` is the one clock seam (``telemetry/clock.py``, issue #1025),
+# re-exported at the top of this module rather than defined here.
 
 
 def _iso_to_epoch(ts: str) -> float:
