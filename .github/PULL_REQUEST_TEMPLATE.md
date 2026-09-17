@@ -60,6 +60,19 @@ $ <the exact commands you ran, in order>
 
 AI-assistance: <runtime> (<model>/<mode>)
 
+## Clock invariant
+
+<!--
+The #506 date bomb: a fixture seeded with a literal date while the code under
+test resolves its evaluation bucket from the live clock — green on the day it
+was written, red every day after (RCA-0008, issue #506). A detector that reads
+the fixture cannot stand in for this answer: at byte-identical seed lines it
+refuses the defect and its own repair alike. Answer on one line, and write `no`
+when this diff pins no date at all.
+-->
+
+Clock-invariant: <no time-pinned fixture — or: pinned <what>, with the evaluation bucket resolved from the entity under test and never from the live clock>
+
 ## Pre-existing red
 
 None — no failing gate is claimed to be pre-existing.

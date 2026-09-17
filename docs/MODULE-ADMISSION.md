@@ -286,3 +286,64 @@ a declared SPoG view or surface that does not resolve, and an `ARCHITECTURE.md`
 that no longer points at this section. It provokes each of those against a
 staged copy of its own inputs on every run, so a check that cannot fail cannot
 pass (AO-GR-4).
+
+## 10. The clock invariant (issue #506, `RCA-0008`)
+
+Status: **declared** (2026-09-17, issue #1028). The class half of the same lesson
+is *requested* on issue #883; the behavioural control named in §10.2 landed on
+`master` with the fix itself (squash `58d5392`).
+
+**A surface this module serves resolves its evaluation buckets from the entity
+under test, never from the live clock.**
+
+### 10.1 Why this is a contract clause
+
+The clause exists because its absence already cost a false green. Issue `#506`
+shipped a fixture that pinned its **seed** to a literal day (`2026-09-14`) while
+the code under test resolved its **evaluation** bucket from the **live clock**.
+Its own `Verify:` command read `47 passed` on 2026-09-14 and `2 failed, 45
+passed` every day after — identically at the closing squash `eae061d`, so the
+green expired with the calendar rather than regressing later. The assertion that
+went red said the *opposite* of the guard it was evidence for: a quota-exhausted
+tenant was **allowed** past an exhausted spend rail, with `provider_called=True`.
+
+Two questions therefore belong in a brief — asked while the work is being shaped,
+not detected afterwards:
+
+1. does this work introduce a **time-pinned fixture** (a literal date/day/month)?
+2. where is the **evaluation** bucket resolved — from the **entity under test**,
+   or from the **live clock**?
+
+Both are asked by this repo's lane templates: the fleet-task brief carries them
+in its acceptance criteria (`.github/ISSUE_TEMPLATE/fleet-task.yml`) and the PR
+template records the one-line answer (`.github/PULL_REQUEST_TEMPLATE.md`).
+
+### 10.2 What the invariant does not license
+
+It is **not** a rule that a fixture may not pin a date. A pinned date is correct
+when the code under test judges against *that* date; what is required is that the
+**evaluation** bucket is derived from the entity, and a fixture that pins the
+evaluation seam as well as the seed is the right shape.
+
+It is **not** enforceable by reading the fixture. Measured in #1039: at
+byte-identical seed lines a static detector refuses the defect **and its own
+repair** alike, so textual enforcement is a formality in both directions. The
+enforcement is behavioural and names the defect:
+
+- `scripts/check-chat-finops.sh`, control `turn-date-scope` (landed with the fix,
+  squash `58d5392`), refuses **by name** — *"the evaluation bucket is not the
+  turn's own (#506)"* — and catches a mutant guard that judges against the live
+  clock.
+- the pattern canon is [`PYTHON-PATTERNS.md`](PYTHON-PATTERNS.md) `PP-1`.
+- the record is `governance/lessons/rca/RCA-0008-date-bomb-seed-without-evaluation.md`
+  (incident `INC-0008`).
+
+### 10.3 What this asks of a module
+
+A module admitted under §1 answers the two questions of §10.1 for the surfaces it
+serves, and a surface whose evidence pins a date while its own evaluation bucket
+comes from the live clock is **not admissible** — its green is true only on the
+day it was taken. This clause is **declared**, not machine-checked by
+`scripts/check-module-admission.sh`: the gate that can refuse it is the owning
+surface's own behavioural control (§10.2), and a second textual detector here
+would be the very formality #1039 measured.
