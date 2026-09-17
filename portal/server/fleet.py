@@ -24,6 +24,7 @@ here, and while it is off every ``/api/fleet/*`` route is refused by the app.
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
@@ -157,6 +158,35 @@ def surface_enabled(
 _CONSOLE_CACHE: dict[str, Any] = {}
 
 
+@contextlib.contextmanager
+def _fleet_dir_returned_to_the_caller(path: Path) -> Iterator[None]:
+    """Run the enclosed import, then take ``<repo>/fleet`` back off ``sys.path``.
+
+    ``fleet/console.py``'s module body puts its own directory on ``sys.path`` so
+    its sibling imports resolve (``channel``, ``runtime``), and it does so
+    *unconditionally* — there is no way to ask it not to. Left in place that
+    entry re-points every later bare import at ``fleet/``: on a checkout
+    carrying ``fleet/telemetry.py``, ``import telemetry.metering`` resolved to
+    the fleet copy and died with ``ModuleNotFoundError: No module named
+    'telemetry.metering'; 'telemetry' is not a package`` — long after this call
+    had returned, and only for whichever caller happened to import ``telemetry``
+    after the console (#968). The entry is therefore borrowed for the duration
+    of the import, exactly as ``skill_studio`` borrows ``registry/`` for its own.
+
+    Only the entries *this* import added are removed: a directory the caller had
+    already placed on the path keeps its position, so a caller that put
+    ``fleet/`` there deliberately (the fleet's own tests, the operator-terminal
+    probe) is unaffected.
+    """
+    entry = str(path.resolve().parent)
+    already = sys.path.count(entry)
+    try:
+        yield
+    finally:
+        while sys.path.count(entry) > already:
+            sys.path.remove(entry)
+
+
 def load_fleet_console(repo_root: Path | str) -> Any:
     """Import ``fleet/console.py`` (the single projection) for ``repo_root``.
 
@@ -164,6 +194,11 @@ def load_fleet_console(repo_root: Path | str) -> Any:
     module's runtime paths address the *same* module object. Returns whatever
     ``fleet/console.py`` defines; the caller only uses the documented pure
     readers (``snapshot``, ``events_snapshot``, ``rung_specs``, ``read_json``).
+
+    Importing the console changes nothing but ``sys.modules``: the ``fleet/``
+    directory the console lends to ``sys.path`` for its own imports is given
+    back when the import returns (see
+    :func:`_fleet_dir_returned_to_the_caller`).
     """
     key = str(Path(repo_root).resolve())
     cached = _CONSOLE_CACHE.get(key)
@@ -175,7 +210,8 @@ def load_fleet_console(repo_root: Path | str) -> Any:
         raise ImportError(f"cannot load the fleet console at {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[_CONSOLE_MODULE_NAME] = module
-    spec.loader.exec_module(module)
+    with _fleet_dir_returned_to_the_caller(path):
+        spec.loader.exec_module(module)
     _CONSOLE_CACHE[key] = module
     return module
 
