@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kushin77/agent-orchestrator/.verify/attestation.schema.json",
+  "title": "verify-gate attestation (issue #882)",
+  "description": "Every scripts/verify.sh run writes exactly one .verify/attestation.json matching this shape, on PASS and on FAIL alike (a gate that only attests when it is green is a false-green risk, GR-12). The overall verdict is the worst of the per-check verdicts -- never better than any check it ran.",
+  "type": "object",
+  "required": ["run_id", "git_sha", "overall_verdict", "checks"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A unique identifier for this gate run (never reused across runs)."
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{7,40}|unknown)$",
+      "description": "The commit under test, or the literal 'unknown' when git could not resolve HEAD (never a fabricated sha)."
+    },
+    "overall_verdict": {
+      "$ref": "#/definitions/verdict",
+      "description": "The worst verdict among checks[]. OK requires every check OK; any WARN with no FAIL yields WARN; any FAIL yields FAIL."
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/check" }
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "verdict": {
+      "type": "string",
+      "enum": ["OK", "WARN", "FAIL"]
+    },
+    "check": {
+      "type": "object",
+      "required": ["name", "verdict", "rc", "duration", "evidence_tail"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "verdict": { "$ref": "#/definitions/verdict" },
+        "rc": { "type": "integer" },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Wall-clock seconds the check ran for."
+        },
+        "evidence_tail": {
+          "type": "string",
+          "description": "The last lines of the check's own output (may be empty for a check that printed nothing)."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}
