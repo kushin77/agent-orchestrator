@@ -128,8 +128,11 @@ class LandingOps(Protocol):
     def run_contract(self, *, pr_number: Optional[int]) -> CommandResult:
         """Run the pre-merge contract (``scripts/merge-gate.sh run``)."""
 
-    def merge_pr(self, number: int) -> str:
-        """Squash-merge the pull request; return the merge commit."""
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        """Run the landed-contract trailer precondition over the commits to be squashed."""
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
+        """Squash-merge the pull request with an explicit trailer-bearing message; return the merge commit."""
 
     def delete_branch(self, branch: str) -> str:
         """Delete the remote source branch."""
@@ -258,11 +261,48 @@ class GitHubOps:
             env["AO_PR_NUMBER"] = str(pr_number)
         return _run(["bash", str(self.root / "scripts" / "merge-gate.sh"), "run"], cwd=self.root, env=env)
 
-    def merge_pr(self, number: int) -> str:
-        """Squash-merge; the branch is deleted by its own named step, not here."""
-        result = self._gh("pr", "merge", str(number), "--squash")
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        """The merge precondition over the artifact that lands (issue #998).
+
+        The repository sets ``squash_merge_commit_message=COMMIT_MESSAGES``, so
+        the landed commit body is composed from the BRANCH COMMIT MESSAGES, not
+        the PR body: a PR whose body is contract-perfect still lands trailer-less
+        if its commit message lacks the ticket trailer. This runs the shared
+        predicate's landed audit over exactly the commits that will be squashed
+        — ``scripts/check-pr-contract.sh --landed --range <base>..<head>`` — the
+        same parser the landed-history audit (``check-isolation-landed``) runs,
+        moved to *before* the merge rather than after it. One rule, one parser,
+        enforced on the artifact that lands.
+        """
+        return _run(
+            [
+                "bash",
+                str(self.root / "scripts" / "check-pr-contract.sh"),
+                "--landed",
+                "--range",
+                f"{base}..{head}",
+            ],
+            cwd=self.root,
+            env=self.env,
+        )
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
+        """Squash-merge with an explicit trailer-bearing message; the branch delete stays its own step.
+
+        The explicit ``--subject``/``--body-file`` makes the landed artifact
+        deterministic: instead of relying on GitHub's COMMIT_MESSAGES
+        composition, the squash commit body is the one the caller composed and
+        validated, so its trailing ticket trailer survives the merge (issue #998).
+        """
+        result = self._gh(
+            "pr", "merge", str(number), "--squash",
+            "--subject", subject, "--body-file", str(body_file),
+        )
         if not result.ok:
-            raise PortError(f"`gh pr merge {number} --squash` failed (rc={result.rc}): {result.stderr.strip()[-300:]}")
+            raise PortError(
+                f"`gh pr merge {number} --squash --subject ... --body-file ...` failed "
+                f"(rc={result.rc}): {result.stderr.strip()[-300:]}"
+            )
         view = self._gh("pr", "view", str(number), "--json", "state,mergeCommit")
         if not view.ok:
             raise PortError(f"`gh pr view {number}` failed (rc={view.rc}): {view.stderr.strip()[-200:]}")
@@ -338,8 +378,12 @@ class RecordingOps:
         self._plan("contract", f"bash scripts/merge-gate.sh run (AO_PR_NUMBER={pr_number or 'unset'})")
         return CommandResult(argv=("bash", "scripts/merge-gate.sh", "run"), rc=0)
 
-    def merge_pr(self, number: int) -> str:
-        return self._plan("merge", f"gh pr merge {number} --squash")
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        self._plan("landed-contract", f"bash scripts/check-pr-contract.sh --landed --range {base}..{head}")
+        return CommandResult(argv=("bash", "scripts/check-pr-contract.sh", "--landed"), rc=0)
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
+        return self._plan("merge", f"gh pr merge {number} --squash --subject {subject!r} --body-file {body_file}")
 
     def delete_branch(self, branch: str) -> str:
         return self._plan("delete-branch", f"git push origin --delete {branch}")

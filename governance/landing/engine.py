@@ -291,6 +291,34 @@ class LandingEngine:
 
     # -- the landing -----------------------------------------------------------
 
+    def _compose_squash_body(self, result: LandingResult, subjects: Sequence[str]) -> str:
+        """The squash-merge commit body — the artifact that actually lands.
+
+        The repository sets ``squash_merge_commit_message=COMMIT_MESSAGES``, so
+        the landed commit body is composed from the branch commit messages, not
+        the PR body. Passing an explicit body makes the landed artifact
+        deterministic and guarantees the trailing ticket trailer the
+        landed-history audit (``check-pr-contract.sh --landed``) requires: the
+        message ends in the trailing trailer block
+        ``Refs <owner>/<repo>#<n>`` followed by GitHub's own bare auto-close
+        keyword, so the squash commit the merge produces re-passes that audit
+        (issue #998).
+        """
+        req = self.request
+        lines: list[str] = []
+        if subjects:
+            lines.extend(f"- {subject}" for subject in subjects)
+        else:
+            lines.append(f"- the lane's commits on `{result.branch}`")
+        lines.extend(
+            [
+                "",
+                f"Refs kushin77/agent-orchestrator#{req.issue}",
+                f"Closes #{req.issue}",
+            ]
+        )
+        return "\n".join(lines) + "\n"
+
     def land(self) -> LandingResult:
         req = self.request
         result = LandingResult(
@@ -470,7 +498,22 @@ class LandingEngine:
             )
         )
         result.steps.append(Step("contract", PLANNED, CONTRACT_COMMAND))
-        result.steps.append(Step("merge", PLANNED, "gh pr merge <n> --squash (only if the fresh attestation is green and names the PR head)"))
+        result.steps.append(
+            Step(
+                "landed-contract",
+                PLANNED,
+                f"bash scripts/check-pr-contract.sh --landed --range {req.base}..<head> "
+                "(the commits to be squashed must carry the trailing ticket trailer)",
+            )
+        )
+        result.steps.append(
+            Step(
+                "merge",
+                PLANNED,
+                "gh pr merge <n> --squash --subject <title> --body-file <trailer-bearing message> "
+                "(only if the fresh attestation is green, names the PR head, and the landed contract is green)",
+            )
+        )
         result.steps.append(Step("delete-branch", PLANNED, f"git push origin --delete {result.branch}"))
         result.steps.append(
             Step("lifecycle-close", PLANNED, f"python3 governance/lifecycle/cli.py close --issue {req.issue}")
@@ -589,16 +632,59 @@ class LandingEngine:
                 )
             )
 
+        # Merge precondition (issue #998): the artifact that lands is the squash
+        # commit, composed from the BRANCH COMMIT MESSAGES because the repository
+        # sets squash_merge_commit_message=COMMIT_MESSAGES. The PR body is not
+        # what lands, so the commits to be squashed must themselves carry the
+        # trailing ticket trailer — refused here, by name, before the merge.
+        landed = self.ops.check_landed_contract(base=req.base, head=landing_commit)
+        result.steps.append(
+            Step(
+                "landed-contract",
+                PERFORMED if landed.rc == 0 else FAILED,
+                f"bash scripts/check-pr-contract.sh --landed --range {req.base}..{landing_commit} -> rc={landed.rc}",
+            )
+        )
+        for line in landed.tail(12).splitlines():
+            result.steps.append(Step("landed-contract", PERFORMED if landed.rc == 0 else FAILED, line))
+        if landed.rc != 0:
+            result.refusal_code = "landed-contract-blocked"
+            result.refusal = (
+                f"the commits to be squashed ({req.base}..{landing_commit}) do not carry the trailing ticket "
+                f"trailer (check-pr-contract --landed rc={landed.rc}) — a trailer-less squash never merges"
+            )
+            result.rc = _normalise_rc(landed.rc)
+            return self._journal(result)
+
+        # The squash message is explicit and trailer-bearing, so the landed
+        # artifact is deterministic rather than dependent on GitHub's
+        # COMMIT_MESSAGES composition.
+        try:
+            subjects = self.ops.commit_subjects(req.base, result.branch)
+        except PortError:
+            subjects = ()
+        title = req.title or (pr.title if pr is not None and pr.title else "") or result.branch
+        squash_body = req.root / ".verify" / f"landing-{req.issue}-squash-message.md"
+        squash_body.parent.mkdir(parents=True, exist_ok=True)
+        squash_body.write_text(self._compose_squash_body(result, subjects), encoding="utf-8")
+
         result.granted = True
         try:
-            result.merge_commit = self.ops.merge_pr(pr.number)
+            result.merge_commit = self.ops.merge_pr(pr.number, subject=title, body_file=squash_body)
         except PortError as exc:
             result.steps.append(Step("merge", FAILED, str(exc)))
             result.refusal_code = "merge-failed"
             result.refusal = str(exc)
             result.rc = EXIT_NOT_OK
             return self._journal(result)
-        result.steps.append(Step("merge", PERFORMED, f"gh pr merge {pr.number} --squash -> {result.merge_commit or 'merge commit unnamed'}"))
+        result.steps.append(
+            Step(
+                "merge",
+                PERFORMED,
+                f"gh pr merge {pr.number} --squash --subject {title!r} --body-file {squash_body.name} "
+                f"-> {result.merge_commit or 'merge commit unnamed'}",
+            )
+        )
 
         try:
             result.steps.append(Step("delete-branch", PERFORMED, self.ops.delete_branch(result.branch)))

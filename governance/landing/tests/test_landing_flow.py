@@ -85,13 +85,14 @@ class TestTheOrder:
         ops = _green(tmp_path)
         landing = LandingEngine(ops, request_factory(apply=True)).land()
         assert landing.rc == 0, landing.refusal or describe(landing)
-        assert ops.calls == [
-            ("push", "issue-764"),
-            ("open-pr", "issue-764"),
-            ("contract", "11"),
-            ("merge", "11"),
-            ("delete-branch", "issue-764"),
-            ("lifecycle-close", "764"),
+        assert [call[0] for call in ops.calls] == [
+            "push",
+            "open-pr",
+            "contract",
+            "landed-contract",
+            "merge",
+            "delete-branch",
+            "lifecycle-close",
         ]
         assert landing.granted and landing.merge_commit == "c" * 40
 
@@ -140,6 +141,81 @@ class TestTheMergeBoundaryRecheck:
         assert not any(call[0] == "merge" for call in ops.calls)
 
 
+class TestTheLandedContractPrecondition:
+    """The commits to be squashed must carry the trailing ticket trailer (#998).
+
+    The repository sets ``squash_merge_commit_message=COMMIT_MESSAGES``, so the
+    landed commit body is composed from the branch commit messages, not the PR
+    body. A PR whose body is contract-perfect still lands trailer-less if its
+    commit message lacks the trailer — so the merge is refused by name on the
+    artifact that lands, before it lands.
+    """
+
+    def test_a_commit_message_lacking_the_trailer_is_refused_by_name(self, tmp_path, request_factory):
+        """Provocation (1): a perfect PR body does not excuse a trailer-less commit."""
+        ops = _green(
+            tmp_path,
+            landed_contract_rc=1,
+            landed_contract_output=(
+                "check-pr-contract: LANDED\n"
+                "  FAIL  commit-missing-ticket-trailer:0123456789ab"
+            ),
+        )
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 1
+        assert landing.refusal_code == "landed-contract-blocked"
+        assert not any(call[0] == "merge" for call in ops.calls)
+        # The PR body is contract-perfect — the refusal names the commit-message
+        # finding, never the PR body.
+        assert "Closes #764" in ops.body
+        assert "AI-assistance:" in ops.body
+        assert any("commit-missing-ticket-trailer" in step.detail for step in landing.steps)
+
+    def test_a_trailer_less_pr_body_is_refused_before_the_merge(self, tmp_path, request_factory):
+        """Provocation (2): a PR body that fails the contract is refused by name."""
+        ops = _green(
+            tmp_path,
+            contract_rc=1,
+            contract_output="merge-gate: NOT-OK\n  FAIL  pr-body-missing-ai-assistance",
+        )
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 1
+        assert landing.refusal_code == "pre-merge-contract-failed"
+        assert not any(call[0] == "merge" for call in ops.calls)
+        assert any("pr-body-missing-ai-assistance" in step.detail for step in landing.steps)
+
+    def test_a_landed_contract_that_cannot_assess_never_merges(self, tmp_path, request_factory):
+        """CANNOT-ASSESS is never a pass: the tri-state binds at the merge boundary."""
+        ops = _green(
+            tmp_path,
+            landed_contract_rc=2,
+            landed_contract_output="check-pr-contract: CANNOT-ASSESS — no commits in landed range",
+        )
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 2
+        assert landing.refusal_code == "landed-contract-blocked"
+        assert not any(call[0] == "merge" for call in ops.calls)
+
+    def test_a_well_formed_branch_still_lands(self, tmp_path, request_factory):
+        """Negative control: a green contract and a green landed contract still merge."""
+        ops = _green(tmp_path)
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 0 and landing.granted
+        assert ("merge", "11") in ops.calls
+        assert landing.merge_commit == "c" * 40
+        # The explicit squash message carries the trailing trailer that lands.
+        assert "Refs kushin77/agent-orchestrator#764" in ops.squash_body
+        assert "Closes #764" in ops.squash_body
+
+    def test_the_landed_contract_runs_at_the_merge_boundary(self, tmp_path, request_factory):
+        """The precondition sits after the contract and before the merge."""
+        ops = _green(tmp_path)
+        LandingEngine(ops, request_factory(apply=True)).land()
+        landed = ops.calls.index(("landed-contract", "master.." + "a" * 40))
+        assert ops.calls.index(("contract", "11")) < landed
+        assert landed < ops.calls.index(("merge", "11"))
+
+
 class TestIdempotence:
     """A landed lane is terminal: no push, no second PR, no second merge."""
 
@@ -176,6 +252,7 @@ class TestDryRun:
             "push",
             "open-pr",
             "contract",
+            "landed-contract",
             "merge",
             "delete-branch",
             "lifecycle-close",
