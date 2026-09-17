@@ -500,6 +500,14 @@ class LandingEngine:
         result.steps.append(Step("contract", PLANNED, CONTRACT_COMMAND))
         result.steps.append(
             Step(
+                "gate-status",
+                PLANNED,
+                "bash scripts/gate-status.sh post --sha <pr-head> --rc <contract-rc> "
+                "(ADR-0028 — posted before the merge decision, for every contract outcome)",
+            )
+        )
+        result.steps.append(
+            Step(
                 "landed-contract",
                 PLANNED,
                 f"bash scripts/check-pr-contract.sh --landed --range {req.base}..<head> "
@@ -575,6 +583,42 @@ class LandingEngine:
         )
         for line in contract.tail(12).splitlines():
             result.steps.append(Step("contract", PERFORMED if contract.rc == 0 else FAILED, line))
+
+        # Publish the gate of record (ADR-0028, #1072) BEFORE the merge decision,
+        # for every contract outcome — a red or unassessable commit is decorated
+        # red/error, never left blank. This runs against the PR's own head, and
+        # ahead of the attribution logic below: an attributed pre-existing red
+        # still posts `failure` (the context is not yet required, so this is
+        # honest rather than defeating the attribution).
+        status_sha = pr.head or result.commit
+        status_rc = _normalise_rc(contract.rc)
+        try:
+            status = self.ops.publish_status(sha=status_sha, rc=status_rc)
+        except PortError as exc:
+            result.steps.append(Step("gate-status", FAILED, str(exc)))
+            result.refusal_code = "gate-status-unpublished"
+            result.refusal = (
+                f"the gate-of-record status could not be published for {status_sha} ({exc}) — a "
+                "failed/unreadable poster is CANNOT-ASSESS, and the commit is never left blank or merged"
+            )
+            result.rc = EXIT_CANNOT_ASSESS
+            return self._journal(result)
+        result.steps.append(
+            Step(
+                "gate-status",
+                PERFORMED if status.ok else FAILED,
+                f"bash scripts/gate-status.sh post --sha {status_sha} --rc {status_rc} -> rc={status.rc}",
+            )
+        )
+        if not status.ok:
+            result.refusal_code = "gate-status-unpublished"
+            result.refusal = (
+                f"the gate-of-record status poster returned rc={status.rc} for {status_sha} — a "
+                "failed/unreadable poster is CANNOT-ASSESS, and the commit is never left blank or merged"
+            )
+            result.rc = EXIT_CANNOT_ASSESS
+            return self._journal(result)
+
         attributed = None
         if contract.rc != 0:
             # The contract's red is measured before it is refused, exactly as at
