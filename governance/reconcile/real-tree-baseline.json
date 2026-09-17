@@ -1,6 +1,6 @@
 {
   "note": "Real-tree baseline for governance/reconcile's disk audit (#740, item 1 of the Bounded proposal). scripts/check-reconcile.sh now runs `audit()` against THIS repository's real working tree (read-only; nothing here is ever removed), on top of the existing synthetic-fixture proofs. Every worktree/branch it reports UNMATCHED at the time this baseline was recorded is listed below by name, so the gate starts failing on any NEW unexplained artifact from this commit forward, without needing to resolve the pre-existing count first. An entry here is REMOVED only by an explicit, reviewed edit to this file (e.g. once its worktree/branch is reclaimed, or a session beat/claim/landing record starts explaining it) -- never silently, and never as a blanket allow. A STALE entry (baselined but no longer unmatched) fails the gate exactly like a NEW unbaselined violation, by name, so this list cannot grow into a permanent excuse.",
-  "measured_at": "2026-09-17",
+  "measured_at": "2026-09-17 (re-measured, #740 follow-up: age grace)",
   "measured_head": "d0a20d6f8e070dda52449b4df49eef77f31b542e",
   "measured_by": "governance/reconcile/real_tree_baseline.py generation, issue #740",
   "entries": [
@@ -507,11 +507,6 @@
     {
       "kind": "worktree",
       "name": "/tmp/ao-masterred-f45f14f",
-      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
-    },
-    {
-      "kind": "worktree",
-      "name": "/tmp/ao-tf-wt",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },
     {
