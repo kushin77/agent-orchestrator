@@ -229,6 +229,13 @@ dimensions:
       # refusal is named (`posture-contradiction`), not resolved by precedence —
       # silently picking a winner is how a plan becomes a guess.
       - [no-human-needed, human-gated]
+    # The NAME is anchored to the filing seam's declaring vocabulary (issue
+    # #1182): governance/conformance/policy.yaml lists `posture` in its `prefixed`
+    # set so the filing path recognises a filer's own `posture:`. The VALUES are
+    # this file's; the gate proves the two halves stay in step.
+    name_authority:
+      path: governance/conformance/policy.yaml
+      pointer: prefixed
 
   # -------------------------------------------------------------------------
   # NEW (issue #1175). The SDLC stage the work is in. This is what makes the
@@ -251,6 +258,10 @@ dimensions:
       - release
       - operate
       - retire
+    # Anchored like `posture` above (issue #1182).
+    name_authority:
+      path: governance/conformance/policy.yaml
+      pointer: prefixed
 
 # ---------------------------------------------------------------------------
 # What the taxonomy REFUSES, by the name it reports. Each refusal below is
@@ -311,4 +322,10 @@ refusals:
       every contract document (AGENTS.md, the spine, GOVERNANCE, EXECUTION-PLAN,
       QA-GATE) must declare the tag authority's marker vocabulary
     names_in_the_finding: the document and the marker it stopped declaring
+    provoked_by: scripts/check-tagging.sh
+  - id: filing-default-drift
+    rule: >-
+      every `filing.tags` dimension the conformance filing seam derives must be a
+      declared dimension here, and every `filing.defaults` value a legal value
+    names_in_the_finding: the dimension and the illegal default value
     provoked_by: scripts/check-tagging.sh

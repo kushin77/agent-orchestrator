@@ -52,6 +52,11 @@ CODE_FINOPS_FLOOR_UNMET = "finops-floor-unmet"
 # contract documents declare it, so the declaration is itself gated.
 CODE_MANDATE_MISSING_DOC = "mandate-missing-doc"
 CODE_MANDATE_MISSING_MARKER = "mandate-missing-marker"
+# The filing seam's tag defaults must be LEGAL values in this taxonomy: the
+# conformance filing path derives `posture`/`lifecycle` for new issues (#1182),
+# and a default that names a value no dimension declares is a drift nobody would
+# otherwise notice until the board filled up with it.
+CODE_FILING_DEFAULT_DRIFT = "filing-default-drift"
 
 # Additional codes this module raises about the taxonomy's own shape. They are
 # not tag refusals — they mean the authority file is malformed, which is a
@@ -78,6 +83,7 @@ REFUSAL_CODES = (
     CODE_FINOPS_FLOOR_UNMET,
     CODE_MANDATE_MISSING_DOC,
     CODE_MANDATE_MISSING_MARKER,
+    CODE_FILING_DEFAULT_DRIFT,
 )
 
 KIND_BORROWED = "borrowed"
@@ -166,6 +172,87 @@ def resolve_pointer(doc: Any, pointer: str) -> Any:
         else:
             raise KeyError(pointer)
     return node
+
+
+def filing_drift(taxonomy: Taxonomy, policy_path: Path) -> List[Finding]:
+    """Prove the filing seam's tag defaults are legal values in this taxonomy.
+
+    ``governance/conformance/policy.yaml`` now derives `posture`/`lifecycle` for
+    every NEW issue (#1182). Its `filing.tags` list names the dimensions and its
+    `filing.defaults` names the values. This check is the one-directional drift
+    anchor: the taxonomy does not import the filing seam, but it DOES read its
+    policy and refuses a default that names an undeclared dimension or an
+    illegal value — because a default that fills the board with a value no
+    dimension declares is the quiet-drift failure ADR-0015 names.
+    """
+    findings: List[Finding] = []
+    try:
+        doc = _load_doc(policy_path)
+    except TaggingUnavailable as exc:
+        return [
+            Finding(
+                CODE_FILING_DEFAULT_DRIFT,
+                "the conformance policy is unreadable: %s" % exc,
+                subject=str(policy_path),
+                remediation="restore governance/conformance/policy.yaml",
+            )
+        ]
+    if not isinstance(doc, Mapping):
+        return [
+            Finding(
+                CODE_FILING_DEFAULT_DRIFT,
+                "the conformance policy is not a mapping",
+                subject=str(policy_path),
+            )
+        ]
+    filing = doc.get("filing") or {}
+    tags = _as_str_tuple(filing.get("tags"))
+    defaults = filing.get("defaults") or {}
+    for name in tags:
+        subject = "dimension:%s" % name
+        dim = taxonomy.dimensions.get(name)
+        if dim is None:
+            findings.append(
+                Finding(
+                    CODE_FILING_DEFAULT_DRIFT,
+                    "the filing seam tags undeclared dimension %r" % name,
+                    subject=subject,
+                    remediation="declare the dimension in taxonomy.yaml, or drop the tag",
+                )
+            )
+            continue
+        value = str(defaults.get(name, "") or "").strip()
+        if not value:
+            findings.append(
+                Finding(
+                    CODE_FILING_DEFAULT_DRIFT,
+                    "the filing seam tags %r but derives no default value" % name,
+                    subject=subject,
+                    remediation="add filing.defaults.%s, or drop the tag" % name,
+                )
+            )
+            continue
+        if dim.kind == KIND_PATTERN:
+            if not re.match(dim.pattern, value):
+                findings.append(
+                    Finding(
+                        CODE_FILING_DEFAULT_DRIFT,
+                        "the filing default %s=%r does not match %s"
+                        % (name, value, dim.pattern),
+                        subject=subject,
+                    )
+                )
+        elif value not in dim.values:
+            findings.append(
+                Finding(
+                    CODE_FILING_DEFAULT_DRIFT,
+                    "the filing default %s=%r is not a value %r declares (%s)"
+                    % (name, value, name, ", ".join(dim.values)),
+                    subject=subject,
+                    remediation="use a declared value, or declare the new one here",
+                )
+            )
+    return findings
 
 
 def _as_str_tuple(value: Any) -> Tuple[str, ...]:

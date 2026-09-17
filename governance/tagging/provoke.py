@@ -243,6 +243,27 @@ def provoke_mandate_missing_doc(scratch: Path, taxonomy: M.Taxonomy, rules: M.Ru
     )
 
 
+def provoke_filing_default_drift(scratch: Path, taxonomy: M.Taxonomy, rules: M.Rules):
+    """A filing default that names an illegal value is refused, by name.
+
+    The provocation mutates the CONFORMANCE policy — the consumer — rather than
+    the taxonomy, because the drift this guards is "the consumer derives a value
+    the authority does not declare". The clean twin is the real policy.
+    """
+    work = _scratch(scratch, "filing-drift")
+    source = ROOT / "governance" / "conformance" / "policy.yaml"
+    text = source.read_text(encoding="utf-8")
+    mutant_text = text.replace("    posture: overall", "    posture: mythic", 1)
+    if mutant_text == text:
+        raise AssertionError("the posture default was not present to mutate")
+    mutant = work / "policy.yaml"
+    mutant.write_text(mutant_text, encoding="utf-8")
+
+    findings = M.filing_drift(taxonomy, mutant)
+    clean = M.filing_drift(taxonomy, source)
+    return findings, clean
+
+
 PROVOCATIONS: Tuple[Tuple[str, str, str, Callable], ...] = (
     ("unknown-dimension", "a tag on an undeclared dimension", "vibe", provoke_unknown_dimension),
     ("unknown-value", "a value the dimension does not declare", "magic", provoke_unknown_value),
@@ -257,6 +278,7 @@ PROVOCATIONS: Tuple[Tuple[str, str, str, Callable], ...] = (
     ("finops-floor-unmet", "a tier below the floor its tags require", "flash", provoke_finops_floor_unmet),
     ("mandate-missing-marker", "a contract doc that stopped declaring a marker", "lifecycle", provoke_mandate_missing_marker),
     ("mandate-missing-doc", "a contract document that went missing", "GOVERNANCE.md", provoke_mandate_missing_doc),
+    ("filing-default-drift", "a filing default that names an illegal value", "mythic", provoke_filing_default_drift),
 )
 
 

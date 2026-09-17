@@ -55,6 +55,9 @@ def _authority_findings(root: Path, taxonomy: M.Taxonomy, rules: M.Rules) -> Lis
     findings: List[M.Finding] = []
     findings.extend(M.lint_taxonomy(taxonomy))
     findings.extend(M.drift(taxonomy, root))
+    findings.extend(
+        M.filing_drift(taxonomy, root / "governance/conformance/policy.yaml")
+    )
     findings.extend(M.lint_rules(rules, taxonomy))
     findings.extend(M.lint_gates(rules, root))
     _, rank_findings = M.finops_rank_map(root / RULES_REL)

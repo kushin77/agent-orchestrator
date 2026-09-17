@@ -7,7 +7,7 @@
 # the gates a tag set requires along the channel those gates run in (pr / ci /
 # cd / ops). This gate is what makes those declarations falsifiable.
 #
-# Six checks, each carrying a REAL exit code, because a gate that cannot fail is
+# Seven checks, each carrying a REAL exit code, because a gate that cannot fail is
 # a formality (GR-12):
 #
 #   tagging-lint      the authority's own shape: every dimension well-formed,
@@ -48,6 +48,14 @@
 #                     moment one stops. That is what makes the rule institutional
 #                     rather than advisory, and it is the same shape
 #                     scripts/check-chronological-dispatch.sh uses for rule 14.
+#   tagging-e2e       the WHOLE chain, end to end and offline: a tag set derives
+#                     a plan, every gate in that plan resolves, the matrix names
+#                     the rules that fired, the mandate holds in this tree, the
+#                     filing seam derives the same tag dimensions for a NEW issue,
+#                     and the filing defaults are values the authority declares.
+#                     Each link is driven with its provoked half AND its clean
+#                     twin, because a chain whose links all pass while doing
+#                     nothing is a decoration, not an integration.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 # CANNOT-ASSESS must never be reported as a pass.
@@ -207,6 +215,27 @@ case "$rc" in
     ;;
   *)
     report SKIP "tagging-mandate — CANNOT-ASSESS (rc $rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    skipped=$((skipped + 1))
+    ;;
+esac
+
+# --- check 7: the whole chain, end to end ----------------------------------
+out="$(python3 governance/tagging/e2e.py 2>&1)"
+rc=$?
+case "$rc" in
+  0)
+    assessed=$((assessed + 1))
+    report PASS "tagging-e2e — $(printf '%s' "$out" | tail -1)"
+    ;;
+  1)
+    assessed=$((assessed + 1))
+    failures=$((failures + 1))
+    report FAIL "tagging-e2e — a link of the chain did not hold"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    ;;
+  *)
+    report SKIP "tagging-e2e — CANNOT-ASSESS (rc $rc)"
     printf '%s\n' "$out" | sed 's/^/      /'
     skipped=$((skipped + 1))
     ;;
