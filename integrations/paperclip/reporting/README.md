@@ -64,6 +64,39 @@ second copy of any rule those artifacts state.
 | `BRIEF-SCHEMA-INVALID` | the emitted brief does not satisfy the frozen schema (the JSON path is named) |
 | `BRIEF-STALE` | the committed artifact differs from a fresh composition |
 
+## Live sync (issue #888)
+
+`sync/live.py` is the surface's `live_sync` evidence
+(`governance/conformance/surfaces.py` `LIVE_TOKENS`): a running module, not a
+data file. `run_sync()` authenticates a caller through the boundary pipeline
+(`integrations/paperclip/auth/guard.py`, issue #412), pulls **tickets** and
+**budgets** through the existing HTTP seam
+(`integrations.paperclip.client.PaperclipClient`) and **heartbeats** through the
+existing local-beat adapter
+(`integrations.paperclip.adapters.heartbeat.adapter.derive_heartbeat`),
+validates the assembled record against the frozen `sync/sync.schema.json`, and
+appends exactly one line to an append-only trail (default
+`.verify/paperclip-live-sync-audit.jsonl`) — a record that fails validation is
+refused and never written.
+
+Refusals are named:
+
+| Code | Refused |
+|---|---|
+| `SYNC-UNAUTHENTICATED` | no/invalid credential at the boundary |
+| `SYNC-FORBIDDEN` | a known caller without the required permission |
+| `SYNC-PAYLOAD-INVALID` | the assembled record fails `sync.schema.json` |
+| `SYNC-SCHEMA-FROZEN` | the schema file is missing, unreadable, or not the frozen `$id` |
+
+```bash
+python3 -m pytest integrations/paperclip/reporting/tests/test_live_sync.py -q
+```
+
+Tests are entirely offline: tickets/budgets replay through
+`client.FixtureTransport` against `integrations/paperclip/tests/fixtures/api.json`,
+heartbeats replay through a canned reader, and the signing key is an
+obviously-fake placeholder — no test here calls a live network.
+
 ## Distribution
 
 The brief, not a copy, travels with the assets: distribution stays with the
