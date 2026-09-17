@@ -435,6 +435,33 @@ class TestTheMasterAttestationWriter:
         assert calls == []
         assert not any(step.action == "master-attestation" for step in landing.steps)
 
+    def test_a_lane_that_was_behind_master_skips_the_write_and_names_why(self, tmp_path, request_factory):
+        """The honesty guard (#1114 follow-up): the attestation measured the
+        LANE head, not master's post-merge head — relabelling it is only fair
+        when the lane already contained master's pre-merge tip. `FakeOps`'s
+        `lane_behind_master=True` makes `merge_base` report no common tip.
+        """
+        ops = _green(tmp_path, lane_behind_master=True)
+        calls, writer = self._recorder()
+        landing = LandingEngine(ops, request_factory(apply=True), master_attestation_writer=writer).land()
+        assert landing.rc == 0, landing.refusal or describe(landing)
+        assert calls == []
+        skip_steps = [step for step in landing.steps if step.action == "master-attestation"]
+        assert len(skip_steps) == 1
+        assert skip_steps[0].outcome == "skipped"
+        assert "behind master" in skip_steps[0].detail
+
+    def test_a_lane_that_was_already_at_master_writes_it(self, tmp_path, request_factory):
+        """The positive control for the same guard: the default `FakeOps`
+        (`lane_behind_master=False`) reports the lane head as already
+        containing master's tip, so the write proceeds as in the base case."""
+        ops = _green(tmp_path)  # lane_behind_master=False by default
+        calls, writer = self._recorder()
+        landing = LandingEngine(ops, request_factory(apply=True), master_attestation_writer=writer).land()
+        assert landing.rc == 0, landing.refusal or describe(landing)
+        assert len(calls) == 1
+        assert not any(step.action == "master-attestation" and step.outcome == "skipped" for step in landing.steps)
+
     def test_the_real_writer_is_atomic_and_reusable_by_read_attestation(self, tmp_path):
         """No injected fake: the production writer really writes a file
         `read_attestation` accepts, and it never leaves a `.tmp-*` file behind.
