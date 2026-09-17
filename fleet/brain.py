@@ -60,9 +60,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fleet"))
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
+# The master-health pre-check (RCA 2026-09-17 fix #5) reads the SAME attestation
+# schema/reader landing uses (`governance/landing/evidence.py`) rather than
+# inventing a second notion of "green" — a flat sibling import, same convention
+# as `governance/dispatch`'s `model` above.
+sys.path.insert(0, str(ROOT / "governance" / "landing"))
 
 import channel  # noqa: E402
 import decompose_policy  # noqa: E402
+import evidence as landing_evidence  # noqa: E402
 import markers  # noqa: E402
 import routing  # noqa: E402
 import runtime  # noqa: E402
@@ -113,6 +119,77 @@ PARKED_SUPPRESSED = "terminal marker"
 # (#693). It is refreshed explicitly by `python3 governance/dispatch/cli.py
 # snapshot --from-github` — the only network-touching board read.
 BOARD_PATH = ROOT / ".board" / "snapshot.json"
+
+# Where the cheap, cached master-health verdict lives (RCA 2026-09-17 fix #5).
+# It is the SAME attestation shape landing reads (`governance/landing/evidence.py`
+# — `rc`/`commit`/`result`/`timestamp`), just written for `origin/master`'s own
+# head instead of a lane's; whatever refreshes it (a cron rung, `make verify`
+# on master) writes with `scripts/merge-gate.sh`'s own writer so both readers
+# agree on one schema. This module never runs verify itself — it only reads
+# the cached verdict, which is what keeps the pre-check cheap.
+MASTER_ATTESTATION = FLEET_DIR / "master-attestation.json"
+# A cached verdict older than this is stale — treated as no fresher than an
+# absent one (CANNOT-ASSESS), never silently trusted as still green.
+MASTER_ATTESTATION_TTL_SECONDS = 900.0
+
+
+def master_health_refusal(order: dict) -> str | None:
+    """Why no directive may be issued because master itself is not known-green.
+
+    Dispatch opens a lane, and a lane that opens a PR against a red master can
+    never land (RCA 2026-09-17: H2/H3) — landing already refuses at the END:
+    this is the SAME check, cheaply, at the START, so the queue stops
+    inflating with work that cannot land. It reads the cached attestation
+    `MASTER_ATTESTATION` (never runs verify) through the SAME reader landing
+    uses (`landing_evidence.read_attestation`), so "green" means one thing in
+    this fleet.
+
+    A lane explicitly fixing a red master is exempt — `task.allow_red_master`
+    (a directive flag) or `task.master_red_fix` (an issue labelled as the fix
+    itself) — otherwise nothing could ever repair master. Every other order is
+    admitted only when the cached verdict is fresh AND green; absent, stale,
+    unreadable, or red all refuse (CANNOT-ASSESS is never a pass, mirroring
+    the honesty tri-state `governance/landing/evidence.py` already uses).
+    """
+    task = order.get("task") or {}
+    if task.get("allow_red_master") or task.get("master_red_fix"):
+        return None
+    attestation = landing_evidence.read_attestation(MASTER_ATTESTATION)
+    if not attestation.readable:
+        return (
+            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} is {attestation.state} "
+            f"({attestation.detail}); dispatch refuses rather than assume master is green"
+        )
+    age = time.time() - _attestation_epoch(attestation.timestamp)
+    if age > MASTER_ATTESTATION_TTL_SECONDS:
+        return (
+            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} is stale "
+            f"({age:.0f}s old, ttl={MASTER_ATTESTATION_TTL_SECONDS:.0f}s); dispatch refuses "
+            "rather than trust an expired verdict"
+        )
+    if not attestation.green:
+        return (
+            f"master-health NOT-OK — {MASTER_ATTESTATION} reports "
+            f"result={attestation.result or 'unknown'} exit_code={attestation.rc}; "
+            "master is red, so a new lane's PR could never land (RCA 2026-09-17 fix #5) — "
+            "pass task.allow_red_master (or label the issue a master-red fix) to dispatch anyway"
+        )
+    return None
+
+
+def _attestation_epoch(timestamp: str) -> float:
+    """The attestation's timestamp as epoch seconds, or -inf when unreadable.
+
+    An unparsable/blank timestamp must never read as "just now" (that would
+    silently defeat the TTL and let a stale attestation pass as fresh).
+    """
+    if not timestamp:
+        return float("-inf")
+    try:
+        text = timestamp.replace("Z", "+00:00")
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        return float("-inf")
 
 
 def suppressed(message: str) -> bool:
@@ -612,6 +689,14 @@ def dispatch(order: dict) -> tuple[bool, str]:
         refusal = closure_refusal(number)
         if refusal is not None:
             return False, refusal
+    # The master-health guard (RCA 2026-09-17 fix #5), between the closure guard
+    # and the send: a lane whose issue is open but whose PR could never land
+    # because master itself is red gets refused here too, before anything is
+    # written or sent — same "no marker, no channel call" refusal shape as the
+    # closure guard above.
+    refusal = master_health_refusal(order)
+    if refusal is not None:
+        return False, refusal
     if marker is not None:
         write_marker(marker, order, markers.SENDING, previous=record)
     result = subprocess.run(

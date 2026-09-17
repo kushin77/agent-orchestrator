@@ -55,7 +55,7 @@ RUNTIME_PATHS = {
         "STEERS",
     ),
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "RUNNER_HOLD", "WORKTREE_ROOT"),
-    "brain": ("HEARTBEAT", "WAVES", "DISPATCH_MARKERS"),
+    "brain": ("HEARTBEAT", "WAVES", "DISPATCH_MARKERS", "MASTER_ATTESTATION"),
     "health": ("SISTER_HEARTBEAT", "BRAIN_HEARTBEAT"),
     # The dispatch markers' state machine (#796): it reads and writes the marker
     # set, the run registry and the dead-letter store, so a test that reconciles
@@ -120,6 +120,35 @@ def isolate_fleet_runtime(tmp_path, monkeypatch):
     singleton = importlib.import_module("singleton")
     monkeypatch.setattr(singleton, "FLEET", tmp_path / "singleton")
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def master_health_is_green_by_default(isolate_fleet_runtime):
+    """`brain.dispatch()` refuses on a red/absent/stale master attestation
+    (RCA 2026-09-17 fix #5) — a fact no suite in this repo was written to
+    expect. Every test's `brain.MASTER_ATTESTATION` is already redirected into
+    `tmp_path` by `isolate_fleet_runtime`, above; this seeds it green by
+    default so an existing suite that dispatches an order for an unrelated
+    reason is not incidentally refused. A test exercising the master-health
+    check itself (``fleet/tests/test_brain.py``) overwrites this file (or
+    repoints the constant) to get a red/absent/stale verdict instead.
+    """
+    brain = importlib.import_module("brain")
+    path = brain.MASTER_ATTESTATION
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "result": "PASS",
+                "exit_code": 0,
+                "commit": "test-fixture",
+                "timestamp": __import__("datetime")
+                .datetime.now(__import__("datetime").timezone.utc)
+                .isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 #: The executable the fleet's default runner names (`terminal.DEFAULT_RUNNER`).
