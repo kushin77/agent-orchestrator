@@ -31,12 +31,14 @@ gateway/catalog
 gateway/limits
 gateway/mcp
 gateway/proxy
+gateway/sync
 registry/profiles
 registry/prompts
 registry/personas
 registry/events
 registry/service
 registry/packs
+registry/sync
 identity/onboarding
 identity/rbac
 identity/cpapi
@@ -65,7 +67,9 @@ governance/dispatch
 fleet
 governance/knowledge
 governance/modules
+governance/modules/sync
 governance/conformance
+governance/controls
 governance/finops
 # Final registration (issue #46, E2E lane): the top-level negative-control +
 # smoke suite plus the remaining merged suites that ship a tests/ dir.
@@ -99,6 +103,7 @@ integrations/paperclip/adapters/skills
 integrations/paperclip/api
 integrations/paperclip/auth
 integrations/paperclip/reporting
+integrations/hermes/sync
 registry/parity
 scripts
 # EPIC #500 (M30 — the enterprise chat surface; issue #502 is the wiring lane):
