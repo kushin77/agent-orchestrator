@@ -744,3 +744,20 @@ verbs:
       Drives a work item to hygiene and closes it. Irreversible in this
       vocabulary: it writes a terminal closure record and mutates an external
       board; no verb here reopens it.
+
+  - id: closure.retire
+    source: governance/lifecycle/cli.py
+    local: retire
+    effect_class: irreversible
+    capability: board:admin
+    audit: closure.retire
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: >-
+      Retires a .fleet/sent/ directive whose issue is closed WITHOUT a change
+      of its own (superseded, issue #861) — the second terminal mode next to
+      closure.close's "landed" gate. Irreversible: it moves the record to
+      .fleet/done/ and stamps it with the retirement reason and the
+      superseding issue(s); nothing here reopens it. Idempotent: retiring an
+      already-retired directive is a no-op, not a refusal.
