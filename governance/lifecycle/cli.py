@@ -417,6 +417,21 @@ class GhOps:
         return (result.stdout or "").strip()
 
     def merge_pull_request(self, number: int) -> str:
+        # Refuse BEFORE merging if the composed squash message would drop the
+        # ticket trailer (#1102) — named squash-message-would-drop-trailer so
+        # the refusal matches scripts/check-squash-message.sh's own vocabulary.
+        check = subprocess.run(
+            ["bash", str(self.root / "scripts" / "check-squash-message.sh"), "--pr", str(number)],
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+        )
+        if check.returncode != 0:
+            raise RuntimeError(
+                f"PR {number} is squash-message-would-drop-trailer: "
+                f"scripts/check-squash-message.sh --pr {number} exited {check.returncode}; "
+                f"{(check.stdout or check.stderr).strip()[-300:]}"
+            )
         # The local delete-branch step fails while the main checkout holds master;
         # the merge itself lands, and step 3 deletes the branch explicitly.
         try:

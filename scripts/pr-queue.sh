@@ -223,6 +223,10 @@ for number in "${merge_order[@]}"; do
     fi
     continue
   fi
+  if ! bash "$(dirname "${BASH_SOURCE[0]}")/check-squash-message.sh" --pr "$number"; then
+    echo "pr-queue: REFUSED — squash-message-would-drop-trailer — #$number's rendered squash message would fail check-isolation-landed after merge; stopping (no loop swallowing a refusal)" >&2
+    exit 1
+  fi
   echo "pr-queue: merging #$number (gh pr merge --squash)"
   if ! gh pr merge "$number" --squash; then
     echo "pr-queue: REFUSED — gh pr merge #$number failed; stopping (no loop swallowing a refusal)" >&2

@@ -143,7 +143,10 @@ human re-deriving it under pressure each time a queue is cleared by hand.
 6. **Verify before done (GR-12):** run the issue's `Verify:` command and
    `make verify`; paste the **actual output** as evidence on the PR.
 7. **Merge after green** (owner autonomous-merge mandate) — never merge failing
-   work.
+   work. `scripts/check-squash-message.sh --pr <n>` runs before every `gh pr
+   merge --squash` (`scripts/pr-queue.sh`); a NOT-OK verdict refuses the merge
+   by name (`squash-message-would-drop-trailer`) and leaves the PR open
+   (issue #1102).
 8. **Close the item out — every artifact terminal.** Merging is not the end of
    the item. Run `python3 governance/lifecycle/cli.py close --issue <n>`: it
    drives the remaining **close-out** steps in dependency order (consume the
