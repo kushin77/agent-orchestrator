@@ -8,10 +8,11 @@ ship flag-gated off, independent of whether the parent module flag is later
 flipped. A tenant should not get live conversion→ledger posting merely because
 someone turned the module on; this bridge needs its own, explicit promotion.
 
-Promotion (the central row in ``infra/feature-flags/registry.yaml`` plus the
-matching terraform variable) belongs to a reviewed go-live, per the module
-README's own "The flag" section — this file declares the id and the default
-only, and never claims to be that registry.
+The promotion row lives at ``services.erp_webhooks_bridge`` in
+``infra/feature-flags/registry.yaml`` with the matching terraform variable
+``enable_erp_webhooks_bridge`` (both added by #995). Flipping it on still
+belongs to a reviewed go-live; this file only declares the id and the
+fail-closed default and never promotes the flag.
 """
 
 from __future__ import annotations
