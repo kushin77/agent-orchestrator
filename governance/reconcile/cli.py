@@ -124,6 +124,8 @@ def cmd_clear(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
+    if getattr(args, "prune_stale", False):
+        return _cmd_status_prune_stale(args)
     sessions = list_sessions(args.root)
     at = time.time()
     rows = []
@@ -182,6 +184,30 @@ def cmd_status(args: argparse.Namespace) -> int:
     if orphans or (disk is not None and disk.unmatched):
         return EXIT_NOT_OK
     return EXIT_OK
+
+
+def _cmd_status_prune_stale(args: argparse.Namespace) -> int:
+    """``status --disk --prune-stale`` — rewrite the real-tree baseline,
+    dropping only the entries the audit itself just reported as no-longer-
+    unmatched (§2 of the second #740 follow-up). One reviewed command instead
+    of a hand-edit; it can never drop a still-live artifact, and it never
+    touches ``new_violations`` or ``young``. Not a new registered verb — a
+    flag on the existing ``status`` command, same as ``--disk`` itself.
+    """
+    from governance.reconcile.real_tree_baseline import check_real_tree, prune_stale
+
+    baseline_path = args.real_tree_baseline
+    verdict = check_real_tree(args.root, baseline_path)
+    print(verdict.describe())
+    if not verdict.assessable:
+        print("reconcile-status: CANNOT-ASSESS — the real tree could not be audited", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    removed = prune_stale(baseline_path, verdict)
+    if removed:
+        print(f"real-tree-baseline: pruned {removed} stale entr{'y' if removed == 1 else 'ies'} from {baseline_path}")
+    else:
+        print("real-tree-baseline: nothing to prune")
+    return EXIT_OK if verdict.ok else EXIT_NOT_OK
 
 
 def cmd_sweep(args: argparse.Namespace) -> int:
@@ -293,6 +319,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--disk",
         action="store_true",
         help="also audit the disk: report every worktree/branch no record explains (#628)",
+    )
+    status_cmd.add_argument(
+        "--real-tree-baseline",
+        default=str(ROOT / "governance" / "reconcile" / "real-tree-baseline.json"),
+        help="the reviewed baseline the real-tree audit is checked against (#740)",
+    )
+    status_cmd.add_argument(
+        "--prune-stale",
+        action="store_true",
+        help=(
+            "rewrite --real-tree-baseline, dropping entries the audit no longer reports "
+            "unmatched (#740 follow-up) — the reap as one reviewed command"
+        ),
     )
     status_cmd.set_defaults(func=cmd_status)
 

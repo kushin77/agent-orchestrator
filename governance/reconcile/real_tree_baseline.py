@@ -14,12 +14,13 @@ an explicit, reviewed, provenanced baseline file naming every accepted
 exception, checked in **both directions**:
 
 * an artifact the real-tree audit reports UNMATCHED that is **not** in the
-  baseline is a NEW violation — the gate fails, named;
+  baseline (and is old enough — see "Age grace" below) is a NEW violation —
+  the gate fails, named;
 * a baseline entry whose artifact the audit no longer reports UNMATCHED (it was
-  matched, or it is simply gone from disk) is STALE — the gate fails, named,
-  because the baseline is not a permanent allow-list; it must shrink as
-  artifacts get explained or cleaned up, by an explicit reviewed edit, never
-  silently.
+  matched, reclaimed, or the worktree/branch was simply cleaned up) is STALE —
+  reported by name, counted, but does **not** fail the gate (see "Stale is
+  not fatal" below); it must still shrink by an explicit reviewed edit (or
+  `--prune-stale`), never silently, but its mere presence is not a violation.
 
 This is deliberately **not** a blanket allow: a baseline that only grows, or
 that accepts "anything currently unmatched" without listing each one by name
@@ -54,6 +55,27 @@ An artifact whose age cannot be measured (a stat failure, an unreadable git
 log) is treated as **old** — fail-closed, the same direction every other
 CANNOT-ASSESS-adjacent decision in this package takes: an unmeasurable age
 must never be read as "young enough to ignore".
+
+## Stale is not fatal (second #740 follow-up)
+
+Unlike ``governance/isolation/landed-baseline.json`` — whose entries are
+**commits**, which never vanish once landed, so an entry there can only ever
+be removed by an explicit reviewed edit once its shape stops matching — this
+baseline's entries are **disk artifacts**: worktrees and branches, which are
+*meant* to disappear once someone reclaims or cleans them up. Measured: a
+worktree named in the baseline (``/tmp/ao-master-probe-wt``) was cleaned up —
+the desired outcome — and the gate went red on it (``STALE ... 1 stale``).
+Treating "the debris is gone" as a gate failure punishes the exact cleanup the
+audit exists to prompt.
+
+A stale entry is therefore **reported**, in the verdict's description and
+count, so the baseline is visibly out of date and someone should prune it —
+but it does not fail :attr:`RealTreeVerdict.ok` or the gate's exit code. The
+baseline can only *grow* by an explicit reviewed edit (same as before); it can
+*shrink* either by the same explicit edit, or mechanically via
+:func:`prune_stale` (``status --disk --prune-stale``), which only ever removes
+entries the audit no longer reports unmatched — it can never fabricate a drop
+of a still-live artifact.
 """
 
 from __future__ import annotations
@@ -108,23 +130,29 @@ class RealTreeVerdict:
 
     @property
     def ok(self) -> bool:
-        return self.assessable and not self.new_violations and not self.stale_entries
+        # Stale entries are reported, not fatal: they name debris the baseline
+        # over-claims, not debris the disk still has to explain. Disk artifacts
+        # are meant to disappear (unlike a landed commit, which never does) —
+        # see the module docstring's "Stale is not fatal".
+        return self.assessable and not self.new_violations
 
     def describe(self) -> str:
         if not self.assessable:
             return f"real-tree-baseline: CANNOT-ASSESS — {self.reason}"
         lines = [
             f"real-tree-baseline: {self.unmatched_count} unmatched artifact(s) on disk, "
-            f"{self.baseline_count} baselined, {len(self.young)} young (< {self.grace_hours:g}h, not failed)"
+            f"{self.baseline_count} baselined, {len(self.young)} young (< {self.grace_hours:g}h, not failed), "
+            f"{len(self.stale_entries)} stale (not failed)"
         ]
         for entry in self.young:
             lines.append(f"  YOUNG    {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.new_violations:
             lines.append(f"  NEW      {entry.kind} {entry.name} — not in the baseline (add it, reviewed, or fix it)")
         for entry in self.stale_entries:
-            lines.append(f"  STALE    {entry.kind} {entry.name} — baselined but no longer unmatched (remove it)")
+            lines.append(f"  STALE    {entry.kind} {entry.name} — baselined but no longer unmatched (remove it, e.g. --prune-stale)")
         if self.ok:
-            lines.append("real-tree-baseline: OK — every unmatched artifact is baselined, young, or explained; no stale entries")
+            suffix = " (some stale entries remain — safe to --prune-stale)" if self.stale_entries else ""
+            lines.append(f"real-tree-baseline: OK — no new unbaselined-and-old artifact{suffix}")
         return "\n".join(lines)
 
 
@@ -254,3 +282,25 @@ def check_real_tree(
         unmatched_count=len(unmatched_keys),
         grace_hours=resolved_grace_hours,
     )
+
+
+def prune_stale(baseline_path: Path | str, verdict: RealTreeVerdict) -> int:
+    """Rewrite the baseline, dropping exactly ``verdict.stale_entries``.
+
+    The reap is one reviewed command (``status --disk --prune-stale``) instead
+    of a hand-edit: it can only ever drop entries the audit *itself* just
+    reported as no-longer-unmatched — it never fabricates a drop of a still-
+    live artifact, and it never touches ``new_violations`` or ``young``.
+    Returns the number of entries removed. A no-op (0) when there is nothing
+    stale, or when ``verdict`` is not assessable.
+    """
+    if not verdict.assessable or not verdict.stale_entries:
+        return 0
+    path = Path(baseline_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    drop_keys = {entry.key for entry in verdict.stale_entries}
+    before = payload.get("entries", [])
+    after = [row for row in before if (row.get("kind"), row.get("name")) not in drop_keys]
+    payload["entries"] = after
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return len(before) - len(after)

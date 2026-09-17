@@ -517,15 +517,18 @@ fi
 # repo. This step points the SAME audit at the real repository this gate runs
 # in ($root), read-only, checked against an explicit, reviewed, provenanced
 # baseline (governance/reconcile/real-tree-baseline.json) — the same shape as
-# governance/isolation/landed-baseline.json / scripts/gate-coverage-baseline.txt.
-# A NEW unmatched artifact absent from the baseline fails, named. A STALE
-# baseline entry (no longer unmatched) fails too, named — this is never a
-# blanket allow, and it never grows silently.
+# governance/isolation/landed-baseline.json / scripts/gate-coverage-baseline.txt,
+# with one deliberate difference: a STALE entry here (a baselined worktree or
+# branch the audit no longer reports unmatched — it was cleaned up, the
+# DESIRED outcome) is reported and counted but does NOT fail the gate, because
+# disk artifacts are meant to disappear (a landed commit never does). Only a
+# NEW unbaselined artifact older than the age-grace window fails, named.
 real_tree_baseline="governance/reconcile/real-tree-baseline.json"
 if [ ! -f "$real_tree_baseline" ]; then
   echo "check-reconcile: FAIL — $real_tree_baseline is missing (#740)" >&2
   exit 1
 fi
+real_tree_baseline_sha_before="$(sha256sum "$real_tree_baseline" | awk '{print $1}')"
 
 python3 - "$root" "$real_tree_baseline" <<'PYREALTREE'
 import sys
@@ -541,50 +544,95 @@ if not verdict.assessable:
 if not verdict.ok:
     print(
         f"check-reconcile: FAIL — real tree drifted from {baseline_path} "
-        f"({len(verdict.new_violations)} new, {len(verdict.stale_entries)} stale)",
+        f"({len(verdict.new_violations)} new-and-old, {len(verdict.stale_entries)} stale, not fatal)",
         file=sys.stderr,
     )
     raise SystemExit(1)
+if verdict.stale_entries:
+    print(
+        f"check-reconcile: {len(verdict.stale_entries)} stale baseline entr(y/ies) — "
+        f"cleaned up on disk; safe to `status --disk --prune-stale`",
+        file=sys.stderr,
+    )
 PYREALTREE
 real_tree_rc=$?
 if [ "$real_tree_rc" -ne 0 ]; then
   fail=$((fail + 1))
 fi
+real_tree_baseline_sha_after="$(sha256sum "$real_tree_baseline" | awk '{print $1}')"
+if [ "$real_tree_baseline_sha_before" != "$real_tree_baseline_sha_after" ]; then
+  echo "  FAIL  the read-only real-tree check modified $real_tree_baseline" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    the real-tree check is read-only: $real_tree_baseline is unchanged"
+fi
 
-# --- 6b. the stale-baseline provocation must be able to fail ----------------
-# A baseline that only ever passes is not proof of anything: prove the STALE
-# path fires by pointing the same check at a copy of the baseline with one
-# fabricated, definitely-absent entry appended, and require the real check to
-# refuse it.
-provoke_baseline="$work/real-tree-baseline-with-stale-entry.json"
-python3 - "$real_tree_baseline" "$provoke_baseline" <<'PYPROVOKE'
-import json, sys
-src, dst = sys.argv[1], sys.argv[2]
-payload = json.loads(open(src, encoding="utf-8").read())
-payload["entries"] = list(payload["entries"]) + [
-    {"kind": "branch", "name": "issue-does-not-exist-check-reconcile-provocation",
-     "reason": "fabricated for the stale-baseline provocation"}
-]
-open(dst, "w", encoding="utf-8").write(json.dumps(payload))
-PYPROVOKE
+# --- 6b. the OLD-unbaselined-artifact provocation must be able to fail ------
+# A gate that only ever passes is not proof of anything. Stale is deliberately
+# non-fatal now (§ above), so the provocation that matters is the one that
+# still must bite: a REAL, unbaselined worktree + branch, backdated past the
+# age-grace window, in the ACTUAL repository this gate runs in. It must be
+# refused by name — and removed again before this script exits, restoring the
+# repository to exactly the state it found ($real_tree_baseline is untouched,
+# proven by its checksum above; the fixture worktree/branch are pruned in a
+# trap so a failure mid-provocation still cleans up).
+provoke_branch="issue-check-reconcile-old-provocation-$$"
+provoke_worktree="$work/old-provocation-wt"
+cleanup_provocation() {
+  git -C "$root" worktree remove --force "$provoke_worktree" >/dev/null 2>&1 || true
+  git -C "$root" worktree prune >/dev/null 2>&1 || true
+  git -C "$root" branch -D "$provoke_branch" >/dev/null 2>&1 || true
+}
+# Not installed as the EXIT trap: `work`'s own `trap 'rm -rf "$work"' EXIT`
+# (above, §3) is already the script's one EXIT trap, and a second `trap ...
+# EXIT` would replace it rather than chain. Cleaned up explicitly below on
+# every path (success, provocation failure, or fixture-creation failure)
+# instead.
 
-python3 - "$root" "$provoke_baseline" <<'PYPROVOKECHECK'
+if git -C "$root" worktree add -q -b "$provoke_branch" "$provoke_worktree" HEAD 2>/dev/null; then
+  thirty_days_ago_epoch=$(( $(date +%s) - 30 * 24 * 3600 ))
+  thirty_days_ago_git="$(date -u -d "@$thirty_days_ago_epoch" +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -r "$thirty_days_ago_epoch" +%Y-%m-%dT%H:%M:%S)"
+  GIT_AUTHOR_DATE="$thirty_days_ago_git" GIT_COMMITTER_DATE="$thirty_days_ago_git" \
+    git -C "$provoke_worktree" commit -q --allow-empty -m "backdated provocation, never real work" >/dev/null 2>&1
+  touch -d "@$thirty_days_ago_epoch" "$provoke_worktree" 2>/dev/null || touch -t "$(date -r "$thirty_days_ago_epoch" +%Y%m%d%H%M.%S)" "$provoke_worktree"
+
+  if python3 - "$root" "$real_tree_baseline" "$provoke_branch" "$provoke_worktree" <<'PYPROVOKECHECK'
 import sys
 sys.path.insert(0, sys.argv[1])
 from governance.reconcile.real_tree_baseline import check_real_tree
 
-verdict = check_real_tree(sys.argv[1], sys.argv[2])
-ok = verdict.assessable and not verdict.ok and any(
-    e.name == "issue-does-not-exist-check-reconcile-provocation" for e in verdict.stale_entries
+root, baseline_path, branch, worktree = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+verdict = check_real_tree(root, baseline_path)
+new_names = {e.name for e in verdict.new_violations}
+young_names = {e.name for e in verdict.young}
+ok = (
+    verdict.assessable
+    and not verdict.ok
+    and branch in new_names
+    and worktree in new_names
+    and branch not in young_names
+    and worktree not in young_names
 )
 if not ok:
-    print("  FAIL  stale-baseline provocation did not fire", file=sys.stderr)
+    print(
+        f"  FAIL  old-unbaselined provocation did not fire (new={sorted(new_names)}, "
+        f"young={sorted(young_names)})",
+        file=sys.stderr,
+    )
     raise SystemExit(1)
-print("  OK    stale-baseline provocation fires: a fabricated stale entry is refused by name")
+print("  OK    old-unbaselined provocation fires: a backdated, unbaselined worktree AND branch are refused by name (neither is 'young')")
 PYPROVOKECHECK
-if [ $? -ne 0 ]; then
+  then
+    :
+  else
+    fail=$((fail + 1))
+  fi
+else
+  echo "  FAIL  could not create the old-unbaselined provocation fixture" >&2
   fail=$((fail + 1))
 fi
+
+cleanup_provocation
 
 if [ "$fail" -gt 0 ]; then
   echo "check-reconcile: FAIL ($fail violation(s))" >&2
