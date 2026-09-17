@@ -25,17 +25,26 @@ import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import policy as _policy
+
+#: The declared control policy this module reads its thresholds from
+#: (``controls.yaml``), loaded once at import time. Every "constant" below is
+#: sourced from it rather than hard-coded, so ``governance/isolation/tests/
+#: test_controls.py`` can mutate a value in a temporary copy of the file and
+#: prove this module's behaviour actually changes (issue #885, no-false-green).
+_CONTROLS = _policy.load()
+
 #: The repo every generated "Refs" trailer points at, unless overridden.
-REPO_SLUG_DEFAULT = "kushin77/agent-orchestrator"
+REPO_SLUG_DEFAULT = _CONTROLS.repo_slug_default
 
 #: Canonical branch prefix. The branch is *named after the issue id*.
-BRANCH_PREFIX = "issue-"
+BRANCH_PREFIX = _CONTROLS.branch_prefix
 
 #: Worktree directory prefix (see ``worktree_name_for``).
-WORKTREE_PREFIX = "ao"
+WORKTREE_PREFIX = _CONTROLS.worktree_prefix
 
 #: Reserved TLD (RFC 2606) — a signature that can never be a human address.
-IDENTITY_DOMAIN = "agents.invalid"
+IDENTITY_DOMAIN = _CONTROLS.identity_domain
 
 #: The four variables that make git sign as this session — and that therefore must
 #: never be exported into a shell shared with another lane (issue #934). Measured
@@ -53,15 +62,15 @@ GIT_IDENTITY_VARS = (
 )
 
 #: Trailer that ties a commit back to its ticket (GR-2).
-COMMIT_TRAILER = "Refs {slug}#{issue}"
+COMMIT_TRAILER = _CONTROLS.commit_trailer_template
 
 #: A branch must encode an issue: ``issue-<n>`` or ``issue-<n>-<suffix>``.
-BRANCH_RE = re.compile(r"^issue-(\d+)(?:-([a-z0-9][a-z0-9-]*))?$")
+BRANCH_RE = re.compile(r"^" + re.escape(BRANCH_PREFIX) + r"(\d+)(?:-([a-z0-9][a-z0-9-]*))?$")
 
 #: Ids that go into branch names, paths and git config: no shell metacharacters.
 AGENT_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
-SESSION_ID_LEN = 12
+SESSION_ID_LEN = _CONTROLS.session_id_len
 
 
 class IdentityRefused(ValueError):
@@ -254,13 +263,18 @@ def mint(
     lane: str = "",
     suffix: str = "",
     worktree_root: Path | str = Path.home() / "ao-worktrees",
-    repo_slug: str = REPO_SLUG_DEFAULT,
+    repo_slug: str | None = None,
 ) -> SessionIdentity:
     """Mint the identity for one agent working one issue.
 
     Deterministic: minting twice for the same inputs returns an equal identity,
-    so a re-dispatch attaches to the lane that already exists.
+    so a re-dispatch attaches to the lane that already exists. ``repo_slug``
+    defaults to the *current* module-level ``REPO_SLUG_DEFAULT`` (read fresh,
+    not bound at import time), so a caller that reloads the declared control
+    policy sees the mint follow it.
     """
+    if repo_slug is None:
+        repo_slug = REPO_SLUG_DEFAULT
     _check_issue(issue)
     _check_agent(agent_id)
     session_id = session_id_for(issue, agent_id, lane, suffix)

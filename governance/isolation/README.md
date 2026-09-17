@@ -514,3 +514,61 @@ finding, a predicate that passes while reporting findings, and a baseline that i
 missing or malformed. It also proves that every commit recorded in the committed
 baseline exists in the clone, so a hand-edited entry cannot silently grandfather
 nothing.
+
+## 9. Controls, audit trail, schema, and the live feed (issue #885)
+
+Four artifacts raise this surface off the thresholds and audit trail it
+already had, each read by name rather than existing decoratively:
+
+* **Controls — [`controls.yaml`](controls.yaml) / [`policy.py`](policy.py).**
+  [`identity.py`](identity.py) (`REPO_SLUG_DEFAULT`, `BRANCH_PREFIX`,
+  `WORKTREE_PREFIX`, `IDENTITY_DOMAIN`, `SESSION_ID_LEN`, `COMMIT_TRAILER`) and
+  [`speculative.py`](speculative.py) (`DEFAULT_BASE`) read these thresholds
+  from `policy.load()` at import time instead of hard-coding them —
+  grep-provable: both modules call `governance.isolation.policy` rather than
+  defining the constant themselves. `policy.load()` also closes the
+  refusal-code vocabulary this surface's `Violation`s may carry
+  ([`violation.KNOWN_CODES`](violation.py)) in both directions: a declared
+  code the surface never emits, or an emitted code nobody declared, is
+  `PolicyUnavailable` at load time. [`tests/test_controls.py`](tests/test_controls.py)
+  mutates a temporary copy of `controls.yaml` and proves `identity.mint()` and
+  `speculative.DEFAULT_BASE` actually follow it; `scripts/check-session-isolation.sh`
+  §3e provokes the same mutation against the real declaration (sha256-restored
+  after).
+* **Audit trail — [`journal.py`](journal.py).** An append-only JSON-Lines file
+  (`.fleet/lanes/journal.jsonl` under the audited `main`, never rewritten —
+  `append()` opens in append mode) that `cli.py cmd_audit` writes exactly one
+  record to per audited lane, on every run, before it prints the verdict —
+  the durable twin of `audit.py`'s re-derived, in-memory verdict.
+  [`tests/test_journal.py`](tests/test_journal.py) proves a refusal produces
+  exactly one record and that the record validates against
+  `isolation.schema.json`.
+* **Schema — [`isolation.schema.json`](isolation.schema.json) /
+  [`schema.py`](schema.py).** Freezes the four record shapes this package
+  persists: the lane identity record (`worktree.write_record`), the
+  speculative-base attestation (`speculative._write`), a
+  [`landed-baseline.json`](landed-baseline.json) quarantine entry, and a
+  journal entry (`journal.append`). Validated with the stdlib-only
+  JSON-Schema subset validator `governance/modules/schema.py` already
+  implements (issue #591) — reused via `schema.py`'s thin wrapper, not
+  reimplemented. [`tests/test_schema.py`](tests/test_schema.py) checks every
+  shape against both a valid and an invalid record, and against every entry
+  actually recorded in `landed-baseline.json`.
+* **Live feed — [`live.py`](live.py).** A read-only projection of every
+  recorded lane identity and speculative attestation against the real
+  worktrees and git state, right now: whether the worktree still exists,
+  whether its current branch matches the recorded one, and whether a
+  speculative attestation's `git_sha` still matches the branch tip. Exposed
+  through the **existing** `audit` verb's `--live` flag
+  (`cli.py audit --live`) rather than a new top-level verb, so
+  `scripts/check-control-verbs.sh` sees no unregistered surface.
+  [`tests/test_live.py`](tests/test_live.py) provisions a real lane, switches
+  its worktree onto a foreign branch behind the CLI's back, and proves
+  `live.py` reports the drift by name; `scripts/check-session-isolation.sh`
+  §3e does the same against the real CLI.
+
+`scripts/check-session-isolation.sh` §3e provokes all four: a `controls.yaml`
+missing a declared refusal code refused by name, a never-audited lane's
+journal record reported absent rather than a fabricated pass, a hand-crafted
+schema-invalid journal record refused by `schema.py`, and a real worktree
+switched off its recorded branch detected as `DRIFT` by `live.py`.

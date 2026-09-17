@@ -62,6 +62,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import policy as _policy
 from .identity import SessionIdentity, branch_issue, commit_trailer
 from .violation import Violation
 from .worktree import git
@@ -71,7 +72,10 @@ from .worktree import git
 #: ``list_records`` glob over lane JSON is untouched by this module.
 RECORD_DIR = ".fleet/lanes/speculative"
 
-DEFAULT_BASE = "master"
+#: The default landing branch a speculative-base claim is re-checked against,
+#: read from the declared control policy (``controls.yaml``) rather than
+#: hard-coded — issue #885.
+DEFAULT_BASE = _policy.load().speculative_default_base
 
 
 class SpeculationRefused(ValueError):
