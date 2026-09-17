@@ -128,6 +128,16 @@ class LandingOps(Protocol):
     def run_contract(self, *, pr_number: Optional[int]) -> CommandResult:
         """Run the pre-merge contract (``scripts/merge-gate.sh run``)."""
 
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        """Publish the gate of record as a GitHub commit status (ADR-0028).
+
+        ``rc`` is the pre-merge contract's own normalised tri-state (0/1/2),
+        never a subprocess return code passed through unexamined. The exit
+        code of the returned :class:`CommandResult` is the *poster's*
+        outcome: 0 means the status was posted (and read back), anything else
+        means it was not — a failed or unreadable poster, never a guess.
+        """
+
     def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
         """Run the landed-contract trailer precondition over the commits to be squashed."""
 
@@ -261,6 +271,20 @@ class GitHubOps:
             env["AO_PR_NUMBER"] = str(pr_number)
         return _run(["bash", str(self.root / "scripts" / "merge-gate.sh"), "run"], cwd=self.root, env=env)
 
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        """``bash scripts/gate-status.sh post --sha <sha> --rc <rc>`` (ADR-0028, #1072).
+
+        Run from the repo root, exactly as the poster's own header documents.
+        The mapping from a gate outcome to a commit-status state lives ONLY in
+        ``scripts/gate-status-map.py`` — this port does not re-decide it, it
+        just runs the poster and reports what the poster reported.
+        """
+        return _run(
+            ["bash", str(self.root / "scripts" / "gate-status.sh"), "post", "--sha", sha, "--rc", str(rc)],
+            cwd=self.root,
+            env=self.env,
+        )
+
     def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
         """The merge precondition over the artifact that lands (issue #998).
 
@@ -377,6 +401,10 @@ class RecordingOps:
     def run_contract(self, *, pr_number: Optional[int]) -> CommandResult:
         self._plan("contract", f"bash scripts/merge-gate.sh run (AO_PR_NUMBER={pr_number or 'unset'})")
         return CommandResult(argv=("bash", "scripts/merge-gate.sh", "run"), rc=0)
+
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        self._plan("gate-status", f"bash scripts/gate-status.sh post --sha {sha} --rc {rc}")
+        return CommandResult(argv=("bash", "scripts/gate-status.sh", "post"), rc=0)
 
     def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
         self._plan("landed-contract", f"bash scripts/check-pr-contract.sh --landed --range {base}..{head}")

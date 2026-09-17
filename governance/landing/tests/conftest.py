@@ -67,6 +67,8 @@ class FakeOps:
         landed_contract_output: str = "check-pr-contract: LANDED OK — every merged commit since the enforcement gate carries the ticket trailer",
         closure_rc: int = 0,
         subjects: tuple = ("feat(landing): the lane's own commit subject",),
+        publish_status_rc: int = 0,
+        publish_status_raises: Exception | None = None,
     ) -> None:
         self.root = Path(root)
         self.attestation_path = self.root / evidence_mod.ATTESTATION_REL
@@ -79,10 +81,13 @@ class FakeOps:
         self._landed_contract_output = landed_contract_output
         self._closure_rc = closure_rc
         self._subjects = tuple(subjects)
+        self._publish_status_rc = publish_status_rc
+        self._publish_status_raises = publish_status_raises
         self.calls: list = []
         self.pushed = False
         self.body = ""
         self.squash_body = ""
+        self.published_statuses: list = []
 
     # -- reads ---------------------------------------------------------------
     def head_commit(self) -> str:
@@ -121,6 +126,17 @@ class FakeOps:
             write_attestation(self.attestation_path, result="NOT-OK", rc=self._contract_rc, commit=commit)
         return CommandResult(
             argv=("bash", "scripts/merge-gate.sh", "run"), rc=self._contract_rc, stdout=self._contract_output
+        )
+
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        self.calls.append(("gate-status", f"{sha}:{rc}"))
+        self.published_statuses.append((sha, rc))
+        if self._publish_status_raises is not None:
+            raise self._publish_status_raises
+        return CommandResult(
+            argv=("bash", "scripts/gate-status.sh", "post"),
+            rc=self._publish_status_rc,
+            stdout=f"gate-status: posted ao/gate-of-record for {sha[:12]} (rc={rc})",
         )
 
     def check_landed_contract(self, *, base: str, head: str) -> CommandResult:

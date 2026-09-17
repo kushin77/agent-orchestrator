@@ -89,6 +89,7 @@ class TestTheOrder:
             "push",
             "open-pr",
             "contract",
+            "gate-status",
             "landed-contract",
             "merge",
             "delete-branch",
@@ -216,6 +217,74 @@ class TestTheLandedContractPrecondition:
         assert landed < ops.calls.index(("merge", "11"))
 
 
+class TestTheGateStatus:
+    """The gate-of-record status is posted at the PR boundary (#1072, ADR-0028).
+
+    Posted immediately after the pre-merge contract runs against the PR head
+    commit, BEFORE the merge decision, for every contract outcome — so a red
+    commit is decorated red rather than left blank. A failed/unreadable poster
+    is a named CANNOT-ASSESS refusal (``gate-status-unpublished``): the merge
+    is refused and nothing is merged.
+    """
+
+    def test_a_green_contract_publishes_success_before_the_merge(self, tmp_path, request_factory):
+        ops = _green(tmp_path)
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 0 and landing.granted
+        assert (HEAD, 0) in ops.published_statuses
+        gate_status_index = ops.calls.index(("gate-status", f"{HEAD}:0"))
+        contract_index = ops.calls.index(("contract", "11"))
+        merge_index = ops.calls.index(("merge", "11"))
+        assert contract_index < gate_status_index < merge_index
+        assert any(step.action == "gate-status" for step in landing.steps)
+
+    def test_a_red_contract_publishes_failure_and_still_refuses_the_merge(self, tmp_path, request_factory):
+        ops = _green(tmp_path, contract_rc=1, contract_output="MERGE-GATE: NOT-OK")
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 1
+        assert (HEAD, 1) in ops.published_statuses, "a red contract must still be decorated, never left blank"
+        assert not any(call[0] == "merge" for call in ops.calls)
+
+    def test_a_cannot_assess_contract_publishes_error(self, tmp_path, request_factory):
+        ops = _green(tmp_path, contract_rc=2, contract_output="MERGE-GATE: CANNOT-ASSESS")
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 2
+        assert (HEAD, 2) in ops.published_statuses
+        assert not any(call[0] == "merge" for call in ops.calls)
+
+    def test_a_poster_failure_refuses_as_gate_status_unpublished_and_never_merges(self, tmp_path, request_factory):
+        ops = _green(tmp_path, publish_status_rc=1)
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 2
+        assert landing.refusal_code == "gate-status-unpublished"
+        assert not any(call[0] == "merge" for call in ops.calls)
+        assert not any(call[0] == "landed-contract" for call in ops.calls)
+
+    def test_a_poster_exception_is_also_gate_status_unpublished(self, tmp_path, request_factory):
+        from governance.landing.ports import PortError
+
+        ops = _green(tmp_path, publish_status_raises=PortError("gh not found"))
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        assert landing.rc == 2
+        assert landing.refusal_code == "gate-status-unpublished"
+        assert not any(call[0] == "merge" for call in ops.calls)
+
+    def test_a_dry_run_plans_the_step_and_posts_nothing(self, tmp_path, request_factory):
+        real = _green(tmp_path)
+        recording = RecordingOps(reads=real)
+        landing = LandingEngine(recording, request_factory(apply=False)).land()
+        assert landing.rc == 0 and landing.granted
+        assert any(step.action == "gate-status" and step.outcome == "planned" for step in landing.steps)
+        assert real.published_statuses == [], "a dry run never posts a status"
+        assert recording.planned == [], "a dry run does not even ask the ops layer to write"
+
+    def test_the_step_is_recorded_in_the_evidence_output(self, tmp_path, request_factory):
+        ops = _green(tmp_path)
+        landing = LandingEngine(ops, request_factory(apply=True)).land()
+        as_dict = landing.as_dict()
+        assert any(step["action"] == "gate-status" for step in as_dict["steps"])
+
+
 class TestIdempotence:
     """A landed lane is terminal: no push, no second PR, no second merge."""
 
@@ -252,6 +321,7 @@ class TestDryRun:
             "push",
             "open-pr",
             "contract",
+            "gate-status",
             "landed-contract",
             "merge",
             "delete-branch",
