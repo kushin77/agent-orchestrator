@@ -78,8 +78,15 @@ class CloseOutOps(Protocol):
     def merge_pull_request(self, number: int) -> str:
         """Squash-merge the pull request; return the merge commit."""
 
-    def record_verification(self, issue: int, commit: str) -> str:
+    def record_verification(self, issue: int, commit: str, landing: str = "") -> str:
         """Record a green verification attestation naming ``commit``.
+
+        ``landing`` is the commit the pull request was **squash-merged as**, and is
+        given only when it *was* merged. A squash merge creates a new commit on the
+        default branch that the verified head is not an ancestor of, so the port may
+        admit a lane cut from the default branch when it contains ``landing`` and
+        ``landing`` carries the same tree as ``commit`` (#1098). An unmerged item has no
+        landing, and therefore still requires the lane to be *at* ``commit``.
 
         Raises ``governance.lifecycle.gate.CannotAssess`` — and *not* a generic
         error — when the gate produced no verification result at all (it was parked,
@@ -266,6 +273,11 @@ def closeout(
     claim = item.get("claim") or {}
     directive = item.get("directive") or {}
     verified_commit = str(pr.get("head_commit") or "")
+    # The commit a squash merge landed as. Given to the port only for a genuinely
+    # merged pull request: it is the licence to measure a lane that is not *at* the
+    # verified head, and it is what makes the squash half of this invariant (#1098)
+    # satisfiable without weakening the unmerged half.
+    landing = str(pr.get("merge_commit") or "") if pr.get("state") == "merged" else ""
 
     # 1. merge (the verified head is what lands).
     _run(result, "merge-pull-request", lambda: ops.merge_pull_request(int(pr.get("number") or 0)),
@@ -273,7 +285,12 @@ def closeout(
 
     # 2. verification evidence for the verified head commit.
     verification_recorded = bool(verify.get("ok")) and str(verify.get("commit") or "") == verified_commit
-    _run(result, "record-verification", lambda: ops.record_verification(issue, verified_commit), not verification_recorded)
+    _run(
+        result,
+        "record-verification",
+        lambda: ops.record_verification(issue, verified_commit, landing),
+        not verification_recorded,
+    )
 
     # 3. the source branch, which a local squash-merge reliably leaves behind.
     _run(result, "delete-branch", lambda: ops.delete_branch(str(pr.get("branch") or "")),

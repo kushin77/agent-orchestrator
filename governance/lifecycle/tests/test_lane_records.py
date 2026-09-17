@@ -29,7 +29,15 @@ import pytest
 from governance.isolation.identity import mint
 from governance.isolation.worktree import provision, write_record
 from governance.lifecycle.audit import audit_item
-from governance.lifecycle.cli import GhOps, _lane_records, lane_view, read_journal, select_lane
+from governance.lifecycle.cli import (
+    GhOps,
+    _lane_records,
+    commit_is_contained,
+    lane_view,
+    read_journal,
+    select_lane,
+    trees_are_identical,
+)
 
 ISSUE = 834
 
@@ -65,12 +73,60 @@ def mounts(tmp_path: Path) -> Path:
     return table
 
 
-def _lane(repo: Path, tmp_path: Path, mounts: Path, suffix: str):
-    """A provisioned, recorded lane on the real repository."""
+def _lane(repo: Path, tmp_path: Path, mounts: Path, suffix: str, base: str = "HEAD"):
+    """A provisioned, recorded lane on the real repository.
+
+    ``base`` is the commit the lane is cut from, so a caller can place a lane on the
+    default branch either side of the point an item landed (#1098).
+    """
     identity = mint(ISSUE, f"copilot-brain-{suffix}", "lifecycle", suffix=suffix, worktree_root=tmp_path / "lanes")
-    provision(identity, repo, base="HEAD", mounts=mounts)
+    provision(identity, repo, base=base, mounts=mounts)
     write_record(identity, repo)
     return identity
+
+
+def _stub_make(tmp_path: Path, monkeypatch) -> Path:
+    """A ``make`` on ``PATH`` that passes, so no test runs the composite gate."""
+    shim = tmp_path / "bin"
+    shim.mkdir(exist_ok=True)
+    make = shim / "make"
+    make.write_text('#!/bin/sh\nprintf \'verify: PASS (120 of 120 checks)\\n\'\nexit 0\n', encoding="utf-8")
+    make.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{shim}:{Path('/usr/bin')}:{Path('/bin')}")
+    return shim
+
+
+def _squash_landing(repo: Path, *, extra_commit: bool = False) -> tuple[str, str]:
+    """The verified head and the commit a **squash merge** landed as, on the real repo.
+
+    The branch tip the merge replaced is deliberately not an ancestor of the default
+    branch — that is the whole shape (#1098), and it is asserted here so a fixture that
+    stopped producing it would fail loudly instead of quietly passing the tests below.
+
+    ``extra_commit`` adds one commit to the branch that the squash did *not* carry, so
+    the landing stops carrying the verified tree while still being contained by master.
+    """
+    _git(repo, "checkout", "-q", "-b", "issue-1098-lane")
+    (repo / "work.txt").write_text("the verified work\n", encoding="utf-8")
+    _git(repo, "add", "work.txt")
+    _git(repo, "commit", "-q", "-m", "the verified head")
+    verified = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "master")
+    _git(repo, "merge", "--squash", "-q", "issue-1098-lane")
+    _git(repo, "commit", "-q", "-m", "the squash landing")
+    landing = _git(repo, "rev-parse", "HEAD")
+    if extra_commit:
+        _git(repo, "checkout", "-q", "issue-1098-lane")
+        (repo / "unsquashed.txt").write_text("content the squash did not carry\n", encoding="utf-8")
+        _git(repo, "add", "unsquashed.txt")
+        _git(repo, "commit", "-q", "-m", "a commit the squash did not carry")
+        verified = _git(repo, "rev-parse", "HEAD")
+        _git(repo, "checkout", "-q", "master")
+    ancestor = subprocess.run(
+        ["git", "-C", str(repo), "merge-base", "--is-ancestor", verified, landing], capture_output=True
+    )
+    assert ancestor.returncode != 0, "the fixture is not a squash merge: the verified head is an ancestor of the landing"
+    return verified, landing
 
 
 @pytest.fixture
@@ -172,6 +228,100 @@ def test_the_audit_reports_a_dead_record_by_name(repo: Path):
     assert "worktree-missing" in lane_findings[0].detail
     assert "deadbeef" in lane_findings[0].detail
     assert "present" in json.dumps(view)
+
+
+# --- the SQUASH half: which lane may stand for a verified commit (#1098) -----
+#
+# A squash merge creates a NEW commit on the default branch, so the branch tip that
+# was verified is not an ancestor of it and a lane cut from the default branch (the
+# correct venue, rule 15) can never be *at* the verified head. Measured on #714,
+# #977 and #978: all three merged, none closable — `record-verification` refused with
+# "lane head <master> is not the verified commit <pr head>". These tests drive the
+# real repository, the real `GhOps`, and both halves of the new rule.
+
+
+def test_a_squash_merged_lane_is_admitted_and_names_all_three_shas(
+    repo: Path, tmp_path: Path, mounts: Path, monkeypatch
+):
+    """The lane contains the landing and the landing carries the verified tree."""
+    _stub_make(tmp_path, monkeypatch)
+    verified, landing = _squash_landing(repo)
+    lane = _lane(repo, tmp_path, mounts, "squash")
+    lane_head = _git(lane.worktree, "rev-parse", "HEAD")
+    assert lane_head != verified, "the fixture must not be the equality arm"
+
+    detail = GhOps(root=repo).record_verification(ISSUE, verified, landing)
+
+    assert "verify green" in detail
+    assert read_journal(ISSUE, repo)["verify"] == {
+        "ok": True,
+        "commit": verified,  # the verified commit the evidence is against — unchanged
+        "source": "lane",
+        "landing": landing,  # the commit the squash landed as
+        "measured": lane_head,  # the tree the gate actually ran in
+        "via": "contains",
+    }
+
+
+def test_a_lane_that_does_not_contain_the_landing_is_refused(
+    repo: Path, tmp_path: Path, mounts: Path, monkeypatch
+):
+    """The pre-#1098 wedge, kept as a control: a lane carrying none of this item's work."""
+    _stub_make(tmp_path, monkeypatch)
+    before = _git(repo, "rev-parse", "HEAD")
+    verified, landing = _squash_landing(repo)
+    _lane(repo, tmp_path, mounts, "predict", base=before)
+
+    with pytest.raises(RuntimeError) as raised:
+        GhOps(root=repo).record_verification(ISSUE, verified, landing)
+
+    message = str(raised.value)
+    assert "is not the verified commit" in message
+    assert "does not contain it" in message
+    assert landing[:12] in message, "the refusal must name the landing that could not license the lane"
+    assert read_journal(ISSUE, repo) == {}, "no attestation may be written for a tree that carries none of the work"
+
+
+def test_a_lane_containing_a_landing_with_another_tree_is_refused(
+    repo: Path, tmp_path: Path, mounts: Path, monkeypatch
+):
+    """Containing *a* landing is not the claim; containing *the verified tree* is."""
+    _stub_make(tmp_path, monkeypatch)
+    verified, landing = _squash_landing(repo, extra_commit=True)
+    _lane(repo, tmp_path, mounts, "difftree")
+
+    with pytest.raises(RuntimeError) as raised:
+        GhOps(root=repo).record_verification(ISSUE, verified, landing)
+
+    assert "does not contain it" in str(raised.value)
+    assert read_journal(ISSUE, repo) == {}, "a landing built from other content may not stand in"
+
+
+def test_an_unmerged_item_still_requires_the_lane_to_be_at_the_verified_commit(
+    repo: Path, tmp_path: Path, mounts: Path, monkeypatch
+):
+    """With no landing there is nothing to stand for, so equality still governs (#1098)."""
+    _stub_make(tmp_path, monkeypatch)
+    verified, _landing = _squash_landing(repo)
+    _lane(repo, tmp_path, mounts, "unmerged")
+
+    with pytest.raises(RuntimeError) as raised:
+        GhOps(root=repo).record_verification(ISSUE, verified)
+
+    assert "does not contain it" in str(raised.value)
+    assert read_journal(ISSUE, repo) == {}
+
+
+def test_the_ancestry_and_tree_questions_fail_closed(repo: Path):
+    """Both halves answer "no" for a commit the repository cannot resolve — never a pass."""
+    head = _git(repo, "rev-parse", "HEAD")
+
+    assert commit_is_contained(repo, head, head) is True
+    assert trees_are_identical(repo, head, head) is True
+    assert commit_is_contained(repo, "c" * 40, head) is False
+    assert trees_are_identical(repo, "c" * 40, head) is False
+    assert commit_is_contained(repo, "", head) is False
+    assert trees_are_identical(repo, head, "") is False
 
 
 def test_an_item_with_no_lane_has_no_lane_view(repo: Path):

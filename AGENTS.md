@@ -146,6 +146,24 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     that had no branch left to run on.
     (`scripts/check-lifecycle-verify-order.sh` provokes the ordering, its negative
     controls, and both halves of the fix.)
+
+    **A squash merge decides which commit a lane can be measured against (#1098).**
+    The same invariant has a second half, and it is the same failure: for a
+    **squash-merged** pull request the commit that was verified — the branch tip — is
+    **not** an ancestor of anything on the default branch, because the merge created a
+    *new* commit carrying the same tree. A lane cut from the default branch (the
+    correct venue, rule 15) can therefore never be *at* the verified head, and the
+    only tree that satisfies equality is the obsolete branch tip — which the
+    non-tree-local checks then fail. Measured on #714, #977 and #978: all three
+    merged, none closable, all three left on `VERIFY_EVIDENCE_MISSING`; at PR #984's
+    head, 19 of 145 checks failed for a tree no green attestation ever existed for.
+    A lane may stand for the verified commit when it **is** that commit, or — for a
+    merged pull request — when it **contains the commit the squash landed as** *and*
+    that landing carries the **verified tree**; the record then names the verified
+    commit, the landing and the tree the gate actually ran in. The tree half is not
+    decoration: containing *a* landing is not the claim, containing *the verified
+    work* is. (`scripts/check-lifecycle-verify-order.sh` provokes all three shapes
+    against a real squash merge, plus a mutant that removes each half.)
 17. **Orphan reconciliation (institutional, issue #304).** A session records a
     **heartbeat** in `.fleet/sessions/<session_id>.json` while it runs, refreshed
     on an interval. A session whose beat passes the TTL (15 minutes) is orphaned;

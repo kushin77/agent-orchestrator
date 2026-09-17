@@ -41,7 +41,7 @@ and the gate can require that each one has been provoked.
 | Invariant | Broken means |
 |---|---|
 | `PR_NOT_MERGED` | A verified change that never landed. |
-| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name the pull request's **head commit** — a squash merge creates a *new* commit, so demanding that evidence name the merge commit would fail every correctly-merged item. What matters is that the tree which was verified is the tree that landed. |
+| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name the pull request's **head commit** — a squash merge creates a *new* commit, so demanding that evidence name the merge commit would fail every correctly-merged item. What matters is that the tree which was verified is the tree that landed. A lane may therefore stand for that head only when it **is** the verified commit, or — for a *merged* pull request — contains the commit the squash landed as **and** that landing carries the same tree (§3.6, #1098). |
 | `BRANCH_NOT_DELETED` | The branch outlived its issue. |
 | `CLAIM_STILL_HELD` | A closed issue still claims a lane, blocking re-dispatch. |
 | `DIRECTIVE_NOT_CONSUMED` | A pending directive re-executes the order the moment the claim frees. |
@@ -296,6 +296,57 @@ repository whose lane is a real `git worktree`: a lane reclaimed before close-ou
 gate was **green** has its invariant *satisfied*; the same lane with a **red** gate, or
 an unreachable commit, is still refused by name; and disabling either half of the fix
 reproduces the wedge, so neither half is decoration.
+
+### 3.6 A squash merge decides which commit a lane can be measured against (#1098)
+
+§3.5 names the commit as what proves the tree. That is right, and it was **half** the
+problem: for a **squash-merged** pull request the commit that was verified — the branch
+tip — is not an ancestor of anything on the default branch. The merge created a *new*
+commit carrying the same tree, so a lane cut from the default branch (the correct venue,
+rule 15) can never be **at** the verified head, and `record-verification` refused it:
+
+```
+failed    record-verification: RuntimeError: lane head 96ae0fba19c3 is not the verified commit a06badc9eb80
+```
+
+Measured on #714, #977 and #978 — all three merged, none closable, all three left
+carrying `VERIFY_EVIDENCE_MISSING`. The obvious remedy (reset the lane to the branch tip)
+satisfied the equality and then measured an **obsolete tree**: the composite gate is not
+tree-local, so its repo-wide invariants failed for reasons unrelated to the change —
+measured at PR #984's head, **19 of 145 checks failed**, for a tree no green attestation
+had ever existed for.
+
+The rule is therefore widened in exactly one direction, and the second arm needs **both**
+of its halves:
+
+| A lane may stand for the verified commit when | |
+|---|---|
+| it **is** the verified commit | unchanged — the equality arm, and the only arm for an item that has not merged |
+| it **contains the landing**, *and* the landing carries the **verified tree** | the squash arm. `landing` is the commit the merge landed as, offered only when the pull request is genuinely merged |
+
+The tree half is what keeps the doctrine intact — "the tree which was verified is the
+tree that landed" — so a lane containing a landing built from *other* content is refused
+rather than measured as if it proved this item. The record then names **all three**
+commits, because each answers a different question:
+
+```json
+{"verify": {"ok": true, "commit": "<the verified head — what the evidence is against>",
+            "landing": "<the commit the squash landed as>",
+            "measured": "<the tree the gate actually ran in>",
+            "via": "contains", "source": "lane"}}
+```
+
+`commit` deliberately keeps naming the **verified** commit: that is the convention the
+audit, the invariant's own text, the table above and every pre-existing record use, and
+re-pointing it at the measured tree would have silently invalidated each of them. The lane
+is the measurement; the verified commit is the subject; the record says which is which.
+
+All of it is provoked in
+[`check-lifecycle-verify-order.sh`](../../scripts/check-lifecycle-verify-order.sh) against
+a **real** squash merge: a lane that contains the landing is **admitted** and journalled;
+a lane containing no landing of the item's, and a lane containing a landing built from
+other content, are both **refused by name**; and removing either the containment arm or
+the tree check reproduces the wrong answer, so neither half is decoration.
 
 ## 4. Auditing, and why it is offline
 

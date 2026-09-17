@@ -33,9 +33,22 @@
 #                                                        failure keeps every lane")
 #   6. MUTANT — the port's re-measurement disabled    -> case 1 goes red (load-bearing)
 #   7. MUTANT — the driver's order guard disabled     -> case 4 goes red (load-bearing)
+#   8. SQUASH (#1098) — a real squash merge, so the verified head is NOT an ancestor of
+#      anything on the default branch:
+#        a. a lane cut from the default branch after it contains the landing and the
+#           landing carries the verified tree         -> the record is PRODUCED, naming the
+#                                                         verified commit, the landing and
+#                                                         the tree the gate ran in
+#        b. a lane of the default branch from BEFORE the landing (it carries none of
+#           this item's work)                 -> REFUSED BY NAME
+#        c. a lane containing a landing built from OTHER content
+#                                                      -> REFUSED: containing a landing is
+#                                                         not containing the verified work
+#   9. MUTANT — the containment arm removed           -> 8a goes red (load-bearing)
+#  10. MUTANT — the tree check removed                -> 8c goes red (load-bearing)
 #
-# Cases 2, 3, 5 and the two mutants are negative controls: without them the gate would
-# pass for a `record_verification` that simply returned success, which is the failure
+# Cases 2, 3, 5, 8b, 8c and the four mutants are negative controls: without them the gate
+# would pass for a `record_verification` that simply returned success, which is the failure
 # mode GR-12 names.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
