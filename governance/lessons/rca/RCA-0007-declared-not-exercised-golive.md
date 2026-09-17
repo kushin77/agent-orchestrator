@@ -4,7 +4,7 @@
 |---|---|
 | RCA id | `RCA-0007` |
 | Incident | `INC-0007` |
-| Origin | `#1029` (parent epic `#607`) |
+| Origin | `#607` (residual `#1029`) |
 | Severity | `high` |
 | Owner | the AgentConsole hosting lane |
 | Reviewed | `2026-09-17` |

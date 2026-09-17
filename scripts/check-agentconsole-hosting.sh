@@ -50,7 +50,12 @@
 #   bash scripts/check-agentconsole-hosting.sh --root DIR   # analyse another tree
 set -uo pipefail
 
-root="${AO_ROOT_OVERRIDE:-}"
+# The script's OWN tree: the provocation stages from here, so `--root DIR` can
+# analyse a DIFFERENT tree while the rules still prove themselves on the shipped
+# files. Staging from `--root` would make the provocation fail on every tree it
+# is asked to analyse, which is the opposite of its purpose.
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$script_root"
 mode="full"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -61,9 +66,6 @@ while [ $# -gt 0 ]; do
     *) echo "check-agentconsole-hosting: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
-if [ -z "$root" ]; then
-  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fi
 if ! command -v python3 >/dev/null 2>&1; then
   echo "check-agentconsole-hosting: CANNOT-ASSESS — python3 is required" >&2
   exit 2
@@ -143,7 +145,7 @@ else:
         f.append("P4: hosting doc does not name the shared-services live host")
     if "retired" not in low:
         f.append("P4: hosting doc does not declare the Cloud Run route RETIRED")
-    if re.search(r"Status:\s*declaration, not a deployment", doc):
+    if re.search(r"Status:\s*(?:\*{1,2}\s*)?declaration, not a deployment", doc):
         f.append("P4: hosting doc still claims it is a declaration, not a deployment "
                  "(the surface is live — the declaration must match reality)")
 
@@ -162,21 +164,21 @@ for line in f:
 PY
 }
 
-if [ "$mode" = "self-test" ]; then
-  scratch="$(mktemp -d /tmp/ao1029-selftest.XXXXXX)" || { echo "CANNOT-ASSESS: no scratch dir" >&2; exit 2; }
+selftest() {
+  scratch="$(mktemp -d /tmp/ao1029-selftest.XXXXXX)" || { echo "CANNOT-ASSESS: no scratch dir" >&2; return 2; }
   trap 'rm -rf "$scratch"' EXIT
   # stage the files the analyser reads, at their real relative paths
   for rel in portal/Dockerfile contrib/shared-services/agentconsole.compose.yml \
              infra/feature-flags/registry.yaml docs/AGENTCONSOLE-HOSTING.md; do
     mkdir -p "$scratch/$(dirname "$rel")"
-    cp "$root/$rel" "$scratch/$rel" 2>/dev/null || true
+    cp "$script_root/$rel" "$scratch/$rel" 2>/dev/null || true
   done
   fail=0
   base="$(analyze "$scratch" | wc -l | tr -d ' ')"
   if [ "$base" != "0" ]; then
     echo "SELFTEST: the unmutated copy produced $base finding(s) — the rule matches everything:"
     analyze "$scratch"
-    exit 1
+    return 1
   fi
   echo "SELFTEST: unmutated copy clean"
   # one mutation per property; each must move the verdict BY NAME
@@ -186,7 +188,11 @@ if [ "$mode" = "self-test" ]; then
     python3 - "$dir/$rel" "$expr" <<'PY'
 import pathlib, sys
 p = pathlib.Path(sys.argv[1]); t = p.read_text()
-exec("new = " + sys.argv[2], {"t": t, "re": __import__("re")})
+ns = {"t": t, "re": __import__("re")}
+exec("new = " + sys.argv[2], ns)
+new = ns.get("new")
+if new is None:
+    print("mutation expression did not bind 'new'"); sys.exit(4)
 if new == t:
     print("NOOP"); sys.exit(3)
 p.write_text(new)
@@ -208,14 +214,31 @@ PY
     're.sub(r"pip install([^\n]*)cryptography", "pip install\\1", t)' || fail=1
   mutate P2 contrib/shared-services/agentconsole.compose.yml \
     't.replace("container_name: shared-services-agentconsole", "container_name: wrong")' || fail=1
+  # P3's mutation is STATE-AWARE: it flips ONE of the three to the opposite of
+  # the others, which is a partial promotion whether the committed state is all
+  # on or all off — so the control cannot go stale as the promotion state moves.
   mutate P3 infra/feature-flags/registry.yaml \
-    't.replace("  operator_terminal:\n    default: on", "  operator_terminal:\n    default: off", 1)' || fail=1
+    're.sub(r"(  operator_terminal:\n    default: )(on|off)", lambda m: m.group(1) + ("off" if m.group(2) == "on" else "on"), t, count=1)' || fail=1
+  # P4's mutation APPENDS the stale claim rather than substituting a fixed line,
+  # so it cannot go NOOP when the status line is reworded.
   mutate P4 docs/AGENTCONSOLE-HOSTING.md \
-    're.sub(r"Status: \*\*[^\n]*\*\*", "Status: **declaration, not a deployment**", t, count=1)' || fail=1
+    't + "\n\n> Status: **declaration, not a deployment**\n"' || fail=1
   mutate P5 docs/AGENTCONSOLE-HOSTING.md \
     't.replace("PORTAL_AUTH_GATE_JWKS_FILE", "SOME_OTHER_VAR")' || fail=1
   [ "$fail" -eq 0 ] && echo "check-agentconsole-hosting: SELFTEST OK" || echo "check-agentconsole-hosting: SELFTEST FAIL"
-  exit "$fail"
+  return "$fail"
+}
+
+if [ "$mode" = "self-test" ]; then
+  selftest
+  exit $?
+fi
+
+# FULL: the provocation runs on EVERY invocation — a gate whose provocation is
+# opt-in is a gate that stops proving itself (GR-12).
+if ! selftest; then
+  echo "check-agentconsole-hosting: FAIL — the self-test did not pass, so this gate proves nothing"
+  exit 1
 fi
 
 findings="$(analyze "$root")"
