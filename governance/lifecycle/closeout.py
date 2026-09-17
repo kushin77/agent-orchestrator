@@ -4,7 +4,10 @@
 is derived from the incident that motivated the module rather than from taste:
 
 1. **merge** first, because the verification evidence must name the merged commit;
-2. **record verification** for that commit, so "green" is evidence and not a claim;
+2. **record verification** for that commit, so "green" is evidence and not a claim —
+   measured in the lane at its verified head, or (when that frozen tree is red only
+   because it predates a commit its own squash was composed on) at the merge commit,
+   which the record then names as the tree it measured (#1003);
 3. **delete the source branch**, which the local merge command measurably fails to
    do while the main checkout holds ``master``;
 4. **consume the authorisation directive** *before* releasing the claim — on #263
@@ -47,7 +50,7 @@ from typing import Callable, Protocol
 
 from governance.lifecycle.audit import Finding, audit_item
 from governance.lifecycle.gate import UNASSESSED_VERDICTS, CannotAssess
-from governance.lifecycle.model import owes_closure
+from governance.lifecycle.model import evidence_green, owes_closure, verified_head
 from governance.lifecycle.report import (
     BoardReport,
     BoardReporter,
@@ -104,6 +107,18 @@ class CloseOutOps(Protocol):
         Asked by :func:`evidence_subject` to decide *which* commit a merged item's evidence
         is against (#1149). The driver owns the decision; the port owns reading the
         repository the decision is made about — so the driver never shells out itself.
+        """
+
+    def commit_is_superset(self, larger: str, smaller: str) -> bool:
+        """Does ``larger``'s tree carry every path ``smaller``'s does, unchanged?
+
+        Asked by :func:`evidence_subject` before it trusts a tree difference as the
+        branch-advanced drift (#1149): that shape is specifically the live head adding
+        content on top of what the squash carried, never touching it — so the squash's
+        tree is fully, unchanged, still sitting inside the live head's. A difference
+        that removes or changes any of ``smaller``'s content (#1003: the frozen head
+        predates a commit its own squash was composed on, so the squash carries content
+        — the sibling declaration — the head never had) is not this shape at all.
         """
 
     def delete_branch(self, branch: str) -> str:
@@ -274,6 +289,19 @@ def evidence_subject(item: dict, ops: CloseOutOps) -> tuple[str, str, str]:
     that would need the tree nobody could read. Treating an unreadable pair as a measured
     drift would report a mismatch nobody measured; treating it as equal would admit a tree
     nobody compared.
+
+    A tree difference is substituted only when ``head``'s tree is a **superset** of
+    ``landing``'s — the branch genuinely continued *past* the squash, adding content
+    without touching what was squashed, so everything the landing carries is still
+    sitting in the live head unchanged. A different tree that is **not** in that
+    direction (#1003: the frozen head predates a commit its own squash was composed on,
+    so the landing carries content — the sibling declaration — the head never had, and
+    a squash disconnects the two commits' ancestry either way) is not this shape at
+    all: it is a lane whose head may still be gated directly, and whose fallback
+    (measuring the merge commit only once that gate measures red) is
+    `record-verification`'s own, not this function's to pre-empt. Pre-empting it here
+    would skip the lane's own run entirely and misname a red-and-fixed-on-arrival lane
+    as "drifted" for a head that never carried the landing's content in the first place.
     """
     pr = item.get("pr") or {}
     head = str(pr.get("head_commit") or "")
@@ -283,7 +311,7 @@ def evidence_subject(item: dict, ops: CloseOutOps) -> tuple[str, str, str]:
         # Not merged, no landing recorded, or the live head *is* the landing: the ordinary
         # shape, and the one where no repository need be read at all.
         return head, landing, ""
-    if ops.tree_relation(head, landing) == "different":
+    if ops.tree_relation(head, landing) == "different" and ops.commit_is_superset(head, landing):
         return landing, landing, head
     return head, landing, ""
 
@@ -318,7 +346,6 @@ def closeout(
         return _finish(result, reporter, apply)
 
     pr = item.get("pr") or {}
-    verify = item.get("verify") or {}
     claim = item.get("claim") or {}
     directive = item.get("directive") or {}
     verified_commit, landing, drifted = evidence_subject(item, ops)
@@ -327,13 +354,19 @@ def closeout(
     _run(result, "merge-pull-request", lambda: ops.merge_pull_request(int(pr.get("number") or 0)),
          pr.get("state") != "merged")
 
-    # 2. verification evidence for the verified head commit.
-    verification_recorded = bool(verify.get("ok")) and str(verify.get("commit") or "") == verified_commit
+    # 2. verification evidence for the verified head commit. The question "is it
+    #    already recorded" is the audit's own rule (``model.evidence_green``), not a
+    #    second copy of it: a record that names the *merged* tree as the tree it
+    #    measured is a recorded verification too (#1003), and reading it as absent
+    #    would re-gate a green item on every pass. ``model.evidence_green`` is offline
+    #    and reads the same subject convention ``evidence_subject`` resolves here — the
+    #    verified head, or (#1149) the landing when the branch drifted past the squash
+    #    — so the two can never disagree about what is already on record.
     _run(
         result,
         "record-verification",
         lambda: ops.record_verification(issue, verified_commit, landing, drifted),
-        not verification_recorded,
+        not evidence_green(item),
     )
 
     # 3. the source branch, which a local squash-merge reliably leaves behind.
@@ -403,13 +436,15 @@ def _verification_owed(item: dict, result: CloseOutResult, subject: str) -> str:
 
     Step 2's own outcome is read first: a ``performed`` verification is the record
     itself, and only then does the item's pre-close state decide (a step that was
-    skipped as already satisfied is a record that was already there).
+    skipped as already satisfied is a record that was already there). The state half is
+    the audit's rule itself (``model.evidence_green``) — including the #1003 clause that
+    lets an attestation name the *merged* tree as the tree it measured, which is still a
+    recorded verification of the verified head.
     """
     step = next((entry for entry in result.steps if entry.action == "record-verification"), None)
     if step is not None and step.outcome == PERFORMED:
         return ""
-    verify = item.get("verify") or {}
-    if verify.get("ok") and str(verify.get("commit") or "") == subject:
+    if evidence_green(item):
         return ""
     outcome = step.outcome if step is not None else "not attempted"
     detail = (step.detail if step is not None else "")[:160]
