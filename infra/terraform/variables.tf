@@ -6,9 +6,15 @@
 # cannot ship on by accident.
 
 variable "project_id" {
-  description = "GCP project id for the control plane. Required at apply; supplied via tfvars or environment."
+  description = <<-EOT
+    GCP project id for the control plane. The placeholder default keeps
+    `terraform plan` diff-free with every surface flag OFF (issue #884's
+    plan-no-diff acceptance) even though `ao_images` (main.tf) is
+    unconditional; real promotion supplies the real id via tfvars or
+    environment and never applies on the placeholder (GR-5: no ad-hoc apply).
+  EOT
   type        = string
-  default     = null
+  default     = "example-control-plane"
 }
 
 variable "region" {
