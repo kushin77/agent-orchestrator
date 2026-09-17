@@ -138,6 +138,22 @@ checks=(
   # SEPARATE deliberate step: requiring one that nothing posts yet would block
   # every merge (#724: an inert control whose own gate could not see it).
   'gate-status|bash scripts/check-gate-status.sh'
+  # merge-guard (issue #1145, parent #878): a trailer-less squash merge reds
+  # `check-isolation-landed` on master's OWN TIP, which makes `make verify` red
+  # for every lane on the box (measured, escalating: 4 unrecorded offenders at
+  # origin/master 04ad55a, 2026-09-17). The message guard
+  # (`scripts/check-squash-message.sh`) was consulted by the programmatic merge
+  # paths -- pr-queue, lifecycle close-out, the landing driver -- but the
+  # instruction every spawned lane receives told it to run the raw GitHub-CLI
+  # merge directly, and the raw path consulted nothing (#1150/#1171/#1185/#1188/
+  # #1191 all merged straight through). `scripts/merge-pr.sh` is the guarded
+  # entrypoint; this check PROVES the refusal offline and without merging:
+  # NOT-OK => exit 1, named, and the merge command is NEVER invoked; OK => exit 0
+  # and it IS invoked once; no verdict => exit 2, never a merge. It also asserts
+  # the instruction surfaces hand out the guarded entrypoint and carries a PLANT
+  # that a raw instruction is refused by name -- so the rule cannot pass by
+  # matching nothing.
+  'merge-guard|bash scripts/check-merge-guard.sh'
   # no-actions (issue #812, GR-15): "No GitHub Actions workflows" was declared in
   # AGENTS.md and the fleet doctrine and enforced by NOTHING. Measured: the repo
   # was running `ci-failure-scanner.yml`, state=active, on a 10-minute cron --
