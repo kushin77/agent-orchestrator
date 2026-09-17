@@ -70,7 +70,15 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import lease
+try:
+    # Package-relative: how this module is reached when imported as
+    # `fleet.gatelock` (e.g. `governance/lifecycle/gate.py`, which only puts
+    # the repo ROOT — not `fleet/` — on `sys.path`).
+    from fleet import lease
+except ImportError:
+    # Script-style: `python3 fleet/gatelock.py ...` or `PYTHONPATH=fleet`,
+    # where `fleet/` itself is on `sys.path` and `fleet` is not a package.
+    import lease
 
 MODULE = "gate-lock"
 
