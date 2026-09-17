@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.isolation import speculative  # noqa: E402
+from governance.isolation import journal, live, speculative  # noqa: E402
 from governance.isolation.audit import Violation, audit_lane  # noqa: E402
 from governance.isolation.identity import (  # noqa: E402
     IDENTITY_DOMAIN,
@@ -328,6 +328,11 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
     failed = 0
     for session_id, problems in sorted(results.items()):
+        # Every verdict is appended to the durable trail before it is reported,
+        # so a refusal (or a clean pass) this run prints is also a record a
+        # later run — or a human — can read back without having re-run the
+        # audit (governance/isolation/journal.py, issue #885).
+        journal.append(main, session_id, problems)
         if problems:
             failed += 1
             print(f"  FAIL  lane {session_id}", file=sys.stderr)
@@ -335,6 +340,12 @@ def cmd_audit(args: argparse.Namespace) -> int:
                 print(f"          {problem}", file=sys.stderr)
         else:
             print(f"  OK    lane {session_id}")
+
+    if args.live:
+        print("  -- live projection (governance/isolation/live.py) --")
+        rendered = live.render(main)
+        print(rendered if rendered else "  (no recorded lanes to project)")
+
     if failed:
         print(f"session-isolation: FAIL ({failed} of {len(results)} lane(s) not isolated)", file=sys.stderr)
         return EXIT_NOT_OK
@@ -525,6 +536,15 @@ def build_parser() -> argparse.ArgumentParser:
             "before auditing, re-verify this lane's speculative-base claim (#699): re-derive merge_base "
             "and git_sha from git right now and re-record them. Requires --session; refuses (CANNOT-ASSESS) "
             "a lane with no prior claim. Run this once, right before opening the PR."
+        ),
+    )
+    audit_cmd.add_argument(
+        "--live",
+        action="store_true",
+        help=(
+            "also print a live projection of recorded lane identities and speculative "
+            "attestations against the real worktrees/git right now (governance/isolation/live.py), "
+            "and report drift by name. Does not replace the audit verdict above it."
         ),
     )
     audit_cmd.set_defaults(func=cmd_audit)

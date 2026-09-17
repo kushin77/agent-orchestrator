@@ -11,6 +11,30 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+#: Every refusal code a module in this package may build a Violation with.
+#: `governance/isolation/controls.yaml` declares the same set (`policy.load()`
+#: refuses to load a declaration that drifts from it in either direction), so
+#: a code emitted here but not declared there — or vice versa — is a load-time
+#: refusal, not a silent gap (issue #885).
+KNOWN_CODES = frozenset(
+    {
+        "branch-does-not-name-issue",
+        "worktree-missing",
+        "worktree-not-linked",
+        "branch-mismatch",
+        "identity-not-lane-local",
+        "identity-mismatch",
+        "identity-leaked-to-shared-config",
+        "commit-missing-ticket-trailer",
+        "commit-trailer-check-unavailable",
+        "commit-authored-by-another-session",
+        "commit-authorship-unmeasurable",
+        "speculative-base-not-landed",
+        "speculative-base-stale-merge-base",
+        "speculative-base-unmeasurable",
+    }
+)
+
 
 @dataclass(frozen=True)
 class Violation:
