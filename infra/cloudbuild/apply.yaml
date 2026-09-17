@@ -25,10 +25,17 @@
 # trigger is the only entry point, so there is one place to read the route's
 # posture and one place to flip it. Nothing turns on by default.
 
+# Run as the deployer SA (created by modules/deployer-sa at promotion).
+# Populated via substitution at go-live; never hard-coded (GR-6).
+# `serviceAccount` is a top-level Build field, not a BuildOptions field —
+# nesting it under `options:` fails at trigger-run time with "unknown field
+# serviceAccount in google.devtools.cloudbuild.v1.BuildOptions". A non-default
+# service account also requires options.logging set away from the legacy
+# default (GCS+Stackdriver dual logging is refused for a custom SA).
+serviceAccount: $_DEPLOYER_SA
+
 options:
-  # Run as the deployer SA (created by modules/deployer-sa at promotion).
-  # Populated via substitution at go-live; never hard-coded (GR-6).
-  serviceAccount: $_DEPLOYER_SA
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
   # Fail-closed gate: only proceed when the apply flag is deliberately on.
