@@ -68,6 +68,41 @@ edit the baseline itself.
 lands the schema/types change first owns the contract; the others consume the
 field name, never the files.
 
+**Core extension points (RCA-0008, the PR-queue-clearing lessons).** Some
+files are natural, LEGITIMATE extension points for more than one lane in the
+same wave — `fleet/watchdog.py` (a new alarm/remedy type), `fleet/cron.py` (a
+new rung), and any doc a feature is expected to append its own section to
+(`docs/FLEET-PARITY.md`-shaped files). "No two lanes share a file" does not
+have an exception for these; it has a PROCEDURE, because three PRs collided on
+exactly this shape in one queue-clearing pass (two watchdog alarm additions,
+two cron rung additions, two independently-created parity docs):
+
+- **Declare intent before starting.** A lane that expects to touch a core
+  extension point says so on its issue before opening its worktree — the
+  file and the kind of change (new alarm, new rung, new section), not a
+  diff. A second lane claiming the same file sees this and coordinates
+  instead of discovering the collision at merge time.
+- **Prefer append-only additions.** A new alarm type, a new rung, a new doc
+  section is added as its own block — its own function, its own dict entry,
+  its own `## heading` — never interleaved into an existing block another
+  lane might also be touching. Two append-only additions to the same file
+  merge cleanly far more often than two edits to the same lines do.
+- **Whoever lands first sets the base; the second REBASES onto it.** The
+  second lane to land does not resolve a conflict blind against its own
+  stale branch — it rebases its commit onto the first lane's landed change and
+  re-runs `make verify` on the rebased result. A conflict resolved without
+  looking at what the other lane actually shipped is how two features regress
+  each other silently.
+- A doc that risks being created independently by two lanes (a new
+  `docs/*-PARITY.md`-shaped file) is claimed the same way as a core code
+  file: declare the filename on the issue before creating it, so a second
+  lane finds the claim instead of writing a byte-different duplicate.
+
+This is lighter than a lock registry on purpose: the existing dispatch claim
+(`governance/dispatch/cli.py claim`) already names the issue and lane; core
+extension points just require that claim to also name the shared file, up
+front, in prose a sibling lane will actually read.
+
 ## 4. Dispatch contract (per soldier/agent)
 
 1. **Claim the issue.** `python3 governance/dispatch/cli.py claim --issue <n>

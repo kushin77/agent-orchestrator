@@ -14,6 +14,13 @@
 #   10  REFUSED  — another gate already holds this worktree (PARKED, not started)
 #   11  PARKED   — every box-wide permit slot is taken (PARKED, not started)
 #   12  CANNOT-ASSESS — the permit store cannot be trusted
+#   13  HEALTH-ATTENTION — `doctor` found a leftover lock (alert-only, see below)
+#
+# `doctor` proactively sweeps every recorded worktree lock for a zero-byte or
+# owner-less leftover (RCA-0007, the #948 follow-up) instead of waiting for a
+# human to trace box-wide contention back to one file. It is read-only —
+# alert, never auto-reap — and is meant to run from cron/the watchdog:
+#   bash "$root/scripts/gate-lock.sh" doctor
 #
 # The permit store lives outside every workspace, and every knob is overridable
 # so a test or a sibling gate never has to touch the box's real store:
