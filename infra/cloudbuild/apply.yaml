@@ -53,18 +53,18 @@ steps:
 
   - id: terraform-init
     name: 'hashicorp/terraform:1.6'
-    entrypoint: 'bash'
+    entrypoint: 'sh'
     args:
-      - '-lc'
+      - '-c'
       - |
         cd infra/terraform
         terraform init -input=false
 
   - id: terraform-plan
     name: 'hashicorp/terraform:1.6'
-    entrypoint: 'bash'
+    entrypoint: 'sh'
     args:
-      - '-lc'
+      - '-c'
       - |
         cd infra/terraform
         terraform plan -input=false \
@@ -92,9 +92,9 @@ steps:
 
   - id: terraform-apply
     name: 'hashicorp/terraform:1.6'
-    entrypoint: 'bash'
+    entrypoint: 'sh'
     args:
-      - '-lc'
+      - '-c'
       - |
         cd infra/terraform
         terraform apply -auto-approve /workspace/tfplan
