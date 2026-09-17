@@ -375,6 +375,14 @@ checks=(
   # no-vendoring finding, deterministic rebuilds. It returns CANNOT-ASSESS (rc 2)
   # when `vendor/CMR` is not initialised, never a pass.
   'module-registry|bash scripts/check-module-registry.sh'
+  # cmr-pin (issue #949, parent #878): the root `cmr-pin.yaml` the CMR module
+  # template prescribes (vendor/CMR/templates/module/cmr-pin.yaml) was absent.
+  # This gate validates it against the hub's own schema
+  # (vendor/CMR/sync/cmr-pin.schema.json, via vendor/CMR/sync/validate-cmr-pin.py)
+  # and refuses DRIFT: bundle_ref must equal the live `vendor/CMR` submodule
+  # HEAD, proved by a provoked negative control (CMR-PIN-DRIFT) in a scratch
+  # copy, never the real pin.
+  'cmr-pin|bash scripts/check-cmr-pin.sh'
   # #447 (the M28 tail): the paperclip reporting agent's module brief — the
   # artifact composes only from #445's registry, every claim resolves to a
   # registry row or a cited hub path, Pending is never rendered as shipped, and

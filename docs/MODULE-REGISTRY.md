@@ -213,3 +213,22 @@ this lane does not own.
 This lane reads the hub and this repository; it writes into neither. A need that
 lands on the hub or on a peer is a **direction issue on that board**. Membership is
 declared by the authority; this registry only reports what it finds.
+
+## 11. The standards pin (issue #949, parent #878)
+
+Separate from module *membership* (§1–§9) is the spoke-side **standards pin**:
+[`../cmr-pin.yaml`](../cmr-pin.yaml) at the repo root, prescribed by
+`vendor/CMR/templates/module/cmr-pin.yaml` (EPIC-26/M23, GH #453, schema
+`cmr.standards-pin/v1` in `vendor/CMR/sync/cmr-pin.schema.json`). It records
+which CMR standards bundle (`bundle_ref`, the hub commit; `manifest_sha` and
+`bundle_digest`, computed over `controller/standards-manifest.txt` at that
+ref) this repo last synced — not registry membership, and admission for this
+repo's own submodule claims in `module.json` stays `requested` (§6), unchanged
+by this pin.
+
+Gated by [`../scripts/check-cmr-pin.sh`](../scripts/check-cmr-pin.sh) (wired
+into `scripts/verify.sh` as `cmr-pin`): validates the pin against the hub's own
+schema via `vendor/CMR/sync/validate-cmr-pin.py`, and refuses **drift** —
+`bundle_ref` must equal the live `vendor/CMR` submodule HEAD — proved by a
+provoked negative control (`CMR-PIN-DRIFT`, in a scratch copy, never the real
+pin).
