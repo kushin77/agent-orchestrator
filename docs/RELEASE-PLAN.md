@@ -14,7 +14,8 @@ gate-green commit.
 | Current version (`module.json` → `versions.latest`) | `v0.1.0` |
 | Control-plane API version (`identity/cpapi/openapi.yaml` → `info.version`) | `1.0.0` |
 | Measured | 2026-09-17 |
-| `master` SHA at branch time | `96ae0fba19c36764e1f0251070d7c77bb17b4a5d` (re-measured after rebase onto `66fa3d4d65dde108234f8b197d57475154859029`, which landed #1072 and #1073) |
+| `master` SHA this document is based on | `66fa3d4d65dde108234f8b197d57475154859029` (rebased from the original branch point `96ae0fba19c36764e1f0251070d7c77bb17b4a5d` once #1072 and #1073 landed) |
+| Source of the §4 acceptance boxes | issue #803's 2026-09-17 re-measurement, taken against `master` `96ae0fb` and updated below against `66fa3d4` where #1072/#1073 changed the state |
 
 The module version (`v0.1.0`) and the API's own `info.version` (`1.0.0`) are
 two different numbers today. Cutting product `v1.0.0` does not require
@@ -65,7 +66,9 @@ One row per acceptance box from issue #803's 2026-09-17 re-measurement
 ("Re-measured 2026-09-17 against master `96ae0fb` — what is left"), which is
 itself the corrected version of the epic body after its two correction
 comments (row 10 OpenAPI, row 11 isolation, row 14 infra — all corrected to
-DONE/withdrawn; row 12 CODEOWNERS left OPEN).
+DONE/withdrawn; row 12 CODEOWNERS left OPEN at that measurement). This table
+updates two of those rows against `66fa3d4` — the SHA this document is
+based on (§1) — to record that #1072 and #1073 landed in between.
 
 | Criterion | Evidence gate / command | Measured state today |
 |---|---|---|
