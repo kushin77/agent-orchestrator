@@ -93,3 +93,17 @@ A reproduction is what makes the claim evidence rather than assertion; see
 [docs/GOVERNANCE.md](../docs/GOVERNANCE.md) for the merge contract and
 [docs/QA-GATE.md](../docs/QA-GATE.md) for the gates.
 -->
+
+<!--
+issue #1001: `gh pr merge --squash` composes the LANDED commit message from
+this title and body ("<title> (#N)\n\n<body>"), not from the branch's own
+commit trailers. That means THIS is the only place the trailer paragraph can
+still be lost before it lands. Leave the line below as the body's FINAL
+paragraph (replace `<n>` with this PR's own issue number; do not add anything
+after it) so the composed squash message keeps the ticket reference inside a
+trailing trailer block. Verify before merging with:
+
+    bash scripts/check-squash-message.sh --pr <this PR's number>
+-->
+
+Refs kushin77/agent-orchestrator#<n>
