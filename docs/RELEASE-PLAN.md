@@ -14,7 +14,7 @@ gate-green commit.
 | Current version (`module.json` → `versions.latest`) | `v0.1.0` |
 | Control-plane API version (`identity/cpapi/openapi.yaml` → `info.version`) | `1.0.0` |
 | Measured | 2026-09-17 |
-| `master` SHA at branch time | `96ae0fba19c36764e1f0251070d7c77bb17b4a5d` |
+| `master` SHA at branch time | `96ae0fba19c36764e1f0251070d7c77bb17b4a5d` (re-measured after rebase onto `66fa3d4d65dde108234f8b197d57475154859029`, which landed #1072 and #1073) |
 
 The module version (`v0.1.0`) and the API's own `info.version` (`1.0.0`) are
 two different numbers today. Cutting product `v1.0.0` does not require
@@ -70,26 +70,29 @@ DONE/withdrawn; row 12 CODEOWNERS left OPEN).
 | Criterion | Evidence gate / command | Measured state today |
 |---|---|---|
 | Branch protection declared as code, applied, read-back gated | `verify.sh` gate `branch-protection` → `scripts/check-branch-protection.sh` | **Done** (#807) |
-| Required-check question decided in an ADR and implemented | `docs/decision-records/ADR-0028-gate-status-without-actions.md` (Accepted) | ADR **accepted**; poster (`scripts/gate-status.sh`) wiring into the merge path is **pending #1072** |
+| Required-check question decided in an ADR and implemented | `docs/decision-records/ADR-0028-gate-status-without-actions.md` (Accepted) | ADR **accepted**; poster (`scripts/gate-status.sh`) is now **wired into `governance/landing`** (#1072, landed at `66fa3d4`) — `governance/landing/ports.py` and `engine.py` call it at the PR boundary. **Not yet observed posting**: `gh api .../commits/66fa3d4.../status` reads `{"state":"pending","statuses":[]}` on 2026-09-17, so ADR-0028 step 2's precondition (a real status observed on a real `master` commit) has not fired yet |
 | GR-15 holds (no GitHub Actions) | `verify.sh` gate `no-actions` → `scripts/check-no-actions.sh` | **Done** (#812) |
 | Checked OpenAPI contract for the control-plane API | `verify.sh` gate `cpapi-spec-drift` → `scripts/check-cpapi-spec-drift.sh` | **Done** (#816) |
 | Cross-tenant isolation proven, in the gate | `engine/memory/tests/test_isolation.py`, `identity/chat/tests/test_isolation.py`, `identity/chat/tests/test_failclosed.py` | **Done** (GR-15/AO-GR-15 evidence; originally reported "unproven" — that row was **withdrawn** in issue #803's correction 1) |
-| `CODEOWNERS` + release version named | `.github/CODEOWNERS` (not yet present) | **Pending #1073** for CODEOWNERS; this document is the release-version half |
-| Required status check actually required (`required_status_checks`) | `governance/platform/branch-protection.yaml` → `required_status_contexts: [ao/gate-of-record]` (declared, not yet in `protection`) | **Pending owner step** — ADR-0028 step 2, deliberately deferred until a real `ao/gate-of-record` status is observed on a real `master` commit |
+| `CODEOWNERS` + release version named | `.github/CODEOWNERS` | **Done** (#1073, landed at `66fa3d4` — a per-pillar ownership map, gated by `verify.sh` gate `codeowners` → `scripts/check-codeowners.sh`); this document is the release-version half |
+| Required status check actually required (`required_status_checks`) | `governance/platform/branch-protection.yaml` → `required_status_contexts: [ao/gate-of-record]` (declared, not yet in `protection`) | **Pending owner step** — ADR-0028 step 2. The poster is wired (#1072) but has not yet posted a real status on `master`, which is the precondition this step names before requiring the check |
 
 ## 5. Residual risks named
 
 - **Required status check not yet required.** `governance/platform/branch-protection.yaml`
   declares `required_status_contexts: [ao/gate-of-record]` outside the
   `protection` block on purpose (ADR-0028): requiring a context nothing
-  posts yet would deadlock every merge (the #724 defect class). Until
-  #1072 lands and a real status is observed, a merge to `master` can still
-  happen without a green gate being technically enforced by GitHub — only
+  posts yet would deadlock every merge (the #724 defect class). The poster
+  is wired (#1072) but has not yet been observed posting a real status on
+  `master` — until it is, and step 2 lands, a merge to `master` can still
+  happen without a green gate being technically enforced by GitHub, only
   by process discipline (AGENTS.md rule 3, autonomous-merge mandate rule 10).
-- **`CODEOWNERS` does not exist.** No per-pillar ownership is enforced by
-  GitHub today; #1073 is the open lane. Until it lands, review/ownership is
-  a convention, not a platform control — the same gap pattern ADR-0028
-  named for branch protection before #807.
+- **`CODEOWNERS` covers pillar ownership, not a required review.** `.github/CODEOWNERS`
+  now exists and is gated (#1073), but `required_pull_request_reviews` is
+  still `null` in `governance/platform/branch-protection.yaml` (deliberately,
+  per that file's own comment — a required review would break the
+  autonomous-merge doctrine). `CODEOWNERS` therefore documents ownership; it
+  does not make GitHub block a merge that skips the named owner.
 - **`enforce_admins: false`.** Recorded deliberately in
   `governance/platform/branch-protection.yaml`: the operator must retain an
   override point on a wedged fleet, per the documented operator role. This
