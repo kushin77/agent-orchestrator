@@ -87,10 +87,14 @@ from model import (
     parse_claim_event,
 )
 from snapshot import DEFAULT_STALENESS_MINUTES, age_minutes, is_stale, now_iso, parse_iso
+import audit as audit_mod  # noqa: E402
 
 DEFAULT_LEDGER = Path(".board/claims.jsonl")
 DEFAULT_CLAIMS_DIR = Path(".board/claims")
 DEFAULT_LOCK_DIR = Path(".board/locks")
+#: The append-only arbitration trail (issue #885), adjacent to — never a
+#: replacement for — the claims ledger above.
+DEFAULT_AUDIT_PATH = audit_mod.DEFAULT_AUDIT_PATH
 #: The claim lease and the reap threshold are declared once in
 #: governance/policy/lease.py: the claim TTL must exceed the session TTL, and the
 #: reap threshold must not release a claim whose lane is still beating.
@@ -510,6 +514,67 @@ def _directive_ref(directive_id: str) -> str:
 
 
 def arbitrate(
+    issue_number: int,
+    agent: str,
+    lane: str,
+    snapshot: Snapshot,
+    ledger: Path | str = DEFAULT_CLAIMS_DIR,
+    lock_dir: Path | str = DEFAULT_LOCK_DIR,
+    directive_id: str = "",
+    require_lane: bool = False,
+    snapshot_path: str = "",
+    snapshot_sha256: str = "",
+    now: datetime | None = None,
+    stale_minutes: int = DEFAULT_STALENESS_MINUTES,
+    queue_data: dict | None | object = MISSING,
+    allow_blocked: bool = False,
+    audit_path: Path | str | None = None,
+) -> Arbitration:
+    """Arbitrate a dispatch, then record exactly one audit record for the outcome.
+
+    Delegates the judgment itself to ``_arbitrate_unaudited`` (unchanged
+    behaviour) and appends a granted or refused record to the audit trail
+    (issue #885, ``audit.py``) before returning or re-raising — the caller
+    never has to remember to log the outcome, and a caller that wants no audit
+    record at all is not a caller this package has (arbitration decides
+    dispatch; every decision is recorded).
+    """
+    moment = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if audit_path is None:
+        # Adjacent to the ledger this arbitration reads, never a repo-root
+        # default that a test (or a caller pointed at a fixture ledger) would
+        # accidentally write into the tracked `.board/` tree.
+        audit_path = Path(ledger).parent / "dispatch-audit.jsonl"
+    try:
+        result = _arbitrate_unaudited(
+            issue_number,
+            agent,
+            lane,
+            snapshot,
+            ledger=ledger,
+            lock_dir=lock_dir,
+            directive_id=directive_id,
+            require_lane=require_lane,
+            snapshot_path=snapshot_path,
+            snapshot_sha256=snapshot_sha256,
+            now=now,
+            stale_minutes=stale_minutes,
+            queue_data=queue_data,
+            allow_blocked=allow_blocked,
+        )
+    except ClaimRefused as exc:
+        audit_mod.append(
+            audit_mod.record_refusal(
+                issue=issue_number, agent=agent, at=moment, reason=exc.reason, detail=exc.detail, lane=lane
+            ),
+            path=audit_path,
+        )
+        raise
+    audit_mod.append(audit_mod.record_grant(result, at=moment), path=audit_path)
+    return result
+
+
+def _arbitrate_unaudited(
     issue_number: int,
     agent: str,
     lane: str,

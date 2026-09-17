@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import claims  # noqa: E402
 import focus as focus_mod  # noqa: E402
+import live as live_mod  # noqa: E402
 import order  # noqa: E402
 import pool as pool_mod  # noqa: E402
 import owner_queue as queue_mod  # noqa: E402
@@ -259,6 +260,9 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"live claims: {len(live)}")
     for issue, claim in sorted(live.items()):
         print(f"  #{issue} held by {claim.agent} ({claim.lane}) since {claim.at} reason={claim.reason}")
+    if getattr(args, "live", False):
+        projection = live_mod.project(snapshot, ledger=args.ledger)
+        print(live_mod.render(projection))
     return EXIT_OK
 
 
@@ -604,6 +608,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="show the active milestone, frontier and live claims")
     add_paths(status)
+    status.add_argument(
+        "--live", action="store_true",
+        help="also print the live projection (issue #885): claim set, frontier and ready wave, read fresh",
+    )
     status.set_defaults(func=cmd_status)
 
     held = sub.add_parser("held", help="print the live claim holder of an issue (exit 0 = held, 1 = free)")

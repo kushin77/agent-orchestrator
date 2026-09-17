@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.dispatch/dispatch-v1",
+  "title": "governance/dispatch record shapes (issue #885)",
+  "$comment": "Freezes the three shapes this package persists to disk: one ClaimEvent (the append-only claims ledger), one Issue row (the committed board snapshot), and the queue.yaml wave document. Validated by governance/dispatch/schema.py (stdlib-only subset validator, reused from governance/modules/schema.py).",
+  "$defs": {
+    "region": {
+      "type": "array",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "fileClaim": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" },
+        "regions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["issue", "lane", "evidence"],
+      "properties": {
+        "issue": { "type": "integer" },
+        "epic": { "type": "integer" },
+        "lane": { "type": "string" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "claimEvent": {
+      "type": "object",
+      "required": ["event", "issue", "agent", "at"],
+      "properties": {
+        "event": { "enum": ["claim", "release", "take-over", "reap"] },
+        "issue": { "type": "integer" },
+        "agent": { "type": "string" },
+        "at": { "type": "string" },
+        "lane": { "type": "string" },
+        "base_commit": { "type": "string" },
+        "snapshot_sha256": { "type": "string" },
+        "reason": { "type": "string" },
+        "ttl_hours": { "type": "integer" },
+        "directive_id": { "type": "string" },
+        "directive_from": { "type": "string" },
+        "reaped_agent": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fileClaim" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "issueRow": {
+      "type": "object",
+      "required": ["number", "title", "state"],
+      "properties": {
+        "number": { "type": "integer" },
+        "title": { "type": "string" },
+        "state": { "enum": ["open", "closed"] },
+        "milestone": { "type": "string" },
+        "labels": { "type": "array", "items": { "type": "string" } },
+        "parent": { "type": "integer" },
+        "blocked_by": { "type": "array", "items": { "type": "integer" } },
+        "cross_refs": { "type": "array", "items": { "type": "string" } },
+        "closed_at": { "type": "string" },
+        "files": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "queueWave": {
+      "type": "object",
+      "required": ["name", "issues"],
+      "properties": {
+        "name": { "type": "string" },
+        "issues": { "type": "array", "items": { "type": "integer" } }
+      },
+      "additionalProperties": false
+    },
+    "queueDocument": {
+      "type": "object",
+      "required": ["waves"],
+      "properties": {
+        "waves": { "type": "array", "items": { "$ref": "#/$defs/queueWave" } },
+        "blocked_by": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "auditRecord": {
+      "type": "object",
+      "required": ["schema", "kind", "issue", "agent", "at"],
+      "properties": {
+        "schema": { "const": "ao.dispatch/audit-v1" },
+        "kind": { "enum": ["refusal", "grant"] },
+        "issue": { "type": "integer" },
+        "agent": { "type": "string" },
+        "at": { "type": "string" },
+        "reason": { "type": ["string", "null"] },
+        "detail": { "type": ["string", "null"] },
+        "lane": { "type": ["string", "null"] },
+        "epic": { "type": ["integer", "null"] },
+        "directive_id": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

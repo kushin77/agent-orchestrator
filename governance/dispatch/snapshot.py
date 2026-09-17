@@ -43,17 +43,33 @@ if str(ROOT / "fleet") not in sys.path:
 from governance.policy import lease  # noqa: E402
 import runtime  # noqa: E402
 from model import Issue, Snapshot  # noqa: E402
+import policy as dispatch_policy  # noqa: E402
 
 DEFAULT_PATH = Path(".board/snapshot.json")
 
 #: The repo board a snapshot is refreshed from by default.
 DEFAULT_REPO = "kushin77/agent-orchestrator"
 
-# A snapshot older than this is refused as stale (issue #170): the board moves
-# faster than an hour-old artifact, and answering confidently from stale data is
-# the failure mode the gate exists to prevent. Declared once in
-# governance/policy/lease.py.
-DEFAULT_STALENESS_MINUTES = lease.SNAPSHOT_STALENESS_MINUTES
+
+def _default_staleness_minutes() -> int:
+    """The staleness threshold, read from the package's declared controls.
+
+    A snapshot older than this is refused as stale (issue #170): the board
+    moves faster than an hour-old artifact, and answering confidently from
+    stale data is the failure mode the gate exists to prevent. The value comes
+    from ``controls.yaml`` (issue #885), which is itself cross-checked against
+    ``governance/policy/lease.SNAPSHOT_STALENESS_MINUTES`` (issue #322, the
+    single upstream source) — a policy that cannot be read is never silently
+    treated as "no threshold", so this falls back to the lease value only when
+    the declared controls cannot be loaded at all (e.g. PyYAML missing).
+    """
+    try:
+        return dispatch_policy.stale_minutes()
+    except dispatch_policy.PolicyUnavailable:
+        return lease.SNAPSHOT_STALENESS_MINUTES
+
+
+DEFAULT_STALENESS_MINUTES = _default_staleness_minutes()
 
 _PARENT_RE = re.compile(r"^\s*(?:parent|part[-_ ]of)\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
 _BLOCKED_RE = re.compile(r"^\s*blocked[-_ ]by\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)

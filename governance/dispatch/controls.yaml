@@ -1,0 +1,55 @@
+# Dispatch's own declared acceptance policy (issue #885, surface-class elite).
+#
+# `model.py` already carries the closed vocabulary of claim reasons and
+# arbitration refusals, and `snapshot.py` already carries a staleness
+# threshold. Before this file existed both lived only as Python constants:
+# nothing declared them as *policy* a reader could review or a test could
+# mutate independently of the code that enforces them. This file is that
+# declaration, read by `policy.py` on every arbitration:
+#
+#   * `arbitrate()` (claims.py) reads `stale_minutes` from here as its default
+#     — it no longer hard-codes a threshold of its own;
+#   * `policy.load()` cross-checks `allowed_claim_reasons`,
+#     `terminal_claim_reasons` and `arbitration_refusals` against the closed
+#     vocabulary `model.py` actually defines, in both directions: this file
+#     may declare no reason the code cannot emit, and the code may emit no
+#     reason this file does not declare. A mismatch is a policy defect
+#     (`PolicyUnavailable`, CANNOT-ASSESS), never a silent pass;
+#   * `claim_ttl_hours` is declared here as the value this package uses by
+#     default, cross-checked against `governance/policy/lease.CLAIM_TTL_HOURS`
+#     (the single upstream source, issue #322) — this file never overrides
+#     that lease, it only proves dispatch has not drifted from it.
+#
+# Changing `stale_minutes` changes real arbitration behaviour immediately
+# (mutation test: `tests/test_policy.py::test_stale_minutes_is_read_from_controls`).
+
+schema: ao.dispatch/controls-v1
+subject: governance/dispatch
+
+stale_minutes: 15
+
+claim_ttl_hours: 24
+
+allowed_claim_reasons:
+  - child-of-claim
+  - successor-of-claim
+  - next-in-milestone
+  - brain-directed
+  - active-epic-child
+  - speculative_base
+
+terminal_claim_reasons:
+  - issue-closed
+  - epic-closed
+  - unowned
+
+arbitration_refusals:
+  - unknown-issue
+  - issue-closed
+  - epic-closed
+  - epic-not-workable
+  - blocked
+  - already-claimed
+  - provenance-mismatch
+  - unowned
+  - snapshot-stale
