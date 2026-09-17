@@ -1,6 +1,6 @@
 ---
 id: ADR-0031
-status: proposed
+status: accepted
 date: 2026-09-17
 deciders: [owner]
 req: []
@@ -11,11 +11,10 @@ supersedes: []
 
 ## Status
 
-`proposed` — issue #883 (lane L4 of EPIC #878). Parts (a) and (b) **reaffirm**
-canon already accepted in [ADR-0010](ADR-0010-canonical-copy-ownership.md) and
-need no new ratification; part (c) introduces a new gate mechanism whose three
-concrete values are **for the owner to confirm** (`deciders: [owner]`). The
-record leaves `proposed` when the owner confirms the ceilings.
+`accepted` — Owner confirmed the three ceiling values on 2026-09-17 (EPIC #878).
+Parts (a) and (b) **reaffirm** canon already accepted in
+[ADR-0010](ADR-0010-canonical-copy-ownership.md); part (c) introduces a new gate
+mechanism whose three concrete values are now ratified.
 
 **Numbering note:** `0030` is the next number in sequence but is already cited
 from this repo's board for a different, fleet-level record (the "lanes hand work
