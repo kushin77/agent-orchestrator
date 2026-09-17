@@ -31,7 +31,7 @@ issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-ru
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
         remediation remediation-scan remediation-dispatch \
-        capacity-gate tagging \
+        capacity-gate tagging epic-focus capability-drift conformance-change-set board-gate ao-ssh-access \
         control-verbs control-audit control-functions cockpit operator console operator-access operator-terminal
 
 .DEFAULT_GOAL := help
@@ -229,6 +229,15 @@ e2e:
 ## shell-syntax — bash -n on every *.sh outside vendor/
 shell-syntax:
 	@bash scripts/check-shell-syntax.sh
+
+## python-syntax — py_compile on every tracked *.py outside vendor/, via the
+## repo's own check script (the recipe DELEGATES; it never re-implements the
+## compile). This target was referenced by `lint` and by the help text but had
+## no recipe, so GNU make treated it as already satisfied and `make lint`
+## silently skipped the Python syntax check it advertised — a live false-green
+## (GR-12). Restored by #1202.
+python-syntax:
+	@bash scripts/check-python-syntax.sh
 
 ## yaml-lint — parse every .yml/.yaml outside vendor/ with PyYAML
 yaml-lint:
@@ -624,10 +633,11 @@ capability-registers:
 ## checks=() array; this target is for fast local iteration, not a second gate
 ## of record. All six are offline and deterministic (no network, no `vendor/CMR`
 ## submodule), so they run for real in a fresh worktree rather than reporting
-## CANNOT-ASSESS. The seventh gate named by issue #502,
-## scripts/check-chat-surface.sh, is deliberately NOT listed here: it does not
-## exist yet (it is owned by #503, the still-open serving-surface lane). A stub
-## would be an invented check, which is worse than a named gap.
+## CANNOT-ASSESS. scripts/check-chat-surface.sh, the seventh gate named by
+## issue #502, is NOT listed among them here: it is owned by #503, which has
+## since shipped it (PR #564), and issue #568 wired it into the gate of record
+## (scripts/verify.sh checks=()), so it runs for real on every `make verify`.
+## This target stays the six-gate convenience runner, not a second gate.
 chat:
 	@bash scripts/check-chat-tools.sh
 	@bash scripts/check-chat-identity.sh
