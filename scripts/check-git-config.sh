@@ -266,13 +266,21 @@ is_lane=0
 if [ -n "$main_root" ] && [ -d "$main_root/.fleet/lanes" ]; then
   for record in "$main_root"/.fleet/lanes/*.json; do
     [ -e "$record" ] || continue
-    record_worktree="$(python3 -c '
+    if command -v python3 >/dev/null 2>&1; then
+      record_worktree="$(python3 -c '
 import json, sys
 try:
     print(json.load(open(sys.argv[1]))["worktree"])
 except Exception:
     pass
 ' "$record" 2>/dev/null || true)"
+    else
+      # No python3: fall back to a plain-text extraction of the "worktree"
+      # field rather than silently treating every worktree as a non-lane
+      # (that would quietly downgrade the strict rule for every lane on a
+      # box without python3 — the opposite of "record the decision").
+      record_worktree="$(sed -n 's/.*"worktree"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$record" | head -1)"
+    fi
     [ -n "$record_worktree" ] || continue
     record_worktree_real="$(realpath -e "$record_worktree" 2>/dev/null || echo "$record_worktree")"
     if [ "$record_worktree_real" = "$root_real" ]; then
