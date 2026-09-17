@@ -65,6 +65,7 @@ from model import (
     REASON_CHILD_OF_CLAIM,
     REASON_EPIC_CLOSED,
     REASON_EPIC_NOT_WORKABLE,
+    REASON_FILE_REGION_CLAIMED,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
     REASON_OUT_OF_EPIC_POOLED,
@@ -75,9 +76,11 @@ from model import (
     REASON_UNOWNED,
     Arbitration,
     ClaimEvent,
+    FileClaim,
     Issue,
     Provenance,
     Snapshot,
+    file_claims_conflict,
     parse_claim_event,
 )
 from snapshot import DEFAULT_STALENESS_MINUTES, age_minutes, is_stale, now_iso, parse_iso
@@ -253,6 +256,29 @@ def replay(events: list[ClaimEvent]) -> dict[int, ClaimEvent]:
         elif event.event in ("release", "reap"):
             raw.pop(event.issue, None)
     return raw
+
+
+def find_file_conflict(
+    files: tuple[FileClaim, ...],
+    live: dict[int, ClaimEvent],
+    issue_number: int,
+    agent: str,
+) -> tuple[ClaimEvent, FileClaim, FileClaim] | None:
+    """First live claim (not this issue/agent) whose files overlap ``files``.
+
+    Only LIVE claims are considered (``active_claims`` already drops expired
+    ones), so a stalled lease past its TTL never blocks a new one — the reap
+    that already frees the issue also frees the files it named, with no
+    separate per-file TTL required.
+    """
+    for other_issue, holder in live.items():
+        if other_issue == issue_number and holder.agent == agent:
+            continue
+        for mine in files:
+            for theirs in holder.files:
+                if file_claims_conflict(mine, theirs):
+                    return holder, mine, theirs
+    return None
 
 
 def reap(
@@ -599,6 +625,7 @@ def claim(
     stale_minutes: int = DEFAULT_STALENESS_MINUTES,
     focus_path: Path | str | None = None,
     pool_path: Path | str = pool.POOL_PATH,
+    files: tuple[FileClaim, ...] = (),
 ) -> ClaimEvent:
     """Claim an issue after arbitrating ownership, then order.
 
@@ -667,6 +694,16 @@ def claim(
             raise ClaimRefused(verdict.reason, verdict.detail)
         reason = verdict.reason
 
+    if files:
+        conflict = find_file_conflict(files, live, issue_number, agent)
+        if conflict is not None:
+            holder, mine, theirs = conflict
+            raise ClaimRefused(
+                REASON_FILE_REGION_CLAIMED,
+                f"file {mine.path!r} region {mine.regions} overlaps claim on #{holder.issue} "
+                f"(agent={holder.agent}, region={theirs.regions}) held since {holder.at}",
+            )
+
     if not _acquire_lock(issue_number, lock_dir, takeover=takeover):
         raise ClaimRefused(
             REASON_ALREADY_CLAIMED,
@@ -687,6 +724,7 @@ def claim(
         directive_id=directive_id,
         directive_from="brain" if directive is not None else "",
         provenance=arbitration.provenance,
+        files=files,
     )
     append_event(event, ledger)
     return event
