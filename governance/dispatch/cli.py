@@ -481,6 +481,55 @@ def cmd_queue(args: argparse.Namespace) -> int:
         print(f"queue: CANNOT-ASSESS — {queue_path} is missing", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
 
+    if args.fix:
+        snapshot_path = Path(args.snapshot)
+        if not snapshot_path.exists():
+            print(
+                f"queue --fix: CANNOT-ASSESS — {snapshot_path} is missing "
+                "(refresh it with: python3 governance/dispatch/cli.py snapshot --from-github)",
+                file=sys.stderr,
+            )
+            return EXIT_CANNOT_ASSESS
+        snapshot = snapshot_mod.load(snapshot_path)
+        if snapshot_mod.is_stale(snapshot, args.stale_minutes):
+            age = snapshot_mod.age_minutes(snapshot)
+            print(
+                f"queue --fix: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m); "
+                "closed/open state needs a fresh board — refresh first: "
+                "python3 governance/dispatch/cli.py snapshot --from-github",
+                file=sys.stderr,
+            )
+            return EXIT_CANNOT_ASSESS
+        text = queue_path.read_text(encoding="utf-8")
+        new_text, removed = queue_mod.prune_closed_text(text, snapshot)
+        if removed:
+            queue_path.write_text(new_text, encoding="utf-8")
+            listed = ", ".join(f"#{n}" for n in removed)
+            print(f"queue --fix: dropped {len(removed)} closed issue(s) from {queue_path}: {listed}")
+        else:
+            print(f"queue --fix: OK ({queue_path} has no closed issues)")
+        # Self-verify (GR-12/AO-GR-19: a check that cannot fail is a
+        # formality): re-load and re-validate what was just written against
+        # the same snapshot. A prune whose regex missed a wave shape (e.g. a
+        # future block-style `issues:` list) must be caught here, not reported
+        # as a false "OK" (issue #1113).
+        rewritten = queue_mod.load(queue_path)
+        survivors = [
+            problem
+            for problem in queue_mod.validate(rewritten, snapshot)
+            if "already closed" in problem
+        ]
+        if survivors:
+            print(
+                f"queue --fix: FAIL — {len(survivors)} closed issue(s) survived the prune "
+                "(the file's 'issues:' shape was not recognized):",
+                file=sys.stderr,
+            )
+            for problem in survivors:
+                print(f"  - {problem}", file=sys.stderr)
+            return EXIT_NOT_OK
+        return EXIT_OK
+
     if args.check:
         snapshot_path = Path(args.snapshot)
         snapshot = None
@@ -670,6 +719,11 @@ def build_parser() -> argparse.ArgumentParser:
     queue_cmd.add_argument("--next", action="store_true", help="print the next claimable issue(s)")
     queue_cmd.add_argument(
         "--check", action="store_true", help="validate the file: no duplicates, all numbers known, no cycles"
+    )
+    queue_cmd.add_argument(
+        "--fix",
+        action="store_true",
+        help="drop issues CLOSED on the (fresh) board snapshot from the committed queue file (issue #1113)",
     )
     queue_cmd.set_defaults(func=cmd_queue)
     return parser

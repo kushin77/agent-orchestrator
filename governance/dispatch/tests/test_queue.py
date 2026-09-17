@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 
+import cli
 import claims
 import order
 import owner_queue as queue_mod
@@ -208,3 +209,91 @@ def test_next_claimable_advances_as_issues_close():
     )
     ready = queue_mod.next_claimable(snapshot, _two_wave_queue())
     assert ready == [102]
+
+
+def test_prune_closed_text_drops_only_closed_numbers_and_keeps_comments():
+    """Issue #1113: a committed queue with closed issues still listed is the
+    exact defect a fresh board snapshot exposed. `--fix`'s prune must drop
+    ONLY the closed numbers, leave open ones and wave order untouched, and
+    must not disturb the file's hand-written commentary."""
+    snapshot = _snapshot(
+        Issue(101, "w0 first", state="closed"),
+        Issue(102, "w0 second", state="open"),
+        Issue(103, "w0 third", state="closed"),
+        Issue(201, "w1 first", state="open"),
+        Issue(202, "w1 second", state="closed"),
+    )
+    text = (
+        "# a hand-written comment that must survive\n"
+        "waves:\n"
+        "  - name: w0\n"
+        "    # another comment\n"
+        "    issues: [101, 102, 103]\n"
+        "  - name: w1\n"
+        "    issues: [201, 202]\n"
+        "blocked_by: {}\n"
+    )
+    new_text, removed = queue_mod.prune_closed_text(text, snapshot)
+    assert removed == [101, 103, 202]
+    assert "# a hand-written comment that must survive" in new_text
+    assert "# another comment" in new_text
+    assert "issues: [102]" in new_text
+    assert "issues: [201]" in new_text
+    assert "blocked_by: {}" in new_text
+
+    # idempotent: re-running against the pruned text is a no-op
+    again_text, again_removed = queue_mod.prune_closed_text(new_text, snapshot)
+    assert again_removed == []
+    assert again_text == new_text
+
+
+def test_cli_queue_fix_refuses_a_stale_board(tmp_path):
+    """`queue --fix` must fail CLOSED on a stale board (issue #1113): pruning
+    against stale open/closed state would risk dropping an issue that has
+    since REOPENED, or missing one that has since closed. It must not touch
+    the queue file at all in that case."""
+    queue_path = tmp_path / "queue.yaml"
+    original = "waves:\n  - name: w0\n    issues: [101]\nblocked_by: {}\n"
+    queue_path.write_text(original, encoding="utf-8")
+
+    stale_snapshot = Snapshot(
+        generated_at="2000-01-01T00:00:00Z",
+        source="test",
+        issues={101: Issue(101, "old", state="closed")},
+    )
+    board_path = tmp_path / "snapshot.json"
+    snapshot_mod.save(stale_snapshot, board_path)
+
+    rc = cli.main(
+        [
+            "queue",
+            "--fix",
+            "--queue", str(queue_path),
+            "--snapshot", str(board_path),
+            "--stale-minutes", "15",
+        ]
+    )
+    assert rc == 2
+    assert queue_path.read_text(encoding="utf-8") == original
+
+
+def test_cli_queue_fix_drops_closed_issues_and_is_idempotent(tmp_path):
+    queue_path = tmp_path / "queue.yaml"
+    queue_path.write_text(
+        "waves:\n  - name: w0\n    issues: [101, 102]\nblocked_by: {}\n",
+        encoding="utf-8",
+    )
+    fresh_snapshot = Snapshot(
+        generated_at=snapshot_mod.now_iso(),
+        source="test",
+        issues={101: Issue(101, "closed one", state="closed"), 102: Issue(102, "open one", state="open")},
+    )
+    board_path = tmp_path / "snapshot.json"
+    snapshot_mod.save(fresh_snapshot, board_path)
+
+    args = ["queue", "--fix", "--queue", str(queue_path), "--snapshot", str(board_path), "--stale-minutes", "15"]
+    assert cli.main(args) == 0
+    assert "issues: [102]" in queue_path.read_text(encoding="utf-8")
+    # second run is a no-op OK, not a false FAIL/rewrite
+    assert cli.main(args) == 0
+    assert "issues: [102]" in queue_path.read_text(encoding="utf-8")
