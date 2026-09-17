@@ -641,8 +641,9 @@ needle = "    try:\n        return lease.fcntl_flock_nb(fd, strict=True)\n"
 mutated = original.replace(needle, "    return True\n" + needle, 1)
 check(
     "the mutation applied to the module under test",
-    mutated != original and needle in original,
-    "the mutation target was not found — this control would be vacuous",
+    mutated != original and original.count(needle) == 1,
+    "the mutation target was not found, or was ambiguous — this control would "
+    "be vacuous",
 )
 mutant_path.write_text(mutated, encoding="utf-8")
 shutil.rmtree(mutant_dir / "__pycache__", ignore_errors=True)
@@ -773,6 +774,13 @@ scratch = work / "scratch-wt"
 (scratch / "scripts").mkdir(parents=True, exist_ok=True)
 (scratch / "fleet").mkdir(parents=True, exist_ok=True)
 
+# `fleet/lease.py` travels WITH `fleet/gatelock.py`: `scripts/gate-lock.sh`
+# `exec`s `python3 "$root/fleet/gatelock.py"`, so `fleet/` itself is on that
+# process's `sys.path` and gatelock's sibling import must resolve from inside
+# the scratch tree. Copying the module without its sibling made gate A die in
+# the gate's OWN admission step — a traceback where a PARKED/ADMITTED line
+# belongs — on every tree, whichever form the import takes (measured
+# 2026-09-17, issues #1071 / #1034).
 orchestrator_files = (
     "scripts/verify.sh",
     "scripts/gate-lock.sh",
