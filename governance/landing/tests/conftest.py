@@ -63,6 +63,8 @@ class FakeOps:
         contract_rc: int = 0,
         contract_commit: str | None = None,
         contract_output: str = "MERGE-GATE: PASS",
+        landed_contract_rc: int = 0,
+        landed_contract_output: str = "check-pr-contract: LANDED OK — every merged commit since the enforcement gate carries the ticket trailer",
         closure_rc: int = 0,
         subjects: tuple = ("feat(landing): the lane's own commit subject",),
     ) -> None:
@@ -73,11 +75,14 @@ class FakeOps:
         self._contract_rc = contract_rc
         self._contract_commit = contract_commit
         self._contract_output = contract_output
+        self._landed_contract_rc = landed_contract_rc
+        self._landed_contract_output = landed_contract_output
         self._closure_rc = closure_rc
         self._subjects = tuple(subjects)
         self.calls: list = []
         self.pushed = False
         self.body = ""
+        self.squash_body = ""
 
     # -- reads ---------------------------------------------------------------
     def head_commit(self) -> str:
@@ -118,8 +123,17 @@ class FakeOps:
             argv=("bash", "scripts/merge-gate.sh", "run"), rc=self._contract_rc, stdout=self._contract_output
         )
 
-    def merge_pr(self, number: int) -> str:
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        self.calls.append(("landed-contract", f"{base}..{head}"))
+        return CommandResult(
+            argv=("bash", "scripts/check-pr-contract.sh", "--landed"),
+            rc=self._landed_contract_rc,
+            stdout=self._landed_contract_output,
+        )
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
         self.calls.append(("merge", str(number)))
+        self.squash_body = Path(body_file).read_text(encoding="utf-8")
         return "c" * 40
 
     def delete_branch(self, branch: str) -> str:

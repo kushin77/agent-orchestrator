@@ -56,7 +56,11 @@ workflow file and nothing to click (GR-15, GR-5).
                                                     (AO_PR_NUMBER set: the PR body is enforced)
   4. consult governance/merge's verdict    verdict  re-read the attestation the contract just
                                                     wrote, against the PR's own head commit
-  5. print the ordered plan                 merge   gh pr merge <n> --squash
+  5. print the ordered plan                 landed-contract bash scripts/check-pr-contract.sh
+                                                    --landed --range <base>..<head> (the commits to be
+                                                    squashed must carry the trailing ticket trailer)
+                                            merge   gh pr merge <n> --squash --subject <title>
+                                                    --body-file <trailer-bearing message>
   6. change nothing                        delete   git push origin --delete <branch>
                                             close   python3 governance/lifecycle/cli.py close
                                                     --issue <n>
