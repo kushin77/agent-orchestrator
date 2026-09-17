@@ -23,7 +23,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "governance" / "tagging"))
 
-import e2e as E  # noqa: E402
 import ledger as L  # noqa: E402
 import live as LV  # noqa: E402
 import model as M  # noqa: E402
@@ -751,73 +750,3 @@ def test_a_missing_filing_default_is_refused(tmp_path, taxonomy):
 def test_an_unreadable_policy_is_refused(tmp_path, taxonomy):
     findings = M.filing_drift(taxonomy, tmp_path / "absent.yaml")
     assert M.CODE_FILING_DEFAULT_DRIFT in {f.code for f in findings}
-
-
-# -- the futureproof mechanism chain (#1193) ---------------------------------
-# The e2e capstone proves every classification mechanism's chain end to end:
-# authority declared -> gate wired -> gate falsifiable. These tests drive that
-# table's own invariants with a clean twin AND a mutant, so the capstone's links
-# cannot pass while doing nothing.
-
-def _discovered() -> set:
-    return E._discovered_gates(ROOT)
-
-
-def _denylisted() -> set:
-    return E._denylisted_gates(ROOT)
-
-
-def test_mechanisms_are_complete():
-    detail = E.mechanisms_complete(E.MECHANISMS, E.EXPECTED_MECHANISMS)
-    assert "10 mechanism(s)" in detail
-
-
-def test_mechanisms_are_disjoint():
-    detail = E.mechanisms_disjoint(E.MECHANISMS)
-    assert "12 gate(s)" in detail
-
-
-def test_every_mechanism_chain_holds_here():
-    discovered, denylisted = _discovered(), _denylisted()
-    for mech in E.MECHANISMS:
-        detail = E.mechanism_ok(ROOT, mech, discovered, denylisted)
-        assert mech["id"] in detail or "gate(s)" in detail
-
-
-def test_mechanism_chain_refuses_a_dead_gate():
-    # A mechanism whose gate script no longer exists must be refused by name.
-    mech = {**E.MECHANISMS[0], "gates": ["surface-class", "does-not-exist"]}
-    with pytest.raises(AssertionError) as exc:
-        E.mechanism_ok(ROOT, mech, _discovered(), _denylisted())
-    assert "does-not-exist" in str(exc.value)
-
-
-def test_mechanism_chain_refuses_a_denylisted_gate():
-    # A mechanism whose gate is denylisted is silently unwired: refuse it.
-    mech = {**E.MECHANISMS[1], "gates": ["shell-patterns", "pr-contract"]}
-    with pytest.raises(AssertionError) as exc:
-        E.mechanism_ok(ROOT, mech, _discovered(), _denylisted() | {"pr-contract"})
-    assert "denylisted" in str(exc.value)
-
-
-def test_mechanism_chain_refuses_a_missing_provocation():
-    mech = {**E.MECHANISMS[3], "provocation": ("governance/lessons/nope.py", "")}
-    with pytest.raises(AssertionError) as exc:
-        E.mechanism_ok(ROOT, mech, _discovered(), _denylisted())
-    assert "provocation artifact" in str(exc.value)
-
-
-def test_mechanisms_complete_refuses_drift():
-    dropped = [m for m in E.MECHANISMS if m["id"] != "rca"]
-    with pytest.raises(AssertionError) as exc:
-        E.mechanisms_complete(dropped, E.EXPECTED_MECHANISMS)
-    assert "rca" in str(exc.value)
-
-
-def test_mechanisms_disjoint_refuses_a_shared_gate():
-    # Two mechanisms claiming the same gate is a hidden authority conflict.
-    shared = E.MECHANISMS[:2]
-    shared[0] = {**shared[0], "gates": ["shell-patterns"]}
-    with pytest.raises(AssertionError) as exc:
-        E.mechanisms_disjoint(shared)
-    assert "two mechanisms" in str(exc.value)

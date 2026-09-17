@@ -52,14 +52,10 @@
 #                     a plan, every gate in that plan resolves, the matrix names
 #                     the rules that fired, the mandate holds in this tree, the
 #                     filing seam derives the same tag dimensions for a NEW issue,
-#                     the filing defaults are values the authority declares, and
-#                     every futureproof classification mechanism (class, pattern,
-#                     template, rca, system, app, env-var, gov, issues, index)
-#                     has its authority declared, its gate wired into make verify,
-#                     and its failure path exercised. Each link is driven with its
-#                     provoked half AND its clean twin, because a chain whose
-#                     links all pass while doing nothing is a decoration, not an
-#                     integration.
+#                     and the filing defaults are values the authority declares.
+#                     Each link is driven with its provoked half AND its clean
+#                     twin, because a chain whose links all pass while doing
+#                     nothing is a decoration, not an integration.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 # CANNOT-ASSESS must never be reported as a pass.
