@@ -347,6 +347,11 @@ if [ "$branches" -eq 1 ]; then
     case "$branch" in
       master|main|HEAD) continue ;;
     esac
+    # Bash-native, line-anchored containment (issue #1145). A quiet grep exits
+    # on its FIRST match and can SIGPIPE its producer; under this script's
+    # pipefail the pipeline is then reported as failed for a branch that IS
+    # present -- i.e. a branch a worktree is standing on would read as free,
+    # and the sweep would delete it.
     is_checked_out=0
     while IFS= read -r co_branch; do
       if [ "$co_branch" = "$branch" ]; then
