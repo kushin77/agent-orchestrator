@@ -185,6 +185,9 @@ CODE_BOARD_INCIDENT_PENDING = "board-incident-pending"
 CODE_RCA_REVIEW_OVERDUE = "rca-review-overdue"
 CODE_CORRECTIVE_ACTION_OPEN = "corrective-action-open"
 CODE_SUGGESTION_OPEN = "suggestion-open"
+CODE_DOC_RCA_ID_UNKNOWN = "doc-rca-id-unknown"
+CODE_DOC_RCA_ARTIFACT_MISMATCH = "doc-rca-artifact-mismatch"
+CODE_README_INCIDENT_COUNT_MISMATCH = "readme-incident-count-mismatch"
 
 #: Required keys per kind. Everything else is optional and preserved as-is.
 REQUIRED_FIELDS: Dict[str, Sequence[str]] = {

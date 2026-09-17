@@ -99,6 +99,9 @@ that carries them.
 | `rca-review-overdue` | deviation | the RCA was not re-read within the cadence |
 | `corrective-action-open` | deviation | the action is still in flight, tracked by its issue |
 | `suggestion-open` | deviation | the improvement idea is still open |
+| `doc-rca-id-unknown` | error | issue #1052: a `docs/rca/*.md` writeup cites an `RCA-NNNN` id that is not a recorded ledger id |
+| `doc-rca-artifact-mismatch` | error | issue #1052: a `docs/rca/*.md` heading MINTS (starts with) an `RCA-NNNN` id whose ledger `artifact` names a different file — a lightweight doc may CITE a ledger RCA, it may not MINT one |
+| `readme-incident-count-mismatch` | error | issue #1052: the hand-written incident count below ("The incidents recorded so far") does not match the ledger's actual count |
 
 `--strict` escalates every deviation to an error. That is the honest position:
 the in-flight work and the historical backlog are real and named, and a
@@ -123,6 +126,17 @@ label, and the by-hand exemptions that followed made it unable to fail at all:
 | `SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL` | *this* repository's policy names the record label and has no exemption path |
 | `REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL` | the same verdict against the REAL ledger, policy and snapshot — the four area-label holders measured, not assumed |
 | `MUTANT-DROPS-THE-REFUSAL` | the control's own control: a scratch copy of the checker with the selector forced off must STOP refusing, or the probe above proves nothing |
+| `DOC-RCA-UNKNOWN-ID-IS-REFUSED` | issue #1052: a `docs/rca/*.md` writeup citing an `RCA-NNNN` id the ledger never recorded is refused |
+| `DOC-RCA-CITATION-IS-ACCEPTED` | citing a KNOWN ledger id in prose, without minting it, is accepted |
+| `DOC-RCA-MINT-MISMATCH-IS-REFUSED` | a heading that MINTS a ledger id whose `artifact` names a different file is refused — the exact double-booking shape of the pre-fix `docs/rca/2026-09-16-pr-queue-clearing.md` |
+| `README-INCIDENT-COUNT-MISMATCH-IS-REFUSED` | a README incident count that does not match the ledger is refused |
+| `README-INCIDENT-COUNT-MATCH-IS-ACCEPTED` | the same sentence, with the ledger's real count, is accepted |
+| `REAL-DOCS-RCA-HAVE-NO-UNKNOWN-IDS` | the REAL `docs/rca/` tree cites only ids the REAL ledger holds |
+| `REAL-README-INCIDENT-COUNT-MATCHES-LEDGER` | the REAL README's count matches the REAL ledger's count |
+| `MUTANT-DROPS-DOC-RCA-REFUSAL` | the doc-rca-id-unknown refusal, proven able to fail, via the same generic mutant driver |
+| `MUTANT-DROPS-README-REFUSAL` | the readme-incident-count-mismatch refusal, proven able to fail, via the same generic mutant driver |
+| `DUPLICATE-ID-IS-REFUSED` | refusal (a) of issue #1052: two ledger lines sharing one id is still refused, named |
+| `MUTANT-DROPS-DUPLICATE-ID-REFUSAL` | the duplicate-id refusal, proven able to fail |
 
 The last probe is the one that matters most. A control proved only against a
 fixture never sees reality, and a probe that fires under every mutation proves
@@ -186,10 +200,14 @@ than stored again here.
 
 ## The incidents recorded so far
 
-Fourteen real incidents from this repository's own history, each with an artifact,
-a corrective action and a lesson — a `LESSON-*` once the change has landed, a
-`SUGGEST-*` while it is still in flight — the eight recorded below, and the six
-the EPIC #708 wave registered in its own section:
+Seventeen real incidents from this repository's own history, each with an
+artifact, a corrective action and a lesson — a `LESSON-*` once the change has
+landed, a `SUGGEST-*` while it is still in flight — the eleven recorded below,
+and the six the EPIC #708 wave registered in its own section. That count is
+gate-asserted, not hand-maintained: `scripts/check-lessons.sh` fails
+(`readme-incident-count-mismatch`) if this sentence and the ledger's actual
+incident count ever diverge again (issue #1052 — a prior hand-merge conflict
+in PR #1036 forced a manual union of two independently-authored counts).
 
 | Incident | Origin | RCA | What it was |
 |---|---|---|---|
@@ -200,19 +218,23 @@ the EPIC #708 wave registered in its own section:
 | `INC-0005` | #157 | [`RCA-0005`](rca/RCA-0005-stale-snapshot-frontier.md) | a 19-minute-old snapshot named a closed issue as the frontier (**open**, #170) |
 | `INC-0006` | #800 | [`RCA-0006`](rca/RCA-0006-agentconsole-wrong-host.md) | the AgentConsole go-live was planned against this repository's own Cloud Run pipeline while the fleet's hosting contract fixes the remote shared-services cluster as the only live host |
 | `INC-0007` | #1029 | [`RCA-0007`](rca/RCA-0007-declared-not-exercised-golive.md) | Epic #607's go-live was declared for months and never exercised — the declarations were not backed by an exercised path (recorded by the #1029 lane) |
-| `INC-0008` | #506 | [`RCA-0008`](rca/RCA-0008-date-bomb-seed-without-evaluation.md) | the two tests that were #506's acceptance proof pinned the quota **seed** day while the runner resolved the **evaluation** bucket from the live clock, so `47 passed` expired with the calendar and a quota-exhausted tenant was allowed for three days (**open**: the fix is PR #1026, unmerged; the RCA takes `RCA-0008` because `RCA-0007`/`RCA-0008` are published by the unlanded `docs/rca/` writeup — see its Follow-up) |
+| `INC-0008` | #506 | [`RCA-0008`](rca/RCA-0008-date-bomb-seed-without-evaluation.md) | the two tests that were #506's acceptance proof pinned the quota **seed** day while the runner resolved the **evaluation** bucket from the live clock, so `47 passed` expired with the calendar and a quota-exhausted tenant was allowed for three days (**open**: the fix is PR #1026, unmerged) |
+| `INC-0015` | #997 | [`RCA-0015`](rca/RCA-0015-zero-byte-gate-lock-wedge.md) | a leftover 0-byte gate lock was read as a live claim, wedging the box-wide concurrency cap and parking every other worktree's gate with no indication which lock caused it — promoted from `docs/rca/2026-09-16-pr-queue-clearing.md` (issue #1052) |
+| `INC-0016` | #1036 | [`RCA-0016`](rca/RCA-0016-shared-core-file-collision.md) | three PRs collided extending the same shared "core" files with no append-only procedure; the class recurred against this ledger and README in PR #1036 — promoted from `docs/rca/2026-09-16-pr-queue-clearing.md` (issue #1052) |
+| `INC-0017` | #1052 | [`RCA-0017`](rca/RCA-0017-rca-id-double-booking.md) | `docs/rca/2026-09-16-pr-queue-clearing.md` minted `RCA-0007`/`RCA-0008` in its own headings, double-booking ids the ledger already held for a different incident, and this README's hand-written incident count needed a hand-merge in PR #1036 |
 
-## Measured state (2026-09-15)
+## Measured state (2026-09-17)
 
 `bash scripts/check-lessons.sh` on this branch, exit code 0. Both parts are
-quoted, the provoked control included; the long policy refusals are elided:
+quoted, the provoked control included; the long policy refusals and the
+per-suggestion/per-action deviation lines are elided:
 
 ```text
-incidents: 12 (5 closed) | rcas: 12 | corrective actions: 14 (7 open) | lessons: 4
-| suggestions: 10 | board issues carrying the `incident` record label: 0
+incidents: 17 (9 closed) | rcas: 17 | corrective actions: 21 (10 open) | lessons: 7
+| suggestions: 13 | board issues carrying the `incident` record label: 0
   WARNING suggestion-open         SUGGEST-0001 is open (owner: gate lane); ...
   WARNING corrective-action-open  CA-0007 is open; remediation is tracked in #170
-lessons: OK (12 incident(s), 4 lesson(s) enforced, 17 deviation(s) tracked)
+lessons: OK (17 incident(s), 7 lesson(s) enforced, 23 deviation(s) tracked)
   probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s), scanned=0, errors=[]
   probe RECORD-LABEL-WITHOUT-A-RECORD-IS-REFUSED: PASS — code=board-incident-without-rca subject=#900 errors=['board-incident-without-rca']
   probe LEDGER-INCIDENT-WITHOUT-RCA-IS-REFUSED: PASS — code=incident-without-rca count=1 errors=['corrective-action-unlinked', 'incident-without-rca', 'unknown-reference', 'unknown-reference']
@@ -223,7 +245,18 @@ lessons: OK (12 incident(s), 4 lesson(s) enforced, 17 deviation(s) tracked)
   probe SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL: PASS — incident_label='incident' exemptions attribute=False cadence=180
   probe REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL: PASS — snapshot: 0 issue(s) carry 'incident' (scanned=0), 4 carry 'area:incident-response' and 0 of them is treated as an incident; board findings=0 errors=[] retired refs reported=(none)
   probe MUTANT-DROPS-THE-REFUSAL: PASS — NOT-REFUSED board-incident-without-rca (the probe is proven able to fail)
-  PROBES: PASS (10 of 10)
+  probe DOC-RCA-UNKNOWN-ID-IS-REFUSED: PASS — code=doc-rca-id-unknown count=1 errors=['doc-rca-id-unknown']
+  probe DOC-RCA-CITATION-IS-ACCEPTED: PASS — doc-rca finding(s)=0 errors=[]
+  probe DOC-RCA-MINT-MISMATCH-IS-REFUSED: PASS — code=doc-rca-artifact-mismatch count=1 errors=['doc-rca-artifact-mismatch']
+  probe README-INCIDENT-COUNT-MISMATCH-IS-REFUSED: PASS — code=readme-incident-count-mismatch count=1 errors=['readme-incident-count-mismatch']
+  probe README-INCIDENT-COUNT-MATCH-IS-ACCEPTED: PASS — finding(s)=0 errors=[]
+  probe REAL-DOCS-RCA-HAVE-NO-UNKNOWN-IDS: PASS — doc-rca finding(s)=0
+  probe REAL-README-INCIDENT-COUNT-MATCHES-LEDGER: PASS — finding(s)=0
+  probe MUTANT-DROPS-DOC-RCA-REFUSAL: PASS — NOT-HELD doc-rca-id-unknown (the probe is proven able to fail)
+  probe MUTANT-DROPS-README-REFUSAL: PASS — NOT-HELD readme-incident-count-mismatch (the probe is proven able to fail)
+  probe DUPLICATE-ID-IS-REFUSED: PASS — code=duplicate-id count=1 errors=['duplicate-id']
+  probe MUTANT-DROPS-DUPLICATE-ID-REFUSAL: PASS — NOT-HELD duplicate-id (the probe is proven able to fail)
+  PROBES: PASS (21 of 21)
 negative-control: OK — an area label cannot manufacture an incident, a
 record-labelled issue with no ledger record is still refused, no exemption can
 be declared, and the refusal is proven able to fail

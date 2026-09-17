@@ -477,6 +477,352 @@ def probe_real_board_has_no_unrecorded_record_label(case: Case) -> Tuple[bool, s
     )
 
 
+def _fresh_fixture(case: Case, tag: str) -> Path:
+    """A fresh, isolated fixture root (issue #1052 probes never share state).
+
+    The board-rule probes above all reuse ``case.fixture_root``; the docs/rca
+    and README probes write files a `docs/rca/*.md` scan or a README scan
+    would pick up, so each one gets its own root under scratch instead, to
+    guarantee no probe's planted file leaks into another probe's verdict.
+    """
+    root = case.scratch / ("fixture-%s" % tag)
+    artifact = root / ARTIFACT_RELPATH
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    blocks = ["# RCA-0001 — probe"] + [
+        "%s\n\nText." % section for section in case.c.RCA_REQUIRED_SECTIONS
+    ]
+    artifact.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+    return root
+
+
+def _fixture_report(case: Case, root: Path, records: List[Dict[str, Any]], snapshot):
+    text = "\n".join(json.dumps(record, sort_keys=True) for record in records) + "\n"
+    ledger = case.c.parse_ledger_text(text, root / "probe-ledger.jsonl")
+    return case.c.check_ledger(
+        ledger,
+        root=root,
+        snapshot=snapshot,
+        policy=None,
+        today=TODAY,
+        git=_StubProbe(),
+        generated_at="2026-09-15T00:00:00Z",
+    )
+
+
+def _doc_codes(report) -> List[Any]:
+    return [f for f in report.findings if str(f.code).startswith("doc-rca")]
+
+
+# --- issue #1052: one RCA id authority ---------------------------------
+
+
+def probe_doc_rca_unknown_id_is_refused(case: Case) -> Tuple[bool, str]:
+    """A ``docs/rca/*.md`` writeup citing an id the ledger never recorded."""
+    code = case.c.CODE_DOC_RCA_ID_UNKNOWN
+    root = _fresh_fixture(case, "doc-unknown")
+    docs_dir = root / "docs" / "rca"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    (docs_dir / "sample.md").write_text(
+        "# A narrative writeup\n\nSee RCA-9999 for background.\n", encoding="utf-8"
+    )
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    report = _fixture_report(case, root, _records("#%d" % TRACED_ISSUE), snapshot)
+    found = [f for f in report.findings if f.code == code]
+    held = (
+        len(found) == 1
+        and found[0].subject == "docs/rca/sample.md"
+        and code in _error_codes(report)
+    )
+    return held, "code=%s count=%d errors=%s" % (code, len(found), _error_codes(report))
+
+
+def probe_doc_rca_citation_is_accepted(case: Case) -> Tuple[bool, str]:
+    """Citing a KNOWN ledger id in prose (not minting it) is accepted."""
+    root = _fresh_fixture(case, "doc-cite")
+    docs_dir = root / "docs" / "rca"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    (docs_dir / "sample.md").write_text(
+        "# A narrative writeup\n\nSee RCA-0001 for the full analysis.\n",
+        encoding="utf-8",
+    )
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    report = _fixture_report(case, root, _records("#%d" % TRACED_ISSUE), snapshot)
+    doc_findings = _doc_codes(report)
+    held = not doc_findings
+    return held, "doc-rca finding(s)=%d errors=%s" % (
+        len(doc_findings),
+        _error_codes(report),
+    )
+
+
+def probe_doc_rca_mint_mismatch_is_refused(case: Case) -> Tuple[bool, str]:
+    """A heading that MINTS a ledger id whose artifact is a different file.
+
+    Issue #1052's exact defect shape: ``docs/rca/2026-09-16-pr-queue-clearing
+    .md`` titled itself ``RCA-0007 / RCA-0008``, ids the ledger already held
+    for a different artifact.
+    """
+    code = case.c.CODE_DOC_RCA_ARTIFACT_MISMATCH
+    root = _fresh_fixture(case, "doc-mint")
+    docs_dir = root / "docs" / "rca"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    (docs_dir / "sample.md").write_text(
+        "# RCA-0001 — a doc that mints an id the ledger already owns\n\nBody.\n",
+        encoding="utf-8",
+    )
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    report = _fixture_report(case, root, _records("#%d" % TRACED_ISSUE), snapshot)
+    found = [f for f in report.findings if f.code == code]
+    held = (
+        len(found) == 1
+        and found[0].subject == "RCA-0001"
+        and code in _error_codes(report)
+    )
+    return held, "code=%s count=%d errors=%s" % (code, len(found), _error_codes(report))
+
+
+def probe_readme_incident_count_mismatch_is_refused(case: Case) -> Tuple[bool, str]:
+    """A README incident count that does not match the ledger is refused."""
+    code = case.c.CODE_README_INCIDENT_COUNT_MISMATCH
+    root = _fresh_fixture(case, "readme-bad")
+    readme_dir = root / "governance" / "lessons"
+    readme_dir.mkdir(parents=True, exist_ok=True)
+    (readme_dir / "README.md").write_text(
+        "Two real incidents recorded so far.\n", encoding="utf-8"
+    )
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    report = _fixture_report(case, root, _records("#%d" % TRACED_ISSUE), snapshot)
+    found = [f for f in report.findings if f.code == code]
+    held = len(found) == 1 and code in _error_codes(report)
+    return held, "code=%s count=%d errors=%s" % (code, len(found), _error_codes(report))
+
+
+def probe_readme_incident_count_match_is_accepted(case: Case) -> Tuple[bool, str]:
+    """The same sentence, with the ledger's real count, is accepted."""
+    root = _fresh_fixture(case, "readme-good")
+    readme_dir = root / "governance" / "lessons"
+    readme_dir.mkdir(parents=True, exist_ok=True)
+    (readme_dir / "README.md").write_text(
+        "One real incidents recorded so far.\n", encoding="utf-8"
+    )
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    report = _fixture_report(case, root, _records("#%d" % TRACED_ISSUE), snapshot)
+    found = [
+        f for f in report.findings
+        if f.code == case.c.CODE_README_INCIDENT_COUNT_MISMATCH
+    ]
+    held = not found
+    return held, "finding(s)=%d errors=%s" % (len(found), _error_codes(report))
+
+
+def probe_duplicate_id_is_refused(case: Case) -> Tuple[bool, str]:
+    """Refusal (a): one id must have exactly one authoritative line.
+
+    Pre-existing behaviour (``Ledger.__init__``) — this is its plant, so the
+    "13+ probes" of issue #1052 covers all three refusals named in its
+    acceptance criteria, not just the two new ones.
+    """
+    code = case.c.CODE_DUPLICATE_ID
+    root = _fresh_fixture(case, "dup-id")
+    records = _records("#%d" % TRACED_ISSUE)
+    duplicate = dict(records[0])  # a second INC-0001 line, byte-different
+    duplicate["summary"] = "a second, conflicting line for the same id"
+    records = records + [duplicate]
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    report = _fixture_report(case, root, records, snapshot)
+    found = [f for f in report.findings if f.code == code]
+    held = len(found) == 1 and found[0].subject == "INC-0001" and code in _error_codes(report)
+    return held, "code=%s count=%d errors=%s" % (code, len(found), _error_codes(report))
+
+
+def probe_mutant_drops_duplicate_id_refusal(case: Case) -> Tuple[bool, str]:
+    """The duplicate-id refusal (``Ledger.__init__``) must be provably able to fail."""
+    anchor = "            if record_id in self.records:\n"
+    replacement = "            if False:  # mutated out: MUTANT-DROPS-DUPLICATE-ID-REFUSAL\n"
+    return _run_generic_mutant(
+        case,
+        tag="dup-id",
+        anchor=anchor,
+        replacement=replacement,
+        probe_name="DUPLICATE-ID-IS-REFUSED",
+        expect_code=case.c.CODE_DUPLICATE_ID,
+    )
+
+
+def probe_real_docs_rca_have_no_unknown_ids(case: Case) -> Tuple[bool, str]:
+    """The REAL ``docs/rca/`` tree cites only ids the ledger actually holds."""
+    c = case.c
+    root = case.repo
+    ledger = c.load_ledger(root / c.LEDGER_RELPATH)
+    snapshot = c.load_snapshot(root / c.SNAPSHOT_RELPATH)
+    policy = c.load_policy(root / c.POLICY_RELPATH)
+    report = c.check_ledger(
+        ledger,
+        root=root,
+        snapshot=snapshot,
+        policy=policy,
+        today=TODAY,
+        git=c.GitProbe(root),
+        generated_at="2026-09-15T00:00:00Z",
+    )
+    doc_findings = _doc_codes(report)
+    held = not doc_findings
+    return held, "doc-rca finding(s)=%d" % len(doc_findings)
+
+
+def probe_real_readme_incident_count_matches_ledger(case: Case) -> Tuple[bool, str]:
+    """The REAL README's incident count matches the REAL ledger's count."""
+    c = case.c
+    root = case.repo
+    ledger = c.load_ledger(root / c.LEDGER_RELPATH)
+    snapshot = c.load_snapshot(root / c.SNAPSHOT_RELPATH)
+    policy = c.load_policy(root / c.POLICY_RELPATH)
+    report = c.check_ledger(
+        ledger,
+        root=root,
+        snapshot=snapshot,
+        policy=policy,
+        today=TODAY,
+        git=c.GitProbe(root),
+        generated_at="2026-09-15T00:00:00Z",
+    )
+    found = [f for f in report.findings if f.code == c.CODE_README_INCIDENT_COUNT_MISMATCH]
+    held = not found
+    return held, "finding(s)=%d" % len(found)
+
+
+#: Generic mutant driver (issue #1052): parameterised on the probe to re-run
+#: against the mutated checker, so a single driver serves every rule's own
+#: mutant, not just the board rule's.
+GENERIC_DRIVER_SOURCE = '''"""Run ONE named probe against a mutated copy of the checker (derived control).
+
+The mutant directory goes FIRST on sys.path, so the probe module's own
+``import checker`` resolves to the mutated copy — while the probe module and
+its helper functions are imported from the real tree.
+"""
+import sys
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+probe_dir = Path(sys.argv[1]).resolve()
+mutant_dir = Path(sys.argv[2]).resolve()
+repo = Path(sys.argv[3]).resolve()
+scratch = Path(sys.argv[4]).resolve()
+probe_name = sys.argv[5]
+sys.path.insert(0, str(probe_dir))
+sys.path.insert(0, str(mutant_dir))
+
+import checker  # noqa: E402
+
+resolved = Path(checker.__file__).resolve()
+if not str(resolved).startswith(str(mutant_dir)):
+    print("MUTANT-VERDICT=UNPROVEN checker resolved to %s" % resolved)
+    raise SystemExit(3)
+
+import negative_control  # noqa: E402
+
+case = negative_control.Case(
+    checker=checker, repo=repo, scratch=scratch, module_dir=mutant_dir
+)
+held, detail = negative_control.PROBES[probe_name](case)
+print("MUTANT-DETAIL=%s" % detail)
+if held:
+    print("MUTANT-VERDICT=STILL-HELD")
+    raise SystemExit(1)
+print("MUTANT-VERDICT=NOT-HELD")
+'''
+
+
+def _run_generic_mutant(
+    case: Case, *, tag: str, anchor: str, replacement: str, probe_name: str, expect_code: str
+) -> Tuple[bool, str]:
+    """Build a scratch copy of the checker with ``anchor`` replaced, and rerun
+    ``probe_name`` against it in a fresh interpreter — the refusal must be
+    OBSERVED to disappear, or the probe proves nothing."""
+    mutant = case.scratch / ("mutant-%s" % tag)
+    mutant_dir = mutant / "governance" / "lessons"
+    mutant_dir.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for name in ("checker.py", "model.py", "edges.py"):
+        source = case.module_dir / name
+        if source.is_file():
+            shutil.copy2(source, mutant_dir / name)
+            copied.append(name)
+    if "checker.py" not in copied:
+        return False, "checker.py is not in %s" % case.module_dir
+    text = (mutant_dir / "checker.py").read_text(encoding="utf-8")
+    matches = text.count(anchor)
+    if matches != 1:
+        return False, "the mutation anchor matched %d time(s), not once" % matches
+    mutated = text.replace(anchor, replacement)
+    if mutated == text:
+        return False, "the mutation was a no-op"
+    (mutant_dir / "checker.py").write_text(mutated, encoding="utf-8")
+
+    driver = mutant / "driver.py"
+    driver.write_text(GENERIC_DRIVER_SOURCE, encoding="utf-8")
+    done = subprocess.run(
+        [
+            sys.executable,
+            str(driver),
+            str(case.module_dir),
+            str(mutant_dir),
+            str(case.repo),
+            str(mutant),
+            probe_name,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    output = (done.stdout + done.stderr).strip()
+    detail_line = ""
+    for line in output.splitlines():
+        if line.startswith("MUTANT-DETAIL="):
+            detail_line = line.split("=", 1)[1]
+    held = done.returncode == 0 and "MUTANT-VERDICT=NOT-HELD" in output
+    return held, "%s; the mutant: %s" % (
+        "NOT-HELD %s (the probe is proven able to fail)" % expect_code
+        if held
+        else "the mutation proved nothing (rc=%d): %s" % (done.returncode, output),
+        detail_line or "(no detail)",
+    )
+
+
+#: The two call sites in ``check_ledger`` that wire the issue #1052 rules in —
+#: each is a unique, single-occurrence anchor a mutation can remove cleanly.
+MUTANT_ANCHOR_DOC_RCA = "    findings.extend(_check_doc_rca_ids(ledger, root=root))\n"
+MUTANT_REPLACEMENT_DOC_RCA = "    pass  # mutated out: MUTANT-DROPS-DOC-RCA-REFUSAL\n"
+MUTANT_ANCHOR_README = (
+    "    findings.extend(_check_readme_incident_count(incidents, root=root))\n"
+)
+MUTANT_REPLACEMENT_README = "    pass  # mutated out: MUTANT-DROPS-README-REFUSAL\n"
+
+
+def probe_mutant_drops_doc_rca_refusal(case: Case) -> Tuple[bool, str]:
+    """The doc-rca-id-unknown refusal must be provably able to fail."""
+    return _run_generic_mutant(
+        case,
+        tag="doc-rca",
+        anchor=MUTANT_ANCHOR_DOC_RCA,
+        replacement=MUTANT_REPLACEMENT_DOC_RCA,
+        probe_name="DOC-RCA-UNKNOWN-ID-IS-REFUSED",
+        expect_code=case.c.CODE_DOC_RCA_ID_UNKNOWN,
+    )
+
+
+def probe_mutant_drops_readme_refusal(case: Case) -> Tuple[bool, str]:
+    """The readme-incident-count-mismatch refusal must be provably able to fail."""
+    return _run_generic_mutant(
+        case,
+        tag="readme",
+        anchor=MUTANT_ANCHOR_README,
+        replacement=MUTANT_REPLACEMENT_README,
+        probe_name="README-INCIDENT-COUNT-MISMATCH-IS-REFUSED",
+        expect_code=case.c.CODE_README_INCIDENT_COUNT_MISMATCH,
+    )
+
+
 def probe_mutant_drops_the_refusal(case: Case) -> Tuple[bool, str]:
     """The control's own control: remove the selector, and the refusal must go.
 
@@ -548,6 +894,17 @@ PROBES: Dict[str, Probe] = {
     "SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL": probe_shipped_policy_declares_the_record_label,
     "REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL": probe_real_board_has_no_unrecorded_record_label,
     "MUTANT-DROPS-THE-REFUSAL": probe_mutant_drops_the_refusal,
+    "DOC-RCA-UNKNOWN-ID-IS-REFUSED": probe_doc_rca_unknown_id_is_refused,
+    "DOC-RCA-CITATION-IS-ACCEPTED": probe_doc_rca_citation_is_accepted,
+    "DOC-RCA-MINT-MISMATCH-IS-REFUSED": probe_doc_rca_mint_mismatch_is_refused,
+    "README-INCIDENT-COUNT-MISMATCH-IS-REFUSED": probe_readme_incident_count_mismatch_is_refused,
+    "README-INCIDENT-COUNT-MATCH-IS-ACCEPTED": probe_readme_incident_count_match_is_accepted,
+    "REAL-DOCS-RCA-HAVE-NO-UNKNOWN-IDS": probe_real_docs_rca_have_no_unknown_ids,
+    "REAL-README-INCIDENT-COUNT-MATCHES-LEDGER": probe_real_readme_incident_count_matches_ledger,
+    "MUTANT-DROPS-DOC-RCA-REFUSAL": probe_mutant_drops_doc_rca_refusal,
+    "MUTANT-DROPS-README-REFUSAL": probe_mutant_drops_readme_refusal,
+    "DUPLICATE-ID-IS-REFUSED": probe_duplicate_id_is_refused,
+    "MUTANT-DROPS-DUPLICATE-ID-REFUSAL": probe_mutant_drops_duplicate_id_refusal,
 }
 
 
