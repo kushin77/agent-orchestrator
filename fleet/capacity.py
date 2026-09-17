@@ -13,7 +13,7 @@ of three bounds that can each genuinely be smaller than the pool.
 Each bound exists because its absence was MEASURED as a failure:
 
 ``pool_size`` (``FLEET_SISTER_POOL``, default 10)
-    The operator's own ceiling: the ``FLEET_SISTER_POOL`` knob the loop already
+    The principal's own ceiling: the ``FLEET_SISTER_POOL`` knob the loop already
     had. ``FLEET_MAX_AGENTS`` (or the pinned focus's ``max_agents``) sets the
     DEFAULT; see :func:`default_max_agents` for the precedence.
 
@@ -42,7 +42,7 @@ HONESTY RULES (the part that keeps the gate from being a formality)
   admitted — nothing can be compared, and holding all undeclared work would wedge
   a queue whose writers do not declare files yet — but it is returned in
   :attr:`DisjointBound.unattributable` and the caller reports the count, so the
-  residual is *visible* rather than silently called disjoint. An operator who
+  residual is *visible* rather than silently called disjoint. A principal who
   wants the strict reading sets ``AO_LANE_FILES_REQUIRED=1`` and the undeclared
   lane is then HELD.
 * **A bound that cannot bind is not a bound.** ``scripts/check-capacity-gate.sh``
@@ -62,7 +62,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-#: ``FLEET_MAX_AGENTS`` — the operator's own default for the fan-out. ``0`` means
+#: ``FLEET_MAX_AGENTS`` — the principal's own default for the fan-out. ``0`` means
 #: "resolve it against the pool and the two measured bounds" (the shipped
 #: default: max-agents ON, gated).
 ENV_MAX_AGENTS = "FLEET_MAX_AGENTS"
@@ -85,8 +85,8 @@ DEFAULT_POOL_SIZE = 10
 #: aggregate ``VmRSS`` of one ``scripts/verify.sh`` process TREE was sampled every
 #: 0.5s for 420s while sibling lanes ran; across 5 distinct gates the per-gate
 #: PEAK was 3 / 23 / 24 / 194 / **236 MiB**.
-#: The budget is 1536 and not 236 because a lane is a **subagent + its gate**: the
-#: subagent is the heavier half and the gate can briefly hold several pytest
+#: The budget is 1536 and not 236 because a lane is a **executor + its gate**: the
+#: executor is the heavier half and the gate can briefly hold several pytest
 #: trees, so the gate-only peak is a floor, not the whole lane. 1536 MiB is
 #: ~6x the measured gate peak — deliberately conservative — and it is the number
 #: that reproduces this box's observed-safe concurrency (~19 GiB available /
@@ -428,7 +428,7 @@ def default_max_agents(
     """The fan-out DEFAULT, before the three bounds are applied.
 
     **The precedence is deliberate and stated here:** an explicit
-    ``FLEET_MAX_AGENTS`` always wins, because that is the operator speaking now;
+    ``FLEET_MAX_AGENTS`` always wins, because that is the principal speaking now;
     an unset variable defers to the pinned focus's ``max_agents`` when it is a
     positive number, because that is the board speaking for this epic (``0``
     there means "the pool", the shipped setting); with neither, the loop's own
@@ -439,7 +439,7 @@ def default_max_agents(
     declared = str((source or {}).get(ENV_MAX_AGENTS, "") or "").strip()
     if declared:
         configured = _int_at_least(declared, ENV_MAX_AGENTS, 0)
-        # ``0`` is the focus schema's own word for "the pool". An operator who
+        # ``0`` is the focus schema's own word for "the pool". A principal who
         # types it is overriding the *focus* too, not merely staying silent, so
         # it resolves straight to the pool rather than falling through to the
         # focus's number.
@@ -469,7 +469,7 @@ class Capacity:
         return not self.problems
 
     def line(self) -> str:
-        """The one-line report a caller prints (the evidence an operator reads)."""
+        """The one-line report a caller prints (the evidence a principal reads)."""
         rendered = " ".join(
             f"{b.name}={b.limit if b.assessed else 'CANNOT-ASSESS'}" for b in self.bounds
         )
@@ -490,7 +490,7 @@ def resolve_capacity(
     """``effective = min(pool, disjoint ready lanes, resource ceiling)``.
 
     Every bound is resolved even when an earlier one is already smaller, so the
-    report always carries all three — an operator tuning one knob needs to see
+    report always carries all three — a principal tuning one knob needs to see
     whether it is the one that binds.
 
     ``focus_max_agents`` is passed explicitly when the caller already read it;

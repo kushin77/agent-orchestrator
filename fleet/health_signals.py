@@ -49,7 +49,7 @@ pass*. When the fleet's own store cannot be read, the publisher emits
 Usage::
 
     from health_signals import Signal, SIGNAL_RUNG_STATE, LABEL_RUNG, LABEL_STATE
-    Signal(kind=SIGNAL_RUNG_STATE, labels={LABEL_RUNG: "brain", LABEL_STATE: NO_DATA})
+    Signal(kind=SIGNAL_RUNG_STATE, labels={LABEL_RUNG: "director", LABEL_STATE: NO_DATA})
 """
 
 from __future__ import annotations
@@ -108,7 +108,7 @@ SIGNAL_KINDS = (
 
 #: Rung states — the watchdog's own decided vocabulary (imported), plus the
 #: honest no-data member. `forced` is deliberately absent: `decide` never returns
-#: it (it is an operator action, not a measured state), so it cannot be published.
+#: it (it is a principal action, not a measured state), so it cannot be published.
 RUNG_STATES = frozenset(watchdog.RUNG_STATES) | {NO_DATA}
 
 #: Beat-age buckets. A readable beat is `fresh` or `stale`; an unreadable one is

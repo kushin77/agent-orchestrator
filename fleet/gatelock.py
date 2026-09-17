@@ -1,6 +1,6 @@
 """Gate admission control: one composite gate per worktree, bounded box-wide.
 
-Operator-measured (2026-09-14): **49 concurrent ``make verify`` runs, 43 of them
+Principal-measured (2026-09-14): **49 concurrent ``make verify`` runs, 43 of them
 stacked in two worktrees, ~16 hours of duplicated work.** Nothing bounded them —
 every dispatcher could start a gate, and every gate ran to completion.
 

@@ -182,6 +182,23 @@ normative_surfaces:
 legacy_region_markers:
   start: "<!-- legacy-gloss:start -->"
   end: "<!-- legacy-gloss:end -->"
+  # Issue #923: the Markdown markers above have no shape inside a `.py` file (an
+  # HTML comment is not a Python comment), so code prose gets its own sibling
+  # pair rather than a second dialect being invented ad hoc. Read by
+  # `scripts/lib/fleet_code_prose.py` / `fleet_prose_sweep.py`, wired into
+  # `scripts/check-fleet-vocabulary.sh`.
+  python_start: "# legacy-gloss:start"
+  python_end: "# legacy-gloss:end"
+
+# Issue #923: code prose (comments and docstrings in `fleet/*.py`) is a declared
+# surface too — see `out_of_scope` below for why it was not swept in #777, and
+# `scripts/check-fleet-vocabulary.sh` section 6 for the gate that now refuses a
+# retired role name used as a NAME in that prose. Scope is `fleet/*.py` only
+# (not `fleet/tests/`, which is ABOUT the retired spellings and must be able to
+# name them).
+code_prose_surfaces:
+  glob: "fleet/*.py"
+  checked_with: scripts/lib/fleet_code_prose.py
 
 # DECLARED NON-SCOPE. Naming this is the point: a rename that quietly claims more
 # than it did is the half-done rename this issue exists to prevent.

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Per-run telemetry record schema + JSONL append helper (issue #232, micro-task 0 of #219).
 
-A "run" is one subagent's pass at one issue. This module defines the record
+A "run" is one executor's pass at one issue. This module defines the record
 shape and a single append primitive; it does not decide when a run starts or
 ends — callers (the sister/brain loop) own that.
 
 Record shape (all fields required unless noted):
     run_id      str   unique id for this run (uuid4 recommended)
     issue       str   issue number/id the run worked, e.g. "232"
-    agent       str   subagent identifier, e.g. "subagent-67e1e8c2"
+    agent       str   executor identifier, e.g. "subagent-67e1e8c2"
     status      str   one of RUN_STATUSES
     started_at  str   ISO-8601 UTC timestamp
     finished_at str   ISO-8601 UTC timestamp, or None if still running

@@ -17,7 +17,7 @@ completed and one that DIED (quarantined, dead-lettered, a run whose
 ``child_pid`` was never set, a runner crash) were indistinguishable, because the
 only surviving evidence was that the send happened.
 
-Measured on this box: the brain reported itself idle for 1535s while the board
+Measured on this box: the director reported itself idle for 1535s while the board
 carried 63 open issues, and its own idle path found three ready
 (``#132``/``#133``/``#786``) — every one permanently suppressed by
 ``.fleet/brain/dispatched/advance-*.json``. For ``#786`` the terminal artifact
@@ -63,7 +63,7 @@ must fail towards the delivery guarantee, not away from it:
   The loop's own ``pid`` is deliberately NOT evidence: a leftover marker whose
   loop is alive would read as a live run, which is the #366 defect this probe
   must not repeat.
-* ``in_flight``      — is the directive still queued for the sister? The LIVE
+* ``in_flight``      — is the directive still queued for the dispatcher? The LIVE
   queue is the inbox; ``.fleet/sent/`` is an ARCHIVE (118 files here, most also
   in ``done/``) and reading it as "still in flight" would suppress everything for
   ever.
@@ -81,20 +81,20 @@ The re-arm count lives in the marker and the BOUNDS are harvested from
 :func:`runaway.backoff_delay` (``min(base * 2**(n-1), 300)``) — so there is one
 budget vocabulary in the fleet, not two. The COUNTER is the marker's own because
 it counts a different thing: the runaway store counts failures of a *directive*
-(keyed by directive id, consumed by the sister's watch), while this counts
+(keyed by directive id, consumed by the dispatcher's watch), while this counts
 re-arms of an ORDER — an order that never got a directive has no directive id to
 count against.
 
 So a stale marker is re-armed at most K times, spaced by the harvested backoff;
 the K-th re-arm leaving the marker stale again is terminal ``dead`` — **parked
-with the issue named**, printed, and never re-dispatched until an operator
+with the issue named**, printed, and never re-dispatched until a principal
 re-arms it BY NAME (:func:`rearm`). A park is reversible; it is not a weld.
 
 AT-MOST-ONCE IS NOT WEAKENED (acceptance criterion 4)
 -----------------------------------------------------
 ``dispatch()`` proceeds past an existing marker only when the marker carries a
 ``rearm`` token — a one-shot authorisation the reconciliation grants, consumed by
-the send itself. A restart that re-reads a plan, an operator re-ordering the same
+the send itself. A restart that re-reads a plan, a principal re-ordering the same
 order, or any caller that did not reconcile therefore still finds the marker and
 is still suppressed. Two further layers back it up:
 
@@ -114,7 +114,7 @@ every re-arm, every park, every held re-arm (once per backoff window, deduped on
 ``fleet/brain.py`` prints them; the advance path additionally prints a line for
 each candidate it did NOT dispatch, naming the marker state.
 
-CLI (operator)::
+CLI (principal)::
 
     python3 fleet/markers.py status [--limit N]        # what every marker says
     python3 fleet/markers.py show --reference <ref>    # one marker, verbatim
@@ -150,10 +150,10 @@ DISPATCHED = FLEET_DIR / "brain" / "dispatched"
 RUNS = FLEET_DIR / "runs"
 #: The runaway guard's terminal store (``fleet/runaway.py``).
 DEAD_LETTER = FLEET_DIR / "dead-letter"
-#: The sister's live queue — the only mailbox whose membership means "not yet
+#: The dispatcher's live queue — the only mailbox whose membership means "not yet
 #: consumed". ``.fleet/sent``/``.fleet/outbox`` are archives and are NOT read.
 INBOX = FLEET_DIR / "inbox"
-#: The brain's own queue, for operator orders (whose reference is the order id).
+#: The director's own queue, for principal orders (whose reference is the order id).
 BRAIN_INBOX = FLEET_DIR / "brain" / "inbox"
 
 # --- the state vocabulary ----------------------------------------------------
@@ -171,7 +171,7 @@ TERMINAL_STATES = (COMPLETED, DEAD)
 # --- the bounds --------------------------------------------------------------
 
 #: A re-arm is only granted to a marker older than this. Delivery is not
-#: instantaneous: between the brain's send and the sister's pickup there is a
+#: instantaneous: between the director's send and the dispatcher's pickup there is a
 #: window (up to a watch cycle) where none of the four probes can yet see the
 #: work, and re-arming inside it would race a healthy directive.
 REARM_GRACE_SECONDS = 300.0
@@ -270,7 +270,7 @@ MARKER_FIELDS = (
 
 @dataclass(frozen=True)
 class Marker:
-    """One dispatched order's marker, and what the brain knows about it."""
+    """One dispatched order's marker, and what the director knows about it."""
 
     reference: str
     state: str
@@ -547,7 +547,7 @@ class FleetProbe:
         return index
 
     def in_flight(self, reference: str) -> bool | None:
-        """Is the order's directive still queued, unconsumed, for the sister?"""
+        """Is the order's directive still queued, unconsumed, for the dispatcher?"""
         if not reference:
             return False
         return reference in self._live_messages()
@@ -843,9 +843,9 @@ def reconcile_reference(
 def rearm(reference: str, *, directory: Path | str | None = None, reason: str = "", moment: float | None = None) -> Marker:
     """Un-park a marker BY NAME: a fresh budget and one authorised send.
 
-    The operator's half of the contract. A park is terminal only until someone
+    The principal's half of the contract. A park is terminal only until someone
     says otherwise — ``runaway.py rearm`` does this for a directive, and this does
-    it for the order's marker. ``attempts`` resets: the operator has changed
+    it for the order's marker. ``attempts`` resets: the principal has changed
     something the automated pass could not (the board, the runner, the directive),
     so the budget starts again rather than instantly re-parking.
     """

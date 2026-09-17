@@ -6,7 +6,7 @@ different lane: lane identities in ``.fleet/lanes/``, session heartbeats in
 ``.fleet/sessions/``, closure journals in ``.fleet/lifecycle/``, claims in
 ``.board/claims/`` and authorisation directives in ``.fleet/{sent,done}/``. No
 one place answered "what is in flight, what is orphaned, what is shelved, what is
-wedged" — the operator reconstructed it by shelling into three CLIs, reading a
+wedged" — the principal reconstructed it by shelling into three CLIs, reading a
 ledger and listing worktrees by hand, which is how an orphaned lane survived
 hours. ``fleet/console.py`` is a dashboard for the *rungs only*; it joins none of
 these.

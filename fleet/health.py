@@ -8,9 +8,9 @@ check for this repo's file-mailbox transport: it never spawns anything, it
 only reads state the loop already writes (the rung heartbeats, the claim
 ledger, the running processes) and reports a tri-state signal.
 
-Both rungs are probed (issue #277). The brain is the middle rung and the only
-thing that turns an operator order into a directive, so a dead brain is not
-healthy even while the sister still beats — this is the same both-rungs truth
+Both rungs are probed (issue #277). The director is the middle rung and the only
+thing that turns a principal order into a directive, so a dead director is not
+healthy even while the dispatcher still beats — this is the same both-rungs truth
 `channel.report_rung` reports. Freshness is read from the rung heartbeat's *age*,
 not `.fleet/slog.jsonl`'s mtime: the log is only written when a message moves, so
 an idle-but-healthy fleet must not read as degraded.
@@ -18,17 +18,17 @@ an idle-but-healthy fleet must not read as degraded.
 The queue-liveness facet and its LATCH (issue #728) are below: this module also
 measures inbox depth, the oldest pending directive's age and the dead-letter
 count, and a runaway condition it finds is *latched* — raised and then kept
-raised, naming the directives and worktrees responsible, until an operator
+raised, naming the directives and worktrees responsible, until a principal
 acknowledges it. See the block comment above `QueueReport`.
 
 Signal:
-    0 healthy  — the sister and the brain are running current builds with fresh
+    0 healthy  — the dispatcher and the director are running current builds with fresh
                  heartbeats, no claim is wedged past the staleness window, and
                  no runaway alarm is raised or latched.
-    1 degraded — a rung is down (at least degraded for a dead brain), running
+    1 degraded — a rung is down (at least degraded for a dead director), running
                  stale code, or its heartbeat is stale; or a claim is held past
                  the staleness window.
-    2 failing  — the sister loop is not running at all, or a runaway alarm is
+    2 failing  — the dispatcher loop is not running at all, or a runaway alarm is
                  raised (or still latched from an earlier excursion).
 
 Usage:
@@ -51,8 +51,8 @@ from pathlib import Path
 import runtime
 
 ROOT = Path(__file__).resolve().parent.parent
-# The two probe targets, mirroring `channel.report_rung`: the sister loop and the
-# brain. Resolved on every call (see `rungs`) so a redirected heartbeat path is
+# The two probe targets, mirroring `channel.report_rung`: the dispatcher loop and the
+# director. Resolved on every call (see `rungs`) so a redirected heartbeat path is
 # honoured.
 SISTER_PROCESS = "fleet/terminal.py"
 BRAIN_PROCESS = "fleet/brain.py"
@@ -81,12 +81,12 @@ def process_running(pattern: str) -> bool:
 
 
 def loop_running() -> bool:
-    """The sister loop — the never-idle dispatcher."""
+    """The dispatcher loop — the never-idle dispatcher."""
     return process_running(SISTER_PROCESS)
 
 
 def brain_running() -> bool:
-    """The brain — the middle rung; no operator order is dispatched without it."""
+    """The director — the middle rung; no principal order is dispatched without it."""
     return process_running(BRAIN_PROCESS)
 
 
@@ -169,8 +169,8 @@ def evaluate(stale_minutes: float, ledger_path: Path) -> tuple[int, list[str]]:
     # The drift baseline is the REMOTE (`.fleet` heartbeat vs `origin/master`),
     # never the local checkout — see `rung_health` (#739, AO-GR-25).
     baseline = channel.remote_head_commit()
-    # Probe BOTH rungs, exactly as `channel.py status` does: a dead brain while the
-    # sister still beats is at least degraded, never healthy. Freshness is the rung
+    # Probe BOTH rungs, exactly as `channel.py status` does: a dead director while the
+    # dispatcher still beats is at least degraded, never healthy. Freshness is the rung
     # heartbeat's age, not `.fleet/slog.jsonl`'s mtime — an idle-but-healthy fleet
     # writes no messages, and reading that as degraded was the second half of #277.
     for name, beat_path, start_cmd, probe in rungs():
@@ -197,7 +197,7 @@ def evaluate(stale_minutes: float, ledger_path: Path) -> tuple[int, list[str]]:
 # one that never happened. So this facet measures the work queue's liveness —
 # inbox depth, the oldest pending directive's age, the dead-letter count — and a
 # runaway condition it finds is LATCHED. Once raised it stays raised, naming the
-# directives and the worktrees responsible, until an operator acknowledges it
+# directives and the worktrees responsible, until a principal acknowledges it
 # with `python3 fleet/health.py ack`. That is the difference between an alarm
 # and a dashboard.
 #
@@ -211,7 +211,7 @@ def evaluate(stale_minutes: float, ledger_path: Path) -> tuple[int, list[str]]:
 # WHY THE NAMES ARE NOT METRIC LABELS: the directives and worktrees responsible
 # are per-session identity, which `fleet/health_signals.py` refuses as a label
 # by name (ADR-0022 D5 / kushin77/monitoring-stack#178). The alarm therefore
-# names them in the local signal and its latch artifact — where an operator
+# names them in the local signal and its latch artifact — where a principal
 # reads them — and publishes only the counts.
 #
 # THE KNOBS are configurable and their defaults are documented here and nowhere
@@ -243,7 +243,7 @@ ENV_MAX_DEAD_LETTERS = "AO_RUNAWAY_DEAD_LETTERS"
 
 #: How many directive ids the alarm names. An alarm that renders an unbounded
 #: list of names is itself a (small) runaway, and the latch artifact is read by
-#: an operator, not a machine.
+#: a principal, not a machine.
 ALARM_NAME_LIMIT = 20
 
 #: `alarm`'s exit code is read with THIS module's tri-state: 0 clear / 2 raised.
@@ -545,7 +545,7 @@ def raise_latch(
     """Latch the alarm: keep the first ``raised_at`` and the union of the evidence.
 
     A second excursion while the alarm is still latched is the SAME alarm — it
-    must not overwrite the moment the condition began, or the operator loses the
+    must not overwrite the moment the condition began, or the principal loses the
     only fact that says how long the fleet has been stuck. A recurrence after an
     ack is a NEW alarm and gets a new ``raised_at``.
     """
@@ -580,7 +580,7 @@ def acknowledge_latch(
     """Clear the latch — the ONLY route, and deliberately a human verb.
 
     The record is kept (``raised: false`` with the acknowledgee, the time and the
-    original evidence) rather than deleted, because the question an operator asks
+    original evidence) rather than deleted, because the question a principal asks
     afterwards is "was this alarmed, and who cleared it", and a deleted file
     cannot answer it. Returns None when there is nothing raised to acknowledge.
     """
@@ -602,7 +602,7 @@ def acknowledge_latch(
 
 
 def alarm_reasons(report: QueueReport, latch: Latch | None, worktrees: tuple[str, ...]) -> list[str]:
-    """The operator-facing reasons: what broke, what is named, and whether it is latched."""
+    """The principal-facing reasons: what broke, what is named, and whether it is latched."""
     reasons: list[str] = []
     if report.raised:
         for finding in report.findings:
@@ -684,7 +684,7 @@ def alarm_payload(
 def cmd_check(args: argparse.Namespace) -> int:
     level, reasons = evaluate(args.stale_minutes, Path(args.ledger))
     fleet = getattr(args, "fleet_dir", None)
-    # The latch is REPORTED here, never raised: `check` is the read the operator
+    # The latch is REPORTED here, never raised: `check` is the read the principal
     # and the gate run freely, and a read that writes is a read with a side
     # effect. Raising is `alarm`'s job.
     try:

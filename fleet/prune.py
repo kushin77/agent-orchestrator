@@ -7,11 +7,11 @@ WHY this exists (issue #280)
     and ``done``, a ~786 KB ``slog.jsonl`` and an unbounded ``runs.jsonl``.
     Nothing rotated or pruned it — ``scripts/prune-worktrees.sh`` reclaims lane
     *worktrees*, not the mailbox — so the directory grew without bound while the
-    brain only ever read the newest ``--limit`` replies. This is the missing
+    director only ever read the newest ``--limit`` replies. This is the missing
     retention job, code-native so cron owns it and no human is involved.
 
 WHAT it prunes (safe by construction)
-    * ``outbox/``, ``sent/``, ``done/`` and the brain rung's same three
+    * ``outbox/``, ``sent/``, ``done/`` and the director rung's same three
       directories: entries **older than** ``--retention-days`` whose message is
       not referenced by a live run or a live claim.
     * ``slog.jsonl`` and ``runs.jsonl``: rotated by size (``--max-log-bytes``),
