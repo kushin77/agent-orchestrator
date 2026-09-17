@@ -374,7 +374,7 @@ genuinely load-bearing evidence, not documentation:
   re-raising). `append()` re-reads the file after writing and requires the
   pre-write bytes to be an exact prefix of the post-write bytes, serialised
   with an advisory `fcntl.flock` so concurrent legitimate appends are never
-  mistaken for a rewrite. Read by `tests/test_audit.py` and any consumer of
+  mistaken for a rewrite. Read by `tests/test_dispatch_audit.py` and any consumer of
   `audit.read()`.
 * **`dispatch.schema.json` + `schema.py`** — freezes the four shapes this
   package persists: `ClaimEvent` (incl. `files`/`provenance`/`speculative_base`
@@ -383,7 +383,7 @@ genuinely load-bearing evidence, not documentation:
   validator (`governance/modules/schema.py`), imported and reused rather than
   re-implemented — `schema.py:problems`/`schema.py:validate` delegate to it.
   `audit.append()`'s records and `claims.py`'s `ClaimEvent.to_json()` output
-  both validate against it (`tests/test_schema.py`, `tests/test_audit.py`).
+  both validate against it (`tests/test_schema.py`, `tests/test_dispatch_audit.py`).
 * **`live.py`** — a live projection of the package's real state (`project()`):
   the live claim set (`claims.active_claims`), the frontier
   (`order.frontier`/`order.active_milestone`) and the earliest ready wave
