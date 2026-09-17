@@ -241,6 +241,8 @@ and its rationale cannot drift apart.
 | `scripts/check-fleet-vocabulary.sh` | `make verify` (`fleet-vocabulary`) | The role vocabulary has one authority and the code agrees with it; a retired role in a schema-2 envelope is refused BY NAME; the write seam is single-emit and negotiated from the recipient's own heartbeat declaration; and a v2 emitter that still emits a v1 role is detected (provoked by mutating the seam in a scratch copy). |
 | `scripts/check-fleet-contract.sh` | `make verify` (`fleet-contract`) | This contract still declares the six verbs, the four trust rules and the schema/ADR references; every declared verb maps to a message type the channel actually implements; and the check proves itself non-vacuous by mutating its own input. |
 | `scripts/check-board-gate.sh` (board triggers) | `make verify` (`board-gate`) | A stale board snapshot produces exactly ONE refresh, and when freshness does not return the directive is PARKED and never re-dispatched; the gate provokes the refusal against a real scratch fleet and fails a mutant that forgets the park. |
+| `scripts/check-fleet-channel.sh` | `make verify` (`fleet-channel`) | The channel refuses invalid traffic **and** the queue-liveness runaway alarm (§9) is raised by the gate-of-record itself: provoked, re-read with the excursion gone (still raised), cleared by `ack`, with a second `ack` refused. |
+| `fleet/tests/test_health_alarm.py` | `make tests` (`fleet` suite) | The same alarm properties, asserted per-case: the signal's three readings, the raise, the latch surviving the excursion, and the `ack` that is the only clear. |
 | `fleet/tests/test_contract.py` | `make tests` (`fleet` suite) | The same declarations, asserted in the per-suite test corpus. |
 
 ## 7. Live transport verbs — the A2A extension (issue #367)
@@ -378,3 +380,68 @@ and license. The prior art is the mature fleet model in `kushin77/leaderboard`
 and `kushin77/capital-underwriting`, both proprietary and owner-authored, so
 what is reused is the *pattern and the vocabulary* — reimplemented here for this
 repo's Python/JSON substrate — never copied code.
+
+## 9. Runaway + queue-liveness alarm (issue #728)
+
+The runaway that motivated the attempt cap (#723) — 49 concurrent `make verify`
+runs on one box — was caught by a human *noticing* it. Detection is a signal,
+and a signal has to be an ALARM: an excursion that clears itself before anyone
+looks is indistinguishable from one that never happened. This section is the
+contract for that alarm. It lives in `fleet/health.py` and it is emitted by the
+gate of record (§6, `check-fleet-channel.sh`), not only by an ad-hoc command.
+
+**The signal reads three things, from state the loop already writes** (it never
+spawns anything):
+
+| Reading | Source |
+|---|---|
+| inbox depth | the pending envelopes in `<fleet>/inbox`, in send order (`channel.ordered_by_time`) |
+| oldest-directive age | the `ts` of the first pending envelope, in minutes |
+| dead-letter count | `runaway.inventory` — the same read `channel.py status` makes |
+
+**A runaway condition LATCHES.** The condition is any of: more pending
+directives than the depth cap; an oldest pending directive older than the age
+cap; a dead-letter count at or above the dead-letter cap. When one holds, the
+alarm is RAISED and the raise is persisted at `<fleet>/health/alarm.json`
+(`runtime.HEALTH` / `runtime.ALARM`). It then stays raised — through the next
+measurement, and the next — until an operator acknowledges it. A later
+measurement that no longer sees the condition does **not** clear it: the second
+read is still raised, still naming the moment the condition began and the
+directives and worktrees responsible.
+
+**It names the culprit.** The responsible directives are the pending envelopes
+(their `id`, or the mailbox stem); the responsible worktrees come from two
+declared joins, never a guess — a live claim is linked to the directive it was
+taken for (`ClaimEvent.directive_id`, #723) and a lane record carries the
+worktree its session was provisioned into (`governance/isolation`). A directive
+that names an issue no lane has claimed still resolves through the lane record
+for that issue, so a queue blocked *before* the claim is taken is named too.
+
+**`ack` is the only clear, and it is a human verb.** Acknowledging writes the
+acknowledgee, the time and the note beside the original evidence (the record is
+kept, not deleted: the question asked afterwards is "was this alarmed, and who
+cleared it"). A second `ack` with nothing raised is refused, so the verb cannot
+pass as a no-op.
+
+**The knobs are the contract** (an unreadable value is refused, never silently
+defaulted — the same asymmetry `fleet/runaway.py` declares):
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `AO_RUNAWAY_INBOX_DEPTH` | `24` | pending directives the inbox may hold |
+| `AO_RUNAWAY_OLDEST_MINUTES` | `120` | minutes a pending directive may sit undrained |
+| `AO_RUNAWAY_DEAD_LETTERS` | `5` | dead-lettered directives that mean the queue is not moving |
+
+**The names do not travel as metrics.** Per-session identity — a directive id, a
+worktree path — is refused as a label by name in `fleet/health_signals.py`
+(ADR-0022 D5 / `kushin77/monitoring-stack#178`), so the alarm names the culprit
+in the local signal and its latch artifact, where the operator reads it, and the
+exported family carries only counts. `check` reports the latch read-only; the
+`alarm` verb raises it. Neither writes outside the fleet directory it was given,
+and neither writes at all when the condition is clear.
+
+```bash
+python3 fleet/health.py check   # the full signal: rungs + queue + the latch, read-only
+python3 fleet/health.py alarm   # measure the queue; raise + latch; exit 2 when raised
+python3 fleet/health.py ack     # acknowledge the latch — the only way it clears
+```
