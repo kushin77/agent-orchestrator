@@ -322,6 +322,7 @@ claim REFUSED: blocked — #889 is blocked by #880, #881, ..., #888 — evidence
 ```bash
 python3 governance/dispatch/cli.py queue --next    # the next claimable issue(s) per the queue
 python3 governance/dispatch/cli.py queue --check   # validate the file (see below)
+python3 governance/dispatch/cli.py queue --fix     # drop issues CLOSED on a fresh board (#1113)
 ```
 
 `--check` validates `governance/dispatch/queue.yaml` structurally (no
@@ -332,6 +333,15 @@ tri-state and fails CLOSED on a stale board: past `--stale-minutes` it
 reports `CANNOT-ASSESS` (exit 2) for the exists/open half rather than a false
 verdict, while the structural half (duplicates, cycles) still runs — that
 half needs no board at all.
+
+`--fix` is the declared mechanism for the defect `--check` only reports
+(issue #1113): against a FRESH `.board/snapshot.json` (same staleness
+contract as `--check` — a stale board is refused with `CANNOT-ASSESS` rather
+than pruning on guessed state), it drops every issue number CLOSED on that
+board from each wave's `issues` list, editing only those lines so the file's
+hand-written commentary survives. It is idempotent — a clean queue prints
+`OK` and rewrites nothing — so it can be re-run after every board refresh
+without hand-editing `queue.yaml` directly.
 
 ### The gate
 
