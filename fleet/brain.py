@@ -150,6 +150,33 @@ def master_health_refusal(order: dict) -> str | None:
     admitted only when the cached verdict is fresh AND green; absent, stale,
     unreadable, or red all refuse (CANNOT-ASSESS is never a pass, mirroring
     the honesty tri-state `governance/landing/evidence.py` already uses).
+
+    WHO WRITES `MASTER_ATTESTATION`, AND HOW OFTEN (tracked as a KNOWN GAP —
+    #1114 follow-up): as of this change, **nothing writes it yet**. Searched
+    for an existing periodic writer first (per RCA fix #5's own acceptance
+    note, "refreshed on a short TTL"): no fleet cron rung
+    (`fleet/cron.py`'s `_LEGACY_JOBS` / the fleet-jobs manifest) or watchdog
+    pass (`fleet/watchdog.py`) runs `scripts/merge-gate.sh` or
+    `scripts/verify.sh` against `origin/master` on any schedule — the only
+    things that currently run either are a lane's own pre-merge contract and
+    an operator's ad-hoc `make verify`. The one seam that DOES have the right
+    data in hand at the right moment is `governance/landing/engine.py`'s
+    `land()`, right after a successful squash-merge
+    (`governance/landing/engine.py:715-717`, immediately after
+    `self.ops.merge_pr(...)` succeeds): `result.attestation` there is already
+    a fresh, green, commit-named attestation in this SAME schema, and the
+    commit it names is about to become (or just became) `origin/master`'s
+    head. That module is out of this lane's ownership (sibling lane,
+    read-only reuse), so the write is not implemented here — until it lands,
+    every non-exempt dispatch reads `MASTER_ATTESTATION` as absent and
+    refuses CANNOT-ASSESS. Whatever writes it must refresh more often than
+    `MASTER_ATTESTATION_TTL_SECONDS` (900s) actually lands merges, or must
+    raise that TTL to match its real cadence — a periodic cron rung would
+    need to run at least every ~900s; a landing-triggered write instead
+    refreshes on every merge, which is usually far more often than that on a
+    healthy fleet and far less often exactly when it matters (master just
+    went red), so the TTL should stay short rather than being raised to fit
+    a slow writer.
     """
     task = order.get("task") or {}
     if task.get("allow_red_master") or task.get("master_red_fix"):
