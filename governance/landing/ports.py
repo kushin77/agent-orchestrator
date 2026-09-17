@@ -116,6 +116,17 @@ class LandingOps(Protocol):
     def remote_branch_head(self, branch: str) -> Optional[str]:
         """The remote head of ``branch``, or None when the branch is not pushed."""
 
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        """The merge base of ``left`` and ``right``, or None when there is none.
+
+        Used ONLY to decide whether publishing master's health after a merge
+        is honest (fix #5 follow-up, #1114): a lane's own attestation
+        measured the LANE head, and relabelling that as a measurement of
+        master's post-squash head is only fair when the lane head already
+        contained master's pre-merge tip — i.e. ``merge_base(lane_head,
+        master_head) == master_head``. Never used for anything else.
+        """
+
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         """The pull request whose head is ``branch`` (any state), or None."""
 
@@ -208,6 +219,16 @@ class GitHubOps:
             if len(parts) == 2 and parts[1].endswith(f"/{branch}"):
                 return parts[0]
         return None
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        result = self._git("merge-base", left, right)
+        if not result.ok:
+            # No common ancestor (or either name is unresolvable in this
+            # checkout) — an honest "cannot tell", not an exception. The
+            # caller (the master-attestation guard) treats this as "not
+            # already at master", the safe default.
+            return None
+        return result.stdout.strip() or None
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         result = self._gh(
@@ -386,6 +407,9 @@ class RecordingOps:
 
     def remote_branch_head(self, branch: str) -> Optional[str]:
         return self.reads.remote_branch_head(branch)
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        return self.reads.merge_base(left, right)
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         return self.reads.pull_request_for(branch)

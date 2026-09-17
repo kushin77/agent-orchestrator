@@ -23,6 +23,7 @@ SHELL := /bin/bash
 # docs/OPERATOR-ACCESS.md §4.
 CONSOLE_HOST ?= 127.0.0.1
 CONSOLE_PORT ?= 8787
+ATTESTATION ?= .verify/attestation.json
 
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e fleet-parity \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage codeowners squash-message chronological-dispatch \
@@ -789,3 +790,21 @@ land:
 	@bash scripts/land-lane.sh --issue "$(ISSUE)"
 
 .PHONY: land
+
+## master-attestation — publish master's own health after a green `make
+## verify` run at origin/master's head (RCA 2026-09-17 fix #5 follow-up,
+## #1114): `make land` already writes this after every FLEET-DRIVEN merge,
+## but an OPERATOR's manual `gh pr merge` never goes through `land()`, so
+## master's head can move with nothing publishing a fresh verdict —
+## fleet/brain.py's dispatch pre-check then reads a stale-head attestation as
+## CANNOT-ASSESS until the next fleet land. Run this right after `make
+## verify` while the checkout still sits at origin/master's head; it is a
+## no-op (prints why, exits 0) on a lane head or a red verify. NOT wired into
+## `make verify`/scripts/verify.sh itself — that file is held by an open PR
+## (#1127) at the time this target was added; this is the seam a follow-up
+## hooks scripts/verify.sh into once #1127 lands.
+##   make verify && make master-attestation
+master-attestation:
+	@python3 governance/landing/cli.py write-master-attestation --attestation "$(ATTESTATION)"
+
+.PHONY: master-attestation
