@@ -496,11 +496,6 @@
     },
     {
       "kind": "worktree",
-      "name": "/tmp/ao-master-probe-wt",
-      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
-    },
-    {
-      "kind": "worktree",
       "name": "/tmp/ao-master-verify",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },

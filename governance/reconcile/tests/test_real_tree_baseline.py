@@ -84,8 +84,12 @@ def test_new_unbaselined_artifact_fails(scratch_repo: Path, tmp_path: Path):
     assert verdict.stale_entries == ()
 
 
-def test_stale_entry_fails(scratch_repo: Path, tmp_path: Path):
-    """A baselined artifact that is no longer unmatched must be removed, not kept."""
+def test_stale_entry_is_reported_but_does_not_fail(scratch_repo: Path, tmp_path: Path):
+    """A baselined artifact that is no longer unmatched is reported by name and
+    counted — but does NOT fail the gate (second #740 follow-up). Unlike
+    landed-baseline.json's commits, disk artifacts are MEANT to disappear once
+    reclaimed or cleaned up; a stale entry records that cleanup already
+    happened, which must never itself be a violation."""
     baseline = tmp_path / "baseline.json"
     _write_baseline(
         baseline,
@@ -97,10 +101,70 @@ def test_stale_entry_fails(scratch_repo: Path, tmp_path: Path):
     )
     verdict = check_real_tree(scratch_repo, baseline, ops=RepoOps(scratch_repo), grace_hours=0)
     assert verdict.assessable
-    assert not verdict.ok
+    assert verdict.ok, f"a stale entry alone must not fail the gate: {verdict.describe()}"
     assert verdict.new_violations == ()
     stale_names = {(e.kind, e.name) for e in verdict.stale_entries}
     assert ("branch", "issue-does-not-exist") in stale_names
+    assert "STALE" in verdict.describe()
+
+
+def test_stale_and_new_violation_together_still_fails_on_the_new_one(scratch_repo: Path, tmp_path: Path):
+    """A stale entry never masks a genuine new-and-old violation sitting next
+    to it — the two are independent."""
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(
+        baseline,
+        [
+            {"kind": "branch", "name": "issue-orphan-1", "reason": "known, unresolved"},
+            {"kind": "branch", "name": "issue-does-not-exist", "reason": "stale by construction"},
+        ],
+    )
+    verdict = check_real_tree(scratch_repo, baseline, ops=RepoOps(scratch_repo), grace_hours=0)
+    assert not verdict.ok
+    assert ("branch", "issue-orphan-2") in {(e.kind, e.name) for e in verdict.new_violations}
+    assert ("branch", "issue-does-not-exist") in {(e.kind, e.name) for e in verdict.stale_entries}
+
+
+def test_prune_stale_drops_only_stale_entries(scratch_repo: Path, tmp_path: Path):
+    """`prune_stale` rewrites the baseline dropping exactly the entries the
+    audit itself just reported as no-longer-unmatched — never a still-live
+    artifact, never `new_violations` or `young`."""
+    from governance.reconcile.real_tree_baseline import prune_stale
+
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(
+        baseline,
+        [
+            {"kind": "branch", "name": "issue-orphan-1", "reason": "known, unresolved"},
+            {"kind": "branch", "name": "issue-orphan-2", "reason": "known, unresolved"},
+            {"kind": "branch", "name": "issue-does-not-exist", "reason": "stale by construction"},
+        ],
+    )
+    verdict = check_real_tree(scratch_repo, baseline, ops=RepoOps(scratch_repo), grace_hours=0)
+    assert len(verdict.stale_entries) == 1
+
+    removed = prune_stale(baseline, verdict)
+    assert removed == 1
+
+    reloaded = load_baseline(baseline)
+    kept_names = {e.name for e in reloaded}
+    assert kept_names == {"issue-orphan-1", "issue-orphan-2"}
+
+    # a second prune, with a fresh (clean) verdict, is a no-op
+    clean_verdict = check_real_tree(scratch_repo, baseline, ops=RepoOps(scratch_repo), grace_hours=0)
+    assert clean_verdict.ok
+    assert prune_stale(baseline, clean_verdict) == 0
+
+
+def test_prune_stale_is_a_noop_when_not_assessable(scratch_repo: Path, tmp_path: Path):
+    from governance.reconcile.real_tree_baseline import RealTreeVerdict, prune_stale
+
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [{"kind": "branch", "name": "issue-x", "reason": "r"}])
+    before = baseline.read_text(encoding="utf-8")
+    removed = prune_stale(baseline, RealTreeVerdict(assessable=False, reason="unreadable"))
+    assert removed == 0
+    assert baseline.read_text(encoding="utf-8") == before
 
 
 def test_malformed_baseline_is_cannot_assess(scratch_repo: Path, tmp_path: Path):
