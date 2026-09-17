@@ -2,8 +2,18 @@
 
 The repo is versioned like every governed fleet repo (GR-7): the **annotated
 `vX.Y.Z` git tag on `master` is the single source of truth** for a release.
-CI/CD automation for this repo ships with issue #6; until then releases are
-tagged locally from a gate-green commit.
+There is no GitHub Actions CI (GR-15 bans it); the gate of record is
+`make verify`, run code-native from the ops runner, and published as a
+GitHub commit status (`ao/gate-of-record`) by `scripts/gate-status.sh`
+(ADR-0028, issue #803 P0-2). That status is not yet a *required* check on
+`master` — declared in `governance/platform/branch-protection.yaml` under
+`required_status_contexts` but deliberately excluded from `protection` until
+a real status is observed on a real commit (ADR-0028 step 2). Until then,
+releases are tagged locally from a gate-green commit, exactly as today.
+
+**Release plan:** see [`docs/RELEASE-PLAN.md`](docs/RELEASE-PLAN.md) for the
+surfaces under this SemVer contract, the v1.0.0 exit criteria, and the
+residual risks named ahead of the v1.0.0 tag.
 
 ## How to release
 
