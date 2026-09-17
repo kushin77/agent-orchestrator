@@ -42,6 +42,7 @@ from model import (
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
     CODE_CORRECTIVE_ACTION_OPEN,
+    CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED,
     CODE_CORRECTIVE_ACTION_UNLINKED,
     CODE_CORRECTIVE_ACTION_UNRECORDED,
     CODE_CORRECTIVE_ACTION_WITHOUT_EVIDENCE,
@@ -321,6 +322,69 @@ def test_an_open_action_names_its_remediation_issue(report_factory):
     report = report_factory(records)
     finding = only(report, CODE_CORRECTIVE_ACTION_OPEN)[0]
     assert "#170" in finding.message
+    assert errors(report.findings) == []
+
+
+def _open_action_with_remediation(remediation="#170"):
+    """One complete ledger whose single action is still open (#1028)."""
+    return [
+        incident(1, status="open"),
+        rca(1, status="open"),
+        action(1, status="open", evidence=[], remediation_issue=remediation),
+        lesson(1),
+    ]
+
+
+def _board_with(*issues):
+    """The fixture board under test, always carrying the default origin #100.
+
+    ``labels=[]`` on purpose: this rule is about an action's *remediation* issue,
+    so the record-label rule must not be what fires.
+    """
+    return board(*issues)
+
+
+def test_an_open_action_whose_remediation_landed_is_an_error(report_factory):
+    """#1028: the record states its own closure condition; the board says it is met."""
+    report = report_factory(
+        _open_action_with_remediation(),
+        snapshot=_board_with(
+            board_issue(100, state="OPEN", labels=[]),
+            board_issue(170, state="CLOSED", labels=[]),
+        ),
+    )
+    finding = only(report, CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED)[0]
+    assert finding.subject == "CA-0001"
+    assert "#170" in finding.message
+    assert "CLOSED" in finding.message
+    assert errors(report.findings) != []
+    # one finding for the action: restating the contradiction, softly, is not a
+    # second observation
+    assert only(report, CODE_CORRECTIVE_ACTION_OPEN) == []
+
+
+def test_an_open_action_whose_remediation_is_open_stays_a_deviation(report_factory):
+    """The accepted half: in-flight work is a deviation, never an error (#1028)."""
+    report = report_factory(
+        _open_action_with_remediation(),
+        snapshot=_board_with(
+            board_issue(100, state="OPEN", labels=[]),
+            board_issue(170, state="OPEN", labels=[]),
+        ),
+    )
+    assert only(report, CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED) == []
+    assert len(only(report, CODE_CORRECTIVE_ACTION_OPEN)) == 1
+    assert errors(report.findings) == []
+
+
+def test_an_open_action_off_the_snapshot_is_not_evidence_it_landed(report_factory):
+    """An issue the point-in-time snapshot does not carry proves nothing (#1028)."""
+    report = report_factory(
+        _open_action_with_remediation(),
+        snapshot=_board_with(board_issue(100, state="OPEN", labels=[])),
+    )
+    assert only(report, CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED) == []
+    assert len(only(report, CODE_CORRECTIVE_ACTION_OPEN)) == 1
     assert errors(report.findings) == []
 
 

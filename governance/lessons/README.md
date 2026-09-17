@@ -86,6 +86,7 @@ that carries them.
 | `corrective-action-unlinked` | error | an action no RCA claims |
 | `corrective-action-without-evidence` | error | a closed action with no proof |
 | `corrective-action-without-owner` | error | AC6: an open action with no remediation issue |
+| `corrective-action-remediation-landed` | error | issue #1028: an open action whose `remediation_issue` the committed board snapshot reports **CLOSED** — the record states a closure condition it has already met, so it is a contradiction rather than work in flight |
 | `incident-closed-without-lesson` | error | closed before the lesson was recorded |
 | `lesson-without-evidence` | error | a learning with nothing behind it |
 | `lesson-without-commit-evidence` | error | a closed lesson must name the commit that shipped it |
@@ -97,7 +98,7 @@ that carries them.
 | `board-incident-without-rca` | error | an issue carrying the `incident` **record** label is closed and no `INC-*` line names it as its origin |
 | `board-incident-pending` | deviation | the same, while that issue is still open |
 | `rca-review-overdue` | deviation | the RCA was not re-read within the cadence |
-| `corrective-action-open` | deviation | the action is still in flight, tracked by its issue |
+| `corrective-action-open` | deviation | the action is still in flight, tracked by its issue — which the committed board snapshot still reports **open** |
 | `suggestion-open` | deviation | the improvement idea is still open |
 | `doc-rca-id-unknown` | error | issue #1052: a `docs/rca/*.md` writeup cites an `RCA-NNNN` id that is not a recorded ledger id |
 | `doc-rca-artifact-mismatch` | error | issue #1052: a `docs/rca/*.md` heading MINTS (starts with) an `RCA-NNNN` id whose ledger `artifact` names a different file — a lightweight doc may CITE a ledger RCA, it may not MINT one |
@@ -218,7 +219,7 @@ in PR #1036 forced a manual union of two independently-authored counts).
 | `INC-0005` | #157 | [`RCA-0005`](rca/RCA-0005-stale-snapshot-frontier.md) | a 19-minute-old snapshot named a closed issue as the frontier (**open**, #170) |
 | `INC-0006` | #800 | [`RCA-0006`](rca/RCA-0006-agentconsole-wrong-host.md) | the AgentConsole go-live was planned against this repository's own Cloud Run pipeline while the fleet's hosting contract fixes the remote shared-services cluster as the only live host |
 | `INC-0007` | #1029 | [`RCA-0007`](rca/RCA-0007-declared-not-exercised-golive.md) | Epic #607's go-live was declared for months and never exercised — the declarations were not backed by an exercised path (recorded by the #1029 lane) |
-| `INC-0008` | #506 | [`RCA-0008`](rca/RCA-0008-date-bomb-seed-without-evaluation.md) | the two tests that were #506's acceptance proof pinned the quota **seed** day while the runner resolved the **evaluation** bucket from the live clock, so `47 passed` expired with the calendar and a quota-exhausted tenant was allowed for three days (**open**: the fix is PR #1026, unmerged) |
+| `INC-0008` | #506 | [`RCA-0008`](rca/RCA-0008-date-bomb-seed-without-evaluation.md) | the two tests that were #506's acceptance proof pinned the quota **seed** day while the runner resolved the **evaluation** bucket from the live clock, so `47 passed` expired with the calendar and a quota-exhausted tenant was allowed for three days (**fix landed**: PR #1026 = `58d5392`; the incident stays open on its remaining actions, `CA-0011` for #1025 and `CA-0012` for #1028) |
 | `INC-0015` | #997 | [`RCA-0015`](rca/RCA-0015-zero-byte-gate-lock-wedge.md) | a leftover 0-byte gate lock was read as a live claim, wedging the box-wide concurrency cap and parking every other worktree's gate with no indication which lock caused it — promoted from `docs/rca/2026-09-16-pr-queue-clearing.md` (issue #1052) |
 | `INC-0016` | #1036 | [`RCA-0016`](rca/RCA-0016-shared-core-file-collision.md) | three PRs collided extending the same shared "core" files with no append-only procedure; the class recurred against this ledger and README in PR #1036 — promoted from `docs/rca/2026-09-16-pr-queue-clearing.md` (issue #1052) |
 | `INC-0017` | #1052 | [`RCA-0017`](rca/RCA-0017-rca-id-double-booking.md) | `docs/rca/2026-09-16-pr-queue-clearing.md` minted `RCA-0007`/`RCA-0008` in its own headings, double-booking ids the ledger already held for a different incident, and this README's hand-written incident count needed a hand-merge in PR #1036 |
@@ -230,11 +231,11 @@ quoted, the provoked control included; the long policy refusals and the
 per-suggestion/per-action deviation lines are elided:
 
 ```text
-incidents: 17 (9 closed) | rcas: 17 | corrective actions: 21 (10 open) | lessons: 7
+incidents: 17 (9 closed) | rcas: 17 | corrective actions: 21 (2 open) | lessons: 7
 | suggestions: 13 | board issues carrying the `incident` record label: 0
   WARNING suggestion-open         SUGGEST-0001 is open (owner: gate lane); ...
-  WARNING corrective-action-open  CA-0007 is open; remediation is tracked in #170
-lessons: OK (17 incident(s), 7 lesson(s) enforced, 23 deviation(s) tracked)
+  WARNING corrective-action-open  CA-0012 is open; remediation is tracked in #1028
+lessons: OK (17 incident(s), 7 lesson(s) enforced, 15 deviation(s) tracked)
   probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s), scanned=0, errors=[]
   probe RECORD-LABEL-WITHOUT-A-RECORD-IS-REFUSED: PASS — code=board-incident-without-rca subject=#900 errors=['board-incident-without-rca']
   probe LEDGER-INCIDENT-WITHOUT-RCA-IS-REFUSED: PASS — code=incident-without-rca count=1 errors=['corrective-action-unlinked', 'incident-without-rca', 'unknown-reference', 'unknown-reference']
@@ -256,10 +257,15 @@ lessons: OK (17 incident(s), 7 lesson(s) enforced, 23 deviation(s) tracked)
   probe MUTANT-DROPS-README-REFUSAL: PASS — NOT-HELD readme-incident-count-mismatch (the probe is proven able to fail)
   probe DUPLICATE-ID-IS-REFUSED: PASS — code=duplicate-id count=1 errors=['duplicate-id']
   probe MUTANT-DROPS-DUPLICATE-ID-REFUSAL: PASS — NOT-HELD duplicate-id (the probe is proven able to fail)
-  PROBES: PASS (21 of 21)
+  probe CA-REMEDIATION-LANDED-IS-REFUSED: PASS — code=corrective-action-remediation-landed subject=CA-0001 errors=['corrective-action-remediation-landed'] (the benign deviation is not also emitted)
+  probe CA-REMEDIATION-OPEN-IS-A-DEVIATION: PASS — code=corrective-action-open count=1 errors=[]
+  probe CA-REMEDIATION-ABSENT-IS-NOT-EVIDENCE: PASS — the issue is off the snapshot; landed finding(s)=0 errors=[]
+  probe MUTANT-DROPS-CA-REMEDIATION-REFUSAL: PASS — NOT-HELD corrective-action-remediation-landed (the probe is proven able to fail)
+  PROBES: PASS (25 of 25)
 negative-control: OK — an area label cannot manufacture an incident, a
 record-labelled issue with no ledger record is still refused, no exemption can
-be declared, and the refusal is proven able to fail
+be declared, an action left open past the landing of the issue that tracks it is
+refused rather than reported as in flight, and each refusal is proven able to fail
 ```
 
 The real-board probe is the measurement the fix is about: **4 issues carry
@@ -294,6 +300,15 @@ new RCA artifacts, each refused as `rca-artifact-untracked` until it was
 committed. That is the gate doing its job on its own author a second time: an
 uncommitted RCA does not exist (`RCA-0002`), and five errors had already been
 raised the same way when this ledger was seeded.
+
+**All six of those actions were closed on 2026-09-17** (issue #1028), each with
+the merge commit that landed its child issue as evidence. They had read `open`
+long after the issues tracking them (`#723`–`#729`) had landed, because nothing
+could observe that the closure condition each record states had been met — the
+same defect as the one below, one layer up. That gap is what
+`corrective-action-remediation-landed` now refuses. The wave's *incidents* stay
+open until their suggestions are closed: an incident closes when the learning is
+recorded as a `LESSON-*`, not when the code lands.
 
 ## Layout
 
