@@ -41,6 +41,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`GIT-ENV-VARIABLES.md`](GIT-ENV-VARIABLES.md) | Canonical registry of the session env contract exported by governance/isolation/** and named in AGENTS.md golden rule 15 (issue #608 → EPIC #616). |
 | [`PYTHON-PATTERNS.md`](PYTHON-PATTERNS.md) | The Python-scoped pattern canon — `PP-1` is the #506 date bomb (a fixture that pins a seed but not the evaluation), with the measured refusal that says why its enforcement is behavioural and lives in `scripts/check-chat-finops.sh` (issue #1028). |
 | [`INFRA-LIMITS.md`](INFRA-LIMITS.md) | The sandbox + ephemeral-storage contract — the blocked network, the read-only-except-workspace filesystem, the shared `/tmp` tmpfs, the write-is-not-a-write-until-read-back rule, and the `scripts/check-infra-limits.sh` guard that enforces them (EPIC #708, issue #729). |
+| [`BOARD-METADATA-AUDIT.md`](BOARD-METADATA-AUDIT.md) | The live board-metadata pass — every open issue's `class/type/priority/area` (+`gdc`/`pillar`), milestone, `epic:<slug>` and declared chain edges, with the before/after coverage and the consumer transcripts (issue #1158). |
 | [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit (AgentConsole) — the operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, flag-gated OFF (EPIC #551, issue #566). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
