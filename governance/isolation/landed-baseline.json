@@ -93,6 +93,31 @@
       "sha": "4b0f7639a5308fa38382152a50e4865e082e67cd",
       "code": "commit-missing-ticket-trailer",
       "why": "squash-merge of #1076 landed on master without a trailing trailer paragraph (this is the third+ recurrence of this shape; the durable fix is #1009 -- enforce the trailer at merge time -- not re-implemented here)"
+    },
+    {
+      "sha": "13185503a0756e905a13f53085026c2980bf1630",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #1119 landed on master without a trailing trailer paragraph -- the squash message setting predates this declaration (issue #1138)"
+    },
+    {
+      "sha": "4986cb63634430ded5d9fe92965176a7942cd158",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #1044 landed on master without a trailing trailer paragraph -- the squash message setting predates this declaration (issue #1138)"
+    },
+    {
+      "sha": "94e23472a49e5dd1adf317a44c0f83f294a33885",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #1121 landed on master without a trailing trailer paragraph -- the squash message setting predates this declaration (issue #1138)"
+    },
+    {
+      "sha": "ea730bee049575d8aeba3739b173b0da0d2040e1",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #1126 landed on master without a trailing trailer paragraph -- the squash message setting predates this declaration (issue #1138)"
+    },
+    {
+      "sha": "75d66257fc80c938d7e7ad0ea6d2cbd0ec5bf00f",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #1103 landed on master without a trailing trailer paragraph -- the squash message setting predates this declaration (issue #1138)"
     }
   ]
 }

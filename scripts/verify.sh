@@ -114,6 +114,17 @@ checks=(
   # CANNOT-ASSESS (exit 2), never a pass -- found by mutation, not by review: the
   # first version printed "not a pass" and then exited 0.
   'branch-protection|bash scripts/check-branch-protection.sh'
+  # repo-settings (issue #1138, parent #803): the platform-level enforcement
+  # of the squash-merge message policy. Measured: the live repo setting was
+  # `squash_merge_commit_message=COMMIT_MESSAGES`, concatenating every
+  # per-commit message onto the squash commit instead of using the PR body --
+  # burying the ticket trailer mid-body and redding check-isolation-landed on
+  # every wave (#1119 #1044 #1121 #1126 #1103, four more baselined in #1130).
+  # This check compares the LIVE settings against the DECLARED policy and is
+  # PROVOKED offline (a matching fixture must pass; a reverted message policy
+  # must be caught and named), mirroring branch-protection's own gate. An
+  # unobservable live state is CANNOT-ASSESS (exit 2), never a pass.
+  'repo-settings|bash scripts/check-repo-settings.sh'
   # gate-status (epic #803 P0-2, ADR-0028): GitHub's required status checks are
   # the only mechanism that makes a merge impossible without green evidence, and
   # producing one normally needs the GitHub Actions that GR-15 bans. ADR-0028

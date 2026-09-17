@@ -153,6 +153,13 @@ verify:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 
+## repo-settings — read back the live repo merge-message policy against the
+## declaration (governance/platform/repo-settings.yaml, issue #1138); pass
+## REPO_SETTINGS_ARGS=apply to PATCH the declared fields onto the live repo
+## (idempotent).
+repo-settings:
+	@bash scripts/repo-settings.sh $(or $(REPO_SETTINGS_ARGS),verify)
+
 ## operator — the operator's way in, one command (issue #763): report every
 ## operator surface (the PRIMARY control plane, the override terminal, the live
 ## view, the browser console), then start the rungs that are missing and attach
