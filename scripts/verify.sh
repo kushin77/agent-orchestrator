@@ -356,6 +356,7 @@ checks=(
   'issue-template|bash scripts/check-issue-template.sh'
   'finops-chooser|bash scripts/check-finops-chooser.sh'
   'lessons|bash scripts/check-lessons.sh'
+  'pr-queue|bash scripts/check-pr-queue.sh'
   'paperclip-integration|bash scripts/check-paperclip-integration.sh'
   'ticket-projection|bash scripts/check-ticket-projection.sh'
   # pmo-rollup (issue #403): the PMO views are derived queries over the ticket
