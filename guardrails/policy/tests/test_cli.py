@@ -50,6 +50,8 @@ def _budget_on_registry(tmp_path: Path) -> Path:
         "workbook-external-state-caching",
         "workbook-zero-token-arithmetic",
         "workbook-webhook-caching",
+        "hermes-head-guardrails",
+        "paperclip-operator-guardrails",
     ):
         enabled = "true" if cid == "model-call-budget" else "false"
         rationale = "\n    on_since_rationale: test registry" if cid == "model-call-budget" else ""
@@ -71,8 +73,8 @@ def test_validate_shipped_examples_exits_zero():
     assert proc.returncode == 0, proc.stderr
     assert "valid: yes" in proc.stdout
     # 3 issue-#26 platform examples + 5 issue-#636 workbook mechanical rules
-    assert "policies: 8" in proc.stdout
-    assert "controls.yaml (8 registered)" in proc.stdout
+    assert "policies: 10" in proc.stdout
+    assert "controls.yaml (10 registered)" in proc.stdout
 
 
 def test_validate_invalid_bundle_exits_one(tmp_path):

@@ -1,0 +1,142 @@
+# guardrails/policy/bundles/platform/hermes-head.yaml
+# Hermes head-of-org guardrail policy (issue #951, parent #878 lane L10).
+#
+# ADR-0012 (docs/decision-records/ADR-0012-hermes-paperclip-boundary.md) names
+# hermes as the routing/capability vocabulary of record and (#878) proposes it
+# as the fleet's head-of-org agent — elevated authority that must be
+# guardrailed, not assumed safe by role. This policy is the allow-list for
+# that authority:
+#
+#   * ALLOWED (explicit LOG rules): dispatch/direct a subordinate agent, but
+#     only when the request travels through the gateway (context.channel ==
+#     "gateway") and stays under its budget/token ceiling;
+#   * FORBIDDEN (explicit BLOCK rules, each named so a refusal names the
+#     rule): self-promotion, approving a `full` rollout, touching secrets,
+#     running IaC apply, dispatching outside the gateway, exceeding the
+#     budget/token ceiling;
+#   * DEFAULT-DENY: `default: block` — any hermes action this policy's rules
+#     do not name falls to the policy default (BLOCK); any action outside
+#     this policy's declared action/subject scope entirely is `uncovered`
+#     and falls to the engine's `uncovered_decision` (BLOCK by default,
+#     guardrails/policy/engine.py) — default-deny at both layers.
+#
+# Every decision this policy contributes is written to the engine's audit
+# log (guardrails/policy/audit.py) — "every directive audited" is the
+# engine's baseline behaviour, not a bespoke mechanism here.
+#
+# Gated behind the `hermes-head-guardrails` control (default OFF,
+# guardrails/policy/controls.yaml). Inert unless BOTH the control is enabled
+# AND the platform's hermes provider flag is on — this repo's convention for
+# "flag name `enable_hermes`" (added by sibling lane #950,
+# infra/feature-flags/registry.yaml) is read defensively (tolerating absence)
+# by scripts/check-guardrail-head-policy.sh, never assumed present here.
+
+id: hermes-head-guardrails
+version: 1
+name: Hermes head-of-org guardrails
+description: >-
+  Constrains hermes when it runs as the fleet's head-of-org agent (#878):
+  dispatch/direct only via the gateway and under budget, never self-promote,
+  never approve a full rollout, never touch secrets or run IaC apply.
+default: block
+controls:
+  - hermes-head-guardrails
+rules:
+  # ------------------------------------------------------------------ #
+  # allowed: dispatch/direct, gateway-only, under budget
+  # ------------------------------------------------------------------ #
+  - id: allow-dispatch-via-gateway
+    actions:
+      - agent.dispatch
+      - agent.directive
+    subjects:
+      - hermes
+    decision: log
+    reason: "hermes dispatch/directive {action} routed through the gateway"
+    condition:
+      all:
+        - path: channel
+          op: eq
+          value: gateway
+
+  - id: allow-model-call-under-ceiling
+    actions:
+      - model.call
+    subjects:
+      - hermes
+    decision: log
+    reason: "hermes model call within budget/token ceiling (utilization {budget.utilization_ratio})"
+    condition:
+      all:
+        - path: budget.utilization_ratio
+          op: lt
+          value: 1.0
+
+  # ------------------------------------------------------------------ #
+  # forbidden: each named so a refusal is refused by name
+  # ------------------------------------------------------------------ #
+  - id: block-directive-off-gateway
+    actions:
+      - agent.dispatch
+      - agent.directive
+    subjects:
+      - hermes
+    decision: block
+    reason: "hermes {action} bypassed the gateway (channel={channel}); every directive must go through the gateway"
+    condition:
+      all:
+        - path: channel
+          op: ne
+          value: gateway
+
+  - id: block-self-promote
+    actions:
+      - agent.self_promote
+    subjects:
+      - hermes
+    decision: block
+    reason: "hermes is forbidden to self-promote its own role/authority"
+
+  - id: block-full-rollout-approval
+    actions:
+      - rollout.approve
+    subjects:
+      - hermes
+    decision: block
+    reason: "hermes is forbidden to approve a full rollout (level={rollout.level})"
+    condition:
+      all:
+        - path: rollout.level
+          op: eq
+          value: full
+
+  - id: block-secrets-access
+    actions:
+      - secrets.access
+      - secrets.read
+      - secrets.write
+    subjects:
+      - hermes
+    decision: block
+    reason: "hermes is forbidden to touch secrets ({action})"
+
+  - id: block-iac-apply
+    actions:
+      - iac.apply
+    subjects:
+      - hermes
+    decision: block
+    reason: "hermes is forbidden to run terraform/IaC apply"
+
+  - id: block-budget-ceiling-exceeded
+    actions:
+      - model.call
+    subjects:
+      - hermes
+    decision: block
+    reason: "hermes model call exceeds its budget/token ceiling (utilization {budget.utilization_ratio})"
+    condition:
+      all:
+        - path: budget.utilization_ratio
+          op: gte
+          value: 1.0

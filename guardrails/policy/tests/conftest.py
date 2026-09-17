@@ -90,6 +90,9 @@ def all_controls_on():
                     "workbook-external-state-caching",
                     "workbook-zero-token-arithmetic",
                     "workbook-webhook-caching",
+                    # issue #951 head-of-org guardrails
+                    "hermes-head-guardrails",
+                    "paperclip-operator-guardrails",
                 )
             ],
         }

@@ -1,0 +1,83 @@
+# guardrails/policy/bundles/platform/paperclip-operator.yaml
+# Paperclip operator-seam guardrail policy (issue #951, parent #878 lane L9).
+#
+# ADR-0013 (docs/decision-records/ADR-0013-paperclip-ing-integration.md) and
+# docs/PAPERCLIP-ING-INTEGRATION.md freeze paperclip's contract to three
+# shapes — heartbeat, ticket, budget — over a process boundary; paperclip is
+# an external operator surface, never a second authoritative runtime. This
+# policy is the allow-list that keeps it inside that seam:
+#
+#   * ALLOWED (explicit LOG rules): ticket updates, heartbeats, budget
+#     queries — the three ADR-0013 contract shapes, nothing else;
+#   * FORBIDDEN (explicit BLOCK rules, each named): code execution (no
+#     shell/tool execution — an operator surface, not a worker), cross-tenant
+#     reads (tenant isolation, guardrails/isolation);
+#   * DEFAULT-DENY: `default: block` — any paperclip action this policy's
+#     rules do not name falls to the policy default (BLOCK); an action
+#     entirely outside this policy's declared scope is `uncovered` and falls
+#     to the engine's `uncovered_decision` (BLOCK by default).
+#
+# Gated behind the `paperclip-operator-guardrails` control (default OFF,
+# guardrails/policy/controls.yaml). Inert unless BOTH the control is enabled
+# AND the platform's paperclip flag (`enable_paperclip`,
+# infra/feature-flags/registry.yaml) is on; scripts/check-guardrail-head-policy.sh
+# reads that flag read-only to prove the reference, never edits it.
+
+id: paperclip-operator-guardrails
+version: 1
+name: Paperclip operator-seam guardrails
+description: >-
+  Constrains paperclip to the ADR-0013 operator seam: ticket/heartbeat/budget
+  scope only, no code execution, no cross-tenant reads.
+default: block
+controls:
+  - paperclip-operator-guardrails
+rules:
+  # ------------------------------------------------------------------ #
+  # allowed: the three ADR-0013 contract shapes
+  # ------------------------------------------------------------------ #
+  - id: allow-ticket-update
+    actions:
+      - ticket.update
+      - ticket.create
+    subjects:
+      - paperclip
+    decision: log
+    reason: "paperclip ticket contract action {action}"
+
+  - id: allow-heartbeat
+    actions:
+      - heartbeat.send
+    subjects:
+      - paperclip
+    decision: log
+    reason: "paperclip heartbeat contract action {action}"
+
+  - id: allow-budget-query
+    actions:
+      - budget.query
+    subjects:
+      - paperclip
+    decision: log
+    reason: "paperclip budget contract action {action}"
+
+  # ------------------------------------------------------------------ #
+  # forbidden: each named so a refusal is refused by name
+  # ------------------------------------------------------------------ #
+  - id: block-code-execution
+    actions:
+      - code.execute
+      - tool.use
+      - shell.exec
+    subjects:
+      - paperclip
+    decision: block
+    reason: "paperclip is an operator surface (ADR-0013); no code execution ({action})"
+
+  - id: block-cross-tenant-read
+    actions:
+      - tenant.read
+    subjects:
+      - paperclip
+    decision: block
+    reason: "paperclip is forbidden to read across tenants ({action})"

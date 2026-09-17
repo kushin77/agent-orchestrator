@@ -31,7 +31,7 @@ def _valid_controls_doc() -> dict:
 
 
 def test_shipped_controls_all_default_off(shipped_controls):
-    assert len(shipped_controls) == 8
+    assert len(shipped_controls) == 10
     assert shipped_controls.active_ids() == ()
     for control in shipped_controls.all():
         assert control.enabled is False  # AO-GR-6: new controls ship OFF
@@ -110,7 +110,7 @@ def test_schema_rejects_bad_registry_shapes():
 
 
 def test_registry_loads_shipped_yaml_from_disk(shipped_controls):
-    assert len(shipped_controls.ids()) == 8
+    assert len(shipped_controls.ids()) == 10
 
 
 def test_unknown_control_id_is_absent():

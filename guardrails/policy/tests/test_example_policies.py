@@ -37,7 +37,12 @@ def test_shipped_examples_validate_with_shipped_controls(shipped_bundle_dir, shi
         "workbook-zero-token-arithmetic",
         "workbook-webhook-caching",
     } <= ids
-    assert len(report_bundle) == 8
+    # plus the two head-of-org guardrails added by issue #951
+    assert {
+        "hermes-head-guardrails",
+        "paperclip-operator-guardrails",
+    } <= ids
+    assert len(report_bundle) == 10
 
 
 def test_all_controls_off_blocks_every_action(shipped_bundle_dir, shipped_controls):
@@ -139,7 +144,13 @@ def _workbook_registry(*, on: bool) -> "ControlRegistry":
     """
     from policy.controls import ControlRegistry
 
-    platform_ids = ("model-call-budget", "tool-use-guard", "data-egress-guard")
+    platform_ids = (
+        "model-call-budget",
+        "tool-use-guard",
+        "data-egress-guard",
+        "hermes-head-guardrails",
+        "paperclip-operator-guardrails",
+    )
     workbook_ids = (
         "workbook-vector-memory-frontload",
         "workbook-drawio-mcp-diagramming",
@@ -209,7 +220,7 @@ def test_the_five_workbook_policies_are_declared(shipped_bundle_dir, shipped_con
         "workbook-zero-token-arithmetic",
         "workbook-webhook-caching",
     } <= ids
-    assert len(bundle) == 8
+    assert len(bundle) == 10
 
 
 def test_every_workbook_policy_is_control_gated_and_refuses_when_off(
