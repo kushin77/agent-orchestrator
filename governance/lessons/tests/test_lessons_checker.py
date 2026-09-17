@@ -436,24 +436,29 @@ def test_an_area_labelled_issue_is_not_an_incident_record(report_factory):
     """The #766 regression: #141/#494/#495/#497 hold the AREA label, not a record.
 
     All four are work items with no incident to record, so none of them may be
-    a finding — and none may need a hand-written exemption to say so.
+    a finding — and none may need a hand-written exemption to say so. #100 is
+    the issue the ledger *names* as INC-0001's origin, so it carries the record
+    label; the AREA-labelled four must not be selected by it (issue #1178).
     """
     snapshot = board(
-        board_issue(100, state="OPEN", labels=["area:board"]),
+        board_issue(100, state="OPEN", labels=[INCIDENT_LABEL]),
         {**board_issue(141, state="CLOSED"), "labels": [AREA_LABEL, "area:lessons"]},
         {**board_issue(494, state="CLOSED"), "labels": [AREA_LABEL]},
         {**board_issue(495, state="CLOSED"), "labels": [AREA_LABEL]},
         {**board_issue(497, state="CLOSED"), "labels": [AREA_LABEL]},
     )
     report = report_factory(clean_ledger(), snapshot=snapshot)
-    assert report.counts["board_incidents_scanned"] == 0
+    assert report.counts["board_incidents_scanned"] == 1
     assert [f for f in report.findings if f.code.startswith("board-incident")] == []
+    subjects = {f.subject for f in report.findings}
+    for ref in ("#141", "#494", "#495", "#497"):
+        assert ref not in subjects
     assert errors(report.findings) == []
 
 
 def test_an_open_record_labelled_issue_is_a_deviation(report_factory, clean_records):
     snapshot = board(
-        board_issue(100, state="OPEN", labels=["area:board"]),
+        board_issue(100, state="OPEN", labels=[INCIDENT_LABEL]),
         board_issue(900, state="OPEN"),
     )
     report = report_factory(clean_records, snapshot=snapshot)
