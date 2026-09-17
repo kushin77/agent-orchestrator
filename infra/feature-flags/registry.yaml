@@ -31,10 +31,18 @@ apply_path:
 ci_cd:
   verify_trigger:
     default: off
+    promoted: true
     description: PR verify trigger runs `make verify` as a code-native CI status.
   apply_trigger:
     default: off
-    description: Flag-gated terraform apply trigger; the only apply route.
+    promoted: true
+    description: >
+      Flag-gated terraform apply trigger; the only apply route. Promotion
+      here records the reviewed go-live decision; arming the live trigger
+      (`gcloud builds triggers update --no-disabled`, out-of-band, never a
+      commit) is a separate operational step, and apply.yaml's flag-gate
+      still refuses every run while `_ENABLE_APPLY` stays "false"
+      (infra/cloudbuild/apply-trigger.yaml).
 
 # Per-service promotion state. `tf_flag` maps to the matching variable in
 # infra/terraform/variables.tf (all default false).
