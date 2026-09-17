@@ -14,6 +14,13 @@
 # it, and refuses both an `area:` label in that position and any `board.`
 # `exemptions` list. See governance/lessons/policy.yaml.
 #
+# One RCA id authority (issue #1052): governance/lessons/ledger.jsonl is the
+# only place an INC-*/RCA-*/CA-*/LESSON-*/SUGGEST-* id is minted, so this check
+# also fails a duplicate id, a docs/rca/*.md RCA-NNNN token that is not a
+# ledger id (or that a doc heading MINTS while the ledger's artifact for it is
+# a different file — a lightweight doc may CITE a ledger RCA, never mint one),
+# and a README incident count that does not match the ledger's actual count.
+#
 # PART 2 (issue #766) is the provoked negative control:
 # governance/lessons/negative_control.py plants one fact per probe and requires
 # the named verdict — an area label producing no incident, a record label with
