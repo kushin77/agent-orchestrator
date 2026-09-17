@@ -698,3 +698,55 @@ def test_every_mandate_code_is_a_declared_refusal(taxonomy):
 def test_the_mandate_is_provoked_in_both_directions():
     assert MD.CODE_MISSING_DOC in PV.PROVOCATIONS_BY_REFUSAL
     assert MD.CODE_MISSING_MARKER in PV.PROVOCATIONS_BY_REFUSAL
+
+
+# ---------------------------------------------------------------------------
+# the filing seam's tag defaults must be legal (issue #1182)
+# ---------------------------------------------------------------------------
+CONFORMANCE_POLICY = ROOT / "governance" / "conformance" / "policy.yaml"
+
+
+def test_the_filing_defaults_are_legal_values(taxonomy):
+    assert M.filing_drift(taxonomy, CONFORMANCE_POLICY) == []
+
+
+def test_the_filing_default_drift_code_is_a_declared_refusal(taxonomy):
+    assert M.CODE_FILING_DEFAULT_DRIFT in taxonomy.refusal_ids
+    assert M.CODE_FILING_DEFAULT_DRIFT in M.REFUSAL_CODES
+
+
+def test_an_illegal_filing_default_is_refused_by_name(tmp_path, taxonomy):
+    text = CONFORMANCE_POLICY.read_text(encoding="utf-8")
+    mutant_text = text.replace("    posture: overall", "    posture: mythic", 1)
+    assert mutant_text != text, "the posture default was not present to mutate"
+    mutant = tmp_path / "policy.yaml"
+    mutant.write_text(mutant_text, encoding="utf-8")
+    findings = M.filing_drift(taxonomy, mutant)
+    assert M.CODE_FILING_DEFAULT_DRIFT in {f.code for f in findings}
+    assert any("mythic" in f.message for f in findings)
+
+
+def test_an_undeclared_filing_tag_is_refused_by_name(tmp_path, taxonomy):
+    text = CONFORMANCE_POLICY.read_text(encoding="utf-8")
+    mutant_text = text.replace("tags: [posture, lifecycle]", "tags: [posture, lifecycle, mood]", 1)
+    assert mutant_text != text
+    mutant = tmp_path / "policy.yaml"
+    mutant.write_text(mutant_text, encoding="utf-8")
+    findings = M.filing_drift(taxonomy, mutant)
+    assert M.CODE_FILING_DEFAULT_DRIFT in {f.code for f in findings}
+    assert any("mood" in f.message for f in findings)
+
+
+def test_a_missing_filing_default_is_refused(tmp_path, taxonomy):
+    text = CONFORMANCE_POLICY.read_text(encoding="utf-8")
+    mutant_text = text.replace("    posture: overall", "    posture: ")
+    assert mutant_text != text
+    mutant = tmp_path / "policy.yaml"
+    mutant.write_text(mutant_text, encoding="utf-8")
+    findings = M.filing_drift(taxonomy, mutant)
+    assert M.CODE_FILING_DEFAULT_DRIFT in {f.code for f in findings}
+
+
+def test_an_unreadable_policy_is_refused(tmp_path, taxonomy):
+    findings = M.filing_drift(taxonomy, tmp_path / "absent.yaml")
+    assert M.CODE_FILING_DEFAULT_DRIFT in {f.code for f in findings}

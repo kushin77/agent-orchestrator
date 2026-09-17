@@ -42,6 +42,7 @@ of a surprise.
 | `cli.py` | The verbs: `lint`, `check`, `plan`, `matrix`, `board`, `labels`, `schema`. |
 | `provoke.py` | The refusal negative control: one real mutant per declared refusal. |
 | `artifacts.py` | The artifact round trips: the shapes, the ledger and the projection, each with its clean twin. |
+| `e2e.py` | **The end-to-end chain.** One offline run proves a tag set derives a plan whose gates all resolve, whose matrix names the fired rules, whose mandate holds in this tree, and whose filing seam derives the same tag dimensions for a NEW issue — with each link's provoked half and clean twin. |
 | `mandate.py` | **The mandate.** Asserts the repository's contract documents (`AGENTS.md`, `docs/GOLDEN-RULES.md`, `docs/GOVERNANCE.md`, `docs/EXECUTION-PLAN.md`, `docs/QA-GATE.md`) declare the tag authority and its `posture`/`lifecycle` dimensions, and FAILS naming the document **and** the marker that went missing — the mechanism that keeps the rule constitutional rather than advisory (GR-29). `--list` prints the marker vocabulary. |
 | `tests/` | The suite, `check-tagging.sh` runs it. |
 

@@ -137,10 +137,10 @@ Baseline gates applied to every tag set: `make:shell-syntax`, `check:python-synt
 | `epic` | pattern | `^[a-z][a-z0-9-]{1,60}$` | no | issue | declared here |
 | `finops` | borrowed | `flash`, `pro`, `auditor` | no | issue | borrowed: `governance/finops/policy.json` → `vocabulary.tiers` |
 | `gdc` | closed | `enterprise` | no | issue | declared here |
-| `lifecycle` | closed | `plan`, `build`, `verify`, `release`, `operate`, `retire` | no | issue, pr | declared here |
+| `lifecycle` | closed | `plan`, `build`, `verify`, `release`, `operate`, `retire` | no | issue, pr | name anchored: `governance/conformance/policy.yaml` → `prefixed` |
 | `phase` | closed | `0-foundations`, `1-agent-registry`, `2-model-gateway`, `3-state-machine`, `4-guardrails-security`, `5-observability-finops`, `6-identity-rbac`, `7-control-plane`, `8-autonomous-ops` | no | issue | declared here |
 | `pillar` | closed | `registry-profiling`, `model-gateway`, `state-machine`, `guardrails-security`, `observability-finops`, `identity-rbac`, `control-plane`, `autonomous-ops`, `governance` | no | issue | declared here |
-| `posture` | closed | `overall`, `saas`, `iac`, `no-human-needed`, `human-gated` | yes | issue, pr | declared here |
+| `posture` | closed | `overall`, `saas`, `iac`, `no-human-needed`, `human-gated` | yes | issue, pr | name anchored: `governance/conformance/policy.yaml` → `prefixed` |
 | `priority` | closed | `P0`, `P1`, `P2`, `P3` | no | issue | name anchored: `governance/conformance/policy.yaml` → `required` |
 | `source` | closed | `cannibalized`, `decision` | no | issue | declared here |
 | `type` | closed | `feature`, `bug`, `task`, `spike`, `research`, `epic`, `automation`, `governance` | no | issue | name anchored: `governance/conformance/policy.yaml` → `required` |
@@ -152,16 +152,17 @@ Baseline gates applied to every tag set: `make:shell-syntax`, `check:python-synt
 `scripts/check-tagging.sh` is tri-state (`0 OK / 1 NOT-OK / 2 CANNOT-ASSESS`,
 and `CANNOT-ASSESS` is never a pass) and it is wired into `make verify` by
 auto-discovery (`scripts/verify.sh`, #698) and into `make lint`, so it is
-enforced the moment it lands. It runs **six** checks:
+enforced the moment it lands. It runs **seven** checks:
 
 | Check | What it proves |
 |---|---|
 | `tagging-lint` | the authority's own shape, every borrowed vocabulary's **equality** with its authority, every rule's `when` clause, every gate name's **resolution**, every document against its frozen shape, and the declared controls against the authority they govern |
 | `tagging-matrix` | the matrix below is the one the authority generates |
 | `tagging-suite` | the module's pytest suite |
-| `tagging-refusals` | every one of the **13** declared refusals is provoked by a real mutant, **by code and by the token the taxonomy promises it names**, with its clean twin accepted |
+| `tagging-refusals` | every one of the **14** declared refusals is provoked by a real mutant, **by code and by the token the taxonomy promises it names**, with its clean twin accepted |
 | `tagging-artifacts` | the frozen shapes, the ledger and the live projection round-trip — each driven with its provoked half *and* its clean twin |
 | `tagging-mandate` | the **constitution still declares the rule** — five contract documents each declare the tag authority and the `posture`/`lifecycle` dimensions, and the check FAILS naming the document **and** the marker that went missing |
+| `tagging-e2e` | the **whole chain** — a tag set derives a plan, every gate in it resolves, the matrix names the rules that fired, the mandate holds in this tree, the filing seam derives the same tag dimensions for a NEW issue, and the filing defaults are values the authority declares |
 
 The refusals check is the one that matters most, because a gate that cannot fail
 is a formality (GR-12). It asserts three things at once: the mutant actually
@@ -224,8 +225,17 @@ Two epics carry **two pillars each** on a single-valued dimension — a board de
 that is invisible until something declares the dimension closed, which nothing had
 done. The 85 `required-missing` deviations are the two dimensions this issue adds,
 reported as deviations exactly as the calibration intends: the board predates
-them, and enforcing them outright would paint the gate red for a reason no lane
-can fix by working its own issue.
+them.
+
+**The prevention half landed with the same change (#1182).**
+`governance/conformance/policy.yaml` now lists `posture` and `lifecycle` in its
+`prefixed` vocabulary and derives them from `filing.tags` + `filing.defaults`, so
+**a newly filed issue is born with `posture:overall` and `lifecycle:build`** and
+the deviation count stops growing. The link is held both ways: the filing seam's
+own `filing-check` proves it derives them (and refuses a filing that cannot), and
+the tag authority's `filing-default-drift` refusal proves a default can never name
+a value the taxonomy does not declare — a default that fills the board with an
+illegal value is the quiet-drift failure ADR-0015 names.
 
 ## What this does *not* yet do
 
@@ -236,11 +246,10 @@ Stated plainly, because a gap named is a gap that can be closed:
   that does not exist yet; claiming a closed set here would be a lie the first
   time someone adds one. The authority says so in the file rather than implying a
   rigor it does not have.
-- **Nothing enforces this on issue creation yet.** `governance/conformance/filing.py`
-  derives the conformance labels a new issue carries; it does not yet derive the
-  `posture`/`lifecycle` labels, so the deviations above will keep accruing until a
-  filing path derives them. That is the natural next lane, and it is deliberately
-  not claimed here.
+- The **legacy** 85 deviations are not repaired, only stopped from growing. The
+  filing seam binds NEW issues; the existing board still carries its 85
+  `required-missing` deviations until a lane re-tags them (or #1158's
+  board-metadata audit closes them).
 - `board` validation reads the **offline snapshot** (`.board/snapshot.json`), so
   it needs `python3 governance/dispatch/cli.py snapshot --from-github` to be
   fresh. It is deliberately *not* in the default `make verify` path, which stays
