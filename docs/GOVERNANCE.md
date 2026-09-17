@@ -106,6 +106,13 @@ AI-originated issues, PRs, commits, and doc sections declare their source:
   `AI-assistance: Copilot (Relentless, flash/LOW)`).
 - **Commit references (GR-2):** every commit references its issue with
   `Refs kushin77/agent-orchestrator#<n>`; every PR closes one with `Closes #<n>`.
+- **Merge order / Gate-changing declaration (issue #1054):** every PR carries
+  `Gate-changing: no` or `Gate-changing: yes — <paths>` in its `## Merge order`
+  section. `scripts/check-pr-contract.sh` cross-checks the declaration against
+  the PR's diff (a `no` that touches a gate script, or a `yes` that touches
+  none, is refused by name) so `scripts/pr-queue.sh` can order gate-changing
+  PRs last mechanically instead of a reviewer reading the file list. The path
+  list lives in `scripts/lib/gate-paths.txt`.
 - **Provenance (GR-10):** cannibalized/harvested assets record source (repo,
   path, license) in the cannibalization index (issue #8). `vendor/CMR` is a
   pinned submodule; `.research/` clones are gitignored.
@@ -128,6 +135,7 @@ AI-originated issues, PRs, commits, and doc sections declare their source:
 - [ ] Docs kept in sync (architecture / execution plan / governance)
 - [ ] AI-assistance + runtime declared
 - [ ] `Closes #<n>` referenced
+- [ ] `## Merge order` / `Gate-changing:` declared and matches the diff
 
 ## 5. Roadmap & work intake
 
