@@ -8,6 +8,7 @@ Index of the repo's canonical documentation. Agents start at
 | Doc | Purpose |
 |-----|---------|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Five-pillar control-plane architecture (source of truth; EPIC-00 = issue #4). |
+| [`RELEASE-PLAN.md`](RELEASE-PLAN.md) | The v1.0.0 commitment and SemVer contract: surfaces under contract, v1.0.0 exit criteria mapped to issue #803's acceptance boxes, residual risks named (issue #1074). |
 | [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | One-issue-one-lane parallel dispatch contract, phase/wave sequencing 0–8. |
 | [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md) | Sourced fork-map of upstream `paperclip.ing` against the fleet's own primitives (issue #368). |
 | [`ERP-MODULE-GAP-ANALYSIS.md`](ERP-MODULE-GAP-ANALYSIS.md) | Feature-by-feature gap of frappe/erpnext against our pillars — the indexer-fed ERP module plan (issue #612, EPIC #645). |
