@@ -95,7 +95,7 @@ notice.
   it is ever revived.
 
 - **Evidence-SHA caveat:** the lesson's commit evidence names the lane
-  commit that ships the gate (`4e7684bcefeb3f7bbbf275474ea1a684063ec25f`). If #1029 lands by squash, that
-  commit is not an ancestor of `master`; append the merge commit (the
-  ledger resolves evidence with `git cat-file -e`, so the object must be
-  present in a fresh clone).
+  commit that ships the gate (`8fd97e3535102c53a9843fe6b095a73407346ddb`). **recorded post-merge, citing the SQUASH commit `8fd97e3` that ships it** —
+  a lesson must cite a commit reachable from `master` (the ledger resolves
+  evidence with `git cat-file -e`, so a lane commit disappears with `--delete-branch`
+  and a fresh clone would flag it). That is now the recorded practice.
