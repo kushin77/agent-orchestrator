@@ -163,6 +163,24 @@ def test_console_shell_and_login_present():
     assert (VIEWS / "login.html").exists()
 
 
+def test_logout_button_delegates_to_gate_logout():
+    """Sign-out must clear the auth gate's session, not just the console's own
+    token cookie.
+
+    The gate's session is the ``os_session`` cookie it sets; the console only
+    ever sees a derived ``os-session-token``. Navigating to
+    ``/views/login.html`` after a console-side logout would loop: the gate
+    re-mints a fresh ``os-session-token`` from the still-valid ``os_session``
+    cookie, logging the user straight back in. The fix delegates to the gate's
+    authoritative navigation logout (``/auth/logout``), which clears
+    ``os_session`` + ``os_csrf`` + ``os-session-token`` and redirects to
+    ``/auth/login``.
+    """
+    js = (STATIC / "js" / "console.js").read_text(encoding="utf-8")
+    assert 'window.location.href = "/auth/logout"' in js
+    assert 'window.location.href = "/views/login.html"' not in js
+
+
 def test_provenance_document_exists():
     provenance = STATIC / "design-tokens" / "PROVENANCE.md"
     assert provenance.exists()

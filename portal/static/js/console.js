@@ -177,7 +177,11 @@
 
   document.getElementById("logoutBtn").addEventListener("click", async function () {
     try { await CP.post("/api/console/logout", {}); } catch (e) { /* ignore */ }
-    window.location.href = "/views/login.html";
+    // Clear the gate's session by delegating to its authoritative navigation
+    // logout (/auth/logout clears os_session + os_csrf + os-session-token).
+    // Navigating to /views/login.html would loop back in: the gate re-issues a
+    // fresh os-session-token from the still-valid os_session cookie.
+    window.location.href = "/auth/logout";
   });
   window.addEventListener("popstate", function () { loadView(currentView()); });
 })();

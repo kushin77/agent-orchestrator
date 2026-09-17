@@ -228,12 +228,20 @@ def verify_console_session_token(
     *,
     now: int,
     require_purpose: bool = True,
+    require_tenant: bool = False,
 ) -> dict[str, Any]:
     """Verify an RS256 console token kid-indexed against trusted public keys.
 
     Fail closed: a token whose ``kid`` matches no trusted key is rejected
     (shared-frontend issue #131), as is any token that is not the
     ``os-session-token`` purpose or that has expired.
+
+    ``tenantId`` is **not** required by default: the shared-frontend auth gate
+    mints the console token tenant-agnostic (``purpose``/``sub``/``email``/
+    ``name``/``role`` — no tenant claim, because one gate serves every portal
+    origin). The consumer maps a verified identity to tenants from its own org
+    directory, never from the token. Pass ``require_tenant=True`` only for the
+    tenant-scoped tokens this repo itself mints.
     """
     header, claims = _split_console_token(token)
     kid = header.get("kid")
@@ -256,7 +264,8 @@ def verify_console_session_token(
             f"console token purpose {verified.get('purpose')!r} is not "
             f"{CONSOLE_TOKEN_PURPOSE!r}"
         )
-    _require_valid_tenant_claim(verified)
+    if require_tenant:
+        _require_valid_tenant_claim(verified)
     return verified
 
 

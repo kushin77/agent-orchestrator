@@ -407,12 +407,18 @@ class SsoService:
         return session
 
     def verify_console(self, token: str, *, now: Optional[int] = None) -> dict[str, Any]:
-        """Verify an RS256 console token against the trusted kid set."""
+        """Verify an RS256 console token against the trusted kid set.
+
+        The tenant-SSO console token this facade mints is tenant-scoped, so the
+        verifier is asked to enforce the ``tenantId`` claim here — unlike the
+        shared-frontend gate token the portal/chat surfaces consume, which is
+        tenant-agnostic.
+        """
         if not self.console_verify:
             raise SsoConfigError("no console verification keys configured")
         now_i = int(now if now is not None else time.time())
         return verify_console_session_token(
-            token, self.console_verify, now=now_i
+            token, self.console_verify, now=now_i, require_tenant=True
         )
 
     def console_jwks_payload(self) -> dict[str, Any]:
