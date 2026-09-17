@@ -281,6 +281,26 @@ if mode == "ff":
     print(f"ff_detail={detail[:160]}")
     sys.exit(0)
 
+if mode == "lease":
+    # #977 (issue #706 D5): a second replica of the fleet-cron pair must never
+    # act on the same tick. Simulate it by pre-holding the tick's own lease
+    # file before calling watchdog_once(), then MEASURE whether the guarded
+    # pass ran — not whether it merely reported OK.
+    import lease as lease_mod
+
+    calls = []
+    watchdog._watchdog_once_locked = lambda force: calls.append(1) or watchdog.channel.EXIT_OK
+
+    lock_path = watchdog.FLEET_DIR / "watchdog.lease"
+    holder = lease_mod.FcntlLease(path=lock_path)
+    assert holder.acquire() is True, "setup: could not pre-hold the lease"
+
+    rc = watchdog.watchdog_once()
+    print(f"LEASE_LOCKED_CALLS={len(calls)}")
+    print(f"LEASE_RC={rc}")
+    holder.release()
+    sys.exit(0)
+
 print(f"UNKNOWN-MODE {mode}", file=sys.stderr)
 sys.exit(9)
 DRIVER
@@ -517,6 +537,72 @@ else
     ok "M2 caught: the stale checkout reads '$m2_case' and is respawned into itself (ff=$m2_ff, respawn=$m2_respawn)"
   else
     bad "M2 survived: the stale checkout is still fast-forwarded (case=$m2_case ff=$m2_ff respawn=$m2_respawn)"
+  fi
+fi
+
+# --- 4. the tick's own single-writer lease (#977, issue #706 D5) -------------
+echo "== the watchdog tick's own lease =="
+lease_state="$work/state-lease-real"
+lease_out="$work/lease-real.out"
+if run_driver "$ROOT" "$lease_state" lease "$lease_out"; then
+  real_locked="$(kv "$lease_out" LEASE_LOCKED_CALLS)"
+  real_rc="$(kv "$lease_out" LEASE_RC)"
+  if [ "$real_locked" = "0" ] && [ "$real_rc" = "0" ]; then
+    ok "real fleet/watchdog.py: a pre-held lease stops the tick from acting (rc=$real_rc)"
+  else
+    bad "real fleet/watchdog.py acted even though the lease was held elsewhere (locked_calls=$real_locked rc=$real_rc)"
+  fi
+else
+  cat "$lease_out" >&2
+  bad "the lease driver could not run against the real tree"
+fi
+
+echo "== mutant 3: the watchdog tick's lease acquire removed =="
+mutant_tree="$work/mutant-lease"
+copy_tree "$mutant_tree" || {
+  echo "check-watchdog-bounded: CANNOT-ASSESS — cannot copy the tree for the mutant" >&2
+  exit 2
+}
+before="$(sha_of "$mutant_tree/fleet/watchdog.py")"
+python3 - "$mutant_tree/fleet/watchdog.py" <<'MUTATE'
+"""Remove the tick's own lease guard: two replicas would both act (#977)."""
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+source = path.read_text(encoding="utf-8")
+needle = "    if not watchdog_lease.acquire():"
+if needle not in source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+mutant = source.replace(needle, "    if False:  # MUTANT: the lease acquire is gone", 1)
+if mutant == source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+path.write_text(mutant, encoding="utf-8")
+print("MUTATED")
+MUTATE
+if [ "$?" -ne 0 ]; then
+  bad "the lease mutation could not be constructed (the source moved)"
+else
+  after="$(sha_of "$mutant_tree/fleet/watchdog.py")"
+  if [ "$after" = "$before" ]; then
+    bad "M3: the mutation did not land (sha256 unchanged) — the control would be vacuous"
+  else
+    ok "M3: the mutation landed (sha256 ${before:0:12} -> ${after:0:12})"
+    m3_state="$work/state-lease-mutant"
+    m3_out="$work/lease-mutant.out"
+    if run_driver "$mutant_tree" "$m3_state" lease "$m3_out"; then
+      m3_locked="$(kv "$m3_out" LEASE_LOCKED_CALLS)"
+      if [ "$m3_locked" != "0" ]; then
+        ok "M3 caught: without the acquire, a second replica acts anyway (locked_calls=$m3_locked)"
+      else
+        bad "M3 survived: the mutant still refused to act — the probe cannot detect the missing acquire"
+      fi
+    else
+      cat "$m3_out" >&2
+      bad "the lease driver could not run against the M3 mutant tree"
+    fi
   fi
 fi
 

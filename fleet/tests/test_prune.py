@@ -399,3 +399,70 @@ def test_a_disabled_line_is_still_recognised_as_ours():
     assert cron._is_ours("# " + cron.line(2))
     assert cron._is_ours("# " + cron.reconcile_line(2))
     assert not cron._is_ours("0 * * * * /usr/bin/true # someone-else")
+
+
+# --- #977: the prune rung's own single-writer lease -----------------------
+
+
+def test_apply_noops_and_logs_skip_when_lease_lost(isolate_prune, monkeypatch, capsys):
+    """A lost lease race on `--apply` is not a failure: no-op, skip record, exit 0."""
+    fleet, ledger = isolate_prune
+    write_message(fleet / "outbox" / "old.json", age_days=30, id="old")
+    before = fingerprint(fleet)
+
+    class _LosingLease:
+        def acquire(self):
+            return False
+
+        def release(self):  # pragma: no cover
+            raise AssertionError("release must not be called when acquire never won")
+
+    monkeypatch.setattr(prune.lease, "make_lease", lambda **kwargs: _LosingLease())
+    monkeypatch.setattr(
+        prune, "_cmd_run_locked", lambda args: (_ for _ in ()).throw(
+            AssertionError("must not touch the mailbox when the lease was lost")
+        )
+    )
+
+    rc = run_prune(fleet, ledger, apply=True)
+
+    assert rc == prune.EXIT_OK
+    assert fingerprint(fleet) == before, "a lost lease must mutate nothing"
+    out = capsys.readouterr().out
+    assert '"status": "skipped"' in out
+    assert '"job": "prune"' in out
+
+
+def test_apply_releases_the_lease_even_when_the_locked_pass_raises(isolate_prune, monkeypatch):
+    fleet, ledger = isolate_prune
+    released = []
+
+    class _WinningLease:
+        def acquire(self):
+            return True
+
+        def release(self):
+            released.append(True)
+
+    monkeypatch.setattr(prune.lease, "make_lease", lambda **kwargs: _WinningLease())
+    monkeypatch.setattr(
+        prune, "_cmd_run_locked", lambda args: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+
+    with pytest.raises(RuntimeError):
+        run_prune(fleet, ledger, apply=True)
+
+    assert released == [True]
+
+
+def test_dry_run_never_touches_the_lease(isolate_prune, monkeypatch):
+    """A dry run is read-only; it must not even attempt to acquire the lease."""
+    fleet, ledger = isolate_prune
+
+    monkeypatch.setattr(
+        prune.lease, "make_lease", lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("a dry run must not touch the lease at all")
+        )
+    )
+
+    assert run_prune(fleet, ledger, apply=False) == prune.EXIT_OK

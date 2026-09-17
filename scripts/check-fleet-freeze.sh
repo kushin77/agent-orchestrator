@@ -172,7 +172,80 @@ else
   bad "fleet/tests/test_freeze.py is not green"
 fi
 
-# --- 4. the wiring note -------------------------------------------------------
+# --- 4. the enforcement: fleet/watchdog.py must actually call refuse_if_frozen
+#        before every spawn (#978) — provoked negative control -------------------
+watchdog_src="$root/fleet/watchdog.py"
+call_count="$(grep -c 'freeze\.refuse_if_frozen(' "$watchdog_src" 2>/dev/null || echo 0)"
+if [ "$call_count" -lt 2 ]; then
+  bad "fleet/watchdog.py calls freeze.refuse_if_frozen() only $call_count time(s) (need >=2: respawn + start_monitor)"
+else
+  ok "fleet/watchdog.py calls freeze.refuse_if_frozen() $call_count time(s) before spawning"
+fi
+
+# Provoke: a copy of watchdog.py with every refuse_if_frozen() call stripped
+# must FAIL the wiring probe below (frozen no longer stops a spawn); the real
+# file must PASS it. Same file, one deletion apart — proves the probe is not
+# vacuously green.
+probe="$work/wiring_probe.py"
+cat > "$probe" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+from types import ModuleType
+
+watchdog_path = Path(sys.argv[1])
+fleet_dir = Path(sys.argv[2])
+scratch_dir = Path(sys.argv[3])
+sys.path.insert(0, str(fleet_dir))
+
+spec = importlib.util.spec_from_file_location("watchdog_probe", watchdog_path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+spawned = []
+mod.spawn = lambda *a, **k: spawned.append((a, k))
+mod.loop_pid = lambda pattern: None
+mod.read_beat = lambda path: None
+mod.rung_came_up = lambda *a, **k: True
+mod.freeze.refuse_if_frozen = lambda rung: f"[{rung}] REFUSED — frozen"
+# Never read/write the real .fleet/ — a stale real drift record (e.g. already
+# PARKED from unrelated history) would short-circuit bounded_remedy before it
+# ever reaches respawn(), making this probe pass vacuously either way.
+mod.FLEET_DIR = scratch_dir
+mod.RUNS_DIR = scratch_dir / "runs"
+
+try:
+    mod.rung_action("sister", "fleet/terminal.py", "fleet/terminal.sh", Path("/tmp/x"), False, "head")
+except Exception as exc:  # a mangled call site (e.g. the check line removed) is also "not wired"
+    print(f"FAIL: rung_action raised instead of refusing cleanly: {type(exc).__name__}: {exc}")
+    raise SystemExit(1)
+
+if spawned:
+    print("FAIL: a spawn happened while frozen")
+    raise SystemExit(1)
+print("PASS: no spawn happened while frozen")
+raise SystemExit(0)
+PY
+
+wiring_scratch="$work/wiring-scratch"
+mkdir -p "$wiring_scratch/real" "$wiring_scratch/provoked"
+if python3 "$probe" "$watchdog_src" "$root/fleet" "$wiring_scratch/real" > "$work/wiring_real.log" 2>&1; then
+  ok "real fleet/watchdog.py: refuse_if_frozen actually stops a spawn"
+else
+  cat "$work/wiring_real.log" >&2
+  bad "real fleet/watchdog.py did NOT refuse to spawn while frozen"
+fi
+
+provoked="$work/watchdog_provoked.py"
+grep -v 'freeze\.refuse_if_frozen(' "$watchdog_src" > "$provoked"
+if python3 "$probe" "$provoked" "$root/fleet" "$wiring_scratch/provoked" > "$work/wiring_provoked.log" 2>&1; then
+  cat "$work/wiring_provoked.log" >&2
+  bad "provocation (refuse_if_frozen call removed) did NOT fail — the wiring probe cannot detect its absence"
+else
+  grep -q "FAIL:" "$work/wiring_provoked.log" && ok "provoked copy (refuse_if_frozen removed) correctly spawns while frozen and is caught"
+fi
+
+# --- 5. the wiring note -------------------------------------------------------
 if grep -qF 'bash scripts/check-fleet-freeze.sh' scripts/verify.sh 2>/dev/null; then
   ok "scripts/verify.sh runs this check"
 else

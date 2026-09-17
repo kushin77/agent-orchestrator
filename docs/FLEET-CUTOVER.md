@@ -40,12 +40,17 @@ run already in progress — a rung mid-directive is allowed to finish naturally.
 
 `fleet.freeze.refuse_if_frozen(rung)` is the check function any dispatch path
 is meant to call before starting new local work for `rung`; it returns a
-human-readable refusal string while the flag is set, `None` otherwise. **As of
-this issue it is wired into nothing** — `fleet/watchdog.py` is owned by another
-lane (per #902, `fleet/cron.py` and the runbook are split the same way: #902
-owns `fleet/cron.py` itself, this issue owns the runbook and `fleet/freeze.py`).
-Wiring `refuse_if_frozen` into the watchdog's respawn/dispatch path is a
-**follow-up**, called out again in the PR description for this issue.
+human-readable refusal string while the flag is set, `None` otherwise.
+
+**Enforced as of #978:** `fleet/watchdog.py` now calls `refuse_if_frozen(rung)`
+immediately before every spawn site (`respawn()` and `start_monitor()`) — so
+this runbook's claimed behavior ("no new local dispatch starts") is not just
+recorded intent, it is checked in code before each respawn/spawn call, with a
+negative control (`scripts/check-fleet-freeze.sh`) proving a copy of
+`fleet/watchdog.py` with that call removed spawns anyway and is caught. A
+refused spawn is logged and does not count against the watchdog's own
+bounded-remedy attempt budget; an in-flight rung already running is left
+untouched, exactly as before.
 
 **Drain is complete** when `python3 fleet/freeze.py status` reports zero live
 local rungs (it checks `brain`, `sister`, `monitor` — the same set

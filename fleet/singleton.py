@@ -13,11 +13,10 @@ lock — an honest refusal, not a silent second worker.
 
 from __future__ import annotations
 
-import fcntl
 import json
-import os
 from pathlib import Path
 
+import lease
 import runtime
 
 FLEET = runtime.FLEET_DIR
@@ -41,19 +40,11 @@ def acquire(rung: str) -> int | None:
 
     The fd is intentionally leaked to the process: releasing it (a `finally`, a
     GC) would unlock the rung, and the lock must live exactly as long as the
-    loop does.
+    loop does. Delegates to `lease.fcntl_try_lock`, the same open+flock+write
+    sequence `gatelock.py` and `fleet/lease.py`'s `FcntlLease` use, so this
+    module does not keep its own copy of it (issue #713).
     """
-    path = lock_path(rung)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        os.close(fd)
-        return None
-    os.truncate(fd, 0)
-    os.write(fd, f"{os.getpid()}\n".encode("utf-8"))
-    return fd
+    return lease.fcntl_try_lock(lock_path(rung))
 
 
 def guard(rung: str, start_cmd: str) -> bool:

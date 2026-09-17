@@ -42,6 +42,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+if str(ROOT / "fleet") not in sys.path:
+    sys.path.insert(0, str(ROOT / "fleet"))
+
+import lease  # noqa: E402  (#977 — single-writer lease around `watch --once`)
 
 from governance.lifecycle.report import (  # noqa: E402
     DEDUPED,
@@ -72,6 +76,13 @@ from governance.reconcile.sweep import (  # noqa: E402
 EXIT_OK = 0
 EXIT_NOT_OK = 1
 EXIT_CANNOT_ASSESS = 2
+
+#: The reconcile rung's single-writer lease (#977, issue #706 D5) — two
+#: replicas of the fleet-cron pair must never sweep/reconcile orphans at the
+#: same time (double-reclaiming a lane or double-releasing a claim is the
+#: race this closes). `AO_FLEET_LOCK_BACKEND` (default `fcntl`, GR-28).
+RECONCILE_LEASE_JOB = "reconcile"
+RECONCILE_LEASE_TTL_SECONDS = 900.0  # 2x reconcile's own nominal execution budget (450s)
 
 
 def _reporter(root: str) -> BoardReporter:
@@ -210,6 +221,24 @@ def cmd_watch(args: argparse.Namespace) -> int:
     passes = 0
     while True:
         passes += 1
+        # #977 (issue #706 D5): acquire the single-writer lease BEFORE this
+        # pass does any work. The loser no-ops the pass and logs a skip
+        # record — it is not an error, just the other replica already
+        # holding this tick.
+        reconcile_lease = lease.make_lease(
+            job=RECONCILE_LEASE_JOB,
+            path=Path(args.root) / ".fleet" / f"{RECONCILE_LEASE_JOB}.lease",
+            ttl_seconds=RECONCILE_LEASE_TTL_SECONDS,
+        )
+        if not reconcile_lease.acquire():
+            record = lease.skipped_log(
+                RECONCILE_LEASE_JOB, backend=lease.backend_name(), detail="reconcile lease held elsewhere"
+            )
+            print(f"reconcile[{passes}]: {json.dumps(record, sort_keys=True)}", flush=True)
+            if args.once:
+                return EXIT_OK
+            time.sleep(args.interval_seconds)
+            continue
         try:
             report = sweep(
                 args.root,
@@ -230,6 +259,8 @@ def cmd_watch(args: argparse.Namespace) -> int:
                 _print_board_reports(report.board_reports)
         except Exception as exc:  # noqa: BLE001 - the worker outlives a bad pass
             print(f"reconcile[{passes}]: pass failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        finally:
+            reconcile_lease.release()
         if args.once:
             return EXIT_OK
         time.sleep(args.interval_seconds)

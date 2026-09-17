@@ -60,8 +60,6 @@ Exit codes of ``scripts/gate-lock.sh`` are deliberately outside the gate's own
 from __future__ import annotations
 
 import argparse
-import errno
-import fcntl
 import hashlib
 import json
 import os
@@ -71,6 +69,8 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+import lease
 
 MODULE = "gate-lock"
 
@@ -415,13 +415,19 @@ def _flock_fresh(fd: int, path: Path) -> bool:
 
 
 def _try_lock(fd: int) -> bool:
+    """Non-blocking exclusive flock on `fd`, via `lease.fcntl_flock_nb`.
+
+    Calls the shared helper in `strict=True` mode: this module needs "held"
+    (ordinary contention, returns False) kept distinguishable from "the store
+    is broken" (any other OSError) — issue #713's acceptance criteria calls
+    this out explicitly ("held must be distinguishable from failed"). One
+    flock call site now backs `singleton.py`, `gatelock.py`, and
+    `fleet/lease.py`'s own `FcntlLease`.
+    """
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError as exc:
-        if exc.errno in (errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK):
-            return False
-        raise StoreUnusable(f"flock failed: {exc}") from exc
-    return True
+        return lease.fcntl_flock_nb(fd, strict=True)
+    except lease.LeaseError as exc:
+        raise StoreUnusable(str(exc)) from exc
 
 
 def _is_held(path: Path) -> bool:
