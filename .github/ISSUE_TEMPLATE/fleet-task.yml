@@ -16,6 +16,16 @@ body:
         directive. The issue-template gate fails if a required field is dropped
         from this form, so edit the form only together with its gate.
 
+        **The clock invariant (issue #506, `RCA-0008`).** A fixture that pins a
+        literal date while the code under test resolves its evaluation bucket
+        from the live clock is green on the day it is written and red every day
+        after — measured, `47 passed` on the day and `2 failed, 45 passed` daily
+        thereafter, identically at the very commit that closed that issue. Ask
+        the two clock questions in Acceptance criteria while the work is being
+        shaped: a detector that reads the fixture cannot stand in for them,
+        because at byte-identical seed lines it refuses the defect and its own
+        repair alike.
+
   - type: dropdown
     id: role
     attributes:
@@ -115,10 +125,14 @@ body:
     id: acceptance-criteria
     attributes:
       label: Acceptance criteria
-      description: Each criterion must be mechanically checkable, with the command or assertion that decides it.
+      description: Each criterion must be mechanically checkable, with the command or assertion that decides it. A work item that pins any literal date, day or month must answer the two clock questions in this field (#506, RCA-0008) — a fixture whose evaluation bucket comes from the live clock is green only on the day it was written.
       value: |
         - [ ] criterion (how it is checked)
         - [ ] criterion (how it is checked)
+        - [ ] clock (#506, RCA-0008) — does this work introduce a time-pinned
+          fixture (a literal date/day/month)? <yes — name it, or no>
+        - [ ] clock (#506, RCA-0008) — where is the EVALUATION bucket resolved,
+          from the entity under test or from the live clock? <name the seam>
       render: text
     validations:
       required: true
