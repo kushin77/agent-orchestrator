@@ -1754,6 +1754,32 @@ def guard_retire(directive_id: str, issue: int, reason: str) -> bool:
     )
 
 
+def guard_retire_terminal(directive_id: str, issue: int, reason: str, terminal_reason: str) -> bool:
+    """Dead-letter a directive on its FIRST refusal — no attempt counted, no backoff.
+
+    Issue #861: a refusal named terminal by :func:`runaway.terminal_classification`
+    (a closed issue, a closed epic, an unowned unit) can never be cured by a
+    retry, so it goes straight to the dead-letter store the SAME
+    :func:`drop_directive` every other terminal path uses — one implementation,
+    now three callers (the automatic budget path, the A2A ``control:drop`` verb,
+    and this one), so the record shape cannot drift between them. This is the
+    difference from :func:`guard_retire`: that function counts an attempt first
+    and only retires once the budget (default K=5, ~450s of a held slot) is
+    exhausted; this one retires on attempt zero, because the classification
+    already answers the question the budget exists to discover by attrition.
+    """
+    return drop_directive(
+        directive_id,
+        issue,
+        reason,
+        dropped_by="runaway-guard-terminal",
+        report=(
+            f"#{issue} DEAD-LETTERED on first refusal — {terminal_reason} is terminal by definition "
+            f"(#861): {reason}."
+        ),
+    )
+
+
 def drop_directive(
     directive_id: str,
     issue: int | None,
@@ -2954,7 +2980,16 @@ def loop(args: argparse.Namespace) -> int:
                 # instead of re-dispatched every cycle. The attempt below still
                 # counts, so the park and the budget compose rather than compete.
                 board_trigger(directive_id, issue)
-            guard_retire(directive_id, issue, f"claim refused: {claim_output[-120:]}")
+            terminal_reason = runaway.terminal_classification(claim_output)
+            if terminal_reason is not None:
+                # Terminal by definition (#861): a closed issue, a closed epic or
+                # an unowned unit cannot be cured by a retry, so it is retired on
+                # the FIRST refusal instead of consuming the K-attempt budget.
+                guard_retire_terminal(
+                    directive_id, issue, f"claim refused: {claim_output[-120:]}", terminal_reason
+                )
+            else:
+                guard_retire(directive_id, issue, f"claim refused: {claim_output[-120:]}")
             if args.once:
                 return 1
             continue

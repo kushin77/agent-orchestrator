@@ -77,6 +77,21 @@ ARBITRATION_REFUSALS = (
     REASON_SNAPSHOT_STALE,
 )
 
+#: Refusals that are terminal BY DEFINITION (issue #861): the claim is refused
+#: for a reason no retry can ever cure — the issue is closed, its epic is closed,
+#: or the unit has no owning lane. These are distinct from a transient refusal
+#: (``already-claimed``, ``blocked``, ``snapshot-stale``) that a retry, a
+#: self-heal or a board refresh can plausibly resolve. A directive refused for
+#: one of these reasons is dead on arrival: the fleet's runaway guard (#723)
+#: reads this set to dead-letter it on the FIRST refusal instead of spending K
+#: attempts (30/60/120/240s of a held queue slot) discovering what this set
+#: already knows.
+TERMINAL_CLAIM_REASONS = (
+    REASON_ISSUE_CLOSED,
+    REASON_EPIC_CLOSED,
+    REASON_UNOWNED,
+)
+
 CLAIM_EVENTS = ("claim", "release", "take-over", "reap")
 
 MISSING = object()

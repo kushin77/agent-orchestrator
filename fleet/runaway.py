@@ -114,6 +114,12 @@ from pathlib import Path
 
 import runtime
 
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from governance.dispatch.model import TERMINAL_CLAIM_REASONS  # noqa: E402
+
 #: The harvested cap: `vendor/CMR/ops/retry.sh` never sleeps longer than this.
 BACKOFF_CAP_SECONDS = 300
 
@@ -482,6 +488,32 @@ def dispatchable(
     if dead_lettered(directive_id, base):
         return False
     return due(directive_id, base, now)
+
+
+def terminal_classification(reason: str) -> str | None:
+    """The named terminal reason a refusal carries, or None when it is retryable.
+
+    Issue #861: a refusal for a closed issue, a closed epic, or an unowned unit
+    is terminal BY DEFINITION — no attempt, backoff or board refresh can ever
+    cure it — and is not distinguishable, by the generic bounded retry, from a
+    refusal worth retrying (``already-claimed``, ``blocked``, the
+    ``snapshot-stale`` case #727 already self-heals). Left to the generic path,
+    such a refusal is retried up to K times (30 + 60 + 120 + 240 ≈ 450s of a
+    held queue slot with the defaults) before landing in the SAME dead-letter
+    store it could have reached on attempt 1.
+
+    The classification is read from :data:`governance.dispatch.model.TERMINAL_CLAIM_REASONS`
+    — the claim layer's own vocabulary (``governance/dispatch/cli.py`` prints
+    ``claim REFUSED: <reason> — <detail>``) — rather than a second vocabulary
+    invented here, so the two cannot drift apart. Matched by substring because
+    the caller passes free text (``claim_output``), not a structured refusal.
+    """
+    if not reason:
+        return None
+    for terminal_reason in TERMINAL_CLAIM_REASONS:
+        if terminal_reason in reason:
+            return terminal_reason
+    return None
 
 
 def dead_letter(

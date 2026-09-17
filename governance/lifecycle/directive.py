@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from governance.lifecycle.model import owes_closure
 
@@ -240,3 +240,103 @@ def consume(root: Path, directive_id: str, landed: Mapping[int, bool] | None = N
         candidate.path.replace(target)
         moved.append(candidate.id)
     return f"consumed {len(moved)} directive(s) for #{issue}: {', '.join(moved)}"
+
+
+def retire(
+    root: Path,
+    directive_id: str,
+    *,
+    closed: bool,
+    reason: str,
+    superseded_by: Sequence[int],
+) -> str:
+    """Retire a stranded order whose issue is **closed without a change of its own**.
+
+    This is the second terminal mode (#861), distinct from :func:`consume`. A
+    superseded issue (closed as a duplicate, or folded into other work) never
+    satisfies :func:`consume`'s gate — "the change has landed" — because it has
+    no change of its own to land; ``consume`` would refuse it *forever*, exactly
+    the strand the issue describes. ``retire`` gates on a different, narrower
+    fact instead: the issue is **closed**. That fact is supplied by the caller
+    (typically a live ``gh issue view``, since the lifecycle record only carries
+    issues with a change of their own) rather than read from the model here, so
+    this module still owns no opinion about *how* closed-ness is known — only
+    what may be done once it is asserted.
+
+    Refused **by name**, in every case where the retirement cannot be shown to
+    be sound — mirroring :func:`consume`'s posture so the two terminal modes
+    cannot drift into a "consume anything" verb between them:
+
+    * no record carries the id — refuse;
+    * the record names no issue — refuse;
+    * the issue is **not closed** — refuse. This is the #821 negative control:
+      an open issue whose change has not landed must stay in ``sent/`` exactly
+      as it does for ``consume``, so ``retire`` can never become a bypass for
+      the "has it landed" gate;
+    * no superseding issue is named — refuse. A retirement with no recorded
+      "why" and "by what" is indistinguishable from a silent hand-edit of the
+      mailbox, which is the very drift #821 exists to prevent;
+    * a colliding, differently-retired terminal record already exists — refuse
+      rather than overwrite (mirrors :func:`consume`'s collision check).
+
+    The retired record's bytes are the ORIGINAL payload plus three new fields
+    (``retired``, ``retirement_reason``, ``superseded_by``) so the audit trail —
+    what the order was, and why it was retired — survives in one file rather
+    than being split across the mailbox move and an operator's memory.
+    """
+    record = resolve(root, directive_id)
+    if record is None:
+        raise DirectiveRefused(f"unknown directive {directive_id!r}: no record in {SENT_DIR}/ or {DONE_DIR}/")
+
+    if record.consumed:
+        return f"{record.id} was already consumed/retired"
+
+    issue = record.issue
+    if issue is None:
+        raise DirectiveRefused(
+            f"directive {record.id} names no issue; refusing to retire an order whose subject cannot be established"
+        )
+    if not closed:
+        raise DirectiveRefused(
+            f"directive {record.id} orders #{issue}, which is not closed (open); refusing to retire live work "
+            f"— it stays in {SENT_DIR}/ (this is the #821 invariant: retire is not a bypass for consume's "
+            "'has it landed' gate)"
+        )
+    superseded = tuple(int(number) for number in superseded_by)
+    if not superseded:
+        raise DirectiveRefused(
+            f"directive {record.id} orders #{issue}; refusing to retire without at least one superseding "
+            "issue in superseded_by — an unattributed retirement is indistinguishable from a hand-edit of "
+            f"{SENT_DIR}/"
+        )
+    if not reason or not reason.strip():
+        raise DirectiveRefused(f"directive {record.id} orders #{issue}; refusing to retire without a reason")
+
+    payload = _read(record.path)
+    if payload is None:
+        raise DirectiveRefused(f"{SENT_DIR}/{record.path.name} is unreadable; refusing to guess its contents")
+
+    sent, done = mailboxes(root)
+    target = done / record.path.name
+    if target.exists():
+        existing = _read(target) or {}
+        if existing.get("retired") is True and existing.get("id") == payload.get("id"):
+            record.path.unlink()
+            return f"{record.id} was already retired for #{issue} ({existing.get('retirement_reason')})"
+        raise DirectiveRefused(
+            f"{DONE_DIR}/{target.name} already holds a different terminal record; refusing to overwrite it"
+        )
+
+    retired_payload = dict(payload)
+    retired_payload["retired"] = True
+    retired_payload["retirement_reason"] = reason.strip()
+    retired_payload["superseded_by"] = list(superseded)
+
+    done.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(retired_payload, indent=2) + "\n", encoding="utf-8")
+    record.path.unlink()
+    superseded_text = ", ".join(f"#{number}" for number in superseded)
+    return (
+        f"retired {record.id} for #{issue}: closed without a change of its own "
+        f"(reason={reason.strip()!r}, superseded_by={superseded_text})"
+    )
