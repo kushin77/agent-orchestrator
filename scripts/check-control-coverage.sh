@@ -59,6 +59,17 @@
 #   * a rule that is not ENFORCED is recorded in scripts/control-coverage-gaps.tsv,
 #     which is SHRINK-ONLY: a new gap fails by name, and a recorded rule that is now
 #     ENFORCED is reported as a shrink to re-record.
+#   * every Part B rule's own spine text carries a `**Control.**` line (#873), of the
+#     exact form:
+#       **Control.** modules: `a/`, `b/` — controls: `check-x.sh`, `suite:dir`
+#     Backticks are cosmetic and stripped; the lists are comma-separated and trimmed.
+#     The line MUST exist (a rule without one fails by name), and its modules set and
+#     controls set MUST equal — in BOTH directions — the same rule's row in
+#     scripts/control-coverage.tsv (an extra or missing name on either side fails by
+#     rule and offending name). This binds the human-readable spine line to the
+#     machine-readable map so the two can never drift apart: the map is still the row
+#     the rest of this gate validates against the repository, and the spine line now
+#     has to say the same thing.
 #
 # HOW IT PROVES ITSELF
 #   The assertions are one function over a map file. It is run twice: once against
@@ -157,6 +168,30 @@ row_for() { # row_for <rule> <map-file>
   map_rows "$2" | awk -F'\t' -v want="$1" '$1 == want { print; exit }'
 }
 
+# --- the spine's Control line: binds docs/GOLDEN-RULES.md to the map (#873) -------
+# Extract the rule's `**Control.**` line from its own block in the spine (from its
+# heading to the next AO-GR- heading, or EOF).
+get_control_line() { # get_control_line <rule> <spine-file>
+  awk -v h="### $1" '
+    index($0, h) == 1 { f = 1; next }
+    f && /^### AO-GR-/ { exit }
+    f && index($0, "**Control.**") == 1 { print; exit }
+  ' "$2"
+}
+
+# Parse the modules or controls list out of a Control line, stripping backticks and
+# trimming whitespace around each comma-separated name. One name per output line.
+control_line_field() { # control_line_field <control-line> <modules|controls>
+  local line="$1" field="$2" part
+  if [ "$field" = "modules" ]; then
+    part="${line#*modules:}"
+    part="${part%%— controls:*}"
+  else
+    part="${line#*— controls:}"
+  fi
+  printf '%s' "$part" | tr -d '`' | tr ',' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | sed '/^$/d'
+}
+
 # --- the assertions, over a map file, so the vacuity control can run them ------
 map_findings=""
 assert_map() { # assert_map <map-file> <spine-file> <label>
@@ -191,6 +226,37 @@ assert_map() { # assert_map <map-file> <spine-file> <label>
         map_findings="$map_findings"$'\n'"  $label: $rule names module '$m', which does not exist"
       fi
     done < <(printf '%s\n' "$modules" | tr ',' '\n')
+
+    # the spine's own **Control.** line must exist and must name the exact same
+    # modules and controls as this row, in both directions — a spine line that drops
+    # or adds a name is the rule and the map disagreeing about what enforces it (#873).
+    local cline
+    cline="$(get_control_line "$rule" "$spine")"
+    if [ -z "$cline" ]; then
+      map_findings="$map_findings"$'\n'"  $label: $rule is missing a **Control.** line in docs/GOLDEN-RULES.md"
+    else
+      local cmods cctrls tmods tctrls extra miss
+      cmods="$(control_line_field "$cline" modules | sort -u)"
+      cctrls="$(control_line_field "$cline" controls | sort -u)"
+      tmods="$(printf '%s\n' "$modules" | tr ',' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | sed '/^$/d' | sort -u)"
+      if [ "$controls" = "-" ]; then
+        tctrls=""
+      else
+        tctrls="$(printf '%s\n' "$controls" | tr ',' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | sed '/^$/d' | sort -u)"
+      fi
+
+      extra="$(comm -23 <(printf '%s\n' "$cmods") <(printf '%s\n' "$tmods") 2>/dev/null | sed '/^$/d')"
+      miss="$(comm -13 <(printf '%s\n' "$cmods") <(printf '%s\n' "$tmods") 2>/dev/null | sed '/^$/d')"
+      if [ -n "$extra" ] || [ -n "$miss" ]; then
+        map_findings="$map_findings"$'\n'"  $label: $rule Control line modules do not match its map row (extra: $(printf '%s' "$extra" | tr '\n' ' '); missing: $(printf '%s' "$miss" | tr '\n' ' '))"
+      fi
+
+      extra="$(comm -23 <(printf '%s\n' "$cctrls") <(printf '%s\n' "$tctrls") 2>/dev/null | sed '/^$/d')"
+      miss="$(comm -13 <(printf '%s\n' "$cctrls") <(printf '%s\n' "$tctrls") 2>/dev/null | sed '/^$/d')"
+      if [ -n "$extra" ] || [ -n "$miss" ]; then
+        map_findings="$map_findings"$'\n'"  $label: $rule Control line controls do not match its map row (extra: $(printf '%s' "$extra" | tr '\n' ' '); missing: $(printf '%s' "$miss" | tr '\n' ' '))"
+      fi
+    fi
 
     # a non-ENFORCED rule must name no control; an ENFORCED one must name >= 1 that
     # a gate actually runs.
@@ -303,7 +369,7 @@ if [ -n "$map_findings" ]; then
   printf '%s\n' "$map_findings" | sed '/^$/d' >&2
   fail=1
 else
-  printf '  OK    every rule has a row, every module exists, every control is invoked by a gate\n'
+  printf '  OK    every rule has a row, every module exists, every control is invoked by a gate, and every spine Control line matches its row (#873)\n'
 fi
 
 printf '\n== the document ==\n'
@@ -442,11 +508,76 @@ fi
 # declaration assertion rather than the existence one.
 provoke "a suite the manifest does not declare is refused" AO-GR-15 "suite:docs" "does not declare"
 
+# The spine-binding path (#873): mutate a COPY of docs/GOLDEN-RULES.md instead of the
+# map, and run the same assert_map against the real map + the mutated spine. This
+# reuses the existing map-mutation harness rather than inventing a second one.
+mutate_spine() { # mutate_spine <src> <dst> <rule> <delete|controls> [<new-controls-value>]
+  python3 - "$1" "$2" "$3" "$4" "${5:-}" <<'PY'
+import sys, re, pathlib
+src, dst, rule, mode, value = sys.argv[1:6]
+lines = pathlib.Path(src).read_text().splitlines(keepends=True)
+heading = f"### {rule}"
+start = None
+end = len(lines)
+for i, l in enumerate(lines):
+    if l.startswith(heading):
+        start = i
+        continue
+    if start is not None and l.startswith("### AO-GR-"):
+        end = i
+        break
+if start is None:
+    print(f"CONTROL-SETUP-BROKEN: heading {rule} not found", file=sys.stderr)
+    raise SystemExit(3)
+block = lines[start:end]
+ctrl_idx = None
+for j, l in enumerate(block):
+    if l.startswith("**Control.**"):
+        ctrl_idx = j
+        break
+if ctrl_idx is None:
+    print(f"CONTROL-SETUP-BROKEN: no Control line for {rule}", file=sys.stderr)
+    raise SystemExit(3)
+if mode == "delete":
+    del block[ctrl_idx]
+elif mode == "controls":
+    old = block[ctrl_idx]
+    new = re.sub(r"controls: .*$", f"controls: {value}\n", old)
+    block[ctrl_idx] = new
+else:
+    print(f"CONTROL-SETUP-BROKEN: unknown mode {mode}", file=sys.stderr)
+    raise SystemExit(3)
+lines[start:end] = block
+pathlib.Path(dst).write_text("".join(lines))
+PY
+}
+
+provoke_spine() { # provoke_spine <label> <rule> <mode> <value> <the-finding-it-must-produce>
+  local label="$1" rule="$2" mode="$3" value="$4" want="$5"
+  if ! mutate_spine "$SPINE" "$tmp/mutated-spine.md" "$rule" "$mode" "$value"; then
+    printf '  FAIL  the control could not be built (%s)\n' "$label" >&2
+    exit 2
+  fi
+  assert_map "$MAP" "$tmp/mutated-spine.md" "control"
+  if [ -n "$map_findings" ] && contains "$map_findings" "$want" && contains "$map_findings" "$rule"; then
+    printf '  OK    %s\n' "$label"
+    printf '%s\n' "$map_findings" | sed '/^$/d' | head -1 | sed 's/^/        /'
+  else
+    printf '  FAIL  %s — accepted, so this check cannot fail\n' "$label" >&2
+    fail=1
+  fi
+}
+
+provoke_spine "a rule's Control line deleted from the spine is refused" \
+  AO-GR-16 delete "" "is missing a **Control.** line"
+provoke_spine "a Control line naming a control not in the map row is refused" \
+  AO-GR-16 controls '`check-does-not-exist.sh`' "check-does-not-exist.sh"
+
 printf '\n'
 if [ "$fail" -ne 0 ]; then
   printf 'check-control-coverage: FAIL\n' >&2
   exit 1
 fi
-printf 'check-control-coverage: OK — every Part B rule is mapped, every mapped control is invoked by a gate, the document names them all, and the %s recorded gap(s) are shrink-only\n' \
+printf 'check-control-coverage: OK — every Part B rule is mapped, every mapped control is invoked by a gate, every rule'"'"'s spine Control line matches its map row (#873), the document names them all, and the %s recorded gap(s) are shrink-only\n' \
   "$(grep -cE '^AO-GR-' "$GAPS" 2>/dev/null || echo 0)"
 exit 0
