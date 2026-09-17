@@ -128,10 +128,11 @@ Stated honestly, so the guard is not read as more than it is:
   holds — both are reported, and the remediation says to confirm with
   `/proc/*/fd` before truncating.
 - It cannot police the workspace, and it does not try.
-- **Wiring:** `scripts/verify.sh` is a single-writer file, so its owner registers
-  this check by path in the `checks=()` array (issue #729). Until that line
-  lands, the script is delivered but inert — issue #526's measured failure mode,
-  recorded as `RCA-0013`.
+- **Wiring:** `scripts/verify.sh` registers this check by path in the
+  `checks=()` array (`infra-limits|bash scripts/check-infra-limits.sh`,
+  issue #729). A delivered `scripts/check-*.sh` that no gate file invokes is
+  inert — issue #526's measured failure mode, recorded as `RCA-0013` — so this
+  guard ships wired, in the same change that delivers it.
 
 ## Provenance
 
