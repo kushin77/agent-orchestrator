@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.lifecycle import directive, gate  # noqa: E402
+from governance.lifecycle import directive, gate, ledger, live  # noqa: E402
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
 from governance.lifecycle.closeout import CloseOutResult, closeout, describe  # noqa: E402
 from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
@@ -685,7 +685,18 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
+    if not args.live and args.issue is None:
+        print("status: CANNOT-ASSESS — pass --issue <n> or --live", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
     record = collect_from_github()
+    if args.live:
+        # The live feed (issue #885): every in-scope item's stage, projected from
+        # the SAME record `status` (without `--live`) and `audit` already read —
+        # not a second collection, so the projection cannot drift from what those
+        # verbs saw. `live.check_live` (the gate's drift provocation) fails loudly
+        # if this ever changes to read a second, possibly stale, source.
+        print(json.dumps(live.project(record), indent=2))
+        return EXIT_OK
     item = next((entry for entry in record["items"] if entry["issue"] == args.issue), None)
     if item is None:
         print(f"status: CANNOT-ASSESS — #{args.issue} is outside the audit scope", file=sys.stderr)
@@ -712,9 +723,31 @@ def cmd_close(args: argparse.Namespace) -> int:
     print(describe(result))
     _print_board_reports(result.board_reports)
     _advance_focus_if_epic_closed(item, result)
+    _record_close_decision(args.issue, result)
     if result.cannot_assess:
         return EXIT_CANNOT_ASSESS
     return EXIT_OK if result.ok else EXIT_NOT_OK
+
+
+def _record_close_decision(issue: int, result: CloseOutResult) -> None:
+    """One append-only ledger record per close-out call (issue #885).
+
+    ``ok``/``cannot-assess`` are ``decision`` records (nothing was refused; a
+    park is a decision to wait, not a defect); a remaining finding is a
+    ``refusal``, named by the first invariant code still owed so the trail can
+    be grepped by code the same way the board report is.
+    """
+    subject = f"#{issue}"
+    if result.remaining:
+        code = result.remaining[0].code
+        ledger.record_decision(
+            ROOT, action="close", subject=subject, outcome=ledger.OUTCOME_REFUSED,
+            detail=describe(result), code=code,
+        )
+        return
+    ledger.record_decision(
+        ROOT, action="close", subject=subject, outcome=ledger.OUTCOME_OK, detail=describe(result),
+    )
 
 
 def _advance_focus_if_epic_closed(item: dict, result: CloseOutResult) -> None:
@@ -829,7 +862,11 @@ def build_parser() -> argparse.ArgumentParser:
     audit_cmd.set_defaults(func=cmd_audit)
 
     status_cmd = sub.add_parser("status", help="where one item sits, and what it still owes")
-    status_cmd.add_argument("--issue", type=int, required=True)
+    status_cmd.add_argument("--issue", type=int, default=None, help="required unless --live is given")
+    status_cmd.add_argument(
+        "--live", action="store_true",
+        help="project every in-scope item's stage instead of one issue's status (issue #885)",
+    )
     status_cmd.set_defaults(func=cmd_status)
 
     close_cmd = sub.add_parser("close", help="drive one item to hygiene, in dependency order")

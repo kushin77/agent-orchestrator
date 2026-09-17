@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.lifecycle/record-v1",
+  "title": "governance/lifecycle record shapes",
+  "description": "The record shapes this package persists to disk: the append-only decision ledger (ledger.py), the directive mailbox record (.fleet/sent|done, including the fields `retire` adds), the per-issue verify attestation (.fleet/lifecycle/<issue>.json), and one baseline.json quarantine entry. Frozen so a consumer can rely on the keys whether the record was written today or a year ago (issue #885).",
+  "$defs": {
+    "ledgerRecord": {
+      "type": "object",
+      "description": "One line of governance/lifecycle/ledger.jsonl: one decision (close/retire/consume), refusal or success, never rewritten.",
+      "required": ["schema", "kind", "action", "subject", "outcome", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "ao.lifecycle/ledger-v1" },
+        "kind": { "enum": ["refusal", "decision"] },
+        "action": { "type": "string" },
+        "subject": { "type": "string" },
+        "code": { "type": "string" },
+        "outcome": { "enum": ["ok", "refused"] },
+        "detail": { "type": "string" }
+      }
+    },
+    "directiveRecord": {
+      "type": "object",
+      "description": "A directive mailbox record, as read from .fleet/sent/<id>.json or .fleet/done/<id>.json. `retired`/`retirement_reason`/`superseded_by` are present only once directive.retire has moved the record (issue #861).",
+      "required": ["id", "task"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "task": {
+          "type": "object",
+          "required": ["issue"],
+          "additionalProperties": true,
+          "properties": {
+            "issue": { "type": "integer" }
+          }
+        },
+        "retired": { "type": "boolean" },
+        "retirement_reason": { "type": "string" },
+        "superseded_by": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "verifyAttestation": {
+      "type": "object",
+      "description": "The `verify` block of .fleet/lifecycle/<issue>.json — a green attestation naming the commit it was measured at.",
+      "required": ["ok", "commit"],
+      "additionalProperties": false,
+      "properties": {
+        "ok": { "type": "boolean" },
+        "commit": { "type": "string" },
+        "source": { "enum": ["lane", "reclaimed-lane"] }
+      }
+    },
+    "quarantineEntry": {
+      "type": "object",
+      "description": "One baseline.json entry: a (code, subject) pair excused only while `tracked_by` is open (issue #269 section 5).",
+      "required": ["code", "subject", "tracked_by"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string" },
+        "subject": { "type": "string" },
+        "tracked_by": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

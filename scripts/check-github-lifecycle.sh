@@ -399,6 +399,153 @@ else
   echo "  OK    vacuity control: removing the rule from AGENTS.md is detected"
 fi
 
+# --- 7. declared controls: a mutated control is refused by name (issue #885) -
+# check_schema requires PyYAML, already required by governance/conformance;
+# sha256-restore idiom mirrors scripts/check-surface-class.sh's negative control.
+controls="governance/lifecycle/controls.yaml"
+base_controls_sha="$(sha256sum "$controls" | awk '{print $1}')"
+python3 - "$controls" "$work/controls-mutant.yaml" <<'PY'
+import sys
+from pathlib import Path
+
+import yaml
+
+src, dst = Path(sys.argv[1]), Path(sys.argv[2])
+doc = yaml.safe_load(src.read_text(encoding="utf-8"))
+doc["retire"]["min_reason_length"] = 0  # policy.load() refuses < 1 (issue #885)
+Path(dst).write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+PY
+mutant_controls_sha="$(sha256sum "$work/controls-mutant.yaml" | awk '{print $1}')"
+if [ "$mutant_controls_sha" = "$base_controls_sha" ]; then
+  echo "check-github-lifecycle: CANNOT-ASSESS — the controls mutation did not change the file" >&2
+  fail=$((fail + 1))
+else
+  control_out="$(AO_LIFECYCLE_CONTROLS="$work/controls-mutant.yaml" python3 "$cli" audit --record "$work/clean.json" --baseline "$work/empty-baseline.json" --json 2>&1)"
+  control_rc=$?
+  if [ "$control_rc" -eq 0 ]; then
+    echo "  FAIL  a mutated control (min_reason_length: 0) was not refused" >&2
+    fail=$((fail + 1))
+  elif ! contains "$control_out" "min_reason_length"; then
+    echo "  FAIL  the mutated control was refused, but not by name (min_reason_length)" >&2
+    printf '%s\n' "$control_out" | sed 's/^/        /' >&2
+    fail=$((fail + 1))
+  else
+    echo "  OK    a control mutated below its floor is refused by name: min_reason_length"
+  fi
+fi
+
+# --- 8. decision ledger: a missing record is refused (issue #885) -----------
+# directive.consume/retire write exactly one ledger record per call, success or
+# refusal; a build that regressed to writing NONE for a refusal would leave the
+# decision trail silently short, so this asserts the record is really there.
+ledger_check="$(python3 - "$root" "$work" <<'PY'
+import json
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+scratch = pathlib.Path(sys.argv[2]) / "ledger-fixture"
+scratch.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(root))
+from governance.lifecycle import directive, ledger  # noqa: E402
+
+sent = scratch / ".fleet" / "sent"
+sent.mkdir(parents=True, exist_ok=True)
+(sent / "d-885.json").write_text(json.dumps({"id": "d-885", "task": {"issue": 99999885}}), encoding="utf-8")
+try:
+    directive.consume(scratch, "d-885", landed={})  # outside the record: refused
+except directive.DirectiveRefused:
+    pass
+records = ledger.read_all(scratch / ledger.DEFAULT_LEDGER)
+if len(records) != 1:
+    print("FAIL: expected exactly 1 ledger record for the refusal, found %d" % len(records))
+    raise SystemExit(1)
+if records[0]["outcome"] != "refused":
+    print("FAIL: the record does not carry outcome=refused")
+    raise SystemExit(1)
+print("OK: exactly one refusal record was written")
+PY
+)"
+ledger_rc=$?
+if [ "$ledger_rc" -ne 0 ]; then
+  echo "  FAIL  a refusal must leave exactly one ledger record; ${ledger_check}" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    a refusal produces exactly one ledger record: ${ledger_check#OK: }"
+fi
+
+# --- 9. frozen schema: a schema-invalid record is refused (issue #885) ------
+schema_check="$(python3 - "$root" <<'PY'
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(root))
+from governance.lifecycle import ledger  # noqa: E402
+from governance.modules import schema as _schema  # noqa: E402
+
+# A record missing required keys (subject/outcome/detail), bypassing render()'s
+# own validation, driven straight at the schema-checked shape.
+bad = {"schema": ledger.SCHEMA, "kind": "decision", "action": "close"}
+problems = list(_schema.problems(bad, ledger._record_schema("ledgerRecord")))
+if not problems:
+    print("FAIL: a record missing required keys validated anyway")
+    raise SystemExit(1)
+try:
+    ledger.render(kind="decision", action="close", subject="#1", outcome="not-a-real-outcome", detail="x")
+    print("FAIL: an unknown outcome was accepted by render()")
+    raise SystemExit(1)
+except ledger.LedgerUnavailable:
+    pass
+print("OK: a schema-invalid record is refused before it is written")
+PY
+)"
+schema_rc=$?
+if [ "$schema_rc" -ne 0 ]; then
+  echo "  FAIL  a schema-invalid record must be refused; ${schema_check}" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    ${schema_check#OK: }"
+fi
+
+# --- 10. live feed: drift from the real store is refused (issue #885) -------
+live_check="$(python3 - "$root" <<'PY'
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(root))
+from governance.lifecycle import live  # noqa: E402
+
+record = {
+    "items": [
+        {
+            "issue": 269, "state": "closed", "milestone": None,
+            "pr": {"state": "merged", "head_commit": "a" * 40},
+            "branch_deleted": True, "claim": {}, "lane": {},
+        }
+    ]
+}
+faithful = live.project(record)
+if live.check_live(record, faithful):
+    print("FAIL: a faithful projection was refused")
+    raise SystemExit(1)
+drifted = {"items": [{"issue": 269, "stage": "filed"}]}  # the real store says "opened"
+problems = live.check_live(record, drifted)
+if not problems or "269" not in problems[0]:
+    print("FAIL: a live feed that drifted from the real store went unreported")
+    raise SystemExit(1)
+print("OK: a live feed that drifted from the real store is refused, by issue")
+PY
+)"
+live_rc=$?
+if [ "$live_rc" -ne 0 ]; then
+  echo "  FAIL  a drifted live feed must be refused; ${live_check}" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    ${live_check#OK: }"
+fi
+
 if [ "$fail" -gt 0 ]; then
   echo "check-github-lifecycle: FAIL ($fail violation(s))" >&2
   exit 1

@@ -335,7 +335,37 @@ The execution loop ([`fleet/terminal.py`](../../fleet/terminal.py)) runs close-o
 after every dispatch and carries its verdict in the report, so a partial close
 reaches the brain instead of being discovered later by hand.
 
-## 7. Board reporting
+## 7. Declared controls, decision ledger, frozen schema, live feed (issue #885)
+
+Four artifacts make the package's evidence machine-checkable rather than
+prose, per the surface-class ladder (`governance/conformance/surfaces.py`):
+
+| Artifact | File | Read by |
+|---|---|---|
+| **controls** | [`controls.yaml`](controls.yaml) + [`policy.py`](policy.py) | `model.py` (import-time: the closed invariant vocabulary must match `controls.yaml` in both directions — a drift is `PolicyUnavailable`, CANNOT-ASSESS); `directive.py` `retire` (`policy.load_for_model().check_retire` — the reason-length floor and the superseded-by requirement, not a hard-coded check) |
+| **audit** (decision ledger) | [`ledger.py`](ledger.py), written to `.fleet/lifecycle/ledger.jsonl` | `directive.consume` and `directive.retire` (exactly one record per call: `ok` or `refused`, schema-validated before it is written); `cli.py` `cmd_close` (one record per close-out verdict) |
+| **schema** | [`lifecycle.schema.json`](lifecycle.schema.json) | `ledger.py` (validates every record against `$defs/ledgerRecord` before appending, reusing `governance/modules/schema.py`'s stdlib-only validator rather than a second implementation) |
+| **live feed** | [`live.py`](live.py), exposed through the existing verb `cli.py status --live` | an operator or another gate wanting every in-scope item's stage in one call, derived from `model.stage_of` on the SAME record `audit`/`status`/`close` already read — never a second collection |
+
+`controls.yaml` declares two judgments that used to live only in code:
+
+* the **closed vocabulary** — one entry per `model.INVARIANTS` code, so an
+  invariant this package can emit that `controls.yaml` does not declare (or
+  vice versa) is a policy defect refused at import time, not a rule nobody
+  reviewed;
+* the **retire preconditions** — `retire.min_reason_length` and
+  `retire.require_superseded_by`, read by `directive.py`'s `retire` instead of
+  the bare `not reason.strip()` it used to carry, so the threshold is
+  reviewable and can be raised without a code change (`AO_LIFECYCLE_CONTROLS`
+  overrides which file is read, for the gate's own mutation provocation).
+
+`scripts/check-github-lifecycle.sh` provokes one violation per new artifact —
+a control mutated (refused by name), a missing ledger record (refused), a
+schema-invalid record (refused), and a live feed that has drifted from the
+record it claims to project (refused) — the sha256-restore idiom the rest of
+the script already uses.
+
+## 8. Board reporting
 
 A finding must reach the board, not only a log line. `cli.py audit --apply` and
 `cli.py close --apply` file a GitHub issue per non-terminal artifact carrying the
