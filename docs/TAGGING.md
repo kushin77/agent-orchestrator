@@ -151,16 +151,17 @@ Baseline gates applied to every tag set: `make:shell-syntax`, `check:python-synt
 
 `scripts/check-tagging.sh` is tri-state (`0 OK / 1 NOT-OK / 2 CANNOT-ASSESS`,
 and `CANNOT-ASSESS` is never a pass) and it is wired into `make verify` by
-auto-discovery (`scripts/verify.sh`, #698), so it is enforced the moment it
-lands. It runs **five** checks:
+auto-discovery (`scripts/verify.sh`, #698) and into `make lint`, so it is
+enforced the moment it lands. It runs **six** checks:
 
 | Check | What it proves |
 |---|---|
 | `tagging-lint` | the authority's own shape, every borrowed vocabulary's **equality** with its authority, every rule's `when` clause, every gate name's **resolution**, every document against its frozen shape, and the declared controls against the authority they govern |
 | `tagging-matrix` | the matrix below is the one the authority generates |
 | `tagging-suite` | the module's pytest suite |
-| `tagging-refusals` | every one of the **11** declared refusals is provoked by a real mutant, **by code and by the token the taxonomy promises it names**, with its clean twin accepted |
+| `tagging-refusals` | every one of the **13** declared refusals is provoked by a real mutant, **by code and by the token the taxonomy promises it names**, with its clean twin accepted |
 | `tagging-artifacts` | the frozen shapes, the ledger and the live projection round-trip — each driven with its provoked half *and* its clean twin |
+| `tagging-mandate` | the **constitution still declares the rule** — five contract documents each declare the tag authority and the `posture`/`lifecycle` dimensions, and the check FAILS naming the document **and** the marker that went missing |
 
 The refusals check is the one that matters most, because a gate that cannot fail
 is a formality (GR-12). It asserts three things at once: the mutant actually
@@ -168,6 +169,33 @@ landed (by sha256, so a no-op mutation cannot be reported as a passing control),
 the refusal fires **by the name the taxonomy promised**, and the clean twin of
 that input is refused **nothing** — so a rule that fires on everything is caught
 rather than passing as strict.
+
+### Institutionalized, not advisory
+
+The behavioural half can be perfectly green while the rule itself stops being
+constitutional: the gate proves the authority is *enforced*, not that anything
+*says* it must be. So the rule is declared where this repository keeps its
+constitution —
+[`AGENTS.md`](../AGENTS.md) golden rule 25,
+[`docs/GOLDEN-RULES.md`](GOLDEN-RULES.md) **AO-GR-28**,
+[`docs/GOVERNANCE.md`](GOVERNANCE.md) §9,
+[`docs/EXECUTION-PLAN.md`](EXECUTION-PLAN.md) §11 (**Tag declaration**) and
+[`docs/QA-GATE.md`](QA-GATE.md)'s stack table — and `tagging-mandate` FAILS when
+any of them stops. This is the same mechanism
+`scripts/check-chronological-dispatch.sh` uses to keep rule 14 from becoming
+decoration, reused deliberately: a second mechanism for making rules canonical
+would be a second thing to keep honest.
+
+The marker vocabulary is the *thing a reader must be able to find*, not a
+fingerprint of any wording — every doc must name the **tag authority** and both
+dimensions, **posture** and **lifecycle**; `AGENTS.md` must additionally name the
+authority **file** and the **gate**; and `docs/EXECUTION-PLAN.md` must declare
+the per-lane **Tag declaration**. List it with
+`python3 governance/tagging/mandate.py --list`.
+
+An issue form now offers both dimensions too
+(`.github/ISSUE_TEMPLATE/fleet-task.yml`), so a filed fleet task can actually
+declare them rather than leaving the words to prose.
 
 ## The artifacts around the authority
 

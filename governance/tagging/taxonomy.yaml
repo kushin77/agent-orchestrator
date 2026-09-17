@@ -302,3 +302,13 @@ refusals:
     rule: a declared FinOps tier must not sit below the floor its tags require
     names_in_the_finding: the declared tier and the floor
     provoked_by: scripts/check-tagging.sh
+  - id: mandate-missing-doc
+    rule: every contract document the mandate names must exist
+    names_in_the_finding: the missing document
+    provoked_by: scripts/check-tagging.sh
+  - id: mandate-missing-marker
+    rule: >-
+      every contract document (AGENTS.md, the spine, GOVERNANCE, EXECUTION-PLAN,
+      QA-GATE) must declare the tag authority's marker vocabulary
+    names_in_the_finding: the document and the marker it stopped declaring
+    provoked_by: scripts/check-tagging.sh

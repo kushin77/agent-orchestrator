@@ -48,6 +48,10 @@ CODE_UNKNOWN_TARGET = "unknown-target"
 CODE_UNKNOWN_GATE = "unknown-gate"
 CODE_RULE_UNKNOWN_DIMENSION = "rule-unknown-dimension"
 CODE_FINOPS_FLOOR_UNMET = "finops-floor-unmet"
+# The mandate (issue #1183): the tag authority is constitutional only while the
+# contract documents declare it, so the declaration is itself gated.
+CODE_MANDATE_MISSING_DOC = "mandate-missing-doc"
+CODE_MANDATE_MISSING_MARKER = "mandate-missing-marker"
 
 # Additional codes this module raises about the taxonomy's own shape. They are
 # not tag refusals — they mean the authority file is malformed, which is a
@@ -72,6 +76,8 @@ REFUSAL_CODES = (
     CODE_UNKNOWN_GATE,
     CODE_RULE_UNKNOWN_DIMENSION,
     CODE_FINOPS_FLOOR_UNMET,
+    CODE_MANDATE_MISSING_DOC,
+    CODE_MANDATE_MISSING_MARKER,
 )
 
 KIND_BORROWED = "borrowed"

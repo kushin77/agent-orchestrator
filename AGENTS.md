@@ -251,6 +251,28 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     the process **immediately**, bypassing claim release and child teardown. An
     operator must never be advised to send a signal that is an abrupt kill.
     (Spine: AO-GR-27.)
+25. **Every governed artifact is tagged, and a tag set derives its gates
+    (institutional, issues #1175 + #1183).** The **tag authority** — one
+    declared vocabulary at `governance/tagging/taxonomy.yaml` — classifies every
+    governed artifact:
+    issue, PR, branch, commit, surface, release. It **borrows** wherever an
+    authority already exists and never re-declares one: the `class` ladder from
+    `governance/conformance/policy.yaml`, the FinOps tiers from
+    `governance/finops/policy.json` — each **mirrored and proven equal** by the
+    gate, because a borrow that reads its own values can never fail. Two
+    dimensions carry the delivery and lifecycle half: **`posture`** (`overall` |
+    `saas` | `iac` | `no-human-needed` | `human-gated`) and **`lifecycle`**
+    (`plan` | `build` | `verify` | `release` | `operate` | `retire`). A tag set
+    **derives the gates it owes**, by channel (`pr`/`ci`/`cd`/`ops`) and at the
+    FinOps floor the doctrine sets, so classification has consequences instead
+    of being a description; `posture:no-human-needed` and `posture:human-gated`
+    are mutually exclusive and both at once is refused by name. **The declaration
+    is half the rule:** this file, `docs/GOLDEN-RULES.md`, `docs/GOVERNANCE.md`,
+    `docs/EXECUTION-PLAN.md` and `docs/QA-GATE.md` each declare it, and
+    `scripts/check-tagging.sh`'s `tagging-mandate` check FAILS naming the
+    document **and** the marker the moment one stops — that is what keeps the
+    rule constitutional rather than advisory (AO-GR-4, GR-29). (Spine:
+    AO-GR-28.)
 
 ## Directory layout (pillar-aligned)
 

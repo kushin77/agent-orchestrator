@@ -36,6 +36,7 @@ from typing import Callable, List, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import mandate as MD  # noqa: E402
 import model as M  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -188,6 +189,60 @@ def provoke_finops_floor_unmet(scratch: Path, taxonomy: M.Taxonomy, rules: M.Rul
     return findings, clean_findings
 
 
+def _mandate_root(scratch: Path, name: str, mutate=None) -> Path:
+    """A scratch tree holding the contract documents, optionally mutated.
+
+    The mandate reads repository-relative paths, so a scratch root containing
+    just those documents is a faithful fixture: it lets the provocation strip one
+    marker, or drop one document, WITHOUT touching the repository — a
+    provocation that edited the real docs would be a hazard, not a control.
+    """
+    root = _scratch(scratch, name)
+    for doc in MD.DOCS:
+        source = ROOT / doc
+        target = root / doc
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    if mutate is not None:
+        mutate(root)
+    return root
+
+
+def provoke_mandate_missing_marker(scratch: Path, taxonomy: M.Taxonomy, rules: M.Rules):
+    """A contract doc that stops declaring a marker is refused, by name.
+
+    The edit is IN PLACE in the scratch copy, so `_copy_without`'s
+    copy-then-hash guard does not apply; the assertion here is stronger for this
+    case — the marker must be gone from the text after the substitution, which
+    the substitution itself could silently fail to achieve.
+    """
+
+    def strip(root: Path) -> None:
+        doc = root / "docs" / "QA-GATE.md"
+        original = doc.read_text(encoding="utf-8")
+        mutated = original.replace("lifecycle", "SDLC-stage")
+        if mutated == original:
+            raise AssertionError("the marker 'lifecycle' was not present to strip")
+        if "lifecycle" in mutated:
+            raise AssertionError("the marker 'lifecycle' survived the substitution")
+        doc.write_text(mutated, encoding="utf-8")
+
+    return MD.check(_mandate_root(scratch, "mandate-marker", strip)), MD.check(
+        _mandate_root(scratch, "mandate-marker-clean")
+    )
+
+
+def provoke_mandate_missing_doc(scratch: Path, taxonomy: M.Taxonomy, rules: M.Rules):
+    """A contract document that has gone missing is refused, by name."""
+
+    def drop(root: Path) -> None:
+        (root / "docs" / "GOVERNANCE.md").unlink()
+
+    return MD.check(_mandate_root(scratch, "mandate-doc", drop)), MD.check(
+        _mandate_root(scratch, "mandate-doc-clean")
+    )
+
+
 PROVOCATIONS: Tuple[Tuple[str, str, str, Callable], ...] = (
     ("unknown-dimension", "a tag on an undeclared dimension", "vibe", provoke_unknown_dimension),
     ("unknown-value", "a value the dimension does not declare", "magic", provoke_unknown_value),
@@ -200,7 +255,14 @@ PROVOCATIONS: Tuple[Tuple[str, str, str, Callable], ...] = (
     ("unknown-gate", "a rule naming a gate that does not exist", "tf-fmt-renamed", provoke_unknown_gate),
     ("rule-unknown-dimension", "a rule keyed on an undeclared dimension", "mood", provoke_rule_unknown_dimension),
     ("finops-floor-unmet", "a tier below the floor its tags require", "flash", provoke_finops_floor_unmet),
+    ("mandate-missing-marker", "a contract doc that stopped declaring a marker", "lifecycle", provoke_mandate_missing_marker),
+    ("mandate-missing-doc", "a contract document that went missing", "GOVERNANCE.md", provoke_mandate_missing_doc),
 )
+
+
+#: The declared refusals this driver provokes, by id — so a caller (the suite,
+#: or a reader) can assert the provocation set without unpacking tuples.
+PROVOCATIONS_BY_REFUSAL = frozenset(refusal for refusal, _, _, _ in PROVOCATIONS)
 
 
 def run(verbose: bool = True) -> int:
