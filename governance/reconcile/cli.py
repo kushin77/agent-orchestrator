@@ -262,24 +262,40 @@ def cmd_watch(args: argparse.Namespace) -> int:
     passes = 0
     while True:
         passes += 1
-        # #977 (issue #706 D5): acquire the single-writer lease BEFORE this
-        # pass does any work. The loser no-ops the pass and logs a skip
-        # record — it is not an error, just the other replica already
-        # holding this tick.
-        reconcile_lease = lease.make_lease(
-            job=RECONCILE_LEASE_JOB,
-            path=Path(args.root) / ".fleet" / f"{RECONCILE_LEASE_JOB}.lease",
-            ttl_seconds=RECONCILE_LEASE_TTL_SECONDS,
-        )
-        if not reconcile_lease.acquire():
-            record = lease.skipped_log(
-                RECONCILE_LEASE_JOB, backend=lease.backend_name(), detail="reconcile lease held elsewhere"
+        # #977 (issue #706 D5): acquire the single-writer lease BEFORE a pass
+        # that can WRITE does any work — two replicas racing to apply the
+        # same reclaim is the defect the lease exists for. A dry-run pass
+        # (`--apply` not given) never writes, so it must not need the lease
+        # either: `fcntl_try_lock` (fleet/lease.py) does `os.open(...,
+        # O_CREAT)` on the lease file unconditionally, which raises
+        # `OSError: [Errno 30] Read-only file system` the moment `.fleet` is
+        # a read-only mount (measured: infra/fleet/docker-compose.agent-cron.yml's
+        # dev-run harness mounts it `read_only: true` by design — the state
+        # roots this dev-first surface must not touch). That raised OUTSIDE
+        # this loop's own `try`, so it was never the caught-and-logged "bad
+        # pass" this function's docstring promises — it killed the process
+        # (rc=1) before a single pass ran, on the UNMUTATED baseline, which
+        # is issue #1034's `check-fleet-cron-dev-run.sh` red. Root cause:
+        # fed4e7d (#977/#978/#984) took the lease unconditionally instead of
+        # only when a pass can act.
+        reconcile_lease = None
+        if args.apply:
+            reconcile_lease = lease.make_lease(
+                job=RECONCILE_LEASE_JOB,
+                path=Path(args.root) / ".fleet" / f"{RECONCILE_LEASE_JOB}.lease",
+                ttl_seconds=RECONCILE_LEASE_TTL_SECONDS,
             )
-            print(f"reconcile[{passes}]: {json.dumps(record, sort_keys=True)}", flush=True)
-            if args.once:
-                return EXIT_OK
-            time.sleep(args.interval_seconds)
-            continue
+            if not reconcile_lease.acquire():
+                record = lease.skipped_log(
+                    RECONCILE_LEASE_JOB,
+                    backend=lease.backend_name(),
+                    detail="reconcile lease held elsewhere",
+                )
+                print(f"reconcile[{passes}]: {json.dumps(record, sort_keys=True)}", flush=True)
+                if args.once:
+                    return EXIT_OK
+                time.sleep(args.interval_seconds)
+                continue
         try:
             report = sweep(
                 args.root,
@@ -301,7 +317,8 @@ def cmd_watch(args: argparse.Namespace) -> int:
         except Exception as exc:  # noqa: BLE001 - the worker outlives a bad pass
             print(f"reconcile[{passes}]: pass failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         finally:
-            reconcile_lease.release()
+            if reconcile_lease is not None:
+                reconcile_lease.release()
         if args.once:
             return EXIT_OK
         time.sleep(args.interval_seconds)

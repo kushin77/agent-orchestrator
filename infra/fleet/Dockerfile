@@ -45,6 +45,26 @@ RUN set -eux; \
         curl; \
     rm -rf /var/lib/apt/lists/*
 
+# --- PyYAML for THIS image's interpreter (issue #1034) ----------------------
+#
+# The reconcile rung (`governance/reconcile/cli.py`) imports
+# `governance.lifecycle`, which validates its closure vocabulary against
+# `governance/lifecycle/controls.yaml` at import time (#885/#1065) and needs
+# PyYAML to read it. That import-time dependency was never declared for this
+# image, so every dispatch of the reconcile rung raised `ModuleNotFoundError`
+# before running a single pass — `scripts/check-fleet-cron-dev-run.sh`'s
+# baseline red, before any mutant is even tried.
+#
+# `pip`, not `apt-get install python3-yaml`: the apt package pulls Debian's
+# own `python3` as a dependency, which would occupy `/usr/bin/python3` before
+# the symlink step below runs and silently split the image onto two
+# interpreters — the one `fleet/cron.py` hardcodes into every crontab line
+# and the one this image's own commands (`sys.executable`) actually run
+# under. `pip` installs into the one interpreter this image has (below),
+# so both paths keep resolving to the same site-packages.
+RUN set -eux; \
+    python3 -m pip install --no-cache-dir --root-user-action=ignore "PyYAML==6.0.2"
+
 # --- gh: the GitHub CLI, from GitHub's own apt repository -------------------
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
