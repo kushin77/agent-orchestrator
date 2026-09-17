@@ -33,7 +33,21 @@ from governance.isolation.worktree import (
     write_record,
 )
 
-from conftest import commit  # noqa: E402  (suite-local helper; conftest bootstraps sys.path)
+import importlib.util as _importlib_util  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_isolation_tests_conftest", Path(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+commit = _conftest.commit
 
 
 def test_provision_creates_the_worktree_on_the_issue_branch(repo: Path, tmp_path: Path, mounts: Path):
