@@ -38,7 +38,6 @@ _conftest_spec = _importlib_util.spec_from_file_location(
 _conftest = _importlib_util.module_from_spec(_conftest_spec)
 _conftest_spec.loader.exec_module(_conftest)
 HEAD_COMMIT = _conftest.HEAD_COMMIT
-clean_item = _conftest.clean_item  # suite-local helper
 
 
 def test_the_stage_vocabulary_is_ordered_and_terminal_is_last():

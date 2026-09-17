@@ -17,7 +17,33 @@ import io
 from dataclasses import FrozenInstanceError
 
 import pytest
-from conftest import ROLLUP_DIR, build_report, inventory, org, run_cli, sme, tree_snapshot
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_rollup_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+
+# Persistent handle for the lazy in-function "model" imports below (see
+# governance/rollup/tests/conftest.py for the rationale: issues #699, #702,
+# #1042).
+import model as _rollup_model  # noqa: E402
+ROLLUP_DIR = _conftest.ROLLUP_DIR
+build_report = _conftest.build_report
+inventory = _conftest.inventory
+org = _conftest.org
+run_cli = _conftest.run_cli
+sme = _conftest.sme
+tree_snapshot = _conftest.tree_snapshot
 
 TENANT = {"alpha": {"ceiling": 300.0, "repos": ["fx/one"]}}
 
@@ -37,7 +63,7 @@ def test_the_input_tree_is_byte_identical_after_a_projection(tmp_path):
     before = tree_snapshot(tmp_path)
 
     from inputs import load_inputs, with_problems
-    from model import project
+    project = _rollup_model.project
 
     loaded = load_inputs(tmp_path / "org.yaml", tmp_path / "inventory", ROLLUP_DIR / "schema.yaml")
     assert loaded.org is not None
@@ -52,7 +78,7 @@ def test_the_input_tree_is_byte_identical_after_a_projection(tmp_path):
 def test_projection_opens_no_file_for_writing(tmp_path, monkeypatch):
     """A write-mode open anywhere in the projection is a failure."""
     from inputs import load_inputs
-    from model import project
+    project = _rollup_model.project
 
     org_doc, inv = docs()
     build_report(tmp_path, org_doc, inv)
@@ -135,7 +161,7 @@ def test_every_input_travels_with_its_content_hash(tmp_path):
 
 def test_projection_is_reproducible_and_the_facts_stay_frozen(tmp_path):
     from inputs import load_inputs
-    from model import project
+    project = _rollup_model.project
 
     org_doc, inv = docs()
     build_report(tmp_path, org_doc, inv)
@@ -159,7 +185,7 @@ def test_the_committed_pilot_projects_from_its_own_declarations(tmp_path, pilot_
                                                                pilot_inventory_dir, schema_path):
     """The pilot is a real projection too, not a special case in the code."""
     from inputs import load_inputs
-    from model import project
+    project = _rollup_model.project
 
     before = tree_snapshot(ROLLUP_DIR / "pilot")
     loaded = load_inputs(pilot_org, pilot_inventory_dir, schema_path)
