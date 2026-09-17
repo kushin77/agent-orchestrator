@@ -565,7 +565,8 @@ line owns the director/dispatcher/monitor rungs. Every N minutes it runs
 `fleet/watchdog.py run`, which respawns a **missing**, **stale** or **drifted**
 loop rung, restarts the **monitor** when it is missing, and does nothing when
 the fleet is healthy — so a tick is cheap and idempotent. A run in flight is
-never restarted just to update code (the one rule the watchdog never breaks).
+never restarted just to update code (the one rule the watchdog never breaks), and
+the HOLD that enforces it is itself bounded — see *the crash-loop escape* below.
 
 ### Two different drift faults, two different remedies (AO-GR-21, issue #773)
 
@@ -615,10 +616,74 @@ python3 fleet/watchdog.py rearm --rung brain   # clear a parked record after fix
 ```
 
 `bash scripts/check-watchdog-bounded.sh` drives the real module: it names both
-cases, fast-forwards a REAL scratch repository, measures the attempt counts, and
-mutation-proves itself with two mutants of the real source (the cap removed, and
-the local-HEAD distinction removed) — each required to diverge on a probe whose
-value must change, with the mutation's landing proved by sha256.
+cases, fast-forwards a REAL scratch repository, measures the attempt counts, drives
+the REAL marker judgement against REAL marker files (the probes above stub
+`run_in_flight`, which is exactly why a pid-only discriminator stayed invisible
+here), and mutation-proves itself with four mutants of the real source (the cap
+removed, the local-HEAD distinction removed, the crash-loop escape removed, and the
+marker-evidence rule removed) — each required to diverge on a probe whose value
+must change, with the mutation's landing proved by sha256.
+
+### What "a run in flight" means — the marker's own evidence (issue #366, #793)
+
+The one rule the watchdog never breaks — *never restart a run just to update code* —
+is enforced by asking whether **the marker's own evidence** says a run is in flight.
+It used to ask whether the marker's `pid` was alive. That `pid` is the **loop's**, and
+a loop outlives every run it dispatches, so a crashed run left a marker that read as
+"in flight" for as long as the loop lived. Measured 2026-09-14: three markers ~4.5h
+old, every one with `child_pid: null`, each naming the live dispatcher loop's pid — so
+the dispatcher's drift lock was held open on every tick while it executed code that
+predated five merged fixes.
+
+Flight is exactly two things, and `governance/spawn/liveness.py` is the one place
+that decides them:
+
+* a **live `child_pid`** — the executor itself, running; or
+* a **beat no older than `AO_RUN_STALE_SECONDS`** (default **120**) — the run's own
+  beater advanced it, which a crashed run cannot do. This is also what protects a run
+  that has only just started, before any child exists (`mark_run` writes
+  `child_pid: null` first).
+
+A marker with neither is a **crashed run**, and the drift remedy proceeds through the
+ordinary bounded path. A **missing or unreadable** beat is judged the same way, and
+deliberately: both writers store the stamp atomically, so an unreadable `ts` means a
+corrupted or foreign marker that nothing in the fleet will ever advance, and counting
+it as work would restore the very deadlock this removes. The decision is reported with
+the marker it was made on (`held by <marker> (live child pid N)`), so an
+unattributable hold is impossible.
+
+### The hold is bounded too — the crash-loop escape (issue #366)
+
+The hold is a *policy*; making it a *bound* is the other half. A rung whose runs die
+before they can report presents flight on **every** tick, so the hold is re-taken on
+every tick and the drift lock never opens —
+`drifted … a run is in flight — left alone` on each tick, from 21:32 onward, while
+the director was respawned in the same tick.
+
+So the hold gets a budget of its own, counted in **respawns due**: every tick the rung
+is drifted (or `checkout-behind`) and the remedy is reached, whether it *runs* or is
+*withheld* because a run appeared in flight. `CRASH_LOOP_RESPAWNS` (**3**) of those
+inside `CRASH_LOOP_WINDOW_SECONDS` (**600**s), with the observation never moving, is a
+crash loop, and the hold stops being honoured:
+
+```
+[watchdog] sister: drifted (running 592b132, origin/master 84afa90) — respawned (attempt 1/3) — crash-looping: 3 respawns due within 600s and none of them moved it (N=3) — the drift lock cannot clear, so this respawn is NOT withheld
+```
+
+Both constants are named on the line, because a bound whose numbers are not in the log
+cannot be audited by the principal reading it. Three properties keep it honest:
+
+* **it is not a second unbounded path.** The escape takes the ordinary remedy route,
+  so the attempt cap, the backoff, the escalate-once and the park all still apply —
+  the same budget as any other drift;
+* **progress resets the ledger**, so a healing fleet can never arm it, and **holds
+  spread wider than the window** never arm it either: it is a window, not a lifetime
+  tally;
+* **a parked rung is excluded first.** A park is terminal (#773), and a *deferral*
+  must not be able to un-park it — without that guard the first tick whose ledger had
+  aged out of the window took the hold again, flipped the record back to `pending`,
+  and would have resurrected a crash loop that had already been escalated and parked.
+  That was found by this gate's own probe, not by review.
 
 ### What "drifted" is measured against (AO-GR-25, issue #739)
 

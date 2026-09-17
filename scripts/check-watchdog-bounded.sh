@@ -45,9 +45,29 @@
 #          which is the measured defect in one line.
 #      A happy-path-only assertion cannot pass this: each mutant has a probe whose
 #      value MUST change, and the check names which value changed.
+#   7. "A run in flight" is the marker's OWN evidence, not a live loop pid (#366,
+#      landed as #793), and it is driven through the REAL `watchdog.run_in_flight`
+#      against REAL marker files. Every probe above STUBS `run_in_flight`, which is
+#      exactly why the pid-only discriminator was invisible here while it held the
+#      live sister's drift lock open: measured 2026-09-14, three markers ~4.5h old
+#      with `child_pid: null` named the live loop's pid, so the sister was never
+#      respawned and ran a commit predating five merged fixes.
+#   8. The hold itself is BOUNDED (#366, half (b)). A rung whose runs die before
+#      they can report presents flight on every tick, so `run_in_flight` answers
+#      True on every tick and the hold is re-taken forever. The probes drive the
+#      real `crash_loop_verdict` and the real remedy ledger and measure: N holds
+#      inside the window with no progress ⇒ the respawn is NOT withheld; holds
+#      wider than the window, or an observation that MOVES, never spend the budget;
+#      and the escape is the ordinary remedy path, so it gets the cap, ONE
+#      escalation and the park — never a second unbounded route to respawn.
+#   9. Every case that decides a marker is PROVOKED separately: a live child
+#      (held), a leftover (crashed), a run that has just started and has no child
+#      yet (held), a dead child, a missing or unparseable beat (crashed, and
+#      reported), an unreadable marker (crashed, and named) — plus mutant M4, which
+#      restores the pid-only rule and must make the remedy stop acting.
 #
 # Tri-state contract (docs/QA-GATE.md):
-#   0 OK             — every case correct and both mutants caught
+#   0 OK             — every case correct and every mutant caught
 #   1 NOT-OK         — a case misclassified, a bound not enforced, a mutant survived
 #   2 CANNOT-ASSESS  — python3/git missing, or the tree cannot be imported
 #
@@ -90,12 +110,22 @@ cat > "$work/driver.py" <<'DRIVER'
 """Drive the watchdog's bounded remedy; print MEASUREMENTS, never claims."""
 import contextlib
 import io
+import json
 import os
+import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 mode = sys.argv[1]
 root = Path(sys.argv[2]).resolve()
+# BOTH roots of the tree under test go on the path, in this order: the fleet
+# directory first for `channel`/`watchdog`, then the tree root for the `governance`
+# packages the watchdog imports (`governance.spawn.liveness` carries half of #366).
+# Without the second entry the mutant M4 below would be vacuous — the mutant tree's
+# `fleet/watchdog.py` would import the REAL `governance.spawn.liveness` and the
+# control would pass while proving nothing.
+sys.path.insert(0, str(root))
 sys.path.insert(0, str(root / "fleet"))
 
 # A stale __pycache__ can shadow the tree under test and make a mutant invisible
@@ -106,7 +136,7 @@ sys.dont_write_bytecode = True
 import channel  # noqa: E402
 import watchdog  # noqa: E402
 
-for module in (channel, watchdog):
+for module in (channel, watchdog, watchdog.spawn_liveness):
     if not Path(module.__file__).resolve().is_relative_to(root):
         print(f"IMPORT-ESCAPED {module.__file__}", file=sys.stderr)
         sys.exit(9)
@@ -268,6 +298,74 @@ if mode == "drift":
         rc = watchdog.watchdog_once()
     print(f"E_config_rc={rc}")
     print("E_config_names_var=" + ("yes" if watchdog.ENV_RESPAWN_ATTEMPTS in stderr.getvalue() else "no"))
+
+    # --- (f) the crash-loop escape (#366) -------------------------------------
+    # `run_in_flight` is pinned True — the ONE stubbed thing here, and it is stubbed
+    # in the direction that WOULD hold. Everything the verdict rests on is the real
+    # module: the real `crash_loop_verdict`, the real remedy ledger on disk, the real
+    # constants.
+    del os.environ[watchdog.ENV_RESPAWN_ATTEMPTS]
+    reset("sister")
+    f_lines = []
+    f_respawns = []
+    for step in range(watchdog.CRASH_LOOP_RESPAWNS + 1):
+        line, counts = act(OTHER, step * 10, inflight=True)
+        f_lines.append(line)
+        f_respawns.append(len(counts["respawn"]))
+    print(f"F_hold_ticks={sum('left alone' in line for line in f_lines[: -1])}")
+    print(f"F_respawns_before_budget={sum(f_respawns[: -1])}")
+    print(f"F_escape_respawns={f_respawns[-1]}")
+    print("F_escape_left_alone=" + ("yes" if "left alone" in f_lines[-1] else "no"))
+    print("F_names_N=" + ("yes" if f"N={watchdog.CRASH_LOOP_RESPAWNS}" in f_lines[-1] else "no"))
+    print(
+        "F_names_window="
+        + ("yes" if str(int(watchdog.CRASH_LOOP_WINDOW_SECONDS)) in f_lines[-1] else "no")
+    )
+
+    # (g) the escape is NOT a second unbounded path: it takes the ordinary remedy
+    # route, so it gets the same cap, ONE escalation and the park. The budget is
+    # pinned (to its own defaults, 3 and 1s) so this probe measures the STRUCTURE
+    # and not the wall-clock spacing — the spacing is proven separately by the
+    # "due in Ns" assertion above, and by `test_the_next_attempt_is_held_until_the_
+    # backoff_elapses`. The tick spacing is a quarter of the window, so three holds
+    # always fall inside it.
+    reset("sister")
+    os.environ[watchdog.ENV_RESPAWN_ATTEMPTS] = str(watchdog.DEFAULT_RESPAWN_ATTEMPTS)
+    os.environ[watchdog.ENV_RESPAWN_BACKOFF] = "1"
+    g_lines = []
+    g_respawns = 0
+    for step in range(9):
+        line, counts = act(OTHER, step * (int(watchdog.CRASH_LOOP_WINDOW_SECONDS) // 4), inflight=True)
+        g_lines.append(line)
+        g_respawns += len(counts["respawn"])
+    print(f"G_escape_respawn_calls={g_respawns}")
+    print(f"G_escalations={sum('ESCALATED ONCE' in line for line in g_lines)}")
+    print(f"G_parked_lines={sum('PARKED' in line for line in g_lines)}")
+    del os.environ[watchdog.ENV_RESPAWN_ATTEMPTS]
+    del os.environ[watchdog.ENV_RESPAWN_BACKOFF]
+
+    # (h) the budget is a WINDOW, not a lifetime tally
+    reset("sister")
+    spacing = int(watchdog.CRASH_LOOP_WINDOW_SECONDS) + 1
+    h_respawns = 0
+    h_line = ""
+    for step in range(watchdog.CRASH_LOOP_RESPAWNS + 2):
+        h_line, counts = act(OTHER, step * spacing, inflight=True)
+        h_respawns += len(counts["respawn"])
+    print(f"H_slow_hold_respawn_calls={h_respawns}")
+    print("H_slow_hold_left_alone=" + ("yes" if "left alone" in h_line else "no"))
+
+    # (i) progress restarts the ledger, so a rung that is HEALING is never escaped
+    reset("sister")
+    i_respawns = 0
+    i_line = ""
+    for step in range(6):
+        i_line, counts = act(f"old{step}", step * 5, inflight=True)
+        i_respawns += len(counts["respawn"])
+    print(f"I_progress_respawn_calls={i_respawns}")
+    print("I_progress_left_alone=" + ("yes" if "left alone" in i_line else "no"))
+    print(f"I_progress_ledger_size={len((watchdog.load_drift_record('sister') or {}).get('respawns') or [])}")
+
     sys.exit(0)
 
 if mode == "ff":
@@ -299,6 +397,124 @@ if mode == "lease":
     print(f"LEASE_LOCKED_CALLS={len(calls)}")
     print(f"LEASE_RC={rc}")
     holder.release()
+    sys.exit(0)
+
+if mode == "flight":
+    # #366 half (a), landed as #793: drive the REAL `run_in_flight` against REAL
+    # marker files. This is the point of a separate mode — the probes above stub
+    # `run_in_flight`, which is precisely why a pid-only discriminator stayed
+    # invisible here while it held the live sister's drift lock open for hours.
+    # The marker's `pid` written here is the DRIVER's own pid, i.e. a live process,
+    # which is exactly the measured shape: the loop alive, nothing running.
+    def stamp(seconds_ago):
+        return (datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def dead_pid():
+        """A pid certainly not alive: a child this process has already reaped."""
+        child = subprocess.Popen([sys.executable, "-c", "pass"])
+        child.wait()
+        return child.pid
+
+    runs = watchdog.RUNS_DIR
+
+    def only(name, **fields):
+        """Leave exactly ONE marker in RUNS_DIR; report the judgement on it."""
+        runs.mkdir(parents=True, exist_ok=True)
+        for path in runs.glob("*"):
+            path.unlink()
+        (runs / f"{name}.json").write_text(json.dumps(fields), encoding="utf-8")
+        return watchdog.spawn_liveness.runs_in_flight(runs)
+
+    live = os.getpid()
+    print(f"F_run_stale_seconds={watchdog.spawn_liveness.stale_seconds()}")
+
+    # 1. a live child is work in progress, whatever its beat says
+    held, detail = only("live-child", pid=live, child_pid=live, ts=stamp(99999))
+    print(f"F1_live_child={'held' if held else 'crashed'}")
+    print("F1_names_marker=" + ("yes" if "live-child" in detail else "no"))
+
+    # 2. the measured box shape: the loop's pid alive, no child, a beat nothing advances
+    held, detail = only("phantom", pid=live, child_pid=None, ts=stamp(16200))
+    print(f"F2_dead_leftover={'held' if held else 'crashed'}")
+    print("F2_names_marker=" + ("yes" if "phantom" in detail else "no"))
+    print(
+        "F2_reports_child_and_age="
+        + ("yes" if ("child_pid None" in detail and "16200s old" in detail) else "no")
+    )
+
+    # 3. `mark_run` writes child_pid: null BEFORE the subagent exists
+    held, _ = only("starting", pid=live, child_pid=None, ts=stamp(2))
+    print(f"F3_fresh_beat_no_child={'held' if held else 'crashed'}")
+
+    # 4. a dead child with a stale beat is not work
+    held, _ = only("dead-child", pid=live, child_pid=dead_pid(), ts=stamp(600))
+    print(f"F4_dead_child={'held' if held else 'crashed'}")
+
+    # 5. no readable beat — decided explicitly, and reported
+    held, detail = only("no-beat", pid=live, child_pid=None)
+    print(f"F5_missing_beat={'held' if held else 'crashed'}")
+    print("F5_says_why=" + ("yes" if "unreadable" in detail else "no"))
+    held, _ = only("bad-beat", pid=live, child_pid=None, ts="not-a-timestamp")
+    print(f"F6_unparseable_beat={'held' if held else 'crashed'}")
+
+    # 6. an unreadable marker is judged, and named — never silently dropped
+    for path in runs.glob("*"):
+        path.unlink()
+    (runs / "torn.json").write_text("{not json", encoding="utf-8")
+    held, detail = watchdog.spawn_liveness.runs_in_flight(runs)
+    print("F7_torn_marker=" + ("held" if held else "crashed"))
+    print("F7_names_it=" + ("yes" if "torn" in detail else "no"))
+
+    # --- the sister's DECISION, with the real `run_in_flight` ------------------
+    rung_beat = watchdog.FLEET_DIR / "sister.heartbeat.json"
+    rung_beat.parent.mkdir(parents=True, exist_ok=True)
+
+    def sister_decision():
+        """One REAL decision over whatever markers are on disk, respawn MEASURED."""
+        rung_beat.write_text(
+            json.dumps({"pid": 111, "state": "idle", "commit": "old0000", "ts": stamp(5)}),
+            encoding="utf-8",
+        )
+        watchdog.drift_record_path("sister").unlink(missing_ok=True)
+        if watchdog.escalation_dir().exists():
+            for path in watchdog.escalation_dir().glob("*.json"):
+                path.unlink()
+        calls = []
+        watchdog.loop_pid = lambda pattern: 111
+        watchdog.respawn = lambda pattern, script, name="": calls.append(name) or True
+        watchdog.fast_forward_checkout = lambda root_=None, *, remote="origin/master": (
+            False,
+            LOCAL,
+            "git merge --ff-only refused (not possible to fast-forward)",
+        )
+        watchdog.channel.capability_line = lambda finding: f"{finding.rung}: {finding.case}"
+        line = watchdog.rung_action(
+            "sister",
+            "fleet/terminal.py",
+            "fleet/terminal.sh",
+            rung_beat,
+            False,
+            REMOTE,
+            local_head=LOCAL,
+        )
+        return line, calls
+
+    only("phantom", pid=live, child_pid=None, ts=stamp(16200))
+    line, calls = sister_decision()
+    print(f"G_crashed_marker_respawn_calls={len(calls)}")
+    print("G_left_alone=" + ("yes" if "left alone" in line else "no"))
+
+    only("live-child", pid=live, child_pid=live, ts=stamp(99999))
+    line, calls = sister_decision()
+    print(f"H_live_child_respawn_calls={len(calls)}")
+    print("H_left_alone=" + ("yes" if "left alone" in line else "no"))
+    print("H_names_the_marker=" + ("yes" if "held by live-child" in line else "no"))
+
+    only("starting", pid=live, child_pid=None, ts=stamp(2))
+    line, calls = sister_decision()
+    print(f"I_fresh_beat_respawn_calls={len(calls)}")
+    print("I_fresh_beat_left_alone=" + ("yes" if "left alone" in line else "no"))
+
     sys.exit(0)
 
 print(f"UNKNOWN-MODE {mode}", file=sys.stderr)
@@ -381,7 +597,60 @@ expect "$real_out" D_completion_respawn_calls "1" "then acted on once the run co
 expect "$real_out" E_config_rc "2" "an unusable attempt cap returns CANNOT-ASSESS, not 0"
 expect "$real_out" E_config_names_var "yes" "and names the knob it refused"
 
-# --- 2. the remedy against a REAL git checkout -------------------------------
+# (f)+(g) the crash-loop escape: N holds on an unchanged observation, then the
+# remedy is NOT withheld — and the escape is still the bounded remedy.
+expect "$real_out" F_hold_ticks "3" "a run in flight holds the lock until the crash-loop budget is spent"
+expect "$real_out" F_respawns_before_budget "0" "and nothing is restarted just to update code while it holds"
+expect "$real_out" F_escape_respawns "1" "then a crash-looping rung is respawned DESPITE the run in flight"
+expect "$real_out" F_escape_left_alone "no" "and is no longer reported as left alone"
+expect "$real_out" F_names_N "yes" "the line names N, so the bound is auditable"
+expect "$real_out" F_names_window "yes" "and the window it counted in"
+expect "$real_out" G_escape_respawn_calls "3" "the escape gets the ordinary budget: at most cap respawns"
+expect "$real_out" G_escalations "1" "then escalates EXACTLY ONCE (no second unbounded path)"
+expect "$real_out" G_parked_lines "2" "and parks — the crash loop cannot be respawned forever"
+expect "$real_out" H_slow_hold_respawn_calls "0" "holds wider than the window are not a crash loop"
+expect "$real_out" H_slow_hold_left_alone "yes" "so a slow-but-busy rung is still protected"
+expect "$real_out" I_progress_respawn_calls "0" "a hold whose observation MOVES is progress, never a loop"
+expect "$real_out" I_progress_left_alone "yes" "so a healing rung is never restarted to update code"
+expect "$real_out" I_progress_ledger_size "1" "because progress restarts the respawn ledger"
+
+# --- 2. "a run in flight" is the marker's OWN evidence (#366 half (a), #793) --
+echo "== the run markers: a crashed run's leftover must not hold the drift lock =="
+flight_out="$work/flight.out"
+run_driver "$ROOT" "$work/state-flight" flight "$flight_out"
+flight_rc=$?
+if [ "$flight_rc" -eq 9 ]; then
+  echo "check-watchdog-bounded: CANNOT-ASSESS — the probe imported code outside the tree under test" >&2
+  exit 2
+fi
+if [ "$flight_rc" -ne 0 ]; then
+  bad "the marker probe could not run against the real tree (rc=$flight_rc)"
+  sed -n '1,20p' "$flight_out" | sed 's/^/    /'
+else
+  info "$(grep -c . "$flight_out") flight measurements (real marker files, nothing stubbed)"
+fi
+
+expect "$flight_out" F1_live_child "held" "a marker with a live child is a run in flight"
+expect "$flight_out" F1_names_marker "yes" "and the hold names the marker that holds it"
+expect "$flight_out" F2_dead_leftover "crashed" "a leftover (loop pid alive, no child, dead beat) is NOT"
+expect "$flight_out" F2_names_marker "yes" "the crashed marker is NAMED — it cannot hold the lock invisibly"
+expect "$flight_out" F2_reports_child_and_age "yes" "with its child state and its age"
+expect "$flight_out" F3_fresh_beat_no_child "held" "a run that just started has no child yet — never restarted"
+expect "$flight_out" F4_dead_child "crashed" "a dead child with a stale beat is not work"
+expect "$flight_out" F5_missing_beat "crashed" "a missing beat is decided in the ACTING direction"
+expect "$flight_out" F5_says_why "yes" "and the decision is reported, not silent"
+expect "$flight_out" F6_unparseable_beat "crashed" "an unparseable beat takes the same decision"
+expect "$flight_out" F7_torn_marker "crashed" "an unreadable marker is judged, never dropped"
+expect "$flight_out" F7_names_it "yes" "and it is named too"
+expect "$flight_out" G_crashed_marker_respawn_calls "1" "so the drift remedy PROCEEDS for a crashed marker"
+expect "$flight_out" G_left_alone "no" "and is no longer reported as left alone"
+expect "$flight_out" H_live_child_respawn_calls "0" "a live child still stops the remedy — the safety rule holds"
+expect "$flight_out" H_left_alone "yes" "reported as before"
+expect "$flight_out" H_names_the_marker "yes" "and the held line names its holder"
+expect "$flight_out" I_fresh_beat_respawn_calls "0" "a fresh beat protects a starting run"
+expect "$flight_out" I_fresh_beat_left_alone "yes" "so a starting run is never restarted to update code"
+
+# --- 3. the remedy against a REAL git checkout -------------------------------
 echo "== the fast-forward remedy (a real repository, no network) =="
 git_id=(-c user.email=agent773@agents.invalid -c user.name=agent773)
 origin="$work/origin.git"
@@ -422,7 +691,7 @@ else
   bad "a diverged checkout was not refused (measured: $(tr '\n' ' ' < "$ff_out"))"
 fi
 
-# --- 3. the mutation proof ----------------------------------------------------
+# --- 4. the mutation proof ----------------------------------------------------
 copy_tree() { # copy_tree <dest>
   mkdir -p "$1" || return 1
   local part
@@ -439,8 +708,8 @@ copy_tree() { # copy_tree <dest>
 
 sha_of() { python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"; }
 
-mutant_probe() { # mutant_probe <name> <mutated-file> <before-sha> <out> <expectation...>
-  local name="$1" file="$2" before="$3" out="$4"
+mutant_probe() { # mutant_probe <name> <mutated-file> <before-sha> <out> [driver-mode]
+  local name="$1" file="$2" before="$3" out="$4" mode="${5:-drift}"
   local after
   after="$(sha_of "$file")"
   if [ "$after" = "$before" ]; then
@@ -452,7 +721,7 @@ mutant_probe() { # mutant_probe <name> <mutated-file> <before-sha> <out> <expect
     bad "$name: the mutated file carries no MUTANT marker — the edit is not identifiable"
     return
   fi
-  run_driver "$mutant_tree" "$work/state-$name" drift "$out"
+  run_driver "$mutant_tree" "$work/state-$name" "$mode" "$out"
   if [ "$?" -eq 9 ]; then
     bad "$name: the probe imported code outside the mutant tree (vacuous control)"
     return
@@ -606,10 +875,112 @@ else
   fi
 fi
 
+# --- M4: the crash-loop escape removed (#366 half (b), the measured deadlock) -
+echo "== mutant 4: the hold is unbounded again (a crashed run holds the lock forever) =="
+mutant_tree="$work/mutant-crashloop"
+copy_tree "$mutant_tree" || {
+  echo "check-watchdog-bounded: CANNOT-ASSESS — cannot copy the tree for the mutant" >&2
+  exit 2
+}
+before="$(sha_of "$mutant_tree/fleet/watchdog.py")"
+python3 - "$mutant_tree/fleet/watchdog.py" <<'MUTATE'
+"""Restore the #366 deadlock: the crash-loop verdict never fires, so the
+in-flight hold is re-taken on every tick and the drift lock never opens."""
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+source = path.read_text(encoding="utf-8")
+needle = "    recent = [stamp for stamp in stamps if 0.0 <= when - stamp <= window]"
+if needle not in source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+mutant = source.replace(
+    needle,
+    "    recent = []  # MUTANT: the crash-loop budget is never spent, so the hold is unbounded",
+    1,
+)
+if mutant == source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+path.write_text(mutant, encoding="utf-8")
+print("MUTATED")
+MUTATE
+if [ "$?" -ne 0 ]; then
+  bad "the crash-loop mutation could not be constructed (the verdict moved)"
+else
+  m4_out="$work/mutant-crashloop.out"
+  mutant_probe "M4" "$mutant_tree/fleet/watchdog.py" "$before" "$m4_out" drift
+  m4_escape="$(kv "$m4_out" F_escape_respawns)"
+  m4_left="$(kv "$m4_out" F_escape_left_alone)"
+  m4_holds="$(kv "$m4_out" F_hold_ticks)"
+  m4_g="$(kv "$m4_out" G_escape_respawn_calls)"
+  if [ "$m4_escape" = "0" ] && [ "$m4_left" = "yes" ] && [ "$m4_g" = "0" ]; then
+    ok "M4 caught: with the crash-loop verdict removed the rung is held $m4_holds/3 ticks and respawned NEVER (G=$m4_g) — the deadlock is back"
+  else
+    bad "M4 survived: the crash-loop escape was not caught (hold_ticks=$m4_holds left_alone=$m4_left F=$m4_escape G=$m4_g)"
+  fi
+fi
+
+# --- M5: the marker's own evidence removed (#366 half (a), #793) --------------
+echo "== mutant 5: a live loop pid counts as a run in flight again =="
+mutant_tree="$work/mutant-pidonly"
+copy_tree "$mutant_tree" || {
+  echo "check-watchdog-bounded: CANNOT-ASSESS — cannot copy the tree for the mutant" >&2
+  exit 2
+}
+before="$(sha_of "$mutant_tree/governance/spawn/liveness.py")"
+python3 - "$mutant_tree/governance/spawn/liveness.py" <<'MUTATE'
+"""Restore the pre-#793 rule: ask whether the loop's pid is alive, and never look
+at the marker's own evidence, so a crashed run's leftover holds the lock."""
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+source = path.read_text(encoding="utf-8")
+needle = '    if process_alive(child):\n        return Verdict(True, marker, f"live child pid {child}")'
+if needle not in source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+mutant = source.replace(
+    needle,
+    '    if process_alive(record.get("pid")):  # MUTANT: the loop pid decides, not the marker\n'
+    '        return Verdict(True, marker, f"live loop pid {record.get(\'pid\')}")',
+    1,
+)
+if mutant == source:
+    print("MUTATE-FAILED", file=sys.stderr)
+    sys.exit(1)
+path.write_text(mutant, encoding="utf-8")
+print("MUTATED")
+MUTATE
+if [ "$?" -ne 0 ]; then
+  bad "the marker-evidence mutation could not be constructed (the discriminator moved)"
+else
+  m5_out="$work/mutant-pidonly.out"
+  mutant_probe "M5" "$mutant_tree/governance/spawn/liveness.py" "$before" "$m5_out" flight
+  m5_leftover="$(kv "$m5_out" F2_dead_leftover)"
+  m5_respawn="$(kv "$m5_out" G_crashed_marker_respawn_calls)"
+  m5_live="$(kv "$m5_out" F1_live_child)"
+  m5_live_respawn="$(kv "$m5_out" H_live_child_respawn_calls)"
+  if [ "$m5_leftover" = "held" ] && [ "$m5_respawn" = "0" ]; then
+    ok "M5 caught: with the pid-only rule back the 4.5h-old leftover reads '$m5_leftover' and the remedy stops acting (G respawn=$m5_respawn)"
+  else
+    bad "M5 survived: the removed marker-evidence rule was not caught (F2=$m5_leftover G respawn=$m5_respawn)"
+  fi
+  # Non-vacuity: the mutant must break the RULE and nothing else — a live child is
+  # still work, so the divergence above is specific to the evidence it removed.
+  if [ "$m5_live" = "held" ] && [ "$m5_live_respawn" = "0" ]; then
+    ok "M5 is specific: a live child still holds the lock, so only the removed rule moved"
+  else
+    bad "M5 is not specific: the live-child case changed too (F1=$m5_live H respawn=$m5_live_respawn)"
+  fi
+fi
+
 # --- verdict ------------------------------------------------------------------
 if [ "$fail" -ne 0 ]; then
   echo "check-watchdog-bounded: FAIL — the watchdog's remedy is not provably bounded" >&2
   exit 1
 fi
-echo "check-watchdog-bounded: OK — the drift remedy is named, bounded, escalated once and parked; two mutants of the real source are caught"
+echo "check-watchdog-bounded: OK — the drift remedy is named, bounded, escalated once and parked; a crashed run's leftover no longer holds the lock and a crash-looping rung is respawned anyway, still under the cap; four mutants of the real source are caught"
 exit 0
