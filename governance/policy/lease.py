@@ -90,6 +90,16 @@ SNAPSHOT_STALENESS_MINUTES = 15
 DIRECTIVE_LIFETIME_HOURS = 48
 DIRECTIVE_LIFETIME_SECONDS = DIRECTIVE_LIFETIME_HOURS * 3600
 
+#: An unmatched real-tree artifact (worktree/branch) younger than this is a
+#: LIVE lane still being set up — a subagent's worktree, or the detached
+#: scratch worktree running the gate itself — not an orphan. It is reported
+#: (INFO, counted as ``young``) but must not fail the gate: a snapshot audit
+#: with no grace window goes red the instant any agent creates a worktree,
+#: i.e. always, and the gate can never be green while the fleet works (#740
+#: follow-up). Only an artifact OLDER than this grace window fails unless it
+#: is explicitly baselined.
+REAL_TREE_GRACE_HOURS = 24
+
 
 @dataclass(frozen=True)
 class Lease:
@@ -309,6 +319,7 @@ CONSUMERS: tuple[tuple[str, str | None, str], ...] = (
     ("governance/dispatch/claims.py", "DEFAULT_REAP_MINUTES", "CLAIM_REAP_MINUTES"),
     ("governance/dispatch/model.py", None, "CLAIM_TTL_HOURS"),
     ("governance/dispatch/snapshot.py", "DEFAULT_STALENESS_MINUTES", "SNAPSHOT_STALENESS_MINUTES"),
+    ("governance/reconcile/real_tree_baseline.py", "DEFAULT_GRACE_HOURS", "REAL_TREE_GRACE_HOURS"),
 )
 
 #: Modules that must read the policy *through* another module's constant.
@@ -349,6 +360,7 @@ OWNED_NAMES: tuple[str, ...] = (
     "CLAIM_REAP_MINUTES",
     "SNAPSHOT_STALENESS_MINUTES",
     "DIRECTIVE_LIFETIME_SECONDS",
+    "REAL_TREE_GRACE_HOURS",
 )
 
 POLICY_MODULE = "governance/policy/lease.py"
