@@ -12,11 +12,21 @@ that gate classifies a piece of *work*, this one classifies a *surface*.
 template → class → pattern → enterprise → faang → elite
 ```
 
-The ladder is defined in `kushin77/CMR` `docs/SOLUTION-CLASSES.md` (referenced
-by [ADR-0010](decision-records/ADR-0010-canonical-copy-ownership.md)). The
-vocabulary here is closed and identical to
-[`governance/conformance/model.py`](../governance/conformance/model.py) — the
-suite asserts the two gates cannot drift apart.
+The ladder is defined in `kushin77/CMR` `docs/SOLUTION-CLASSES.md` and is
+consumed here **by pin, never by copy**
+([ADR-0031](decision-records/ADR-0031-solution-class-ladder-pin-and-class-ceilings.md),
+reaffirming [ADR-0010](decision-records/ADR-0010-canonical-copy-ownership.md) §2):
+the pinned text is `vendor/CMR/docs/SOLUTION-CLASSES.md` at the `vendor/CMR`
+gitlink recorded as `bundle_ref` in `cmr-pin.yaml` (`scripts/check-cmr-pin.sh`).
+The vocabulary here is closed and identical to
+[`governance/conformance/model.py`](../governance/conformance/model.py) —
+`governance/conformance/tests/test_surfaces.py::test_ladder_is_identical_to_the_issue_policy`
+asserts the surface ladder and the issue ladder are the same tuple, and
+`test_real_policy_loads` pins that tuple to the six CMR rungs, so the two gates
+cannot drift apart or away from the pin. A local copy of the ladder is refused
+by `governance/dupcheck/check-duplicates.sh scan` (`SOLUTION-CLASSES.md` is a
+protected canonical doc name); a ladder change arrives only through a submodule
+bump + re-pin.
 
 ## The declared surfaces (measured 2026-09-14, issue #351; scope widened by #590 and #620; four `governance/` surfaces raised to `elite` by #885)
 
@@ -79,6 +89,85 @@ and #620 established.
 The declared class is **measured, never aspirational**: a surface is never
 declared above the evidence its own tree shows, because raising one fails the
 gate. The table above is reproducible — run `make surface-class`.
+
+## Class ceilings (non-product rows)
+
+Some rows cannot honestly reach the top rung because of their **shape**, not
+their quality: a static asset bundle, repository metadata, a single file. The
+upper rungs require artifacts *under the path* (controls, audit, schema, a
+live-sync `.py`); planting them there would be decorative evidence the
+no-false-green doctrine forbids. Instead such a row carries an explicit ceiling
+in `surfaces.yaml` (issue #883,
+[ADR-0031](decision-records/ADR-0031-solution-class-ladder-pin-and-class-ceilings.md) §c):
+
+```yaml
+  - surface: commit-contract
+    path: .gitmessage
+    declared_class: template
+    class_ceiling: template
+    ceiling_reason: >-
+      The path is a single file; every rung above `template` requires an
+      artifact *under* the path, which a file cannot hold. ...
+```
+
+Semantics — a ceiling is **reported, never silently waived**:
+
+| Rule | Finding | Severity |
+|---|---|---|
+| a `class_ceiling` must be a rung below the top and must carry a `ceiling_reason` | policy refused (`CANNOT-ASSESS`) | policy defect |
+| the ceiling and its reason are printed on **every** run | `surface-class-ceiling` | warning |
+| `declared_class` above the ceiling | `surface-above-class-ceiling` | error |
+| measured class above the ceiling (the ceiling has gone stale) | `surface-class-ceiling-stale` | error |
+| `surface-below-declared-class` still fires under a ceiling | unchanged | error |
+
+A row with a ceiling is a **non-product row**; every other row is a product
+row. EPIC #878's "every row `elite`" is read as: every product row measures
+`elite`, every non-product row measures its ceiling. The three ceilings today
+(**proposed; for the owner to confirm**):
+
+| Row | Ceiling | Why |
+|---|---|---|
+| `shell` (`portal/static`) | `pattern` | a README and a suite are the most a static bundle can honestly carry; controls/audit/schema/live-sync are `portal` server artifacts |
+| `github` (`.github`) | `pattern` | repository metadata; its real gates live in `scripts/` and already match by name |
+| `commit-contract` (`.gitmessage`) | `template` | a single file can hold nothing under it; enforced by `scripts/check-pr-contract.sh` |
+
+## The module's declared class (`module.json`)
+
+`module.json` declares the module's own rung in the additive key
+`solution_class` (the CMR module template names no ladder field; the catalog
+schema admits additional properties). Its value is the **product floor** — the
+lowest measured class over the product rows (rows without a ceiling) — today
+`pattern`, held by `portal`. `surfaces.py check` reads `<root>/module.json`
+(or `--module <path>`), prints the floor and the declared class on every run
+(`module     module.json      pattern      floor=pattern (portal)`), emits them
+under `"module"` in `--json`, and refuses by name:
+
+| Finding | Meaning |
+|---|---|
+| `module-class-above-floor` | `solution_class` is above the lowest measured product row (a mutant declaring `elite` is refused) |
+| `module-class-undeclared` | the manifest carries no `solution_class` |
+| `module-class-unknown` | `solution_class` is not a rung |
+| `module-manifest-unreadable` | the manifest is not valid JSON |
+
+The negative control is proved in
+`governance/conformance/tests/test_surface_ceiling.py`
+(`test_mutant_module_declaring_elite_is_refused_by_name`,
+`test_real_tree_mutant_manifest_declaring_elite_is_refused_by_name`).
+
+## The flip protocol (raising a declared class)
+
+`declared_class` in `surfaces.yaml` is never raised in the same PR as the
+evidence it depends on:
+
+1. **Artifact PR merges** — the lane ships the real artifact (contract, suite,
+   controls, audit, schema, gate, live-sync), with its own negative control.
+2. **Measurement shows the rung** — `bash scripts/check-surface-class.sh`
+   prints the row's *measured* class at the target rung against `master`.
+3. **Flip PR raises `declared_class`** — one flip PR per wave, touching only
+   `surfaces.yaml` (and this table), never bundled with artifact work; the gate
+   refuses the flip by name if step 2 does not hold.
+4. **`module.json` follows the floor** — `solution_class` is raised only when
+   the lowest product row has itself been flipped.
 
 ## What each rung requires
 
@@ -149,6 +238,11 @@ because a check that cannot fail is a formality.
 | `surface-undeclared` | error | an existing surface root no surface declares |
 | `surface-duplicate` | error | a surface is declared more than once |
 | `surface-manual-requirement` | warning | a declared class carries a manual requirement (reported, never assumed met) |
+| `surface-class-ceiling` | warning | a row carries a class ceiling (reported on every run with its reason, never silently waived) |
+| `surface-above-class-ceiling` | error | a row declares a class above its ceiling |
+| `surface-class-ceiling-stale` | error | a row measures above its ceiling; the ceiling no longer describes it |
+| `module-class-above-floor` | error | `module.json` `solution_class` is above the lowest measured product row |
+| `module-class-undeclared` / `module-class-unknown` / `module-manifest-unreadable` | error | `module.json` has no `solution_class`, a non-rung, or is not valid JSON |
 
 `surface_roots` in [`governance/conformance/surfaces.yaml`](../governance/conformance/surfaces.yaml)
 names the top-level directories that are product surfaces; each that exists must
@@ -159,6 +253,9 @@ be declared or waived by name, so no surface goes unclassified by omission.
 - Implements issue #351 (parent #338); widened to the git-ecosystem surfaces by
   issue #620 (parent #616, from the gap analysis of issue #608).
 - Complements `scripts/check-conformance.sh` (issue #140, the issue-class gate).
-- The class ladder is declared in `kushin77/CMR` `docs/SOLUTION-CLASSES.md`;
-  the ladder's local canonical copy note is
-  [ADR-0010](decision-records/ADR-0010-canonical-copy-ownership.md).
+- The class ladder is declared in `kushin77/CMR` `docs/SOLUTION-CLASSES.md`
+  and consumed by pin (`vendor/CMR/docs/SOLUTION-CLASSES.md`); canon is
+  [ADR-0010](decision-records/ADR-0010-canonical-copy-ownership.md), the pin,
+  the class ceilings, the module's declared class and the flip protocol are
+  [ADR-0031](decision-records/ADR-0031-solution-class-ladder-pin-and-class-ceilings.md)
+  (issue #883, EPIC #878).
