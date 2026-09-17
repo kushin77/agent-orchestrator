@@ -56,6 +56,33 @@ log) is treated as **old** — fail-closed, the same direction every other
 CANNOT-ASSESS-adjacent decision in this package takes: an unmeasurable age
 must never be read as "young enough to ignore".
 
+## Vanished-between-list-and-measure (#885 follow-up)
+
+Age measurement runs *after* the disk listing (`audit()`'s `git worktree
+list`/`git for-each-ref`), not atomically with it. Under concurrent lane
+churn — exactly what three sibling lanes racing worktrees/branches during a
+`make verify` run produces — an artifact the listing just reported UNMATCHED
+can be **gone by the time its age is measured**: its worktree directory
+removed, its branch ref deleted. Measured: `check-reconcile.sh`'s real-tree
+step failed once during a concurrent `make verify` with 0 new violations and
+`assessable=False`-shaped surprise, traced to exactly this race.
+
+Before this artifact could only be **present-but-unmeasurable** (a `stat`
+failure, an unreadable `git log`) — correctly fail-closed to OLD, because an
+age this audit truly cannot read must never be read as "young enough to
+ignore" (see "Age grace" above). But "the path no longer exists" / "the ref no
+longer resolves" is not "I could not measure it" — it is "the artifact the
+listing saw is no longer there", which is exactly the state a concurrent
+cleanup produces and is never a violation on its own account.
+
+`artifact_vanished()` checks existence/resolution *before* attempting to
+measure age: a worktree whose path is gone, or a branch whose ref no longer
+resolves (`git rev-parse --verify`), is **vanished** — reported and counted
+(`RealTreeVerdict.vanished`), never fails the gate, and is never mistaken for
+a genuinely present-but-unreadable artifact (`artifact_age_seconds` is
+unchanged and still fail-closes to OLD for that case; it is now only reached
+for artifacts `artifact_vanished()` says are still there).
+
 ## Stale is not fatal (second #740 follow-up)
 
 Unlike ``governance/isolation/landed-baseline.json`` — whose entries are
@@ -99,6 +126,7 @@ _KEY = tuple[str, str]
 DEFAULT_GRACE_HOURS = lease.REAL_TREE_GRACE_HOURS
 
 YOUNG = "young"
+VANISHED = "vanished"
 
 
 class BaselineUnavailable(Exception):
@@ -124,6 +152,7 @@ class RealTreeVerdict:
     new_violations: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     stale_entries: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     young: tuple[BaselineEntry, ...] = field(default_factory=tuple)
+    vanished: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     baseline_count: int = 0
     unmatched_count: int = 0
     grace_hours: float = 0.0
@@ -143,8 +172,10 @@ class RealTreeVerdict:
         lines = [
             f"real-tree-baseline: {self.unmatched_count} unmatched artifact(s) on disk, "
             f"{self.baseline_count} baselined, {len(self.young)} young (< {self.grace_hours:g}h, not failed), "
-            f"{len(self.stale_entries)} stale (not failed)"
+            f"{len(self.stale_entries)} stale (not failed), {len(self.vanished)} vanished (not failed)"
         ]
+        for entry in self.vanished:
+            lines.append(f"  VANISHED {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.young:
             lines.append(f"  YOUNG    {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.new_violations:
@@ -179,6 +210,33 @@ def _branch_age_seconds(root: Path | str, branch: str, *, at: float) -> float | 
         return at - float(text)
     except ValueError:
         return None
+
+
+def _branch_resolves(root: Path | str, branch: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def artifact_vanished(root: Path | str, kind: str, name: str) -> bool:
+    """The artifact the disk listing reported UNMATCHED is already gone.
+
+    Checked *before* any age measurement is attempted, and deliberately
+    narrower than "age could not be measured" (:func:`artifact_age_seconds`):
+    a worktree path that no longer exists, or a branch ref that no longer
+    resolves, is a concurrent cleanup racing the audit — never a violation on
+    its own. An artifact that IS still there but whose age this audit cannot
+    read (a `stat` failure, an unreadable `git log`) is unaffected by this
+    check and stays fail-closed to OLD, exactly as before (#885).
+    """
+    if kind == "worktree":
+        return not Path(name).exists()
+    if kind == "branch":
+        return not _branch_resolves(root, name)
+    return False
 
 
 def artifact_age_seconds(root: Path | str, kind: str, name: str, *, at: float) -> float | None:
@@ -252,7 +310,18 @@ def check_real_tree(
     unbaselined = sorted(unmatched_keys - set(baseline_by_key))
     young: list[BaselineEntry] = []
     new_violations: list[BaselineEntry] = []
+    vanished: list[BaselineEntry] = []
     for kind, name in unbaselined:
+        if artifact_vanished(root, kind, name):
+            vanished.append(
+                BaselineEntry(
+                    kind=kind,
+                    name=name,
+                    reason="gone between the disk listing and age measurement "
+                    "(concurrent cleanup); not a violation",
+                )
+            )
+            continue
         age = artifact_age_seconds(root, kind, name, at=now)
         if age is not None and age < grace_seconds:
             young.append(
@@ -279,6 +348,7 @@ def check_real_tree(
         new_violations=tuple(new_violations),
         stale_entries=stale_entries,
         young=tuple(young),
+        vanished=tuple(vanished),
         baseline_count=len(baseline),
         unmatched_count=len(unmatched_keys),
         grace_hours=resolved_grace_hours,

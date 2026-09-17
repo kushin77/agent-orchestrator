@@ -337,3 +337,126 @@ def test_unmeasurable_age_is_treated_as_old_fail_closed(scratch_repo: Path, tmp_
         scratch_repo, "worktree", str(tmp_path / "no-such-worktree-dir"), at=time.time()
     )
     assert age_worktree is None
+
+
+# --- vanished-between-list-and-measure (#885 follow-up) ---------------------
+#
+# Concurrent lane churn during `make verify` can delete a worktree/branch
+# between the disk *listing* (`audit()`) and this module's *age measurement*
+# of the same unmatched artifact. That must be reported as VANISHED — never a
+# violation, and never confused with a genuinely present-but-unreadable
+# artifact (which stays fail-closed to OLD, `artifact_age_seconds` unchanged).
+
+
+class _FakeAuditOps:
+    """Reports artifacts that were never real on disk — simulating "the
+    listing saw it, but it is gone by the time anything looks again"."""
+
+    def __init__(self, *, worktrees, branches):
+        self._worktrees = worktrees
+        self._branches = branches
+
+    def list_worktrees(self):
+        return self._worktrees
+
+    def list_local_branches(self):
+        return self._branches
+
+    def active_claims(self):
+        return {}
+
+    def landed_issues(self):
+        return set()
+
+
+def test_a_vanished_branch_is_reported_but_does_not_fail(scratch_repo: Path, tmp_path: Path):
+    from governance.reconcile.audit import WorktreeEntry
+
+    ops = _FakeAuditOps(
+        worktrees=[WorktreeEntry(path=str(scratch_repo), primary=True)],
+        branches=["issue-vanished-branch"],  # never a real ref in scratch_repo
+    )
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    verdict = check_real_tree(scratch_repo, baseline, ops=ops, grace_hours=0)
+    assert verdict.assessable
+    assert verdict.ok, "a vanished artifact must never fail the gate"
+    assert verdict.new_violations == ()
+    names = {(e.kind, e.name) for e in verdict.vanished}
+    assert ("branch", "issue-vanished-branch") in names
+
+
+def test_a_vanished_worktree_is_reported_but_does_not_fail(scratch_repo: Path, tmp_path: Path):
+    from governance.reconcile.audit import WorktreeEntry
+
+    gone = str(tmp_path / "worktree-that-is-already-gone")
+    ops = _FakeAuditOps(
+        worktrees=[
+            WorktreeEntry(path=str(scratch_repo), primary=True),
+            WorktreeEntry(path=gone, branch="lane-gone"),
+        ],
+        branches=[],
+    )
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    verdict = check_real_tree(scratch_repo, baseline, ops=ops, grace_hours=0)
+    assert verdict.assessable
+    assert verdict.ok, "a vanished artifact must never fail the gate"
+    assert verdict.new_violations == ()
+    names = {(e.kind, e.name) for e in verdict.vanished}
+    assert ("worktree", gone) in names
+
+
+def test_artifact_vanished_true_for_missing_worktree_path(tmp_path: Path, scratch_repo: Path):
+    from governance.reconcile.real_tree_baseline import artifact_vanished
+
+    assert artifact_vanished(scratch_repo, "worktree", str(tmp_path / "does-not-exist")) is True
+
+
+def test_artifact_vanished_false_for_a_real_branch(scratch_repo: Path):
+    from governance.reconcile.real_tree_baseline import artifact_vanished
+
+    assert artifact_vanished(scratch_repo, "branch", "issue-orphan-1") is False
+
+
+def test_artifact_vanished_true_for_a_deleted_branch_ref(scratch_repo: Path):
+    """A branch that resolved when listed but was deleted before this check
+    runs — the concurrent-cleanup race this module now distinguishes."""
+    from governance.reconcile.real_tree_baseline import artifact_vanished
+
+    _git(scratch_repo, "branch", "-D", "issue-orphan-2")
+    assert artifact_vanished(scratch_repo, "branch", "issue-orphan-2") is True
+
+
+def test_present_but_unmeasurable_still_fails_closed_old_not_vanished(
+    scratch_repo: Path, tmp_path: Path
+):
+    """The pre-existing fail-closed case (#740) must be untouched: an artifact
+    that genuinely exists but whose age this audit cannot read is OLD, never
+    vanished and never young — `artifact_vanished` must say False for it."""
+    from governance.reconcile.real_tree_baseline import artifact_vanished
+
+    worktree = tmp_path / "present-worktree"
+    worktree.mkdir()
+    # A real, existing path: not vanished, even though its age may later be
+    # unmeasurable in some other scenario (permission, corrupt log, etc.) —
+    # this module's vanished check is existence/resolution only.
+    assert artifact_vanished(scratch_repo, "worktree", str(worktree)) is False
+
+
+def test_vanished_count_is_recorded_on_the_ledger(scratch_repo: Path, tmp_path: Path):
+    import sys as _sys
+
+    from governance.reconcile import ledger
+    from governance.reconcile.audit import WorktreeEntry
+
+    ops = _FakeAuditOps(
+        worktrees=[WorktreeEntry(path=str(scratch_repo), primary=True)],
+        branches=["issue-vanished-for-ledger"],
+    )
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    check_real_tree(scratch_repo, baseline, ops=ops, grace_hours=0)
+    records = [r for r in ledger.read(scratch_repo) if r["kind"] == ledger.REAL_TREE_VERDICT]
+    assert records, "check_real_tree must write a real-tree-verdict ledger record"
+    assert records[-1]["vanished"] == 1
