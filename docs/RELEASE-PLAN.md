@@ -28,17 +28,13 @@ gate are listed. Each path below was confirmed present with `test -e` (§7).
 | Surface | Defining artifact | Defending gate | Current version |
 |---|---|---|---|
 | Control-plane API | `identity/cpapi/openapi.yaml` (OpenAPI 3.0.3, 28 paths) | `scripts/check-cpapi-spec-drift.sh` (`verify.sh` gate `cpapi-spec-drift`, issue #816) | `1.0.0` (`info.version`) |
-| Pillar boundaries | `docs/ARCHITECTURE.md` (five pillars + cross-cutting) | `docs/SURFACE-CLASS.md` + `governance/conformance/` (per-surface declared-class gate) | n/a — architectural contract, not a numbered artifact |
+| Generated clients | `identity/cpapi/clients/` (`control_plane_client.py`) | `scripts/check-cpapi-spec-drift.sh` — the same gate; its own header states the spec "is what consumers generate clients from," and it does not carry a version distinct from the spec's | tracks `1.0.0` |
+| Pillar boundaries | `docs/ARCHITECTURE.md` (five pillars + cross-cutting) | `scripts/check-surface-class.sh` (`verify.sh` gate `surface-class`), declared against `docs/SURFACE-CLASS.md` | n/a — architectural contract, not a numbered artifact |
 | Branch-protection policy | `governance/platform/branch-protection.yaml` | `scripts/check-branch-protection.sh` (`verify.sh` gate `branch-protection`) | schema `ao.branch-protection/v1` |
 | Gate-of-record status context | `scripts/gate-status.sh` (posts `ao/gate-of-record`) | `scripts/check-gate-status.sh` (`verify.sh` gate `gate-status`, ADR-0028) | context string, not versioned |
 
-**Not listed:** generated API clients. `identity/cpapi/openapi.yaml`'s own
-description states clients are built "in `clients/`", but no `clients/`
-directory exists in this checkout today — confirmed absent by `test -e`
-(§7). This is not asserted as a gap requiring a lane here; it is simply
-omitted per the instruction to list only what is verified to exist. No MCP
-or agent-facing surface declares its own OpenAPI-equivalent contract or gate
-yet, so none is listed.
+No MCP or agent-facing surface declares its own OpenAPI-equivalent contract
+or gate yet, so none is listed here.
 
 ## 3. What MAJOR / MINOR / PATCH mean here
 
