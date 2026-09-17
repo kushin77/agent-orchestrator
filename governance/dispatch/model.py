@@ -61,6 +61,12 @@ REASON_PROVENANCE_MISMATCH = "provenance-mismatch"
 REASON_UNOWNED = "unowned"
 # Not an ownership refusal: the board evidence is too old to judge with at all.
 REASON_SNAPSHOT_STALE = "snapshot-stale"
+# Per-file leases (issue #702): a claim may name the files it touches, with an
+# optional region per file. Two live claims naming the SAME file with
+# OVERLAPPING regions (or either with no region — the whole file) conflict; two
+# claims naming the same file with disjoint regions do not, so a slow neighbour
+# touching a different region of one file no longer serializes the whole file.
+REASON_FILE_REGION_CLAIMED = "file-region-claimed"
 
 #: Every reason the A2A arbitration (`claims.arbitrate`) can refuse with. Its
 #: self-control must provoke all of them or the gate fails, so a refusal cannot
@@ -251,6 +257,52 @@ class Arbitration:
         }
 
 
+Region = tuple[int, int]
+
+
+@dataclass(frozen=True)
+class FileClaim:
+    """One file named by a claim, with an optional list of line regions.
+
+    ``regions is None`` means the whole file is held (the pre-#702 behaviour).
+    A non-empty ``regions`` names the ``[start, end]`` (inclusive) line spans the
+    claim actually touches, so a second claim on the SAME file with DISJOINT
+    regions does not conflict.
+    """
+
+    path: str
+    regions: tuple[Region, ...] | None = None
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "regions": [list(region) for region in self.regions] if self.regions is not None else None,
+        }
+
+
+def regions_overlap(a: Region | None, b: Region | None) -> bool:
+    """True when two (inclusive) line regions overlap.
+
+    ``None`` means "the whole file" and overlaps every region, including
+    another ``None``. This is the single predicate both the claim path and the
+    reap/reconcile provocation exercise — it must never be re-declared.
+    """
+    if a is None or b is None:
+        return True
+    a_start, a_end = a
+    b_start, b_end = b
+    return a_start <= b_end and b_start <= a_end
+
+
+def file_claims_conflict(a: FileClaim, b: FileClaim) -> bool:
+    """True when two ``FileClaim`` records name the same path with overlap."""
+    if a.path != b.path:
+        return False
+    if a.regions is None or b.regions is None:
+        return True
+    return any(regions_overlap(ra, rb) for ra in a.regions for rb in b.regions)
+
+
 @dataclass(frozen=True)
 class ClaimEvent:
     """One line of the append-only claim ledger."""
@@ -270,6 +322,9 @@ class ClaimEvent:
     reaped_agent: str = ""
     #: issue -> epic -> lane ownership, arbitrated before the claim was recorded.
     provenance: Provenance | None = None
+    #: Per-file leases (#702). Empty means the claim declared no files (the
+    #: pre-#702 shape) — whole-issue exclusivity still governs it.
+    files: tuple[FileClaim, ...] = ()
 
     @property
     def is_claim(self) -> bool:
@@ -295,6 +350,8 @@ class ClaimEvent:
         # arbitrated (a release record keeps its pre-#726 shape).
         if self.provenance is not None:
             payload["provenance"] = self.provenance.to_json()
+        if self.files:
+            payload["files"] = [f.to_json() for f in self.files]
         return payload
 
 
@@ -344,6 +401,7 @@ def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
         raise ValueError(f"{where}: field 'ttl_hours' must be a positive integer")
     recorded = obj.get("provenance")
     provenance = parse_provenance(recorded, where=where) if recorded is not None else None
+    files = parse_file_claims(obj.get("files"), where=where)
     return ClaimEvent(
         event=event,
         issue=issue,
@@ -358,4 +416,44 @@ def parse_claim_event(obj: Any, where: str = "ledger") -> ClaimEvent:
         directive_from=str(obj.get("directive_from", "") or ""),
         reaped_agent=str(obj.get("reaped_agent", "") or ""),
         provenance=provenance,
+        files=files,
     )
+
+
+def parse_file_claims(obj: Any, where: str = "ledger") -> tuple[FileClaim, ...]:
+    """Parse the ``files`` field of a ledger record. Raises ValueError."""
+    if obj is None:
+        return ()
+    if not isinstance(obj, list):
+        raise ValueError(f"{where}: field 'files' must be a list")
+    result: list[FileClaim] = []
+    for i, item in enumerate(obj):
+        item_where = f"{where}.files[{i}]"
+        if not isinstance(item, dict):
+            raise ValueError(f"{item_where}: must be a JSON object")
+        path = _require(item, "path", str, item_where)
+        if not path.strip():
+            raise ValueError(f"{item_where}: field 'path' must not be empty")
+        raw_regions = item.get("regions")
+        regions: tuple[Region, ...] | None
+        if raw_regions is None:
+            regions = None
+        else:
+            if not isinstance(raw_regions, list):
+                raise ValueError(f"{item_where}: field 'regions' must be a list or null")
+            parsed_regions: list[Region] = []
+            for j, region in enumerate(raw_regions):
+                region_where = f"{item_where}.regions[{j}]"
+                if (
+                    not isinstance(region, list)
+                    or len(region) != 2
+                    or any(isinstance(x, bool) or not isinstance(x, int) for x in region)
+                ):
+                    raise ValueError(f"{region_where}: must be a [start, end] pair of integers")
+                start, end = region
+                if start > end:
+                    raise ValueError(f"{region_where}: start ({start}) must be <= end ({end})")
+                parsed_regions.append((start, end))
+            regions = tuple(parsed_regions)
+        result.append(FileClaim(path=path.strip(), regions=regions))
+    return tuple(result)
