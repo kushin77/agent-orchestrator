@@ -281,6 +281,15 @@ checks=(
   # undropped directive is still returned. Two mutants (the dropper removed, the
   # order left in the inbox) must each be refused BY NAME.
   'dead-letter|bash scripts/check-dead-letter.sh'
+  # runaway-guard (issue #723, epic #708): the bounded-runaway gate itself was
+  # on disk but unwired — the epic's own Verify section names this script and
+  # requires it to provoke a runaway and FAIL, but `checks=()` had zero
+  # matches, so the gate was inert per this file's own gate-coverage doctrine.
+  # The script proves the attempt cap persists across a restart, the harvested
+  # backoff is pinned, held paths share one counter, and a directive is
+  # dead-lettered after K attempts — against the real tree and two mutated
+  # scratch copies (CAP-DISABLED, BACKOFF-FLAT) that it must refuse BY NAME.
+  'runaway-guard|bash scripts/check-runaway-guard.sh'
   'lease-policy|bash scripts/check-lease-policy.sh'
   'fleet-state|bash scripts/check-fleet-state.sh'
   'paperclip-gap-analysis|bash scripts/check-paperclip-gap-analysis.sh'

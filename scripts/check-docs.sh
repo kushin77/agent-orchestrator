@@ -237,6 +237,7 @@ idx_excluded_dirs=(
   docs/decision-records/
   docs/spikes/
   docs/contracts/
+  docs/rca/
 )
 
 # Quarantine baseline: tracked docs/*.md not yet indexed in docs/README.md,

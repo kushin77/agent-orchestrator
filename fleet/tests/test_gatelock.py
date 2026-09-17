@@ -568,3 +568,57 @@ def test_the_entrypoint_refuses_to_guess_when_it_has_no_command(gate_store):
 def test_the_entrypoint_leaves_bytecode_caches_out_of_the_tree():
     text = ENTRY.read_text(encoding="utf-8")
     assert "PYTHONDONTWRITEBYTECODE=1" in text
+
+
+# --- the proactive health sweep (RCA-0007, the #948 follow-up) -------------
+
+
+def test_health_reports_ok_when_the_store_is_clean(gate_store, lane):
+    worktree = lane("ao-a")
+    handle = gatelock.acquire(worktree, root=gate_store, owner_pid=os.getpid())
+    gatelock.release(worktree, root=gate_store, caller_pid=os.getpid())
+    report, needs_attention = gatelock.health(root=gate_store)
+    assert needs_attention is False
+    assert "needing attention" not in report
+
+
+def test_health_finds_a_zero_byte_owner_less_leftover_without_touching_it(gate_store, lane):
+    worktree = lane("ao-a")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    # #948's exact shape: a lock file survives with nothing holding it and no
+    # readable record. Recreate it directly so the SWEEP is what's under test,
+    # not the (already-fixed) release path that would normally reap it.
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.touch()
+    assert lock.exists() and lock.stat().st_size == 0
+
+    report, needs_attention = gatelock.health(root=gate_store)
+
+    assert needs_attention is True
+    assert "needing attention" in report
+    assert lock.name in report
+    # Alert-only: the sweep must never delete what it found.
+    assert lock.exists()
+
+
+def test_health_does_not_flag_a_live_holder(gate_store, lane):
+    worktree = lane("ao-a")
+    gatelock.acquire(worktree, root=gate_store, owner_pid=os.getpid())
+    report, needs_attention = gatelock.health(root=gate_store)
+    assert needs_attention is False
+    assert "needing attention" not in report
+
+
+def test_the_entrypoint_doctor_exits_13_on_a_leftover_and_0_when_clean(gate_store, lane):
+    worktree = lane("ao-a")
+    gatelock.acquire(worktree, root=gate_store, owner_pid=os.getpid())
+    gatelock.release(worktree, root=gate_store, caller_pid=os.getpid())
+    clean = _entry("doctor", store=gate_store)
+    assert clean.returncode == gatelock.EXIT_ADMIT
+
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.touch()
+    dirty = _entry("doctor", store=gate_store)
+    assert dirty.returncode == gatelock.EXIT_HEALTH_ATTENTION
+    assert "needing attention" in dirty.stdout

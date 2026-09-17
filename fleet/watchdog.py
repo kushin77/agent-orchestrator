@@ -111,6 +111,7 @@ sys.path.insert(0, str(ROOT / "fleet"))
 
 import channel  # noqa: E402
 import freeze  # noqa: E402  (#978 — refuse_if_frozen before every spawn)
+import gatelock  # noqa: E402  (RCA-0007 — the proactive gate-lock health sweep)
 import lease  # noqa: E402  (#977 — single-writer lease around the tick)
 import runtime  # noqa: E402
 
@@ -1438,6 +1439,33 @@ def _watchdog_once_locked(force: bool) -> int:
             print(f"[watchdog] monitor: missing — REFUSED (frozen) — {exc}", flush=True)
     else:
         print("[watchdog] monitor: healthy", flush=True)
+    # Proactive gate-lock health sweep (RCA-0007, the #948 follow-up): a
+    # zero-byte or owner-less worktree lock used to be found only reactively,
+    # by tracing a starved box-wide verify-gate cap back to one leftover file
+    # across many unrelated PRs' "PARKED (rc 10/rc 11)" evidence. This runs
+    # the same sweep `gate-lock.sh doctor` runs, on every tick, so a leftover
+    # is a printed finding on the next pass instead of hours of contention.
+    # Alert-only: it reports by name and never reaps a lock it does not own.
+    try:
+        gate_report, gate_needs_attention = gatelock.health()
+    except Exception as exc:  # defensive: mirrors this pass's own CANNOT-ASSESS style
+        print(f"[watchdog] gate-lock health: CANNOT-ASSESS — {exc}", flush=True)
+        unassessable = True
+    else:
+        for gate_line in gate_report.splitlines():
+            print(f"[watchdog] gate-lock health: {gate_line}", flush=True)
+        if gate_needs_attention:
+            # Alert loudly, but don't fold into this pass's own pass/fail
+            # verdict: the sweep is box-wide (every worktree's lock, not just
+            # this checkout's), so a leftover left by an unrelated worktree
+            # must not make an otherwise-healthy watchdog pass report NOT-OK.
+            # `gate-lock.sh doctor` and its own exit 13 are the enforcement
+            # surface; this pass is the loud, cheap, always-on notice.
+            print(
+                "[watchdog] gate-lock health: ATTENTION — see 'needing attention' "
+                "above; run 'bash scripts/gate-lock.sh doctor' or 'status' to act",
+                flush=True,
+            )
     if failed:
         return channel.EXIT_NOT_OK
     if unassessable:
