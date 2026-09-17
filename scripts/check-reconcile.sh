@@ -511,5 +511,84 @@ if [ "$fail" -gt 0 ]; then
   echo "check-reconcile: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-reconcile: OK — heartbeats beat, orphans are flagged, landed lanes are reclaimed, unmerged work is never destroyed, and the disk audit names what no record explains (removing nothing, and refusing to guess when it cannot look)"
+
+# --- 6. the real tree, not only the fixture (#740 item 1) -------------------
+# Every audit() call above proves the mechanism against a synthetic scratch
+# repo. This step points the SAME audit at the real repository this gate runs
+# in ($root), read-only, checked against an explicit, reviewed, provenanced
+# baseline (governance/reconcile/real-tree-baseline.json) — the same shape as
+# governance/isolation/landed-baseline.json / scripts/gate-coverage-baseline.txt.
+# A NEW unmatched artifact absent from the baseline fails, named. A STALE
+# baseline entry (no longer unmatched) fails too, named — this is never a
+# blanket allow, and it never grows silently.
+real_tree_baseline="governance/reconcile/real-tree-baseline.json"
+if [ ! -f "$real_tree_baseline" ]; then
+  echo "check-reconcile: FAIL — $real_tree_baseline is missing (#740)" >&2
+  exit 1
+fi
+
+python3 - "$root" "$real_tree_baseline" <<'PYREALTREE'
+import sys
+sys.path.insert(0, sys.argv[1])
+from governance.reconcile.real_tree_baseline import check_real_tree
+
+root, baseline_path = sys.argv[1], sys.argv[2]
+verdict = check_real_tree(root, baseline_path)
+print(verdict.describe())
+if not verdict.assessable:
+    print("check-reconcile: CANNOT-ASSESS on the real tree", file=sys.stderr)
+    raise SystemExit(2)
+if not verdict.ok:
+    print(
+        f"check-reconcile: FAIL — real tree drifted from {baseline_path} "
+        f"({len(verdict.new_violations)} new, {len(verdict.stale_entries)} stale)",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PYREALTREE
+real_tree_rc=$?
+if [ "$real_tree_rc" -ne 0 ]; then
+  fail=$((fail + 1))
+fi
+
+# --- 6b. the stale-baseline provocation must be able to fail ----------------
+# A baseline that only ever passes is not proof of anything: prove the STALE
+# path fires by pointing the same check at a copy of the baseline with one
+# fabricated, definitely-absent entry appended, and require the real check to
+# refuse it.
+provoke_baseline="$work/real-tree-baseline-with-stale-entry.json"
+python3 - "$real_tree_baseline" "$provoke_baseline" <<'PYPROVOKE'
+import json, sys
+src, dst = sys.argv[1], sys.argv[2]
+payload = json.loads(open(src, encoding="utf-8").read())
+payload["entries"] = list(payload["entries"]) + [
+    {"kind": "branch", "name": "issue-does-not-exist-check-reconcile-provocation",
+     "reason": "fabricated for the stale-baseline provocation"}
+]
+open(dst, "w", encoding="utf-8").write(json.dumps(payload))
+PYPROVOKE
+
+python3 - "$root" "$provoke_baseline" <<'PYPROVOKECHECK'
+import sys
+sys.path.insert(0, sys.argv[1])
+from governance.reconcile.real_tree_baseline import check_real_tree
+
+verdict = check_real_tree(sys.argv[1], sys.argv[2])
+ok = verdict.assessable and not verdict.ok and any(
+    e.name == "issue-does-not-exist-check-reconcile-provocation" for e in verdict.stale_entries
+)
+if not ok:
+    print("  FAIL  stale-baseline provocation did not fire", file=sys.stderr)
+    raise SystemExit(1)
+print("  OK    stale-baseline provocation fires: a fabricated stale entry is refused by name")
+PYPROVOKECHECK
+if [ $? -ne 0 ]; then
+  fail=$((fail + 1))
+fi
+
+if [ "$fail" -gt 0 ]; then
+  echo "check-reconcile: FAIL ($fail violation(s))" >&2
+  exit 1
+fi
+echo "check-reconcile: OK — heartbeats beat, orphans are flagged, landed lanes are reclaimed, unmerged work is never destroyed, and the disk audit names what no record explains (removing nothing, and refusing to guess when it cannot look), including against the real tree against its reviewed baseline"
 exit 0
