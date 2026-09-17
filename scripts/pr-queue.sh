@@ -24,7 +24,20 @@
 #     session can merge mid-run) — apply mode re-fetches and reclassifies
 #     each remaining PR immediately before merging it;
 #   - one call to `gh pr merge --squash` per PR, and a refusal stops the run
-#     immediately (no loop swallowing a refusal).
+#     immediately (no loop swallowing a refusal);
+#   - a PR touching anything under scripts/ gets its GATE-REGRESSION checked
+#     before it is merged (issue #1145): the PR's head commit is materialized
+#     into a scratch worktree, where a curated set of fast whole-tree content
+#     scanners (GATE_REGRESSION_SCRIPTS — verdict-contains, shell-patterns,
+#     shell-syntax, python-syntax, secrets, json, docs; not every
+#     scripts/check-*.sh — see that array's own comment for why) is run bare.
+#     A scanner that goes from clean at the merge base to red at head refuses
+#     the merge BY NAME. This closes the gap that let #1118 merge clean
+#     through the queue while reddening check-verdict-contains.sh — the
+#     queue proved the merge message, never the work. If the PR's head
+#     commit cannot be materialized, the merge is refused rather than
+#     silently skipped (an audit that could not run is not evidence the diff
+#     is safe).
 #
 # Env vars (see docs/PR-QUEUE.md):
 #   AO_QUEUE_APPLY=1              execute merges serially (default: plan only)
@@ -45,13 +58,31 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
 
 base="master"
+check_gate_regression_head=""
+check_gate_regression_base=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) base="${2:-master}"; shift 2 ;;
     --base=*) base="${1#*=}"; shift ;;
+    # Test seam for the gate-regression check (issue #1145): drives
+    # gate_regression_check() directly, offline, against a real commit —
+    # see that function's header for the negative-control invocation.
+    --check-gate-regression)
+      if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "pr-queue: CANNOT-ASSESS — --check-gate-regression needs a head OID" >&2
+        exit 2
+      fi
+      check_gate_regression_head="$2"; shift 2 ;;
+    --against-base)
+      if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "pr-queue: CANNOT-ASSESS — --against-base needs a base ref/OID" >&2
+        exit 2
+      fi
+      check_gate_regression_base="$2"; shift 2 ;;
     --help | -h)
       cat <<'USAGE'
 Usage: bash scripts/pr-queue.sh [--base BASE]
+       bash scripts/pr-queue.sh --check-gate-regression <head-oid>   (reads touched paths on stdin)
 Env: AO_QUEUE_APPLY, AO_QUEUE_INCLUDE_DRAFTS, AO_QUEUE_GATE_PATHS, AO_QUEUE_FIXTURE
 See docs/PR-QUEUE.md.
 USAGE
@@ -72,7 +103,12 @@ gate_paths() {
     return 0
   fi
   if [ -f "$root/scripts/lib/gate-paths.txt" ]; then
-    cat "$root/scripts/lib/gate-paths.txt"
+    # Blank lines and `#` comments are ignored (the file's own header says
+    # so, and scripts/check-pr-contract.sh's reader does strip them) —
+    # without this, a comment line like "scripts/pr-queue.sh" in prose
+    # becomes a glob (measured: this is the only reason #1135 was classified
+    # gate-changing).
+    grep -vE '^[[:space:]]*(#|$)' "$root/scripts/lib/gate-paths.txt"
     return 0
   fi
   printf '%s\n' "$DEFAULT_GATE_PATHS"
@@ -92,7 +128,7 @@ fetch_prs() {
     exit 2
   fi
   gh pr list --state open --base "$base" --limit 200 \
-    --json number,title,isDraft,mergeable,mergeStateStatus,files,body,headRefName
+    --json number,title,isDraft,mergeable,mergeStateStatus,files,body,headRefName,headRefOid
 }
 
 # classify.py — the ONE classifier, used by the plan, the self-test and the
@@ -101,6 +137,7 @@ classify_py() {
   python3 - "$@" <<'PY'
 import fnmatch
 import json
+import re
 import sys
 
 gate_globs_raw, include_drafts_raw, prs_json = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -115,19 +152,32 @@ except json.JSONDecodeError as exc:
     sys.exit(2)
 
 
+# Exact-heading match, reconciled with scripts/check-pr-contract.sh's own
+# predicate (`^##+[ \t]*Pre-existing red[ \t]*$`) rather than the queue's
+# former ad hoc prefix match — a heading like "## Pre-existing red /
+# environment notes" (#1127) must be treated the SAME way by both readers.
+PRE_EXISTING_RED_HEADING = re.compile(r"(?im)^##+[ \t]*Pre-existing red[ \t]*$")
+
+
 def pre_existing_red(body):
-    lines = (body or "").splitlines()
-    for i, line in enumerate(lines):
-        if line.strip().lower().startswith("## pre-existing red"):
-            for later in lines[i + 1:]:
-                text = later.strip()
-                if not text:
-                    continue
-                if text.startswith("#"):
-                    return None
-                return text
-            return None
-    return None
+    """Returns (found, text): found=False means no exact heading at all —
+    the queue treats that as UNSAFE-TO-MERGE (see classify()), not as an
+    implicit "None". A body can decline gate-changing entirely and still
+    slip an unreviewed regression past a queue that reads "no section" as
+    "nothing to declare"."""
+    text = body or ""
+    match = PRE_EXISTING_RED_HEADING.search(text)
+    if not match:
+        return False, None
+    lines = text[match.end():].splitlines()
+    for later in lines:
+        stripped = later.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            return True, None
+        return True, stripped
+    return True, None
 
 
 def classify(pr):
@@ -139,20 +189,39 @@ def classify(pr):
 
     if is_draft and not include_drafts:
         return "draft", "draft PR excluded (set AO_QUEUE_INCLUDE_DRAFTS=1 to admit)"
+    # gh reports mergeability as the JSON string "UNKNOWN" while GitHub is
+    # still computing it, not just JSON null — treating only null as unknown
+    # (measured: #1142 came back mergeable="UNKNOWN"/mergeStateStatus="UNKNOWN"
+    # from `gh pr list` while the single-PR endpoint said mergeable:false,
+    # dirty) misclassifies it as mergeable and can order it into the merge
+    # order ahead of PRs GitHub will actually refuse.
+    if mergeable in (None, "UNKNOWN") or mstate in (None, "UNKNOWN"):
+        return "unknown", "gh reported no settled mergeable/mergeStateStatus for this PR"
     if mergeable == "CONFLICTING" or mstate in ("DIRTY", "CONFLICTING"):
         return "conflict", "conflicting with the base branch; skipped, not fought"
-    red = pre_existing_red(body)
+    found, red = pre_existing_red(body)
+    if not found:
+        return (
+            "unclear-pre-existing-red",
+            "no exact '## Pre-existing red' heading found; cannot confirm nothing is being hidden",
+        )
     if red is not None and not red.strip().lower().startswith("none"):
         return "pre-existing-red", f"declares pre-existing red: {red}"
-    if mergeable is None or mstate is None:
-        return "unknown", "gh reported no mergeable/mergeStateStatus for this PR"
     touched = sorted({f for f in files if any(fnmatch.fnmatch(f, g) for g in gate_globs)})
     if touched:
         return "gate-changing", "touches gate path(s): " + ", ".join(touched)
     return "ready", "no gate path touched; mergeable"
 
 
-order = {"ready": 0, "gate-changing": 1, "draft": 2, "conflict": 3, "pre-existing-red": 4, "unknown": 5}
+order = {
+    "ready": 0,
+    "gate-changing": 1,
+    "draft": 2,
+    "conflict": 3,
+    "pre-existing-red": 4,
+    "unclear-pre-existing-red": 5,
+    "unknown": 6,
+}
 rows = []
 for pr in prs:
     cls, reason = classify(pr)
@@ -178,6 +247,171 @@ merge_order = [str(r[0]) for r in rows if r[1] in ("ready", "gate-changing")]
 print("MERGE_ORDER:" + (" " + " ".join(merge_order) if merge_order else ""))
 PY
 }
+
+# pr_head_and_files_py — the head OID and changed-file list for one PR
+# number, from the SAME `gh pr list --json ...` payload fetch_prs already
+# pulled (never a second `gh pr view` call, which could observe a different
+# moment than the classification just made). Prints the head OID on the
+# first line, one changed path per line after it. Empty output if the PR is
+# no longer in the list.
+pr_head_and_files_py() { # <prs-json> <number>
+  python3 - "$1" "$2" <<'PY'
+import json
+import sys
+
+prs = json.loads(sys.argv[1])
+want = int(sys.argv[2])
+for pr in prs:
+    if pr.get("number") == want:
+        print(pr.get("headRefOid") or "")
+        for f in pr.get("files") or []:
+            path = f.get("path", "")
+            if path:
+                print(path)
+        break
+PY
+}
+
+# gate_regression_check — the seam issue #1145 exists for. A PR touching
+# anything under scripts/ gets its head commit materialized into a scratch
+# worktree, where GATE_REGRESSION_SCRIPTS is run bare (no args) under a
+# per-script timeout; one that hangs past the timeout is skipped, not
+# treated as a failure (its verdict is unknown, not red). Only a script
+# that exits 1 (NOT-OK) at head is a candidate.
+#
+# A candidate is checked AGAINST THE MERGE BASE before it refuses anything
+# (a second, smaller worktree, built only when something is already red —
+# the common case touches nothing here): master itself can be red on an
+# UNRELATED gate right now (the issue names #1144/check-isolation-landed),
+# and refusing every scripts/ PR because of a pre-existing, already-known
+# red would just get this check disabled. Only a 0-at-base -> 1-at-head
+# FLIP is a regression the PR's own diff is responsible for; a gate that
+# was already red at the merge base is reported but does not block.
+#
+# Reads touched files from stdin (one path per line) so it can be driven
+# directly, offline, against REAL historical commits for a negative
+# control:
+#   printf 'scripts/prune-worktrees.sh\n' | \
+#     bash scripts/pr-queue.sh --check-gate-regression 2df367d --base be94933
+# proves the check refuses by name (check-verdict-contains: rc 0 at
+# be94933 -> rc 1 at 2df367d) at the exact commit that made master red
+# (#1118); omitting --base (so head IS its own base) proves it does not
+# false-red a tree that was already clean.
+GATE_REGRESSION_TIMEOUT="${AO_QUEUE_GATE_TIMEOUT:-30}"
+
+# The gate set this check runs, not "every scripts/check-*.sh" (measured:
+# globbing all ~160 and running each bare took over ten minutes and did not
+# finish — several gates make real network/fleet calls with their own
+# multi-second waits when run outside their intended context, which is not
+# safe or affordable to do serially inside a merge loop). These seven are the
+# generic, offline, whole-tree CONTENT scanners — no PR/range argument, no
+# network, no fleet state — and #1118's regression (a bash idiom bug in an
+# unrelated file, caught by check-verdict-contains.sh, a file neither of
+# #1118's own changed files) is exactly the class of thing a repo-wide
+# content scanner catches and a file-path glob (gate-paths.txt) cannot: this
+# list, not "which check-*.sh path matched", is the actual "affected gates"
+# set for a scripts/ diff.
+GATE_REGRESSION_SCRIPTS=(
+  check-verdict-contains.sh
+  check-shell-patterns.sh
+  check-shell-syntax.sh
+  check-python-syntax.sh
+  check-secrets.sh
+  check-json.sh
+  check-docs.sh
+)
+
+gate_regression_worktree() { # <ref> <out-var-name>
+  local ref="$1" var="$2" wt
+  wt="$(mktemp -d "${TMPDIR:-/tmp}/pr-queue-gate-regression.XXXXXX" 2>/dev/null)" || return 1
+  rmdir "$wt"
+  git worktree add --detach --quiet "$wt" "$ref" >/dev/null 2>&1 || return 1
+  printf -v "$var" '%s' "$wt"
+}
+
+gate_regression_run_all() { # <worktree> <out-array-name (assoc: script -> rc)>
+  local wt="$1" name rc
+  local -n results_ref="$2"
+  for name in "${GATE_REGRESSION_SCRIPTS[@]}"; do
+    [ -f "$wt/scripts/$name" ] || continue
+    ( cd "$wt" && timeout "$GATE_REGRESSION_TIMEOUT" bash "scripts/$name" ) >/dev/null 2>&1
+    rc=$?
+    results_ref["$name"]="$rc"
+  done
+}
+
+gate_regression_check() { # <head-oid> <base-ref-or-empty>
+  local head_oid="$1" base_ref="${2:-}" touched f any_scripts=0
+
+  touched="$(cat)"
+  while IFS= read -r f; do
+    case "$f" in
+      scripts/*) any_scripts=1 ;;
+    esac
+  done <<<"$touched"
+  if [ "$any_scripts" -eq 0 ]; then
+    return 0
+  fi
+  if [ -z "$head_oid" ]; then
+    echo "pr-queue: gate-regression CANNOT-ASSESS — no head OID to materialize" >&2
+    return 1
+  fi
+  [ -n "$base_ref" ] || base_ref="$head_oid^"
+
+  git fetch --quiet origin "$head_oid" >/dev/null 2>&1 || true
+
+  local head_wt=""
+  if ! gate_regression_worktree "$head_oid" head_wt; then
+    echo "pr-queue: gate-regression CANNOT-ASSESS — could not materialize head $head_oid as a scratch worktree (fetched into this clone?)" >&2
+    return 1
+  fi
+
+  declare -A head_rc=()
+  gate_regression_run_all "$head_wt" head_rc
+  git worktree remove --force "$head_wt" >/dev/null 2>&1
+  rm -rf "$head_wt" 2>/dev/null
+
+  local candidates=() name
+  for name in "${!head_rc[@]}"; do
+    [ "${head_rc[$name]}" = "1" ] && candidates+=("$name")
+  done
+
+  if [ "${#candidates[@]}" -eq 0 ]; then
+    return 0
+  fi
+
+  local base_wt=""
+  if ! gate_regression_worktree "$base_ref" base_wt; then
+    echo "pr-queue: gate-regression CANNOT-ASSESS — head $head_oid reds ${candidates[*]}, but the merge base ($base_ref) could not be materialized to tell a regression from a pre-existing red" >&2
+    return 1
+  fi
+
+  local regressed=() reported=()
+  for name in "${candidates[@]}"; do
+    ( cd "$base_wt" && timeout "$GATE_REGRESSION_TIMEOUT" bash "scripts/$name" ) >/dev/null 2>&1
+    if [ $? -eq 1 ]; then
+      reported+=("$name (already red at $base_ref, pre-existing — not this PR's fault)")
+    else
+      regressed+=("$name")
+    fi
+  done
+  git worktree remove --force "$base_wt" >/dev/null 2>&1
+  rm -rf "$base_wt" 2>/dev/null
+
+  if [ "${#reported[@]}" -gt 0 ]; then
+    printf 'pr-queue: gate-regression NOTE — %s\n' "${reported[*]}" >&2
+  fi
+  if [ "${#regressed[@]}" -gt 0 ]; then
+    echo "pr-queue: gate-regression REFUSED — ${regressed[*]} pass at $base_ref but go red at $head_oid" >&2
+    return 1
+  fi
+  return 0
+}
+
+if [ -n "$check_gate_regression_head" ]; then
+  gate_regression_check "$check_gate_regression_head" "$check_gate_regression_base"
+  exit $?
+fi
 
 gate_globs_text="$(gate_paths)"
 include_drafts="${AO_QUEUE_INCLUDE_DRAFTS:-0}"
@@ -225,6 +459,13 @@ for number in "${merge_order[@]}"; do
   fi
   if ! bash "$(dirname "${BASH_SOURCE[0]}")/check-squash-message.sh" --pr "$number"; then
     echo "pr-queue: REFUSED — squash-message-would-drop-trailer — #$number's rendered squash message would fail check-isolation-landed after merge; stopping (no loop swallowing a refusal)" >&2
+    exit 1
+  fi
+  head_and_files="$(pr_head_and_files_py "$recheck_json" "$number")"
+  number_head_oid="$(printf '%s\n' "$head_and_files" | head -n1)"
+  number_files="$(printf '%s\n' "$head_and_files" | tail -n +2)"
+  if ! printf '%s\n' "$number_files" | gate_regression_check "$number_head_oid" "origin/$base"; then
+    echo "pr-queue: REFUSED — gate-regression — #$number's diff would red a check-*.sh gate that passes on master today; stopping (no loop swallowing a refusal)" >&2
     exit 1
   fi
   echo "pr-queue: merging #$number (gh pr merge --squash)"
