@@ -10,17 +10,32 @@ read as a pass.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import fleet.gatelock as gatelock
 
-from conftest import (  # noqa: E402
-    MAKE_FAILURE_EXIT,
-    PARKED_OUTPUT,
-    gate_run,
-    make_run,
-    parked_output,
-    transcript,
-)
 from governance.lifecycle import gate  # noqa: E402
+
+import importlib.util as _importlib_util  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_lifecycle_tests_conftest", Path(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+MAKE_FAILURE_EXIT = _conftest.MAKE_FAILURE_EXIT
+PARKED_OUTPUT = _conftest.PARKED_OUTPUT
+gate_run = _conftest.gate_run
+make_run = _conftest.make_run
+parked_output = _conftest.parked_output
+transcript = _conftest.transcript
 
 
 def test_the_admission_vocabulary_is_consumed_from_its_owner():

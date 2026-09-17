@@ -228,34 +228,67 @@ surfaces:
       exist; the measured rung is the base one.
   - surface: dispatch
     path: governance/dispatch
-    declared_class: pattern
+    declared_class: elite
     notes: >-
       Claim/order/dispatch governance (AGENTS.md rule 14, chronological
-      dependency-gated selection): contract, a suite (governance/dispatch/tests)
-      and its gate scripts/check-chronological-dispatch.sh. It owns no
-      controls/audit/schema artifact, which is what holds it at `pattern`.
+      dependency-gated selection, issue #885): contract, a suite
+      (governance/dispatch/tests) and its gate
+      scripts/check-chronological-dispatch.sh, plus the four artifacts landed
+      by #1062 that carry it past `pattern` to `elite`: the declared
+      acceptance policy `controls.yaml` + `policy.py` (read by
+      `snapshot.py`'s `DEFAULT_STALENESS_MINUTES`), the append-only
+      arbitration-outcome trail `audit.py` (written by `claims.arbitrate()`),
+      the frozen record shapes `dispatch.schema.json` + `schema.py` (validated
+      by `audit.append()` and `claims.py`'s `ClaimEvent.to_json()`), and the
+      live projection `live.py` exposed through the existing verb as
+      `status --live` (`cli.py:cmd_status`).
   - surface: isolation
     path: governance/isolation
-    declared_class: pattern
+    declared_class: elite
     notes: >-
-      Session identity and lane isolation (AGENTS.md rule 15, issue #263):
-      contract, a suite, the gate scripts/check-session-isolation.sh and the
-      audit module (audit.py) the instrumentation reads. It has `audit` but owns
-      no `controls` or `schema` artifact, so it stops at `pattern`.
+      Session identity and lane isolation (AGENTS.md rule 15, issue #263,
+      raised by #885): contract, a suite, the gate
+      scripts/check-session-isolation.sh and the audit module (audit.py) the
+      instrumentation reads, plus the four artifacts landed by #1066 that
+      carry it past `pattern` to `elite`: the declared policy `controls.yaml`
+      + `policy.py` (read at import time by `identity.py` and
+      `speculative.py`, closing `violation.KNOWN_CODES`), the append-only
+      audit-verdict trail `journal.py` (written by `cli.py cmd_audit`
+      alongside `audit.py`'s in-memory verdict), the frozen record shapes
+      `isolation.schema.json` + `schema.py` (validated with the stdlib-only
+      subset validator `governance/modules/schema.py`), and the live
+      projection `live.py` exposed through the existing `audit` verb's
+      `--live` flag (`cli.py audit --live`).
   - surface: lifecycle
     path: governance/lifecycle
-    declared_class: pattern
+    declared_class: elite
     notes: >-
-      End-to-end closure (AGENTS.md rule 16, issue #269): contract, a suite, the
-      gate scripts/check-github-lifecycle.sh and audit.py. `controls` and a
-      `*.schema.json` are absent, so the measured rung is `pattern`.
+      End-to-end closure (AGENTS.md rule 16, issue #269, raised by #885):
+      contract, a suite, the gate scripts/check-github-lifecycle.sh and
+      audit.py, plus the four artifacts landed by #1065 that carry it past
+      `pattern` to `elite`: the declared policy `controls.yaml` + `policy.py`
+      (checked against `model.py`'s closed invariant vocabulary at import
+      time, and read by `directive.py`'s `retire`), the decision ledger
+      `ledger.py` (written to `.fleet/lifecycle/ledger.jsonl` by
+      `directive.consume`/`directive.retire` and `cli.py cmd_close`), the
+      frozen record shapes `lifecycle.schema.json` (validated by `ledger.py`
+      via `governance/modules/schema.py`), and the live projection `live.py`
+      exposed through the existing verb `cli.py status --live`.
   - surface: reconcile
     path: governance/reconcile
-    declared_class: pattern
+    declared_class: elite
     notes: >-
-      Orphan reconciliation (AGENTS.md rule 17, issue #304): contract, a suite
-      and the gate scripts/check-reconcile.sh. It owns no audit/control/schema
-      artifact, so the measured rung is `pattern`.
+      Orphan reconciliation (AGENTS.md rule 17, issue #304, raised by #885):
+      contract, a suite and the gate scripts/check-reconcile.sh, plus the four
+      artifacts landed by #1064 that carry it past `pattern` to `elite`: the
+      declared policy `controls.yaml` + `policy.py` (read by `sweep.py` for
+      `sweep.max_actions_per_pass` and the closed `sweep.outcome_codes`
+      vocabulary), the audit trail `ledger.py` (one record per sweep decision
+      and per `real_tree_baseline.check_real_tree()` call, validated against
+      `reconcile.schema.json` before it is written), the frozen record shapes
+      `reconcile.schema.json` (also validated by `live.py`'s projected rows),
+      and the live projection `live.py` exposed through the existing verb
+      `status --live` (`cli.py cmd_status`).
   - surface: hermes-integration
     path: integrations/hermes
     declared_class: faang
