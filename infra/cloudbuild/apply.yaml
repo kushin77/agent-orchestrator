@@ -79,6 +79,8 @@ steps:
           -var="enable_mcp_outbound=$_ENABLE_MCP_OUTBOUND" \
           -var="enable_sandbox_runtime=$_ENABLE_SANDBOX_RUNTIME" \
           -var="enable_erp_module=$_ENABLE_ERP_MODULE" \
+          -var="deployer_enabled=$_ENABLE_DEPLOYER" \
+          -var="deployer_role_class=$_DEPLOYER_ROLE_CLASS" \
           -out=/workspace/tfplan
 
   - id: terraform-apply
