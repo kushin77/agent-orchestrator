@@ -181,6 +181,19 @@ def test_the_grant_is_a_real_flock_not_a_file_that_looks_held(gate_store, lane):
         os.close(fd)
 
 
+def test_flock_fresh_detects_an_open_that_lost_its_path(gate_store, tmp_path):
+    """The unlink-racing-open re-check: a flocked fd whose path is gone is stale."""
+    path = tmp_path / "x.lock"
+    path.write_bytes(b"")
+    fd = os.open(path, os.O_RDWR)
+    try:
+        assert gatelock._flock_fresh(fd, path), "a present, untouched file must read fresh"
+        os.unlink(path)
+        assert not gatelock._flock_fresh(fd, path), "an unlinked open must read stale"
+    finally:
+        os.close(fd)
+
+
 # --- the refusals -----------------------------------------------------------
 
 
@@ -418,6 +431,71 @@ def test_the_store_is_overridable_and_defaults_outside_every_workspace(
     monkeypatch.setenv("AO_GATE_LOCK_ROOT", str(tmp_path / "explicit"))
     assert gatelock.store_root() == tmp_path / "explicit"
     assert gatelock.store_root(tmp_path / "argument") == tmp_path / "argument"
+
+
+# --- the #948 leftover reaping ----------------------------------------------
+
+
+def test_release_reaps_a_zero_byte_leftover_lock_file(gate_store, lane):
+    """A 0-byte owner-less lock file must not survive `release`'s verdict."""
+    worktree = lane("ao-948-a")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_bytes(b"")
+    text = gatelock.release(worktree, root=gate_store)
+    assert "already free" in text
+    assert not lock.exists(), "a 0-byte leftover survives an 'already free' release"
+
+
+def test_release_reaps_a_stale_record_lock_file(gate_store, lane):
+    """A dead holder's record is removed outright, not truncated to a 0-byte file."""
+    worktree = lane("ao-948-b")
+    handle = gatelock.acquire(worktree, root=gate_store, owner_pid=os.getpid())
+    _kill(handle.holder_pid)
+    assert _until(lambda: not gatelock.probe(handle.lock_path).held)
+    state = gatelock.probe(handle.lock_path)
+    assert state.stale and state.record_bytes > 0
+    text = gatelock.release(worktree, root=gate_store)
+    assert f"pid {handle.holder_pid}" in text
+    assert not handle.lock_path.exists(), "release truncated but left the stale file behind"
+
+
+def test_status_names_a_zero_byte_leftover_lock_file(gate_store, lane):
+    """Status names a 0-byte leftover rather than omitting it (#948)."""
+    worktree = lane("ao-948-c")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_bytes(b"")
+    report = gatelock.status(root=gate_store)
+    assert "needing attention" in report and lock.name in report
+    one = gatelock.status(worktree, root=gate_store)
+    assert "FREE" in one and "0-byte" in one and lock.name in one
+
+
+def test_status_names_a_stale_record_lock_file(gate_store, lane):
+    """Status names a dead holder's record by pid, in the leftover listing."""
+    worktree = lane("ao-948-d")
+    handle = gatelock.acquire(worktree, root=gate_store, owner_pid=os.getpid())
+    _kill(handle.holder_pid)
+    assert _until(lambda: not gatelock.probe(handle.lock_path).held)
+    report = gatelock.status(root=gate_store)
+    assert "needing attention" in report
+    assert handle.lock_path.name in report
+    assert f"pid {handle.holder_pid}" in report
+
+
+def test_reap_free_lock_leaves_a_held_lock_alone(gate_store, lane):
+    """The reaper takes the flock first, so a live holder is never unlinked."""
+    worktree = lane("ao-948-e")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    holder = _hold_externally(lock)
+    try:
+        gatelock._reap_free_lock(lock)
+        assert lock.exists(), "the reaper unlinked a held lock"
+        assert gatelock.probe(lock).held, "the reaper broke a live flock"
+    finally:
+        holder.kill()
+        holder.wait(timeout=20)
 
 
 def test_max_concurrent_and_ttl_read_their_env_vars_and_reject_nonsense(monkeypatch):
