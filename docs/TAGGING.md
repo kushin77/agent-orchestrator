@@ -162,7 +162,7 @@ enforced the moment it lands. It runs **seven** checks:
 | `tagging-refusals` | every one of the **14** declared refusals is provoked by a real mutant, **by code and by the token the taxonomy promises it names**, with its clean twin accepted |
 | `tagging-artifacts` | the frozen shapes, the ledger and the live projection round-trip — each driven with its provoked half *and* its clean twin |
 | `tagging-mandate` | the **constitution still declares the rule** — five contract documents each declare the tag authority and the `posture`/`lifecycle` dimensions, and the check FAILS naming the document **and** the marker that went missing |
-| `tagging-e2e` | the **whole chain** — a tag set derives a plan, every gate in it resolves, the matrix names the rules that fired, the mandate holds in this tree, the filing seam derives the same tag dimensions for a NEW issue, the filing defaults are values the authority declares, **and every futureproof classification mechanism** (`class`, `pattern`, `template`, `rca`, `system`, `app`, `env-var`, `gov`, `issues`, `index`) has its authority declared, its gate wired into `make verify`, and its failure path exercised — 19 links end to end |
+| `tagging-e2e` | the **whole chain** — a tag set derives a plan, every gate in it resolves, the matrix names the rules that fired, the mandate holds in this tree, the filing seam derives the same tag dimensions for a NEW issue, and the filing defaults are values the authority declares |
 
 The refusals check is the one that matters most, because a gate that cannot fail
 is a formality (GR-12). It asserts three things at once: the mutant actually
@@ -170,6 +170,32 @@ landed (by sha256, so a no-op mutation cannot be reported as a passing control),
 the refusal fires **by the name the taxonomy promised**, and the clean twin of
 that input is refused **nothing** — so a rule that fires on everything is caught
 rather than passing as strict.
+
+### The whole classification surface, proved separately
+
+The capstone above proves the **tag-derivation** chain — this authority's own
+gates, fed by this authority's own rules. The repository's **classification
+surface** is wider than tags, so it has its own capstone and its own gate:
+`scripts/check-futureproof-e2e.sh` (module
+[`governance/futureproof/`](../governance/futureproof/README.md)), auto-discovered
+into `make verify` the moment it lands.
+
+For each of the ten mechanisms this repository classifies by — `class`,
+`pattern`, `template`, `rca`, `system`, `app`, `env-var`, `gov`, `issues`,
+`index` — it proves the chain **`authority-declared` → `gate-wired` →
+`gate-falsifiable` → `assesses-real-tree`**, and reports a verdict per mechanism
+in the four words this repository already uses for that judgement
+(`ENFORCED` / `DECLARED-ONLY` / `IMPLEMENTED-UNGATED` / `ABSENT`, borrowed from
+[`SYSTEM-APP-GOVERNANCE-E2E-GAP-ANALYSIS.md`](SYSTEM-APP-GOVERNANCE-E2E-GAP-ANALYSIS.md),
+issue #1156).
+
+`assesses-real-tree` is the link that makes the rest worth having: `make verify`
+records an rc 2 `CANNOT-ASSESS` as `SKIP` and still prints a PASS, so a gate that
+is **permanently** CANNOT-ASSESS passes every structural test — discovered,
+executable, carrying a negative control — while assessing nothing. The capstone
+therefore **runs** each mechanism's gate and refuses one that does not reach a
+verdict. A gate that never assesses is a formality that hides in the `skipped`
+bucket (see #1176, #1189, #1199, #1200).
 
 ### Institutionalized, not advisory
 

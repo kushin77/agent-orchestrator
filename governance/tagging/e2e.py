@@ -11,15 +11,6 @@ one the other gates cannot reach, because it crosses the package boundary from
 one-directional (tagging reads conformance's policy; conformance never imports
 tagging), and this module is the only place it is exercised.
 
-It then proves the WHOLE "futureproof" classification surface end to end: for
-every mechanism the operator named — `class`, `pattern`, `template`, `rca`,
-`system`, `app`, `env-var`, `gov`, `issues`, `index` — the declared authority is
-tracked, the gate is executable and wired into `make verify` (not denylisted,
-not undiscovered), and the gate's failure path is exercised by a concrete
-provocation artifact. That is the inverse of the measured failure class #1164
-(`governance/dupcheck/check-duplicates.sh` is invoked by NOTHING): a control
-that exists but never runs is the whole point this link refuses.
-
     python3 governance/tagging/e2e.py
 
 Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS — the repository's tri-state.
@@ -48,165 +39,6 @@ CANNOT_ASSESS = 2
 
 TAGS = ["class:elite", "type:feature", "priority:P1", "area:standards",
         "posture:iac", "lifecycle:release", "finops:pro"]
-
-# The futureproof classification surface (the operator's list). For each
-# mechanism: the declared AUTHORITY (must be tracked in the tree), the GATE(s)
-# (must be executable, discovered into `make verify`, and not denylisted), and
-# the PROVOCATION — a concrete artifact that exercises the gate's failure path
-# (a negative control, a self-test flag, or the file that carries the planted
-# mutant). A mechanism whose gate can never fail is a formality (GR-12); a
-# mechanism whose gate is invoked by nothing is invisible (#1164).
-MECHANISMS = [
-    {
-        "id": "class",
-        "authorities": [
-            "governance/conformance/policy.yaml",
-            "governance/conformance/surfaces.yaml",
-        ],
-        "gates": ["surface-class", "conformance"],
-        "provocation": ("scripts/check-surface-class.sh", "negative control"),
-    },
-    {
-        "id": "pattern",
-        "authorities": ["docs/SHELL-PATTERNS.md"],
-        "gates": ["shell-patterns"],
-        "provocation": ("scripts/check-shell-patterns.sh", "--self-test"),
-    },
-    {
-        "id": "template",
-        "authorities": [".github/ISSUE_TEMPLATE"],
-        "gates": ["issue-template"],
-        "provocation": ("scripts/check-issue-template.sh", "negative control"),
-    },
-    {
-        "id": "rca",
-        "authorities": [
-            "governance/lessons/policy.yaml",
-            "governance/lessons/ledger.jsonl",
-        ],
-        "gates": ["lessons"],
-        "provocation": ("governance/lessons/negative_control.py", ""),
-    },
-    {
-        "id": "system",
-        "authorities": ["module.json", "docs/MODULE-ADMISSION.md"],
-        "gates": ["system-app-declaration"],
-        "provocation": ("scripts/check-system-app-declaration.sh", "provok"),
-    },
-    {
-        "id": "app",
-        "authorities": ["docs/MODULE-ADMISSION.md"],
-        "gates": ["module-admission"],
-        "provocation": ("scripts/check-module-admission.sh", "negative control"),
-    },
-    {
-        "id": "env-var",
-        "authorities": [
-            "docs/GIT-ENV-VARIABLES.md",
-            "infra/terraform/modules/web-surface/auth-env.json",
-        ],
-        "gates": ["portal-auth-env"],
-        "provocation": ("scripts/check-portal-auth-env.sh", "provoked"),
-    },
-    {
-        "id": "gov",
-        "authorities": ["docs/GOLDEN-RULES.md", "AGENTS.md"],
-        "gates": ["authority"],
-        "provocation": ("scripts/check-authority.sh", "isolation"),
-    },
-    {
-        "id": "issues",
-        "authorities": ["governance/dispatch/README.md", ".board/snapshot.json"],
-        "gates": ["issue-claims"],
-        "provocation": ("scripts/check-issue-claims.sh", "mutant"),
-    },
-    {
-        "id": "index",
-        "authorities": [
-            "docs/CODEIDX-CAPABILITY-REGISTER.md",
-            "docs/DIAGRAMS-CAPABILITY-REGISTER.md",
-            "governance/knowledge/catalog.json",
-        ],
-        "gates": ["knowledge-index", "diagrams-capability-register"],
-        "provocation": ("scripts/check-diagrams-capability-register.sh", "negative control"),
-    },
-]
-
-EXPECTED_MECHANISMS = [
-    "class", "pattern", "template", "rca", "system", "app",
-    "env-var", "gov", "issues", "index",
-]
-
-
-def _discovered_gates(root: Path) -> set:
-    """The gate names `scripts/discover-checks.sh` would wire into make verify."""
-    return {
-        p.name[len("check-"):-len(".sh")]
-        for p in sorted((root / "scripts").glob("check-*.sh"))
-    }
-
-
-def _denylisted_gates(root: Path) -> set:
-    path = root / "scripts" / "check-denylist.txt"
-    if not path.exists():
-        return set()
-    blocked = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            blocked.add(line)
-    return blocked
-
-
-def mechanism_ok(root: Path, mech: dict, discovered: set, denylisted: set) -> str:
-    """One mechanism's chain. Returns a detail string or raises AssertionError
-    naming the broken link: a missing authority, a dead/denylisted/undiscovered
-    gate, or a missing provocation artifact."""
-    missing_auth = [a for a in mech["authorities"] if not (root / a).exists()]
-    if missing_auth:
-        raise AssertionError("authority missing: %s" % ", ".join(missing_auth))
-    for gate in mech["gates"]:
-        script = root / "scripts" / ("check-%s.sh" % gate)
-        if not script.exists():
-            raise AssertionError("gate check-%s.sh does not exist" % gate)
-        if script.stat().st_size == 0:
-            raise AssertionError("gate check-%s.sh is empty (a dead gate)" % gate)
-        if gate in denylisted or script.name in denylisted:
-            raise AssertionError("gate %s is denylisted (silently unwired)" % gate)
-        if gate not in discovered:
-            raise AssertionError("gate %s is not discovered into make verify" % gate)
-    provocation_path, needle = mech["provocation"]
-    artifact = root / provocation_path
-    if not artifact.exists():
-        raise AssertionError("provocation artifact %s is missing" % provocation_path)
-    if needle and needle.lower() not in artifact.read_text(encoding="utf-8").lower():
-        raise AssertionError("provocation %r not found in %s" % (needle, provocation_path))
-    return "%d gate(s), %d authorit(y/ies), provocation %s" % (
-        len(mech["gates"]), len(mech["authorities"]), provocation_path,
-    )
-
-
-def mechanisms_complete(mechanisms: list, expected: list) -> str:
-    got = [m["id"] for m in mechanisms]
-    missing = [e for e in expected if e not in got]
-    extra = [g for g in got if g not in expected]
-    if missing or extra:
-        raise AssertionError(
-            "mechanism set drift — missing %s, extra %s" % (missing, extra)
-        )
-    return "%d mechanism(s) named" % len(got)
-
-
-def mechanisms_disjoint(mechanisms: list) -> str:
-    all_gates = [g for m in mechanisms for g in m["gates"]]
-    dupes = {g for g in all_gates if all_gates.count(g) > 1}
-    if dupes:
-        raise AssertionError(
-            "a gate is claimed by two mechanisms: %s" % ", ".join(sorted(dupes))
-        )
-    return "%d gate(s) across %d mechanism(s), none shared" % (
-        len(all_gates), len(mechanisms),
-    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -315,21 +147,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         return "the filing defaults are values the authority declares"
 
     checks.append(("filing-defaults-legal", _filing_defaults_are_legal))
-
-    # -- the futureproof surface: every mechanism's chain, end to end --------
-    discovered = _discovered_gates(ROOT)
-    denylisted = _denylisted_gates(ROOT)
-    for mech in MECHANISMS:
-        def _mk(m=mech):
-            return lambda: mechanism_ok(ROOT, m, discovered, denylisted)
-        checks.append(("mechanism-%s" % mech["id"], _mk()))
-    checks.append(
-        ("mechanisms-complete",
-         lambda: mechanisms_complete(MECHANISMS, EXPECTED_MECHANISMS))
-    )
-    checks.append(
-        ("mechanisms-disjoint", lambda: mechanisms_disjoint(MECHANISMS))
-    )
 
     # -- the provoked half: a broken link in the chain is refused -----------
     scratch = Path(tempfile.mkdtemp(prefix="ao1182-e2e."))
