@@ -118,6 +118,11 @@
       "sha": "75d66257fc80c938d7e7ad0ea6d2cbd0ec5bf00f",
       "code": "commit-missing-ticket-trailer",
       "why": "squash-merge of #1103 landed on master without a trailing trailer paragraph -- the squash message setting predates this declaration (issue #1138)"
+    },
+    {
+      "sha": "d3eb77fa0cb19f4043eeb3a7a1109a498287d752",
+      "code": "commit-missing-ticket-trailer",
+      "why": "squash-merge of #1144 landed on master without a trailing trailer paragraph -- the squash message setting predates this declaration (issue #1138)"
     }
   ]
 }

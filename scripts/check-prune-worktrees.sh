@@ -157,7 +157,7 @@ fi
 
 report="$(reap "$branches" --check --branches)"
 rc=$?
-if [ "$rc" -eq 1 ] && printf '%s' "$report" | grep -q "STALE  branch issue-42-lane"; then
+if [ "$rc" -eq 1 ] && [[ "$report" == *"STALE  branch issue-42-lane"* ]]; then
   ok "a landed branch that still exists is a finding (--check --branches rc=1)"
 else
   bad "a landed lane branch was not reported (rc=$rc)"
@@ -191,7 +191,7 @@ held_lane="$work/lane-held"
 git_ "$held" worktree add -q -b issue-44-lane "$held_lane"
 git_ "$held" push -qu origin issue-44-lane
 held_out="$(reap "$held" --branches --apply)"
-if printf '%s' "$held_out" | grep -q 'issue-44-lane'; then
+if [[ "$held_out" == *"issue-44-lane"* ]]; then
   bad "a branch a worktree is standing on was treated as a candidate"
 elif git_ "$held" rev-parse --verify --quiet issue-44-lane >/dev/null 2>&1; then
   ok "a branch checked out in a worktree is not a candidate at all"
