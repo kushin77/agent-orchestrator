@@ -464,7 +464,18 @@ for number in "${merge_order[@]}"; do
   head_and_files="$(pr_head_and_files_py "$recheck_json" "$number")"
   number_head_oid="$(printf '%s\n' "$head_and_files" | head -n1)"
   number_files="$(printf '%s\n' "$head_and_files" | tail -n +2)"
-  if ! printf '%s\n' "$number_files" | gate_regression_check "$number_head_oid" "origin/$base"; then
+  # The MERGE BASE, not master's current tip: the tip moves as the queue
+  # works through the plan, and a two-dot-shaped comparison against the
+  # tip is exactly the range-computation defect issue #1145 also names
+  # (in check-pr-contract.sh, out of this lane's scope — see the PR body).
+  git fetch --quiet origin "$base" >/dev/null 2>&1 || true
+  git fetch --quiet origin "$number_head_oid" >/dev/null 2>&1 || true
+  number_merge_base="$(git merge-base "origin/$base" "$number_head_oid" 2>/dev/null)"
+  if [ -z "$number_merge_base" ]; then
+    echo "pr-queue: REFUSED — gate-regression CANNOT-ASSESS — could not compute the merge base of #$number's head ($number_head_oid) with origin/$base; stopping (no loop swallowing a refusal)" >&2
+    exit 1
+  fi
+  if ! printf '%s\n' "$number_files" | gate_regression_check "$number_head_oid" "$number_merge_base"; then
     echo "pr-queue: REFUSED — gate-regression — #$number's diff would red a check-*.sh gate that passes on master today; stopping (no loop swallowing a refusal)" >&2
     exit 1
   fi
