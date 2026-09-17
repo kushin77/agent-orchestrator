@@ -8,7 +8,10 @@ Asserts the declarative rollout contract, all of which can genuinely fail
   2. every flag in the current rollout state defaults to OFF (AO-GR-6) - a
      flag that shipped on is a hard failure;
   3. the go-live plan covers every Phase 0-8 surface, each flag resolves and
-     each declared stage is in the closed vocabulary;
+     each declared stage is in the closed vocabulary - and the plan/state
+     pairing holds in BOTH directions (issue #966): a flag the plan names but
+     the state does not declare is a typo, and a flag the state declares but
+     no phase names is a row the ordered ladder can never reach;
   4. the rollout Cloud Build triggers ship DISABLED with _ENABLE_ROLLOUT=false
      (flag-gated OFF), mirroring the infra/cloudbuild convention;
   5. service and CI/CD flags in the rollout state mirror
@@ -118,6 +121,60 @@ def check_live_state(doc: object, known_flags: list, model: StageModel, rollout_
     return errors
 
 
+def _plan_named_flags(doc: object) -> set:
+    """Every flag some phase of the plan names (empty for an unusable plan)."""
+    named: set = set()
+    if not isinstance(doc, dict):
+        return named
+    phases = doc.get("phases")
+    if not isinstance(phases, dict):
+        return named
+    for body in phases.values():
+        if not isinstance(body, dict):
+            continue
+        surfaces = body.get("surfaces")
+        if not isinstance(surfaces, list):
+            continue
+        for surface in surfaces:
+            if isinstance(surface, dict) and isinstance(surface.get("flag"), str):
+                named.add(surface["flag"])
+    return named
+
+
+def check_state_reachability(state_flags: list, plan_doc: object) -> list:
+    """The REVERSE direction of the plan/state pairing (issue #966).
+
+    ``validate_go_live_plan_doc`` answers exactly one question - does every
+    flag the plan names resolve in the rollout state? It never asked the other
+    one: is every flag the state declares **reached by some phase**? So a flag
+    could be declared, drivable (the engine promotes a flag it carries) and
+    **permanently unreachable** (the ordered driver takes its path from this
+    plan), with the only symptom an operator noticing that a go-live run never
+    mentioned it. That is the defect measured on ``services.erp_module`` and
+    ``surfaces.erp_module`` - the same class as #954 and #935, one level up:
+    the gate was one-directional, and the direction it did not check is the one
+    that decides whether a surface can ever ship.
+
+    The two directions are deliberately worded apart because they take
+    different fixes: a row no phase names belongs **in a phase** (or needs a
+    reasoned exemption recorded beside it), while a name with no declaration is
+    a misspelling in the plan.
+
+    An unusable plan (no phase names any flag) reports nothing here: it is
+    already a hard error from ``validate_go_live_plan_doc``, and repeating it
+    once per state flag would bury the reason rather than add to it.
+    """
+    named = _plan_named_flags(plan_doc)
+    if not named:
+        return []
+    return [
+        f"go-live-plan: flag '{flag}' is declared in rollout-state.yaml (so the engine can drive it) "
+        "but is named by no phase of go-live-plan.yaml, so the ordered ladder can never reach it - "
+        "add it to the phase it belongs to, or record a reasoned exemption beside its row"
+        for flag in sorted(set(state_flags) - named)
+    ]
+
+
 def check_go_live_plan(doc: object, known_flags: list, model: StageModel) -> list:
     errors = [f"go-live-plan: {e}" for e in validate_go_live_plan_doc(doc, known_flags, model)]
     if isinstance(doc, dict) and doc.get("promotion_order") != "strict-by-phase":
@@ -126,6 +183,7 @@ def check_go_live_plan(doc: object, known_flags: list, model: StageModel) -> lis
             "(infra/rollout/go_live.py) computes and enforces that order, so a plan declaring anything "
             "else declares an order no code implements"
         )
+    errors.extend(check_state_reachability(known_flags, doc))
     return errors
 
 
@@ -360,12 +418,50 @@ def _probes() -> list:
         }
         return check_live_state(bad_live_state, ["services.registry"], model)
 
+    def unplanned_state_flag_probe():
+        """A declared, drivable flag that no phase reaches must fail BY NAME (#966).
+
+        The reverse direction: the plan resolves every flag it names, and the
+        state declares one more row, which the ordered ladder can therefore
+        never reach. The probe insists on THIS direction's own message, so the
+        one-directional check (the defect #966 measured) cannot satisfy it by
+        reporting some other error.
+        """
+        model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
+        plan = _load(os.path.join(ROLLOUT_DIR, "go-live-plan.yaml"))
+        known = list(_load(os.path.join(ROLLOUT_DIR, "rollout-state.yaml"))["flags"])
+        errors = check_go_live_plan(plan, [*known, "rollout.probe_orphan"], model)
+        if any("named by no phase" in error for error in errors):
+            return errors[:1]
+        return [f"the declared-but-not-planned rule did not fire: {errors!r}"]
+
+    def undeclared_plan_flag_probe():
+        """A phase naming a flag the state does not declare must fail BY NAME.
+
+        The opposite direction - a misspelling in the plan rather than a row no
+        phase reaches. The probe asserts THIS direction's message, because the
+        two have different meanings and different fixes, so one reported as the
+        other would misdirect the repair.
+        """
+        model = StageModel.load(_load(os.path.join(ROLLOUT_DIR, "stage-model.yaml")))
+        plan = copy.deepcopy(_load(os.path.join(ROLLOUT_DIR, "go-live-plan.yaml")))
+        plan["phases"]["7"]["surfaces"].append(
+            {"flag": "services.probe_undeclared", "go_live_stage": "full"}
+        )
+        known = list(_load(os.path.join(ROLLOUT_DIR, "rollout-state.yaml"))["flags"])
+        errors = check_go_live_plan(plan, known, model)
+        if any("does not resolve to a known flag" in error for error in errors):
+            return errors[:1]
+        return [f"the planned-but-not-declared rule did not fire: {errors!r}"]
+
     return [
         ("stage-model rejects unknown stage", stage_probe),
         ("stage-model rejects policy auto-approving full", full_autoapprove_probe),
         ("rollout-state rejects default-ON flag", state_probe),
         ("go-live-plan rejects partial phase coverage", plan_probe),
         ("go-live-plan rejects a promotion_order no driver honours", promotion_order_probe),
+        ("go-live-plan rejects a declared flag no phase reaches", unplanned_state_flag_probe),
+        ("go-live-plan rejects a phase naming an undeclared flag", undeclared_plan_flag_probe),
         ("registry parity rejects unknown service flag", parity_probe),
         ("registry parity checks a surfaces flag against the surfaces section", surface_parity_probe),
         ("cloudbuild requires disabled rollout triggers", trigger_probe),
