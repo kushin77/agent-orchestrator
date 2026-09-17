@@ -35,6 +35,7 @@ Exit-code contract (the repo's honesty tri-state, issue #28): 0 OK /
 
 from __future__ import annotations
 
+import fnmatch
 import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -45,6 +46,42 @@ from governance.landing import evidence as evidence_mod
 from governance.landing import verdict as verdict_mod
 from governance.landing.evidence import Attestation, Gap, evidence_gap, read_attestation
 from governance.landing.ports import LandingOps, PortError, PullRequest
+
+#: Where the gate-sensitive path globs live (issue #1054), read from THIS
+#: repo's own checkout — never from the lane/range under test — so a PR that
+#: deletes or rewrites the path file cannot also delete the cross-check. Same
+#: boundary rule ``scripts/check-pr-contract.sh`` documents for its own read.
+GATE_PATHS_REL = "scripts/lib/gate-paths.txt"
+
+
+def _gate_paths(repo_root: Path) -> tuple:
+    """The glob list from ``scripts/lib/gate-paths.txt``, blank/`#` lines dropped."""
+    path = repo_root / GATE_PATHS_REL
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return ()
+    globs = []
+    for line in raw.splitlines():
+        g = line.strip()
+        if not g or g.startswith("#"):
+            continue
+        globs.append(g)
+    return tuple(globs)
+
+
+def _gate_changing_line(repo_root: Path, touched: Sequence[str]) -> str:
+    """``Gate-changing: yes — <paths>`` or ``Gate-changing: no`` — MEASURED, never hard-coded.
+
+    Matches ``touched`` (the lane's changed files) against the glob list in
+    ``scripts/lib/gate-paths.txt``, exactly the cross-check
+    ``scripts/check-pr-contract.sh`` runs against the declaration this composes.
+    """
+    globs = _gate_paths(repo_root)
+    matched = sorted({f for f in touched for g in globs if fnmatch.fnmatch(f, g)})
+    if matched:
+        return "Gate-changing: yes — " + ", ".join(matched)
+    return "Gate-changing: no"
 
 EXIT_OK = 0
 EXIT_NOT_OK = 1
@@ -237,6 +274,19 @@ class LandingEngine:
             lines.append(f"- the lane's commits on `{result.branch}`")
         if req.notes_file and Path(req.notes_file).is_file():
             lines.extend(["", Path(req.notes_file).read_text(encoding="utf-8").rstrip()])
+        try:
+            touched = self.ops.changed_files(req.base, result.branch)
+        except PortError:
+            touched = ()
+        lines.extend(
+            [
+                "",
+                "## Merge order",
+                "",
+                _gate_changing_line(Path(__file__).resolve().parents[2], touched),
+                "",
+            ]
+        )
         lines.extend(["", "## Evidence", "", "```"])
         if attestation.readable:
             lines.append(f"$ cat {attestation.path}")

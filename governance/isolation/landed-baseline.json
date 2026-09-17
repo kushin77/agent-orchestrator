@@ -77,22 +77,22 @@
     {
       "sha": "4155448942a86fd931c62302032e6eeb800e623e",
       "code": "commit-missing-ticket-trailer",
-      "why": "squash-merge of #1084 landed on master without a trailing trailer paragraph"
+      "why": "squash-merge of #1084 landed on master without a trailing trailer paragraph (this is the third+ recurrence of this shape; the durable fix is #1009 -- enforce the trailer at merge time -- not re-implemented here)"
     },
     {
       "sha": "90c7f5447a23ff525cc9842de151911331a19127",
       "code": "commit-missing-ticket-trailer",
-      "why": "squash-merge of #1085 landed on master without a trailing trailer paragraph"
+      "why": "squash-merge of #1085 landed on master without a trailing trailer paragraph (this is the third+ recurrence of this shape; the durable fix is #1009 -- enforce the trailer at merge time -- not re-implemented here)"
     },
     {
       "sha": "9ab9c77a764591f6bb0b88df602329e40ce53bee",
       "code": "commit-missing-ticket-trailer",
-      "why": "squash-merge of #1086 landed on master without a trailing trailer paragraph"
+      "why": "squash-merge of #1086 landed on master without a trailing trailer paragraph (this is the third+ recurrence of this shape; the durable fix is #1009 -- enforce the trailer at merge time -- not re-implemented here)"
     },
     {
       "sha": "4b0f7639a5308fa38382152a50e4865e082e67cd",
       "code": "commit-missing-ticket-trailer",
-      "why": "squash-merge of #1076 landed on master without a trailing trailer paragraph"
+      "why": "squash-merge of #1076 landed on master without a trailing trailer paragraph (this is the third+ recurrence of this shape; the durable fix is #1009 -- enforce the trailer at merge time -- not re-implemented here)"
     }
   ]
 }
