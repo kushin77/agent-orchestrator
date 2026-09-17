@@ -188,7 +188,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint squash-message chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint squash-message chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners tagging
 	@echo ""
 	@echo "lint: OK"
 

@@ -616,3 +616,85 @@ def test_a_missing_age_is_reported_as_unknown_not_zero(tmp_path, taxonomy):
     path.write_text(json.dumps({"issues": []}), encoding="utf-8")
     projection = LV.project(ROOT, taxonomy, snapshot_path=path)
     assert projection["snapshot_age_minutes"] is None
+
+
+# ---------------------------------------------------------------------------
+# the mandate — the constitution must keep declaring the rule (issue #1183)
+# ---------------------------------------------------------------------------
+import mandate as MD  # noqa: E402
+import provoke as PV  # noqa: E402
+
+
+def _mandate_tree(tmp_path: Path, mutate=None) -> Path:
+    root = tmp_path / "tree"
+    for doc in MD.DOCS:
+        target = root / doc
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text((ROOT / doc).read_text(encoding="utf-8"), encoding="utf-8")
+    if mutate is not None:
+        mutate(root)
+    return root
+
+
+def test_the_repository_declares_the_mandate():
+    assert MD.check(ROOT) == ()
+
+
+def test_the_mandate_names_five_contract_documents():
+    assert len(MD.DOCS) == 5
+    assert "AGENTS.md" in MD.DOCS
+    assert "docs/GOLDEN-RULES.md" in MD.DOCS
+
+
+def test_every_contract_doc_declares_the_shared_markers():
+    for doc, markers in MD.contract():
+        for marker in MD.SHARED_MARKERS:
+            assert marker in markers, "%s is missing the shared marker %r" % (doc, marker)
+
+
+def test_agents_md_must_name_the_authority_file_and_the_gate():
+    markers = dict(MD.contract())["AGENTS.md"]
+    assert "governance/tagging/taxonomy.yaml" in markers
+    assert "scripts/check-tagging.sh" in markers
+
+
+def test_the_spine_declares_its_numbered_entry():
+    assert "AO-GR-28" in dict(MD.contract())["docs/GOLDEN-RULES.md"]
+
+
+def test_a_stripped_marker_is_refused_by_name(tmp_path):
+    def strip(root: Path) -> None:
+        doc = root / "docs" / "QA-GATE.md"
+        text = doc.read_text(encoding="utf-8")
+        mutated = text.replace("lifecycle", "SDLC-stage")
+        assert mutated != text, "the marker was not present to strip"
+        doc.write_text(mutated, encoding="utf-8")
+
+    findings = MD.check(_mandate_tree(tmp_path, strip))
+    errs = M.errors(findings)
+    assert MD.CODE_MISSING_MARKER in {f.code for f in errs}
+    assert any(f.subject == "docs/QA-GATE.md" for f in errs)
+    assert any("lifecycle" in f.message for f in errs)
+
+
+def test_a_missing_contract_doc_is_refused_by_name(tmp_path):
+    def drop(root: Path) -> None:
+        (root / "docs" / "GOVERNANCE.md").unlink()
+
+    findings = MD.check(_mandate_tree(tmp_path, drop))
+    assert MD.CODE_MISSING_DOC in {f.code for f in findings}
+    assert any(f.subject == "docs/GOVERNANCE.md" for f in findings)
+
+
+def test_the_unmutated_tree_is_refused_nothing(tmp_path):
+    assert MD.check(_mandate_tree(tmp_path)) == ()
+
+
+def test_every_mandate_code_is_a_declared_refusal(taxonomy):
+    assert MD.CODE_MISSING_DOC in taxonomy.refusal_ids
+    assert MD.CODE_MISSING_MARKER in taxonomy.refusal_ids
+
+
+def test_the_mandate_is_provoked_in_both_directions():
+    assert MD.CODE_MISSING_DOC in PV.PROVOCATIONS_BY_REFUSAL
+    assert MD.CODE_MISSING_MARKER in PV.PROVOCATIONS_BY_REFUSAL

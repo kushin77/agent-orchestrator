@@ -7,7 +7,7 @@
 # the gates a tag set requires along the channel those gates run in (pr / ci /
 # cd / ops). This gate is what makes those declarations falsifiable.
 #
-# Five checks, each carrying a REAL exit code, because a gate that cannot fail is
+# Six checks, each carrying a REAL exit code, because a gate that cannot fail is
 # a formality (GR-12):
 #
 #   tagging-lint      the authority's own shape: every dimension well-formed,
@@ -39,6 +39,15 @@
 #                     past a hand-written garbage line, the live projection names
 #                     the item it refuses while an all-clean board is refused
 #                     nothing, and a relaxed control is refused by name.
+#   tagging-mandate   the CONSTITUTION still declares the rule. A rule only prose
+#                     carries is advice (GR-29 / AO-GR-4), so the contract docs —
+#                     AGENTS.md, docs/GOLDEN-RULES.md, docs/GOVERNANCE.md,
+#                     docs/EXECUTION-PLAN.md, docs/QA-GATE.md — must each declare
+#                     the tag authority and its `posture`/`lifecycle` dimensions,
+#                     and this check FAILS naming the document AND the marker the
+#                     moment one stops. That is what makes the rule institutional
+#                     rather than advisory, and it is the same shape
+#                     scripts/check-chronological-dispatch.sh uses for rule 14.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 # CANNOT-ASSESS must never be reported as a pass.
@@ -173,6 +182,31 @@ case "$rc" in
     ;;
   *)
     report SKIP "tagging-artifacts — CANNOT-ASSESS (rc $rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    skipped=$((skipped + 1))
+    ;;
+esac
+
+# --- check 6: the constitution still declares the rule ----------------------
+# The behavioural half above can be perfectly green while the rule itself stops
+# being constitutional: the gate proves the authority is enforced, not that
+# anything SAYS it must be. This check reads the contract docs and fails naming
+# the document and the marker that went missing.
+out="$(python3 governance/tagging/mandate.py 2>&1)"
+rc=$?
+case "$rc" in
+  0)
+    assessed=$((assessed + 1))
+    report PASS "tagging-mandate — $(printf '%s' "$out" | tail -1)"
+    ;;
+  1)
+    assessed=$((assessed + 1))
+    failures=$((failures + 1))
+    report FAIL "tagging-mandate — a contract document stopped declaring the rule"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    ;;
+  *)
+    report SKIP "tagging-mandate — CANNOT-ASSESS (rc $rc)"
     printf '%s\n' "$out" | sed 's/^/      /'
     skipped=$((skipped + 1))
     ;;

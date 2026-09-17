@@ -38,6 +38,7 @@ So the QA gate must:
 | `make qa-loop` | `scripts/qa-loop.sh` — fix → verify → re-check until green (or no auto-fix left) | reuses gate evidence |
 | `make merge-gate` | `scripts/merge-gate.sh run` — pre-merge contract (refuses dirty tree, full gate, writes commit-named attestation) | `.verify/merge-attestation.json`, `.verify/merge-gate.log` |
 | `make tests` | `scripts/run-pytest-suites.sh` — every declared suite in isolation | `.verify/test-results.json` |
+| `make tagging` | `scripts/check-tagging.sh` — the **tag authority** (AO-GR-28, #1175 + #1183): six checks — the taxonomy's shape, every borrowed vocabulary proven equal to its authority, every rule's gate name resolved, the generated matrix's freshness, every declared refusal provoked by a real mutant with its clean twin accepted, and the **`tagging` mandate** that the contract docs keep declaring the rule (`posture`/`lifecycle` incl.). Also runs inside `make verify` by auto-discovery, and `make lint` | `.verify/verify.log`'s `tagging` row |
 
 ### `make gate` signal table (per-signal evidence)
 
