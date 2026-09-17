@@ -84,7 +84,7 @@ def _span(
         outcome=outcome,
         ts=ts,
         provider="anthropic" if is_call else None,
-        model="claude-sonnet-4-5" if is_call else None,
+        model="claude-sonnet-5" if is_call else None,
         tier="MED" if is_call else None,
         input_tokens=100 if is_call else 0,
         output_tokens=50 if is_call else 0,

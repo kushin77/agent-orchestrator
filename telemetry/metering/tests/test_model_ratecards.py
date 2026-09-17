@@ -200,3 +200,32 @@ def test_shipped_cards_serialize_as_valid_json():
             assert entry.standard.input_usd_per_million >= 0
             assert entry.standard.output_usd_per_million >= 0
         json.dumps(card.to_dict())  # must not raise
+
+
+# --------------------------------------------------------------------------- #
+# Legacy model-id aliasing (issue #971): a retired Claude id must price
+# identically to its current replacement, through the same alias map the
+# gateway's fail-closed model check uses (telemetry/metering/model_aliases.py).
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "legacy_id,current_id",
+    [
+        ("claude-haiku-4-5", "claude-haiku-4-5-20251001"),
+        ("claude-sonnet-4-5", "claude-sonnet-5"),
+        ("claude-opus-4-5", "claude-opus-5"),
+        ("claude-opus-4-1", "claude-opus-5"),
+    ],
+)
+def test_legacy_model_id_prices_identically_to_current_id(legacy_id, current_id):
+    store = RateCardStore.load_dir()
+
+    legacy_entry = store.lookup("anthropic", legacy_id)
+    current_entry = store.lookup("anthropic", current_id)
+    assert legacy_entry is not None
+    assert legacy_entry == current_entry
+
+    legacy_estimate = store.estimate("anthropic", legacy_id, 800, 200)
+    current_estimate = store.estimate("anthropic", current_id, 800, 200)
+    assert legacy_estimate is not None
+    assert legacy_estimate.cost_usd == pytest.approx(current_estimate.cost_usd)
+    assert legacy_estimate.model == current_estimate.model == current_id

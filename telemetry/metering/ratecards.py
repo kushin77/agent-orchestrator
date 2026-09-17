@@ -32,6 +32,8 @@ from typing import Any, Dict, List, Mapping, Optional
 
 import yaml
 
+from telemetry.metering.model_aliases import normalize_model
+
 RATE_CARD_SCHEMA_VERSION = 1
 
 #: Default directory holding the per-provider YAML rate cards.
@@ -242,11 +244,19 @@ class RateCardStore:
         return self._cards.get(provider)
 
     def lookup(self, provider: str, model: str) -> Optional[RateCardEntry]:
-        """Resolve an exact (provider, model) entry, or ``None`` if unknown."""
+        """Resolve an exact (provider, model) entry, or ``None`` if unknown.
+
+        ``model`` is first normalized through the shared
+        ``telemetry.metering.model_aliases.LEGACY_MODEL_ALIASES`` map (the
+        same alias table the gateway's fail-closed model check uses), so a
+        retired id such as ``claude-sonnet-4-5`` prices identically to its
+        current replacement (``claude-sonnet-5``) instead of missing the
+        card and silently pricing as unmetered.
+        """
         card = self._cards.get(provider)
         if card is None:
             return None
-        return card.lookup(model)
+        return card.lookup(normalize_model(model))
 
     def estimate(
         self,
@@ -265,6 +275,7 @@ class RateCardStore:
         entry = self.lookup(provider, model)
         if entry is None:
             return None
+        model = normalize_model(model)
         inp = _safe_tokens(input_tokens)
         out = _safe_tokens(output_tokens)
         rate = entry.rate_for(inp)
