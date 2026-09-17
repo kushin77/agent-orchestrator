@@ -53,6 +53,11 @@ TASK_BOARD_SURFACE = "task_board"
 #: and this key is the id that manifest declares (``erp-module``), underscored
 #: exactly as ``infra/feature-flags/registry.yaml`` spells its own surface keys.
 ERP_MODULE_SURFACE = "erp_module"
+#: The fleet board (issue #880, EPIC #878 lane L1) — projects the live
+#: ``.board/snapshot.json`` / ``.board/claims.jsonl`` roster the fleet
+#: CLI/cron already treat as the source of truth, joined and schema-validated
+#: by ``portal.server.livestore.load_board_rows``.
+FLEET_BOARD_SURFACE = "fleet_board"
 
 #: Every surface this module knows about, so a test can assert the set is closed.
 DECLARED_SURFACES = frozenset(
@@ -61,6 +66,7 @@ DECLARED_SURFACES = frozenset(
         SKILL_STUDIO_SURFACE,
         TASK_BOARD_SURFACE,
         ERP_MODULE_SURFACE,
+        FLEET_BOARD_SURFACE,
     }
 )
 
