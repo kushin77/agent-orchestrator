@@ -65,6 +65,7 @@ from governance.reconcile.heartbeat import (
 )
 from governance.reconcile import ledger as reconcile_ledger
 from governance.reconcile import policy as reconcile_policy
+from governance.reconcile import findings as reconcile_findings
 
 PERFORMED = "performed"
 SKIPPED = "skipped"
@@ -120,8 +121,22 @@ class SweepReport:
 
     actions: list[Action] = field(default_factory=list)
     board_reports: list[BoardReport] = field(default_factory=list)
+    #: The disposition of every *filed* finding the pass re-measured (#973).
+    #: A finding is not unlike a session: it is re-evaluated every pass and
+    #: reaches a terminal state, or it is named as still owing.
+    finding_states: list[reconcile_findings.FindingState] = field(default_factory=list)
     applied: bool = False
     at: float = 0.0
+
+    @property
+    def finding_failures(self) -> list[reconcile_findings.FindingState]:
+        """Findings whose re-measurement was attempted and lost the board write.
+
+        An *unmeasured* finding is not a failure — it is an absence of a result,
+        and the tri-state rule keeps the two apart. This is only the write that
+        was attempted and did not land.
+        """
+        return [state for state in self.finding_states if state.outcome == reconcile_findings.FAILED]
 
     def by_outcome(self, outcome: str) -> list[Action]:
         return [action for action in self.actions if action.outcome == outcome]
@@ -156,6 +171,8 @@ class SweepReport:
                 {"key": r.key, "action": r.action, "number": r.number}
                 for r in self.board_reports
             ],
+            "finding_counts": reconcile_findings.counts(self.finding_states),
+            "finding_states": [state.to_json() for state in self.finding_states],
             "actions": [
                 {
                     "session_id": action.session_id,
@@ -193,6 +210,18 @@ class ReconcileOps(Protocol):
     def mark_shelved(self, session: Session, reason: str) -> str: ...
 
     def clear_session(self, session_id: str) -> str: ...
+
+
+class RecheckFindings(Protocol):
+    """Re-measure every *filed* finding and drive it to a terminal state (#973).
+
+    A seam, not a direct call, because re-measuring a lifecycle finding reads the
+    board: the reconcile gate drives ``sweep()`` offline against a scratch
+    repository, and with no seam given this pass reads nothing and the sweep is
+    exactly what it was.
+    """
+
+    def __call__(self, reporter: BoardReporter) -> list[reconcile_findings.FindingState]: ...
 
 
 def _attempt(action: Action, name: str, op, needed: bool = True) -> bool:
@@ -285,6 +314,7 @@ def sweep(
     alive: dict[str, bool] | None = None,
     ops: ReconcileOps | None = None,
     reporter: BoardReporter | None = None,
+    recheck: RecheckFindings | None = None,
     controls: "reconcile_policy.Controls | None" = None,
 ) -> SweepReport:
     """One reconciliation pass over every session with a heartbeat.
@@ -303,6 +333,11 @@ def sweep(
     every further orphaned session this pass is REFUSED rather than acted on —
     re-evaluated next pass, never dropped. Every decision (including a refusal)
     is written to the append-only ledger (`ledger.py`).
+
+    ``recheck`` is the *finding* half of the same rule (#973): a filed finding is
+    re-evaluated every pass exactly as a lane is, and retires into a terminal
+    state once the invariant it names is no longer charged. Without the seam no
+    finding is re-measured, which is what keeps every offline proof offline.
     """
     if ops is None:
         raise ValueError("sweep requires an operations port (see RepoOps)")
@@ -371,6 +406,21 @@ def sweep(
             pass
         if reporter is not None:
             report.board_reports.extend(board_report_action(reporter, session, action, apply))
+
+    if reporter is not None and recheck is not None:
+        try:
+            report.finding_states = list(recheck(reporter))
+        except Exception as exc:  # noqa: BLE001 - a finding pass must not lose the sweep
+            # The lane decisions above are already made and must still be
+            # reported: a finding pass that cannot run is named here, not raised
+            # out of the sweep that protects work.
+            report.finding_states = [
+                reconcile_findings.FindingState(
+                    key="(finding recheck)",
+                    outcome=reconcile_findings.FAILED,
+                    detail=f"the finding recheck did not run: {type(exc).__name__}: {exc}"[:300],
+                )
+            ]
     return report
 
 
@@ -419,12 +469,22 @@ def board_report_action(
                 apply=apply,
             )
         ]
-    if session.state == SHELVED and action.outcome in (RECLAIMED, PARKED):
-        reporter.resolve(
-            shelved_key,
-            comment=_resolved_body(session, action),
-            apply=apply,
-        )
+    if action.outcome in (RECLAIMED, PARKED):
+        # The lane reached its terminal state, so no finding charged against it is
+        # true any more: the shelve that named unmerged work, the failure that said
+        # the teardown could not finish, and the suspect beat whose process was
+        # gone. Retiring all three is what gives a reconcile finding a terminal
+        # state (#973) — before this only `shelved:` was ever resolved, so a
+        # `failed:`/`suspect:` issue stayed open for a lane that had since been
+        # reclaimed cleanly, and a *genuine* recurrence was deduped against it
+        # instead of being filed. A key with no entry is a no-op: `resolve` reads
+        # the ledger, finds nothing to pop and returns without saving.
+        for key, body in (
+            (shelved_key, _resolved_body(session, action)),
+            (finding_key("reconcile:failed", session.session_id), _terminal_body(session, action, "failed")),
+            (finding_key("reconcile:suspect", session.session_id), _terminal_body(session, action, "suspect")),
+        ):
+            reconcile_findings.resolve_key(reporter, key, comment=body, apply=apply)
     return []
 
 
@@ -486,6 +546,29 @@ def _resolved_body(session: Session, action: Action) -> str:
         f"- session: `{session.session_id}`\n"
         f"- issue: #{session.issue}\n"
         f"- branch: `{session.branch or '(unknown)'}`\n"
+    )
+
+
+def _terminal_body(session: Session, action: Action, what: str) -> str:
+    """The resolution comment for a `failed:`/`suspect:` finding (#973).
+
+    Both describe a *state of this session* — a teardown that could not finish, a
+    beat whose process was gone. Once the session has been reclaimed or parked,
+    neither describes anything true, so the finding is retired with the action
+    that retired the session as its evidence.
+    """
+    return (
+        f"Resolved: this {what} finding was about a session the sweep has since "
+        f"{action.outcome}.\n\n"
+        f"- session: `{session.session_id}`\n"
+        f"- issue: #{session.issue}\n"
+        f"- lane: `{session.lane or '(unknown)'}`\n"
+        f"- branch: `{session.branch or '(unknown)'}`\n"
+        f"- outcome: `{action.outcome}`\n\n"
+        "The fingerprint is retired from the dedupe ledger, so a genuinely new "
+        f"{what} finding for this session files again rather than being swallowed "
+        "by this one.\n\n"
+        "Reported by `governance/reconcile` (issue #973).\n"
     )
 
 
@@ -666,6 +749,11 @@ def describe(report: SweepReport) -> str:
         for step in action.steps:
             if step.outcome != SKIPPED or step.action in {"keep-remote-branch", "plan"}:
                 lines.append(f"      {step.outcome:<9} {step.action}: {step.detail}")
+    # Every re-measured finding is printed, not only counted: a finding left
+    # "still-owed" or "unmeasured" is the whole point of the pass, and a summary
+    # line would let it read as untouched.
+    for state in report.finding_states:
+        lines.append(f"  finding      {state}")
     return "\n".join(lines)
 
 
