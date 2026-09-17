@@ -18,7 +18,7 @@ vocabulary here is closed and identical to
 [`governance/conformance/model.py`](../governance/conformance/model.py) — the
 suite asserts the two gates cannot drift apart.
 
-## The declared surfaces (measured 2026-09-14, issue #351; scope widened by #590 and #620)
+## The declared surfaces (measured 2026-09-14, issue #351; scope widened by #590 and #620; four `governance/` surfaces raised to `elite` by #885)
 
 | Surface | Path | Declared class | Measured class | Why this rung |
 |---|---|---|---|---|
@@ -31,10 +31,10 @@ suite asserts the two gates cannot drift apart.
 | `module-brief` | `integrations/paperclip/reporting` | `faang` | `faang` | The paperclip reporting agent's module brief (#447, hardened by #592): contract, a suite, an owned schema for the artifact, the declared claim-resolution policy (`claim-policy.json` + `policy.py`, **read by** `composer.py`) and an append-only audit trail. Its dedicated gate carries it past `enterprise`; no live-sync module, so not `elite`. |
 | `github` | `.github` | `template` | `template` | The repository's GitHub surface: the issue forms (`.github/ISSUE_TEMPLATE/`), the PR template and `dependabot.yml`. Their substantive gates are `scripts/check-issue-template.sh` and `scripts/check-pr-contract.sh`, but the ladder's `tests` and `contract` evidence is directory-shaped — there is no suite and no `README.md` under the path — so the measured rung is the base one. |
 | `commit-contract` | `.gitmessage` | `template` | `template` | The commit-message contract (issue #5) parsed by `scripts/check-pr-contract.sh`. The path is a single file, so `tests` and `contract` (measured as artifacts *under* the path) cannot exist; the measured rung is the base one. |
-| `dispatch` | `governance/dispatch` | `pattern` | `pattern` | Claim/order/dispatch governance (golden rule 14): contract, a suite and the `scripts/check-chronological-dispatch.sh` gate. It owns no controls/audit/schema artifact, which is what holds it at `pattern`. |
-| `isolation` | `governance/isolation` | `pattern` | `pattern` | Session identity and lane isolation (rule 15): contract, a suite, the `scripts/check-session-isolation.sh` gate and the audit module (`audit.py`) the instrumentation reads. It has `audit` but owns no `controls` or `schema` artifact, so it stops at `pattern`. |
-| `lifecycle` | `governance/lifecycle` | `pattern` | `pattern` | End-to-end closure (rule 16): contract, a suite, the `scripts/check-github-lifecycle.sh` gate and `audit.py`. `controls` and a `*.schema.json` are absent, so the measured rung is `pattern`. |
-| `reconcile` | `governance/reconcile` | `pattern` | `pattern` | Orphan reconciliation (rule 17): contract, a suite and the `scripts/check-reconcile.sh` gate. It owns no audit/control/schema artifact, so the measured rung is `pattern`. |
+| `dispatch` | `governance/dispatch` | `elite` | `elite` | Claim/order/dispatch governance (golden rule 14): contract, a suite and the `scripts/check-chronological-dispatch.sh` gate, plus the four `elite` artifacts landed by #1062 (issue #885): `controls.yaml` + `policy.py` (read by `snapshot.py`'s `DEFAULT_STALENESS_MINUTES`), the append-only arbitration audit trail (`audit.py`), the frozen record shapes (`dispatch.schema.json` + `schema.py`), and the live projection `live.py` (`status --live`). |
+| `isolation` | `governance/isolation` | `elite` | `elite` | Session identity and lane isolation (rule 15): contract, a suite, the `scripts/check-session-isolation.sh` gate and the audit module (`audit.py`) the instrumentation reads, plus the four `elite` artifacts landed by #1066 (issue #885): `controls.yaml` + `policy.py` (read at import time by `identity.py` and `speculative.py`), the append-only audit-verdict journal (`journal.py`), the frozen record shapes (`isolation.schema.json` + `schema.py`), and the live projection `live.py` (`audit --live`). |
+| `lifecycle` | `governance/lifecycle` | `elite` | `elite` | End-to-end closure (rule 16): contract, a suite, the `scripts/check-github-lifecycle.sh` gate and `audit.py`, plus the four `elite` artifacts landed by #1065 (issue #885): `controls.yaml` + `policy.py` (checked against `model.py`'s invariant vocabulary), the decision ledger (`ledger.py`), the frozen record shapes (`lifecycle.schema.json`), and the live projection `live.py` (`status --live`). |
+| `reconcile` | `governance/reconcile` | `elite` | `elite` | Orphan reconciliation (rule 17): contract, a suite and the `scripts/check-reconcile.sh` gate, plus the four `elite` artifacts landed by #1064 (issue #885): `controls.yaml` + `policy.py` (read by `sweep.py` for `max_actions_per_pass` and the closed `outcome_codes` vocabulary), the audit trail (`ledger.py`), the frozen record shapes (`reconcile.schema.json`), and the live projection `live.py` (`status --live`). |
 
 **Scope widened by [#590](https://github.com/kushin77/agent-orchestrator/issues/590).**
 `surface_roots` named only `portal`, `gateway`, `telemetry` and `registry`, so two
@@ -49,13 +49,32 @@ the rung their evidence **measures**.
 never looked at `.github/**`, at the commit contract, or at the four
 `governance/` packages this repo's own rules are built on — they were held to
 **no class at all** while the table read green, the same silent-scope failure
-#590 recorded once. They are now declared surfaces at the rung each one's own
-evidence **measures**: `pattern` where a contract, a suite and a gate are all
-present (`governance/dispatch`, `governance/isolation`, `governance/lifecycle`,
-`governance/reconcile`), and the base `template` rung for the two git-ecosystem
-paths whose evidence is a single artifact rather than a directory (`.github`,
-`.gitmessage`). A declared row is enforcement, not documentation: declaring any
-of them one rung above its measurement fails `make surface-class` **by name**.
+#590 recorded once. They were declared surfaces at the rung each one's own
+evidence **measured** at the time: `pattern` where a contract, a suite and a
+gate were all present (`governance/dispatch`, `governance/isolation`,
+`governance/lifecycle`, `governance/reconcile` — since raised to `elite` by
+#885, below), and the base `template` rung for the two git-ecosystem paths
+whose evidence is a single artifact rather than a directory (`.github`,
+`.gitmessage`). A declared row is enforcement, not documentation: declaring
+any of them one rung above its measurement fails `make surface-class` **by
+name**.
+
+**Scope raised by [#885](https://github.com/kushin77/agent-orchestrator/issues/885).**
+#620 declared the four `governance/` packages at `pattern` — a contract, a
+suite and a gate, but no owned controls, audit trail or schema, so
+`enterprise` and above were out of reach. Four lanes (#1062 dispatch, #1064
+reconcile, #1065 lifecycle, #1066 isolation) each landed the same four
+genuinely load-bearing artifacts — a declared acceptance policy
+(`controls.yaml` + `policy.py`, read by the package's own code rather than
+existing decoratively), an audit/ledger/journal trail, an owned
+`*.schema.json`, and a live projection exposed through an existing verb's
+`--live` flag rather than a new one — which is what carries all four past
+`enterprise` and `faang` straight to `elite`, the top rung. Each package's own
+gate (`scripts/check-chronological-dispatch.sh`, `scripts/check-session-isolation.sh`,
+`scripts/check-github-lifecycle.sh`, `scripts/check-reconcile.sh`) provokes a
+mutation of each new artifact and requires it to be refused by name. Declared
+at the rung its evidence measures, never above it — the same discipline #590
+and #620 established.
 
 The declared class is **measured, never aspirational**: a surface is never
 declared above the evidence its own tree shows, because raising one fails the

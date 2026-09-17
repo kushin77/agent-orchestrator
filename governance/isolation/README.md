@@ -551,7 +551,7 @@ already had, each read by name rather than existing decoratively:
   journal entry (`journal.append`). Validated with the stdlib-only
   JSON-Schema subset validator `governance/modules/schema.py` already
   implements (issue #591) — reused via `schema.py`'s thin wrapper, not
-  reimplemented. [`tests/test_schema.py`](tests/test_schema.py) checks every
+  reimplemented. [`tests/test_isolation_schema.py`](tests/test_isolation_schema.py) checks every
   shape against both a valid and an invalid record, and against every entry
   actually recorded in `landed-baseline.json`.
 * **Live feed — [`live.py`](live.py).** A read-only projection of every
@@ -562,7 +562,7 @@ already had, each read by name rather than existing decoratively:
   through the **existing** `audit` verb's `--live` flag
   (`cli.py audit --live`) rather than a new top-level verb, so
   `scripts/check-control-verbs.sh` sees no unregistered surface.
-  [`tests/test_live.py`](tests/test_live.py) provisions a real lane, switches
+  [`tests/test_isolation_live.py`](tests/test_isolation_live.py) provisions a real lane, switches
   its worktree onto a foreign branch behind the CLI's back, and proves
   `live.py` reports the drift by name; `scripts/check-session-isolation.sh`
   §3e does the same against the real CLI.

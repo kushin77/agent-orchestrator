@@ -60,6 +60,10 @@ governance/board/violations.jsonl
 # The decision log is the branch/PR history; the rail is the working state.
 .board/pool.jsonl
 
+# The dispatch audit trail (issue #885, #1062) is runtime state too: one
+# arbitration-outcome record per claim/release, written by claims.arbitrate().
+.board/dispatch-audit.jsonl
+
 # Fleet steering mailboxes are runtime state (schema + standing directive are tracked)
 .fleet/inbox/
 .fleet/outbox/

@@ -153,7 +153,7 @@ genuinely new shelve files again.
 - **Dry-run by default.** No board write happens without `--apply`; a dry-run
   pass prints `board: dry-run — would file for …`.
 - **Offline-testable.** The board effects are an injected port, exercised by
-  `governance/reconcile/tests/test_boardreport.py` with no network.
+  `governance/reconcile/tests/test_reconcile_boardreport.py` with no network.
 
 ## 8. `elite` artifacts (issue #885)
 
@@ -180,7 +180,7 @@ that are this package's **own**:
   `reconcile.batch-limit-exceeded`) and re-evaluated next pass — never
   dropped. `sweep.py:sweep()` reads it through `policy.load()`
   (`governance/reconcile/sweep.py`, the `resolved_controls` seam) instead of
-  a hard-coded number; `governance/reconcile/tests/test_policy.py` and
+  a hard-coded number; `governance/reconcile/tests/test_reconcile_policy.py` and
   `test_sweep.py::test_batch_limit_*` prove the mutation: a temp copy with
   `max_actions_per_pass: 0` refuses every destructive decision, by name.
 * `sweep.outcome_codes` — the closed vocabulary `ledger.py` stamps a decision
