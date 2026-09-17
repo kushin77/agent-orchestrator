@@ -28,6 +28,12 @@
 #       the surface is not deployed.
 #   P5  the env contract — the JWKS-file and allowlist names are declared with
 #       their fail-closed consequence (healthy ≠ usable).
+#   P6  the cutover recipe declares the **two-rule** fronting and, in
+#       particular, the `^/auth/` path rule — the console's unauthenticated
+#       redirect is RELATIVE (`AUTH_GATE_LOGIN_PATH = "/auth/login"`), so the
+#       fronting must serve `/auth/*`. Without it `/auth/login` answers 404 and
+#       login is impossible (measured 2026-09-17: the first cutover shipped
+#       exactly that defect).
 #
 # HOW IT PROVES ITSELF (a control that cannot fail is a formality — GR-12)
 #   `--self-test` runs on EVERY invocation, over a scratch copy of the shipped
@@ -159,6 +165,14 @@ else:
     if "healthy" not in doc.lower() or "refus" not in doc.lower():
         f.append("P5: hosting doc does not state the fail-closed consequence (healthy ≠ usable)")
 
+# P6 — the cutover recipe declares the ^/auth/ path rule.
+rb = read("docs/AGENTCONSOLE-GOLIVE.md")
+if rb is None:
+    f.append("P6: docs/AGENTCONSOLE-GOLIVE.md (the go-live recipe) is missing")
+elif "^/auth/" not in rb:
+    f.append("P6: the go-live recipe does not declare the ^/auth/ path rule — the console's "
+             "redirect is RELATIVE, so without it /auth/login 404s and login is impossible")
+
 for line in f:
     print(line)
 PY
@@ -169,7 +183,8 @@ selftest() {
   trap 'rm -rf "$scratch"' EXIT
   # stage the files the analyser reads, at their real relative paths
   for rel in portal/Dockerfile contrib/shared-services/agentconsole.compose.yml \
-             infra/feature-flags/registry.yaml docs/AGENTCONSOLE-HOSTING.md; do
+             infra/feature-flags/registry.yaml docs/AGENTCONSOLE-HOSTING.md \
+             docs/AGENTCONSOLE-GOLIVE.md; do
     mkdir -p "$scratch/$(dirname "$rel")"
     cp "$script_root/$rel" "$scratch/$rel" 2>/dev/null || true
   done
@@ -225,6 +240,10 @@ PY
     't + "\n\n> Status: **declaration, not a deployment**\n"' || fail=1
   mutate P5 docs/AGENTCONSOLE-HOSTING.md \
     't.replace("PORTAL_AUTH_GATE_JWKS_FILE", "SOME_OTHER_VAR")' || fail=1
+  # P6: drop the ^/auth/ path rule from the recipe — the exact omission that
+  # broke login on the first cutover.
+  mutate P6 docs/AGENTCONSOLE-GOLIVE.md \
+    't.replace("^/auth/", "/NOTAUTH/")' || fail=1
   [ "$fail" -eq 0 ] && echo "check-agentconsole-hosting: SELFTEST OK" || echo "check-agentconsole-hosting: SELFTEST FAIL"
   return "$fail"
 }

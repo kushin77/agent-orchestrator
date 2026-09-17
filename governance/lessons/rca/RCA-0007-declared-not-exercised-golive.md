@@ -22,6 +22,14 @@ which passed no `project_id` and so could never have planned. The operator
 carried an inaccurate mental model — "nothing here is live" — for as long as the
 declarations said so.
 
+**And the class bit again on the first cutover itself (measured 2026-09-17).**
+The cutover recipe declared ONE tunnel rule (`ai.purebliss.app` → the console)
+when the console requires **two**: its unauthenticated redirect is a *relative*
+`/auth/login` (`portal/server/sso.py` `AUTH_GATE_LOGIN_PATH`), so the fronting —
+not the console — must serve `/auth/*`. The first cutover therefore answered
+`404 no such route: GET /auth/login` and **login was impossible** on
+`ai.purebliss.app`. The recipe was declared and never exercised, in miniature.
+
 ## Detection
 
 **Late, and by a human, during the go-live itself.** Nothing in the repository

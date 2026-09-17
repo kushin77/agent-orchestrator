@@ -76,19 +76,31 @@ the tunnel. State flows one way — from the fleet host **to** the console host.
    `surfaces.fleet_projection`, `surfaces.remote_control`,
    `surfaces.operator_terminal` → `default: on` + `promoted: true`. Then rebuild
    (step 1) so the promoted registry is in the image and redeploy (step 4).
-7. **Cut the fronting** — **merge** the tunnel ingress rule for the hostname;
+7. **Cut the fronting** — **merge** the tunnel ingress rules for the hostname;
    never replace the array (a blind rewrite deletes every other hostname the
-   tunnel serves):
+   tunnel serves). **TWO rules are required, and their ORDER is load-bearing** —
+   first match wins:
    ```
-   ai.purebliss.app  https://192.168.168.42:8493  ->  http://192.168.168.42:18286
+   ai.purebliss.app   path ^/auth/   ->  http://192.168.168.42:18280   # the OS auth gate
+   ai.purebliss.app   (no path)      ->  http://192.168.168.42:18286   # the console
    ```
-   The Cloudflare token comes from Secret Manager (`cloudflare-api-token`),
-   never a file. Backup the previous config first — that *is* the rollback.
-8. **Verify at the edge** (the acceptance):
+   The console's unauthenticated redirect is a **relative** `/auth/login`
+   (`portal/server/sso.py` `AUTH_GATE_LOGIN_PATH`), so the **fronting** — not the
+   console — must serve `/auth/*`. The pre-existing fronting proxied it; a
+   cutover that forgets this rule makes `/auth/login` answer **404** and login
+   becomes impossible (measured 2026-09-17, the first cutover's defect). The
+   Cloudflare token comes from Secret Manager (`cloudflare-api-token`), never a
+   file. Backup the previous config first — that *is* the rollback.
+8. **Verify at the edge** (the acceptance — the `/auth/` line is what proves the
+   cutover is *complete*, not just that the console answers):
    ```bash
    curl -s -o /dev/null -w '%{http_code}\n' https://ai.purebliss.app/api/healthz        # 200
    curl -s -o /dev/null -w '%{http_code}\n' https://ai.purebliss.app/api/fleet/snapshot # 401
-   curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://ai.purebliss.app/console  # 302 /auth/login
+   curl -s -o /dev/null -w '%{http_code}\n' https://ai.purebliss.app/console            # 302
+   # the gate must be REACHED, not shadowed by the console (a 404 here = broken login):
+   curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://ai.purebliss.app/auth/login
+   #   expect 302 -> https://accounts.google.com/... ; a 404 means the ^/auth/ rule is missing
+   ```
    ```
 
 ## Rollback
