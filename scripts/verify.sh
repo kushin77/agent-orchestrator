@@ -629,6 +629,20 @@ checks=(
   # comparator function with four fixtures (valid / missing-pillar /
   # stale-path / malformed-owner), each required to fail BY NAME.
   'codeowners|bash scripts/check-codeowners.sh'
+  # EPIC #878 flip (issue #883/#878): five suites this lane declared in
+  # scripts/pytest-suites.txt as part of raising every product surface's
+  # `declared_class` to `elite` (the live_sync evidence). A suite declared in
+  # the manifest but named by no gate is refused by check-gate-coverage, which
+  # never grandfathers a newly declared one -- so each gets the `pytest-*`
+  # wiring precedent (`pytest-fleet`, `pytest-conversation`, `pytest-control`)
+  # rather than being named only from inside an unrelated per-surface check.
+  # Offline and deterministic (no network, no vendor seed), so each RUNS for
+  # real in a fresh worktree.
+  'pytest-gateway-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/sync/tests'
+  'pytest-registry-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/sync/tests'
+  'pytest-module-registry-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/modules/sync/tests'
+  'pytest-hermes-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/hermes/sync/tests'
+  'pytest-governance-controls|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/controls/tests'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------
