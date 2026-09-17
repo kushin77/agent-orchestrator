@@ -39,6 +39,11 @@ substitutions:
   _ENABLE_SANDBOX_RUNTIME: "false"
   _ENABLE_ERP_MODULE: "false"
   _WEB_IMAGE_TAG: "0000000000000000000000000000000000000000"
-  _PROJECT_ID: "false"
-  _ENABLE_DEPLOYER: "false"
-  _DEPLOYER_ROLE_CLASS: "none"
+  _PROJECT_ID: "purebliss-ghl"
+  _ENABLE_DEPLOYER: "true"
+  _DEPLOYER_ROLE_CLASS: "minimal"
+  # One-time bootstrap identity: the deployer SA doesn't exist yet, so the
+  # first apply (the one that creates it) must run as an already-privileged
+  # account. Cut over to control-plane-deployer@purebliss-ghl... in a
+  # follow-up PR once that first apply has run.
+  _DEPLOYER_SA: "projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com"
