@@ -364,6 +364,69 @@ def test_an_always_failing_directive_is_dead_lettered_and_never_watched_again(
     assert "d-always-fails" not in out
 
 
+# --- 5b. terminal classification (#861): dead-lettered on the FIRST refusal --
+#
+# A closed issue, a closed epic or an unowned unit can never be cured by a
+# retry — so it must not consume the K-attempt budget the way a transient
+# refusal (``already-claimed``, ``blocked``, a stale snapshot) legitimately
+# does. These are the controls that prove the classification, and prove it is
+# NARROW: a transient refusal still takes the slow (budgeted) road.
+
+
+def test_terminal_classification_names_the_three_reasons_and_nothing_else():
+    assert runaway.terminal_classification("claim REFUSED: issue-closed — #692 is closed") == "issue-closed"
+    assert runaway.terminal_classification("claim REFUSED: epic-closed — parent #613 is closed") == "epic-closed"
+    assert runaway.terminal_classification("claim REFUSED: unowned — no lane owns #601") == "unowned"
+    # transient refusals are NOT terminal — the negative half of the control.
+    assert runaway.terminal_classification("claim REFUSED: already-claimed — held by sister-2") is None
+    assert runaway.terminal_classification("claim REFUSED: blocked — #900 blocked by #901") is None
+    assert runaway.terminal_classification("claim REFUSED: snapshot-stale — refresh it") is None
+    assert runaway.terminal_classification("") is None
+
+
+def test_a_closed_issue_refusal_is_dead_lettered_on_the_first_refusal(tmp_path, monkeypatch):
+    """The measured cost (#861): the generic path burns 450s (K=5, defaults) before
+    retiring a directive that was dead on arrival. The terminal path retires it on
+    attempt ZERO — no counter is even written."""
+    state = wire_scratch(tmp_path, monkeypatch, cap=5)
+    plant(state / "inbox", "d-closed-234")
+
+    reason = "claim REFUSED: issue-closed — #234 is closed on the committed board"
+    terminal_reason = runaway.terminal_classification(reason)
+    assert terminal_reason == "issue-closed"
+
+    retired = terminal.guard_retire_terminal("d-closed-234", 234, reason, terminal_reason)
+
+    assert retired is True
+    assert runaway.dead_lettered("d-closed-234", base=state) is True
+    record = runaway.load("d-closed-234", base=state)
+    assert record.attempts == 0, "the terminal path must not consume any of the K-attempt budget"
+    assert not (state / "inbox" / "d-closed-234.json").exists()
+
+
+def test_the_692_style_negative_control_a_transient_refusal_still_takes_the_slow_road(
+    tmp_path, monkeypatch
+):
+    """The negative control this issue requires: an ``already-claimed`` refusal
+    (retryable) must NOT be classified terminal, and must still take K attempts
+    to retire — proving the fast path is narrow, not a general dead-letter-on-
+    first-refusal shortcut."""
+    state = wire_scratch(tmp_path, monkeypatch, cap=3)
+    monkeypatch.setattr(terminal, "report_once", record_reporting([]))
+    plant(state / "inbox", "d-transient")
+
+    reason = "claim REFUSED: already-claimed — held by sister-2"
+    assert runaway.terminal_classification(reason) is None
+
+    assert terminal.guard_retire("d-transient", 723, reason) is False
+    assert terminal.guard_retire("d-transient", 723, reason) is False
+    assert runaway.dead_lettered("d-transient", base=state) is False, (
+        "a transient refusal was dead-lettered before its budget was exhausted"
+    )
+    assert terminal.guard_retire("d-transient", 723, reason) is True
+    assert runaway.dead_lettered("d-transient", base=state) is True
+
+
 # --- 6/7. the backoff holds a directive; healthy work is never held ----------
 
 

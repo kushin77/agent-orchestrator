@@ -242,3 +242,86 @@ def test_a_stranded_directive_wins_over_a_terminal_sibling(tmp_path):
 def test_an_issue_with_no_directive_reports_nothing(tmp_path):
     directive_file(tmp_path, "brain-directive-old", 821, mailbox="done")
     assert _directive_for(900, root=tmp_path) == {}
+
+
+# --- retire: the terminal mode for a closed issue with no change of its own (#861) --
+#
+# ``consume()`` gates on "landed" (owes_closure): closed, or PR merged. That gate
+# is exactly wrong for a SUPERSEDED issue — one closed by another issue's change,
+# with no PR of its own — because such an issue is closed but its own change never
+# lands, so it can never satisfy `landed`. ``retire()`` is the second terminal mode
+# this filed: it gates on CLOSED (a fact the caller supplies, e.g. from a live
+# `gh issue view`), requires a reason and at least one superseding issue, and
+# refuses (the #821 invariant) an OPEN issue whose change has not landed — retire
+# must never become a bypass for consume's gate.
+
+
+def test_a_closed_superseded_issue_is_retireable(tmp_path):
+    source = directive_file(tmp_path, "brain-directive-a2a-692", 692)
+    before = digest(source)
+
+    detail = directive.retire(
+        tmp_path,
+        "brain-directive-a2a-692",
+        closed=True,
+        reason="superseded",
+        superseded_by=(723, 727, 754),
+    )
+
+    target = tmp_path / ".fleet" / "done" / "brain-directive-a2a-692.json"
+    assert "retired" in detail and "#692" in detail
+    assert not source.exists(), "the stranded record is still in sent/ — the retire did not move it"
+    assert target.exists(), "the record did not arrive in done/"
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["retired"] is True
+    assert payload["retirement_reason"] == "superseded"
+    assert payload["superseded_by"] == [723, 727, 754]
+    # the original bytes are extended, not discarded — the id/body survive.
+    assert payload["id"] == "brain-directive-a2a-692"
+
+
+def test_the_692_negative_control_an_open_issue_is_not_retireable(tmp_path):
+    """The #821 invariant, preserved: retire must not become a bypass for consume's
+    'has the change landed' gate. An OPEN issue whose change has not landed must be
+    refused, exactly like ``consume()`` refuses it."""
+    source = directive_file(tmp_path, "brain-directive-open", 900)
+    before = digest(source)
+
+    with pytest.raises(DirectiveRefused) as refused:
+        directive.retire(
+            tmp_path,
+            "brain-directive-open",
+            closed=False,
+            reason="superseded",
+            superseded_by=(901,),
+        )
+
+    message = str(refused.value)
+    assert "brain-directive-open" in message and "#900" in message
+    assert "not closed" in message or "open" in message
+    assert source.exists() and digest(source) == before, "a refused order was moved anyway"
+    assert not (tmp_path / ".fleet" / "done").exists()
+
+
+def test_retire_requires_a_superseding_issue(tmp_path):
+    directive_file(tmp_path, "brain-directive-692", 692)
+    with pytest.raises(DirectiveRefused) as refused:
+        directive.retire(tmp_path, "brain-directive-692", closed=True, reason="superseded", superseded_by=())
+    assert "superseded_by" in str(refused.value) or "superseding" in str(refused.value)
+
+
+def test_retire_is_idempotent(tmp_path):
+    directive_file(tmp_path, "brain-directive-692", 692)
+    directive.retire(tmp_path, "brain-directive-692", closed=True, reason="superseded", superseded_by=(723,))
+    again = directive.retire(tmp_path, "brain-directive-692", closed=True, reason="superseded", superseded_by=(723,))
+    assert "already" in again
+
+
+def test_retire_refuses_a_directive_naming_no_issue(tmp_path):
+    source = directive_file(tmp_path, "brain-directive-subjectless2", None)
+    with pytest.raises(DirectiveRefused) as refused:
+        directive.retire(
+            tmp_path, "brain-directive-subjectless2", closed=True, reason="superseded", superseded_by=(1,)
+        )
+    assert "names no issue" in str(refused.value)
+    assert source.exists()

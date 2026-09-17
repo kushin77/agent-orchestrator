@@ -742,6 +742,72 @@ def _advance_focus_if_epic_closed(item: dict, result: CloseOutResult) -> None:
     print(f"focus: advanced off #{item.get('issue')} (epic closed)")
 
 
+def _live_issue_closed(root: Path, issue: int) -> bool | None:
+    """The issue's closed-ness read from LIVE GitHub — ``None`` when unreachable.
+
+    ``retire`` gates on CLOSED, not on the lifecycle record's ``landed`` fact
+    (#861): a superseded issue never carries a change of its own, so it is
+    outside the record :func:`consume` reads and the record cannot answer this
+    question. GitHub itself can, so it is read directly here, the same way
+    ``fleet/terminal.py``'s ``gh_issue_field`` reads a live field rather than the
+    (possibly stale) committed board snapshot.
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "view", str(issue), "--json", "state", "-q", ".state"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    state = (result.stdout or "").strip().upper()
+    return state == "CLOSED" if state else None
+
+
+def cmd_retire(args: argparse.Namespace) -> int:
+    """Retire a stranded ``sent/`` directive for a superseded (closed, no change of
+    its own) issue — the second terminal mode ``directive.py`` names (#861).
+
+    ``--closed`` overrides the live GitHub read for a scripted/offline caller (a
+    test, or an operator who already confirmed it another way); by default the
+    issue's live state is read via ``gh issue view`` because a superseded issue
+    is, by construction, outside the lifecycle record :func:`consume` uses.
+    """
+    root = Path(args.root) if args.root else ROOT
+    record = directive.resolve(root, args.directive)
+    if record is None:
+        print(f"retire: unknown directive {args.directive!r}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if args.closed is not None:
+        closed = args.closed
+    else:
+        closed = _live_issue_closed(root, record.issue) if record.issue is not None else None
+        if closed is None:
+            print(
+                f"retire: CANNOT-ASSESS — could not read #{record.issue}'s live state from GitHub "
+                "(pass --closed explicitly to override)",
+                file=sys.stderr,
+            )
+            return EXIT_CANNOT_ASSESS
+    try:
+        detail = directive.retire(
+            root,
+            args.directive,
+            closed=closed,
+            reason=args.reason,
+            superseded_by=tuple(args.superseded_by),
+        )
+    except directive.DirectiveRefused as exc:
+        print(f"retire REFUSED: {exc}", file=sys.stderr)
+        return EXIT_NOT_OK
+    print(f"retire: {detail}")
+    return EXIT_OK
+
+
 def cmd_collect(args: argparse.Namespace) -> int:
     record = collect_from_github()
     out = Path(args.out)
@@ -775,6 +841,23 @@ def build_parser() -> argparse.ArgumentParser:
     collect_cmd = sub.add_parser("collect", help="write the live lifecycle record")
     collect_cmd.add_argument("--out", required=True)
     collect_cmd.set_defaults(func=cmd_collect)
+
+    retire_cmd = sub.add_parser(
+        "retire",
+        help="retire a sent/ directive for a superseded issue (closed, no change of its own — #861)",
+    )
+    retire_cmd.add_argument("--directive", required=True, help="the directive id in .fleet/sent/")
+    retire_cmd.add_argument("--reason", required=True, help="why the order is dead (e.g. 'superseded')")
+    retire_cmd.add_argument(
+        "--superseded-by", dest="superseded_by", type=int, nargs="+", required=True,
+        help="the issue number(s) whose change actually did the work",
+    )
+    retire_cmd.add_argument(
+        "--closed", dest="closed", action="store_const", const=True, default=None,
+        help="assert closed-ness rather than reading it live from GitHub",
+    )
+    retire_cmd.add_argument("--root", default="", help="repository root (default: this checkout)")
+    retire_cmd.set_defaults(func=cmd_retire)
     return parser
 
 
