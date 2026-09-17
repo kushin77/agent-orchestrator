@@ -43,11 +43,12 @@ image:
 schedule:
   owner: fleet/cron.py
   install: python3 fleet/cron.py install
-  lines: 3
+  lines: 4
   markers:
     - ao-fleet-watchdog
     - ao-fleet-prune
     - ao-fleet-reconcile
+    - ao-fleet-reap
 
 # 2. THE RUNGS the watchdog owns (fleet/watchdog.py) — respawned when missing or
 # drifted, never restarted merely to update code. Measured against
@@ -89,6 +90,11 @@ binaries:
   - git
   - gh
   - claude
+  # `ao-fleet-reap`'s crontab line (fleet/cron.py:reap_line) runs
+  # `bash scripts/prune-worktrees.sh`, the same literal `bash` invocation the
+  # dev-run role dispatches — same argument as `/usr/bin/python3` above: the
+  # image does not get to change what the schedule's owner writes.
+  - bash
 
 # 5. PACKAGES. Every package the image installs, with the reason it is there and
 # a marker of whether it is installed at build time only. Compared BOTH ways
@@ -179,3 +185,8 @@ dev_run:
       discipline: dry-run
       command: "governance/reconcile/cli.py watch --once"
       why: "one reconciliation pass without --apply: it names the orphans it would act on."
+    - marker: ao-fleet-reap
+      role: reap
+      discipline: dry-run
+      command: "scripts/prune-worktrees.sh"
+      why: "the worktree reaper (#207/#516, scheduled by #830/#901) is a report by default; --apply is what removes anything."

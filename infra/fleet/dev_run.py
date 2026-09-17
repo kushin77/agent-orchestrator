@@ -82,16 +82,35 @@ EPIC = 706
 
 @dataclass(frozen=True)
 class Role:
-    """One scheduled job, and the dry-run form of it (empty when there is none)."""
+    """One scheduled job, and the dry-run form of it (empty when there is none).
+
+    ``interpreter`` is what runs ``argv``'s first element: `sys.executable` for
+    every Python-owned role, ``("bash",)`` for the reap role, which shells out to
+    a `.sh` tool (`scripts/prune-worktrees.sh`) rather than a Python module. A
+    role that hard-coded `sys.executable` would launch a shell script through the
+    Python interpreter, which is not a dry run of it — it is a syntax error.
+    """
 
     marker: str
     name: str
     argv: tuple[str, ...]
     why: str
+    interpreter: tuple[str, ...] = (sys.executable,)
 
     @property
     def disposition(self) -> str:
         return "dry-run" if self.argv else "not-dispatched"
+
+    @property
+    def command(self) -> tuple[str, ...]:
+        """The full argv actually executed — interpreter plus argv, together.
+
+        Every `--apply` check must look here, not at `argv` alone: the
+        interpreter is as much a part of what runs as the arguments are, and a
+        check that inspects only `argv` would miss a forbidden token smuggled
+        into `interpreter`.
+        """
+        return (*self.interpreter, *self.argv)
 
 
 #: The role table, keyed by the schedule's own markers. ``fleet/cron.py`` owns
@@ -121,6 +140,14 @@ ROLES: tuple[Role, ...] = (
         name="reconcile",
         argv=("governance/reconcile/cli.py", "watch", "--once"),
         why="one reconciliation pass, without `--apply`: it names the orphans it would act on.",
+    ),
+    Role(
+        marker="ao-fleet-reap",
+        name="reap",
+        argv=("scripts/prune-worktrees.sh",),
+        why="the worktree reaper (#207/#516, scheduled by #830/#901) reports without acting by "
+        "default; `--apply` is what removes a worktree, and this run never passes it.",
+        interpreter=("bash",),
     ),
 )
 
@@ -350,9 +377,9 @@ def check_role_table(markers: list[str]) -> list[str]:
 def check_no_apply() -> list[str]:
     findings: list[str] = []
     for role in ROLES:
-        if FORBIDDEN_TOKEN in role.argv:
+        if FORBIDDEN_TOKEN in role.command:
             findings.append(
-                f"role {role.name!r} would run {FORBIDDEN_TOKEN} ({' '.join(role.argv)}); "
+                f"role {role.name!r} would run {FORBIDDEN_TOKEN} ({' '.join(role.command)}); "
                 "the dev run dispatches no applying job"
             )
     return findings
@@ -360,7 +387,7 @@ def check_no_apply() -> list[str]:
 
 def dispatch(role: Role, repo: Path, environment: dict, timeout: int) -> dict:
     """Run one role, bounded, and record what it said (tail) and how it ended."""
-    argv = [sys.executable, *role.argv]
+    argv = list(role.command)
     started = time.time()
     record = {
         "marker": role.marker,
@@ -368,7 +395,7 @@ def dispatch(role: Role, repo: Path, environment: dict, timeout: int) -> dict:
         "disposition": role.disposition,
         "why": role.why,
         "argv": list(role.argv),
-        "apply": FORBIDDEN_TOKEN in role.argv,
+        "apply": FORBIDDEN_TOKEN in role.command,
         "rc": None,
         "timed_out": False,
         "seconds": None,
@@ -499,7 +526,7 @@ class DevRun:
         if refusals:
             return self.refuse("dispatch-refused", "; ".join(refusals))
 
-        applying = [role.name for role in ROLES if FORBIDDEN_TOKEN in role.argv]
+        applying = [role.name for role in ROLES if FORBIDDEN_TOKEN in role.command]
         log(
             f"DRY-RUN — dispatching {len([r for r in ROLES if r.argv])} of {len(ROLES)} role(s); "
             f"{len(applying)} with {FORBIDDEN_TOKEN}"
@@ -510,7 +537,29 @@ class DevRun:
         after = state_snapshot(roots)
         changes = classify_changes(before, after, permitted)
 
-        failed = [job for job in jobs if job["rc"] not in (0, None) or job["timed_out"]]
+        # A role that reports CANNOT_ASSESS (rc=2, this repo's own exit-code
+        # contract — see e.g. scripts/prune-worktrees.sh's header) has taken no
+        # action: it measured its environment and declined to guess, which is
+        # exactly the dry-run discipline this harness exists to prove. The
+        # `reap` role's dry-run form (scripts/prune-worktrees.sh) cannot see a
+        # `.git` directory in THIS image on purpose — `.dockerignore` excludes
+        # `.git` from the build context so the image stays reproducible — so a
+        # CANNOT-ASSESS here is the tool failing closed as designed, not a
+        # dispatch that misbehaved. It is still recorded, by code, so a reader
+        # sees it; it just does not fail the run the way a genuine NOT-OK (1)
+        # or an unexpected rc/timeout does.
+        cannot_assess = [job for job in jobs if job["rc"] == CANNOT_ASSESS and not job["timed_out"]]
+        for job in cannot_assess:
+            self.finding(
+                "role-cannot-assess",
+                f"role {job['role']!r} reported CANNOT-ASSESS (rc=2) and took no action "
+                f"({'; '.join(job['tail'][-2:]) if job['tail'] else 'no output'})",
+            )
+        failed = [
+            job
+            for job in jobs
+            if (job["rc"] not in (0, None, CANNOT_ASSESS)) or job["timed_out"]
+        ]
         for job in failed:
             self.finding(
                 "role-failed",

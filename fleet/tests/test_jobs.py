@@ -119,7 +119,7 @@ def test_the_real_manifest_validates_and_gates_the_snapshot_job_off():
     assert cron.validate_manifest(manifest) == []
     jobs = cron.manifest_jobs(manifest)
     enabled = cron.enabled_jobs(manifest)
-    assert [job["name"] for job in enabled] == ["watchdog", "prune", "reconcile"]
+    assert [job["name"] for job in enabled] == ["watchdog", "prune", "reconcile", "reap"]
     disabled = [job for job in jobs if job not in enabled]
     assert [job["name"] for job in disabled] == ["snapshot-refresh"]
     assert [job["marker"] for job in disabled] == [cron.SNAPSHOT_REFRESH_MARKER]
@@ -172,10 +172,10 @@ def test_reconcile_is_a_noop_on_a_clean_crontab():
 
 def test_install_lines_and_remove_lines():
     merged = cron.install_lines([], 2)
-    assert len([entry for entry in merged if cron._is_ours(entry)]) == 3
+    assert len([entry for entry in merged if cron._is_ours(entry)]) == 4
     kept, ours = cron.remove_lines(merged)
     assert kept == []
-    assert len(ours) == 3
+    assert len(ours) == 4
 
 
 def test_render_is_deterministic():
