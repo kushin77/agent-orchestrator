@@ -52,6 +52,8 @@ from telemetry.budgets.model import (  # consumed ladder vocabulary
     EnforcerDecision,
     MODE_OBSERVE,
     OUTCOME_BLOCKED,
+    day_bucket,  # consumed bucket helpers: the turn's own window, never a copy
+    month_bucket,
 )
 from telemetry.budgets.preflight import PreflightResult, first_blocking_rail, preflight
 from telemetry.budgets.quota import (
@@ -76,7 +78,11 @@ class TurnBudgetOutcome:
     ``outcome`` is the metering non-billable outcome the turn is recorded
     under when it is refused (``None`` when allowed), so the refusal and its
     metering row agree by construction.  ``metered`` is always ``True``: a
-    turn is metered whatever the verdict.
+    turn is metered whatever the verdict.  ``day`` / ``month`` are the buckets
+    the turn was **actually evaluated in** (pinned by the caller, else derived
+    from the turn's own timestamp), so a verdict names the window it decided
+    over instead of leaving it to be inferred from when the check happened to
+    run — the #506 date bomb's blind spot.
     """
 
     turn_id: str
@@ -93,6 +99,8 @@ class TurnBudgetOutcome:
     vendor: Optional[str] = None
     estimated_cost_usd: float = 0.0
     cap: Optional[str] = None
+    day: Optional[str] = None
+    month: Optional[str] = None
 
     @property
     def refused(self) -> bool:
@@ -127,6 +135,8 @@ class TurnBudgetOutcome:
             "vendor": self.vendor,
             "estimatedCostUsd": self.estimated_cost_usd,
             "cap": self.cap,
+            "day": self.day,
+            "month": self.month,
             "rails": [dict(rail) for rail in self.rails],
         }
 
@@ -211,11 +221,30 @@ class TurnBudgetGuard:
         (the caller's figure — this lane does not re-derive it).  ``model`` /
         ``vendor`` are the *routed* values from the chooser's stamp, used for
         the per-vendor cap; a client-supplied model is never passed here.
+
+        ``day`` / ``month`` pin the evaluation buckets deliberately.  When a
+        caller does not pin them they are **derived from the turn's own
+        timestamp** (``turn.normalized_ts``) instead of being left for the
+        rails to resolve: a rail reads the *live* clock when it is given no
+        bucket (``StaticLedger`` falls back to ``today_utc()`` /
+        ``this_month_utc()``), so a turn dated in the past was evaluated
+        against today's spend, missed a fixture seeded on its own bucket, and
+        silently came back *allowed*.  That is the #506 date bomb — a green
+        that expires with the calendar.  Deriving the bucket from the turn is
+        what makes a pinned fixture correct **by construction** rather than
+        correct only on the day it was written.  A live turn carries
+        ``ts == now``, so its derived bucket is today's and a live turn is
+        judged exactly as before.
         """
         if estimated_cost_usd < 0:
             raise ValueError(
                 f"estimated_cost_usd must be >= 0, got {estimated_cost_usd}"
             )
+        turn_ts = turn.normalized_ts
+        if day is None:
+            day = day_bucket(turn_ts)
+        if month is None:
+            month = month_bucket(turn_ts)
         is_critical = turn.critical if critical is None else critical
         result = preflight(
             turn.tenant_id,
@@ -247,6 +276,8 @@ class TurnBudgetGuard:
             vendor=vendor,
             estimated_cost_usd=estimated_cost_usd,
             cap=rail.cap if rail is not None else None,
+            day=day,
+            month=month,
         )
 
 
@@ -296,8 +327,22 @@ class GuardedTurnRunner:
         vendor: Optional[str] = None,
         tier: Optional[str] = None,
         critical: Optional[bool] = None,
+        day: Optional[str] = None,
+        month: Optional[str] = None,
     ) -> GuardedTurnResult:
-        """Guard, then (only if allowed) call ``provider``, then attribute."""
+        """Guard, then (only if allowed) call ``provider``, then attribute.
+
+        ``day`` / ``month`` pin the evaluation buckets for a caller that wants
+        them fixed; left unset they are **not passed on** (rather than passed
+        as ``None``) so a guard subclass injected here keeps the ability to
+        supply the bucket itself, and the guard's own default — the turn's own
+        bucket — applies (see :meth:`TurnBudgetGuard.check`).
+        """
+        buckets: Dict[str, str] = {}
+        if day is not None:
+            buckets["day"] = day
+        if month is not None:
+            buckets["month"] = month
         outcome = self.guard.check(
             turn,
             estimated_cost_usd=estimated_cost_usd,
@@ -305,6 +350,7 @@ class GuardedTurnRunner:
             model=model,
             vendor=vendor,
             critical=critical,
+            **buckets,
         )
         if not outcome.allowed:
             attribution = self.attributor.attribute_refusal(
