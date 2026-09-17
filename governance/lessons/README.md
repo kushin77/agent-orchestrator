@@ -186,9 +186,10 @@ than stored again here.
 
 ## The incidents recorded so far
 
-Thirteen real incidents from this repository's own history, each with an artifact,
-a corrective action and a lesson — the seven recorded below, and the six the
-EPIC #708 wave registered in its own section:
+Fourteen real incidents from this repository's own history, each with an artifact,
+a corrective action and a lesson — a `LESSON-*` once the change has landed, a
+`SUGGEST-*` while it is still in flight — the eight recorded below, and the six
+the EPIC #708 wave registered in its own section:
 
 | Incident | Origin | RCA | What it was |
 |---|---|---|---|
@@ -198,6 +199,8 @@ EPIC #708 wave registered in its own section:
 | `INC-0004` | #157 | [`RCA-0004`](rca/RCA-0004-claim-replay-historical-truth.md) | the claim audit judged a historical claim by today's snapshot |
 | `INC-0005` | #157 | [`RCA-0005`](rca/RCA-0005-stale-snapshot-frontier.md) | a 19-minute-old snapshot named a closed issue as the frontier (**open**, #170) |
 | `INC-0006` | #800 | [`RCA-0006`](rca/RCA-0006-agentconsole-wrong-host.md) | the AgentConsole go-live was planned against this repository's own Cloud Run pipeline while the fleet's hosting contract fixes the remote shared-services cluster as the only live host |
+| `INC-0007` | #1029 | [`RCA-0007`](rca/RCA-0007-declared-not-exercised-golive.md) | Epic #607's go-live was declared for months and never exercised — the declarations were not backed by an exercised path (recorded by the #1029 lane) |
+| `INC-0008` | #506 | [`RCA-0008`](rca/RCA-0008-date-bomb-seed-without-evaluation.md) | the two tests that were #506's acceptance proof pinned the quota **seed** day while the runner resolved the **evaluation** bucket from the live clock, so `47 passed` expired with the calendar and a quota-exhausted tenant was allowed for three days (**open**: the fix is PR #1026, unmerged; the RCA takes `RCA-0008` because `RCA-0007`/`RCA-0008` are published by the unlanded `docs/rca/` writeup — see its Follow-up) |
 
 ## Measured state (2026-09-15)
 
