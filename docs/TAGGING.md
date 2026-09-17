@@ -171,6 +171,32 @@ the refusal fires **by the name the taxonomy promised**, and the clean twin of
 that input is refused **nothing** — so a rule that fires on everything is caught
 rather than passing as strict.
 
+### The whole classification surface, proved separately
+
+The capstone above proves the **tag-derivation** chain — this authority's own
+gates, fed by this authority's own rules. The repository's **classification
+surface** is wider than tags, so it has its own capstone and its own gate:
+`scripts/check-futureproof-e2e.sh` (module
+[`governance/futureproof/`](../governance/futureproof/README.md)), auto-discovered
+into `make verify` the moment it lands.
+
+For each of the ten mechanisms this repository classifies by — `class`,
+`pattern`, `template`, `rca`, `system`, `app`, `env-var`, `gov`, `issues`,
+`index` — it proves the chain **`authority-declared` → `gate-wired` →
+`gate-falsifiable` → `assesses-real-tree`**, and reports a verdict per mechanism
+in the four words this repository already uses for that judgement
+(`ENFORCED` / `DECLARED-ONLY` / `IMPLEMENTED-UNGATED` / `ABSENT`, borrowed from
+[`SYSTEM-APP-GOVERNANCE-E2E-GAP-ANALYSIS.md`](SYSTEM-APP-GOVERNANCE-E2E-GAP-ANALYSIS.md),
+issue #1156).
+
+`assesses-real-tree` is the link that makes the rest worth having: `make verify`
+records an rc 2 `CANNOT-ASSESS` as `SKIP` and still prints a PASS, so a gate that
+is **permanently** CANNOT-ASSESS passes every structural test — discovered,
+executable, carrying a negative control — while assessing nothing. The capstone
+therefore **runs** each mechanism's gate and refuses one that does not reach a
+verdict. A gate that never assesses is a formality that hides in the `skipped`
+bucket (see #1176, #1189, #1199, #1200).
+
 ### Institutionalized, not advisory
 
 The behavioural half can be perfectly green while the rule itself stops being
