@@ -12,5 +12,5 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
 ## Index
 
 - [`2026-09-16-pr-queue-clearing.md`](2026-09-16-pr-queue-clearing.md) — the
-  zero-byte gate-lock wedge (RCA-0007) and the shared-core-file collision
-  class (RCA-0008) from a 17-PR queue-clearing session.
+  zero-byte gate-lock wedge (RCA-0015) and the shared-core-file collision
+  class (RCA-0016) from a 17-PR queue-clearing session.

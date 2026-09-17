@@ -68,7 +68,7 @@ edit the baseline itself.
 lands the schema/types change first owns the contract; the others consume the
 field name, never the files.
 
-**Core extension points (RCA-0008, the PR-queue-clearing lessons).** Some
+**Core extension points (RCA-0016, the PR-queue-clearing lessons).** Some
 files are natural, LEGITIMATE extension points for more than one lane in the
 same wave — `fleet/watchdog.py` (a new alarm/remedy type), `fleet/cron.py` (a
 new rung), and any doc a feature is expected to append its own section to
