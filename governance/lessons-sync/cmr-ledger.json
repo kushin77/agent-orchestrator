@@ -186,80 +186,456 @@
     }
   ],
   "local_only": [
-    "CA-0001",
-    "CA-0002",
-    "CA-0003",
-    "CA-0004",
-    "CA-0005",
-    "CA-0006",
-    "CA-0007",
-    "CA-0008",
-    "CA-0009",
-    "CA-0010",
-    "CA-0011",
-    "CA-0012",
-    "CA-0013",
-    "CA-0014",
-    "CA-0015",
-    "CA-0016",
-    "CA-0017",
-    "CA-0018",
-    "CA-0019",
-    "CA-0020",
-    "CA-0022",
-    "INC-0001",
-    "INC-0002",
-    "INC-0003",
-    "INC-0004",
-    "INC-0005",
-    "INC-0006",
-    "INC-0007",
-    "INC-0008",
-    "INC-0009",
-    "INC-0010",
-    "INC-0011",
-    "INC-0012",
-    "INC-0013",
-    "INC-0014",
-    "INC-0015",
-    "INC-0016",
-    "INC-0017",
-    "LESSON-0001",
-    "LESSON-0002",
-    "LESSON-0003",
-    "LESSON-0004",
-    "LESSON-0005",
-    "LESSON-0006",
-    "LESSON-0007",
-    "RCA-0001",
-    "RCA-0002",
-    "RCA-0003",
-    "RCA-0004",
-    "RCA-0005",
-    "RCA-0006",
-    "RCA-0007",
-    "RCA-0008",
-    "RCA-0009",
-    "RCA-0010",
-    "RCA-0011",
-    "RCA-0012",
-    "RCA-0013",
-    "RCA-0014",
-    "RCA-0015",
-    "RCA-0016",
-    "RCA-0017",
-    "SUGGEST-0001",
-    "SUGGEST-0002",
-    "SUGGEST-0003",
-    "SUGGEST-0004",
-    "SUGGEST-0005",
-    "SUGGEST-0006",
-    "SUGGEST-0007",
-    "SUGGEST-0008",
-    "SUGGEST-0009",
-    "SUGGEST-0010",
-    "SUGGEST-0011",
-    "SUGGEST-0012",
-    "SUGGEST-0013"
+
+    {
+      "id": "CA-0001",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#155",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0002",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#156",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0003",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#158",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0004",
+      "reason": "no-hub-counterpart",
+      "record_ref": "94d12fa",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0005",
+      "reason": "no-hub-counterpart",
+      "record_ref": "ca63611",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0006",
+      "reason": "no-hub-counterpart",
+      "record_ref": "b35fcd0",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0007",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#170",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0008",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#806",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0009",
+      "reason": "no-hub-counterpart",
+      "record_ref": "8fd97e3535102c53a9843fe6b095a73407346ddb",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0010",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#506",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0011",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1025",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0012",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1028",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0013",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#729",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0014",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#726",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0015",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#724",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0016",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#723",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0017",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#725",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0018",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#727",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0019",
+      "reason": "no-hub-counterpart",
+      "record_ref": "9e0ab1683777aa5995130832978b4006dcf07fcd",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0020",
+      "reason": "no-hub-counterpart",
+      "record_ref": "6e44c3c431987f007804bd2c772d38eec7ba0f3d",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0022",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1052",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0001",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#153",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0002",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#148",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0003",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#155",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0004",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#157",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0005",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#157",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0006",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#800",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0007",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1029",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0008",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#506",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0009",
+      "reason": "no-hub-counterpart",
+      "record_ref": "tmpfs-full-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0010",
+      "reason": "no-hub-counterpart",
+      "record_ref": "a2a-no-arbitration-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0011",
+      "reason": "no-hub-counterpart",
+      "record_ref": "gate-stacking-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0012",
+      "reason": "no-hub-counterpart",
+      "record_ref": "uncapped-redispatch-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0013",
+      "reason": "no-hub-counterpart",
+      "record_ref": "inert-gate-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0014",
+      "reason": "no-hub-counterpart",
+      "record_ref": "stale-snapshot-no-trigger-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0015",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#997",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0016",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1036",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0017",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1052",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0001",
+      "reason": "no-hub-counterpart",
+      "record_ref": "0ba7a2c",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0002",
+      "reason": "no-hub-counterpart",
+      "record_ref": "94d12fa",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0003",
+      "reason": "no-hub-counterpart",
+      "record_ref": "ca63611",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0004",
+      "reason": "no-hub-counterpart",
+      "record_ref": "b35fcd0",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0005",
+      "reason": "no-hub-counterpart",
+      "record_ref": "8fd97e3535102c53a9843fe6b095a73407346ddb",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0006",
+      "reason": "no-hub-counterpart",
+      "record_ref": "9e0ab1683777aa5995130832978b4006dcf07fcd",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0007",
+      "reason": "no-hub-counterpart",
+      "record_ref": "6e44c3c431987f007804bd2c772d38eec7ba0f3d",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0001",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#153",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0002",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#148",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0003",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#155",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0004",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#157",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0005",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#157",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0006",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#800",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0007",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#607",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0008",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#506",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0009",
+      "reason": "no-hub-counterpart",
+      "record_ref": "tmpfs-full-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0010",
+      "reason": "no-hub-counterpart",
+      "record_ref": "a2a-no-arbitration-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0011",
+      "reason": "no-hub-counterpart",
+      "record_ref": "gate-stacking-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0012",
+      "reason": "no-hub-counterpart",
+      "record_ref": "uncapped-redispatch-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0013",
+      "reason": "no-hub-counterpart",
+      "record_ref": "inert-gate-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0014",
+      "reason": "no-hub-counterpart",
+      "record_ref": "stale-snapshot-no-trigger-2026-09-14",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0015",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#997",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0016",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1036",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0017",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1052",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0001",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#152",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0002",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#170",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0003",
+      "reason": "no-hub-counterpart",
+      "record_ref": "fleet/channel.py",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0004",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#806",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0005",
+      "reason": "no-hub-counterpart",
+      "record_ref": "eae061d",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0006",
+      "reason": "no-hub-counterpart",
+      "record_ref": "scripts/verify.sh",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0007",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#729",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0008",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#726",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0009",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#724",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0010",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#723",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0011",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#725",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0012",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#727",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0013",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1052",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    }
   ]
 }
