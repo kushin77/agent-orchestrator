@@ -33,12 +33,25 @@ REASON_BRAIN_DIRECTED = "brain-directed"
 # A child of the ACTIVE epic (epic focus, issue #707): stricter than the
 # milestone frontier, it is a chain edge to the epic the fleet is driving.
 REASON_ACTIVE_EPIC_CHILD = "active-epic-child"
+# Branch-stacking (DG-3, issue #699, dispatch half): a claim that would
+# otherwise be refused ONLY because it is blocked-by an in-flight upstream
+# lane is accepted as SPECULATIVE when `claim --base <upstream-branch>` names
+# that upstream's own branch. Never a chain edge on its own — it only ever
+# substitutes for one when `--base` proves (by naming the exact branch of one
+# of the issue's open blockers) which upstream it is speculating against, and
+# it hands off to `governance.isolation.speculative.claim` so the isolation
+# gate re-verifies before the lane's PR (see governance/isolation/README.md
+# §7.1). A blocked issue with no matching `--base` is still `blocked`; a
+# `--base` naming a branch that is not the blocking upstream's is refused by
+# name (`speculative-base-not-upstream`), never silently accepted.
+REASON_SPECULATIVE_BASE = "speculative_base"
 ALLOWED_CLAIM_REASONS = (
     REASON_CHILD_OF_CLAIM,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_NEXT_IN_MILESTONE,
     REASON_BRAIN_DIRECTED,
     REASON_ACTIVE_EPIC_CHILD,
+    REASON_SPECULATIVE_BASE,
 )
 
 # Reasons a claim is refused.
@@ -67,6 +80,17 @@ REASON_SNAPSHOT_STALE = "snapshot-stale"
 # claims naming the same file with disjoint regions do not, so a slow neighbour
 # touching a different region of one file no longer serializes the whole file.
 REASON_FILE_REGION_CLAIMED = "file-region-claimed"
+# Branch-stacking (#699 dispatch half): `--base <branch>` was given but does not
+# name the branch of one of the issue's own open blockers — never the
+# out-of-order reason itself (that stays `blocked`, `no-chain-edge`,
+# `already-claimed`, etc., all still refused with `--base` present), only the
+# separate claim that the speculative exemption was invoked against the wrong
+# upstream.
+REASON_SPECULATIVE_BASE_NOT_UPSTREAM = "speculative-base-not-upstream"
+# `--base` named the right upstream, but the isolation-side attestation itself
+# could not be recorded (unresolvable ref, unmeasurable git state) — GR-12:
+# unproven is never a pass.
+REASON_SPECULATIVE_CLAIM_FAILED = "speculative-claim-failed"
 
 #: Every reason the A2A arbitration (`claims.arbitrate`) can refuse with. Its
 #: self-control must provoke all of them or the gate fails, so a refusal cannot

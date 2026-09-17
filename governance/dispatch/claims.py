@@ -71,6 +71,9 @@ from model import (
     REASON_OUT_OF_EPIC_POOLED,
     REASON_PROVENANCE_MISMATCH,
     REASON_SNAPSHOT_STALE,
+    REASON_SPECULATIVE_BASE,
+    REASON_SPECULATIVE_BASE_NOT_UPSTREAM,
+    REASON_SPECULATIVE_CLAIM_FAILED,
     REASON_SUCCESSOR_OF_CLAIM,
     REASON_UNKNOWN_ISSUE,
     REASON_UNOWNED,
@@ -94,6 +97,59 @@ DEFAULT_LOCK_DIR = Path(".board/locks")
 DEFAULT_TTL_HOURS = lease.CLAIM_TTL_HOURS
 DEFAULT_REAP_MINUTES = lease.CLAIM_REAP_MINUTES
 SENT_DIR = runtime.FLEET_DIR / "sent"
+
+
+def _isolation_modules():
+    """Lazily import ``governance.isolation`` (identity + speculative, #699).
+
+    Imported by path, not at module load: `claims.py` must not fail to import
+    for every OTHER verb just because the isolation package moved, and the
+    speculative-base exemption is the only caller here that needs it.
+    """
+    from governance.isolation import identity as iso_identity  # noqa: PLC0415
+    from governance.isolation import speculative  # noqa: PLC0415
+
+    return iso_identity, speculative
+
+
+def speculative_claim(
+    issue_number: int,
+    agent: str,
+    lane: str,
+    upstream_branch: str,
+    open_blockers: tuple[int, ...],
+    main: Path | str,
+) -> None:
+    """Record the ISOLATION-side speculative-base attestation for this claim.
+
+    This is what turns "blocked" into "speculative" (#699 DG-3, dispatch half):
+    it is called ONLY after the caller has already proven ``upstream_branch``
+    names one of ``open_blockers`` — never a chain edge in its own right, and
+    never a substitute for that proof. Refuses by name
+    (``speculative-base-not-upstream``) when it does not, and
+    (``speculative-claim-failed``) when the isolation attestation itself cannot
+    be written (unresolvable ref, unmeasurable git state — GR-12: unproven is
+    never a pass).
+    """
+    iso_identity, speculative = _isolation_modules()
+    upstream_issue = iso_identity.branch_issue(upstream_branch)
+    if upstream_issue is None or upstream_issue not in open_blockers:
+        blockers = ", ".join(f"#{n}" for n in open_blockers) or "none"
+        raise ClaimRefused(
+            REASON_SPECULATIVE_BASE_NOT_UPSTREAM,
+            f"--base {upstream_branch!r} does not name the branch of one of #{issue_number}'s "
+            f"open blockers ({blockers}); a speculative claim must name the exact upstream "
+            "it is cut from, not merely any branch",
+        )
+    identity = iso_identity.mint(issue_number, agent, lane or "")
+    try:
+        speculative.claim(main, identity, upstream_branch, base=speculative.DEFAULT_BASE)
+    except speculative.SpeculationRefused as exc:
+        raise ClaimRefused(
+            REASON_SPECULATIVE_CLAIM_FAILED,
+            f"speculative-base attestation for #{issue_number} against {upstream_branch!r} "
+            f"could not be recorded: {exc}",
+        ) from exc
 
 
 class ClaimRefused(Exception):
@@ -467,6 +523,7 @@ def arbitrate(
     now: datetime | None = None,
     stale_minutes: int = DEFAULT_STALENESS_MINUTES,
     queue_data: dict | None | object = MISSING,
+    allow_blocked: bool = False,
 ) -> Arbitration:
     """Prove issue -> epic -> lane ownership before a unit is dispatched (#726).
 
@@ -474,6 +531,14 @@ def arbitrate(
     used only to name a queue-sourced blocker in the ``blocked`` refusal
     detail. The sentinel default ``model.MISSING`` resolves to the committed file at
     call time; pass ``None`` explicitly to mean "no queue" in a test.
+
+    ``allow_blocked`` is set ONLY by ``claim()``, and ONLY after it has already
+    proven a ``--base`` argument names the branch of one of this issue's own
+    open blockers (#699 DG-3 dispatch half, branch-stacking) — never taken on
+    arbitrate()'s own say-so. It skips exactly the ``blocked`` refusal below;
+    every other arbitration refusal (closed issue, closed epic, already
+    claimed, provenance mismatch, unowned, stale board) still applies
+    unchanged.
 
     Returns the granted arbitration, or raises ``ClaimRefused`` naming the reason
     *and the evidence it checked*: the board snapshot (source, generation, digest)
@@ -518,7 +583,7 @@ def arbitrate(
         )
 
     open_blockers = snapshot.blockers_open(issue)
-    if open_blockers:
+    if open_blockers and not allow_blocked:
         listed = ", ".join(f"#{number}" for number in open_blockers)
         detail = f"#{issue_number} is blocked by {listed} — evidence: {board}"
         queue_note = queue_mod.queue_detail(issue_number, queue_data, snapshot)
@@ -626,6 +691,8 @@ def claim(
     focus_path: Path | str | None = None,
     pool_path: Path | str = pool.POOL_PATH,
     files: tuple[FileClaim, ...] = (),
+    speculative_base: str = "",
+    main: Path | str = ROOT,
 ) -> ClaimEvent:
     """Claim an issue after arbitrating ownership, then order.
 
@@ -637,6 +704,18 @@ def claim(
     (#707 lane F6). When the resolver returns ``None`` — no active epic — an
     out-of-epic refusal cannot happen, so any pool left over from a previous focus
     is DRAINED here and reported, never silently carried forward.
+
+    ``speculative_base`` is the dispatch-side half of branch-stacking (DG-3,
+    #699): when the ordinary eligibility check would refuse this claim ONLY
+    because it is ``blocked`` by an in-flight upstream lane, and
+    ``speculative_base`` names that upstream lane's OWN branch (verified
+    against the issue's actual ``blocked_by`` edges, never taken on faith),
+    the claim is accepted as SPECULATIVE instead: `reason` is recorded as
+    ``speculative_base`` and ``governance.isolation.speculative.claim`` is
+    called so the isolation gate enforces the mandatory re-verify before this
+    lane's PR. It never bypasses any OTHER refusal — a wrong milestone
+    frontier, a missing chain edge, an already-claimed issue or a file-region
+    conflict are refused exactly as without ``--base``, evidence and all.
     """
     focus_path = _resolve_focus(focus_path)
     moment = now or datetime.now(timezone.utc)
@@ -651,18 +730,49 @@ def claim(
     # stale board is refused with the board state it was judged against. A live
     # claim blocks anyone else; an expired one may be taken over, so a dead agent
     # cannot wedge the chain forever.
-    arbitration = arbitrate(
-        issue_number,
-        agent,
-        lane,
-        snapshot,
-        ledger=ledger,
-        lock_dir=lock_dir,
-        directive_id=directive_id,
-        snapshot_sha256=snapshot_sha256,
-        now=moment,
-        stale_minutes=stale_minutes,
-    )
+    #
+    # Branch-stacking (#699 DG-3, dispatch half): `--base` is consulted ONLY
+    # when arbitration's FIRST attempt refuses `blocked` and nothing else —
+    # every other out-of-order reason (closed issue, closed epic, already
+    # claimed, unowned, stale board, provenance mismatch) is refused exactly as
+    # it would be without `--base`, never intercepted. Only once `blocked` is
+    # the actual refusal is `--base` checked against the issue's own open
+    # blockers; a mismatch is refused by name (`speculative-base-not-upstream`)
+    # rather than silently falling back to the original `blocked`.
+    speculative_accepted = False
+    try:
+        arbitration = arbitrate(
+            issue_number,
+            agent,
+            lane,
+            snapshot,
+            ledger=ledger,
+            lock_dir=lock_dir,
+            directive_id=directive_id,
+            snapshot_sha256=snapshot_sha256,
+            now=moment,
+            stale_minutes=stale_minutes,
+        )
+    except ClaimRefused as refused:
+        if refused.reason != REASON_BLOCKED or not speculative_base:
+            raise
+        issue_for_blockers = snapshot.get(issue_number)
+        open_blockers = tuple(snapshot.blockers_open(issue_for_blockers)) if issue_for_blockers is not None else ()
+        speculative_claim(issue_number, agent, lane, speculative_base, open_blockers, main)
+        speculative_accepted = True
+        arbitration = arbitrate(
+            issue_number,
+            agent,
+            lane,
+            snapshot,
+            ledger=ledger,
+            lock_dir=lock_dir,
+            directive_id=directive_id,
+            snapshot_sha256=snapshot_sha256,
+            now=moment,
+            stale_minutes=stale_minutes,
+            allow_blocked=True,
+        )
     lane = arbitration.lane
     takeover = latest is not None and is_expired(latest, moment) and latest.agent != agent
 
@@ -674,6 +784,13 @@ def claim(
 
     if directive is not None:
         reason = REASON_BRAIN_DIRECTED
+    elif speculative_accepted:
+        # Mirrors the directive branch above: a proven speculative claim is,
+        # like a directive, a reason that stands ON ITS OWN — it does not also
+        # have to clear `order.eligible` (which would refuse it `blocked` all
+        # over again, since the board still shows the issue blocked; that is
+        # exactly the fact this exemption exists to work around).
+        reason = REASON_SPECULATIVE_BASE
     else:
         others = frozenset(number for number, holder in live.items() if holder.agent != agent)
         verdict = order.eligible(
@@ -685,10 +802,11 @@ def claim(
             focus_path=focus_path,
         )
         if not verdict.eligible:
-            # Epic focus (#707, lane F6): out-of-epic work is parked, not dropped.
-            # The refusal still stands — this only records WHY the issue is
-            # waiting, so the pool is a decision log and the issue can be found
-            # again. A drain (focus == None) is what takes it back out.
+            # Epic focus (#707, lane F6): out-of-epic work is parked, not
+            # dropped. The refusal still stands — this only records WHY the
+            # issue is waiting, so the pool is a decision log and the issue
+            # can be found again. A drain (focus == None) is what takes it
+            # back out.
             if verdict.reason == REASON_OUT_OF_EPIC_POOLED:
                 pool.note(issue_number, pool.REASON_OUT_OF_EPIC, path=pool_path)
             raise ClaimRefused(verdict.reason, verdict.detail)

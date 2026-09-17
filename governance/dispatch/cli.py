@@ -166,6 +166,8 @@ def cmd_claim(args: argparse.Namespace) -> int:
             directive_id=args.directive,
             stale_minutes=args.stale_minutes,
             files=files,
+            speculative_base=args.base,
+            main=Path(args.main) if args.main else claims.ROOT,
         )
     except claims.ClaimRefused as exc:
         print(f"claim REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
@@ -558,6 +560,22 @@ def build_parser() -> argparse.ArgumentParser:
     claim.add_argument("--lane", default="")
     claim.add_argument("--ttl-hours", type=int, default=claims.DEFAULT_TTL_HOURS)
     claim.add_argument("--base-commit", default="")
+    claim.add_argument(
+        "--base",
+        default="",
+        help=(
+            "speculative branch-stacking (DG-3, #699): the upstream lane's OWN branch "
+            "this claim is cut from. Accepted ONLY when the issue would otherwise be "
+            "refused `blocked` by that exact upstream (refused by name, "
+            "speculative-base-not-upstream, if --base names any other branch); never "
+            "bypasses out-of-order/already-claimed/file-region refusals"
+        ),
+    )
+    claim.add_argument(
+        "--main",
+        default="",
+        help="the repository the isolation attestation is written into (default: this checkout)",
+    )
     claim.add_argument("--directive", default="", help="brain directive id authorizing this claim")
     claim.add_argument(
         "--files",
