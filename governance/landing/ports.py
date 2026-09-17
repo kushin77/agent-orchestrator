@@ -113,6 +113,13 @@ class LandingOps(Protocol):
     def commit_subjects(self, base: str, rev: str) -> Tuple[str, ...]:
         """The subjects of the lane's own commits (the PR's what-changed list)."""
 
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        """The files the lane's diff touches (``git diff --name-only base...rev``).
+
+        Used to MEASURE the ``Gate-changing:`` declaration in the composed PR
+        body against ``scripts/lib/gate-paths.txt`` — never hard-coded.
+        """
+
     def remote_branch_head(self, branch: str) -> Optional[str]:
         """The remote head of ``branch``, or None when the branch is not pushed."""
 
@@ -210,6 +217,10 @@ class GitHubOps:
 
     def commit_subjects(self, base: str, rev: str) -> Tuple[str, ...]:
         out = self._git_text("log", "--no-merges", "--format=%s", f"{base}..{rev}")
+        return tuple(line for line in out.splitlines() if line.strip())
+
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        out = self._git_text("diff", "--name-only", f"{base}...{rev}")
         return tuple(line for line in out.splitlines() if line.strip())
 
     def remote_branch_head(self, branch: str) -> Optional[str]:
@@ -404,6 +415,9 @@ class RecordingOps:
 
     def commit_subjects(self, base: str, rev: str) -> Tuple[str, ...]:
         return self.reads.commit_subjects(base, rev)
+
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        return self.reads.changed_files(base, rev)
 
     def remote_branch_head(self, branch: str) -> Optional[str]:
         return self.reads.remote_branch_head(branch)

@@ -382,6 +382,57 @@ class TestThePrBody:
         assert '"result": "PASS"' in ops.body
 
 
+class TestTheGateChangingLine:
+    """``## Merge order`` / ``Gate-changing:`` is MEASURED from the lane's diff (#1130)."""
+
+    def test_a_lane_touching_a_gate_script_declares_yes_with_the_path(self, tmp_path, request_factory):
+        write_attestation(tmp_path / evidence_mod.ATTESTATION_REL, commit=HEAD)
+        ops = FakeOps(root=tmp_path, changed=("scripts/check-foo.sh", "docs/README.md"))
+        LandingEngine(ops, request_factory(apply=True)).land()
+        assert re.search(r"^##\s+Merge order\s*$", ops.body, re.M)
+        assert re.search(r"^Gate-changing:\s*yes\s*—\s*scripts/check-foo\.sh\s*$", ops.body, re.M)
+
+    def test_a_docs_only_lane_declares_no(self, tmp_path, request_factory):
+        write_attestation(tmp_path / evidence_mod.ATTESTATION_REL, commit=HEAD)
+        ops = FakeOps(root=tmp_path, changed=("docs/README.md", "governance/landing/engine.py"))
+        LandingEngine(ops, request_factory(apply=True)).land()
+        assert re.search(r"^Gate-changing:\s*no\s*$", ops.body, re.M)
+
+    def test_the_composed_body_passes_the_real_check_pr_contract_gate_changing_check(self, tmp_path, request_factory):
+        """Drives the real ``scripts/check-pr-contract.sh`` over a composed body (#1130).
+
+        ``HEAD..HEAD`` is an empty diff against the real checkout, so a body
+        declaring ``no`` is the shape that is honestly cross-checkable here —
+        the ``yes``-with-a-real-gate-path case is pinned at the engine level
+        above (``test_a_lane_touching_a_gate_script_declares_yes_with_the_path``),
+        against an injected (not the real) diff.
+        """
+        import subprocess
+
+        write_attestation(tmp_path / evidence_mod.ATTESTATION_REL, commit=HEAD)
+        ops = FakeOps(root=tmp_path, changed=("docs/README.md",))
+        LandingEngine(ops, request_factory(apply=True)).land()
+        body_file = tmp_path / "composed-body.md"
+        body_file.write_text(ops.body, encoding="utf-8")
+
+        repo_root = Path(__file__).resolve().parents[3]
+        result = subprocess.run(
+            [
+                "bash",
+                str(repo_root / "scripts" / "check-pr-contract.sh"),
+                "--body-file",
+                str(body_file),
+                "--range",
+                "HEAD..HEAD",
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        assert "pr-body-missing-gate-changing" not in result.stdout + result.stderr
+        assert "gate-changing-mismatch" not in result.stdout + result.stderr
+
+
 class TestTheReport:
     def test_the_report_quotes_the_verdict_and_every_step(self, tmp_path, request_factory):
         ops = _green(tmp_path)

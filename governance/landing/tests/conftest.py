@@ -71,6 +71,7 @@ class FakeOps:
         publish_status_raises: Exception | None = None,
         master_remote_head: str | None = None,
         lane_behind_master: bool = False,
+        changed: tuple = (),
     ) -> None:
         self.root = Path(root)
         self.attestation_path = self.root / evidence_mod.ATTESTATION_REL
@@ -83,6 +84,7 @@ class FakeOps:
         self._landed_contract_output = landed_contract_output
         self._closure_rc = closure_rc
         self._subjects = tuple(subjects)
+        self._changed = tuple(changed)
         self._publish_status_rc = publish_status_rc
         self._publish_status_raises = publish_status_raises
         # `master`'s own remote head, as read BEFORE the merge (fix #5 follow-up,
@@ -108,6 +110,9 @@ class FakeOps:
 
     def commit_subjects(self, base: str, rev: str) -> tuple:
         return self._subjects
+
+    def changed_files(self, base: str, rev: str) -> tuple:
+        return self._changed
 
     def remote_branch_head(self, branch: str):
         if branch == "master":
