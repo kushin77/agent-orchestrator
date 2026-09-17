@@ -162,7 +162,7 @@ enforced the moment it lands. It runs **seven** checks:
 | `tagging-refusals` | every one of the **14** declared refusals is provoked by a real mutant, **by code and by the token the taxonomy promises it names**, with its clean twin accepted |
 | `tagging-artifacts` | the frozen shapes, the ledger and the live projection round-trip — each driven with its provoked half *and* its clean twin |
 | `tagging-mandate` | the **constitution still declares the rule** — five contract documents each declare the tag authority and the `posture`/`lifecycle` dimensions, and the check FAILS naming the document **and** the marker that went missing |
-| `tagging-e2e` | the **whole chain** — a tag set derives a plan, every gate in it resolves, the matrix names the rules that fired, the mandate holds in this tree, the filing seam derives the same tag dimensions for a NEW issue, and the filing defaults are values the authority declares |
+| `tagging-e2e` | the **whole chain** — a tag set derives a plan, every gate in it resolves, the matrix names the rules that fired, the mandate holds in this tree, the filing seam derives the same tag dimensions for a NEW issue, the filing defaults are values the authority declares, **and every futureproof classification mechanism** (`class`, `pattern`, `template`, `rca`, `system`, `app`, `env-var`, `gov`, `issues`, `index`) has its authority declared, its gate wired into `make verify`, and its failure path exercised — 19 links end to end |
 
 The refusals check is the one that matters most, because a gate that cannot fail
 is a formality (GR-12). It asserts three things at once: the mutant actually
