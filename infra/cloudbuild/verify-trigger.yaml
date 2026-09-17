@@ -6,11 +6,12 @@
 name: control-plane-verify
 disabled: true
 description: Run make verify on pull requests against master (code-native CI status).
-github:
-  owner: kushin77
-  name: agent-orchestrator
+repositoryEventConfig:
   pullRequest:
     branch: ^master$
+  repository: projects/purebliss-ghl/locations/us-central1/connections/capital-gh/repositories/agent-orchestrator
+  repositoryType: GITHUB
+serviceAccount: projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com
 filename: infra/cloudbuild/verify.yaml
 substitutions:
   _ENABLE_VERIFY: "false"
