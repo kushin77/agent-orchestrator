@@ -24,6 +24,10 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/definitions/check" }
+    },
+    "skip_ratchet": {
+      "$ref": "#/definitions/skip_ratchet",
+      "description": "The skip ratchet's own record (issue #1199): which skipped checks are NAMED (a standing gap against an open issue, or a venue limit against an absent named precondition), and which are not. A run whose skip set is not accounted for here cannot be quoted as a green board -- scripts/lib/validate-attestation.py refuses the record by name."
     }
   },
   "additionalProperties": true,
@@ -31,6 +35,47 @@
     "verdict": {
       "type": "string",
       "enum": ["OK", "WARN", "FAIL"]
+    },
+    "skip_ratchet": {
+      "type": "object",
+      "required": ["verdict", "standing_skips", "unbudgeted_skips", "stale_entries"],
+      "properties": {
+        "budget": {
+          "type": "string",
+          "description": "The named, shrink-only exemption record this run was asserted against (repo-relative)."
+        },
+        "budget_entries": { "type": "integer", "minimum": 0 },
+        "verdict": {
+          "type": "string",
+          "enum": ["OK", "VIOLATION", "CANNOT-ASSESS"],
+          "description": "OK: every skip is named. VIOLATION: an unnamed skip, a stale exemption, or an entry naming an undiscovered check. CANNOT-ASSESS: the record could not be evaluated -- never a pass."
+        },
+        "standing_skips": {
+          "type": "array",
+          "description": "The NAMED skips of this run, each with the kind of blindness it declares.",
+          "items": { "type": "object", "required": ["check", "kind"] }
+        },
+        "unbudgeted_skips": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Skipped checks that NO entry names -- refused by the ratchet and by this validator's accounting rule."
+        },
+        "stale_entries": {
+          "type": "array",
+          "description": "`standing-gap` exemptions whose check assesses now: they must be deleted, the list can only shrink.",
+          "items": { "type": "object", "required": ["check"] }
+        },
+        "unused_venue_entries": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Venue exemptions whose precondition was PRESENT in this run, so they did not bite. Reported, never a failure: the precondition de-activates the entry."
+        },
+        "findings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
     },
     "check": {
       "type": "object",

@@ -13,6 +13,18 @@
 # failure -- and is named in the summary and in the attestation, so a skip can
 # never hide. Only a definite NOT-OK (or an unexpected code) fails the run.
 #
+# A skip may not sit there forever (issue #1199). Naming the names is not enough:
+# the SAME two checks can occupy that bucket on every run, and the composite
+# still reads `PASS`. The skip ratchet below therefore asserts the run's skip set
+# against a NAMED, SHRINK-ONLY record (scripts/skip-budget.json): every skip must
+# be a standing gap against an open issue, or a venue limit against a named
+# precondition path that is absent here; an entry goes STALE the moment its check
+# assesses and then fails the run by name; and a skip nobody named is REFUSED.
+# rc-2 semantics are untouched -- what changes is that a permanently blind check
+# can no longer be quoted as part of a green board without being named as a
+# standing gap. The ratchet's own record rides in the attestation as
+# `skip_ratchet`.
+#
 # The check set includes the declared `fleet` pytest suite (`pytest-fleet`) and
 # the declared capstone `e2e` suite (`e2e`).
 # The gate of record must exercise the tests it claims to cover: a red fleet
@@ -748,6 +760,16 @@ for entry in "${discovered[@]}"; do
   checks+=("$entry")
 done
 
+# --- this run's own check list (issue #1199) ---------------------------------
+# The skip ratchet is asserted against the AUTHORITATIVE name set of THIS run --
+# what was really discovered and run, never a hand-kept copy -- so an exemption
+# naming a check that no longer exists is refused by name instead of being
+# honoured forever. One name per line, in run order.
+check_names_file="$verify_dir/.check-names.txt"
+for entry in "${checks[@]}"; do
+  printf '%s\n' "${entry%%|*}"
+done > "$check_names_file"
+
 # --- duplicate-registration guard (issue #499) -------------------------------
 # `checks=()` is an explicit list that every wiring lane appends to, so two
 # lanes can register the SAME name (measured on this board: a re-added
@@ -799,6 +821,64 @@ for entry in "${checks[@]}"; do
   fi
 done
 
+# --- skip ratchet (issue #1199) ----------------------------------------------
+# rc-2 semantics are NOT changed here: a check that answers 2 is still recorded
+# as SKIP, still never a pass, and still not a failure of that check. What this
+# adds is whether the BOARD can read the composite's green as covering it.
+# `verify: PASS (... N skipped: <names>)` named the skips -- but nothing stopped
+# the SAME names sitting in that bucket on every run, and two live witnesses did
+# exactly that while the composite read PASS, each hiding a filed defect it could
+# not report (`check-dispatch-queue`, #1189; `check-paperclip-routines`, #1176).
+# A permanently skipped check is not a pass that happens to be skipped; it is a
+# check that does not exist, wearing the composite's green.
+#
+# Shape: a NAMED, SHRINK-ONLY record (scripts/skip-budget.json), not a
+# consecutive-run counter -- `.verify/` is gitignored, per-worktree and truncated
+# every run, so a streak counter restarts at 1 in every fresh lane and could
+# never reach N where it matters (measured: `.gitignore:39`). Every skip must be
+# NAMED in that record: a `standing-gap` entry (the check's inputs ARE present
+# and it still cannot assess -- a defect of the check, #1176) against the OPEN
+# issue that tracks it, or a `venue` entry (a NAMED PRECONDITION path of this
+# venue is absent, e.g. an uninitialised vendor/CMR submodule) that is honoured
+# only while that path is absent. Consequences, all of them mechanical:
+#   * a skip with NO entry is REFUSED by name -- the composite will not publish a
+#     PASS whose skip set is narrated by nobody;
+#   * a `standing-gap` entry is STALE the moment its check assesses: the run
+#     FAILS naming the entry, which must then be DELETED -- the list can only
+#     shrink and cannot outlive its fix;
+#   * an entry naming a check this run did not discover is REFUSED by name.
+# Fail-closed: a MISSING record means "no exemptions" (so every skip is refused);
+# a MALFORMED or unreadable one is itself a FAILURE -- never a silent
+# no-exemption, which is how a control turns into a formality (GR-12).
+ratchet_json="$verify_dir/.skip-ratchet.json"
+ratchet_log="$verify_dir/.skip-ratchet.log"
+ratchet_note_file="$verify_dir/.skip-ratchet.note"
+ratchet_note=""
+: > "$ratchet_note_file"
+ratchet_rc=0
+if [ -f "$root/scripts/lib/skip-ratchet.py" ]; then
+  python3 "$root/scripts/lib/skip-ratchet.py" \
+    --root "$root" \
+    --results "$results_tsv" \
+    --names "$check_names_file" \
+    --budget "$root/scripts/skip-budget.json" \
+    --json-out "$ratchet_json" \
+    --note-out "$ratchet_note_file" 2>&1 | tee -a "$log" "$ratchet_log"
+  ratchet_rc="${PIPESTATUS[0]}"
+else
+  ratchet_rc=2
+  printf 'verify: skip ratchet CANNOT-ASSESS (rc 2, not a pass and not a failure of any check) -- %s is missing, so the skip set cannot be evaluated and the gate will not certify it\n' \
+    'scripts/lib/skip-ratchet.py' | tee -a "$log" "$ratchet_log" >&2
+fi
+if [ "$ratchet_rc" -ne 0 ]; then
+  printf 'verify: skip ratchet FAIL (rc %s) -- the run does not attest a fully named skip set; the refusal(s) are named above and in %s\n' \
+    "$ratchet_rc" "${ratchet_log#$root/}" | tee -a "$log" "$ratchet_log" >&2
+  overall=1
+fi
+if [ -f "$ratchet_note_file" ]; then
+  ratchet_note="$(cat "$ratchet_note_file")"
+fi
+
 # --- attestation ------------------------------------------------------------
 export ATTEST_DIR="$verify_dir"
 export ATTEST_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -811,6 +891,7 @@ export ATTEST_VERIFIED_BY="${AO_AGENT_ID:-$(id -un 2>/dev/null || echo unknown)}
 export ATTEST_VERIFICATION_SESSION="${AO_SESSION_ID:-}"
 export ATTEST_RESULTS_TSV="$results_tsv"
 export ATTEST_DUPLICATES_TSV="$duplicates_tsv"
+export ATTEST_SKIP_RATCHET="$ratchet_json"
 export ATTEST_RUN_ID="${ATTEST_TS}-$$"
 python3 - <<'PY'
 import json, os
@@ -881,6 +962,30 @@ with open(duplicates_tsv, encoding="utf-8") as fh:
         dup_name, dup_count = line.split("\t", 1)
         duplicates[dup_name] = int(dup_count)
 
+# The skip ratchet's own record (issue #1199): which skips are NAMED (a standing
+# gap against an open issue, or a venue limit against an absent named
+# precondition), which are not, and which exemptions went stale. It is embedded
+# verbatim so the board reads the skip set from the signed record, not from a
+# prose line -- and so a record that cannot be produced is recorded as
+# CANNOT-ASSESS rather than being silently absent from a PASS.
+ratchet: dict = {
+    "budget": "scripts/skip-budget.json",
+    "budget_entries": 0,
+    "verdict": "CANNOT-ASSESS",
+    "standing_skips": [],
+    "unbudgeted_skips": [],
+    "stale_entries": [],
+    "unused_venue_entries": [],
+    "findings": ["the skip ratchet produced no record for this run"],
+}
+ratchet_path = os.environ.get("ATTEST_SKIP_RATCHET", "")
+if ratchet_path and os.path.isfile(ratchet_path):
+    try:
+        with open(ratchet_path, encoding="utf-8") as rh:
+            ratchet = json.load(rh)
+    except (OSError, json.JSONDecodeError) as exc:
+        ratchet["findings"] = ["the skip ratchet record is unreadable (%s)" % exc]
+
 overall = int(os.environ["ATTEST_RESULT"])
 attestation = {
     "run_id": os.environ["ATTEST_RUN_ID"],
@@ -898,6 +1003,7 @@ attestation = {
     "check_count": len(checks),
     "skipped": len(skipped),
     "skipped_checks": skipped,
+    "skip_ratchet": ratchet,
     "duplicates": duplicates,
     "checks": checks,
 }
@@ -958,6 +1064,12 @@ skip_note=""
 if [ "$skipped" -gt 0 ]; then
   skip_note=", $skipped skipped: $skipped_names"
 fi
+# The ratchet's note rides in the SAME parenthesis as the counts (issue #1199):
+# a PASS that includes skips can then never be quoted without the standing-gap
+# naming travelling with it. It is empty when nothing skipped and no exemption
+# went stale -- so a run whose every check assessed reads exactly as it did
+# before this ratchet existed.
+skip_note="${skip_note}${ratchet_note}"
 
 if [ -s "$duplicates_tsv" ]; then
   echo "verify: duplicate check name(s): $(awk -F'\t' '{printf "%s%s", sep, $1; sep=", "}' "$duplicates_tsv")" >&2
