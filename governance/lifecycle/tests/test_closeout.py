@@ -24,6 +24,7 @@ from governance.lifecycle.closeout import (
     SKIPPED,
     closeout,
     describe,
+    evidence_subject,
 )
 
 import importlib.util as _importlib_util  # noqa: E402
@@ -263,6 +264,49 @@ def test_an_already_merged_pull_request_is_not_merged_again():
     closeout(clean_item(), ops)
     assert "merge-pull-request" not in ops.calls
     assert MERGE_COMMIT  # documented: the merge commit is provenance, not evidence
+
+
+# --- the subject of a merged item's evidence is the tree that LANDED (#1149) --
+
+
+def test_the_subject_is_resolved_by_measurement_not_by_default():
+    """The three answers of the tree comparison, and what each one licenses (#1149).
+
+    ``same`` and ``unknown`` both leave the subject at the pull request's head commit —
+    the first because the head's tree *is* the landed one, the second because nothing was
+    measured and a claim may not be invented. Only a **measured** difference moves the
+    subject to the landing, which is the commit that carries the tree that landed.
+    """
+    item = clean_item(verify={})
+    for relation, expected, drifted in (
+        ("same", HEAD_COMMIT, ""),
+        ("different", MERGE_COMMIT, HEAD_COMMIT),
+        ("unknown", HEAD_COMMIT, ""),
+    ):
+        ops = FakeOps(item, tree_relations={(HEAD_COMMIT, MERGE_COMMIT): relation})
+        assert evidence_subject(item, ops) == (expected, MERGE_COMMIT, drifted), relation
+
+
+def test_a_branch_that_advanced_after_the_squash_records_the_landed_tree():
+    """#1149, measured on #977/#978 via PR #984.
+
+    The live head is a tree that never landed and never gated (54 files and 4731
+    insertions away from the commit the squash landed as), so it cannot be the subject of
+    evidence for work that landed. The landing becomes the subject and the live head is
+    journalled as ``drifted_head`` — disclosed, never silently substituted.
+    """
+    item = clean_item(verify={})
+    ops = FakeOps(item, tree_relations={(HEAD_COMMIT, MERGE_COMMIT): "different"})
+    result = closeout(item, ops)
+
+    assert ops.calls == ["record-verification"]
+    assert item["verify"] == {
+        "ok": True,
+        "commit": MERGE_COMMIT,
+        "landing": MERGE_COMMIT,
+        "drifted_head": HEAD_COMMIT,
+    }
+    assert result.verdict == OK and result.ok
 
 
 # --- the gate's admission control, read by the consumer (#840) ---------------

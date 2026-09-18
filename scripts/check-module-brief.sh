@@ -361,6 +361,11 @@ new_tree() { # new_tree <dir> ; echoes the tree path
     "$tree/registry/personas/cards" "$tree/registry/profiles/seeds" \
     "$tree/governance" "$tree/integrations" || return 1
   cp -a "$root/integrations/paperclip" "$tree/integrations/paperclip" || return 1
+  # The paperclip reporting half imports the seam it shares with
+  # `integrations/hermes/` (issue #1208, `integrations/_seam/`), so the scratch
+  # tree must carry it too — without it every provocation below measures a
+  # ModuleNotFoundError instead of the refusal it is provoking.
+  cp -a "$root/integrations/_seam" "$tree/integrations/_seam" || return 1
   cp -a "$root/governance/modules" "$tree/governance/modules" || return 1
   cp -a "$root/registry/personas/cards/paperclip.yaml" \
     "$tree/registry/personas/cards/paperclip.yaml" || return 1

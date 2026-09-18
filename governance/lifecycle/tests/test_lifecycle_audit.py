@@ -57,6 +57,29 @@ def test_evidence_that_names_the_wrong_commit_is_a_finding():
     assert "not the verified head commit" in str(findings[0])
 
 
+def test_evidence_naming_the_landed_tree_after_a_drift_is_not_a_finding():
+    """#1149: the live head's tree never landed, the landing's did, and it is named.
+
+    The one other shape a merged item may legitimately have: the branch advanced after
+    the squash, so the evidence names the commit the squash landed as and records the
+    live head it drifted from.
+    """
+    item = clean_item(
+        verify={"ok": True, "commit": MERGE_COMMIT, "landing": MERGE_COMMIT, "drifted_head": HEAD_COMMIT}
+    )
+    assert audit_item(item) == []
+
+
+def test_naming_the_landing_without_measuring_the_drift_is_still_a_finding():
+    """A substitution nobody measured is still a mismatch (#1149).
+
+    Without this control the rule above would accept *any* record naming the merge
+    commit, which is exactly the shape the invariant exists to refuse.
+    """
+    item = clean_item(verify={"ok": True, "commit": MERGE_COMMIT, "landing": MERGE_COMMIT})
+    assert "VERIFY_EVIDENCE_MISSING" in codes(audit_item(item))
+
+
 def test_a_surviving_branch_is_a_finding():
     """Measured on #263: the local merge command reported success and left it."""
     findings = audit_item(clean_item(branch_deleted=False))

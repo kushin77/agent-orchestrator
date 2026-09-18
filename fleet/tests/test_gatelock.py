@@ -22,6 +22,7 @@ touch the box's real permit store or a sibling lane's lock state.
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import subprocess
@@ -622,3 +623,279 @@ def test_the_entrypoint_doctor_exits_13_on_a_leftover_and_0_when_clean(gate_stor
     dirty = _entry("doctor", store=gate_store)
     assert dirty.returncode == gatelock.EXIT_HEALTH_ATTENTION
     assert "needing attention" in dirty.stdout
+
+
+# --- RCA 2026-09-17 fix #3: a holder reaps its OWN leftover on exit --------
+#
+# RCA-0015 (governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md)
+# already reviewed and refused a box-wide auto-heal of these leftovers:
+# `_reap_free_lock` cannot unlink a lock a live holder flocks (correctness is
+# fine), but a sweeper walking every worktree can still race a DIFFERENT
+# worktree's in-flight `acquire` between that acquirer's `os.open(O_CREAT)`
+# and its `_try_lock` — the file is briefly unflocked and looks exactly like
+# a leftover, so the sweep would unlink it, the acquirer's `_flock_fresh`
+# re-check would fail, and a legitimately-starting gate would report rc 12
+# CANNOT-ASSESS. Scoped to ONE worktree — the sweeper's own — the only
+# acquirer that could ever be in that window is the sweeper itself, so the
+# race disappears. These tests pin: (1) a holder unlinks its own worktree
+# lock on its own exit path (not just truncates it — that truncate-only
+# ending is exactly what manufactured the 157 leftovers RCA `2026-09-17
+# pr-pileup` measured), (2) permit slot files are left in place (truncated,
+# never unlinked — they are a fixed, reused pool with no `_flock_fresh`
+# re-check in `acquire`'s permit loop), and (3) a worktree-scoped reap never
+# touches a live lock or a DIFFERENT worktree's leftover.
+
+
+def test_the_holder_unlinks_its_own_lock_file_when_its_gate_dies(gate_store, lane):
+    """The crash half, RCA fix #3: no trap can run, but the holder still reaps."""
+    worktree = lane("ao-1109-a")
+    gate_process = subprocess.Popen(["sleep", "30"])
+    handle = gatelock.acquire(worktree, root=gate_store, owner_pid=gate_process.pid)
+    gate_process.kill()
+    gate_process.wait()
+    assert _until(lambda: not handle.lock_path.exists()), (
+        "the holder must unlink its own leftover, not merely truncate it"
+    )
+
+
+def test_the_holder_unlinks_its_own_lock_file_on_sigterm(gate_store, lane, tmp_path):
+    worktree = lane("ao-1109-b")
+    script = tmp_path / "trap-gate.sh"
+    script.write_text(TRAP_GATE, encoding="utf-8")
+    log = tmp_path / "trap-gate.log"
+    env = dict(os.environ)
+    env["AO_GATE_LOCK_ROOT"] = str(gate_store)
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    with open(log, "w", encoding="utf-8") as handle:
+        process = subprocess.Popen(
+            ["bash", str(script), str(ENTRY), str(worktree)],
+            stdout=handle,
+            stderr=subprocess.STDOUT,
+            env=env,
+            start_new_session=True,
+        )
+    try:
+        assert _until(lambda: gatelock.probe(lock).held)
+        assert _wait_for_text(log, "GATE-RUNNING"), "the gate never reached its run loop"
+        process.send_signal(signal.SIGTERM)
+        process.wait(timeout=20)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=20)
+    assert _until(lambda: not lock.exists()), (
+        "a SIGTERM'd holder must unlink its own leftover, not merely truncate it"
+    )
+
+
+def test_the_holder_leaves_permit_slot_files_in_place_after_exit(gate_store, lane):
+    """Negative control: permit files are a reused pool — truncate, never unlink."""
+    worktree = lane("ao-1109-c")
+    handle = gatelock.acquire(worktree, root=gate_store, owner_pid=os.getpid())
+    permit_path = handle.permit_path
+    text = gatelock.release(worktree, root=gate_store)
+    assert "RELEASED" in text
+    assert _until(lambda: not gatelock.probe(handle.lock_path).held)
+    assert permit_path.exists(), (
+        "unlinking a permit slot lets two future gates flock two different "
+        "inodes both named the same slot path"
+    )
+
+
+def test_reap_own_worktree_reaps_a_free_leftover_for_that_worktree(gate_store, lane):
+    worktree = lane("ao-1109-d")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_bytes(b"")
+    gatelock.reap_own_worktree(worktree, root=gate_store)
+    assert not lock.exists()
+
+
+def test_reap_own_worktree_leaves_a_live_lock_alone(gate_store, lane):
+    """Negative control: a lock flocked by a live process is never unlinked."""
+    worktree = lane("ao-1109-e")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    holder = _hold_externally(lock)
+    try:
+        gatelock.reap_own_worktree(worktree, root=gate_store)
+        assert lock.exists(), "the own-worktree reap unlinked a live lock"
+        assert gatelock.probe(lock).held, "the own-worktree reap broke a live flock"
+    finally:
+        holder.kill()
+        holder.wait(timeout=20)
+
+
+def test_reap_own_worktree_does_not_touch_a_different_worktrees_leftover(gate_store, lane):
+    """Scoped, not box-wide: worktree A's reap must never touch worktree B's file."""
+    worktree_a = lane("ao-1109-f")
+    worktree_b = lane("ao-1109-g")
+    lock_a = gatelock.worktree_lock_path(worktree_a, gate_store)
+    lock_b = gatelock.worktree_lock_path(worktree_b, gate_store)
+    lock_a.parent.mkdir(parents=True, exist_ok=True)
+    lock_a.write_bytes(b"")
+    lock_b.write_bytes(b"")
+    gatelock.reap_own_worktree(worktree_a, root=gate_store)
+    assert not lock_a.exists(), "worktree A's own leftover must still be reaped"
+    assert lock_b.exists(), (
+        "a worktree-scoped reap must never remove a DIFFERENT worktree's "
+        "leftover, even though it is provably free — that is the box-wide "
+        "auto-heal RCA-0015 refused"
+    )
+
+
+# --- #1170: the provably-safe prune ----------------------------------------
+#
+# `doctor` names a leftover but never removes one, so 160 zero-byte owner-less
+# leftovers held it permanently at rc 13. `prune` removes a file only when it can
+# PROVE the lock is dead: a named leftover only when its recorded owner_pid is
+# gone AND its recorded worktree path is absent (never either alone); a 0-byte
+# owner-less file only while holding its own flock. These pin each half of that
+# sentence, and the refusals that make it an institution rather than a sweep.
+
+
+def _dead_pid() -> int:
+    """A pid that is provably gone (spawned, then reaped)."""
+    proc = subprocess.Popen(["sleep", "30"])
+    pid = proc.pid
+    proc.kill()
+    proc.wait()
+    assert not gatelock.pid_alive(pid)
+    return pid
+
+
+def _write_record(store, name, *, owner_pid, worktree, pid=None):
+    path = store / "worktrees" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "pid": owner_pid if pid is None else pid,
+                "kind": "worktree",
+                "worktree": worktree,
+                "owner_pid": owner_pid,
+                "started_ts": 1.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_prune_refuses_a_leftover_whose_owner_pid_is_alive(gate_store, lane, tmp_path):
+    lock = _write_record(
+        gate_store, "leftover.lock", owner_pid=os.getpid(), worktree=str(tmp_path / "absent")
+    )
+    outcome = gatelock.prune(root=gate_store, apply=True)
+    assert outcome.removed == 0 and outcome.refused == 1
+    assert "its owner pid" in outcome.report and "is alive" in outcome.report
+    assert lock.exists(), "prune removed a lock whose owner pid is still alive"
+
+
+def test_prune_refuses_a_leftover_whose_worktree_still_exists(gate_store, lane, tmp_path):
+    existing = lane("still-here")
+    lock = _write_record(
+        gate_store, "leftover.lock", owner_pid=_dead_pid(), worktree=str(existing)
+    )
+    outcome = gatelock.prune(root=gate_store, apply=True)
+    assert outcome.removed == 0 and outcome.refused == 1
+    assert f"worktree {existing} still exists" in outcome.report
+    assert lock.exists(), "prune removed a lock for a worktree that still exists"
+
+
+def test_prune_removes_a_leftover_with_dead_owner_and_absent_worktree(
+    gate_store, lane, tmp_path
+):
+    lock = _write_record(
+        gate_store, "leftover.lock", owner_pid=_dead_pid(), worktree=str(tmp_path / "absent")
+    )
+    outcome = gatelock.prune(root=gate_store, apply=True)
+    assert outcome.removed == 1 and outcome.refused == 0
+    assert outcome.exit_code == gatelock.EXIT_ADMIT
+    assert not lock.exists(), "prune kept a leftover it could prove dead"
+
+
+def test_prune_refuses_a_zero_byte_lock_held_by_a_live_process(gate_store, lane):
+    worktree = lane("ao-1170-held")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    held = _hold_externally(lock)
+    try:
+        outcome = gatelock.prune(root=gate_store, apply=True)
+        assert outcome.removed == 0
+        assert "REFUSED" in outcome.report and "HELD right now" in outcome.report
+        assert lock.exists(), "prune unlinked a 0-byte file a live process holds"
+        assert gatelock.probe(lock).held
+    finally:
+        held.kill()
+        held.wait(timeout=20)
+
+
+def test_prune_removes_an_unheld_zero_byte_lock(gate_store, lane):
+    worktree = lane("ao-1170-free")
+    lock = gatelock.worktree_lock_path(worktree, gate_store)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_bytes(b"")
+    outcome = gatelock.prune(root=gate_store, apply=True)
+    assert outcome.removed == 1
+    assert not lock.exists(), "prune kept a 0-byte owner-less file it could take the flock on"
+
+
+def test_prune_leaves_a_live_gate_alone(gate_store, lane):
+    worktree = lane("ao-1170-live")
+    handle = gatelock.acquire(worktree, root=gate_store, owner_pid=os.getpid())
+    try:
+        outcome = gatelock.prune(root=gate_store, apply=True)
+        assert handle.lock_path.exists() and gatelock.probe(handle.lock_path).held
+        assert outcome.removed == 0
+    finally:
+        gatelock.release(worktree, root=gate_store, caller_pid=os.getpid())
+
+
+def test_prune_is_dry_run_by_default(gate_store, lane, tmp_path):
+    lock = _write_record(
+        gate_store, "leftover.lock", owner_pid=_dead_pid(), worktree=str(tmp_path / "absent")
+    )
+    outcome = gatelock.prune(root=gate_store)
+    assert outcome.removed == 0 and outcome.would_remove == 1
+    assert "WOULD-REMOVE" in outcome.report and lock.exists()
+    assert outcome.exit_code == gatelock.EXIT_HEALTH_ATTENTION
+
+
+def test_prune_flags_a_record_it_cannot_classify(gate_store, lane):
+    lock = gate_store / "worktrees" / "leftover.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(json.dumps({"pid": _dead_pid(), "kind": "worktree", "worktree": ""}),
+                    encoding="utf-8")
+    outcome = gatelock.prune(root=gate_store, apply=True)
+    assert outcome.refused == 1 and outcome.needs_attention is True
+    assert outcome.exit_code == gatelock.EXIT_HEALTH_ATTENTION
+    assert "names no owner_pid" in outcome.report and lock.exists()
+
+
+def test_prune_never_touches_permits(gate_store, lane):
+    permit = gate_store / "permits" / "slot-00.lock"
+    permit.parent.mkdir(parents=True, exist_ok=True)
+    permit.write_text(json.dumps({"pid": _dead_pid(), "kind": "permit"}), encoding="utf-8")
+    before = permit.read_bytes()
+    gatelock.prune(root=gate_store, apply=True)
+    assert permit.read_bytes() == before, "prune touched a permit slot"
+
+
+def test_prune_reports_ok_on_a_clean_store(gate_store):
+    outcome = gatelock.prune(root=gate_store, apply=True)
+    assert outcome.exit_code == gatelock.EXIT_ADMIT
+    assert "OK" in outcome.report and "SKIP" not in outcome.report
+    assert outcome.considered == 0
+
+
+def test_the_entrypoint_prune_is_dry_run_by_default_and_apply_removes(gate_store, lane, tmp_path):
+    _write_record(
+        gate_store, "leftover.lock", owner_pid=_dead_pid(), worktree=str(tmp_path / "absent")
+    )
+    lock = gate_store / "worktrees" / "leftover.lock"
+    dry = _entry("prune", store=gate_store)
+    assert dry.returncode == gatelock.EXIT_HEALTH_ATTENTION
+    assert "WOULD-REMOVE" in dry.stdout and lock.exists()
+
+    applied = _entry("prune", "--apply", store=gate_store)
+    assert applied.returncode == gatelock.EXIT_ADMIT
+    assert "REMOVED" in applied.stdout and not lock.exists()

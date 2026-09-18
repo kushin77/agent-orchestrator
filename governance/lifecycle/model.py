@@ -71,7 +71,7 @@ INVARIANTS: Tuple[Invariant, ...] = (
     ),
     Invariant(
         code="VERIFY_EVIDENCE_MISSING",
-        requires="a green verification attestation naming the pull request's head commit - the tree that was verified and then merged",
+        requires="a green verification attestation naming the commit whose tree is the tree that landed - the pull request's head commit, or the commit the squash landed as when the branch advanced after it (#1149)",
         remediation=(
             "run `make verify` on the branch head before merging and record its attestation; evidence "
             "names a commit, and a summary is not evidence. Close out BEFORE the lane is torn down "
@@ -80,7 +80,9 @@ INVARIANTS: Tuple[Invariant, ...] = (
             "while this invariant is unsatisfied (#786). For a SQUASH-merged pull request the lane may "
             "instead be a tree cut from the default branch after the merge: it is admitted when it "
             "contains the commit the squash landed as and that landing carries the same tree as the "
-            "verified head, and the record then names all three commits (#1098)"
+            "verified head, and the record then names all three commits (#1098). Where the branch "
+            "advanced *after* the squash, the live head's tree never landed and the evidence names the "
+            "commit the squash landed as instead, recording the drifted head it moved past (#1149)"
         ),
     ),
     Invariant(
