@@ -82,6 +82,11 @@ prefixed:
 # names none (the fleet's standard), and `defaults` are the companion labels a
 # filing may leave unstated. Removing either turns the corresponding filing into a
 # refusal instead of an unclassified issue — which is what `filing-check` exercises.
+# Deriving a label is not the same as the repository HAVING it, so every label the
+# defaults below derive is also resolved against the recorded inventory
+# (`labels.json`): `gh issue create` refuses a label that does not exist, which
+# makes a default naming one a broken production path that a derivation-only
+# control cannot see (#1160).
 filing:
   default_class: enterprise
   # The tag dimensions a filing must derive (issue #1182). `posture` and
@@ -91,11 +96,23 @@ filing:
   # VALUES below are the authority's closed vocabularies, mirrored and proven
   # equal by scripts/check-tagging.sh's `filing-default-drift` refusal — a
   # default that names an illegal value fails the gate by name.
+  #
+  # `area` is the exception, and the reason this block carries a comment: the tag
+  # authority declares it SLUG-SHAPED (`taxonomy.yaml`: kind `pattern`), so it has
+  # no mintable vocabulary and its values can only come from the repository's live
+  # label set. `governance` was never one of them (#1160), which made every
+  # defaulted filing fail in production — `gh` refuses a label it does not have —
+  # while the gate that owns this seam stayed green because it proved label
+  # *derivation* and never label *existence*. `standards` is the area the policy's
+  # own parenting issues carry (#140, which created this file, and #174), and it
+  # is recorded in `labels.json` together with every other label these defaults
+  # derive, so `filing-check` can refuse a default that names a label the
+  # repository does not have.
   tags: [posture, lifecycle]
   defaults:
     type: feature
     priority: P2
-    area: governance
+    area: standards
     gdc: enterprise
     posture: overall
     lifecycle: build
