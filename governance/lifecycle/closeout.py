@@ -88,8 +88,10 @@ class CloseOutOps(Protocol):
         given only when it *was* merged. A squash merge creates a new commit on the
         default branch that the verified head is not an ancestor of, so the port may
         admit a lane cut from the default branch when it contains ``landing`` and
-        ``landing`` carries the same tree as ``commit`` (#1098). An unmerged item has no
-        landing, and therefore still requires the lane to be *at* ``commit``.
+        ``landing`` carries the verified work: the verified tree itself when nothing else
+        landed in between, or the change ``commit`` introduced once a sibling landing moved
+        the base under the squash (#1098, #1298). An unmerged item has no landing, and
+        therefore still requires the lane to be *at* ``commit``.
 
         ``drifted`` is the pull request's live head where the branch advanced *after* the
         squash carried it, so that head's tree never landed and ``commit`` is the landing
