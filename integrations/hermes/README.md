@@ -64,6 +64,22 @@ instantiated exclusively by the `probe` verb. The gate calls only `check`; the
 tests inject `FixtureTransport`. No live request exists in the gate or the
 tests.
 
+## Live sync
+
+`integrations/hermes/sync/` (issue #889, lane L10) is the live counterpart to
+the offline `project`/`check` path: `sync.live.serve_live_capabilities` calls
+the service through the existing `HermesClient` seam (`HttpTransport` live,
+`FixtureTransport` offline in tests — the same seam `probe` uses, no new
+transport), validates every returned capability entry against the real
+`capabilities.schema.json` (`mapping.validate`, never a hand-rolled check),
+and diffs the live capability set against the static, declared projection
+(`mapping.build_projection`'s `tiering.capabilities`), reporting
+`live_missing` / `live_extra`. A capability entry that fails schema
+validation is refused by name (`CapabilityRejected`) — never silently dropped
+or accepted. Tests: `integrations/hermes/sync/tests/` (offline
+`FixtureTransport`, no network), including the negative control for a
+malformed capability entry.
+
 ## The gate
 
 [`scripts/check-hermes-integration.sh`](../../scripts/check-hermes-integration.sh)

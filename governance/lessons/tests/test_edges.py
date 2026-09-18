@@ -7,7 +7,26 @@ rather than passed through as free text, and the derivation is deterministic.
 
 from __future__ import annotations
 
-from conftest import action, incident, lesson, rca, suggestion
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_lessons_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+action = _conftest.action
+incident = _conftest.incident
+lesson = _conftest.lesson
+rca = _conftest.rca
+suggestion = _conftest.suggestion
 
 from edges import (
     EDGE_CAUSED_BY,
@@ -177,7 +196,7 @@ def test_the_pmo_view_holds_only_learnings():
 
 
 def test_the_repositorys_own_register_types_cleanly():
-    from conftest import REPO_ROOT
+    REPO_ROOT = _conftest.REPO_ROOT
     from edges import load_records
 
     records = load_records(REPO_ROOT)

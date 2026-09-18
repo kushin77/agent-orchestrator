@@ -265,6 +265,30 @@ esac
 STUB
 }
 
+write_gate_status_stub() { # <lane>
+  mkdir -p "$1/scripts"
+  cat > "$1/scripts/gate-status.sh" <<'STUB'
+#!/usr/bin/env bash
+# Fixture stand-in for scripts/gate-status.sh (ADR-0028, #1072): records the
+# call and answers GATE_STATUS_RC (default 0 -- posted). The real poster's own
+# mapping and dry-run/show paths are proven by scripts/check-gate-status.sh;
+# this control proves the landing driver's USE of it -- posted at the PR
+# boundary, before the merge decision, for every contract outcome.
+sha="" rc=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    post) : ;;
+    --sha) sha="${2:-}"; shift ;;
+    --rc)  rc="${2:-}";  shift ;;
+  esac
+  shift
+done
+printf 'gate-status %s %s\n' "$sha" "$rc" >> "${EVENTS:?}"
+exit "${GATE_STATUS_RC:-0}"
+STUB
+  chmod +x "$1/scripts/gate-status.sh"
+}
+
 write_lifecycle_stub() { # <lane>
   mkdir -p "$1/governance/lifecycle"
   cat > "$1/governance/lifecycle/cli.py" <<'STUB'
@@ -314,6 +338,7 @@ lane_new() { # <dir> — a lane worktree, its bare origin, its stubs
   write_gh_stub "$dir/bin"
   write_contract_stub "$lane"
   write_contract_predicate_stub "$lane"
+  write_gate_status_stub "$lane"
   write_lifecycle_stub "$lane"
   install_pre_receive_hook "$origin"
 }
@@ -541,7 +566,14 @@ if [ "$(event_count "contract AO_PR_NUMBER=4242")" = "1" ]; then
 else
   fail "apply: the contract did not run at the PR boundary: $(grep contract "$EVENTS" | tr '\n' ' ')"
 fi
+if [ "$(event_count "gate-status $(lane_head "$ap") 0")" = "1" ]; then
+  ok "apply: the gate of record was published (rc=0) for the PR head, before the merge"
+else
+  fail "apply: no ao/gate-of-record status was published for the PR head: $(grep gate-status "$EVENTS" | tr '\n' ' ')"
+fi
 before "contract AO_PR_NUMBER=4242" "gh pr-merge" "apply"
+before "gate-status $(lane_head "$ap") 0" "gh pr-merge" "apply"
+before "contract AO_PR_NUMBER=4242" "gate-status $(lane_head "$ap") 0" "apply"
 before "landed-contract green" "gh pr-merge" "apply"
 before "gh pr-create" "gh pr-merge" "apply"
 before "gh pr-merge" "lifecycle close --issue 764" "apply"
@@ -624,6 +656,29 @@ else
   fail "trailer-less branch: the landed-contract predicate did not run red"
 fi
 unset PREDICATE_MODE CONTRACT_MODE
+
+# --- 8c. a failed/unreadable poster (#1072): CANNOT-ASSESS, never merged -----
+gs="$work/gate-status-unpublished"
+lane_new "$gs"
+export PATH="$gs/bin:$PATH"
+export GH_PR_HEAD="$(lane_head "$gs")"
+export CONTRACT_MODE=green
+export GATE_STATUS_RC=1
+: > "$EVENTS"
+AO_LAND_APPLY=1 bash "$entry" --issue 764 --root "$gs/lane" > "$work/out-gate-status.txt" 2>&1; gs_rc=$?
+[ "$gs_rc" -eq 2 ] || fail "gate-status-unpublished: rc=$gs_rc, expected 2 (CANNOT-ASSESS, never a merge)"
+assert_named "$work/out-gate-status.txt" "gate-status-unpublished" "failed poster"
+if [ "$(event_count 'gh pr-merge')" = "0" ]; then
+  ok "gate-status-unpublished: nothing was merged — a failed poster never merges"
+else
+  fail "gate-status-unpublished: the driver merged although the poster failed"
+fi
+if [ "$(event_count 'landed-contract')" = "0" ]; then
+  ok "gate-status-unpublished: the landed-contract precondition never ran — the refusal is before the merge decision"
+else
+  fail "gate-status-unpublished: the landed-contract precondition ran despite the failed poster"
+fi
+unset GATE_STATUS_RC CONTRACT_MODE
 
 # --- 9. the wiring: the driver CONSUMES the attribution ----------------------
 echo "== check-landing: pre-existing suite reds are attributed by measurement =="

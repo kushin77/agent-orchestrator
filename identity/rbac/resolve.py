@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rbac.model import ScopeNode, is_permission, permission_granted
+from .model import ScopeNode, is_permission, permission_granted
 
 
 @dataclass(frozen=True)

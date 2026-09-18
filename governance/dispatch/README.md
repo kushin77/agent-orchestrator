@@ -151,7 +151,7 @@ sidestepped by calling the mutation directly. Each refusal names what it read:
 | `unowned` | the dispatch and the directive both name no lane | the empty lane and the directive that would have declared one |
 | `provenance-mismatch` | the directive declares an epic or lane the board does not corroborate | the directive file, the declared `task.epic` / `task.lane`, and the board's own edge |
 | `blocked` / `unknown-issue` / `epic-not-workable` | the issue is blocked, absent, or is itself an epic | the snapshot and the issue fields read |
-| `snapshot-stale` | the board is older than `--stale-minutes` (fail closed, exit 2) | the snapshot's age and how to refresh it |
+| `snapshot-stale` | the board is older than `--stale-minutes` (fail closed, exit 2) | the snapshot's age, the ONE bounded refresh it ran (#1179) and the outcome, and the state of the board's liveness producer |
 
 Exit codes stay tri-state: `0` granted, `1` refused, `2` CANNOT-ASSESS (missing or
 stale board). `unowned` applies at the dispatch seam, where a unit no lane owns
@@ -176,6 +176,85 @@ own lane, and a claim still **live** that was taken by a directive
 records written before #726 carry no provenance, and an audit that retro-blames
 them cannot be green on its own repository.
 
+## Board liveness, the in-band refresh, and dangling epics (#1179)
+
+The staleness contract above is a **liveness** tolerance: 15 minutes is honest
+only for a consumer that keeps the board fresh. For a long time the entry point
+was not that consumer — `status`/`eligible`/`claim`/`dispatch` refused with
+"refresh first" and never refreshed, and the one cron rung that could have been a
+producer is declared `"enabled": false` in `config/fleet-jobs.json` (ship-gated
+OFF) while `scripts/check-fleet-jobs.sh` proves the *reconciler* heals drift in a
+**scratch** crontab and never asserts the real one. So the entry point was
+`CANNOT-ASSESS` by construction for anyone not already inside the fleet loop, and
+nothing said so.
+
+**The entry point does not refresh unasked — it NAMES the refresh (issue #1179).**
+The `snapshot-stale` refusal now reports the age, the threshold, the state of the
+board's producer (read from the live crontab), and the one-command remedy;
+`--refresh` runs the ONE bounded refresh in band — the same seam the fleet loop
+runs (`snapshot.refresh`, the single network path and the single place the window
+is applied) — and then decides.
+
+```bash
+python3 governance/dispatch/cli.py status              # names the age, the producer and the remedy
+python3 governance/dispatch/cli.py status --refresh    # refreshes ONCE in band, then decides
+python3 governance/dispatch/cli.py liveness            # is the declared producer installed?
+python3 governance/dispatch/cli.py dangling            # open issues whose parent is CLOSED
+```
+
+It is opt-in on purpose, and that was **measured, not assumed**. Making the
+refresh the default was tried first, and it made a READ verb perform a network
+call and rewrite the tracked `.board/snapshot.json` — so a pytest suite driving
+the loop (`fleet/tests`) rewrote the repository's board during `make verify`:
+measured as `pytest fleet/tests` changing the snapshot's sha256 on the change
+that did it, while pristine `origin/master` leaves it byte-identical. A gate that
+reaches the network, and a read verb that writes a tracked artifact, are both
+defects. The 15-minute threshold is **unchanged**: widening it would convert a
+dead control into a lying one.
+
+`liveness` answers the declared-vs-installed question in the tri-state vocabulary
+and reads the **live crontab** — the blind spot the scratch-crontab reconciler
+proof leaves. It names exactly one verdict:
+
+| verdict | meaning | exit |
+|---|---|---|
+| `installed` | the declared board-refresh rung is enabled AND in the live crontab | 0 |
+| `self-refresh` | no rung is installed, but the entry point refreshes in band — the contract is met | 0 |
+| `declared-but-not-installed` | enabled in the manifest, absent from the live crontab | 1 |
+| `installed-but-declared-off` | the live crontab carries a rung the manifest declares OFF | 1 |
+| `no-producer` | no installed rung, declared OFF, and no in-band refresh | 1 |
+| `cannot-assess` | the crontab or the manifest could not be read | 2 |
+
+A finding is **never a pass**, and `cannot-assess` is never `0`. The `--crontab-file`
+flag is the gate's fixture seam; the default is always the real crontab.
+
+`dangling` reports the other silent dead-end: an issue declaring `Parent:` to a
+**closed** epic is refused `epic-closed` — correctly, the epic that would own the
+work is gone — but nothing named it, so it was invisible *and* permanently
+unclaimable. `status` prints the same finding, and `dangling` exits 1 with the
+remedy:
+
+```
+dangling-epic: #12 declares Parent #7, which is closed (the ownering epic)
+  remediate: re-point the issue's `Parent:` at the open epic that now owns the work
+```
+
+The refusal is deliberately **not** relaxed: the fix is visibility plus a
+reachable re-parenting path, not a silent re-allow.
+
+Finally, `status` advertises the **claimable** frontier (issue #1168). The
+milestone frontier (`order.frontier`) applies every *issue-property* refusal
+`eligible` applies — closed, claimed elsewhere, an epic, epic-closed, blocked — so
+it can never name an issue no reader could take. The epic-focus refusal stays a
+separate question (`order.claimable_frontier`), because the milestone frontier and
+"the active epic's frontier" are genuinely different, and `status` uses the
+focus-aware one so it cannot advertise work `claim` will refuse.
+
+All of it is provoked rather than asserted:
+`scripts/check-dispatch-entrypoint.sh` plants each violation, asserts the rc **and
+the literal refusal string**, and includes a mutant of `order.py` with the
+pre-#1168 frontier predicate that MUST make the disagreement appear by name.
+
 ## Claim protocol
 
 ```bash
@@ -189,7 +268,9 @@ python3 governance/dispatch/cli.py release --issue 139 --agent me
 
 Exit codes follow the repo tri-state convention: `0` OK, `1` refused/NOT-OK,
 `2` CANNOT-ASSESS (for example the snapshot is missing **or stale** — past
-`--stale-minutes`, default 15 minutes).
+`--stale-minutes`, default 15 minutes). A stale board is refused by default and
+the refusal names the producer's state and the remedy (#1179, see "Board
+liveness" above); `--refresh` performs that remedy in band.
 
 * **Claim record** — one JSON object per event. New events are written **one file
   per event** into `.board/claims/` (atomic, collision-proof), so two concurrent
@@ -322,6 +403,7 @@ claim REFUSED: blocked — #889 is blocked by #880, #881, ..., #888 — evidence
 ```bash
 python3 governance/dispatch/cli.py queue --next    # the next claimable issue(s) per the queue
 python3 governance/dispatch/cli.py queue --check   # validate the file (see below)
+python3 governance/dispatch/cli.py queue --fix     # drop issues CLOSED on a fresh board (#1113)
 ```
 
 `--check` validates `governance/dispatch/queue.yaml` structurally (no
@@ -332,6 +414,15 @@ tri-state and fails CLOSED on a stale board: past `--stale-minutes` it
 reports `CANNOT-ASSESS` (exit 2) for the exists/open half rather than a false
 verdict, while the structural half (duplicates, cycles) still runs — that
 half needs no board at all.
+
+`--fix` is the declared mechanism for the defect `--check` only reports
+(issue #1113): against a FRESH `.board/snapshot.json` (same staleness
+contract as `--check` — a stale board is refused with `CANNOT-ASSESS` rather
+than pruning on guessed state), it drops every issue number CLOSED on that
+board from each wave's `issues` list, editing only those lines so the file's
+hand-written commentary survives. It is idempotent — a clean queue prints
+`OK` and rewrites nothing — so it can be re-run after every board refresh
+without hand-editing `queue.yaml` directly.
 
 ### The gate
 

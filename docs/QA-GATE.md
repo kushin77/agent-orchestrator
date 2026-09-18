@@ -38,6 +38,7 @@ So the QA gate must:
 | `make qa-loop` | `scripts/qa-loop.sh` — fix → verify → re-check until green (or no auto-fix left) | reuses gate evidence |
 | `make merge-gate` | `scripts/merge-gate.sh run` — pre-merge contract (refuses dirty tree, full gate, writes commit-named attestation) | `.verify/merge-attestation.json`, `.verify/merge-gate.log` |
 | `make tests` | `scripts/run-pytest-suites.sh` — every declared suite in isolation | `.verify/test-results.json` |
+| `make tagging` | `scripts/check-tagging.sh` — the **tag authority** (AO-GR-28, #1175 + #1183): six checks — the taxonomy's shape, every borrowed vocabulary proven equal to its authority, every rule's gate name resolved, the generated matrix's freshness, every declared refusal provoked by a real mutant with its clean twin accepted, and the **`tagging` mandate** that the contract docs keep declaring the rule (`posture`/`lifecycle` incl.). Also runs inside `make verify` by auto-discovery, and `make lint` | `.verify/verify.log`'s `tagging` row |
 
 ### `make gate` signal table (per-signal evidence)
 
@@ -197,3 +198,57 @@ throwaway `<module>` with a deliberately failing test to
 `scripts/pytest-suites.txt` → `make gate` exits nonzero naming the suite →
 remove the throwaway + manifest line → `make gate` green again. Both directions
 are asserted before this stack is merged.
+
+## 9. Per-check attestation (issue #882, lane L3 of #878)
+
+Every `scripts/verify.sh` run writes `.verify/attestation.json` — on FAIL as
+well as PASS, because a gate that only attests when it is green cannot be
+trusted to have run at all (GR-12, no-false-green). The shape it must conform
+to is `governance/isolation/attestation.schema.json`: the contract lives
+outside the wholly-generated `.verify/` root, so `.verify/` stays a plain,
+un-negated `.gitignore` entry while the schema itself is checked in.
+
+* `run_id`, `git_sha`, `overall_verdict` at the top level;
+* `checks[]`, one entry per gate, each carrying `name`, `verdict`
+  (`OK`/`WARN`/`FAIL` — the same tri-state contract `verify.sh` already runs
+  on: rc 0 → OK, rc 2 (CANNOT-ASSESS) → WARN, anything else → FAIL), `rc`,
+  `duration` (wall-clock seconds) and `evidence_tail` (the check's own last
+  ~20 lines of output, not the whole run's combined log).
+* `overall_verdict` is the WORST of the per-check verdicts — never better than
+  any check the run actually performed.
+
+`scripts/lib/validate-attestation.py <attestation.json> <schema.json>`
+validates it: `jsonschema` when importable, otherwise a hand-rolled STRICT
+validator checking the identical required shape, so the gate is never
+disabled by a missing optional dependency. It also runs a SEMANTIC
+cross-check the schema alone cannot express — a check whose `rc` is a genuine
+failure (not 0, not 2) can never carry `verdict: OK`, and `overall_verdict`
+can never rank better than the worst check. `verify.sh` runs this validator
+on its own freshly-written attestation and folds a validation failure into
+the run's own exit code: a gate that produced a malformed or dishonest
+attestation is itself a defect, not a formality.
+
+Negative control (proves the false-green class is actually refused, not just
+declared refused): a fabricated attestation marking a `rc: 1` check
+`verdict: OK` is schema-valid in isolation (every field present and well
+typed) and is still refused, by name (`red-reported-ok`), by the semantic
+check — see `governance/isolation/tests/test_attestation_validate.py::test_negative_control_a_red_reported_ok_is_refused`.
+
+## 10. Squash-merge message gate (issue #1001, child of #882)
+
+`gh pr merge --squash` composes the LANDED commit message from the PR
+title/body, not from the branch's own commit trailers — so a clean branch
+could still land without the ticket trailer, and did, three times in one day
+(#960/#976, then #996/#991), each recurrence red on `check-isolation-landed`
+until a baseline-entry PR (#836 doctrine) unblocked the merge queue.
+`scripts/check-squash-message.sh --pr <N>` renders the same message
+(`gh pr view N --json title,body` → `"<title> (#N)\n\n<body>"`) and asks the
+ONE shared trailer predicate (`governance/isolation/trailer.py`, which
+delegates to `scripts/check-pr-contract.sh` — not a second implementation of
+the rule) about it BEFORE the merge, refusing by name
+(`commit-missing-ticket-trailer` / `commit-ref-only-in-subject` /
+`commit-ref-outside-the-trailer-block`). `--self-test` proves the passing
+fixture is accepted and both mutants are refused. The PR template
+(`.github/PULL_REQUEST_TEMPLATE.md`) now ends with
+`Refs kushin77/agent-orchestrator#<n>` as its own final paragraph by default,
+so an untouched template still composes a compliant squash message.

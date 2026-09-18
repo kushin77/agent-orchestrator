@@ -87,6 +87,11 @@ checks=(
   'yaml-lint|python3 scripts/check-yaml.py'
   'json-lint|bash scripts/check-json.sh'
   'docs-lint|bash scripts/check-docs.sh'
+  # squash-message (issue #1102, parent #878): a detector nothing calls is
+  # advisory. This self-test proves scripts/check-squash-message.sh can fail
+  # before the merge-path refusal (governance/lifecycle/cli.py,
+  # scripts/pr-queue.sh) is trusted to call it for real.
+  'squash-message|bash scripts/check-squash-message.sh --self-test'
   # gate-coverage (issue #526, RCA of EPIC #524): the gate registry was not
   # self-checking. A new `scripts/check-*.sh` that nobody registers is inert,
   # and a suite declared in scripts/pytest-suites.txt that no gate names is only
@@ -109,6 +114,17 @@ checks=(
   # CANNOT-ASSESS (exit 2), never a pass -- found by mutation, not by review: the
   # first version printed "not a pass" and then exited 0.
   'branch-protection|bash scripts/check-branch-protection.sh'
+  # repo-settings (issue #1138, parent #803): the platform-level enforcement
+  # of the squash-merge message policy. Measured: the live repo setting was
+  # `squash_merge_commit_message=COMMIT_MESSAGES`, concatenating every
+  # per-commit message onto the squash commit instead of using the PR body --
+  # burying the ticket trailer mid-body and redding check-isolation-landed on
+  # every wave (#1119 #1044 #1121 #1126 #1103, four more baselined in #1130).
+  # This check compares the LIVE settings against the DECLARED policy and is
+  # PROVOKED offline (a matching fixture must pass; a reverted message policy
+  # must be caught and named), mirroring branch-protection's own gate. An
+  # unobservable live state is CANNOT-ASSESS (exit 2), never a pass.
+  'repo-settings|bash scripts/check-repo-settings.sh'
   # gate-status (epic #803 P0-2, ADR-0028): GitHub's required status checks are
   # the only mechanism that makes a merge impossible without green evidence, and
   # producing one normally needs the GitHub Actions that GR-15 bans. ADR-0028
@@ -315,6 +331,12 @@ checks=(
   # every seed must validate as a projected identity; the check mutates its own
   # input, so it cannot pass vacuously.
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
+  # provider-parity (issue #1194): flag UNEXPLAINED Claude/DeepSeek capability
+  # drift without forcing literal parity (roles differ by design); every
+  # asymmetric flag-gated module.json feature and capabilitySet/toolAllowlist
+  # entry must carry an inline rationale marker, and the check mutates a
+  # scratch copy with an unmarked item, so it cannot pass vacuously.
+  'provider-parity|bash scripts/check-provider-parity.sh'
   # rbac-head-binding (issue #952): tenant/RBAC binding for the head-of-org
   # personas (hermes, paperclip) — identity/rbac/presets/head-agents.yaml +
   # identity/rbac/head_bindings.py; GR-28 default-off is asserted live and the
@@ -613,6 +635,31 @@ checks=(
   # being recorded as CANNOT-ASSESS.
   'erp-core-model|bash scripts/check-erp-core-model.sh'
   'lane-collision|bash scripts/check-lane-collision.sh'
+  # codeowners (issue #1073, cites #803 row 12 — platform-level enforcement of a
+  # declared control): `.github/CODEOWNERS` did not exist, so the five-pillar +
+  # cross-cutting map AGENTS.md and docs/ARCHITECTURE.md declare had no reviewer
+  # mapping and nothing would notice drift — a new pillar with no rule, a rule
+  # left behind naming a renamed/removed directory, or a typo'd owner token
+  # GitHub silently ignores. This check is STRUCTURAL (default rule present,
+  # every pillar present in the tree has an explicit rule, every rule names a
+  # real path, every owner token well-formed) and PROVOKED against the same
+  # comparator function with four fixtures (valid / missing-pillar /
+  # stale-path / malformed-owner), each required to fail BY NAME.
+  'codeowners|bash scripts/check-codeowners.sh'
+  # EPIC #878 flip (issue #883/#878): five suites this lane declared in
+  # scripts/pytest-suites.txt as part of raising every product surface's
+  # `declared_class` to `elite` (the live_sync evidence). A suite declared in
+  # the manifest but named by no gate is refused by check-gate-coverage, which
+  # never grandfathers a newly declared one -- so each gets the `pytest-*`
+  # wiring precedent (`pytest-fleet`, `pytest-conversation`, `pytest-control`)
+  # rather than being named only from inside an unrelated per-surface check.
+  # Offline and deterministic (no network, no vendor seed), so each RUNS for
+  # real in a fresh worktree.
+  'pytest-gateway-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/sync/tests'
+  'pytest-registry-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/sync/tests'
+  'pytest-module-registry-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/modules/sync/tests'
+  'pytest-hermes-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/hermes/sync/tests'
+  'pytest-governance-controls|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/controls/tests'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------
@@ -667,13 +714,21 @@ if [ -s "$duplicates_tsv" ]; then
   overall=1
 fi
 
+check_out_dir="$verify_dir/.check-out"
+mkdir -p "$check_out_dir"
 for entry in "${checks[@]}"; do
   name="${entry%%|*}"
   cmd="${entry#*|}"
   printf '\n== %s ==\n' "$name" | tee -a "$log"
-  bash -c "$cmd" 2>&1 | tee -a "$log"
+  # Per-check output is captured separately (issue #882) so the attestation can
+  # carry an evidence tail for THIS check, not the whole run's log.
+  check_out="$check_out_dir/${name//\//_}.txt"
+  check_start="$(date +%s)"
+  bash -c "$cmd" 2>&1 | tee -a "$log" "$check_out"
   rc="${PIPESTATUS[0]}"
-  printf '%s\t%s\n' "$name" "$rc" >> "$results_tsv"
+  check_end="$(date +%s)"
+  duration=$((check_end - check_start))
+  printf '%s\t%s\t%s\t%s\n' "$name" "$rc" "$duration" "$check_out" >> "$results_tsv"
   # Honest tri-state (GR-12 / guardrails/honesty). 0 = PASS; 1 = NOT-OK, a real
   # defect, and the run fails; 2 = CANNOT-ASSESS -> SKIP. A check that says it
   # genuinely could not assess (e.g. the pinned vendor/CMR submodule is absent in
@@ -698,6 +753,7 @@ export ATTEST_VERIFIED_BY="${AO_AGENT_ID:-$(id -un 2>/dev/null || echo unknown)}
 export ATTEST_VERIFICATION_SESSION="${AO_SESSION_ID:-}"
 export ATTEST_RESULTS_TSV="$results_tsv"
 export ATTEST_DUPLICATES_TSV="$duplicates_tsv"
+export ATTEST_RUN_ID="${ATTEST_TS}-$$"
 python3 - <<'PY'
 import json, os
 
@@ -705,17 +761,56 @@ attest_dir = os.environ["ATTEST_DIR"]
 results_tsv = os.environ["ATTEST_RESULTS_TSV"]
 duplicates_tsv = os.environ["ATTEST_DUPLICATES_TSV"]
 
+# Tri-state per check (issue #882, same rc contract as the gate loop itself):
+# rc 0 -> OK, rc 2 -> WARN (CANNOT-ASSESS, never reported as a pass), anything
+# else -> FAIL. A red is never reported OK -- that mapping is enforced here,
+# not left to a caller to get right later.
+_VERDICT = {"0": "OK", "2": "WARN"}
+
+
+def verdict_for(rc: str) -> str:
+    return _VERDICT.get(rc, "FAIL")
+
+
 checks = []
 with open(results_tsv, encoding="utf-8") as fh:
     for line in fh:
         line = line.rstrip("\n")
         if not line:
             continue
-        name, rc = line.split("\t", 1)
+        fields = line.split("\t")
+        name, rc = fields[0], fields[1]
+        duration = float(fields[2]) if len(fields) > 2 and fields[2] else 0.0
+        out_path = fields[3] if len(fields) > 3 else ""
         status = "PASS" if rc == "0" else ("SKIP" if rc == "2" else "FAIL")
-        checks.append({"name": name, "rc": int(rc), "status": status})
+        evidence_tail = ""
+        if out_path and os.path.isfile(out_path):
+            try:
+                with open(out_path, encoding="utf-8", errors="replace") as ofh:
+                    tail_lines = ofh.readlines()[-20:]
+                evidence_tail = "".join(tail_lines)
+            except OSError:
+                evidence_tail = ""
+        checks.append(
+            {
+                "name": name,
+                "rc": int(rc),
+                "status": status,
+                "verdict": verdict_for(rc),
+                "duration": duration,
+                "evidence_tail": evidence_tail,
+            }
+        )
 
 skipped = [c["name"] for c in checks if c["status"] == "SKIP"]
+
+# Overall verdict = the worst of the per-check verdicts, never better than any
+# check it ran (issue #882's no-false-green requirement).
+_RANK = {"OK": 0, "WARN": 1, "FAIL": 2}
+overall_verdict = "OK"
+for c in checks:
+    if _RANK[c["verdict"]] > _RANK[overall_verdict]:
+        overall_verdict = c["verdict"]
 
 # Duplicate check names: a name registered twice is a gate defect (two lanes
 # wrote the same surface), so it is recorded here verbatim -- {} when clean.
@@ -730,9 +825,11 @@ with open(duplicates_tsv, encoding="utf-8") as fh:
 
 overall = int(os.environ["ATTEST_RESULT"])
 attestation = {
+    "run_id": os.environ["ATTEST_RUN_ID"],
     "gate": "verify",
     "mode": os.environ["ATTEST_MODE"],
     "result": "PASS" if overall == 0 else "FAIL",
+    "overall_verdict": overall_verdict,
     "exit_code": overall,
     "timestamp": os.environ["ATTEST_TS"],
     "host": os.environ["ATTEST_HOST"],
@@ -751,6 +848,20 @@ with open(path, "w", encoding="utf-8") as fh:
     json.dump(attestation, fh, indent=2)
     fh.write("\n")
 PY
+
+# --- attestation self-validation (issue #882) --------------------------------
+# Written EVEN ON FAILURE (above) so a red run still carries evidence; validated
+# here so a malformed attestation is itself a gate defect, not a silent hole. A
+# schema violation here is not allowed to hide behind an otherwise-green run:
+# it forces the whole gate to FAIL (no-false-green doctrine, GR-12).
+attestation_schema="$root/governance/isolation/attestation.schema.json"
+if [ -f "$attestation_schema" ] && command -v python3 >/dev/null 2>&1; then
+  if ! python3 "$root/scripts/lib/validate-attestation.py" \
+      "$verify_dir/attestation.json" "$attestation_schema" >>"$log" 2>&1; then
+    echo "verify: attestation.json failed schema validation (see $log) -- the gate cannot attest a shape it did not itself produce correctly" >&2
+    overall=1
+  fi
+fi
 
 # --- summary ----------------------------------------------------------------
 # A SKIP is counted and named here so it can never hide (a skip is not a pass).

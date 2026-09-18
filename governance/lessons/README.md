@@ -102,6 +102,11 @@ that carries them.
 | `doc-rca-id-unknown` | error | issue #1052: a `docs/rca/*.md` writeup cites an `RCA-NNNN` id that is not a recorded ledger id |
 | `doc-rca-artifact-mismatch` | error | issue #1052: a `docs/rca/*.md` heading MINTS (starts with) an `RCA-NNNN` id whose ledger `artifact` names a different file — a lightweight doc may CITE a ledger RCA, it may not MINT one |
 | `readme-incident-count-mismatch` | error | issue #1052: the hand-written incident count below ("The incidents recorded so far") does not match the ledger's actual count |
+| `board-link-missing` | error | issue #1178: a `LESSON-*`/`SUGGEST-*` that reaches no board issue and declares no `orphan` reason — silence is what left twenty records unreachable |
+| `board-link-dangling` | error | issue #1178: an incident's `origin`, an orphan's `ticket` or an open action's `remediation_issue` names a board issue the committed snapshot does not carry |
+| `board-link-unlabelled` | error | issue #1178: the ledger names the issue as an incident's origin and the board does not carry the `incident` label, so the board rule cannot select it |
+| `board-link-orphan` | deviation | issue #1178: a record that reaches no board issue, reported with its declared reason |
+| `board-link-goal-unresolved` | deviation | issue #1178: the record reaches an issue that has neither an epic (`Parent: #N`) nor a milestone |
 
 `--strict` escalates every deviation to an error. That is the honest position:
 the in-flight work and the historical backlog are real and named, and a
@@ -142,6 +147,61 @@ The last probe is the one that matters most. A control proved only against a
 fixture never sees reality, and a probe that fires under every mutation proves
 nothing — so the mutant is built, the refusal is observed to disappear, and the
 harness reports it by name.
+
+## The board linkage: ledger -> issue -> epic (issue #1178)
+
+A register that cannot be reached from the board is an island. The only
+direction this module enforced was *labelled issue -> ledger record*, and the
+label selected an empty set on real data, so the rule could fail only against
+the mutants above. [`linkage.py`](linkage.py) makes the other direction —
+**ledger -> issue -> epic** — a measurement and a rule.
+
+```bash
+python3 governance/lessons/cli.py linkage                # the census
+python3 governance/lessons/cli.py linkage --orphans-only # just the unreachable
+```
+
+A record reaches the board when a path of its own fields gets there: its
+`origin` (kind `issue`), the `remediation_issue` of an action, or the `rca` /
+`incident` record it names. **A pull request is not a ticket**: a `pr`, `commit`
+or `event` origin declares where a record came from but is not a board node, so
+it does not make the record reachable. A reachable record whose issue has
+neither a `Parent: #N` epic nor a milestone has reached an *issue* but no
+*goal*, which is a deviation.
+
+Three rules make it binding:
+
+1. **Silence is refused.** A `LESSON-*`/`SUGGEST-*` that reaches no board issue
+   must declare it: `"orphan": {"reason": "..."}`. The thirteen records that
+   were unreachable and silent now carry that declaration, each with the reason
+   (their RCA traces to a pull request or a recorded event, not to an issue).
+   The declaration is a *claim*, not an exemption: a false one is refused, and
+   the `orphan.ticket` it may carry must resolve on the board.
+2. **A dangling reference is refused.** An incident's `origin` was never
+   resolved against the board before this issue — only an RCA's was — so an
+   incident could name an issue that no longer existed and nothing saw it.
+3. **The label lands where the ledger names it.** `board-link-unlabelled`
+   requires every issue the ledger names as an `INC-*` origin to carry the
+   `incident` record label. This is the inverse of `board-incident-without-rca`,
+   and it is what keeps the scope declaration from being empty: the holder set
+   is derived from the ledger, not from the label. On `origin/master` before
+   this issue the gate measured **1** holder (the label was on #1029 alone,
+   whose `INC-0007` names it) while `cli.py status` printed **0** — `status`
+   called `check_ledger(..., snapshot=None)` and so could never count a holder
+   at all. `status` now loads the snapshot, and five issues carry the label.
+
+**The measured census** (this revision, 75 records): 34 reach a board issue, 26
+of those reach a goal, 41 are orphans, 0 references dangle. An orphan whose
+provenance is a PR or an event is reported as a deviation rather than hidden:
+the remedy is a board issue, and the filings that would close the largest
+groups are listed in the lane issue (#1178) rather than mass-created as a proxy
+for the rule.
+
+The two probes that matter are `REAL-DATA-LABEL-REMOVAL-IS-REFUSED` and
+`REAL-DATA-DECLARATION-REMOVAL-IS-REFUSED`: they take the **real** ledger and
+the **real** committed snapshot, remove exactly one real fact, and require the
+real check to refuse it by id. A rule proved only against a fixture has not
+been shown able to fail on the data it actually reads.
 
 ## Escalation, ownership and review cadence
 
@@ -231,11 +291,13 @@ per-suggestion/per-action deviation lines are elided:
 
 ```text
 incidents: 17 (9 closed) | rcas: 17 | corrective actions: 21 (10 open) | lessons: 7
-| suggestions: 13 | board issues carrying the `incident` record label: 0
+| suggestions: 13 | board issues carrying the `incident` record label: 5 | ledger
+records reaching the board: 34 of 75 (41 orphaned)
   WARNING suggestion-open         SUGGEST-0001 is open (owner: gate lane); ...
+  WARNING board-link-orphan       LESSON-0001 declares itself board-orphaned (lesson); ...
   WARNING corrective-action-open  CA-0007 is open; remediation is tracked in #170
-lessons: OK (17 incident(s), 7 lesson(s) enforced, 23 deviation(s) tracked)
-  probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s), scanned=0, errors=[]
+lessons: OK (17 incident(s), 7 lesson(s) enforced, 72 deviation(s) tracked)
+  probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s) and is not among the 1 scanned record-labelled issue(s) ([901]); errors=[]
   probe RECORD-LABEL-WITHOUT-A-RECORD-IS-REFUSED: PASS — code=board-incident-without-rca subject=#900 errors=['board-incident-without-rca']
   probe LEDGER-INCIDENT-WITHOUT-RCA-IS-REFUSED: PASS — code=incident-without-rca count=1 errors=['corrective-action-unlinked', 'incident-without-rca', 'unknown-reference', 'unknown-reference']
   probe RECORD-LABEL-WITH-A-RECORD-IS-ACCEPTED: PASS — scanned=1 board finding(s)=0 errors=[] (the ledger traces #900)
@@ -243,7 +305,7 @@ lessons: OK (17 incident(s), 7 lesson(s) enforced, 23 deviation(s) tracked)
   probe EXEMPTIONS-CANNOT-BE-DECLARED: PASS — board.exemptions is not a supported scope declaration (...); the retired refs #141/#494/#495/#497 cannot be declared
   probe AREA-LABEL-CANNOT-BE-THE-RECORD-LABEL: PASS — board.incident_label='area:incident-response' is an AREA label (...)
   probe SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL: PASS — incident_label='incident' exemptions attribute=False cadence=180
-  probe REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL: PASS — snapshot: 0 issue(s) carry 'incident' (scanned=0), 4 carry 'area:incident-response' and 0 of them is treated as an incident; board findings=0 errors=[] retired refs reported=(none)
+  probe REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL: PASS — snapshot: 5 issue(s) carry 'incident' (scanned=5), 4 carry 'area:incident-response' and 0 of them is treated as an incident; board findings=0 errors=[] retired refs reported=(none)
   probe MUTANT-DROPS-THE-REFUSAL: PASS — NOT-REFUSED board-incident-without-rca (the probe is proven able to fail)
   probe DOC-RCA-UNKNOWN-ID-IS-REFUSED: PASS — code=doc-rca-id-unknown count=1 errors=['doc-rca-id-unknown']
   probe DOC-RCA-CITATION-IS-ACCEPTED: PASS — doc-rca finding(s)=0 errors=[]
@@ -256,10 +318,24 @@ lessons: OK (17 incident(s), 7 lesson(s) enforced, 23 deviation(s) tracked)
   probe MUTANT-DROPS-README-REFUSAL: PASS — NOT-HELD readme-incident-count-mismatch (the probe is proven able to fail)
   probe DUPLICATE-ID-IS-REFUSED: PASS — code=duplicate-id count=1 errors=['duplicate-id']
   probe MUTANT-DROPS-DUPLICATE-ID-REFUSAL: PASS — NOT-HELD duplicate-id (the probe is proven able to fail)
-  PROBES: PASS (21 of 21)
+  probe BOARD-LINK-MISSING-IS-REFUSED: PASS — code=board-link-missing subject=LESSON-0002 errors=['board-link-missing']
+  probe BOARD-LINK-ORPHAN-DECLARATION-IS-ACCEPTED: PASS — missing=0 orphan-deviations=4 errors=[]
+  probe BOARD-LINK-DANGLING-ORIGIN-IS-REFUSED: PASS — code=board-link-dangling subject=INC-0001 count=1 errors=[...]
+  probe BOARD-LINK-UNLABELLED-IS-REFUSED: PASS — code=board-link-unlabelled subject=#901 errors=['board-link-unlabelled']
+  probe BOARD-LINK-LABEL-PRESENT-IS-ACCEPTED: PASS — finding(s)=0 errors=[]
+  probe REAL-LEDGER-HAS-NO-SILENT-ORPHAN: PASS — the REAL ledger: 0 silent orphan(s), 0 dangling reference(s), errors=[]
+  probe REAL-BOARD-LINKAGE-CENSUS-IS-NOT-EMPTY: PASS — the REAL ledger names 5 issue(s) as an incident origin; 5 carry `incident`; the board rule scanned 5; unlabelled=0
+  probe REAL-DATA-LABEL-REMOVAL-IS-REFUSED: PASS — the REAL ledger names 5 issue(s); removed 'incident' from #148 and the REAL check reported 1 finding(s) for it, errors=['board-link-unlabelled']
+  probe REAL-DATA-DECLARATION-REMOVAL-IS-REFUSED: PASS — the REAL ledger carries 13 declaration(s); removed LESSON-0001's and the REAL check reported 1 finding(s) for it, errors=['board-link-missing']
+  probe MUTANT-DROPS-BOARD-LINK-MISSING: PASS — NOT-HELD board-link-missing (the probe is proven able to fail)
+  probe MUTANT-DROPS-BOARD-LINK-DANGLING: PASS — NOT-HELD board-link-dangling (the probe is proven able to fail)
+  probe MUTANT-DROPS-BOARD-LINK-UNLABELLED: PASS — NOT-HELD board-link-unlabelled (the probe is proven able to fail)
+  PROBES: PASS (33 of 33)
 negative-control: OK — an area label cannot manufacture an incident, a
 record-labelled issue with no ledger record is still refused, no exemption can
-be declared, and the refusal is proven able to fail
+be declared, the refusal is proven able to fail, and the ledger -> board linkage
+(a silent orphan, a dangling reference, an incident-origin issue with no record
+label) is refused on the real ledger and board with one real fact changed
 ```
 
 The real-board probe is the measurement the fix is about: **4 issues carry

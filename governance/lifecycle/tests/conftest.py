@@ -165,7 +165,7 @@ class FakeOps:
         self.item["pr"]["state"] = "merged"
         return MERGE_COMMIT
 
-    def record_verification(self, issue: int, commit: str) -> str:
+    def record_verification(self, issue: int, commit: str, landing: str = "") -> str:
         self._record("record-verification")
         self.item["verify"] = {"ok": True, "commit": commit}
         return f"verify green at {commit[:12]}"

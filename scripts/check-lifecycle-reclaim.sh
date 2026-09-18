@@ -144,17 +144,73 @@ git -C "$scratch" commit -q -m seed >/dev/null 2>&1
 mkdir -p "$scratch/.fleet/sent" "$scratch/.fleet/done" "$scratch/.fleet/lanes"
 
 copy_tree() { # copy_tree <destination>
-  mkdir -p "$1/governance" "$1/fleet"
-  cp -r governance/isolation "$1/governance/isolation"
-  cp -r governance/lifecycle "$1/governance/lifecycle"
+  mkdir -p "$1/fleet"
+  # `governance/isolation` and `governance/lifecycle` are what the driver
+  # imports directly, but `governance/lifecycle/*` reaches across to sibling
+  # packages under `governance/` at import time (e.g.
+  # `governance.lifecycle.ledger` imports `governance.modules.schema`), and
+  # those imports are transitive and not enumerable one file at a time
+  # without this fixture rotting again the next time a lifecycle module grows
+  # a new cross-import (which is exactly how #1106's "No module named
+  # 'governance.modules'" red happened, one layer under the `fleet` one).
+  # Copy the whole `governance/` package instead, so the copy resolves
+  # imports the same way the real tree does. `__pycache__` is excluded so a
+  # stale `.pyc` from THIS run's Python can never shadow the mutated source.
+  cp -r governance "$1/governance"
+  find "$1/governance" -name '__pycache__' -type d -prune -exec rm -rf {} +
   # The verify port reads the admission control's exit vocabulary from
   # `fleet/gatelock.py` (#840), so the copy has to carry it: a mutant tree that
   # cannot be imported proves nothing, and this gate would fail for a reason that
-  # has nothing to do with the wedge under test.
+  # has nothing to do with the wedge under test. `gatelock.py` itself imports
+  # `lease` (package-relative `from fleet import lease`, or script-style
+  # `import lease` when `fleet/` is on sys.path) — copying gatelock.py without
+  # its sibling left the copy unimportable everywhere ("No module named
+  # 'fleet'"/"cannot import name 'lease' from 'fleet'"), which is exactly the
+  # red this gate measured from a detached worktree (issue #1106); it is not
+  # location-specific, the fixture was just incomplete.
   cp fleet/gatelock.py "$1/fleet/gatelock.py"
+  # ...and the admission control's own dependency, for the same reason one
+  # dependency deeper: since #977 `fleet/gatelock.py` imports the single-writer
+  # lease (`from fleet import lease`, else the script-style `import lease`), so a
+  # copy that carries the lock but not the lease cannot be imported at all. This
+  # is measured, not hypothetical — see the precondition below.
+  cp fleet/lease.py "$1/fleet/lease.py"
 }
 copy_tree "$scratch"
 copy_tree "$mutant"
+
+# --- 1b. the mutant copy can import what the driver imports (#1034) ----------
+# The gate's whole mutant control is "revert the fix in a COPY of the tree, re-run
+# the driver, and require the run to go RED". That control measures something only
+# if the copy is importable: a mutant tree that cannot be imported has not been
+# mutated into a failure, it has been broken, and the refusal it fails to produce
+# proves nothing about the fix. #1034 was exactly that — `fleet/gatelock.py` gained
+# the lease dependency (#977), `copy_tree` above was not taught to carry it, and
+# the mutant run died at import with `ModuleNotFoundError: No module named 'lease'`
+# while the control reported "the mutated driver could not run at all". The
+# precondition below measures the copy's imports directly, so a forgotten fixture
+# dependency is FAILED BY NAME here instead of surfacing as an unexplained mutant
+# death, and the mutant run is skipped rather than re-reported.
+copied_modules=(
+  governance.isolation.identity
+  governance.isolation.worktree
+  governance.lifecycle.cli
+)
+tree_imports() { # tree_imports <tree> <log> -> 0 when every copied module imports
+  ( cd "$1" && env PYTHONDONTWRITEBYTECODE=1 python3 -c '
+import importlib, os, sys
+sys.path.insert(0, os.getcwd())
+for name in sys.argv[1:]:
+    importlib.import_module(name)
+' "${copied_modules[@]}" ) >"$2" 2>&1
+}
+fixture_ok=1
+if tree_imports "$mutant" "$work/import-mutant.txt"; then
+  ok "the mutant copy imports every module the driver imports — the reverts are the only difference from the tree under test"
+else
+  bad "the mutant copy imports every module the driver imports" "$(tail -1 "$work/import-mutant.txt")"
+  fixture_ok=0
+fi
 git init -q -b master "$mutant_scratch" >/dev/null 2>&1
 git -C "$mutant_scratch" config user.name "Gate Human"
 git -C "$mutant_scratch" config user.email "gate-human@example.com"
@@ -462,7 +518,10 @@ path.write_text(text[:start] + mutant + text[end:], encoding="utf-8")
 print("  OK    the lane selector is reverted to the pre-fix accident (later record wins)")
 PY
 
-if ! run_driver "$mutant" "$mutant_scratch" "$work/mutant-lanes" "$work/mutant-out.txt"; then
+if [ "$fixture_ok" -eq 0 ]; then
+  echo "  FAIL  the mutant control was not measured: the mutant copy cannot import the tree under test (the FAIL above names what the copy is missing)" >&2
+  fail=$((fail + 1))
+elif ! run_driver "$mutant" "$mutant_scratch" "$work/mutant-lanes" "$work/mutant-out.txt"; then
   echo "  FAIL  the mutated driver could not run at all (a mutation that breaks the tree proves nothing)" >&2
   sed 's/^/        /' "$work/mutant-out.txt" >&2
   fail=$((fail + 1))

@@ -10,7 +10,23 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from conftest import SNAPSHOT, sample_path
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_knowledge_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+SNAPSHOT = _conftest.SNAPSHOT
+sample_path = _conftest.sample_path
 
 from indexer import build_index, drift_findings, load_catalog, write_catalog
 from model import (
@@ -111,7 +127,7 @@ def test_expected_kind_warning_names_a_reason(tree: Path):
 
 def test_secret_shaped_asset_is_an_error_not_a_silent_index(tree: Path):
     """NEGATIVE CONTROL: an indexed asset carrying a credential fails the build."""
-    from conftest import credentialed_literal
+    credentialed_literal = _conftest.credentialed_literal
 
     def reader(path):
         return credentialed_literal()

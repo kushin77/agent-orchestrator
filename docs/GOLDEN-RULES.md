@@ -65,6 +65,18 @@ Every rule has exactly three parts:
   must ship it with the surface — a rule whose verification "cannot run yet" is
   stated honestly as such, never silently assumed green.
 
+Part B rules (AO-GR-12…20, the platform/SaaS spine) carry a fourth part:
+
+- **Control** — `**Control.** modules: `a/`, `b/` — controls: `check-x.sh`,
+  `suite:dir``. Names the enforcing gate control(s) and the implementing
+  module(s). It is machine-checked: `scripts/check-control-coverage.sh`
+  parses this line and requires its modules and controls to be the exact same
+  set as the rule's row in `scripts/control-coverage.tsv`, in both
+  directions, so the spine line and the map cannot drift apart (#873).
+
+Part C rules also carry a fourth part, **Origin**, unrelated to Control (see
+Part C below).
+
 ## Policy spine (adopted policies)
 
 Issue #7 mandates that the policy spine explicitly adopt six policies. They are
@@ -271,6 +283,8 @@ not write the code").
 - A control-plane change that adds an "execute work" path fails review
   (structural/static check once CI lands, issue #6).
 
+**Control.** modules: `control-plane/` — controls: `check-control-functions.sh`, `check-control-verbs.sh`
+
 ### AO-GR-13 — Independent auditor
 
 **Rule.** AI/agent output is verified by an **independent** party that executes
@@ -288,6 +302,8 @@ artifact's boundary, not its prose.
 - Audit verdicts are published and reference the command that proves them.
 - The audit log is consulted **before** retrying failed work (leaderboard R12) —
   a published re-check command outranks any agent's reading of the code.
+
+**Control.** modules: `governance/merge/`, `governance/lifecycle/` — controls: `check-landing.sh`, `suite:governance/merge`
 
 ### AO-GR-14 — Separation of duties
 
@@ -308,6 +324,8 @@ approval-gate & agent-orchestration-model; leaderboard R5).
   under autonomous merge the *independent* verification evidence is the second
   party (AO-GR-3/AO-GR-11).
 
+**Control.** modules: `governance/merge/`, `identity/rbac/` — controls: `check-authority.sh`
+
 ### AO-GR-15 — Tenant isolation is structural
 
 **Rule.** Tenants are hard-isolated across data, model routing, budgets, audit,
@@ -323,6 +341,8 @@ discovered months later (issue #30, tenant-isolation integrity).
   access attempt is denied (fail-closed).
 - A cross-tenant isolation test suite ships with the tenancy surface and a
   known-bad probe fails it (issue #30).
+
+**Control.** modules: `guardrails/isolation/`, `telemetry/ledger/`, `identity/edges/` — controls: `suite:guardrails/isolation`, `suite:telemetry/ledger`
 
 ### AO-GR-16 — DLP + prompt-injection defense on every model interaction
 
@@ -341,6 +361,8 @@ external-llm-egress-policy; issue #27).
 - Injection-defense tests include **negative controls** — a probe proven to fire
   (issue #27; AO-GR-4).
 
+**Control.** modules: `guardrails/dlp/`, `guardrails/chat/` — controls: `check-chat-guardrails.sh`
+
 ### AO-GR-17 — Tamper-evident audit ledger
 
 **Rule.** Every agent action and policy decision is recorded on an
@@ -357,6 +379,8 @@ telemetry contracts).
 - Append-only is enforced at the storage layer; a tamper attempt breaks the
   chain and fails the check (issue #31).
 
+**Control.** modules: `telemetry/ledger/`, `telemetry/audit/` — controls: `check-audit-read-model.sh`, `suite:telemetry/ledger`
+
 ### AO-GR-18 — Per-tenant budgets, quotas, and a kill switch
 
 **Rule.** Every tenant/agent runs within declared budgets and quotas with a
@@ -370,6 +394,8 @@ runaway must be containable by a single switch, not a support ticket
 - Metering → budget-enforcement path is exercised: a budget-violating call is
   blocked and metered.
 - The global kill switch halts the tenant/agent end-to-end (issue #34).
+
+**Control.** modules: `gateway/finops/`, `telemetry/chat/` — controls: `check-chat-finops.sh`, `check-metering-parity.sh`
 
 ### AO-GR-19 — Guard honesty: tri-state + negative controls
 
@@ -387,6 +413,8 @@ control doctrine).
 - Each guard has a negative-control fixture (a probe proven to fire it) in its
   test suite (issue #28).
 
+**Control.** modules: `guardrails/policy/`, `guardrails/honesty/` — controls: `check-negative-controls.sh`, `check-guardrail-controls.sh`, `check-policy-schema.sh`
+
 ### AO-GR-20 — Private by default
 
 **Rule.** Tenant data, agent orgs, and platform surfaces are **private by
@@ -402,6 +430,8 @@ into, not stumbled into (CMR GR-8 / SaaS escape-hatch ADR-0010).
   surface requires an explicit flag + separate security review.
 - Public/private posture is part of the surface's gate (issue #37 proxy
   allowlist boundary).
+
+**Control.** modules: `infra/feature-flags/`, `portal/config/` — controls: `check-feature-flags.py`
 
 ---
 
@@ -632,6 +662,68 @@ would silently corrupt the evidence chain, and the recurring
   a restart signal is recommended that the loop does not handle.
 - The runbook names the clean restart signal (`SIGTERM`) and states plainly that
   `SIGHUP` is unhandled and therefore destructive.
+
+---
+
+### AO-GR-28 — Every governed artifact is tagged, and a tag set derives its gates
+
+**Origin.** Issue #1175 (the tag authority) and issue #1183 (making it
+constitutional). Measured 2026-09-17: classification existed in five places —
+the conformance policy, the surface policy, the FinOps policy, the fleet
+vocabulary and the issue forms — and **none of them could say what a tag
+implies**. A lane could write `class:elite` and nothing connected that word to a
+gate, a FinOps floor, or a lifecycle stage.
+
+**Rule.** One declared vocabulary (`governance/tagging/taxonomy.yaml`)
+classifies every governed artifact — issue, PR, branch, commit, surface,
+release. The vocabulary **borrows** wherever this repository already has an
+authority and never re-declares one: the `class` ladder is borrowed from
+`governance/conformance/policy.yaml` and the FinOps tiers from
+`governance/finops/policy.json`, and the values are **mirrored and proven
+equal** by the gate — a borrow that reads its own values can never fail, so the
+mirror is what makes drift detectable. Two dimensions carry the delivery and
+lifecycle half: **`posture`** (`overall` | `saas` | `iac` | `no-human-needed` |
+`human-gated`) and **`lifecycle`** (`plan` | `build` | `verify` | `release` |
+`operate` | `retire`).
+
+A tag set **derives the gates it owes** — by channel (`pr`/`ci`/`cd`/`ops`) and
+at the FinOps floor the doctrine sets — so classification has consequences
+rather than being a description. Every gate a rule names must **resolve**
+(`make:<target>` against the Makefile, `check:<name>` against the check registry
+`scripts/verify.sh` builds): renaming a gate fails by name rather than describing
+a pipeline that no longer exists. `posture:no-human-needed` and
+`posture:human-gated` are **mutually exclusive** and both at once is refused by
+name — a contradiction is not a preference, and silently picking a winner is how
+a plan becomes a guess.
+
+**Why.** A vocabulary that lives nowhere in particular is a convention, not a
+contract: five copies of a classification scheme is five chances for them to
+disagree, and no way to notice. The failure this rule prevents is the one
+[ADR-0015](decision-records/ADR-0015-routing-seam-single-authority.md) names —
+*two things quietly both being authoritative* — and the mechanism is the
+repository's own mirrored-constant pattern (`governance/vocabulary/fleet.yaml` <->
+`fleet/channel.py`): declare once, mirror where a consumer must be fast, and let
+a gate hold the two equal.
+
+**The mandate is half the rule.** The rule is only constitutional while the
+contract documents declare it, so `AGENTS.md`, this spine, `docs/GOVERNANCE.md`,
+`docs/EXECUTION-PLAN.md` and `docs/QA-GATE.md` each declare it, and
+`scripts/check-tagging.sh`'s `tagging-mandate` check FAILS naming the document
+**and** the marker the moment one stops. A rule only prose carries is advice
+(AO-GR-4); a rule whose declaration is gated is a rule.
+
+**Verify.**
+- `scripts/check-tagging.sh` (in `make verify` by auto-discovery, and `make
+tagging`) — the authority's shape, every borrowed vocabulary proven equal to its
+authority, every rule's gate name resolved, every document against its frozen
+shape, the declared controls against the authority they govern, the generated
+matrix's freshness, and every declared refusal provoked by a real mutant with its
+clean twin accepted.
+- `tagging-mandate` — every marker above present in every contract document,
+  provoked by stripping each marker in a scratch copy and requiring the refusal
+  by name.
+- `python3 governance/tagging/cli.py plan --tag …` — the gates a tag set owes;
+  `… board --live` — what the board actually declares.
 
 ---
 

@@ -18,6 +18,25 @@ PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PKG_DIR not in sys.path:
     sys.path.insert(0, PKG_DIR)
 
+# governance/merge shares the bare basenames "model" and "gate" with sibling
+# governance/* suites. Evict any stale sys.modules entry from an
+# earlier-collected suite before this directory's test modules do their own
+# bare imports, so they resolve against THIS package's files (issues #699,
+# #702, #1042).
+for _name in ("model", "gate"):
+    sys.modules.pop(_name, None)
+
+# Import THIS package's "model" and "gate" NOW (while sys.path/sys.modules are
+# freshly correct) and keep private references, rather than re-importing the
+# bare names lazily inside fixtures below. A lazy ``from model import ...``
+# executed at TEST-EXECUTION time (fixture call) would run after collection
+# has already imported every governance suite's conftest, so sys.modules may
+# by then hold a sibling suite's "model"/"gate" (issues #699, #702, #1042).
+import importlib as _importlib
+
+_merge_model = _importlib.import_module("model")
+_merge_gate = _importlib.import_module("gate")
+
 
 def _card(
     persona_id: str,
@@ -129,7 +148,7 @@ def executor_only_cards() -> dict:
 @pytest.fixture
 def pr_factory():
     """Factory for a fresh MergePr under test."""
-    from model import MergePr
+    MergePr = _merge_model.MergePr
 
     def make(
         number: int = 1,
@@ -162,7 +181,7 @@ def assigner(mini_cards):
 @pytest.fixture
 def green_outcome():
     """A green verify outcome naming a commit (attestation present)."""
-    from gate import outcome_from_exit_code
+    outcome_from_exit_code = _merge_gate.outcome_from_exit_code
 
     return outcome_from_exit_code(0, "abc123", evidence="make verify green")
 
@@ -170,7 +189,7 @@ def green_outcome():
 @pytest.fixture
 def red_outcome():
     """A NOT-OK verify outcome (the gate genuinely failed)."""
-    from gate import outcome_from_exit_code
+    outcome_from_exit_code = _merge_gate.outcome_from_exit_code
 
     return outcome_from_exit_code(1, "abc123", evidence="tests failed")
 
@@ -178,6 +197,6 @@ def red_outcome():
 @pytest.fixture
 def cannot_outcome():
     """A CANNOT-ASSESS verify outcome (no verdict — never a pass)."""
-    from gate import outcome_from_exit_code
+    outcome_from_exit_code = _merge_gate.outcome_from_exit_code
 
     return outcome_from_exit_code(2, "abc123", evidence="timeout, no verdict")

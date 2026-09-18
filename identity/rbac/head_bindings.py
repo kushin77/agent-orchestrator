@@ -49,9 +49,9 @@ default OFF; nothing here defaults ON either).
 
 from __future__ import annotations
 
-from rbac.model import SUBJECT_AGENT, Binding, Org, Role, ScopeNode
-from rbac.guard import Decision, guard
-from rbac.presets import RolePack, load_pack
+from .model import SUBJECT_AGENT, Binding, Org, Role, ScopeNode
+from .guard import Decision, guard
+from .presets import RolePack, load_pack
 
 #: Pack key for `presets/head-agents.yaml` - not a tenant type (see module
 #: docstring): loaded by name, exactly like `CSUITE_PACK_KEY`.
