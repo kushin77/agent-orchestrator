@@ -53,7 +53,12 @@ from fleet.runner.model import (
     PruneResult,
 )
 
-DEFAULT_CAPACITY = 3
+from fleet.runner.capacity import default_capacity as _default_capacity
+import os as _os
+
+#: The fan-out width when nothing declares one: min(8, nproc // 2), never a
+#: literal. The declared width is `AO_RUNNER_CAPACITY` (fleet/runner/capacity.py).
+DEFAULT_CAPACITY = _default_capacity(_os.cpu_count() or 2)
 
 
 def _order(actions: list[Action]) -> list[Action]:

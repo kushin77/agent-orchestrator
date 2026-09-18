@@ -25,8 +25,16 @@ together. **The runner merges; sessions open PRs.**
    the `control-plane-verify` check-run, the `ao/gate-of-record` status and the
    local markers; live builds; the hold set.
 5. **Plan** (`fleet/runner/plan.py`, pure) → ordered actions.
-6. **Execute**: cancel stale builds → verify up to `--capacity` (3) heads in
+6. **Execute**: cancel stale builds → verify up to the fan-out width in
    parallel, each in its own held worktree → merge the greens.
+
+The width is declared, never a literal: `AO_RUNNER_CAPACITY` (env contract;
+empty = `min(8, nproc // 2)`), `--capacity` overrides per run. Before each
+fan-out `fleet/runner/capacity.py` backs it off — never below 1 — when the
+1-minute load exceeds nproc (`capacity-backoff:load:<load>/<nproc>`) or
+MemAvailable is under `AO_RUNNER_MEM_FLOOR_GB` (default 8,
+`capacity-backoff:memory:<gb><floor>`); the `capacity` ledger row carries
+declared/effective/reason and `status` prints it.
 
 Merges are **dry-run unless `--apply`**: the merged-tree seam runs and
 `scripts/merge-pr.sh` runs in its own dry-run mode. The verify + post half is
@@ -108,8 +116,12 @@ declared, reconciled and never installed.
 
 ### Owner steps on the pair (192.168.168.42)
 
+The pair's git clone is `~/ao-verify-repo` (`~/agent-orchestrator` there is a
+NON-git copy); its interpreter is the `~/ao-verify-venv` venv (python 3.14).
+
 ```bash
-cd ~/agent-orchestrator && git fetch origin master && git checkout master && git pull --ff-only
+export PATH=$HOME/ao-verify-venv/bin:$HOME/.local/bin:/snap/bin:$PATH
+cd ~/ao-verify-repo && git fetch origin master && git checkout master && git pull --ff-only
 AO_RUNNER_HOST_ROLE=primary python3 fleet/runner/cli.py run --once          # dry-run merges; verifies + posts
 AO_RUNNER_HOST_ROLE=primary python3 fleet/runner/cli.py run --once --apply  # merges the greens
 AO_RUNNER_HOST_ROLE=primary python3 fleet/cron.py install                   # schedule the rung

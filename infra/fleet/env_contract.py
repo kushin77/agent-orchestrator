@@ -203,6 +203,27 @@ VARS: tuple[Var, ...] = (
             "otherwise. The default is standby, so a host that says nothing merges nothing."
         ),
     ),
+    Var(
+        name="AO_RUNNER_CAPACITY",
+        default="",
+        kind="optional",
+        code="runner-capacity-invalid",
+        why=(
+            "issue #1343: the PR runner's parallel-verify width. Empty = min(8, nproc // 2) "
+            "(fleet/runner/capacity.py); a positive integer declares it. Backed off under load "
+            "or below the memory floor either way, never below 1."
+        ),
+    ),
+    Var(
+        name="AO_RUNNER_MEM_FLOOR_GB",
+        default="8",
+        kind="positive-int",
+        code="runner-mem-floor-not-a-positive-integer",
+        why=(
+            "issue #1343: the MemAvailable floor (GB) below which the PR runner halves its "
+            "fan-out before each cycle (capacity-backoff:memory)."
+        ),
+    ),
 )
 
 BY_NAME: dict[str, Var] = {var.name: var for var in VARS}

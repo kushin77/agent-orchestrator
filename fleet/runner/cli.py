@@ -64,6 +64,7 @@ from fleet.runner.model import (  # noqa: E402
     PruneResult,
 )
 from fleet.runner.plan import DEFAULT_CAPACITY, explain, plan  # noqa: E402
+from fleet.runner import capacity as capacity_mod  # noqa: E402
 from fleet.runner import merge as merge_mod  # noqa: E402
 from fleet.runner import verify as verify_mod  # noqa: E402
 from fleet.runner.verify import Command, Ledger, Result  # noqa: E402
@@ -225,14 +226,31 @@ def cycle(
     *,
     base: Path,
     apply: bool,
-    capacity: int = DEFAULT_CAPACITY,
+    capacity: int | None = None,
     execute: bool = True,
     out=sys.stdout,
+    host_probe=capacity_mod.probe_host,
 ) -> int:
-    """One full cycle. Returns the tri-state rc."""
+    """One full cycle. Returns the tri-state rc.
+
+    `capacity` is the `--capacity` override; otherwise the width is
+    `AO_RUNNER_CAPACITY` (env contract) or min(8, nproc // 2). Either way it is
+    backed off before the fan-out when the host is loaded (capacity.py) and the
+    effective width is ledgered.
+    """
     base.mkdir(parents=True, exist_ok=True)
     ledger = Ledger(base / "ledger.jsonl")
     ledger.record("cycle-start", apply=apply, execute=execute, role=transports.env.get(ROLE_ENV, ""))
+    load1, mem_gb, nproc = host_probe()
+    declared = int(capacity) if capacity is not None else capacity_mod.declared_capacity(transports.env, nproc=nproc)
+    width = capacity_mod.effective_capacity(
+        declared, load1=load1, mem_available_gb=mem_gb, nproc=nproc, mem_floor_gb=capacity_mod.declared_mem_floor_gb(transports.env)
+    )
+    ledger.record("capacity", declared=width.declared, effective=width.effective, reason=width.reason or "none", load1=load1, mem_available_gb=mem_gb, nproc=nproc)
+    if width.reason:
+        print(f"  NOTE  {width.reason}: fan-out {width.declared} -> {width.effective}", file=out)
+        ledger.record("note", detail=width.reason)
+    capacity = width.effective
 
     if execute:
         refusal = role_refusal(transports.env)
@@ -377,6 +395,10 @@ def cmd_status(args: argparse.Namespace) -> int:
     starts = [r for r in rows if r.get("event") == "cycle-start"]
     last = cycles[-1] if cycles else None
     print(f"runner: status — {len(starts)} cycle(s) started, last rc {last.get('rc') if last else 'n/a'} at {last.get('at') if last else 'n/a'}")
+    caps = [r for r in rows if r.get("event") == "capacity"]
+    if caps:
+        cap = caps[-1]
+        print(f"  capacity: declared {cap.get('declared')} effective {cap.get('effective')} ({cap.get('reason')}) at {cap.get('at')}")
     for row in [r for r in rows if r.get("event") == "cannot-assess"][-3:]:
         print(f"  CANNOT-ASSESS {row.get('reason')} at {row.get('at')}")
     for line in status_lines(rows, holds):
@@ -429,7 +451,7 @@ def plan_from_fixture(path: Path, capacity: int = DEFAULT_CAPACITY) -> list[Acti
 
 def cmd_plan(args: argparse.Namespace) -> int:
     if args.fixture:
-        for line in explain(plan_from_fixture(Path(args.fixture), args.capacity)):
+        for line in explain(plan_from_fixture(Path(args.fixture), args.capacity if args.capacity is not None else DEFAULT_CAPACITY)):
             print(line)
         return OK
     return cycle(Transports.real(), base=runner_dir(), apply=False, capacity=args.capacity, execute=False)
@@ -461,7 +483,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("plan", help="print the planned actions; nothing is executed")
-    p.add_argument("--capacity", type=int, default=DEFAULT_CAPACITY)
+    p.add_argument("--capacity", type=int, default=None, help="override the declared width (AO_RUNNER_CAPACITY)")
     p.add_argument("--fixture", help="plan from a JSON fixture instead of GitHub (offline; the gate uses this)")
     p.set_defaults(func=cmd_plan)
 
@@ -470,7 +492,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--once", action="store_true", default=True)
     mode.add_argument("--loop", action="store_true")
     r.add_argument("--apply", action="store_true", help="really merge (default: the merge verb runs in dry-run)")
-    r.add_argument("--capacity", type=int, default=DEFAULT_CAPACITY, help="parallel verifies (default 3)")
+    r.add_argument("--capacity", type=int, default=None, help="override the declared width (AO_RUNNER_CAPACITY, default min(8, nproc//2)); backed off under load either way")
     r.add_argument("--interval", type=int, default=120, help="seconds between --loop cycles")
     r.set_defaults(func=cmd_run)
 
