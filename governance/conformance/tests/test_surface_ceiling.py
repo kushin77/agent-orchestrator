@@ -15,14 +15,15 @@ Two additions to the per-surface check (ADR-0031):
 Both checks stay silent when their input is absent (no ceiling key, no
 manifest), so the existing suite's exact finding-code assertions still hold.
 
-EPIC #878 flip note: the real tree's product floor is now `elite` — the
-ladder's top rung — so the above-floor negative control can no longer be run
-against the real tree (there is no rung left to mutate into). That real-tree
-variant was replaced by
-``test_real_tree_floor_is_elite_so_no_rung_can_mutate_above_it``, which
-asserts the floor really is the top rung and that the real manifest declares
-exactly it; the negative-control *mechanism* itself stays proven by the two
-synthetic-policy tests named above.
+EPIC #878 flip note: that flip put every product surface at `elite`, the
+ladder's top rung, so the above-floor negative control could no longer be run
+against the real tree (there was no rung left to mutate into) and it was
+replaced by a real-tree pin. Issue #1256 declared the five module roots at the
+rungs their evidence measures, which puts the floor back at `pattern` and makes
+the real-tree control expressible again — so the pin is gone and
+``test_real_tree_mutant_manifest_declaring_elite_is_refused_by_name`` now
+PROVOKES the refusal in the real policy instead of restating the floor. The
+synthetic-policy controls named above stay as they were.
 """
 
 from __future__ import annotations
@@ -100,7 +101,8 @@ def policy_doc(**overrides) -> dict:
         },
         "requirements": base_requirements(),
         "surface_roots": [],
-        "waived_roots": [],
+        # A waiver is a name -> reason mapping (issue #1256).
+        "waived_roots": {},
         "surfaces": [],
     }
     doc.update(overrides)
@@ -389,21 +391,40 @@ def test_real_policy_ceilings_are_the_three_non_product_rows():
             assert row["ceiling_reason"].strip(), row["surface"]
 
 
-def test_real_tree_floor_is_elite_so_no_rung_can_mutate_above_it(tmp_path):
-    # EPIC #878 flip: every product surface now measures `elite`, so the real
-    # product floor is the ladder's top rung. There is no rung left above
-    # `elite` to mutate the manifest into, so the above-floor negative control
-    # this test used to run against the real tree is no longer expressible
-    # here (it stays covered generically by the synthetic-policy negative
-    # controls: test_cli_refuses_a_mutant_manifest and
-    # test_cli_module_flag_overrides_the_manifest_path). What we can still
-    # assert against the real tree is that the floor really is the top rung,
-    # and the real manifest declares exactly the floor, never above it.
+def test_real_tree_mutant_manifest_declaring_elite_is_refused_by_name(tmp_path):
+    # Restored by issue #1256, and strictly stronger than the pin it replaces:
+    # declaring the five module roots at the rungs their evidence measures puts
+    # the real product floor back at `pattern`, so the real tree CAN mutate a
+    # manifest one rung above the floor again — and the check must refuse it by
+    # name. `docs/SURFACE-CLASS.md` has named this test since ADR-0031; the elite
+    # floor made that name unwritable for a while, and this is what makes it
+    # true again.
     policy = load_surface_policy(REAL_POLICY)
     rows, _ = evaluate_surfaces(policy, ROOT)
-    floor, _holders = product_floor(policy, rows)
-    assert floor == policy.ladder[-1] == "elite"
+    floor, holders = product_floor(policy, rows)
+    assert floor == "pattern"
+    assert set(holders) >= {"engine", "identity", "control-plane", "fleet"}
+    mutant = tmp_path / "module.json"
+    mutant.write_text(json.dumps({MODULE_CLASS_KEY: "elite"}), encoding="utf-8")
+    findings = evaluate_module_class(policy, rows, mutant)
+    assert codes(findings) == {CODE_MODULE_ABOVE_FLOOR}
+    [above] = findings
+    assert above.severity == "error"
+    assert "'elite'" in above.message
+    assert "'pattern'" in above.message
+    assert "engine" in above.message
+    # The real manifest declares exactly the floor, never above it.
     manifest = json.loads(REAL_MODULE.read_text(encoding="utf-8"))
     assert manifest[MODULE_CLASS_KEY] == floor
-    findings = evaluate_module_class(policy, rows, REAL_MODULE)
-    assert findings == [], [f.message for f in findings]
+    assert evaluate_module_class(policy, rows, REAL_MODULE) == []
+
+
+def test_real_tree_floor_is_below_the_top_rung_so_a_mutant_is_expressible():
+    # The precondition the control above depends on, asserted rather than
+    # assumed: a floor at the ladder's top rung would make its mutation
+    # impossible and the control a formality.
+    policy = load_surface_policy(REAL_POLICY)
+    rows, _ = evaluate_surfaces(policy, ROOT)
+    floor, _ = product_floor(policy, rows)
+    assert floor != policy.ladder[-1]
+    assert policy.rank(floor) + 1 < len(policy.ladder)
