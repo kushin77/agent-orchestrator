@@ -151,6 +151,47 @@ Quarantined artifacts are still **reported on every pass**, by name, in the
 verdict: rule 17's "reported until someone resolves it" is satisfied by the
 report, and the tracking issue carries the resolution.
 
+## An exemption that protects nothing is refuted (#1311)
+
+The rules above make an entry fail when its artifact is **gone**, when its tip has
+**moved**, or when the lease has **lapsed**. All three measure the entry against
+*itself*. None of them re-measures the claim the entry is there to make: that this
+work exists nowhere else. Measured on #1311 — five of the document's 23 entries
+said *"no commit on the default branch carries its work"* while a commit on the
+default branch carried an **identical** ``git patch-id --stable``, because the
+squash that landed them named the pull request in its subject and the issue
+nowhere in a ``Closes #n`` line. Each was honoured, reported, and excused —
+silently, by exactly the gap this section closes.
+
+So every **honoured** entry is also re-measured for whether it is still *needed*,
+and an exemption that is not is **REFUTED**, reported by name, and **fatal**:
+
+* the artifact's **whole** committed work is already on the default branch, by
+  patch identity — :func:`landing.RepoLanding.surplus_patch_identity`, whose
+  candidate set is the default branch's commits touching a path the artifact
+  changed, so it can see a landing the audit's declared convention cannot;
+* and, for a **worktree**, it holds no uncommitted work of its **own** —
+  ``governance/isolation/worktree.foreign_uncommitted``, the repository's own
+  declaration of the paths a reclaim must refuse (#830/#1118). Residue a machine
+  rewrites (``.board/focus.json``, ``.board/snapshot.json``, ``.fleet/``) is not
+  lane work: a tree dirty only in it is holding nothing an exemption protects. A
+  **branch** has no uncommitted state, so the patch proof alone decides it.
+
+This is the same class of statement as a stale exemption, and it is fatal for the
+same reason: the exemption outlived its need. Refusing to excuse it would also be
+wrong — the artifact *is* on disk and the audit still cannot explain it — so the
+entry stays **honoured** and the verdict carries one named failure instead: the
+demand that the document shrink. A landed-by-content artifact's home is
+:file:`real-tree-baseline.json` (a reviewed, name-keyed exception whose stale arm
+is deliberately non-fatal), which is the route #1323/#1324 took for
+``issue-1158``. Refutation is evaluated only for entries that are **in force**
+(same venue, live lease): a document that is inert here cannot be refuted here.
+
+Every unreadable state — no default ref, a failed ``git``, an unmeasurable
+status, a candidate list past its bound — leaves the exemption **honoured**. The
+proof's only power is to demand that a protection be given up, so every path on
+which it cannot be proved must leave the protection standing.
+
 ## An exemption has a venue (#1317 → #1321)
 
 An exemption's artifact is a **disk artifact of one repository instance** — a
@@ -340,6 +381,11 @@ class RealTreeVerdict:
     vanished: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     quarantined: tuple[QuarantineEntry, ...] = field(default_factory=tuple)
     stale_quarantine: tuple[BaselineEntry, ...] = field(default_factory=tuple)
+    #: Honoured entries whose excuse was re-measured and is no longer needed
+    #: (#1311): the artifact's whole work is on the default branch, and (for a
+    #: worktree) it holds no uncommitted work of its own. Named, and fatal — an
+    #: exemption nobody re-measures is how five false reasons survived.
+    refuted_quarantine: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     #: Entries of a document that is not in force in this venue (#1321): reported
     #: by name, honouring nothing, and NOT fatal — see "An exemption has a venue".
     inapplicable_quarantine: tuple[QuarantineEntry, ...] = field(default_factory=tuple)
@@ -364,7 +410,16 @@ class RealTreeVerdict:
         # A stale *quarantine* entry is the opposite: losing that artifact would
         # mean the worker discarded work that exists nowhere else, so the excuse
         # outliving its need — or its lease lapsing — is exactly what must bite.
-        return self.assessable and not self.new_violations and not self.stale_quarantine
+        #
+        # A *refuted* entry (#1311) is the same defect measured from the other
+        # side: an excuse that no longer excuses anything, because the work it
+        # was protecting is already on the default branch. Also fatal, and named.
+        return (
+            self.assessable
+            and not self.new_violations
+            and not self.stale_quarantine
+            and not self.refuted_quarantine
+        )
 
     def describe(self) -> str:
         if not self.assessable:
@@ -387,6 +442,8 @@ class RealTreeVerdict:
             lines.append(f"  VANISHED {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.stale_quarantine:
             lines.append(f"  STALE-QUARANTINE {entry.kind} {entry.name} — {entry.reason}")
+        for entry in self.refuted_quarantine:
+            lines.append(f"  REFUTED-QUARANTINE {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.young:
             lines.append(f"  YOUNG    {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.new_violations:
@@ -463,6 +520,67 @@ def artifact_tip(root: Path | str, kind: str, name: str) -> str:
     if kind == "worktree":
         return worktree_head(name)
     return ""
+
+
+class _Surplus:
+    """Is this exemption still *needed*? Lazily built, memoized, fail-closed (#1311).
+
+    Building the prover costs a couple of `git` calls, so it is built on first use
+    and only ever for entries that are actually honoured: a document that is inert
+    here, holds no entries, or whose lease has lapsed never pays for it.
+
+    Every failure mode answers ``""``. Refutation is the only thing in this module
+    that can ask for a protection to be *given up*, so anything unprovable must
+    leave the protection standing.
+    """
+
+    def __init__(self, root: Path | str) -> None:
+        self._root = root
+        self._prover = None
+        self._unavailable = False
+
+    def _patch_proof(self, tip: str) -> str:
+        if self._prover is None and not self._unavailable:
+            from governance.reconcile.landing import LandingUnavailable, RepoLanding
+
+            try:
+                self._prover = RepoLanding(self._root)
+            except LandingUnavailable:
+                # No default ref, no repository git can read: nothing to prove.
+                self._unavailable = True
+        if self._prover is None:
+            return ""
+        return self._prover.surplus_patch_identity(tip)
+
+    def refusal(self, kind: str, name: str, tip: str) -> str:
+        """``""`` while the exemption is still needed; else why it no longer is."""
+        sha = self._patch_proof(tip)
+        if not sha:
+            return ""
+        remedy = (
+            "Remove this exemption in a reviewed edit and record the artifact in "
+            "real-tree-baseline.json (a landed-by-content artifact is not the rule 17 class: "
+            "reaping it loses no work — #1323/#1324 did exactly this for issue-1158)"
+        )
+        if kind == "worktree":
+            from governance.isolation.worktree import foreign_uncommitted
+
+            try:
+                foreign = foreign_uncommitted(name)
+            except Exception:  # noqa: BLE001 — an unreadable worktree is never a refutation
+                return ""
+            if foreign:
+                return ""
+            return (
+                f"its whole committed work is already on the default branch at {sha[:12]} "
+                "(patch identity) and it holds no uncommitted work of its own — residue a machine "
+                "rewrites (.board/focus.json, .board/snapshot.json, .fleet/) is not lane work, so "
+                f"this exemption protects nothing. {remedy}"
+            )
+        return (
+            f"its whole work is already on the default branch at {sha[:12]} (patch identity: "
+            f"`git patch-id --stable`), so this exemption protects nothing. {remedy}"
+        )
 
 
 def repository_venue(root: Path | str) -> str:
@@ -651,6 +769,12 @@ def check_real_tree(
     it no artifact is excused — the fail-closed direction, since an exemption is
     the only thing here that can turn a finding into a pass.
 
+    An entry that is in force is also re-measured for whether it is still
+    *needed*: one whose artifact's whole work is already on the default branch is
+    reported in ``refuted_quarantine`` and fails the verdict (#1311 — see "An
+    exemption that protects nothing is refuted"). It is still honoured, so the
+    single named failure is the demand that the document shrink.
+
     ``grace_hours`` defaults to the declared policy
     (``governance/policy/lease.REAL_TREE_GRACE_HOURS``); a caller may override
     it (the self-control / mutation tests pass ``0`` to prove the grace window
@@ -677,9 +801,11 @@ def check_real_tree(
     # --- the named, leased quarantine (#1291), scoped to its venue (#1321) ---
     quarantine_entries: list[QuarantineEntry] = []
     stale_quarantine: list[BaselineEntry] = []
+    refuted_quarantine: list[BaselineEntry] = []
     inapplicable_quarantine: list[QuarantineEntry] = []
     quarantine_note = ""
     honoured: dict[_KEY, QuarantineEntry] = {}
+    surplus_prover = _Surplus(root)
     venue = ""
     declared_venue = ""
     quarantine_applicable = True
@@ -777,6 +903,15 @@ def check_real_tree(
                             )
                             continue
                         honoured[entry.key] = entry
+                        # ... and an honoured entry is re-measured for whether it is
+                        # still *needed* (#1311). It stays honoured: the artifact IS
+                        # on disk and the audit still cannot explain it, so the only
+                        # honest failure is the named demand that the document shrink.
+                        surplus = surplus_prover.refusal(entry.kind, entry.name, entry.tip)
+                        if surplus:
+                            refuted_quarantine.append(
+                                BaselineEntry(kind=entry.kind, name=entry.name, reason=surplus)
+                            )
 
     unbaselined = sorted(unmatched_keys - set(baseline_by_key))
     young: list[BaselineEntry] = []
@@ -826,6 +961,7 @@ def check_real_tree(
         vanished=tuple(vanished),
         quarantined=tuple(quarantined),
         stale_quarantine=tuple(stale_quarantine),
+        refuted_quarantine=tuple(refuted_quarantine),
         inapplicable_quarantine=tuple(inapplicable_quarantine),
         venue=venue,
         quarantine_venue=declared_venue,

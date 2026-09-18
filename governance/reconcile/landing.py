@@ -49,6 +49,18 @@ branch, proven three ways, strongest first:
    *remove* five exemptions, so it is reported to the owner rather than taken
    here; this generator deliberately searches only the two declared halves.
 
+   **The wider search exists, and it is a refuter — never an excuse** (issue
+   #1311). :func:`RepoLanding.surplus_patch_identity` searches the default
+   branch's commits that *touch a path the artifact changed* rather than the
+   ones that name its issue, so it finds a squash landing whose message names a
+   pull request and an issue it never closes. It is deliberately **not** wired
+   into the three proofs above: granting an excuse from a wider candidate set
+   would *reduce* the real-tree findings on the owner's behalf, which is the
+   decision this docstring declines. Its only caller is the quarantine, where it
+   answers the opposite question — "does this exemption still protect
+   anything?" — and where a proof can only ever demand that the exemption list
+   **shrink** (``real_tree_baseline.exemption_surplus``), never hide a finding.
+
 ## What it deliberately does NOT do
 
 * **No wildcard.** An artifact is never excused because a record somewhere names
@@ -108,6 +120,12 @@ RECORD_SEPARATOR = "\x1e"
 
 #: How many candidate landing commits to patch-compare for one artifact.
 MAX_CANDIDATE_COMMITS = 40
+
+#: How many candidates the *refuter* (:func:`RepoLanding.surplus_patch_identity`)
+#: patch-compares. A latency guard, never a claim: past the bound the artifact
+#: keeps whatever exemption it holds, which is the fail-closed direction for a
+#: proof whose only power is to demand that an exemption be removed.
+MAX_SURPLUS_CANDIDATE_COMMITS = 60
 
 #: The longest a single ``git`` call may take before it is treated as unreadable.
 GIT_TIMEOUT_SECONDS = 60
@@ -316,6 +334,54 @@ class RepoLanding:
             if self._commit_patch_id(sha) == wanted:
                 return sha
         return None
+
+    # -- the refuter (issue #1311) ------------------------------------------
+
+    def surplus_patch_identity(self, tip: str) -> str:
+        """The default-branch commit carrying this tip's WHOLE work, else ``""``.
+
+        ``_patch_identity`` above answers the *audit's* question — "may I excuse
+        this finding?" — from the declared landing convention, and is deliberately
+        narrow: an excuse it cannot prove is never granted. This answers the
+        opposite question, and is deliberately wide: "is this artifact's work on
+        the default branch *at all*, whatever its message happened to name?"
+
+        The difference matters because the two are not symmetrical. A missed
+        excuse leaves a finding visible (the safe direction, and the owner's
+        decision to widen — see the module docstring). A missed *refutation*
+        leaves an exemption in place that protects nothing, and an exemption
+        nobody re-measures is how five entries on issue #1311 came to claim "no
+        commit on the default branch carries its work" while a commit does, by
+        ``git patch-id --stable``, for work that landed under a message naming
+        the pull request and never the issue.
+
+        Widening the *search* is still not widening the *proof*: every candidate
+        is patch-compared, and the candidate set is the default branch's own
+        commits **touching a path this tip changed** — a necessary condition for
+        an identical patch (``patch-id`` hashes the diff), not a heuristic. It is
+        bounded by :data:`MAX_SURPLUS_CANDIDATE_COMMITS` and returns ``""`` for
+        every state it cannot read, so an unproven surplus never removes
+        anything.
+        """
+        if self.ref is None:
+            return ""
+        # Three-dot: the patch is the tip's own change, not the default branch's drift.
+        diff = self._run(["diff", "--no-color", f"{self.ref}...{tip}"])
+        if not diff:
+            return ""
+        wanted = self._patch_id(diff)
+        if not wanted:
+            return ""
+        paths = self._changed_paths(tip)
+        if not paths:
+            return ""
+        listing = self._run(["log", "--format=%H", self.ref, "--", *paths])
+        if listing is None:
+            return ""
+        for sha in listing.split()[:MAX_SURPLUS_CANDIDATE_COMMITS]:
+            if self._commit_patch_id(sha) == wanted:
+                return sha
+        return ""
 
     # -- the answer ---------------------------------------------------------
 

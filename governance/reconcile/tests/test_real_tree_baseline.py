@@ -684,6 +684,239 @@ def test_the_real_quarantine_document_is_well_formed_and_every_entry_is_pinned()
         assert len(entry.reason.strip()) > 40, f"the reason must say something: {entry.name}"
 
 
+# --- an exemption that protects nothing is refuted (#1311) -------------------
+#
+# The rules above measure an entry against *itself* (gone, moved, lapsed). These
+# measure the claim the entry exists to make — that this work exists on no other
+# ref — and they are the ones the five false reasons on issue #1311 slipped past.
+# The positive halves matter as much as the negative one: a rule that refuted
+# every exemption would satisfy the refutation test alone.
+
+
+def _landed_by_content_branch(
+    repo: Path, name: str = "issue-7000", *, landed: bool = True
+) -> tuple[str, str | None]:
+    """``(tip, landing)`` — a branch whose whole work IS on the default branch,
+    yet stays a finding, built to the shape measured on issue #1311:
+
+    * the two commits are **distinct objects carrying the same diff** (the branch
+      commit is backdated, so it is never the landing commit itself) — a squash
+      landing, which is what makes ancestry blind to it;
+    * the landed path has drifted since — tree containment compares the *current*
+      default branch, so it fails;
+    * the landing's message names the pull request (``#7001``), never the issue,
+      so the audit's candidate set for ``issue-7000`` is empty.
+
+    ``landed=False`` builds the same branch with **no** landing on the default
+    branch: the positive control, where the exemption must survive. Either way
+    ``refs/remotes/origin/master`` is created, because without a default ref the
+    refuter proves nothing (fail-closed) — which is the state every other fixture
+    in this file is in.
+    """
+    (repo / "f.txt").write_text("base\n", encoding="utf-8")
+    _git(repo, "add", "f.txt")
+    _git(repo, "commit", "-q", "-m", "base with f.txt")
+    base = _git(repo, "rev-parse", "HEAD").strip()
+    _git(repo, "checkout", "-q", "-b", name, base)
+    (repo / "f.txt").write_text("landed\n", encoding="utf-8")
+    _git(repo, "add", "f.txt")
+    _git_commit_with_date(
+        repo,
+        "ask the clock invariant where a lane is shaped (#7001)",
+        when_epoch=time.time() - 30 * 24 * 3600,
+    )
+    tip = _git(repo, "rev-parse", "HEAD").strip()
+    _git(repo, "checkout", "-q", "master")
+    landing: str | None = None
+    if landed:
+        (repo / "f.txt").write_text("landed\n", encoding="utf-8")
+        _git(repo, "add", "f.txt")
+        _git(repo, "commit", "-q", "-m", "ask the clock invariant where a lane is shaped (#7001)")
+        landing = _git(repo, "rev-parse", "HEAD").strip()
+        (repo / "f.txt").write_text("drifted\n", encoding="utf-8")
+        _git(repo, "add", "f.txt")
+        _git(repo, "commit", "-q", "-m", "drift the landed path")
+    _git(repo, "update-ref", "refs/remotes/origin/master", _git(repo, "rev-parse", "master").strip())
+    assert tip != (landing or ""), "the branch commit must be a different object from the landing"
+    return tip, landing
+
+
+def test_an_exemption_whose_work_is_on_the_default_branch_is_refuted(
+    scratch_repo: Path, tmp_path: Path
+):
+    """The negative control for #1311: the rule MUST fire, by name, and it must
+    still *honour* the entry so the ONE named failure is the demand to shrink the
+    document (the artifact is on disk and the audit still cannot explain it)."""
+    branch_tip, landing = _landed_by_content_branch(scratch_repo)
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [
+            {
+                "kind": "branch",
+                "name": "issue-7000",
+                "tip": branch_tip,
+                "reason": "rule 17: no commit on the default branch carries its work",
+            }
+        ],
+        venue_of=scratch_repo,
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=0
+    )
+    assert verdict.assessable
+    assert not verdict.ok, "an exemption that protects nothing must fail the verdict"
+    assert [e.name for e in verdict.refuted_quarantine] == ["issue-7000"]
+    assert [e.name for e in verdict.quarantined] == ["issue-7000"], (
+        "refuting must not stop the entry honouring: the single named failure is the "
+        "demand that the document shrink, not a second finding for the same artifact"
+    )
+    assert "issue-7000" not in {e.name for e in verdict.new_violations}
+    text = verdict.describe()
+    assert "REFUTED-QUARANTINE branch issue-7000" in text
+    assert "already on the default branch" in text, text
+    assert landing and landing[:12] in verdict.refuted_quarantine[0].reason, (
+        "the refusal must name the commit that carries the work, not merely claim it"
+    )
+
+
+def test_the_same_artifact_is_honoured_when_its_work_is_not_landed(
+    scratch_repo: Path, tmp_path: Path
+):
+    """The positive control: the SAME branch with no landing on the default branch,
+    and a default ref the refuter can read. If the rule refuted this, it would be
+    satisfied by a rule that excuses nothing."""
+    tip, landing = _landed_by_content_branch(scratch_repo, name="issue-7002", landed=False)
+    assert landing is None
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [
+            {
+                "kind": "branch",
+                "name": "issue-7002",
+                "tip": tip,
+                "reason": "rule 17: work exists nowhere but this box",
+            }
+        ],
+        venue_of=scratch_repo,
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=0
+    )
+    assert verdict.assessable
+    assert verdict.refuted_quarantine == ()
+    assert verdict.ok, verdict.describe()
+    assert [e.name for e in verdict.quarantined] == ["issue-7002"]
+    assert "REFUTED-QUARANTINE" not in verdict.describe()
+
+
+def test_a_worktree_holding_its_own_uncommitted_work_is_not_refuted(
+    scratch_repo: Path, tmp_path: Path
+):
+    """The ground that decides a worktree (measured on #1311: two of the kept
+    entries are exactly this shape — a landed HEAD plus work on no branch at all).
+    Residue a machine rewrites is a different thing from work, and only the second
+    keeps the exemption."""
+    tip, _landing = _landed_by_content_branch(scratch_repo, name="issue-7003")
+    worktree = tmp_path / "lane-wt"
+    _git(scratch_repo, "worktree", "add", "-q", str(worktree), "issue-7003")
+    (worktree / "f.txt").write_text("half-written lane work\n", encoding="utf-8")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(
+        baseline,
+        [{"kind": "branch", "name": "issue-7003", "reason": "the branch this worktree is on: known"}],
+    )
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [
+            {
+                "kind": "worktree",
+                "name": str(worktree),
+                "tip": tip,
+                "reason": "rule 17: its own uncommitted work is on no branch at all",
+            }
+        ],
+        venue_of=scratch_repo,
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=0
+    )
+    assert verdict.assessable
+    assert [e.name for e in verdict.quarantined] == [str(worktree)]
+    assert verdict.refuted_quarantine == (), (
+        f"a tree holding its own uncommitted work must keep its exemption: {verdict.describe()}"
+    )
+    assert verdict.ok, verdict.describe()
+
+
+def test_a_document_that_is_not_in_force_here_is_never_refuted(scratch_repo: Path, tmp_path: Path):
+    """Refutation is venue-scoped like every other tooth (#1321): a document
+    measured in another instance is inert here, so it can neither excuse nor be
+    refuted on this checkout's disk."""
+    tip, _landing = _landed_by_content_branch(scratch_repo, name="issue-7004")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [
+            {
+                "kind": "branch",
+                "name": "issue-7004",
+                "tip": tip,
+                "reason": "rule 17: measured in another repository instance",
+            }
+        ],
+        venue="/somewhere/else/.git",
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=0
+    )
+    assert verdict.assessable
+    assert verdict.refuted_quarantine == ()
+    assert verdict.quarantined == ()
+    assert [e.name for e in verdict.inapplicable_quarantine] == ["issue-7004"]
+    assert "issue-7004" in {e.name for e in verdict.new_violations}, (
+        "an inert document excuses nothing, so the artifact stays a finding here"
+    )
+
+
+def test_the_refuted_count_reaches_the_ledger(scratch_repo: Path, tmp_path: Path):
+    """A shrunk document must stay visible in the trail after the edit that
+    removed the entries (the ledger record is what outlives the document)."""
+    from governance.reconcile import ledger
+
+    tip, _landing = _landed_by_content_branch(scratch_repo, name="issue-7005")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [
+            {
+                "kind": "branch",
+                "name": "issue-7005",
+                "tip": tip,
+                "reason": "rule 17: no commit on the default branch carries its work",
+            }
+        ],
+        venue_of=scratch_repo,
+    )
+    check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=0
+    )
+    records = [r for r in ledger.read(scratch_repo) if r["kind"] == ledger.REAL_TREE_VERDICT]
+    assert records, "check_real_tree must write a real-tree-verdict ledger record"
+    assert records[-1]["refuted_quarantine"] == 1
+    assert records[-1]["ok"] is False
+
+
 # --- the venue of an exemption (#1321) ---------------------------------------
 #
 # #1300 quarantined 23 artifacts by name; #1317 emptied the document because on
