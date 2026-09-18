@@ -1,0 +1,28 @@
+# worktree-cap.yaml — declared slack for scripts/check-worktree-cap.sh (#1265).
+#
+# The cap is `open lane records (.fleet/lanes/*.json) + slack`, never a bare
+# worktree count: lanes come and go, and a fixed number would either false-red
+# on a busy day or hide a real pile on a quiet one. `slack` is the number of
+# worktrees allowed ABOVE the lanes actually in flight — for a lane mid-close,
+# a scratch worktree a human is using by hand, or a lane whose record has not
+# been written yet. Declared here, in one place, so raising it is a reviewed
+# change rather than a comment in a script nobody reads.
+slack: 10
+
+# Temporary ratchet (issue #1265 comment 3): the target is `slack: 10`, but the
+# real box was NOT at that number the day this landed even after running the
+# reaper's own `--apply` (only provably-dead worktrees removed first). Gating
+# straight to the target the same day this gate ships would red on a pile this
+# PR did not create and cannot instantly clear by itself. `measured` is what
+# was left on THIS host after that reap; the gate honours
+# `cap = lanes + max(slack, measured - lanes)` until `expires`, printing
+# `worktree-cap-ratchet:<n>` as a NOTE while it is in force. After `expires`
+# the declared `slack` above is the only cap — this block is not renewed
+# automatically, so the pile has to keep shrinking rather than being re-measured
+# and re-excused forever.
+ratchet:
+  measured: 90
+  host: ElevatedIQ-AK
+  expires: "2026-10-02"
+  note: "post-reap count 80 on 2026-09-18 + 10 churn headroom; ratchet expires 2026-10-02, then slack 10 applies"
+

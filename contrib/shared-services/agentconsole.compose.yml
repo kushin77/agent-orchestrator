@@ -82,11 +82,20 @@ services:
   # ── AgentConsole — the operator terminal behind the SSO gate ──────────────
   agentconsole:
     <<: *agentconsole
-    image: ${AGENTCONSOLE_IMAGE:-agent-orchestrator-console:local}
-    build:
-      # The portal image builds from the repo ROOT (see portal/Dockerfile).
-      context: ${AO_ROOT:-/home/akushnir/agent-orchestrator}
-      dockerfile: portal/Dockerfile
+    # PRODUCTION RUNS ONLY AN IMMUTABLE ARTIFACT REGISTRY REF (issue #1329):
+    # `AGENTCONSOLE_IMAGE` is set by infra/fleet/promote_portal.py from the
+    # newest AR tag reachable from origin/master, never by a build here. This
+    # service used to carry an UNCONDITIONAL `build:` fallback — a host-built
+    # image from a non-git copy of the repo, invisible to every merged change
+    # (measured 2026-09-18: `agent-orchestrator-console:master` built ON THE
+    # HOST 2026-09-17T05:11Z, a full day of merged portal/ commits behind). It
+    # is removed here: a bare `up -d` with no `AGENTCONSOLE_IMAGE` set now
+    # fails to start rather than silently building a stale image. A developer
+    # who genuinely needs a local build uses the SIBLING service below
+    # (`agentconsole-dev-build`, `--profile dev-build`, opt-in and named,
+    # matching the `state-rw` profile-gate convention infra/fleet's compose
+    # already uses) instead of a fallback the primary service carried for free.
+    image: ${AGENTCONSOLE_IMAGE:?set AGENTCONSOLE_IMAGE to an immutable AR ref (infra/fleet/promote_portal.py), or use --profile dev-build}
     container_name: shared-services-agentconsole
     ports:
       # Re-check for collisions on the host before the first up: 18280 is the OS
@@ -149,6 +158,37 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    labels:
+      - os.module=agentconsole
+      - governance.finops=limited
+
+  # ── agentconsole-dev-build — the ONLY place this overlay still builds ──────
+  # Opt-in (`docker compose --profile dev-build up agentconsole-dev-build`),
+  # never started by a bare `up`. For a developer iterating on portal/ with no
+  # Artifact Registry access; production always runs `agentconsole` above,
+  # pinned to an immutable AR ref (issue #1329).
+  agentconsole-dev-build:
+    <<: *agentconsole
+    profiles:
+      - dev-build
+    build:
+      context: ${AO_ROOT:-/home/akushnir/agent-orchestrator}
+      dockerfile: portal/Dockerfile
+    image: agent-orchestrator-console:dev-build
+    container_name: shared-services-agentconsole-dev-build
+    ports:
+      - "0.0.0.0:${AGENTCONSOLE_DEV_BUILD_PORT:-18287}:8080"
+    environment:
+      PORTAL_AUTH_GATE_JWKS: "${PORTAL_AUTH_GATE_JWKS:-}"
+      PORTAL_AUTH_GATE_JWKS_FILE: "${PORTAL_AUTH_GATE_JWKS_FILE:-}"
+      ROOT_ADMIN_EMAILS: "${ROOT_ADMIN_EMAILS:-}"
+      AO_FLEET_DIR: "/var/lib/ao/fleet"
+      AO_LEDGER_DIR: "/var/lib/ao/ledger"
+    volumes:
+      - ${AO_FLEET_HOST:-/home/akushnir/agent-orchestrator/.fleet}:/var/lib/ao/fleet
+      - ${AO_LEDGER_HOST:-/home/akushnir/agent-orchestrator/.portal/control/ledger}:/var/lib/ao/ledger
+      - ${AO_BOARD_HOST:-/home/akushnir/agent-orchestrator/.board}:/app/.board:ro
+      - ${AGENTCONSOLE_JWKS_FILE:-/srv/agentconsole/auth-gate-jwks.json}:/etc/ao/auth-gate-jwks.json:ro
     labels:
       - os.module=agentconsole
       - governance.finops=limited

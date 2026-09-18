@@ -1,5 +1,5 @@
 {
-  "note": "Real-tree baseline for governance/reconcile's disk audit (#740, item 1 of the Bounded proposal). scripts/check-reconcile.sh now runs `audit()` against THIS repository's real working tree (read-only; nothing here is ever removed), on top of the existing synthetic-fixture proofs. Every worktree/branch it reports UNMATCHED at the time this baseline was recorded is listed below by name, so the gate starts failing on any NEW unexplained artifact from this commit forward, without needing to resolve the pre-existing count first. An entry here is REMOVED only by an explicit, reviewed edit to this file (e.g. once its worktree/branch is reclaimed, or a session beat/claim/landing record starts explaining it) -- never silently, and never as a blanket allow. A STALE entry (baselined but no longer unmatched) fails the gate exactly like a NEW unbaselined violation, by name, so this list cannot grow into a permanent excuse.",
+  "note": "Real-tree baseline for governance/reconcile's disk audit (#740, item 1 of the Bounded proposal). scripts/check-reconcile.sh now runs `audit()` against THIS repository's real working tree (read-only; nothing here is ever removed), on top of the existing synthetic-fixture proofs. Every worktree/branch it reports UNMATCHED at the time this baseline was recorded is listed below by name, so the gate starts failing on any NEW unexplained artifact from this commit forward, without needing to resolve the pre-existing count first. An entry here is REMOVED only by an explicit, reviewed edit to this file (e.g. once its worktree/branch is reclaimed, or a session beat/claim/landing record starts explaining it) -- never silently, and never as a blanket allow. A STALE entry (baselined but no longer unmatched) is reported by name and counted, and is deliberately NOT fatal (a disk artifact is meant to disappear; punishing the cleanup the audit exists to prompt was the #740 follow-up defect) — it must still shrink by an explicit reviewed edit, or mechanically via `--prune-stale`, so this list cannot grow into a permanent excuse.",
   "measured_at": "2026-09-17 (re-measured, #740 follow-up: age grace)",
   "measured_head": "d0a20d6f8e070dda52449b4df49eef77f31b542e",
   "measured_by": "governance/reconcile/real_tree_baseline.py generation, issue #740",
@@ -26,6 +26,11 @@
     },
     {
       "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a23016a2ba69986a5",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at 4b0f7639a530, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .fleet/reconcile/ledger.jsonl, .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...bc7a5af04af4 | git patch-id --stable` = 8160a6b34d0d, identical to 4b0f7639a530 ('feat(governance): Control: lines on AO-GR-12..20 bound to the coverage map (#873) (#1076)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a23255851fc17056a",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },
@@ -43,6 +48,11 @@
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a3112c97ac486df58",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a325a56496fb44b99",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at a43fd1d474a1, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .board/focus.json, .fleet/reconcile.lease, .fleet/reconcile/ledger.jsonl, .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...159cf0058698 | git patch-id --stable` = ba8c73b969c5, identical to a43fd1d474a1 ('fix(dispatch): prune closed issues from the committed dispatch queue (#1128)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
     },
     {
       "kind": "worktree",
@@ -66,8 +76,28 @@
     },
     {
       "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a607b2f079f40da5a",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at a2429bbacd91, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .fleet/reconcile/ledger.jsonl, .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...d99f2131e109 | git patch-id --stable` = d3358ead839f, identical to a2429bbacd91 ('fix(reconcile): distinguish vanished-between-list-and-measure from unmeasurable (#1067)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a66fa2d39da316c8e",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at a25beaf8d8f3, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .board/focus.json, .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...3ede1026cd45 | git patch-id --stable` = 174e4e0780cf, identical to a25beaf8d8f3 ('feat(dispatch): controls/audit/schema/live-feed to raise surface to elite (#885) (#1062)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a67aa5cb2076746ba",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at 367f2ca7a01c, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .board/focus.json, .fleet/reconcile.lease, .fleet/reconcile/ledger.jsonl, .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...a3484089df62 | git patch-id --stable` = 4a4f6fcf3623, identical to 367f2ca7a01c ('fix(gates): make gate-lock/lifecycle-reclaim/git-config location-independent (#1124)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a7400858aa1f2aaa2",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a74d2950557431f05",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at de435a87e34d, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .board/focus.json, .fleet/reconcile.lease, .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...0f5476689c44 | git patch-id --stable` = 8f2829e78ed5, identical to de435a87e34d ('feat(isolation): controls/audit/schema/live-feed to raise surface to elite (#1066)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
     },
     {
       "kind": "worktree",
@@ -101,6 +131,11 @@
     },
     {
       "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-acd285c4246994a4f",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at 3986172806f5, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...126c05f21a39 | git patch-id --stable` = 732ecb4b5792, identical to 3986172806f5 ('feat(lifecycle): controls, decision ledger, frozen schema, live feed (elite) (#1065)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ada458afb43e3bbf0",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },
@@ -108,6 +143,11 @@
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae21c1b75566fee9b",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae391267f79052e9c",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at e352ddeb6afe, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: .fleet/watchdog.lease). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...e34e7b6e0030 | git patch-id --stable` = 1e407f19f751, identical to e352ddeb6afe ('fix(board,lessons-sync): refresh stale board snapshot and CMR local-only baseline (#1117)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
     },
     {
       "kind": "worktree",
@@ -158,6 +198,16 @@
       "kind": "worktree",
       "name": "/home/akushnir/ao-worktrees/ao-1028-masterbase",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1056-c58e7589",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its HEAD 9d065ae3118f is contained in refs/remotes/origin/issue-1056 and it holds no uncommitted work of its own, so reaping the worktree loses no work; it is not the AGENTS.md rule 17 keep-and-report class. It is NOT landed on the default branch (patch identity: no match), and the gate cannot re-measure remote preservation offline (a remote-tracking ref can be stale), so this is a reviewed measurement rather than a gate rule: the exemption was removed from real-tree-quarantine.json in this same reviewed edit (#1311) and the reap is the reaper's (#1265/#1159). Measured live: `git ls-remote --heads origin` = 939410410e92 for `refs/heads/issue-1056`, and `git merge-base --is-ancestor 9d065ae3118f 939410410e92` rc 0 — the live remote head contains the tip."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1154",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole committed work is the default branch's own, at 62be903bf4de, and it holds no uncommitted work of its own (its dirty path(s) are machine-managed: none). Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...53cb02c50ab0 | git patch-id --stable` = c10ba828e237, identical to 62be903bf4de ('fix(isolation): record 0aa836c as legacy — the trailer red recurred 3 min after #1169 (#11', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
     },
     {
       "kind": "worktree",
@@ -661,13 +711,43 @@
     },
     {
       "kind": "branch",
+      "name": "issue-1028-tpl",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole work is the default branch's own, at 96ae0fba19c3. Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...f11abe47bb17 | git patch-id --stable` = 40ed84d9550f, identical to 96ae0fba19c3 ('feat(templates): ask the #506 clock invariant where a lane is shaped (#1060) (#1063)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "branch",
       "name": "issue-1029-evidence-fix",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },
     {
       "kind": "branch",
+      "name": "issue-1056",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its tip 9d065ae3118f is contained in refs/remotes/origin/issue-1056, so the branch's work is preserved on the remote and reaping the local branch loses no work; it is not the AGENTS.md rule 17 keep-and-report class. It is NOT landed on the default branch (patch identity: no match), and the gate cannot re-measure remote preservation offline (a remote-tracking ref can be stale), so this is a reviewed measurement rather than a gate rule: the exemption was removed from real-tree-quarantine.json in this same reviewed edit (#1311) and the reap is the reaper's (#1265/#1159). Measured live: `git ls-remote --heads origin` = 939410410e92 for `refs/heads/issue-1056`, and `git merge-base --is-ancestor 9d065ae3118f 939410410e92` rc 0 — the live remote head contains the tip."
+    },
+    {
+      "kind": "branch",
       "name": "issue-11-persona-registry",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1106-gate-location-independence",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole work is the default branch's own, at 367f2ca7a01c. Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...a3484089df62 | git patch-id --stable` = 4a4f6fcf3623, identical to 367f2ca7a01c ('fix(gates): make gate-lock/lifecycle-reclaim/git-config location-independent (#1124)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1107-ticket-projection-reds",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole work is the default branch's own, at e352ddeb6afe. Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...e34e7b6e0030 | git patch-id --stable` = 1e407f19f751, identical to e352ddeb6afe ('fix(board,lessons-sync): refresh stale board snapshot and CMR local-only baseline (#1117)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1113-dispatch-queue-prune",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole work is the default branch's own, at a43fd1d474a1. Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...159cf0058698 | git patch-id --stable` = ba8c73b969c5, identical to a43fd1d474a1 ('fix(dispatch): prune closed issues from the committed dispatch queue (#1128)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1154",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole work is the default branch's own, at 62be903bf4de. Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...53cb02c50ab0 | git patch-id --stable` = c10ba828e237, identical to 62be903bf4de ('fix(isolation): record 0aa836c as legacy — the trailer red recurred 3 min after #1169 (#11', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
     },
     {
       "kind": "branch",
@@ -2146,6 +2226,11 @@
     },
     {
       "kind": "branch",
+      "name": "issue-830-reap-rung",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its whole work is the default branch's own, at 2df367d3e5c3. Reaping it loses no work, so it is not the AGENTS.md rule 17 keep-and-report class the quarantine exists for (the quarantine's entry was REFUTED and removed in this same reviewed edit, #1311). Proof: `git diff origin/master...025381c3b5b1 | git patch-id --stable` = 74f14dedd0db, identical to 2df367d3e5c3 ('feat(fleet): the reaper reaps landed lane branches by content, and generated (#1118)', on origin/master). The audit's own three proofs still grant nothing — ancestry no; tree containment no (the tip's changed paths have drifted on the default branch since the landing); patch identity no, because landing.py's candidate generator reads the subject's `#n` and the body's `Closes #n`, and this landing names neither for the artifact's issue (#1310 read only the subject; #1312 added the body half)."
+    },
+    {
+      "kind": "branch",
       "name": "issue-830-work",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },
@@ -2293,6 +2378,11 @@
       "kind": "branch",
       "name": "issue-943-module-assess",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-944",
+      "reason": "measured 2026-09-18T19:46:51Z by the #1311 lane at origin/master f9729e585ae7: baselined, NOT quarantined — its tip 5b5ef426cbd7 is contained in refs/remotes/origin/issue-944, so the branch's work is preserved on the remote and reaping the local branch loses no work; it is not the AGENTS.md rule 17 keep-and-report class. It is NOT landed on the default branch (patch identity: no match), and the gate cannot re-measure remote preservation offline (a remote-tracking ref can be stale), so this is a reviewed measurement rather than a gate rule: the exemption was removed from real-tree-quarantine.json in this same reviewed edit (#1311) and the reap is the reaper's (#1265/#1159). Measured live: `git ls-remote --heads origin` = 61d1eb073e5d for `refs/heads/issue-944`, and `git merge-base --is-ancestor 5b5ef426cbd7 61d1eb073e5d` rc 0 — the live remote head contains the tip."
     },
     {
       "kind": "branch",

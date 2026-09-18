@@ -160,6 +160,11 @@ def record_real_tree_verdict(root: Path | str, verdict, *, at: float | None = No
             # show a green verdict with no trace of what was excused.
             "quarantined": len(getattr(verdict, "quarantined", ()) or ()),
             "stale_quarantine": len(getattr(verdict, "stale_quarantine", ()) or ()),
+            # Exemptions that are honoured but no longer needed (#1311): the work
+            # they were protecting is on the default branch. Fatal, and recorded
+            # here so a shrinking document is visible in the trail even after the
+            # edit that removed them.
+            "refuted_quarantine": len(getattr(verdict, "refuted_quarantine", ()) or ()),
             # Exemptions that are not in force in the venue this verdict was
             # measured in (#1321): reported, honouring nothing. Their count and
             # the venue make "which checkout was this read in?" answerable from
