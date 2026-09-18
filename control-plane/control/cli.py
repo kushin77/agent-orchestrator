@@ -72,6 +72,10 @@ SOURCES: dict[str, set[str]] = {
     "governance/dispatch/cli.py": {
         "audit", "eligible", "claim", "dispatch", "release", "status", "held",
         "reap", "snapshot", "focus", "pool", "trigger", "queue",
+        # issue #1179: the board's liveness producer is reported by verb, and the
+        # dangling-on-a-closed-epic report gets its own verb rather than being
+        # buried in `status` output a reader can miss.
+        "liveness", "dangling",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
     "governance/lifecycle/cli.py": {"audit", "status", "close", "collect", "retire"},

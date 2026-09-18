@@ -35,16 +35,53 @@ Exit-code contract (the repo's honesty tri-state, issue #28): 0 OK /
 
 from __future__ import annotations
 
+import fnmatch
 import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 from governance.landing import attribution as attribution_mod
 from governance.landing import evidence as evidence_mod
 from governance.landing import verdict as verdict_mod
 from governance.landing.evidence import Attestation, Gap, evidence_gap, read_attestation
 from governance.landing.ports import LandingOps, PortError, PullRequest
+
+#: Where the gate-sensitive path globs live (issue #1054), read from THIS
+#: repo's own checkout — never from the lane/range under test — so a PR that
+#: deletes or rewrites the path file cannot also delete the cross-check. Same
+#: boundary rule ``scripts/check-pr-contract.sh`` documents for its own read.
+GATE_PATHS_REL = "scripts/lib/gate-paths.txt"
+
+
+def _gate_paths(repo_root: Path) -> tuple:
+    """The glob list from ``scripts/lib/gate-paths.txt``, blank/`#` lines dropped."""
+    path = repo_root / GATE_PATHS_REL
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return ()
+    globs = []
+    for line in raw.splitlines():
+        g = line.strip()
+        if not g or g.startswith("#"):
+            continue
+        globs.append(g)
+    return tuple(globs)
+
+
+def _gate_changing_line(repo_root: Path, touched: Sequence[str]) -> str:
+    """``Gate-changing: yes — <paths>`` or ``Gate-changing: no`` — MEASURED, never hard-coded.
+
+    Matches ``touched`` (the lane's changed files) against the glob list in
+    ``scripts/lib/gate-paths.txt``, exactly the cross-check
+    ``scripts/check-pr-contract.sh`` runs against the declaration this composes.
+    """
+    globs = _gate_paths(repo_root)
+    matched = sorted({f for f in touched for g in globs if fnmatch.fnmatch(f, g)})
+    if matched:
+        return "Gate-changing: yes — " + ", ".join(matched)
+    return "Gate-changing: no"
 
 EXIT_OK = 0
 EXIT_NOT_OK = 1
@@ -197,9 +234,20 @@ def _normalise_rc(rc: int) -> int:
 class LandingEngine:
     """The ordered landing, over injected effects."""
 
-    def __init__(self, ops: LandingOps, request: LandingRequest) -> None:
+    def __init__(
+        self,
+        ops: LandingOps,
+        request: LandingRequest,
+        *,
+        master_attestation_writer: Optional[Callable[[Path, Attestation, str], Path]] = None,
+    ) -> None:
         self.ops = ops
         self.request = request
+        # Injectable so `governance/landing/tests` can assert the write happened
+        # (and with what commit) without ever touching disk — the same reason
+        # every other effect here goes through `ops` rather than a bare
+        # `Path.write_text`. Defaults to the real, atomic writer (fix #5, #1114).
+        self.master_attestation_writer = master_attestation_writer or evidence_mod.write_master_attestation
 
     # -- body composition ------------------------------------------------------
 
@@ -226,6 +274,19 @@ class LandingEngine:
             lines.append(f"- the lane's commits on `{result.branch}`")
         if req.notes_file and Path(req.notes_file).is_file():
             lines.extend(["", Path(req.notes_file).read_text(encoding="utf-8").rstrip()])
+        try:
+            touched = self.ops.changed_files(req.base, result.branch)
+        except PortError:
+            touched = ()
+        lines.extend(
+            [
+                "",
+                "## Merge order",
+                "",
+                _gate_changing_line(Path(__file__).resolve().parents[2], touched),
+                "",
+            ]
+        )
         lines.extend(["", "## Evidence", "", "```"])
         if attestation.readable:
             lines.append(f"$ cat {attestation.path}")
@@ -712,6 +773,11 @@ class LandingEngine:
         squash_body.parent.mkdir(parents=True, exist_ok=True)
         squash_body.write_text(self._compose_squash_body(result, subjects), encoding="utf-8")
 
+        # Read master's remote head BEFORE the merge (fix #5 follow-up,
+        # #1114's merge-base guard) — `merge_pr` is about to move it, so this
+        # is the only chance to know what it was *before* this lane landed.
+        master_before_merge = self.ops.remote_branch_head(req.base)
+
         result.granted = True
         try:
             result.merge_commit = self.ops.merge_pr(pr.number, subject=title, body_file=squash_body)
@@ -729,6 +795,62 @@ class LandingEngine:
                 f"-> {result.merge_commit or 'merge commit unnamed'}",
             )
         )
+
+        # Publish master's own health (RCA 2026-09-17 fix #5, #1114): a lane that
+        # just landed IS a fresh, green, attested measurement of the commit that
+        # is now (or is about to be) origin/master's head — fleet/brain.py's
+        # dispatch pre-check reads exactly this file before opening the next
+        # lane's PR. Named with the SQUASH commit that actually lands, not the
+        # pre-squash lane head those two shas usually differ. Best-effort: a
+        # write failure here must never turn an otherwise-successful landing
+        # into a reported failure — the merge already happened.
+        #
+        # HONESTY GUARD: relabelling the lane's own attestation (which measured
+        # `landing_commit`, the pre-squash lane head) as a measurement of
+        # master's post-merge head is only fair when the lane head already
+        # contained master's PRE-merge tip — i.e. this lane was rebased/current,
+        # not landing something that was behind master and got squashed on top
+        # regardless. `merge_base(landing_commit, master_before_merge) ==
+        # master_before_merge` is exactly that check (a fast-forward
+        # relationship). When it does not hold (or master's pre-merge head could
+        # not be read at all), the write is skipped and the reason is a Step —
+        # never a silent no-op, and never a failed landing over it.
+        master_commit = result.merge_commit or (result.attestation.commit if result.attestation else "") or landing_commit
+        if result.attestation is None or not master_commit:
+            pass
+        elif master_before_merge is None:
+            result.steps.append(
+                Step(
+                    "master-attestation",
+                    SKIPPED,
+                    "master attestation skipped: master's pre-merge head could not be read",
+                )
+            )
+        else:
+            base = self.ops.merge_base(landing_commit, master_before_merge)
+            if not evidence_mod.same_commit(base, master_before_merge):
+                result.steps.append(
+                    Step(
+                        "master-attestation",
+                        SKIPPED,
+                        "master attestation skipped: lane head was behind master "
+                        f"(merge-base({landing_commit}, {master_before_merge}) = {base!r}, "
+                        f"not {master_before_merge!r})",
+                    )
+                )
+            else:
+                try:
+                    master_attestation_path = self.master_attestation_writer(
+                        req.root / evidence_mod.MASTER_ATTESTATION_REL,
+                        result.attestation,
+                        commit=master_commit,
+                    )
+                except OSError as exc:
+                    result.steps.append(Step("master-attestation", FAILED, str(exc)))
+                else:
+                    result.steps.append(
+                        Step("master-attestation", PERFORMED, f"wrote {master_attestation_path} (commit={master_commit})")
+                    )
 
         try:
             result.steps.append(Step("delete-branch", PERFORMED, self.ops.delete_branch(result.branch)))

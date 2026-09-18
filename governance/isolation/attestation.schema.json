@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://kushin77/agent-orchestrator/.verify/attestation.schema.json",
+  "$id": "https://kushin77/agent-orchestrator/governance/isolation/attestation.schema.json",
   "title": "verify-gate attestation (issue #882)",
   "description": "Every scripts/verify.sh run writes exactly one .verify/attestation.json matching this shape, on PASS and on FAIL alike (a gate that only attests when it is green is a false-green risk, GR-12). The overall verdict is the worst of the per-check verdicts -- never better than any check it ran.",
   "type": "object",

@@ -382,6 +382,57 @@ class TestThePrBody:
         assert '"result": "PASS"' in ops.body
 
 
+class TestTheGateChangingLine:
+    """``## Merge order`` / ``Gate-changing:`` is MEASURED from the lane's diff (#1130)."""
+
+    def test_a_lane_touching_a_gate_script_declares_yes_with_the_path(self, tmp_path, request_factory):
+        write_attestation(tmp_path / evidence_mod.ATTESTATION_REL, commit=HEAD)
+        ops = FakeOps(root=tmp_path, changed=("scripts/check-foo.sh", "docs/README.md"))
+        LandingEngine(ops, request_factory(apply=True)).land()
+        assert re.search(r"^##\s+Merge order\s*$", ops.body, re.M)
+        assert re.search(r"^Gate-changing:\s*yes\s*—\s*scripts/check-foo\.sh\s*$", ops.body, re.M)
+
+    def test_a_docs_only_lane_declares_no(self, tmp_path, request_factory):
+        write_attestation(tmp_path / evidence_mod.ATTESTATION_REL, commit=HEAD)
+        ops = FakeOps(root=tmp_path, changed=("docs/README.md", "governance/landing/engine.py"))
+        LandingEngine(ops, request_factory(apply=True)).land()
+        assert re.search(r"^Gate-changing:\s*no\s*$", ops.body, re.M)
+
+    def test_the_composed_body_passes_the_real_check_pr_contract_gate_changing_check(self, tmp_path, request_factory):
+        """Drives the real ``scripts/check-pr-contract.sh`` over a composed body (#1130).
+
+        ``HEAD..HEAD`` is an empty diff against the real checkout, so a body
+        declaring ``no`` is the shape that is honestly cross-checkable here —
+        the ``yes``-with-a-real-gate-path case is pinned at the engine level
+        above (``test_a_lane_touching_a_gate_script_declares_yes_with_the_path``),
+        against an injected (not the real) diff.
+        """
+        import subprocess
+
+        write_attestation(tmp_path / evidence_mod.ATTESTATION_REL, commit=HEAD)
+        ops = FakeOps(root=tmp_path, changed=("docs/README.md",))
+        LandingEngine(ops, request_factory(apply=True)).land()
+        body_file = tmp_path / "composed-body.md"
+        body_file.write_text(ops.body, encoding="utf-8")
+
+        repo_root = Path(__file__).resolve().parents[3]
+        result = subprocess.run(
+            [
+                "bash",
+                str(repo_root / "scripts" / "check-pr-contract.sh"),
+                "--body-file",
+                str(body_file),
+                "--range",
+                "HEAD..HEAD",
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        assert "pr-body-missing-gate-changing" not in result.stdout + result.stderr
+        assert "gate-changing-mismatch" not in result.stdout + result.stderr
+
+
 class TestTheReport:
     def test_the_report_quotes_the_verdict_and_every_step(self, tmp_path, request_factory):
         ops = _green(tmp_path)
@@ -404,3 +455,92 @@ class TestTheReport:
         ops = _green(tmp_path, closure_rc=2)
         landing = LandingEngine(ops, request_factory(apply=True)).land()
         assert landing.rc == 2
+
+
+class TestTheMasterAttestationWriter:
+    """RCA 2026-09-17 fix #5 (#1114): a successful land publishes master's own
+    health, at the exact seam `fleet/brain.py`'s dispatch pre-check reads, so a
+    lane that just landed is never followed by dispatch reading a stale (or
+    never-written) verdict. Injected so the write is asserted without disk.
+    """
+
+    def _recorder(self):
+        calls: list = []
+
+        def writer(path, attestation, *, commit):
+            calls.append({"path": path, "attestation": attestation, "commit": commit})
+            return path
+
+        return calls, writer
+
+    def test_a_successful_land_writes_it_naming_the_squash_commit(self, tmp_path, request_factory):
+        ops = _green(tmp_path)
+        calls, writer = self._recorder()
+        landing = LandingEngine(ops, request_factory(apply=True), master_attestation_writer=writer).land()
+        assert landing.rc == 0, landing.refusal or describe(landing)
+        assert len(calls) == 1
+        assert calls[0]["path"] == tmp_path / evidence_mod.MASTER_ATTESTATION_REL
+        # FakeOps.merge_pr always returns "c" * 40 (the squash commit) — the
+        # writer must be told THAT sha, not the pre-squash lane head (HEAD).
+        assert calls[0]["commit"] == "c" * 40
+        assert calls[0]["commit"] != HEAD
+        assert calls[0]["attestation"].readable and calls[0]["attestation"].green
+        assert ("master-attestation", tmp_path / evidence_mod.MASTER_ATTESTATION_REL) not in ops.calls
+        assert any(step.action == "master-attestation" and step.outcome == "performed" for step in landing.steps)
+
+    def test_a_refused_land_never_writes_it(self, tmp_path, request_factory):
+        """A red contract refuses before any merge — nothing is published."""
+        ops = _green(tmp_path, contract_rc=1, contract_output="MERGE-GATE: NOT-OK")
+        calls, writer = self._recorder()
+        landing = LandingEngine(ops, request_factory(apply=True), master_attestation_writer=writer).land()
+        assert landing.rc != 0
+        assert calls == []
+        assert not any(step.action == "master-attestation" for step in landing.steps)
+
+    def test_a_dry_run_never_writes_it(self, tmp_path, request_factory):
+        ops = _green(tmp_path)
+        calls, writer = self._recorder()
+        landing = LandingEngine(ops, request_factory(apply=False), master_attestation_writer=writer).land()
+        assert calls == []
+        assert not any(step.action == "master-attestation" for step in landing.steps)
+
+    def test_a_lane_that_was_behind_master_skips_the_write_and_names_why(self, tmp_path, request_factory):
+        """The honesty guard (#1114 follow-up): the attestation measured the
+        LANE head, not master's post-merge head — relabelling it is only fair
+        when the lane already contained master's pre-merge tip. `FakeOps`'s
+        `lane_behind_master=True` makes `merge_base` report no common tip.
+        """
+        ops = _green(tmp_path, lane_behind_master=True)
+        calls, writer = self._recorder()
+        landing = LandingEngine(ops, request_factory(apply=True), master_attestation_writer=writer).land()
+        assert landing.rc == 0, landing.refusal or describe(landing)
+        assert calls == []
+        skip_steps = [step for step in landing.steps if step.action == "master-attestation"]
+        assert len(skip_steps) == 1
+        assert skip_steps[0].outcome == "skipped"
+        assert "behind master" in skip_steps[0].detail
+
+    def test_a_lane_that_was_already_at_master_writes_it(self, tmp_path, request_factory):
+        """The positive control for the same guard: the default `FakeOps`
+        (`lane_behind_master=False`) reports the lane head as already
+        containing master's tip, so the write proceeds as in the base case."""
+        ops = _green(tmp_path)  # lane_behind_master=False by default
+        calls, writer = self._recorder()
+        landing = LandingEngine(ops, request_factory(apply=True), master_attestation_writer=writer).land()
+        assert landing.rc == 0, landing.refusal or describe(landing)
+        assert len(calls) == 1
+        assert not any(step.action == "master-attestation" and step.outcome == "skipped" for step in landing.steps)
+
+    def test_the_real_writer_is_atomic_and_reusable_by_read_attestation(self, tmp_path):
+        """No injected fake: the production writer really writes a file
+        `read_attestation` accepts, and it never leaves a `.tmp-*` file behind.
+        """
+        source = write_attestation(tmp_path / "source-attestation.json", commit=HEAD)
+        attestation = evidence_mod.read_attestation(source)
+        target = tmp_path / evidence_mod.MASTER_ATTESTATION_REL
+        written = evidence_mod.write_master_attestation(target, attestation, commit="c" * 40)
+        assert written == target and target.is_file()
+        assert list(target.parent.glob(".*tmp*")) == []
+        reread = evidence_mod.read_attestation(target)
+        assert reread.readable and reread.green
+        assert reread.commit == "c" * 40

@@ -95,9 +95,12 @@ A reproduction is what makes the claim evidence rather than assertion; see
 -->
 
 <!--
-issue #1001: `gh pr merge --squash` composes the LANDED commit message from
-this title and body ("<title> (#N)\n\n<body>"), not from the branch's own
-commit trailers. That means THIS is the only place the trailer paragraph can
+issue #1001, declared as platform policy by issue #1138
+(governance/platform/repo-settings.yaml, `squash_merge_commit_message: PR_BODY`,
+`squash_merge_commit_title: PR_TITLE` -- verify with
+`bash scripts/repo-settings.sh verify`): the squash commit message on `master`
+IS this PR's body ("<title> (#N)\n\n<body>"), never the branch's own commit
+trailers. That means THIS is the only place the trailer paragraph can
 still be lost before it lands. Leave the line below as the body's FINAL
 paragraph (replace `<n>` with this PR's own issue number; do not add anything
 after it) so the composed squash message keeps the ticket reference inside a

@@ -169,10 +169,20 @@ variable "deployer_enabled" {
   default     = false
 }
 
-variable "deployer_roles" {
-  description = "IAM roles granted to the deployer service account at promotion. Empty by default — populated by a reviewed go-live."
-  type        = list(string)
-  default     = []
+variable "deployer_role_class" {
+  description = <<-EOT
+    Selects a named IAM role bundle for the deployer SA from
+    local.deployer_role_bundles (main.tf) — never a raw role list passed
+    through Cloud Build substitutions. "none" (the default) grants nothing;
+    the SA is created inert until a reviewed go-live picks a real class.
+  EOT
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "minimal", "standard"], var.deployer_role_class)
+    error_message = "deployer_role_class must be one of: none, minimal, standard (see local.deployer_role_bundles in main.tf)."
+  }
 }
 
 # --- Container images (placeholders until each phase ships a real build) ----

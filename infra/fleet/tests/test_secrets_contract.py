@@ -14,10 +14,21 @@ below is built from string fragments or uses a name of a different shape, so
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import secrets_contract
-from conftest import REPO_ROOT
+
+# Computed locally, not `from conftest import REPO_ROOT`: a bare `conftest`
+# import name collides with `fleet/tests/conftest.py` when both suites are
+# collected in the same `pytest` invocation (issue #710/#1108's
+# `python3 -m pytest -q infra/fleet/tests fleet/tests`) — whichever
+# `conftest.py` pytest resolved first for the process wins the module-cache
+# slot named `conftest`, so the other suite's bare import either fails or
+# silently binds the wrong module. `infra/fleet/tests/conftest.py` still runs
+# (it inserts `infra/fleet` onto `sys.path` for `import secrets_contract`
+# above); this file just no longer reaches back into it by that ambiguous name.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
 def test_declares_gh_gcloud_ssh() -> None:

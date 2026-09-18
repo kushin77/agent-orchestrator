@@ -24,15 +24,34 @@ if str(REPO_ROOT / "fleet") not in sys.path:
 from governance.reconcile import cli  # noqa: E402
 
 
-def _args(root: Path, *, once: bool = True) -> SimpleNamespace:
+def _args(root: Path, *, once: bool = True, apply: bool = True) -> SimpleNamespace:
     return SimpleNamespace(
         root=str(root),
         ttl_minutes=15.0,
         interval_seconds=0.0,
-        apply=False,
+        apply=apply,
         once=once,
         json=False,
     )
+
+
+def test_watch_once_skips_the_lease_entirely_on_a_dry_run(tmp_path, monkeypatch):
+    """#1126: only `--apply` takes the lease — a dry run never writes, so it
+    must not need the single-writer wrap either (fleet/prune.py's own
+    dry-run-untouched convention). `make_lease` must not even be CALLED.
+    """
+
+    def _refuse(**kwargs):
+        raise AssertionError("a dry-run watch --once must never call make_lease")
+
+    from governance.reconcile.sweep import SweepReport
+
+    monkeypatch.setattr(cli.lease, "make_lease", _refuse)
+    monkeypatch.setattr(cli, "sweep", lambda *a, **k: SweepReport())
+
+    rc = cli.cmd_watch(_args(tmp_path, apply=False))
+
+    assert rc == cli.EXIT_OK
 
 
 def test_watch_once_noops_and_logs_skip_when_lease_lost(tmp_path, monkeypatch, capsys):

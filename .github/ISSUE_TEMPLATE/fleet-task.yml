@@ -99,6 +99,35 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: posture
+    attributes:
+      label: Posture (delivery)
+      description: How this work is delivered — the tag authority's `posture` dimension (AO-GR-28, governance/tagging/taxonomy.yaml). iac means the infrastructure is DECLARED, never clicked, and ships flag-gated OFF; saas puts it behind the identity and boundary gates; no-human-needed means the lane must finish with NO operator input at all; human-gated means an operator gate precedes merge. These are orthogonal — a SaaS surface can also be IaC-declared.
+      options:
+        - overall
+        - saas
+        - iac
+        - no-human-needed
+        - human-gated
+    validations:
+      required: false
+
+  - type: dropdown
+    id: lifecycle
+    attributes:
+      label: Lifecycle (SDLC stage)
+      description: The SDLC stage this work is in — the tag authority's `lifecycle` dimension. It decides which channel's gates apply — `plan` goes to `pr`, `build`/`verify` to `ci`, `release` to `cd`, `operate`/`retire` to `ops`. Ask for the derived plan with `python3 governance/tagging/cli.py plan --tag …`.
+      options:
+        - plan
+        - build
+        - verify
+        - release
+        - operate
+        - retire
+    validations:
+      required: false
+
   - type: input
     id: verify-command
     attributes:
