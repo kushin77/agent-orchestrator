@@ -10,6 +10,13 @@ protocol — with two implementations:
   fixture file. Both the tests and the ``make verify`` gate use it, which is why
   **the gate never touches the network**.
 
+The seam itself — the ``Transport`` protocol and the offline ``FixtureTransport``
+— is shared with ``integrations/hermes/`` (``integrations/_seam/``, issue #1208),
+as are ``Response`` and the rendering behind ``error_for_status``. Only the live
+transport is this adapter's own, because only this one carries
+``Authorization: Bearer`` and ``X-Paperclip-Run-Id`` and owns the ``/api``
+prefix.
+
 Auth and run correlation are applied at the seam, uniformly: every request
 carries ``Authorization: Bearer <token>``, and a mutating request (``POST`` /
 ``PATCH`` / ``PUT`` / ``DELETE``) made during a run carries
@@ -20,12 +27,14 @@ carries ``Authorization: Bearer <token>``, and a mutating request (``POST`` /
 from __future__ import annotations
 
 import json as _json
-import os
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, Optional
 
-from .model import Response, error_for_status
+from .._seam.transport import FixtureTransport as _SeamFixtureTransport
+from .._seam.transport import Transport  # noqa: F401 - re-exported at this adapter's seam
+from .._seam.wire import decode
+from .model import BOUNDARY, Response, error_for_status
 
 #: HTTP methods that mutate upstream state and therefore carry the run header.
 MUTATING_METHODS = ("POST", "PATCH", "PUT", "DELETE")
@@ -37,8 +46,8 @@ API_PREFIX = "/api"
 def build_headers(*, token: str, run_id: Optional[str], method: str) -> Dict[str, str]:
     """The auth + run-correlation headers for one request.
 
-    Shared by both transports so the offline fixture path exercises exactly the
-    headers the live path sends — the gate asserts on this, not on a copy.
+    Handed to the fixture transport too, so the offline path exercises exactly
+    the headers the live path sends — the gate asserts on this, not on a copy.
     """
     headers: Dict[str, str] = {"Accept": "application/json"}
     if token:
@@ -48,19 +57,10 @@ def build_headers(*, token: str, run_id: Optional[str], method: str) -> Dict[str
     return headers
 
 
-@runtime_checkable
-class Transport(Protocol):
-    """The transport seam: one request, one response, no other coupling."""
-
-    def request(
-        self,
-        method: str,
-        path: str,
-        *,
-        json: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Response:  # pragma: no cover - protocol declaration
-        ...
+# ``Transport`` — the seam's protocol — is the shared one
+# (``integrations/_seam/transport.py``, issue #1208). Its signature is the wider
+# of the two adapters', which is the one this adapter already declared, and it is
+# re-exported above so existing callers keep importing it from here.
 
 
 class HttpTransport:
@@ -113,37 +113,29 @@ class HttpTransport:
                 raw = resp.read().decode("utf-8")
                 return Response(
                     status=int(resp.status),
-                    body=_decode(raw),
+                    body=decode(raw),
                     headers={k.lower(): v for k, v in resp.headers.items()},
                 )
         except urllib.error.HTTPError as exc:
             detail = ""
             try:
-                detail = _decode(exc.read().decode("utf-8")).get("error", "")
+                detail = decode(exc.read().decode("utf-8")).get("error", "")
             except Exception:  # pragma: no cover - best-effort body read
                 detail = ""
             raise error_for_status(int(exc.code), path, str(detail)) from exc
 
 
-def _decode(raw: str) -> Any:
-    """Decode a body as JSON, falling back to the raw text."""
-    if not raw:
-        return None
-    try:
-        return _json.loads(raw)
-    except ValueError:
-        return raw
+class FixtureTransport(_SeamFixtureTransport):
+    """The offline transport: the shared seam's, held to this adapter's boundary.
 
-
-class FixtureTransport:
-    """The offline transport: replays canned responses from a fixture.
-
-    A fixture is either a mapping ``{"responses": [ {"method", "path", "status",
-    "body"} ... ]}`` or the path to a JSON file holding one. Every call is
-    recorded on ``requests`` (method, path, headers) so the gate can assert the
-    request *shape* — prefix, company scoping, auth and run header — without a
-    network. An unmatched request raises ``KeyError`` (a loud miss, never a
-    silent default), so a drifted client path fails the gate.
+    Every call is recorded on ``requests`` (method, path, headers) so the gate can
+    assert the request *shape* — the ``/api`` prefix, company scoping, auth and the
+    run header — without a network. Two things are this adapter's rather than the
+    seam's, and both are configuration: a path outside ``/api`` is refused, and the
+    headers recorded are the ones ``build_headers`` would have sent, so the gate
+    asserts on the real header construction and not on a copy. An unmatched request
+    raises ``KeyError`` (a loud miss, never a silent default), so a drifted client
+    path fails the gate.
     """
 
     def __init__(
@@ -153,47 +145,14 @@ class FixtureTransport:
         token: str = "",
         run_id: Optional[str] = None,
     ) -> None:
-        if isinstance(fixture, (str, bytes, os.PathLike)):
-            with open(fixture, encoding="utf-8") as fh:
-                fixture = _json.load(fh)
-        responses = fixture.get("responses") if isinstance(fixture, dict) else None
-        if not isinstance(responses, list):
-            raise ValueError("fixture must be an object with a 'responses' list")
-        self._table: Dict[tuple, Response] = {}
-        for entry in responses:
-            key = (str(entry["method"]).upper(), str(entry["path"]))
-            self._table[key] = Response(
-                status=int(entry.get("status", 200)),
-                body=entry.get("body"),
-                headers={k.lower(): v for k, v in (entry.get("headers") or {}).items()},
-            )
+        super().__init__(
+            fixture,
+            boundary=BOUNDARY,
+            prefix=API_PREFIX,
+            headers_for=lambda method: build_headers(token=token, run_id=run_id, method=method),
+        )
         self.token = token
         self.run_id = run_id
-        self.requests: List[Dict[str, Any]] = []
-
-    def request(
-        self,
-        method: str,
-        path: str,
-        *,
-        json: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Response:
-        if not path.startswith(API_PREFIX):
-            raise ValueError(f"path must start with {API_PREFIX!r}: {path!r}")
-        merged = build_headers(token=self.token, run_id=self.run_id, method=method)
-        if json is not None:
-            merged["Content-Type"] = "application/json"
-        if headers:
-            merged.update(headers)
-        self.requests.append({"method": method.upper(), "path": path, "headers": merged})
-        try:
-            response = self._table[(method.upper(), path)]
-        except KeyError as exc:
-            raise KeyError(f"no fixture response for {method.upper()} {path}") from exc
-        if not response.ok:
-            raise error_for_status(response.status, path)
-        return response
 
 
 class PaperclipClient:

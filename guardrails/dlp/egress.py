@@ -18,9 +18,6 @@ Model:
 * **default deny**: an empty or missing allowlist denies everything, an
   unlisted tenant is denied, and an unlisted provider/host/path is denied.
   There is no implicit default provider set — allowlisting is explicit.
-
-The :data:`KNOWN_ENDPOINTS` table is a convenience used to author allowlists
-(and by the docs/tests); the guard itself never falls back to it.
 """
 
 from __future__ import annotations
@@ -28,16 +25,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, Sequence
 from urllib.parse import urlsplit
-
-# Canonical commercial endpoints (authoring convenience only — the guard does
-# not consult this table when deciding).
-KNOWN_ENDPOINTS: Dict[str, str] = {
-    "openai": "https://api.openai.com",
-    "anthropic": "https://api.anthropic.com",
-    "google": "https://generativelanguage.googleapis.com",
-    "deepseek": "https://api.deepseek.com",
-    "ollama": "http://127.0.0.1:11434",
-}
 
 
 @dataclass(frozen=True)

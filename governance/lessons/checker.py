@@ -9,8 +9,9 @@ Scope, stated honestly (the same posture as ``governance/conformance``):
 
 * **Errors** are the records a lane controls: a malformed ledger, an incident
   with no analysis, an RCA with no corrective action, an action that is not
-  recorded, a lesson with no commit evidence, an action with no owner. These
-  fail the gate.
+  recorded, a lesson with no commit evidence, an action with no owner, and an
+  action left open past the landing of the issue that tracks it
+  (``corrective-action-remediation-landed``, issue #1028). These fail the gate.
 * **Deviations** are the historical backlog and the open work the process is
   still draining (an issue that records an incident with no RCA yet, an action
   that is open, a review past its cadence). They are reported with the
@@ -38,6 +39,7 @@ from model import (
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
     CODE_CORRECTIVE_ACTION_OPEN,
+    CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED,
     CODE_CORRECTIVE_ACTION_UNLINKED,
     CODE_CORRECTIVE_ACTION_UNRECORDED,
     CODE_CORRECTIVE_ACTION_WITHOUT_EVIDENCE,
@@ -447,7 +449,9 @@ def check_ledger(
     findings.extend(_check_origins(rcas, snapshot=snapshot, probe=probe))
     findings.extend(_check_incident_coverage(incidents, rcas, lessons))
     findings.extend(_check_lessons(lessons, root=root, probe=probe))
-    findings.extend(_check_actions(actions, rcas, root=root, probe=probe))
+    findings.extend(
+        _check_actions(actions, rcas, root=root, probe=probe, snapshot=snapshot)
+    )
     findings.extend(_check_review_cadence(rcas, today=today, policy=active_policy))
     findings.extend(_check_doc_rca_ids(ledger, root=root))
     findings.extend(_check_readme_incident_count(incidents, root=root))
@@ -828,8 +832,42 @@ def _check_lessons(lessons, *, root: Path, probe: GitProbe) -> List[Finding]:
     return findings
 
 
-def _check_actions(actions, rcas, *, root: Path, probe: GitProbe) -> List[Finding]:
-    """AC4/AC6: an action is recorded, evidenced, owned and reachable."""
+def _remediation_landed(issue_ref: str, snapshot) -> bool:
+    """Does the board snapshot say the issue that tracks this action has closed?
+
+    An *open* action carries its own closure condition — "close the action when
+    #<n> lands" — and until issue #1028 nothing could observe that the condition
+    had been met: the deviation was emitted forever, whatever the board said, so
+    a stale record was indistinguishable from work in flight. This is that
+    check, and it is deliberately keyed on the **committed board snapshot**, so
+    the verdict is a pure function of the tree (ledger + snapshot) and never of
+    the wall clock.
+
+    An issue the snapshot does not carry returns ``False`` on purpose: the
+    snapshot is point-in-time, so its silence about an issue is evidence of
+    nothing at all — firing there would redden every action recorded since the
+    last refresh, which is the failure this repository has already paid for
+    (``origin-unresolved`` exists for a reference that is genuinely broken).
+    """
+    if snapshot is None:
+        return False
+    match = RE_ISSUE_REF.match(issue_ref or "")
+    if match is None:
+        return False
+    issue = snapshot.get(int(match.group(1)))
+    if not isinstance(issue, dict):
+        return False
+    return str(issue.get("state", "")).upper() == "CLOSED"
+
+
+def _check_actions(actions, rcas, *, root: Path, probe: GitProbe, snapshot=None) -> List[Finding]:
+    """AC4/AC6: an action is recorded, evidenced, owned and reachable.
+
+    An open action is a *deviation* while its remediation issue is still open on
+    the committed board snapshot, and an **error** once that issue has closed —
+    at that point the record states a closure condition it has already met
+    (``corrective-action-remediation-landed``, issue #1028).
+    """
     findings: List[Finding] = []
     claimed: set = set()
     for rca in rcas:
@@ -868,6 +906,23 @@ def _check_actions(actions, rcas, *, root: Path, probe: GitProbe) -> List[Findin
                         message="%s is open and names no remediation issue" % action_id,
                         subject=action_id,
                         remediation="file the follow-up issue and record its number (AC6)",
+                    )
+                )
+            elif _remediation_landed(issue_ref, snapshot):
+                # The record names its own closure condition and the board says
+                # that condition is already met. One finding, not two: the
+                # contradiction IS the state, so the benign deviation would only
+                # restate it in softer words.
+                findings.append(
+                    Finding(
+                        code=CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED,
+                        message="%s is open, but the issue that tracks it "
+                        "(%s) is CLOSED on the committed board snapshot — the "
+                        "closure condition this record states has already been "
+                        "met" % (action_id, issue_ref),
+                        subject=action_id,
+                        remediation="close it with the commit that landed %s, "
+                        "or re-point it at the issue that is still open" % issue_ref,
                     )
                 )
             else:

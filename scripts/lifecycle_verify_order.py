@@ -27,8 +27,15 @@ Everything that decides the answer here is the shipping code:
 Exactly two things are not: ``make`` on ``PATH`` (the repo's established seam — a gate
 may not run the composite gate twice per case), and the board read, which a gate may not
 make at all. Both are named on every line they affect, and neither can manufacture a
-green: the stub's outcomes are read by the shipping consumer, and cases 2, 3, 5, 8b and
-8c below are the negative controls that prove it.
+green: the stub's outcomes are read by the shipping consumer, and the negative controls
+below — cases 2, 3, 5, 8b, 9 and the mutants — prove it.
+
+#1149 adds the third half: **which commit the evidence is against**. For a branch that
+received commits after the squash, GitHub's ``head_commit`` is a tree that never landed, so
+``closeout`` resolves the subject to the commit the squash landed as and journals the
+drifted head beside it. The positive case is the drifted branch closing out green on the
+landed tree; the controls are the port refusing that drifted subject in its own words, and
+a mutant that removes the resolution and must red the positive case.
 """
 
 from __future__ import annotations
@@ -797,8 +804,8 @@ def case_squash_lane_predating_the_landing_is_refused() -> None:
     # lane head's sha, which a green message would satisfy too. That vacuity is the
     # failure mode this control exists to avoid.
     ok(
-        "the refusal is the refusal, naming the lane head and the verified commit",
-        f"lane head {lane_head[:12]} is not the verified commit {verified[:12]} and does not contain it" in detail,
+        "the refusal is the refusal, naming the lane head and the commit it would have to be",
+        f"lane head {lane_head[:12]} is not the verified commit {verified[:12]} and does not contain" in detail,
         detail[:300],
     )
     ok("nothing green was reported for it", "verify green" not in detail, detail[:300])
@@ -812,46 +819,132 @@ def case_squash_lane_predating_the_landing_is_refused() -> None:
     ok("the lane is kept, not reclaimed over the missing evidence", "reclaim-lane" not in ops.calls, f"calls={ops.calls}")
 
 
-def case_squash_different_tree_is_refused() -> None:
-    """Containing *a* landing is not the claim; containing *the verified tree* is."""
-    stage("negative control — a contained landing whose tree is NOT the verified tree is REFUSED (#1098)")
-    repo, _lane, verified, landing, lane_head = world_squash("squash-difftree", 795, variant="different_tree")
+def case_squash_drifted_head_repoints_the_subject() -> None:
+    """#1149: a branch that advanced after the squash is closed out on the LANDED tree.
+
+    GitHub's live ``head_commit`` for this shape is a tree that **never landed** — measured
+    on #977/#978 through PR #984: 54 files and 4731 insertions away from the commit the
+    squash landed as — so it cannot be the subject of evidence for work that landed. The
+    landing carries the landed tree by construction, becomes the subject, and the drifted
+    head is journalled beside it rather than silently substituted. Without this the item is
+    **structurally unclosable**: the port refuses the live head ("contains the landing, but
+    the landing carries a different tree") and there is no other subject to offer.
+    """
+    stage("a branch that advanced after the SQUASH is closed out on the tree that LANDED (#1149)")
+    repo, lane, verified, landing, lane_head = world_squash("squash-drifted", 798, variant="different_tree")
     outcome("passed")
     print(
-        f"  measured: the lane at {lane_head[:12]} contains the landing {landing[:12]}, but the verified "
-        f"head {verified[:12]} carries a commit the squash did not"
+        f"  measured: the live head {verified[:12]} carries a commit the squash did not, so its tree "
+        f"never landed; the landing {landing[:12]} carries the tree that did; the lane is at {lane_head[:12]}"
     )
 
-    item = item_for(795, verified, lane_present=True, merge_commit=landing)
+    item = item_for(798, verified, lane_present=True, merge_commit=landing)
     ops = OfflineOps(repo, item)
     result = closeout(item, ops)
+    print(describe(result))
 
+    recorded = journal_verify(repo, 798)
+    ok(
+        "the invariant is SATISFIED — no REMAINS VERIFY_EVIDENCE_MISSING for a drifted branch",
+        VERIFY_INVARIANT not in {finding.code for finding in result.remaining},
+        f"remaining={[f.code for f in result.remaining]}",
+    )
+    ok("the item reaches a terminal verdict", result.verdict == OK, f"verdict={result.verdict}")
+    ok(
+        "the record's SUBJECT is the landed tree's commit, not the un-landed live head",
+        recorded.get("commit") == landing,
+        f"recorded={recorded}",
+    )
+    ok(
+        "the record never names the un-landed live head as the verified commit",
+        recorded.get("commit") != verified,
+        f"recorded={recorded}",
+    )
+    ok(
+        "the record names the live head it drifted from — disclosed, never hidden",
+        recorded.get("drifted_head") == verified,
+        f"recorded={recorded}",
+    )
+    ok("the record names the landing it stands for", recorded.get("landing") == landing, f"recorded={recorded}")
+    ok(
+        "the record names the tree the gate actually ran in",
+        recorded.get("measured") == lane_head,
+        f"recorded={recorded}",
+    )
     verification = step(result, "record-verification")
     detail = verification.detail if verification else ""
     ok(
-        "the invariant is still broken and still NAMED",
-        VERIFY_INVARIANT in {finding.code for finding in result.remaining},
-        f"remaining={[f.code for f in result.remaining]}",
-    )
-    ok(
-        "the record-verification step FAILED — nothing green was recorded",
-        verification is not None and verification.outcome == FAILED,
-        f"outcome={verification.outcome if verification else 'no step'} detail={detail[:200]}",
-    )
-    ok(
-        "the refusal opens by naming the lane head and the verified commit",
-        f"lane head {lane_head[:12]} is not the verified commit {verified[:12]} and does not contain it" in detail,
+        "the step's detail says which tree the evidence is against, and why",
+        "advanced past the squash" in detail and "the evidence is against the tree that landed" in detail,
         detail[:300],
     )
-    ok("nothing green was reported for it", "verify green" not in detail, detail[:300])
+    ran = gate_ran()
+    ok("the gate really ran", ran is not None, "no gate run recorded")
+    if ran is not None:
+        _where, measured = ran
+        ok(
+            "the gate ran at the LANE's head — the current tree",
+            measured == lane_head,
+            f"measured {measured[:12]} vs lane head {lane_head[:12]}",
+        )
     ok(
-        "the refusal names the landing the lane DOES contain, so the operator sees why it was not enough",
-        f"landing {landing[:12]}" in detail,
-        detail[:300],
+        "no network-facing step was reached",
+        not [call for call in ops.calls if call in OfflineOps.NETWORK_STEPS],
+        f"calls={ops.calls}",
     )
+    ok(
+        "the lane was reclaimed once its record existed",
+        "reclaim-lane" in ops.calls and not lane.exists(),
+        f"calls={ops.calls} lane_exists={lane.exists()}",
+    )
+
+
+def case_a_drifted_subject_is_refused_at_the_port() -> None:
+    """Negative control: the tree half of #1098's rule is still load-bearing (#1149).
+
+    The subject resolution moves the evidence onto the landing *because* a drifted live head
+    is not the landed content. This drives the port directly with that very pair, so the
+    layer that must refuse it is provoked on its own — and so the refusal is required to name
+    the **true** cause ("it DOES contain the landing, and the landing carries a different
+    tree") rather than the cause #1098's single message named for both ("and does not contain
+    it"), which diagnosed #977/#978 as the one thing they were not.
+    """
+    stage("negative control — a drifted subject handed to the port is REFUSED, in its own words (#1149)")
+    repo, _lane, verified, landing, lane_head = world_squash(
+        "squash-drifted-port", 799, variant="different_tree"
+    )
+    outcome("passed")
+    print(
+        f"  measured: the lane at {lane_head[:12]} contains the landing {landing[:12]}; the subject "
+        f"offered is the un-landed live head {verified[:12]}"
+    )
+
+    item = item_for(799, verified, lane_present=True, merge_commit=landing)
+    ops = OfflineOps(repo, item)
+    try:
+        ops.record_verification(799, verified, landing)
+    except RuntimeError as refused:
+        message = str(refused)
+    else:
+        message = ""
+    ok("the port REFUSED the drifted subject", bool(message), "the port accepted an un-landed live head")
+    ok("nothing green was recorded for it", journal_verify(repo, 799) == {}, "a journal exists")
     ok("the gate never ran in that lane", gate_ran() is None, "a gate run was recorded")
-    ok("no record was written", journal_verify(repo, 795) == {}, "a journal exists")
-    ok("the lane is kept, not reclaimed over the missing evidence", "reclaim-lane" not in ops.calls, f"calls={ops.calls}")
+    ok(
+        "the refusal opens by naming the lane head and the commit it would have to be",
+        f"lane head {lane_head[:12]} is not the verified commit {verified[:12]}" in message,
+        message[:300],
+    )
+    ok(
+        "the refusal names the TRUE cause — it DOES contain the landing, and the tree differs",
+        f"it DOES contain the landing {landing[:12]}" in message and "names a tree that never landed" in message,
+        message[:300],
+    )
+    ok(
+        "and it no longer reports the cause that was not the cause",
+        "and does not contain it" not in message,
+        message[:300],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -865,6 +958,7 @@ def case_mutants() -> None:
     original_remeasure = GhOps._remeasure
     original_owed = closeout_module._verification_owed
     original_admissible = GhOps._admissible
+    original_subject = closeout_module.evidence_subject
     try:
         # MUTANT 1 — the port's re-measurement, i.e. the pre-#786 code exactly.
         # The signature tracks the shipping one: #834 added ``dead`` (so the refusal can
@@ -892,7 +986,7 @@ def case_mutants() -> None:
         GhOps._remeasure = original_remeasure  # type: ignore[method-assign]
 
         # MUTANT 2 — the driver's order guard, i.e. the pre-#786 driver exactly.
-        closeout_module._verification_owed = lambda item, result: ""  # type: ignore[assignment]
+        closeout_module._verification_owed = lambda item, result, subject: ""  # type: ignore[assignment]
         repo, lane, head = world("mutant-2", 792, reclaim=False)
         outcome("parked")
         item = item_for(792, head, lane_present=True)
@@ -937,6 +1031,12 @@ def case_mutants() -> None:
         # MUTANT 4 — containment without the tree check: the arm is *nearly* right, and a
         # landing built from other content is admitted. Without this the tree half of the
         # rule would be a formality nobody had provoked.
+        #
+        # Driven at the PORT, not through ``closeout``: since #1149 the driver no longer
+        # offers a drifted pair as a subject (it resolves the subject to the landing first),
+        # so a closeout-level case here would pass under the mutant and under the fix alike
+        # — a vacuous control. The port is the layer that owns the tree half, so the port is
+        # where it is provoked.
         def containment_without_the_tree_check(self, worktree: Path, head: str, commit: str, landing: str) -> str:
             if not commit or head == commit:
                 return "equals"
@@ -948,22 +1048,60 @@ def case_mutants() -> None:
         repo, _lane, verified, landing, _lane_head = world_squash("mutant-4", 797, variant="different_tree")
         outcome("passed")
         item = item_for(797, verified, lane_present=True, merge_commit=landing)
-        result = closeout(item, OfflineOps(repo, item))
+        ops = OfflineOps(repo, item)
+        try:
+            admitted = ops.record_verification(797, verified, landing)
+        except RuntimeError as refused:
+            admitted = f"REFUSED: {refused}"
         ok(
-            "with the TREE check removed a landing built from other content is ADMITTED, so its case is load-bearing",
-            VERIFY_INVARIANT not in {finding.code for finding in result.remaining},
-            "the mutant still refused, so the tree half of the rule proves nothing",
+            "with the TREE check removed the un-landed live head IS admitted, so its case is load-bearing",
+            "verify green" in admitted,
+            admitted[:300],
         )
         ok(
             "and an attestation is written for a tree the item was never verified in",
-            journal_verify(repo, 797).get("ok") is True,
+            journal_verify(repo, 797).get("commit") == verified,
             f"recorded={journal_verify(repo, 797)}",
         )
         GhOps._admissible = original_admissible  # type: ignore[method-assign]
+
+        # MUTANT 5 — the subject resolution removed, i.e. the pre-#1149 driver exactly: the
+        # evidence is put on the pull request's LIVE head, which for a branch that advanced
+        # after the squash is a tree that never landed. The positive case must go red, or the
+        # remedy is decoration.
+        closeout_module.evidence_subject = lambda item, ops: (  # type: ignore[assignment]
+            str((item.get("pr") or {}).get("head_commit") or ""),
+            str((item.get("pr") or {}).get("merge_commit") or ""),
+            "",
+        )
+        repo, _lane, verified, landing, _lane_head = world_squash("mutant-5", 800, variant="different_tree")
+        outcome("passed")
+        item = item_for(800, verified, lane_present=True, merge_commit=landing)
+        result = closeout(item, OfflineOps(repo, item))
+        verification = step(result, "record-verification")
+        detail = verification.detail if verification else ""
+        ok(
+            "with the subject resolution disabled the drifted branch is UNCLOSABLE again",
+            VERIFY_INVARIANT in {finding.code for finding in result.remaining},
+            "the mutant still satisfied the invariant, so the resolution proves nothing",
+        )
+        ok(
+            "and the wedge returns naming the un-landed live head as the subject",
+            f"is not the verified commit {verified[:12]}" in detail
+            and f"it DOES contain the landing {landing[:12]}" in detail,
+            detail[:300],
+        )
+        ok(
+            "no record is written against the un-landed head",
+            journal_verify(repo, 800) == {},
+            "a journal exists",
+        )
+        closeout_module.evidence_subject = original_subject  # type: ignore[assignment]
     finally:
         GhOps._remeasure = original_remeasure  # type: ignore[method-assign]
         closeout_module._verification_owed = original_owed  # type: ignore[assignment]
         GhOps._admissible = original_admissible  # type: ignore[method-assign]
+        closeout_module.evidence_subject = original_subject  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -984,6 +1122,19 @@ def case_declarations() -> None:
             "governance/lifecycle/closeout.py",
             ("order", "reclaim"),
             ("record-verification",),
+        ),
+        # #1149: the rule the cases above provoke must be declared where the model is read,
+        # or it is a behaviour nobody reviewing the invariant can see — and this gate would
+        # be enforcing a rule the vocabulary does not carry.
+        (
+            "governance/lifecycle/model.py",
+            ("the commit whose tree is the tree that landed",),
+            ("#1149",),
+        ),
+        (
+            "governance/lifecycle/README.md",
+            ("the tree that landed",),
+            ("#1149",),
         ),
     )
     for path, required, alternatives in declarations:
@@ -1010,7 +1161,7 @@ def case_declarations() -> None:
 
 def main() -> int:
     write_stub()
-    print("== the close-out's verification ordering, provoked (#786, #1098) ==")
+    print("== the close-out's verification ordering, provoked (#786, #1098, #1149) ==")
     case_reclaimed_lane_green()
     case_reclaimed_lane_red()
     case_reclaimed_lane_unreachable()
@@ -1018,7 +1169,8 @@ def main() -> int:
     case_unrelated_failure_still_reclaims()
     case_squash_lane_from_the_default_branch()
     case_squash_lane_predating_the_landing_is_refused()
-    case_squash_different_tree_is_refused()
+    case_squash_drifted_head_repoints_the_subject()
+    case_a_drifted_subject_is_refused_at_the_port()
     case_mutants()
     case_declarations()
 

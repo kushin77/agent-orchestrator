@@ -85,7 +85,6 @@ trap cleanup EXIT
 fail=0
 ok()  { printf '  OK    %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
-note() { printf '  NOTE  %s\n' "$1"; }
 
 digest() { sha256sum "$1" | awk '{print $1}'; }
 

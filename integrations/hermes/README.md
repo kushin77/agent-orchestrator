@@ -25,11 +25,11 @@ its wire shape, model, endpoint and the reason it is out of scope.
 
 | File | Role |
 |---|---|
-| `mapping.py` | the deterministic mapper: persona card + profile seed + FinOps tier table + gateway catalog row -> one canonical projection; carries the inline `CONTRACT` and the stdlib-only YAML-subset loader and JSON-Schema-subset validator |
+| `mapping.py` | the deterministic mapper: persona card + profile seed + FinOps tier table + gateway catalog row -> one canonical projection; carries the inline `CONTRACT`, and re-exports the YAML-subset loader and JSON-Schema-subset validator it shares with `integrations/paperclip/` |
 | `policy.py` | the mapped tiering policy: the security floor, the escalation thresholds and the per-capability default/max tiers from `gateway/finops/tiers.yaml`, projected into one frozen value the mapper consumes |
 | `audit.py` | the cross-source consistency audit: one journal entry per invariant (capability-set parity, tier parity, floor presence, tier coverage), each with a status and an evidence sha256 |
 | `capabilities.schema.json` | the capability-registry schema: the shape of one projected capability tier-entry, enforced per entry by `check` |
-| `client.py` | the `Transport` protocol, `HttpTransport` and `FixtureTransport`; the read-only `HermesClient` over the four declared endpoints |
+| `client.py` | the read-only `HermesClient` over the four declared endpoints, its live `HttpTransport`, and the transport `Protocol` + offline `FixtureTransport` it shares with `integrations/paperclip/` |
 | `model.py` | the frozen source shapes and the service-contract constants |
 | `cli.py` | `project` (offline print), `check` (tri-state conformance), `probe` (the live path, never run by the gate) |
 | `tests/` | the offline fixture transport and the mapper/validator/schema/audit suites, including the negative control |
@@ -58,11 +58,33 @@ copy of the surface, the checker must refuse it, and the copy is then removed).
 ## Offline by construction
 
 `project` and `check` are pure functions of the tree — they read files and
-import `mapping` (hashlib / json / pathlib / re / typing), and never import the
+import `mapping` (hashlib / json / pathlib / typing), and never import the
 transport. The only network path in the adapter, `HttpTransport`, is
 instantiated exclusively by the `probe` verb. The gate calls only `check`; the
 tests inject `FixtureTransport`. No live request exists in the gate or the
 tests.
+
+## The seam shared with `integrations/paperclip/` (issue #1208)
+
+This adapter was written as a systematic copy of the paperclip one, down to the
+private helper bodies — and by the time the copy was cut the two validators had
+already drifted (paperclip enforced `format: date-time`, `minimum` and
+`maximum`; this one did not). The parts that were the same now live in one
+place, `integrations/_seam/`:
+
+| Seam module | What it holds | Re-exported as |
+|---|---|---|
+| `_seam/yaml_subset.py` | the stdlib-only YAML subset loader (the union of the two copies: the block parser plus the flow collections `gateway/finops/tiers.yaml` writes) | `mapping.load_yaml` |
+| `_seam/schema.py` | the stdlib-only JSON-Schema subset validator, the **superset** — the keywords both copies implemented, at paperclip's stricter rules | `mapping.validate` |
+| `_seam/wire.py` | `Response`, `decode` and the `error_for_status` rendering, with this adapter's label and status table bound in as `model.BOUNDARY` | `model.Response`, `model.error_for_status` |
+| `_seam/transport.py` | the `Transport` protocol and the offline `FixtureTransport` | `client.Transport`, `client.FixtureTransport` |
+
+Nothing else moved: the typed errors, the live `HttpTransport`, the source
+shapes and the mappers are still this adapter's own, and neither adapter's wire
+behaviour changed. The drift is closed **up**, not down — and
+`tests/test_seam.py` provokes it: the three keywords this copy had ignored are
+refused now, and `mapping.validate` *is* the seam's object, so a re-forked
+helper fails the suite.
 
 ## Live sync
 

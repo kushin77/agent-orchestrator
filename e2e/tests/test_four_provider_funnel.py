@@ -100,15 +100,15 @@ def test_provider_serves_with_tier_and_usage(provider, model, health):
 
 
 def test_team_gateway_uses_real_paperclip_and_hermes_adapters():
-    """The real adapters (issue #255) own paperclip/hermes; the e2e stubs are
-    only a fallback and are NOT installed while the real adapters exist."""
+    """The real adapters (issue #255) own paperclip/hermes: the funnel ASSERTS
+    they are registered instead of installing any superseded fallback stub."""
     from providers import PROVIDER_CLASSES
     from providers.hermes import HermesProvider as RealHermesProvider
     from providers.paperclip import PaperclipProvider as RealPaperclipProvider
 
-    from e2e.wiring import install_team_provider_stubs
+    from e2e.wiring import assert_team_providers_registered
 
-    install_team_provider_stubs()  # guard is a no-op while real adapters exist
+    assert_team_providers_registered()
     assert PROVIDER_CLASSES["paperclip"] is RealPaperclipProvider
     assert PROVIDER_CLASSES["hermes"] is RealHermesProvider
 

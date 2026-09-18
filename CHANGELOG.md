@@ -19,7 +19,7 @@ reviewed go-live promotes it.
 Highlights by phase:
 
 - **Phase 0 — Foundations**: repo scaffold + agent-instruction layering,
-  golden-rules product spine (AO-GR-1..20), CI/CD + IaC foundation
+  golden-rules product spine (AO-GR-1..28), CI/CD + IaC foundation
   (flag-gated OFF, `make verify`), cannibalization index (issue #5-#8, #50-#53).
 - **Phase 1 — Agent Registry & Profiling** (`registry/`): AgentProfile schema +
   validator + versioning, prompt/instruction library, SME persona registry,
@@ -60,7 +60,7 @@ Highlights by phase:
   `vendor/CMR/catalog/schemas/module.schema.json`.
 - Guardrail set ratified: root `AGENTS.md`/`CLAUDE.md`/`.cursorrules`/
   `.github/copilot-instructions.md` + root `GOLDEN-RULES.md` ratification
-  pointer (hub GR-1..18 bind where the repo spine is silent).
+  pointer (hub GR-1..24 bind where the repo spine is silent).
 - CMR vendor onboarding: `CMR:ONBOARD-0012` (issue #98).
 
 [`RELEASING.md`](RELEASING.md) describes how to cut future releases.

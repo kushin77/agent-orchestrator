@@ -77,6 +77,16 @@ CMR_DISPOSITIONS = frozenset({"hub-only", "mirrors"})
 CMR_ROW_ID_RE = re.compile(r"^(?:LESSON|SUGGEST)-\d+$")
 LEDGER_REL = "governance/lessons/ledger.jsonl"
 
+# The reason vocabulary for a `local-only` declaration is declared by the
+# contract (`cmr_hub.local_only_reasons`) and never hard-coded here: each reason
+# names a predicate this module implements, and the checker evaluates it for the
+# record the declaration covers. A reason whose predicate is not implemented, or
+# whose predicate no longer holds, is refused **by record id**.
+LOCAL_ONLY_PREDICATE_NO_HUB_MIRROR = "no-hub-row-mirrors-this-id"
+LOCAL_ONLY_PREDICATES = frozenset({LOCAL_ONLY_PREDICATE_NO_HUB_MIRROR})
+LOCAL_ONLY_REASON_NO_HUB_COUNTERPART = "no-hub-counterpart"
+LOCAL_ONLY_FIELDS = ("id", "reason", "record_ref", "judged_against")
+
 # A foreign-repo close reference: `Closes owner/repo#N` (and Fixes/Resolves).
 FOREIGN_CLOSE_RE = re.compile(
     r"\b(?:Closes|Fixes|Resolves)\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+)",
@@ -111,11 +121,16 @@ def _load_json(path: str) -> Any:
         raise InputError(f"input malformed JSON: {path} ({exc})") from exc
 
 
-def _load_ledger_ids(path: str) -> set[str]:
-    """The set of lesson-record ids in this repository's authoritative ledger."""
+def _load_ledger_records(path: str) -> dict[str, dict[str, Any]]:
+    """The authoritative ledger, by record id.
+
+    The records — not only their ids — are the input the local-only half of the
+    second-ledger check needs: a declaration cites a ref that must appear in the
+    record it covers, so an id-only caller cannot judge one.
+    """
     if not os.path.isfile(path):
         raise InputError(f"ledger not found: {path}")
-    ids: set[str] = set()
+    records: dict[str, dict[str, Any]] = {}
     with open(path, encoding="utf-8") as fh:
         for lineno, raw in enumerate(fh, 1):
             line = raw.strip()
@@ -126,10 +141,27 @@ def _load_ledger_ids(path: str) -> set[str]:
             except ValueError as exc:
                 raise InputError(f"ledger malformed JSONL at line {lineno} ({exc})") from exc
             if isinstance(record, dict) and isinstance(record.get("id"), str):
-                ids.add(record["id"])
-    if not ids:
+                records[record["id"]] = record
+    if not records:
         raise InputError(f"ledger declares no records: {path}")
-    return ids
+    return records
+
+
+def _load_ledger_ids(path: str) -> set[str]:
+    """The set of lesson-record ids in this repository's authoritative ledger."""
+    return set(_load_ledger_records(path))
+
+
+def _iter_string_values(value: Any) -> Iterable[str]:
+    """Yield every string *value* reachable in a nested structure (not keys)."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for key in sorted(value):
+            yield from _iter_string_values(value[key])
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_string_values(item)
 
 
 def _finding(code: str, item_id: str, message: str) -> dict[str, str]:
@@ -357,8 +389,10 @@ def _cmr_source_path(root: str, override: str | None) -> str:
 
 
 def check_cmr_ledger(contract: dict[str, Any], cmr_doc: dict[str, Any],
-                     ledger_ids: set[str]) -> list[dict[str, str]]:
-    """C7/C8 — the second lessons ledger: declared, ref resolves, no silent drop.
+                     ledger_ids: set[str],
+                     ledger_records: dict[str, dict[str, Any]] | None = None,
+                     ) -> list[dict[str, str]]:
+    """C7..C10 — the second lessons ledger: declared, ref resolves, no silent drop.
 
     Every CMR index record must carry an explicit disposition. `hub-only` says it
     is org-scoped and deliberately not mirrored here; `mirrors` names the local
@@ -366,6 +400,17 @@ def check_cmr_ledger(contract: dict[str, Any], cmr_doc: dict[str, Any],
     record with neither is reported **by id**; so is a mapping whose counterpart is
     missing. An unconfirmed relationship (`confirmed: false`) may assert no
     `mirrors` mapping at all.
+
+    The local side is judged the same way. Every authoritative-ledger record that
+    no hub row mirrors must carry a `local-only` **declaration**, and a
+    declaration only accounts for that record when it is judgeable: a reason from
+    the contract's vocabulary, whose predicate still holds for that record, taken
+    against the hub revision the freeze records, and citing a ref the record
+    itself carries. A bare id records no reason; a declaration inherited across a
+    hub refresh records a judgement nobody re-made. Both are refused **by id**.
+    `ledger_records` is the ledger's records (not only their ids) — without them
+    no declaration can be tied to the record it covers, so an id-only caller
+    fails closed.
     """
     findings: list[dict[str, str]] = []
     hub = contract.get("cmr_hub")
@@ -421,13 +466,131 @@ def check_cmr_ledger(contract: dict[str, Any], cmr_doc: dict[str, Any],
                 f"CMR index record {rid} carries no disposition (hub-only, or mirrors "
                 f"naming a local counterpart) — reported by id, never dropped"))
 
-    local_only = cmr_doc["local_only"]
-    for lid in sorted(str(x) for x in local_only):
+    findings.extend(_check_local_only(contract, hub, cmr_doc, ledger_ids,
+                                      ledger_records or {}, mirrored_locals))
+    return findings
+
+
+def _local_only_vocabulary(hub: dict[str, Any]) -> dict[str, Any] | None:
+    """The declared reason vocabulary, or None when the contract declares none."""
+    vocabulary = hub.get("local_only_reasons")
+    if isinstance(vocabulary, dict) and vocabulary:
+        return vocabulary
+    return None
+
+
+def _local_only_predicate_holds(predicate: str, lid: str,
+                                mirrored_locals: set[str]) -> bool:
+    """Evaluate a declared predicate for one record. An unknown one raises."""
+    if predicate == LOCAL_ONLY_PREDICATE_NO_HUB_MIRROR:
+        return lid not in mirrored_locals
+    raise KeyError(predicate)
+
+
+def _record_ref_resolves(ref: str, record: dict[str, Any] | None) -> bool:
+    """True when `ref` is a string value the ledger record itself carries."""
+    if not isinstance(record, dict):
+        return False
+    return any(value == ref for value in _iter_string_values(record))
+
+
+def _declaration_is_complete(entry: Any) -> bool:
+    """A declaration is complete when every field is a non-empty string."""
+    if not isinstance(entry, dict):
+        return False
+    return all(isinstance(entry.get(field), str) and entry[field].strip()
+               for field in LOCAL_ONLY_FIELDS)
+
+
+def _check_local_only(contract: dict[str, Any], hub: dict[str, Any],
+                      cmr_doc: dict[str, Any], ledger_ids: set[str],
+                      ledger_records: dict[str, dict[str, Any]],
+                      mirrored_locals: set[str]) -> list[dict[str, str]]:
+    """C9/C10 — the local side: every unmirrored record carries a judged reason."""
+    findings: list[dict[str, str]] = []
+    vocabulary = _local_only_vocabulary(hub)
+    if vocabulary is None:
+        findings.append(_finding(
+            "local-only-vocabulary-undeclared", "contract",
+            "cmr_hub.local_only_reasons declares no reason vocabulary, so a local-only "
+            "declaration cannot be judged against anything"))
+        vocabulary = {}
+    provenance = cmr_doc.get("_provenance")
+    vendor_commit = (str(provenance.get("vendor_commit", ""))
+                     if isinstance(provenance, dict) else "")
+
+    declared: set[str] = set()
+    for entry in cmr_doc["local_only"]:
+        if not isinstance(entry, dict):
+            lid = str(entry)
+            findings.append(_finding(
+                "local-only-undocumented", lid,
+                f"local-only declaration {lid!r} is a bare id: it records no reason and "
+                f"is tied to no ledger record — refused"))
+            continue
+        lid = entry.get("id")
+        if not isinstance(lid, str) or not lid.strip():
+            findings.append(_finding(
+                "local-only-undocumented", "local_only",
+                f"local-only declaration {entry!r} carries no record id — refused"))
+            continue
+        lid = lid.strip()
         if lid not in ledger_ids:
             findings.append(_finding(
                 "local-record-unknown", lid,
                 "declared local-only id is not recorded in the authoritative ledger"))
-    accounted = set(mirrored_locals) | {str(x) for x in local_only}
+            continue
+        missing = [field for field in LOCAL_ONLY_FIELDS
+                   if not isinstance(entry.get(field), str) or not entry[field].strip()]
+        if missing:
+            findings.append(_finding(
+                "local-only-undocumented", lid,
+                f"local-only declaration for {lid} records no {'/'.join(missing)} — a "
+                f"declaration must name the reason, the ref the record carries, and "
+                f"the hub revision it was judged against — refused"))
+            continue
+        reason = entry["reason"].strip()
+        specification = vocabulary.get(reason)
+        if not isinstance(specification, dict):
+            findings.append(_finding(
+                "local-only-reason-unknown", lid,
+                f"local-only declaration for {lid} records reason {reason!r}, which "
+                f"cmr_hub.local_only_reasons does not declare — reported by id"))
+            continue
+        predicate = specification.get("predicate")
+        if predicate not in LOCAL_ONLY_PREDICATES:
+            findings.append(_finding(
+                "local-only-predicate-unknown", lid,
+                f"local-only declaration for {lid} records reason {reason!r}, whose "
+                f"predicate {predicate!r} this pass does not implement — a reason the "
+                f"gate cannot evaluate is not a judgement"))
+            continue
+        judged_against = entry["judged_against"].strip()
+        if judged_against != vendor_commit:
+            findings.append(_finding(
+                "local-only-declaration-stale", lid,
+                f"the local-only declaration for {lid} was judged against hub revision "
+                f"{judged_against!r}, but the frozen baseline records "
+                f"{vendor_commit!r} — re-judge it against the new revision, never "
+                f"inherit it"))
+            continue
+        if not _local_only_predicate_holds(predicate, lid, mirrored_locals):
+            findings.append(_finding(
+                "local-only-reason-stale", lid,
+                f"the local-only declaration for {lid} records reason {reason!r}, whose "
+                f"predicate {predicate!r} no longer holds for this record — re-judge "
+                f"it"))
+            continue
+        if not _record_ref_resolves(entry["record_ref"].strip(), ledger_records.get(lid)):
+            findings.append(_finding(
+                "local-only-record-ref-unresolved", lid,
+                f"the local-only declaration for {lid} cites {entry['record_ref']!r}, "
+                f"which that ledger record does not carry — a declaration that cannot "
+                f"be tied to the record it covers is refused"))
+            continue
+        declared.add(lid)
+
+    accounted = set(mirrored_locals) | declared
     for lid in sorted(ledger_ids - accounted):
         findings.append(_finding(
             "local-record-undisclosed", lid,
@@ -478,10 +641,18 @@ def refresh_cmr_baseline(root: str, source_path: str, out_path: str,
     """Regenerate the frozen CMR baseline from the live index (populated vendor).
 
     Preserves each existing record's declared disposition by id, updates the
-    provenance `source_sha256`, and recomputes `local_only` from the authoritative
-    ledger minus mirror targets. A record that is new in the live index is written
-    with no disposition on purpose, so it surfaces as `cmr-record-undisclosed`
-    until it is dispositioned by name.
+    provenance `source_sha256`, and carries every local-only **declaration** over
+    verbatim — reason, record ref and `judged_against` included. A record that is
+    new in the live index is written with no disposition on purpose, so it
+    surfaces as `cmr-record-undisclosed` until it is dispositioned by name.
+
+    It never invents a declaration. A local record that no hub row mirrors and
+    that carries no complete declaration makes the refresh **refuse**, naming the
+    ids, instead of writing a bare one: declaring a record local-only with no
+    reason is the shortcut this pass exists to refuse. And because each carried
+    declaration keeps the hub revision it was judged against, a refresh that moves
+    the pin leaves every declaration stale — reported by id — until someone
+    actually re-judges it.
     """
     if not source_path or not os.path.isfile(source_path):
         print(f"lessons-sync: CANNOT-ASSESS — live CMR source unavailable: {source_path}",
@@ -515,6 +686,35 @@ def refresh_cmr_baseline(root: str, source_path: str, out_path: str,
     ledger_ids = sorted(_load_ledger_ids(os.path.join(root, LEDGER_REL)))
     mirrored = {r["mirrors"] for r in records
                 if r.get("disposition") == "mirrors" and isinstance(r.get("mirrors"), str)}
+    previous_declarations: dict[str, Any] = {}
+    if os.path.isfile(out_path):
+        try:
+            with open(out_path, encoding="utf-8") as fh:
+                for entry in json.load(fh).get("local_only", []):
+                    if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                        previous_declarations[entry["id"]] = entry
+        except (ValueError, OSError, TypeError):
+            previous_declarations = {}
+    declarations: list[dict[str, Any]] = []
+    undeclared: list[str] = []
+    for lid in ledger_ids:
+        if lid in mirrored:
+            continue
+        entry = previous_declarations.get(lid)
+        if _declaration_is_complete(entry):
+            declarations.append({field: str(entry[field]).strip()
+                                 for field in LOCAL_ONLY_FIELDS})
+        else:
+            undeclared.append(lid)
+    if undeclared:
+        print(f"lessons-sync: REFUSED — {len(undeclared)} local record(s) carry no "
+              f"complete local-only declaration, and a refresh never invents one:",
+              file=sys.stderr)
+        for lid in undeclared:
+            print(f"  local-only-undocumented {lid}: declare a reason (from "
+                  f"cmr_hub.local_only_reasons), a ref that record carries, and the "
+                  f"hub revision it was judged against", file=sys.stderr)
+        return NOT_OK
     prev_prov = {}
     if os.path.isfile(out_path):
         try:
@@ -542,7 +742,7 @@ def refresh_cmr_baseline(root: str, source_path: str, out_path: str,
         "ledger_ref": {"repo": "kushin77/CMR", "path": CMR_LESSONS_REL,
                        "kind": "org-consolidated-index"},
         "records": records,
-        "local_only": [lid for lid in ledger_ids if lid not in mirrored],
+        "local_only": declarations,
     }
     directory = os.path.dirname(out_path)
     if directory:
@@ -551,13 +751,18 @@ def refresh_cmr_baseline(root: str, source_path: str, out_path: str,
         json.dump(documented, fh, indent=2, sort_keys=False)
         fh.write("\n")
     print(f"lessons-sync: refreshed {os.path.relpath(out_path, root)} "
-          f"({len(records)} CMR record(s), {len(documented['local_only'])} local-only)")
+          f"({len(records)} CMR record(s), {len(documented['local_only'])} local-only "
+          f"declaration(s) carried over verbatim)")
+    print("lessons-sync: each carried declaration keeps the hub revision it was "
+          "judged against — a moved pin leaves them stale, reported by id, until "
+          "they are re-judged")
     return OK
 
 
 def evaluate(contract: dict[str, Any], peer: dict[str, Any], hints_doc: Any,
              ledger_ids: set[str], cmr_doc: dict[str, Any],
-             *, commit_exists: Callable[[str], bool] | None = None,
+             *, ledger_records: dict[str, dict[str, Any]] | None = None,
+             commit_exists: Callable[[str], bool] | None = None,
              live: Callable[[str, int], bool] | None = None) -> list[dict[str, str]]:
     """Pure evaluation: the ordered, deterministic finding list."""
     if isinstance(hints_doc, dict):
@@ -573,7 +778,8 @@ def evaluate(contract: dict[str, Any], peer: dict[str, Any], hints_doc: Any,
     findings += check_contract(contract)
     findings += check_ledger_ref(contract, peer, live=live)
     findings += check_discoverable(ledger_ids, hints, peer, commit_exists=commit_exists)
-    findings += check_cmr_ledger(contract, cmr_doc, ledger_ids)
+    findings += check_cmr_ledger(contract, cmr_doc, ledger_ids,
+                                 ledger_records=ledger_records)
     findings += check_peer_close(contract, peer, hints_doc)
     # Deterministic ordering: sort by (code, id, message).
     return sorted(findings, key=lambda f: (f["code"], f["id"], f["message"]))
@@ -618,13 +824,15 @@ def run(args: argparse.Namespace) -> int:
         contract = _load_json(contract_path)
         peer = _load_json(peer_path)
         hints_doc = _load_json(hints_path)
-        ledger_ids = _load_ledger_ids(ledger_path)
+        ledger_records = _load_ledger_records(ledger_path)
+        ledger_ids = set(ledger_records)
         cmr_doc = _load_cmr_baseline(cmr_path)
         if not isinstance(contract, dict):
             raise InputError("contract input is not an object")
         if not isinstance(peer, dict):
             raise InputError("peer snapshot is not an object")
         findings = evaluate(contract, peer, hints_doc, ledger_ids, cmr_doc,
+                            ledger_records=ledger_records,
                             commit_exists=_git_commit_exists, live=live)
         if args.verify_cmr_source:
             findings += check_cmr_source(cmr_doc, _cmr_source_path(root, args.cmr_source))
@@ -680,27 +888,35 @@ def self_test() -> int:
         "cmr_hub": {"repo": "kushin77/CMR", "role": DERIVED_ROLE, "confirmed": False,
                     "direction": "one-way:agent-orchestrator->CMR",
                     "ledger_ref": {"repo": "kushin77/CMR", "path": CMR_LESSONS_REL,
-                                   "kind": "org-consolidated-index"}},
+                                   "kind": "org-consolidated-index"},
+                    "local_only_reasons": {
+                        LOCAL_ONLY_REASON_NO_HUB_COUNTERPART: {
+                            "why": "no hub index row mirrors this local record",
+                            "predicate": LOCAL_ONLY_PREDICATE_NO_HUB_MIRROR}}},
         "sync": {"direction": "one-way:writer->derived", "symmetric": False},
     }
     base_peer = {"repo": "kushin77/deepseek", "issues": [{"number": 84, "state": "open"}],
                  "peer_lessons": []}
     base_hints = {"hints": [{"id": "hint-0001", "lesson_id": "L-1", "issue": "#402",
                              "commit": "b87cdf9"}]}
+    hub_rev = "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     base_cmr = {
         "_provenance": {"vendor_repo": "kushin77/CMR", "source_path": CMR_LESSONS_REL,
-                        "source_sha256": "0" * 64},
+                        "source_sha256": "0" * 64, "vendor_commit": hub_rev},
         "ledger_ref": {"repo": "kushin77/CMR", "path": CMR_LESSONS_REL,
                        "kind": "org-consolidated-index"},
         "records": [{"id": "LESSON-001", "kind": "lesson", "status": "closed",
                      "disposition": "hub-only"}],
-        "local_only": ["L-1"],
+        "local_only": [{"id": "L-1", "reason": LOCAL_ONLY_REASON_NO_HUB_COUNTERPART,
+                        "record_ref": "#402", "judged_against": hub_rev}],
     }
-    ledger = {"L-1"}
+    base_records = {"L-1": {"id": "L-1", "kind": "lesson", "status": "closed",
+                            "origin": {"kind": "issue", "ref": "#402"}}}
 
-    def rc_of(contract, peer, hints, ids=ledger, cmr=None):
+    def rc_of(contract, peer, hints, records=base_records, cmr=None):
         doc = base_cmr if cmr is None else cmr
-        return evaluate(contract, peer, hints, set(ids), _copy_doc(doc),
+        return evaluate(contract, peer, hints, set(records), _copy_doc(doc),
+                        ledger_records=_copy.deepcopy(records),
                         commit_exists=lambda _s: True)
 
     import copy as _copy
@@ -777,6 +993,68 @@ def self_test() -> int:
     controls.append(("local record with no counterpart declaration reported by id",
                      any(f["code"] == "local-record-undisclosed" and f["id"] == "L-1"
                          for f in findings)))
+
+    # --- the local side: which reasons, judged against what, tied to what ---
+    bare_local = _copy.deepcopy(base_cmr)
+    bare_local["local_only"] = ["L-1"]
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=bare_local)
+    controls.append(("bare-id local-only declaration refused by id",
+                     any(f["code"] == "local-only-undocumented" and f["id"] == "L-1"
+                         for f in findings)))
+    controls.append(("a refused declaration does not account for its record",
+                     any(f["code"] == "local-record-undisclosed" and f["id"] == "L-1"
+                         for f in findings)))
+
+    no_reason = _copy.deepcopy(base_cmr)
+    no_reason["local_only"][0]["reason"] = "because-i-say-so"
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=no_reason)
+    controls.append(("reason outside the contract's vocabulary refused by id",
+                     any(f["code"] == "local-only-reason-unknown" and f["id"] == "L-1"
+                         for f in findings)))
+
+    no_vocabulary = _copy.deepcopy(base_contract)
+    no_vocabulary["cmr_hub"].pop("local_only_reasons")
+    codes = {f["code"] for f in rc_of(no_vocabulary, base_peer, base_hints)}
+    controls.append(("undeclared reason vocabulary refused",
+                     "local-only-vocabulary-undeclared" in codes))
+
+    unimplemented = _copy.deepcopy(base_contract)
+    unimplemented["cmr_hub"]["local_only_reasons"][
+        LOCAL_ONLY_REASON_NO_HUB_COUNTERPART]["predicate"] = "vibes"
+    codes = {f["code"] for f in rc_of(unimplemented, base_peer, base_hints)}
+    controls.append(("a reason whose predicate is not implemented refused by id",
+                     "local-only-predicate-unknown" in codes))
+
+    other_revision = _copy.deepcopy(base_cmr)
+    other_revision["local_only"][0]["judged_against"] = "deadbeef"
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=other_revision)
+    controls.append(("declaration judged against another hub revision refused by id",
+                     any(f["code"] == "local-only-declaration-stale" and f["id"] == "L-1"
+                         for f in findings)))
+
+    mirrored_now = _copy.deepcopy(base_cmr)
+    mirrored_now["records"].append({"id": "LESSON-002", "kind": "lesson",
+                                    "status": "closed", "disposition": "mirrors",
+                                    "mirrors": "L-1"})
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=mirrored_now)
+    controls.append(("a hub row that mirrors the record satisfies the local side",
+                     not any(f["code"] == "local-record-undisclosed" for f in findings)))
+    controls.append(("a local-only reason the hub has just falsified refused by id",
+                     any(f["code"] == "local-only-reason-stale" and f["id"] == "L-1"
+                         for f in findings)))
+
+    wrong_ref = _copy.deepcopy(base_cmr)
+    wrong_ref["local_only"][0]["record_ref"] = "#999999"
+    findings = rc_of(base_contract, base_peer, base_hints, cmr=wrong_ref)
+    controls.append(("declaration citing a ref the record does not carry refused by id",
+                     any(f["code"] == "local-only-record-ref-unresolved"
+                         and f["id"] == "L-1" for f in findings)))
+
+    findings = evaluate(base_contract, base_peer, base_hints, {"L-1"},
+                        _copy_doc(base_cmr), commit_exists=lambda _s: True)
+    controls.append(("an id-only caller cannot judge a declaration (fails closed)",
+                     any(f["code"] == "local-only-record-ref-unresolved"
+                         and f["id"] == "L-1" for f in findings)))
 
     ok = True
     for name, passed in controls:

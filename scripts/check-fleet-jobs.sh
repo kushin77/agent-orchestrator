@@ -14,9 +14,14 @@
 # WHAT IS PROVEN (against the real tree, not a description of it)
 #   1. the manifest meets the renderer's contract (every job has a name, a
 #      unique marker, a command, a schedule-or-interval and a log), the enabled
-#      jobs' markers equal `fleet/cron.MARKERS`, and the fourth (snapshot-
-#      refresh) job is declared but ship-gated OFF — so it cannot change the
-#      installed crontab;
+#      jobs' markers equal `fleet/cron.MARKERS`, and the two ship-gated-OFF jobs
+#      (snapshot-refresh, and scan-pr-failures — issue #1207) are declared but
+#      disabled, so neither can change the installed crontab;
+#   1b. BOTH directions of reachability for the ship-gated-OFF jobs (issue
+#      #1207): while disabled the scanner installs nothing, and flipping only
+#      its `enabled` flag — never the code — makes the renderer emit exactly its
+#      marker and the reconciler recognise a stale line for it, so the
+#      declaration is what schedules it and `fleet/cron.py` is what owns it;
 #   2. the renderer is deterministic (rendered twice, byte-identical) and the
 #      legacy `line`/`prune_line`/`reconcile_line` builders are the same render,
 #      so the manifest and the module cannot drift apart;
@@ -136,14 +141,32 @@ probe(
 )
 disabled = [j for j in jobs if j.get("enabled") is not True]
 probe(
-    "SNAPSHOT-REFRESH-SHIP-GATED-OFF",
-    [j.get("name") for j in disabled] == ["snapshot-refresh"]
-    and disabled[0].get("marker") == cron.SNAPSHOT_REFRESH_MARKER,
+    "SHIP-GATED-OFF-SET",
+    [j.get("name") for j in disabled] == ["snapshot-refresh", "scan-pr-failures"]
+    and [j.get("marker") for j in disabled]
+    == [cron.SNAPSHOT_REFRESH_MARKER, cron.SCAN_PR_FAILURES_MARKER],
     "disabled=%s" % [j.get("name") for j in disabled],
 )
 probe(
     "DECLARED-MARKERS-COMPLETE",
-    cron.declared_markers(manifest) == cron.MARKERS + (cron.SNAPSHOT_REFRESH_MARKER,),
+    cron.declared_markers(manifest)
+    == cron.MARKERS + (cron.SNAPSHOT_REFRESH_MARKER, cron.SCAN_PR_FAILURES_MARKER),
+)
+# Reachability, proved BOTH ways (issue #1207). A disabled job is only "wired"
+# if the declaration — not a code path — is what would install it: with the
+# manifest as declared, the scanner installs nothing; flipping ONLY its flag
+# makes the SAME renderer emit its line. A job that needed an extra code change
+# to install would fail the second half, and a job accidentally enabled would
+# fail SHIP-GATED-OFF-SET above.
+scan_pr = [j for j in jobs if j.get("name") == "scan-pr-failures"]
+scan_on = [dict(j, enabled=True) if j.get("name") == "scan-pr-failures" else j for j in jobs]
+rendered_on = cron.render_lines(cron.enabled_jobs({"jobs": scan_on}))
+probe(
+    "SCAN-PR-REACHABLE-WHEN-ENABLED",
+    bool(scan_pr)
+    and len(rendered_on) == len(enabled) + 1
+    and any(entry.endswith("# " + cron.SCAN_PR_FAILURES_MARKER) for entry in rendered_on),
+    "%d line(s) rendered with the flag on" % len(rendered_on),
 )
 
 # --- 2. the renderer is deterministic and the legacy builders are the same ---
@@ -219,6 +242,21 @@ probe(
     any("ao-fleet-snapshot-refresh" in entry for entry in report2["stale"])
     and stale_snapshot not in merged2,
     json.dumps(report2),
+)
+# The same for the scanner's marker (issue #1207): a DISABLED job's stale line
+# must still be OURS to the reconciler, or `uninstall`/`reconcile` would leave a
+# line the manifest no longer installs. This is the half of "reachable from
+# fleet/cron.py" that the renderer probe above cannot show.
+stale_scan = (
+    "*/15 * * * * cd /repo && bash scripts/scan-pr-failures.sh --apply "
+    ">> /tmp/x.log 2>&1 # ao-fleet-scan-pr-failures"
+)
+merged2b, report2b = cron.reconcile_lines([cron.line(2), foreign, stale_scan], enabled)
+probe(
+    "RECONCILE-HEALS-STALE-SCAN-PR",
+    any("ao-fleet-scan-pr-failures" in entry for entry in report2b["stale"])
+    and stale_scan not in merged2b,
+    json.dumps(report2b),
 )
 drifted_watchdog = cron.line(2).replace("*/2", "*/9", 1)
 merged3, report3 = cron.reconcile_lines([drifted_watchdog, foreign], enabled)

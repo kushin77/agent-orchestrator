@@ -61,9 +61,10 @@ conformance stage disables providers one at a time via the real health signal
 The two team-local hops (paperclip, hermes) are served by the REAL
 `gateway/providers/{paperclip,hermes}.py` adapters (issue #255); the e2e lane
 overrides their configs to keyless local endpoints and appends them as terminal
-fallback hops at runtime — no gateway file is edited. `e2e/_team_providers.py`
-keeps offline fallback adapters for the case those real adapters are ever
-absent, mirroring the same wire shapes.
+fallback hops at runtime — no gateway file is edited. `e2e/wiring.py` asserts
+those real adapters are registered (`assert_team_providers_registered`) rather
+than installing an offline stub, so a missing real adapter fails loudly instead
+of being masked by a fallback.
 
 Every hop is a canned offline response through the real providers registry
 transport rig — no keys, no network.

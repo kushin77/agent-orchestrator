@@ -7,49 +7,53 @@ HMAC-SHA256 signed ``header.payload.signature`` token whose payload carries the
 scoped claims ``tenantId`` / ``agentId`` / ``role`` / ``allowedTools`` plus the
 standard ``iss`` / ``sub`` / ``aud`` / ``iat`` / ``exp`` / ``jti`` names.
 
+Encode and verify are not implemented here: both delegate to the identity
+lane's canonical HS256 codec (``identity/sso/jose.py``, issue #1204), so this
+module no longer carries its own base64url/HMAC. The wire format is unchanged -
+it was always byte-identical to the registry's, and now it is literally the
+same code.
+
 Production issuance of these sessions belongs to the registry / control plane
 (``registry.service.IdentityService.issue_session``); the gateway's job is
 verification only. ``mint_session`` exists so the gateway is fully exercisable
-offline (demo + tests) with byte-identical tokens to what the registry issues,
-and is documented as an offline convenience - it is never the gateway's
-production issuance path.
+offline (demo + tests) and is documented as an offline convenience - it is
+never the gateway's production issuance path.
 """
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
-import json
+import os
+import sys
 import time
 import uuid
 from typing import Callable, Optional, Tuple
 
-from .errors import InvalidCredentialError, SessionExpiredError
-from .model import SessionIdentity
+# The HS256 JWT codec is the identity lane's canonical one
+# (``identity/sso/jose.py``); this module delegates to it rather than
+# hand-rolling base64url/HMAC (issue #1204). ``gateway/`` is on ``sys.path`` for
+# the ``mcp`` package, so the repository root (three levels above this file) is
+# inserted here to resolve ``identity.sso`` - the same bootstrap the sibling
+# ``mcp.sources`` / ``registry.packs`` modules use for cross-pillar imports.
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from identity.sso.errors import (  # noqa: E402
+    SignatureVerificationError as JoseSignatureError,
+    SsoError as JoseError,
+)
+from identity.sso.jose import jwt_encode, jwt_unsign  # noqa: E402
+from identity.sso.model import ALG_HS256  # noqa: E402
+
+from .errors import InvalidCredentialError, SessionExpiredError  # noqa: E402
+from .model import SessionIdentity  # noqa: E402
 
 ISSUER = "urn:agent-orchestrator:mcp"
 DEFAULT_AUDIENCE = ("control-plane",)
 DEFAULT_ROLE = "agent"
 DEFAULT_TTL_SECONDS = 3600
-
-_JSON_KW = {"sort_keys": True, "separators": (",", ":"), "ensure_ascii": False}
-_HEADER = {"alg": "HS256", "typ": "JWT"}
-
-
-def _b64url_encode(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def _b64url_decode(text: str) -> bytes:
-    padding = "=" * (-len(text) % 4)
-    return base64.urlsafe_b64decode(text + padding)
-
-
-def _sign(signing_input: bytes, signing_key: bytes) -> str:
-    return _b64url_encode(
-        hmac.new(signing_key, signing_input, hashlib.sha256).digest()
-    )
 
 
 def mint_session(
@@ -82,15 +86,13 @@ def mint_session(
 
 
 def session_to_token(session: SessionIdentity, signing_key: bytes) -> str:
-    """Encode a session to an HS256 token (header.payload.signature)."""
-    header_part = _b64url_encode(
-        json.dumps(_HEADER, **_JSON_KW).encode("utf-8")
-    )
-    payload_part = _b64url_encode(
-        json.dumps(session.to_claims(), **_JSON_KW).encode("utf-8")
-    )
-    signing_input = f"{header_part}.{payload_part}".encode("ascii")
-    return f"{header_part}.{payload_part}.{_sign(signing_input, signing_key)}"
+    """Encode a session to an HS256 token (header.payload.signature).
+
+    Delegates to the canonical codec (``identity/sso/jose.py``, issue #1204);
+    the output is byte-identical to what this module emitted before the
+    collapse, so tokens minted by the old code still verify and vice versa.
+    """
+    return jwt_encode(session.to_claims(), alg=ALG_HS256, key=signing_key)
 
 
 def verify_token(
@@ -101,24 +103,22 @@ def verify_token(
 ) -> SessionIdentity:
     """Verify a token's signature + expiry; return the session it carries.
 
-    Raises ``InvalidCredentialError`` on a malformed token, a signature
-    mismatch or incomplete claims, and ``SessionExpiredError`` once ``exp``
-    has passed. A forged claim never verifies (HMAC signature).
+    Signature verification is the canonical codec's job
+    (``identity/sso/jose.py``, issue #1204): a constant-time HMAC compare with
+    ``alg`` pinned to HS256, so a ``none`` / algorithm-confusion token is
+    refused before any signature work. Raises ``InvalidCredentialError`` on a
+    malformed token, a signature mismatch or incomplete claims, and
+    ``SessionExpiredError`` once ``exp`` has passed. A forged claim never
+    verifies (HMAC signature).
     """
-    parts = token.split(".")
-    if len(parts) != 3:
-        raise InvalidCredentialError("malformed token: expected 3 segments")
-    header_part, payload_part, signature_part = parts
-    signing_input = f"{header_part}.{payload_part}".encode("ascii")
-    expected = _sign(signing_input, signing_key)
-    if not hmac.compare_digest(expected, signature_part):
-        raise InvalidCredentialError("token signature does not verify")
     try:
-        payload = json.loads(_b64url_decode(payload_part).decode("utf-8"))
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise InvalidCredentialError("token payload is not valid JSON") from exc
+        claims = jwt_unsign(token, alg=ALG_HS256, key=signing_key)
+    except JoseSignatureError as exc:
+        raise InvalidCredentialError("token signature does not verify") from exc
+    except JoseError as exc:
+        raise InvalidCredentialError(f"malformed token: {exc}") from exc
     try:
-        session = SessionIdentity.from_claims(payload)
+        session = SessionIdentity.from_claims(claims)
     except ValueError as exc:
         raise InvalidCredentialError(str(exc)) from exc
     now = now if now is not None else int(time.time())

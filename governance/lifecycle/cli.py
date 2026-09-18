@@ -227,6 +227,30 @@ def commit_is_contained(worktree: Path, ancestor: str, descendant: str) -> bool:
     return result.returncode == 0
 
 
+def tree_relation(worktree: Path, left: str, right: str) -> str:
+    """``"same"``, ``"different"`` or ``"unknown"`` — how two commits' trees compare.
+
+    Three answers rather than two, because *"the trees differ"* and *"the trees cannot
+    be read"* are different facts and only one of them licenses a conclusion (#1149).
+    ``git diff --quiet`` exits 128 for an object this repository does not hold; a caller
+    that read that as *different* would report a drift nobody measured, and one that read
+    it as *same* would admit a tree nobody compared. Both are fail-open, and this module
+    exists to close exactly that gap.
+    """
+    if not left or not right:
+        return "unknown"
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "diff", "--quiet", left, right],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return "same"
+    if result.returncode == 1:
+        return "different"
+    return "unknown"
+
+
 def trees_are_identical(worktree: Path, left: str, right: str) -> bool:
     """Do two commits carry the **same tree** — is this the tree that landed?
 
@@ -237,17 +261,11 @@ def trees_are_identical(worktree: Path, left: str, right: str) -> bool:
     check ``commit_is_contained`` alone would admit a lane that contains a landing
     built from **different** content — a measurement of work nobody verified.
 
-    ``git diff --quiet`` exits 0 for identical trees, 1 for differing ones and 128 when
-    a commit is unknown; only 0 is a match, so this fails closed too.
+    Only the measured ``same`` is a match, and an unreadable commit is not one, so this
+    fails closed too — the tri-state is read through :func:`tree_relation` rather than
+    re-derived here, so the two cannot drift apart.
     """
-    if not left or not right:
-        return False
-    result = subprocess.run(
-        ["git", "-C", str(worktree), "diff", "--quiet", left, right],
-        capture_output=True,
-        text=True,
-    )
-    return result.returncode == 0
+    return tree_relation(worktree, left, right) == "same"
 
 
 def select_lane(records: list[dict] | None, commit: str = "") -> dict | None:
@@ -525,6 +543,52 @@ class GhOps:
             "so the item has no green verification"
         )
 
+    def tree_relation(self, left: str, right: str) -> str:
+        """How two commits' trees compare — read in the repository this port measures.
+
+        The driver asks this to decide *which* commit a merged item's evidence is against
+        (#1149). It is a question about a repository, so it is asked of the port rather
+        than of a bare ``git`` call inside the driver — the driver owns the decision, the
+        port owns knowing where to look.
+        """
+        return tree_relation(self.root, left, right)
+
+    def _refusal_reason(self, worktree: Path, head: str, commit: str, landing: str) -> str:
+        """Why this lane may not stand for ``commit`` — one line, naming the true reason.
+
+        #1098's refusal said "and does not contain it" for two different causes, so the
+        #977/#978 shape — a lane that **does** contain the landing, whose landing carries
+        a different tree than the commit the evidence names — was diagnosed as the one
+        thing it was not. The causes have different remedies: a lane of the wrong tree is
+        re-cut, while a subject naming a tree that never landed is re-pointed. Naming them
+        apart is the whole point of a refusal whose operator has to act on it (#1149).
+        """
+        opening = f"lane head {head[:12]} is not the verified commit {commit[:12]}"
+        if not landing:
+            return (
+                f"{opening}: no landing is recorded for it, so a lane cut from the default "
+                "branch cannot stand for it — the equality arm is the only arm for an "
+                "unmerged (or landless) pull request"
+            )
+        if not commit_is_contained(worktree, landing, head):
+            return (
+                f"{opening} and does not contain the landing {landing[:12]}, the commit the squash "
+                "landed as: a lane may stand for the verified commit only when it contains the "
+                "landing and that landing carries the same tree (#1098)"
+            )
+        if trees_are_identical(worktree, commit, landing):
+            return (
+                f"{opening}: the lane contains the landing {landing[:12]} and that landing "
+                "carries the same tree as the verified commit, so these facts do not explain "
+                "the refusal — the admissibility rule refused a lane it should admit"
+            )
+        return (
+            f"{opening}: it DOES contain the landing {landing[:12]}, but the landing carries a "
+            f"different tree — {commit[:12]} names a tree that never landed, so it may not be "
+            "the subject of this item's evidence; the tree that landed is the one "
+            f"{landing[:12]} carries (#1149)"
+        )
+
     def _admissible(self, worktree: Path, head: str, commit: str, landing: str) -> str:
         """``"equals"``, ``"contains"`` or ``""`` — how this lane may stand for ``commit``.
 
@@ -555,7 +619,7 @@ class GhOps:
             return "contains"
         return ""
 
-    def record_verification(self, issue: int, commit: str, landing: str = "") -> str:
+    def record_verification(self, issue: int, commit: str, landing: str = "", drifted: str = "") -> str:
         """Record a green attestation for ``commit``, from the lane or from the commit.
 
         The lane is the first source: the gate is re-run in it, and the attestation it
@@ -583,6 +647,14 @@ class GhOps:
         silently invalidated each of them. The lane is the measurement; the verified
         commit is the subject; the record says which is which.
 
+        ``drifted`` is the pull request's **live** head where a commit landed *after* the
+        squash carried it. ``governance/lifecycle/closeout.py`` measured that its tree is
+        not the landed one, so it cannot be the subject and the landing is (#1149). It is
+        recorded as ``drifted_head`` rather than dropped: the whole defect was that the
+        drifted head was used *silently*, as though it were the verified work. It changes
+        nothing about what is accepted — the lane is still admitted by the two arms only,
+        with the tree half intact.
+
         A run that did not happen writes **no journal**. ``.fleet/lifecycle``'s
         presence is another module's landing record — ``governance/reconcile``
         reads a journal file as "this issue's work landed" — so writing one for a
@@ -597,21 +669,26 @@ class GhOps:
             head = self._run(["git", "-C", str(worktree), "rev-parse", "HEAD"])
             via = self._admissible(worktree, head, commit, landing)
             if not via:
-                raise RuntimeError(
-                    f"lane head {head[:12]} is not the verified commit {commit[:12]} and does not "
-                    f"contain it: a lane must be at the verified commit, or be a tree cut after the "
-                    f"landing {landing[:12] or '(none recorded)'} that contains it and carries the "
-                    "same tree as the verified commit (#1098)"
-                )
+                raise RuntimeError(self._refusal_reason(worktree, head, commit, landing))
             self._gate_in(worktree, head[:12])
             record: dict = {"ok": True, "commit": commit or head, "source": "lane"}
             if via == "contains":
                 record.update({"landing": landing, "measured": head, "via": via})
+                if drifted and drifted != commit:
+                    # The live head whose tree never landed (#1149). Disclosed precisely so
+                    # the substitution that caused this defect can never be silent again.
+                    record["drifted_head"] = drifted
             write_journal(issue, {"verify": record}, self.root)
             if via == "contains":
                 return (
                     f"verify green at {record['commit'][:12]} (measured in the lane at {head[:12]}, "
                     f"which contains the landing {landing[:12]})"
+                    + (
+                        f"; the live head {drifted[:12]} advanced past the squash and its tree never "
+                        "landed, so the evidence is against the tree that landed"
+                        if record.get("drifted_head")
+                        else ""
+                    )
                 )
             return f"verify green at {head[:12]}"
         if any(record["worktree_exists"] for record in records):
@@ -629,11 +706,13 @@ class GhOps:
         # still in the object store is re-measured rather than mourned — and when
         # there is none, ``_remeasure`` refuses by name, naming the ordering.
         measured = self._remeasure(issue, commit, dead=lane)
-        write_journal(
-            issue,
-            {"verify": {"ok": True, "commit": measured, "source": "reclaimed-lane"}},
-            self.root,
-        )
+        record = {"ok": True, "commit": measured, "source": "reclaimed-lane"}
+        if drifted and drifted != commit and commit == landing:
+            # A subject that is the landing rather than the branch tip (#1149): the
+            # re-measurement is still a real gate run at the commit the evidence names,
+            # and the drift is still disclosed rather than dropped.
+            record.update({"landing": landing, "drifted_head": drifted})
+        write_journal(issue, {"verify": record}, self.root)
         return f"verify green at {measured[:12]} (re-measured at the verified commit; the lane is gone)"
 
     def _remeasure(self, issue: int, commit: str, dead: dict | None = None) -> str:
