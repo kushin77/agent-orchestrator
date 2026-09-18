@@ -32,10 +32,57 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Sequence
 
-ROOT = Path(__file__).resolve().parents[2]
+#: The repository whose state the lifecycle reads and writes: the journals other
+#: modules read as landing records, the lane records, the decision ledger, and the git
+#: object store the evidence is measured from. Derived from this file's location, so a
+#: checkout's own copy operates on its own state.
+ROOT_ENV = "AO_LIFECYCLE_ROOT"
+
+
+def lifecycle_root() -> Path:
+    """The state root — this checkout's, unless ``AO_LIFECYCLE_ROOT`` names another.
+
+    The seam exists because the driver has two requirements that a lane worktree
+    cannot satisfy at once, and the box measured the cost of that (2026-09-18, #1247):
+
+    * it must run the **fixed** code — and the fix for this class
+      (:meth:`GhOps._measure_landed_tree`, #1003) is on ``master``; and
+    * it must run against the **fleet's** state — the journals, lane records and
+      ledger the fleet loops write in the shared checkout, without which the item is
+      not even in the audit's scope.
+
+    The shared checkout is not a stable code baseline: it holds whichever branch a
+    lane last left it on. Measured on this box while diagnosing #1247, it sat on
+    ``issue-708-wire-runaway-guard``, 3.7 hours behind ``origin/master``, so its copy
+    of this module still refuses a red frozen head outright and the #1003 remedy could
+    not be exercised from it at all. Pointing a lane's copy — the one with the fix — at
+    the shared checkout's ``.fleet`` is the alternative to editing the shared checkout,
+    which dozens of lanes are using.
+
+    A root that is not a repository is refused rather than used: the override decides
+    where landing records are written, and a typo there would scatter them. An empty or
+    unset override is this checkout, unchanged.
+    """
+    override = os.environ.get(ROOT_ENV, "").strip()
+    local = Path(__file__).resolve().parents[2]
+    if not override:
+        return local
+    candidate = Path(override).expanduser().resolve()
+    if not (candidate / ".git").exists():
+        raise SystemExit(
+            f"{ROOT_ENV}={override} is not a repository root (no .git at {candidate}): "
+            "the lifecycle writes the journals, lane records and decision ledger under it, "
+            "so an unvalidated override would scatter another module's landing records "
+            "outside the fleet's state"
+        )
+    return candidate
+
+
+ROOT = lifecycle_root()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -114,6 +161,86 @@ def _gate_attempt(worktree: Path) -> gate.GateAttempt:
         ["make", "verify"], cwd=str(worktree), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
     )
     return gate.GateAttempt(exit_code=result.returncode, output=result.stdout or "")
+
+
+#: The composite gate's own per-check record, written by ``scripts/verify.sh`` into the
+#: worktree it ran in — **even on failure**, deliberately ("so a red run still carries
+#: evidence"). It is the only machine-readable account of *which* check the gate
+#: disagreed with: the gate's own FAIL banner names how many failed and which ones
+#: were **skipped**, never which ones failed.
+ATTESTATION_PATH = Path(".verify") / "attestation.json"
+
+#: The gate's own tri-state for a check, read from that record: 0 PASS, 2
+#: CANNOT-ASSESS (the gate records it as SKIP), anything else NOT-OK. These are the
+#: gate's contract, quoted from ``scripts/verify.sh`` rather than re-derived from its
+#: human-readable summary.
+CHECK_PASS = 0
+CHECK_SKIP = 2
+
+
+def _head_of(worktree: Path) -> str:
+    """The commit a worktree holds, or ``""`` when there is no tree to read."""
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "rev-parse", "HEAD"], capture_output=True, text=True
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def failed_checks(worktree: Path, since: float) -> list[str]:
+    """The checks the gate ran in ``worktree`` and disagreed with, by name.
+
+    A refused verification carries the gate's own sentence — ``verify: FAIL (2 of 142
+    checks failed, 4 skipped: module-registry, ...)`` — which names the **skips** and
+    never the failures. The operator is then told that something is wrong and not
+    what, and the only way to learn more is to run the whole composite gate again, so
+    the finding cannot be acted on and cannot converge. Measured on #627 and #629:
+    their close-outs refused with "1 of 142 checks failed" and "2 of 142 checks
+    failed" and nothing else, and the two board findings that record it (#1247,
+    #1251) were unactionable for exactly that reason.
+
+    The names come from the gate's **own attestation**, and only when the file is
+    demonstrably this run's:
+
+    * its ``git_sha`` must be the measured tree's HEAD — a lane keeps the attestation
+      of an older run in the same worktree, and that is a measurement of another
+      commit;
+    * it must have been written at or after ``since``, the attempt's own start, so a
+      run that died before writing one cannot be described by the previous run's red.
+
+    When either guard fails nothing is returned, and the caller reports the count it
+    did measure rather than inventing a name — the substitution this module exists to
+    prevent. Names keep the gate's own order, so the first failure is the first the
+    operator reads.
+    """
+    path = worktree / ATTESTATION_PATH
+    try:
+        if path.stat().st_mtime < since:
+            return []
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(payload, dict) or str(payload.get("git_sha") or "") != _head_of(worktree):
+        return []
+    entries = payload.get("checks")
+    if not isinstance(entries, list):
+        return []
+    names = [
+        str(entry.get("name") or "")
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("rc") not in (CHECK_PASS, CHECK_SKIP)
+    ]
+    return [name for name in names if name]
+
+
+def _prefix(names: Sequence[str]) -> str:
+    """``failing check(s): a, b — `` , or ``""`` when no name could be read.
+
+    The names go **first** in a refusal because ``closeout`` clamps a step's detail at
+    300 characters and the gate's own banner already spends most of that on counts and
+    skips: a failure that cannot name its check cannot be acted on, and the name is the
+    only way to reproduce it without running the whole composite gate again.
+    """
+    return f"failing check(s): {', '.join(names)} — " if names else ""
 
 
 def _gh(*args: str) -> list | dict:
@@ -480,11 +607,23 @@ class RedGate(RuntimeError):
     transcript — kept beside the message because ``closeout`` truncates a step's detail at
     300 characters: a *composed* refusal that has to name two red trees must fit inside
     that cap, and the sentence saying which run failed is the part worth spending it on.
+    ``failing`` is carried as *data* for the same reason and by the same rule as the
+    message: the gate's own sentence says how many checks failed and which ones were
+    skipped, never **which** ones failed, and a refusal that cannot name the failing
+    check cannot be acted on. Keeping it a field rather than a prefix of the sentence
+    lets each refusal put it where the cap cannot reach it.
     """
 
-    def __init__(self, detail: str, verdict_line: str = "") -> None:
+    def __init__(
+        self, detail: str, verdict_line: str = "", failing: Sequence[str] = ()
+    ) -> None:
         super().__init__(detail)
         self.verdict_line = verdict_line
+        self.failing = tuple(failing)
+
+    def named(self) -> str:
+        """``failing check(s): a, b`` — or ``""`` when nothing was readable."""
+        return f"failing check(s): {', '.join(self.failing)}" if self.failing else ""
 
 
 class GhOps:
@@ -556,20 +695,33 @@ class GhOps:
 
         One reader for both trees — the lane's and the re-measurement's — so the two
         paths cannot drift into reading the same gate differently.
+
+        A **failure** names the checks it measured red (:func:`failed_checks`), because
+        the gate's own banner names only how many failed and which ones skipped. Without
+        them the refusal says that something is wrong and not what, and the only way to
+        find out is to run the whole composite gate again — which is why the two board
+        findings measured on #627 and #629 (#1247, #1251) carried "1 of 142 checks
+        failed" and "2 of 142 checks failed" and could not be acted on. The names are
+        never guessed: an attestation that is not demonstrably this run's yields no
+        names, and the message then reports the count it did measure.
         """
+        started = time.time()
         run = gate.run_gate(lambda: _gate_attempt(worktree))
         if run.admitted:
             return
         if run.cannot_assess:
             raise gate.CannotAssess(run.verdict, run.detail(), run.remediation())
-        raise RedGate(
-            f"{run.detail()} — the gate ran against {described} and reported a failure, "
-            "so the item has no green verification",
+        failing = failed_checks(worktree, started)
+        red = RedGate(
+            f"{_prefix(failing)}{run.detail()} — the gate ran against {described} and reported a "
+            "failure, so the item has no green verification",
             # The *short* sentence, not ``detail()``: a composed refusal has to fit the
             # 300-character step detail, and the retry bookkeeping is not what an operator
             # needs to read twice.
             run.final.headline() or f"verify: {run.verdict.upper()} (rc {run.exit_code})",
+            failing,
         )
+        raise red
 
     def tree_relation(self, left: str, right: str) -> str:
         """How two commits' trees compare — read in the repository this port measures.
@@ -876,9 +1028,10 @@ class GhOps:
             # fact an operator needs is *which* two trees are red — not the retry bookkeeping
             # twice over.
             raise RuntimeError(
-                f"{red.verdict_line or red} — the gate ran against {commit[:12]} and reported a failure, "
-                f"so the item has no green verification — and the tree that landed ({landed[:12]}) is red too "
-                f"({also_red.verdict_line or 'the gate failed'})"
+                f"{_prefix(red.failing)}{red.verdict_line or red} — the gate ran against {commit[:12]} "
+                "and reported a failure, so the item has no green verification — and the tree that "
+                f"landed ({landed[:12]}) is red too ({_prefix(also_red.failing)}"
+                f"{also_red.verdict_line or 'the gate failed'})"
             ) from None
         return landed
 
