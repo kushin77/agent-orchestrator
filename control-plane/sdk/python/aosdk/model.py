@@ -460,17 +460,46 @@ class PolicyBinding:
     tenant_id: str = ""
     enabled: bool = True
     controls: List[str] = field(default_factory=list)
+    # ``GET /v1/policies`` serves a guardrail-store view, not this vocabulary:
+    # the real row is ``{"id", "description", "mode", "controls": <int>}``
+    # (issue #1235, measured against ``identity/cpapi``). These fields carry
+    # that payload faithfully; nothing is inferred or coerced into ``controls``.
+    description: Optional[str] = None
+    mode: Optional[str] = None
+    controls_count: Optional[int] = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "PolicyBinding":
+        policy_id = str(raw.get("policyId") or raw.get("id") or "")
+        wire_controls = raw.get("controls")
+        controls: List[str] = []
+        controls_count = raw.get("controlsCount")
+        if isinstance(wire_controls, (list, tuple)):
+            controls = [str(item) for item in wire_controls]
+        elif isinstance(wire_controls, bool):
+            raise TypeError("policy controls: expected a list or an int count")
+        elif isinstance(wire_controls, int):
+            # The server sends a COUNT, not the control ids. Keep it as a count
+            # rather than inventing a list the server never sent (#1235).
+            controls_count = wire_controls
+        elif wire_controls is not None:
+            raise TypeError(
+                "policy controls: expected a list or an int count, got "
+                f"{type(wire_controls).__name__}"
+            )
+        if controls_count is not None:
+            controls_count = int(controls_count)
         return cls(
-            policy_id=str(raw.get("policyId") or ""),
-            name=str(raw.get("name") or raw.get("policyId") or ""),
+            policy_id=policy_id,
+            name=str(raw.get("name") or raw.get("description") or policy_id),
             bundle=raw.get("bundle"),
             version=raw.get("version"),
             tenant_id=str(raw.get("tenantId") or ""),
             enabled=bool(raw.get("enabled", True)),
-            controls=list(raw.get("controls") or []),
+            controls=controls,
+            description=raw.get("description"),
+            mode=raw.get("mode"),
+            controls_count=controls_count,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -482,6 +511,9 @@ class PolicyBinding:
             "tenantId": self.tenant_id,
             "enabled": self.enabled,
             "controls": list(self.controls),
+            "description": self.description,
+            "mode": self.mode,
+            "controlsCount": self.controls_count,
         }
 
 
