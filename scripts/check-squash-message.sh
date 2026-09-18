@@ -29,6 +29,21 @@
 #     * commit-ref-outside-the-trailer-block — the reference exists but sits in
 #       prose above the trailing trailer block
 #
+#   Issue #1266: 27 squash merges landed on 2026-09-18 and closed 0 issues —
+#   bodies carried the reference (`Refs kushin77/agent-orchestrator#<n>`,
+#   which satisfies the shared predicate above) but never GitHub's own
+#   auto-close keyword, so the issue stayed open after merge and the lifecycle
+#   auto-filer went on to raise `VERIFY_EVIDENCE_MISSING` against issues
+#   already closed by hand (#992/#1247/#1251). The shared predicate accepts a
+#   bare `Closes #<n>` line as satisfying the trailer rule (since #835), but it
+#   does not REQUIRE one — `Refs` alone still passes it. This script adds that
+#   second, narrower requirement on top, only for lanes shaped `issue-<n>*`:
+#   the composed message's trailing trailer block must ALSO contain
+#   `Closes #<n>` (or another GitHub auto-close keyword naming the same
+#   number), refusing `closes-missing:<n>` otherwise. A branch not shaped
+#   `issue-<n>*` (a `direct` lane) is exempt from this rule; it still needs the
+#   shared predicate's plain `Refs` trailer, checked above.
+#
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage:
@@ -129,6 +144,93 @@ PY
   return "$rc"
 }
 
+# --- issue-1266: does the message's own trailing trailer block ALSO carry ----
+# GitHub's auto-close keyword for THIS issue number? Mirrors the shared
+# predicate's paragraph-walk-back (scripts/check-pr-contract.sh
+# `commit_finding`) so "trailer block" means the same thing in both places,
+# without importing that script (it is not a module) or editing it. Prints
+# `closes-missing:<n>` on stdout when the block lacks the keyword, empty when
+# it is present.
+closes_finding() { # <message> <issue-number>
+  local msg="$1" n="$2"
+  MESSAGE="$msg" ISSUE_N="$n" python3 - <<'PY'
+import os
+import re
+
+message = os.environ["MESSAGE"]
+n = os.environ["ISSUE_N"]
+
+lines = message.splitlines()
+paragraphs = []
+current = []
+for line in lines:
+    if line.strip():
+        current.append(line)
+    elif current:
+        paragraphs.append(current)
+        current = []
+if current:
+    paragraphs.append(current)
+
+ref_re = re.compile(r"Refs:?\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+")
+closing_re = re.compile(r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]+#[0-9]+", re.IGNORECASE)
+separator_re = re.compile(r"^-{2,}[ \t]*$")
+
+
+def is_trailer_line(line: str) -> bool:
+    if ref_re.fullmatch(line.strip()):
+        return True
+    if line[:1] in (" ", "\t"):
+        return True
+    if closing_re.fullmatch(line.strip()):
+        return True
+    return bool(re.match(r"^[A-Za-z][A-Za-z0-9_-]*:[ \t]*\S", line))
+
+
+def is_separator_line(line: str) -> bool:
+    return bool(separator_re.fullmatch(line.strip()))
+
+
+def paragraph_kind(paragraph):
+    significant = [line for line in paragraph if not is_separator_line(line)]
+    if not significant:
+        return "separator"
+    if all(is_trailer_line(line) for line in significant):
+        return "trailer"
+    return "other"
+
+
+region = []
+for paragraph in reversed(paragraphs):
+    kind = paragraph_kind(paragraph)
+    if kind == "other":
+        break
+    if kind == "trailer":
+        region = paragraph + region
+
+this_close_re = re.compile(
+    r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]+#" + re.escape(n) + r"\b",
+    re.IGNORECASE,
+)
+if any(this_close_re.search(line) for line in region):
+    print("")
+else:
+    print(f"closes-missing:{n}")
+PY
+}
+
+# The lane-branch shape this rule is scoped to: `issue-<n>` or `issue-<n>-*`.
+# Anything else (a `direct` lane, e.g. `fix/foo`) is exempt from the
+# `Closes #<n>` requirement — it still owes the shared predicate's `Refs`.
+issue_branch_number() { # <branch> -> prints <n>, empty + rc 1 if not shaped issue-<n>*
+  local branch="$1"
+  if [[ "$branch" =~ ^issue-([0-9]+)(-.*)?$ ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  return 1
+}
+
 report_finding() { # <finding> [label]
   local finding="$1" label="${2:-check-squash-message}"
   case "$finding" in
@@ -143,6 +245,11 @@ report_finding() { # <finding> [label]
     commit-missing-ticket-trailer|commit-ref-only-in-subject|commit-ref-outside-the-trailer-block)
       printf '  FAIL  %s\n' "$finding" >&2
       echo "$label: NOT-OK — the rendered squash message would fail check-isolation-landed after merge" >&2
+      return 1
+      ;;
+    closes-missing:*)
+      printf '  FAIL  %s\n' "$finding" >&2
+      echo "$label: NOT-OK — the head branch is an issue lane but the trailer block has no Closes #<n>, so merging would not auto-close the issue" >&2
       return 1
       ;;
     *)
@@ -203,6 +310,46 @@ run_self_test() {
     failures=$((failures + 1))
   fi
 
+  # issue #1266: an issue-lane PR whose trailer has `Refs` but no `Closes`.
+  local refs_only_body
+  refs_only_body="$(printf 'What changed.\n\nRefs kushin77/agent-orchestrator#42')"
+  local refs_only_msg
+  refs_only_msg="$(render_message "fix(thing): do the thing" "42" "$refs_only_body")"
+  local refs_only_n refs_only_finding
+  if refs_only_n="$(issue_branch_number "issue-42")"; then
+    refs_only_finding="$(closes_finding "$refs_only_msg" "$refs_only_n")"
+  else
+    refs_only_finding="BRANCH-NOT-RECOGNISED"
+  fi
+  if [ "$refs_only_finding" = "closes-missing:42" ]; then
+    echo "  OK    issue-42 branch, Refs-only body: refused by name (closes-missing:42)"
+  else
+    echo "  FAIL  issue-42 branch, Refs-only body: expected closes-missing:42, got '${refs_only_finding:-<clean>}'" >&2
+    failures=$((failures + 1))
+  fi
+
+  # Same body, with `Closes #42` added to the trailer block -> accepted.
+  local with_closes_body
+  with_closes_body="$(printf 'What changed.\n\nRefs kushin77/agent-orchestrator#42\nCloses #42')"
+  local with_closes_msg
+  with_closes_msg="$(render_message "fix(thing): do the thing" "42" "$with_closes_body")"
+  local with_closes_finding
+  with_closes_finding="$(closes_finding "$with_closes_msg" "$refs_only_n")"
+  if [ -z "$with_closes_finding" ]; then
+    echo "  OK    issue-42 branch, body with Closes #42: accepted"
+  else
+    echo "  FAIL  issue-42 branch, body with Closes #42: expected clean, got '$with_closes_finding'" >&2
+    failures=$((failures + 1))
+  fi
+
+  # A `direct` lane (branch not shaped issue-<n>*) is exempt: only Refs needed.
+  if issue_branch_number "fix/foo" >/dev/null; then
+    echo "  FAIL  branch fix/foo: expected NOT to match issue-<n>* shape, but it did" >&2
+    failures=$((failures + 1))
+  else
+    echo "  OK    branch fix/foo: exempt from Closes #<n> (not an issue-<n>* lane)"
+  fi
+
   echo ""
   if [ "$failures" -eq 0 ]; then
     echo "check-squash-message --self-test: OK — passing fixture accepted, both mutants refused by name"
@@ -223,7 +370,7 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 2
 fi
 
-pr_json="$(gh pr view "$pr_number" --json title,body 2>&1)"
+pr_json="$(gh pr view "$pr_number" --json title,body,headRefName 2>&1)"
 gh_rc=$?
 if [ "$gh_rc" -ne 0 ]; then
   echo "check-squash-message: CANNOT-ASSESS — gh pr view $pr_number failed: $pr_json" >&2
@@ -232,6 +379,7 @@ fi
 
 pr_title="$(printf '%s' "$pr_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["title"])' 2>/dev/null)"
 pr_body="$(printf '%s' "$pr_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("body") or "", end="")' 2>/dev/null)"
+pr_branch="$(printf '%s' "$pr_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("headRefName") or "", end="")' 2>/dev/null)"
 if [ -z "$pr_title" ]; then
   echo "check-squash-message: CANNOT-ASSESS — could not parse title/body from gh pr view $pr_number" >&2
   exit 2
@@ -239,5 +387,8 @@ fi
 
 message="$(render_message "$pr_title" "$pr_number" "$pr_body")"
 finding="$(classify_message "$message")"
+if [ -z "$finding" ]; then
+  issue_n="$(issue_branch_number "$pr_branch")" && finding="$(closes_finding "$message" "$issue_n")"
+fi
 report_finding "$finding" "check-squash-message --pr $pr_number"
 exit $?

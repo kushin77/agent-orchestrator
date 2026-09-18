@@ -8,6 +8,9 @@
     matrix   render the tag -> gate matrix (stdout, or --write into docs/)
     board    judge the board's declared tags against the taxonomy (--live projects)
     labels   emit the `gh label create` commands that mint the new vocabulary
+    pr-labels derive/apply the class:/posture:/lifecycle:/pillar: labels a
+             PR's own `## Classification` block implies (issue #1254 step 5c
+             / #1328)
     schema   print the frozen shapes of the authority's own artifacts
 
 Exit codes follow the repository's tri-state convention (guardrails/honesty):
@@ -18,9 +21,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
+import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -408,6 +414,214 @@ def cmd_board(args: argparse.Namespace) -> int:
     return rc
 
 
+GH_BIN_ENV = "AO_GH_BIN"
+LABEL_FAMILY_PREFIXES = ("class:", "posture:", "lifecycle:", "pillar:")
+
+
+def _gh_bin() -> str:
+    """The `gh` binary, injected through a variable (SP-4): tests shadow it
+    with a fake script rather than a function named after the real binary."""
+    return os.environ.get(GH_BIN_ENV, "gh")
+
+
+def _run_gh(args_list: Sequence[str], root: Path) -> "subprocess.CompletedProcess[str]":
+    return subprocess.run(
+        [_gh_bin(), *args_list], cwd=str(root), capture_output=True, text=True
+    )
+
+
+def parse_classification(body: str) -> Dict[str, str]:
+    """The `## Classification` block's `key: value` lines (issue #1328).
+
+    Deliberately the same shape `scripts/check-pr-contract.sh`'s classification
+    check parses — comments stripped, one field per `key: value` line, an
+    inline `# comment` after the value trimmed. Kept in step with the shell
+    parser by the shared fixtures in `governance/tagging/tests/test_pr_labels.py`.
+    """
+    text = re.sub(r"<!--.*?-->", "", body or "", flags=re.S)
+    match = re.search(
+        r"(?im)^##+[ \t]*Classification[ \t]*$(.*?)(?=^##+[ \t]|\Z)",
+        text,
+        flags=re.S | re.M,
+    )
+    fields: Dict[str, str] = {}
+    if not match or not match.group(1).strip():
+        return fields
+    for raw_line in match.group(1).splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        kv = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$", line)
+        if not kv:
+            continue
+        key = kv.group(1).lower()
+        value = re.split(r"\s+#", kv.group(2).strip(), maxsplit=1)[0].strip()
+        fields[key] = value
+    return fields
+
+
+def _filled(value: str) -> bool:
+    return bool(value) and "<" not in value
+
+
+def derive_pr_labels(
+    fields: Mapping[str, str], taxonomy: M.Taxonomy
+) -> Tuple[List[str], List[Tuple[str, str]]]:
+    """The class:/posture:/lifecycle:/pillar: labels a Classification block
+    implies, plus the findings for whichever fields do not resolve.
+
+    `class`'s vocabulary is `taxonomy.dimensions["class"].values` — the SAME
+    mirrored-and-drift-checked set `governance/conformance/policy.yaml`'s
+    ladder is proven to equal (`M.drift`), so this never re-declares the
+    ladder; it borrows the borrow.
+    """
+    labels: List[str] = []
+    findings: List[Tuple[str, str]] = []
+
+    cls = fields.get("class", "")
+    class_vocab = list(taxonomy.dimensions["class"].values)
+    if _filled(cls) and cls in class_vocab:
+        labels.append("class:%s" % cls)
+    else:
+        findings.append(("pr-class-unknown", cls or "(missing)"))
+
+    posture_raw = fields.get("posture", "")
+    posture_vocab = list(taxonomy.dimensions["posture"].values)
+    if not _filled(posture_raw):
+        findings.append(("pr-posture-unknown", "(missing)"))
+    else:
+        postures = [p.strip() for p in posture_raw.split(",") if p.strip()]
+        bad = [p for p in postures if p not in posture_vocab]
+        if bad or not postures:
+            findings.append(("pr-posture-unknown", ",".join(bad) or posture_raw))
+        for p in postures:
+            if p in posture_vocab:
+                labels.append("posture:%s" % p)
+
+    lifecycle = fields.get("lifecycle", "")
+    lifecycle_vocab = list(taxonomy.dimensions["lifecycle"].values)
+    if _filled(lifecycle) and lifecycle in lifecycle_vocab:
+        labels.append("lifecycle:%s" % lifecycle)
+    else:
+        findings.append(("pr-lifecycle-unknown", lifecycle or "(missing)"))
+
+    pillar = fields.get("pillar", "")
+    pillar_vocab = list(taxonomy.dimensions["pillar"].values)
+    if _filled(pillar) and pillar in pillar_vocab:
+        labels.append("pillar:%s" % pillar)
+    else:
+        findings.append(("pr-pillar-unknown", pillar or "(missing)"))
+
+    return labels, findings
+
+
+def cmd_pr_labels(args: argparse.Namespace) -> int:
+    root = repo_root()
+    try:
+        taxonomy, _ = _load(root)
+    except M.TaggingUnavailable as exc:
+        print("tagging-pr-labels: CANNOT-ASSESS — %s" % exc, file=sys.stderr)
+        return CANNOT_ASSESS
+
+    subject = "PR #%s" % args.pr if args.pr else (args.body_file or "(body)")
+
+    if args.body_file:
+        try:
+            body = Path(args.body_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            print(
+                "tagging-pr-labels: CANNOT-ASSESS — cannot read %s: %s"
+                % (args.body_file, exc),
+                file=sys.stderr,
+            )
+            return CANNOT_ASSESS
+    else:
+        if not args.pr:
+            print(
+                "tagging-pr-labels: CANNOT-ASSESS — pr-context-missing: no --pr "
+                "and no --body-file",
+                file=sys.stderr,
+            )
+            return CANNOT_ASSESS
+        proc = _run_gh(["pr", "view", str(args.pr), "--json", "body", "--jq", ".body"], root)
+        if proc.returncode != 0:
+            print(
+                "tagging-pr-labels: CANNOT-ASSESS — cannot read %s's body via gh: %s"
+                % (subject, proc.stderr.strip()),
+                file=sys.stderr,
+            )
+            return CANNOT_ASSESS
+        body = proc.stdout
+
+    fields = parse_classification(body)
+    if not fields:
+        print(
+            "tagging-pr-labels: CANNOT-ASSESS — pr-classification-missing: %s "
+            "carries no ## Classification block" % subject,
+            file=sys.stderr,
+        )
+        return CANNOT_ASSESS
+
+    labels, findings = derive_pr_labels(fields, taxonomy)
+    for label in sorted(labels):
+        print(label)
+    for code, detail in findings:
+        print("  %s: %s" % (code, detail), file=sys.stderr)
+    rc = NOT_OK if findings else OK
+
+    if args.apply:
+        if not args.pr:
+            print(
+                "tagging-pr-labels: CANNOT-ASSESS — --apply requires --pr",
+                file=sys.stderr,
+            )
+            return CANNOT_ASSESS
+        proc = _run_gh(
+            ["pr", "view", str(args.pr), "--json", "labels", "--jq",
+             "[.labels[].name] | join(\",\")"],
+            root,
+        )
+        if proc.returncode != 0:
+            print(
+                "tagging-pr-labels: CANNOT-ASSESS — cannot read %s's labels via "
+                "gh: %s" % (subject, proc.stderr.strip()),
+                file=sys.stderr,
+            )
+            return CANNOT_ASSESS
+        existing = [l for l in (proc.stdout or "").strip().split(",") if l]
+        existing_family = [l for l in existing if l.startswith(LABEL_FAMILY_PREFIXES)]
+        derived_set = set(labels)
+        drift = sorted(set(existing_family) - derived_set)
+        for d in drift:
+            print("  pr-label-drift: %s" % d, file=sys.stderr)
+        to_add = sorted(derived_set - set(existing))
+        for label in to_add:
+            r = _run_gh(["pr", "edit", str(args.pr), "--add-label", label], root)
+            if r.returncode != 0:
+                print(
+                    "tagging-pr-labels: CANNOT-ASSESS — gh could not add label "
+                    "%s: %s" % (label, r.stderr.strip()),
+                    file=sys.stderr,
+                )
+                return CANNOT_ASSESS
+        for label in drift:
+            r = _run_gh(["pr", "edit", str(args.pr), "--remove-label", label], root)
+            if r.returncode != 0:
+                print(
+                    "tagging-pr-labels: CANNOT-ASSESS — gh could not remove "
+                    "label %s: %s" % (label, r.stderr.strip()),
+                    file=sys.stderr,
+                )
+                return CANNOT_ASSESS
+        print(
+            "tagging-pr-labels: applied %d label(s), removed %d drifted label(s)"
+            % (len(to_add), len(drift))
+        )
+        rc = NOT_OK if findings or drift else OK
+
+    return rc
+
+
 def cmd_labels(args: argparse.Namespace) -> int:
     root = repo_root()
     try:
@@ -471,6 +685,14 @@ def build_parser() -> argparse.ArgumentParser:
     labels.add_argument("--repo", default="kushin77/agent-orchestrator")
     labels.add_argument("--dimension", action="append", default=[])
 
+    pr_labels = sub.add_parser(
+        "pr-labels",
+        help="derive/apply the labels a PR's Classification block implies",
+    )
+    pr_labels.add_argument("--pr", type=int, default=0)
+    pr_labels.add_argument("--body-file", default="")
+    pr_labels.add_argument("--apply", action="store_true")
+
     schema = sub.add_parser("schema", help="print the frozen shapes of the authority")
     schema.add_argument("--shapes", action="store_true", help="list the shape names")
 
@@ -487,6 +709,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "plan": cmd_plan,
         "matrix": cmd_matrix,
         "labels": cmd_labels,
+        "pr-labels": cmd_pr_labels,
         "schema": cmd_schema,
     }
     handler = handlers.get(args.verb or "")

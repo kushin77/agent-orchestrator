@@ -431,6 +431,16 @@ mirror_out="$(env PATH="$minbin" "$bash_bin" "$mirror" \
   --jwks-file "$work/jwks.json" --project stub-project --apply 2>&1)" || mirror_rc=$?
 if [ "$mirror_rc" -eq 2 ] && grep -qF "gcloud not found" <<<"$mirror_out"; then
   echo "  OK    with no gcloud the publish is CANNOT-ASSESS (rc 2), never a pass"
+elif [ "$mirror_rc" -eq 2 ]; then
+  # rc 2 but the message names something other than gcloud: $minbin carries
+  # only the tools $mirror is known to invoke (python3 cat dirname sed), so a
+  # host whose mirror script reaches for one more is CANNOT-ASSESS for THIS
+  # control, not a FAIL of the mirror's own gcloud detection — the assertion
+  # below is only that gcloud absence is refused BY NAME, not that this
+  # minimal PATH is sufficient on every host.
+  printf '%s\n' "$mirror_out" | sed 's/^/    /' >&2
+  echo "CANNOT-ASSESS gcloud-missing: the no-gcloud fixture refused for an unexpected reason, not proving gcloud detection either way" >&2
+  exit 2
 else
   printf '  FAIL  a publish with no gcloud did not report CANNOT-ASSESS (rc=%s)\n%s\n' "$mirror_rc" "$mirror_out" >&2
   mirror_ok=1
