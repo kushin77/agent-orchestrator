@@ -1502,12 +1502,6 @@ def _watchdog_once_locked(force: bool) -> int:
                 "above; run 'bash scripts/gate-lock.sh doctor' or 'status' to act",
                 flush=True,
             )
-    # RCA 2026-09-17 fix #3: a proven-free reap scoped to THIS checkout's own
-    # worktree — never box-wide. See `_self_reap_own_gate_lock` for why a
-    # box-wide sweep stays refused (RCA-0015) while a worktree-scoped one is
-    # safe.
-    if _self_reap_own_gate_lock():
-        unassessable = True
     if failed:
         return channel.EXIT_NOT_OK
     if unassessable:
