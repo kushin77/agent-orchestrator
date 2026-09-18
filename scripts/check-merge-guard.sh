@@ -106,16 +106,33 @@ chmod +x "$fakebin/gh"
 # --- the two PR bodies the fake `gh pr view` answers with -------------------
 view_bad="$TMPD/view-bad.json"
 view_good="$TMPD/view-good.json"
-python3 - "$view_bad" "$view_good" <<'PY'
+# A real, resolvable commit for headRefOid: merged-tree evidence (issue #1254
+# step 6, wired into merge-pr.sh's apply path by #1332) computes a real
+# merge-base against origin/master, so the fixture must name a commit that
+# actually exists in this checkout rather than a placeholder string.
+head_oid_for_fixture="$(git rev-parse HEAD 2>/dev/null)"
+if [ -z "$head_oid_for_fixture" ]; then
+  echo "check-merge-guard: CANNOT-ASSESS — could not resolve HEAD for the scratch fixtures" >&2
+  exit 2
+fi
+python3 - "$view_bad" "$view_good" "$head_oid_for_fixture" <<'PY'
 import json
 import sys
 
 bad, good = sys.argv[1], sys.argv[2]
+# baseRefName/headRefOid (issue #1332's merged-tree seam): merge-pr.sh's apply
+# path now reads these off the SAME `gh pr view` call this fake answers, so a
+# fixture missing them starves that seam of evidence and merge-pr.sh reaches
+# CANNOT-ASSESS before ever reaching gh pr merge — that is not this gate's
+# NOT-OK/no-verdict case, it is a fixture gap, so both bodies carry them.
+head_oid = sys.argv[3]
 with open(bad, "w", encoding="utf-8") as handle:
     json.dump(
         {
             "title": "fix(thing): do the thing",
             "body": "What changed.\n\nSome detail with no trailer paragraph at all.\n",
+            "baseRefName": "master",
+            "headRefOid": head_oid,
         },
         handle,
     )
@@ -124,6 +141,8 @@ with open(good, "w", encoding="utf-8") as handle:
         {
             "title": "fix(thing): do the thing",
             "body": "What changed.\n\nSome detail.\n\nRefs kushin77/agent-orchestrator#1233\n",
+            "baseRefName": "master",
+            "headRefOid": head_oid,
         },
         handle,
     )
@@ -144,8 +163,15 @@ run_merge() {
   calls="$TMPD/calls-$label.txt"
   out="$TMPD/out-$label.txt"
   : > "$calls"
+  # AO_QUEUE_VERIFY_MERGED/AO_QUEUE_VERIFY_CMD are scripts/pr-queue.sh's own
+  # offline test seam for merged-tree evidence source (b) — merge-pr.sh's
+  # apply path now reuses merged_tree_evidence_by_ref (issue #1254 step 6 via
+  # #1332), and this fake `gh` cannot answer a real `gate-status.sh show`
+  # (evidence source (a)), so without this seam every apply-mode run would
+  # refuse merged-tree-unverified before ever reaching gh pr merge.
   AO_TEST_GH_MERGE_CALLS="$calls" AO_TEST_GH_VIEW_MODE="$mode" AO_TEST_GH_VIEW_JSON="$json" \
-    AO_MERGE_APPLY="$apply" PATH="$fakebin:$PATH" \
+    AO_MERGE_APPLY="$apply" AO_QUEUE_VERIFY_MERGED=1 AO_QUEUE_VERIFY_CMD="exit 0" \
+    PATH="$fakebin:$PATH" \
     bash "$root/$entry" --pr 1233 > "$out" 2>&1
   rc=$?
   printf '%s' "$rc"
