@@ -1,6 +1,6 @@
 # Reconcile — a dead session leaves a clean workspace
 
-> **Status:** institutional · **Issues:** #304, #628 · **Gate:**
+> **Status:** institutional · **Issues:** #304, #628, #973 · **Gate:**
 > [`scripts/check-reconcile.sh`](../../scripts/check-reconcile.sh) (`make verify`)
 > · **Rule:** `AGENTS.md` golden rule 17
 
@@ -223,4 +223,80 @@ control (limit `0`) refuses every teardown by name; a deleted ledger record is
 detected by `ledger.verify()`; a hand-corrupted ledger line fails schema
 validation by name; and a session whose recorded worktree is deleted out from
 under it is reported as `drift` by `status --live`.
+
+## 9. A filed finding reaches a terminal state (#973)
+
+§7 files a finding once per fingerprint and never files it again. Filing was
+idempotent; **unfiling did not exist.** The only `resolve` call in the repository
+was the `shelved:` key below, so a `lifecycle:*` fingerprint lived in
+`.fleet/board-reports.json` for ever.
+
+Measured on 2026-09-17: the board carried `[lifecycle] LANE_NOT_RECLAIMED — #241`
+while the item it named was fully reclaimed — #241's lane record, worktree, claim,
+branch and heartbeat were all gone, and the live audit charged it **0 findings out
+of 715** in the record. The finding was true when filed and false from then on.
+
+Two harms follow, and the second is the one that matters:
+
+* **stale board noise** — an open issue describing a violation that no longer
+  exists, which reads as a live defect to everyone who opens it;
+* **a fail-open dedupe** — because the fingerprint never left the ledger, a
+  *genuine* recurrence of the same violation on the same subject is reported as
+  `deduped` against the stale issue and **never filed**.
+
+`findings.py` gives every filed finding the terminal state §3 already gives a
+lane: it is **re-evaluated every pass**, never written off. The re-measurement is
+the audit's own (`lifecycle`'s `audit(record, quarantine)`, the same call
+`lifecycle/cli.py audit` makes) — a second implementation of the invariants would
+drift, and the two would then disagree about whether a finding is owed.
+
+| Re-measurement | Outcome | Entry | Board |
+|---|---|---|---|
+| the invariant is **still charged** for the subject | `still-owed` | kept | nothing |
+| the board **could not be read** | `unmeasured` | kept | nothing |
+| the audit **cannot speak about** the subject | `unmeasured` | kept | nothing |
+| the board write **failed** | `failed` | kept, retried next pass | nothing |
+| the invariant is **no longer charged** | `resolved` | retired | issue closed with the re-measurement as its evidence |
+| a dry run, invariant no longer charged | `would-resolve` | kept | nothing |
+
+Three properties are deliberate and load-bearing:
+
+* **Absence of evidence is never read as absence of the violation.** An
+  unreachable board, an uncollected subject and a lost write all *keep* the
+  fingerprint and are named. Only a successful re-measurement that does not charge
+  the invariant retires it.
+* **Only `apply` resolves anything.** `BoardReporter.resolve` saves the ledger
+  unconditionally and gates only the comment, so a dry run that called it would
+  drop the dedupe entry with no board write at all — a silent suppression of a
+  finding. Every retirement goes through `findings.resolve_key`, which refuses
+  while `apply` is false. This also fixes the same hazard on the `shelved:` path.
+* **The close happens before the ledger is retired.** The ledger entry is what
+  makes the resolution retryable, so retiring it first would turn a failed board
+  write into a permanently open issue nobody would look at again.
+
+`reconcile:failed:` and `reconcile:suspect:` findings reach the same terminal
+state through §3's own evidence: once the session has been reclaimed or parked,
+nothing they assert is true any more, so a later pass retires them. A
+`failed:`/`suspect:` issue for a lane that was reclaimed cleanly used to stay open
+for ever, and swallow a recurrence the same way.
+
+`recheck` is a **seam on `sweep()`**, not a call inside it: re-measuring reads the
+board, and the gate drives `sweep()` offline against a scratch repository. With no
+seam given, nothing is read and the pass is exactly what it was. With no lifecycle
+fingerprint in the ledger this is a local file read and no board at all.
+
+The recheck runs **after** every session decision in the pass, so a slow board
+delays the next pass and never the teardown of an orphan. It is also bounded: the
+collection shells out to `gh` (no timeout of its own) and once per item to
+`git ls-remote`, and one collection measured **~150s** on 2026-09-17 with ~40 lanes
+running, so it runs as a child process under `COLLECT_TIMEOUT_SECONDS` (300s, inside
+the pass's own nominal budget). A read that runs out of budget is `unmeasured` —
+nothing is resolved, the same verdict as a board that could not be read. Turning the
+recheck *cadence* into its own declared control is the obvious next step and is left
+out of this change on purpose: it is a policy value, not part of the defect.
+
+```bash
+python3 governance/reconcile/cli.py sweep --root <repo>            # names what would resolve
+python3 governance/reconcile/cli.py sweep --root <repo> --apply    # closes + retires
+```
 
