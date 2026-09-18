@@ -77,6 +77,14 @@ indirect_reads:
   - path: fleet/watchdog.py
     sites: 2
     reason: the watchdog resolves its rung tunables from caller-supplied names.
+  - path: telemetry/clock.py
+    sites: 2
+    reason: >-
+      both reads resolve the variable name through the `FROZEN_ENV` module
+      constant (`os.environ.get(FROZEN_ENV)` in `_read_frozen`, and
+      `os.environ[FROZEN_ENV] = value` / `os.environ.get(FROZEN_ENV)` in the
+      `frozen()` context manager), not the literal `"AO_FROZEN_CLOCK"`, so the
+      scanner cannot resolve the name statically.
   - path: control-plane/sdk/python/aosdk/auth.py
     sites: 1
     reason: >-
@@ -362,6 +370,17 @@ variables:
     secret: false
     required_by: [ops]
     readers: [governance/tagging/ledger.py]
+
+  # -- telemetry -----------------------------------------------------------
+  - name: AO_FROZEN_CLOCK
+    purpose: >-
+      pins telemetry's one clock seam (telemetry/clock.py) to an ISO 8601
+      instant, so a test or a gate can freeze "now" for the whole money path
+      (metering, budgets, the ledger, observability) instead of resolving to
+      whatever day the suite happens to run on. Unset, the clock is live.
+    secret: false
+    required_by: [local-run, tooling]
+    readers: [telemetry/clock.py]
 
 # Read by the tree, deliberately NOT part of the surface a deploy or a local run
 # supplies. Each carries the reason it is exempt; `surface.py` refuses an
