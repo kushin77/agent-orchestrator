@@ -27,6 +27,18 @@ metadata its filer believes it declared — the same defect class as a silently
 dropped chain marker. `--dry-run` plans through the same
 :func:`plan_filing`, so it shows exactly the label set a real filing would carry.
 
+**Deriving a label is not the repository having it (issue #1160).** Every label
+here is a *derivation from the policy*, so nothing on this path can tell you
+whether the label exists: the seam hands `gh issue create` a label set and `gh`
+refuses the whole create — ``could not add label: '<label>' not found`` — after the
+plan was built. That is how a `filing.defaults` entry of `area: governance` broke
+the default filing path in production while every control that proved *derivation*
+stayed green. The resolution half is therefore the gate's
+(:func:`checker.audit_filing_labels`): it resolves the derived default set against
+the recorded inventory (`governance/conformance/labels.json`) and refuses a default
+naming a label this repository does not have, naming the policy file, the label and
+the one refresh verb.
+
 Importing this module pulls in the conformance checker (and with it this package's
 flat `model`), so a caller that already has *another* package's flat `model` on
 `sys.path` must load the seam without disturbing it — `fleet/brain.py` puts
