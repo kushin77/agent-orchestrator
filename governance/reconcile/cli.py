@@ -54,6 +54,7 @@ from governance.lifecycle.report import (  # noqa: E402
     GhFiler,
 )
 from governance.reconcile.audit import audit, describe as describe_audit  # noqa: E402
+from governance.reconcile.findings import GhCloser, recheck_findings  # noqa: E402
 from governance.reconcile.live import describe as describe_live, project as project_live  # noqa: E402
 from governance.reconcile.heartbeat import (  # noqa: E402
     DEFAULT_BEAT_SECONDS,
@@ -100,6 +101,31 @@ def _print_board_reports(reports: list) -> None:
             print(f"board: already filed (#{board_report.number}) for {board_report.key}")
         else:
             print(f"board: dry-run — would file for {board_report.key}")
+
+
+def _recheck(args: argparse.Namespace):
+    """The finding-recheck seam (#973): re-measure every *filed* finding.
+
+    A finding is re-evaluated every pass exactly as a lane is, so a pass is where
+    both halves of the rule live: the lane half in `sweep`'s sessions, the finding
+    half here. It reads the board only when the ledger actually holds a lifecycle
+    finding, so a repository with none (a scratch fixture, a fresh install) pays a
+    local file read and nothing else.
+    """
+    return lambda reporter: recheck_findings(
+        reporter, root=args.root, apply=args.apply, closer=GhCloser()
+    )
+
+
+def _print_finding_states(states: list) -> None:
+    """Print every re-measured finding, whatever its outcome.
+
+    Only a resolution is a board write, but an unresolved outcome is the reason
+    to look: a `still-owed` or `unmeasured` finding must be as visible as a
+    retired one, or the pass reads as clean because it printed nothing.
+    """
+    for state in states:
+        print(f"finding: {state.outcome:<14} {state.key} — {state.detail}")
 
 
 def cmd_stamp(args: argparse.Namespace) -> int:
@@ -232,14 +258,22 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         apply=args.apply,
         ops=RepoOps(args.root),
         reporter=_reporter(args.root),
+        recheck=_recheck(args),
     )
     if args.json:
         print(json.dumps(report.to_json(), indent=2))
     else:
         print(describe(report))
         _print_board_reports(report.board_reports)
+        _print_finding_states(report.finding_states)
     if report.failed:
         print(f"reconcile: NOT-OK — {len(report.failed)} session(s) could not be reconciled", file=sys.stderr)
+        return EXIT_NOT_OK
+    if report.finding_failures:
+        print(
+            f"reconcile: NOT-OK — {len(report.finding_failures)} filed finding(s) could not be resolved",
+            file=sys.stderr,
+        )
         return EXIT_NOT_OK
     if report.shelved:
         print(f"reconcile: {len(report.shelved)} lane(s) shelved (unmerged work kept)", file=sys.stderr)
@@ -303,6 +337,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
                 apply=args.apply,
                 ops=RepoOps(args.root),
                 reporter=_reporter(args.root),
+                recheck=_recheck(args),
             )
             counts = ", ".join(
                 f"{name}={len(report.by_outcome(name))}"
@@ -314,6 +349,10 @@ def cmd_watch(args: argparse.Namespace) -> int:
                     if action.outcome != "reported":
                         print(f"    {action}", flush=True)
                 _print_board_reports(report.board_reports)
+            # Outside the line above on purpose: on this box the pass that matters
+            # is the one that touches no session at all and still retires a stale
+            # finding — a print guarded on session outcomes would hide it.
+            _print_finding_states(report.finding_states)
         except Exception as exc:  # noqa: BLE001 - the worker outlives a bad pass
             print(f"reconcile[{passes}]: pass failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         finally:

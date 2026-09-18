@@ -116,6 +116,19 @@ The pass checks the contract, and every check can genuinely fail:
 | counterpart by id (CMR side) | a `mirrors` mapping whose local counterpart is missing (`local-counterpart-missing`, naming the id) |
 | intent is not a mapping | a `mirrors` mapping asserted while `confirmed: false` (`mapping-unconfirmed`) |
 | no silent drop (local side) | a local ledger record that is neither a mirror target nor `local-only` (`local-record-undisclosed`, naming the id) |
+| a reason, not a silence (local side) | a `local-only` declaration that is a bare id, or that omits its reason, its record ref or the hub revision it was judged against (`local-only-undocumented`, naming the id) |
+| the reason is vocabulary, not prose | a declaration whose `reason` is not declared in `cmr_hub.local_only_reasons` (`local-only-reason-unknown`), or whose declared predicate this pass does not implement (`local-only-predicate-unknown`) |
+| a judgement has a revision | a declaration judged against a hub revision other than the freeze's `_provenance.vendor_commit` — a re-frozen hub invalidates it by id (`local-only-declaration-stale`) |
+| a reason can be falsified | a declaration whose predicate no longer holds for the record, e.g. a hub row has since declared `mirrors` for it (`local-only-reason-stale`, naming the id) |
+| a declaration is tied to its record | a declaration citing a `record_ref` the ledger record does not carry (`local-only-record-ref-unresolved`, naming the id) |
+
+**A `local-only` listing is a per-record judgement** (#1123), never a blanket
+silence: each entry is `{id, reason, record_ref, judged_against}` — a reason from
+the closed vocabulary `cmr_hub.local_only_reasons` in `contract.json`, a ref the
+record itself carries, and the hub revision the judgement was taken against. A
+bare id records nothing and is refused; a re-frozen hub makes every declaration
+stale **by id** instead of letting it be inherited. A record can therefore be
+listed local-only only by naming why, for that record, against a named revision.
 
 **No silent close.** A `Closes` / `Fixes` / `Resolves <owner>/<repo>#<n>`
 reference to a foreign repo is refused: same-owner cross-repo `Closes` *does*
