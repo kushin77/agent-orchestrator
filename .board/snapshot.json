@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-17T18:42:35Z",
+  "generated_at": "2026-09-18T15:14:20Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -6636,7 +6636,7 @@
     {
       "number": 665,
       "title": "EPIC: ERPNext & DeepSeek FinOps \u2014 token-optimal subscription engine from CRM hook to ledger (operator mandate)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M32 - ERPNext & DeepSeek FinOps (ledger-faithful subscription engine)",
       "labels": [
         "area:erp-module",
@@ -6651,7 +6651,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T14:19:06Z",
       "files": []
     },
     {
@@ -8592,7 +8592,7 @@
     {
       "number": 877,
       "title": "Retire the measured shell-pattern gaps (SP-7 SP-8) and enforce them (EPIC #616, after #621)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -8606,7 +8606,7 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T13:03:46Z",
       "files": []
     },
     {
@@ -9026,7 +9026,7 @@
     {
       "number": 931,
       "title": "[bug] check-verdict-contains under-counts: four pipe-into-grep shapes escape its \"must never under-count\" anchor",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -9040,7 +9040,7 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T12:46:41Z",
       "files": []
     },
     {
@@ -9180,7 +9180,7 @@
     {
       "number": 944,
       "title": "no declared environment-variable surface, and infra/ is not a declared surface root",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
         "area:standards",
@@ -9194,7 +9194,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T14:03:25Z",
       "files": []
     },
     {
@@ -9212,7 +9212,7 @@
     {
       "number": 946,
       "title": "EPIC #607 residual: the owner-executed go-live (GCP + approval codes + run-half cutover)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
         "area:fleet",
@@ -9226,7 +9226,7 @@
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T14:19:02Z",
       "files": []
     },
     {
@@ -9366,7 +9366,7 @@
     {
       "number": 966,
       "title": "rollout-state declares flags no plan phase reaches, and check_rollout only enforces the reverse direction",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
         "area:fleet",
@@ -9380,7 +9380,7 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T12:47:01Z",
       "files": []
     },
     {
@@ -9406,7 +9406,7 @@
     {
       "number": 968,
       "title": "load_fleet_console() puts <repo>/fleet on sys.path, shadowing the telemetry package (latent ModuleNotFoundError)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
         "area:fleet",
@@ -9420,7 +9420,7 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T13:15:16Z",
       "files": []
     },
     {
@@ -9442,7 +9442,7 @@
     {
       "number": 973,
       "title": "[lifecycle] LANE_NOT_RECLAIMED \u2014 #241",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:board",
@@ -9456,7 +9456,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T13:25:54Z",
       "files": []
     },
     {
@@ -9559,7 +9559,7 @@
     {
       "number": 992,
       "title": "[lifecycle] VERIFY_EVIDENCE_MISSING \u2014 #955",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:board",
@@ -9573,7 +9573,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T14:18:59Z",
       "files": []
     },
     {
@@ -9631,7 +9631,7 @@
     {
       "number": 1003,
       "title": "lifecycle close-out verifies the frozen lane head, so an already-merged item can owe VERIFY_EVIDENCE_MISSING forever (#955)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:fleet",
@@ -9645,7 +9645,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T13:58:32Z",
       "files": []
     },
     {
@@ -9746,7 +9746,7 @@
     {
       "number": 1025,
       "title": "the money path reads the live clock in 11 places behind 6 duplicate seams, and 63 test modules pin a date literal \u2014 so a green can expire with the calendar (#506)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:fleet",
@@ -9760,13 +9760,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T13:03:35Z",
       "files": []
     },
     {
       "number": 1028,
       "title": "institutionalize the #506 date bomb across RCA / pattern / class / template / system-app (learn it once, refuse it mechanically thereafter)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:lessons",
@@ -9781,7 +9781,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T12:56:16Z",
       "files": []
     },
     {
@@ -10018,7 +10018,7 @@
     {
       "number": 1077,
       "title": "master red: the committed board snapshot is 2 days stale, so the ticket projection and every PMO view are red on a clean checkout",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:board",
@@ -10032,7 +10032,7 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T14:59:29Z",
       "files": []
     },
     {
@@ -10050,7 +10050,7 @@
     {
       "number": 1082,
       "title": "check-portal-auth-env maps an INTERRUPTED pytest suite to FAIL, reporting a red it cannot evidence",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
         "area:fleet",
@@ -10064,7 +10064,7 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T14:19:01Z",
       "files": []
     },
     {
@@ -10181,7 +10181,7 @@
     {
       "number": 1123,
       "title": "master red: check-cross-repo-lessons \u2014 19 hub ledger records have no counterpart declaration and are not listed local-only",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:lessons",
@@ -10195,7 +10195,7 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T12:59:06Z",
       "files": []
     },
     {
@@ -10215,7 +10215,7 @@
     {
       "number": 1136,
       "title": "wire write-master-attestation into scripts/verify.sh once #1127 lands (follow-up to #1114)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -10229,7 +10229,7 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T14:19:08Z",
       "files": []
     },
     {
@@ -10249,7 +10249,7 @@
     {
       "number": 1145,
       "title": "the merge queue proves the message but never the work: merging #1118 made master red on verdict-contains, plus 4 measured pr-queue.sh defects",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -10263,7 +10263,7 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T23:53:27Z",
       "files": []
     },
     {
@@ -10289,7 +10289,7 @@
     {
       "number": 1147,
       "title": "check-pr-contract --pr uses a two-dot range, so it judges a lane by master's files and refuses correct PRs (every lane cut from an older master)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -10303,13 +10303,13 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T13:53:40Z",
       "files": []
     },
     {
       "number": 1148,
       "title": "P1: `/healthz` job-set check cannot fail \u2014 `EXPECTED_JOBS = 3` is a stale literal, so a document missing the 4th enabled rung (`ao-fleet-reap`) still answers 200",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -10323,13 +10323,13 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T01:52:53Z",
       "files": []
     },
     {
       "number": 1149,
       "title": "lifecycle: a merged item's evidence subject must be the tree that landed, not the branch tip that advanced after the squash",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:fleet",
@@ -10343,13 +10343,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T12:47:35Z",
       "files": []
     },
     {
       "number": 1152,
       "title": "check-verdict-contains is red on master again \u2014 3 piped-grep sites from #1118 (#1145)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -10363,7 +10363,7 @@
       "parent": 1145,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T13:40:56Z",
       "files": []
     },
     {
@@ -10428,7 +10428,7 @@
     {
       "number": 1157,
       "title": "P1: infra/fleet/dev_run.py writes the whole process environment \u2014 including live API keys \u2014 into .verify/dev-run/decision.json",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -10440,7 +10440,7 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T01:36:30Z",
       "files": []
     },
     {
@@ -10578,7 +10578,7 @@
     {
       "number": 1168,
       "title": "governance/dispatch: frontier() names an epic-closed issue that claim refuses (measured: status says #132, eligible refuses it)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:board",
@@ -10592,13 +10592,13 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T20:03:08Z",
       "files": []
     },
     {
       "number": 1170,
       "title": "gate-lock: 160 zero-byte leftover worktree locks accumulate; doctor sits permanently at rc 13 and no safe prune verb exists",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -10610,7 +10610,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-18T12:49:26Z",
       "files": []
     },
     {
@@ -10646,7 +10646,7 @@
     {
       "number": 1175,
       "title": "e2e tagging: one declared tag authority, tag -> gate derivation, and a gate that can fail",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -10659,7 +10659,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T18:49:54Z",
       "files": []
     },
     {
@@ -10676,7 +10676,7 @@
         "priority:P1",
         "type:bug"
       ],
-      "parent": null,
+      "parent": 1268,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
@@ -10685,7 +10685,7 @@
     {
       "number": 1178,
       "title": "Lessons ledger -> board: make every record's linkage real, and provable on real data",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:lessons",
@@ -10697,13 +10697,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T20:24:52Z",
       "files": []
     },
     {
       "number": 1179,
       "title": "governance/dispatch: the entry point is dead by construction \u2014 no producer for the board liveness contract, silent epic-closed dead-end, and frontier() naming work claim refuses",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:board",
@@ -10714,6 +10714,751 @@
         "type:governance"
       ],
       "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T20:03:08Z",
+      "files": []
+    },
+    {
+      "number": 1182,
+      "title": "tagging: the filing path does not derive posture/lifecycle, so the 85 deviations only grow",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T20:28:56Z",
+      "files": []
+    },
+    {
+      "number": 1183,
+      "title": "institutionalize the tag authority: a golden rule, the contract docs, and a mandate gate that cannot rot",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T19:42:07Z",
+      "files": []
+    },
+    {
+      "number": 1186,
+      "title": "isolation-landed: two landed squash commits carry no ticket trailer, so make verify is red on master for every lane",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T22:39:39Z",
+      "files": []
+    },
+    {
+      "number": 1189,
+      "title": "check-dispatch-queue: the committed queue names 6 closed issues, so the check is red on a fresh board and inert on a stale one (#1178 finding)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1192,
+      "title": "futureproof e2e: prove every classification mechanism's chain end to end",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T20:36:14Z",
+      "files": []
+    },
+    {
+      "number": 1193,
+      "title": "futureproof e2e: prove every classification mechanism's chain end to end",
+      "state": "CLOSED",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T21:02:53Z",
+      "files": []
+    },
+    {
+      "number": 1194,
+      "title": "Add provider parity gate: flag Claude/DeepSeek gateway+registry capability drift",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T21:55:59Z",
+      "files": []
+    },
+    {
+      "number": 1198,
+      "title": "check-knowledge-index.sh declares no provocation \u2014 the gate cannot be shown to fail (#1193 capstone)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1199,
+      "title": "make verify: a permanently-skipped check still reads as PASS \u2014 the skipped bucket should ratchet (#1176/#1189)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1200,
+      "title": "futureproof capstone: add the assesses-real-tree link \u2014 a gate that never assesses must not pass with the rest (#1193 follow-up)",
+      "state": "CLOSED",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:standards",
+        "class:elite",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T21:53:59Z",
+      "files": []
+    },
+    {
+      "number": 1201,
+      "title": "Deep code review (2026-09-17): overlap / redundant / dead-code register",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1202,
+      "title": "Makefile: python-syntax is a phantom target \u2014 make lint silently skips the Python syntax check",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T13:58:08Z",
+      "files": []
+    },
+    {
+      "number": 1203,
+      "title": "gate: make verify runs no test in registry/gateway/engine and wires no Python linter",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1204,
+      "title": "identity: three independent HS256 JWT codecs \u2014 collapse onto identity/sso/jose",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:48:07Z",
+      "files": []
+    },
+    {
+      "number": 1205,
+      "title": "delete confirmed dead code and resolve the two orphaned controls (deep review)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:48:22Z",
+      "files": []
+    },
+    {
+      "number": 1206,
+      "title": "docs: golden-rule ranges are wrong in four files; 31 tracked docs are quarantined out of the index",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:48:39Z",
+      "files": []
+    },
+    {
+      "number": 1207,
+      "title": "scripts/scan-pr-failures.sh is invoked by nothing \u2014 the #812 code-native scanner never runs",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:48:55Z",
+      "files": []
+    },
+    {
+      "number": 1208,
+      "title": "integrations: extract the shared paperclip/hermes adapter seam",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:47:50Z",
+      "files": []
+    },
+    {
+      "number": 1212,
+      "title": "a stray /tmp/pytest.ini hijacks pytest's rootdir and fakes SIX red checks (and a verify: FAIL) for any lane working under /tmp",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1214,
+      "title": "master red: `check-isolation-landed` refuses origin/master's own tip \u2014 the trailer-less squash-merge of #1213 (75e10e30) is unrecorded",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T22:57:42Z",
+      "files": []
+    },
+    {
+      "number": 1224,
+      "title": "master red: #1221 cleared `check-isolation-landed` and re-created it in its own merge commit (2964d65) \u2014 residue now two commits",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T23:19:55Z",
+      "files": []
+    },
+    {
+      "number": 1228,
+      "title": "master red: #1225 re-created the trailer red in its own merge commit (b81f18a) \u2014 the second consecutive unblock to do so",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T23:54:48Z",
+      "files": []
+    },
+    {
+      "number": 1229,
+      "title": "e2e: drive the published aosdk against the real identity/cpapi surface (the SDK has no in-repo consumer)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:49:10Z",
+      "files": []
+    },
+    {
+      "number": 1233,
+      "title": "the agent instruction still teaches raw `gh pr merge --squash` \u2014 the trailer red recurred 8\u00d7, and two unblocks re-created it while recording it (#1145)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1235,
+      "title": "aosdk.list_policies() cannot parse the real GET /v1/policies: the SDK and cpapi disagree on every field (controls is int vs List[str])",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1236,
+      "title": "check-verdict-contains red on master: false-positive piped-grep match in check-pr-queue.sh's own self-test (from #1145/#1231)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T00:16:06Z",
+      "files": []
+    },
+    {
+      "number": 1238,
+      "title": "master red: check-isolation-landed refuses origin/master's own tip 0d9e9251d0c2 (#1234)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T00:16:09Z",
+      "files": []
+    },
+    {
+      "number": 1240,
+      "title": "check-pr-queue-squash-guard.sh red on master: gate-regression's merge-base lookup runs unconditionally, not scoped to scripts/ files (#1145 regression)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T00:33:12Z",
+      "files": []
+    },
+    {
+      "number": 1245,
+      "title": "ci: control-plane-verify never ran \u2014 logging option, runner toolchain, py3.14, git identity, full history",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T14:18:58Z",
+      "files": []
+    },
+    {
+      "number": 1247,
+      "title": "[lifecycle] VERIFY_EVIDENCE_MISSING \u2014 #627",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1249,
+      "title": "isolation: record 098d304 and d37132a (squash of #1244, #1246) \u2014 tenth and eleventh trailer-less landed commits",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:14:57Z",
+      "files": []
+    },
+    {
+      "number": 1251,
+      "title": "[lifecycle] VERIFY_EVIDENCE_MISSING \u2014 #629",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1252,
+      "title": "lessons: docs/rca/2026-09-16-pr-queue-clearing.md mints RCA-0007/0008 already owned by the ledger \u2014 master red",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T12:37:18Z",
+      "files": []
+    },
+    {
+      "number": 1254,
+      "title": "EPIC: mechanical, not doctrinal \u2014 the merge path, PR contract, and every rule that broke this week become gates (#1145)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1256,
+      "title": "class: five module roots (engine, guardrails, identity, control-plane, fleet) are held to no solution class",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1257,
+      "title": "repair the ungated dead-code population: 7 dangling type names + 4 dead bindings + 1 dead statement (deep review #1201)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance"
+      ],
+      "parent": 1201,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T13:36:28Z",
+      "files": []
+    },
+    {
+      "number": 1259,
+      "title": "governance/dispatch: an open issue whose parent epic closed can never be claimed (measured on #877)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1260,
+      "title": "master red (all lanes): check-reconcile's committed real-tree baseline has drifted (18 new-and-old), so no lane can reach a green merge or close-out",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T14:19:04Z",
+      "files": []
+    },
+    {
+      "number": 1262,
+      "title": "paperclip: control_mapping has no opinion row for the fleet.drop verb \u2014 test_control_mapping.py red on master, and no gate runs it",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1263,
+      "title": "gate: live Cloud Build trigger + scheduler config must match infra/cloudbuild/*-trigger.yaml (drift redded the whole CI)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1264,
+      "title": "gate: toolchain-parity \u2014 the verify runner declares and asserts Python minor, git identity and full history against the dev box",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1265,
+      "title": "gate: worktree/lane cap \u2014 live worktrees must not exceed lanes in flight, and the reaper runs on a declared schedule",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1266,
+      "title": "gate: issue close-out is composed by the squash guard \u2014 Closes #<n> derived from the lane branch, never typed",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1267,
+      "title": "ci: verify builds EXPIRE unrun behind the 5-slot cap \u2014 declare queueTtl and make EXPIRED a named failure",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1268,
+      "title": "EPIC: mechanical, not doctrinal, between runtimes \u2014 paperclip / hermes / Claude / DeepSeek coordination becomes records and gates",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1269,
+      "title": "a2a: standing notices require an ack from every registered runtime \u2014 check-notice-acks",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1270,
+      "title": "a2a: the lane brief and the lane result are one schema for all runtimes \u2014 check-lane-record",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1271,
+      "title": "a2a: runtime liveness + code drift \u2014 every runtime beats through adapters/heartbeat, and a trailing sister restarts itself within a bound",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1272,
+      "title": "a2a: approval is a record, not a chat word \u2014 adapters/approvals feeds pr-queue and the branch sweep",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1273,
+      "title": "a2a: per-runtime allowlists for verbs, skills and secrets are validated at spawn \u2014 not stated in the brief",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1274,
+      "title": "a2a: one tiers.yaml judges every runtime's spawn \u2014 FINOPS-ROLE-NOT-ALLOWED for Claude subagents and hermes personas, not only the fleet",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1275,
+      "title": "a2a: one identity per actor across GitHub, the mailbox, paperclip and hermes \u2014 check-agent-identity-parity extended to PR/approval/directive actors",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1276,
+      "title": "merge rights live only with the queue's service identity \u2014 agent tokens open PRs, GitHub refuses their merges",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1277,
+      "title": "env-surface: AO_FROZEN_CLOCK (telemetry/clock.py, #1110) undeclared \u2014 master red after #1115 landed the gate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-18T14:45:27Z",
+      "files": []
+    },
+    {
+      "number": 1284,
+      "title": "reaper: declare .fleet/ (and machine-rewritten .board files) as runtime state \u2014 134 worktrees held by noise",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1265,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1291,
+      "title": "reconcile red at origin/master 99f6b37 is a live-fleet verdict, not a stale baseline (31 unstable findings; 25 misattributed; 3 true, work exists nowhere but this box)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
