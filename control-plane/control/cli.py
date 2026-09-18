@@ -76,6 +76,9 @@ SOURCES: dict[str, set[str]] = {
         # dangling-on-a-closed-epic report gets its own verb rather than being
         # buried in `status` output a reader can miss.
         "liveness", "dangling",
+        # issue #1189: the committed board snapshot states the age it
+        # tolerates, and a reader must be able to ask it directly.
+        "freshness",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
     "governance/lifecycle/cli.py": {"audit", "status", "close", "collect", "retire"},

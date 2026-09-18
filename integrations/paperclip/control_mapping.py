@@ -1,8 +1,9 @@
 """The upstream control-verb mapping — a mapping, never authority (issue #557).
 
-EPIC #551 gives this fleet its own control vocabulary (RC-2, issue #553): 49
-verbs in ``<family>.<action>`` form declared once in
-``control-plane/control/verbs.yaml``. Upstream paperclip.ing has a control
+EPIC #551 gives this fleet its own control vocabulary (RC-2, issue #553): verbs
+in ``<family>.<action>`` form declared once in
+``control-plane/control/verbs.yaml`` (63 at this writing; the count is read from
+the registry below, never pinned in this prose). Upstream paperclip.ing has a control
 surface of its own — per-agent and per-heartbeat-run routes on **its** server
 (``server/src/routes/agents.ts``, inventoried in
 ``docs/REMOTE-CONTROL-GAP-ANALYSIS.md`` §3.2). This module is the **correspondence
@@ -363,6 +364,12 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
         MAPPED, "GET /heartbeat-runs/:runId/events",
         "The unbounded form of channel.listen; the same upstream read.",
     ),
+    "channel.follow": (
+        MAPPED, "GET /heartbeat-runs/:runId/log",
+        "Tails one directive's live log stream (the `follow` half of `listen "
+        "--directive`). Upstream serves one run's log, so this is the same read "
+        "reached per named unit — the correspondence fleet.debug already carries.",
+    ),
     # -- the one write that maps ------------------------------------------
     "fleet.override": (
         MAPPED, "POST /companies/:companyId/issues",
@@ -432,6 +439,22 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
         UNMAPPED, None,
         "refresh plus a local knowledge-index rebuild; same reason.",
     ),
+    "fleet.drop": (
+        UNMAPPED, None,
+        "Dead-letters a NAMED directive: the sister moves the order out of "
+        "`.fleet/inbox/` into `.fleet/dead-letter/`, records why and who dropped "
+        "it, and acks the sender. Upstream has no directive queue to dead-letter "
+        "from and records no reason for retiring a unit — its nearest route "
+        "(POST /heartbeat-runs/:runId/cancel) retires one RUNNING run, a different "
+        "object from a queued order, which is why the resemblance is refuted "
+        "rather than mapped.",
+    ),
+    "fleet.dead-letter": (
+        UNMAPPED, None,
+        "Lists or inspects the dead-letter mailbox — the read side of fleet.drop. "
+        "Upstream keeps no dropped-order store to read; its nearest list "
+        "(GET /companies/:companyId/issues) enumerates live tickets.",
+    ),
     "channel.verify": (
         UNMAPPED, None,
         "Validates our own message contract. A remote caller has no message to "
@@ -482,6 +505,33 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
         UNMAPPED, None,
         "Consumes a mailbox message locally; no upstream route.",
     ),
+    "channel.log": (
+        UNMAPPED, None,
+        "APPENDS one event to a directive's own live log stream (fleet/channel.py "
+        "cmd_log writes the per-directive log the sister and subagents feed). "
+        "Upstream's nearest route (GET /heartbeat-runs/:runId/log) READS its own "
+        "run log and writes nothing, and no upstream route appends into a "
+        "caller's stream, so there is no counterpart — the registry declares this "
+        "verb read-class while its handler appends, and both halves of that "
+        "divergence land on this same row.",
+    ),
+    "channel.kb": (
+        UNMAPPED, None,
+        "Answers a query from OUR institutional index (governance/knowledge/, and "
+        "CANNOT-ASSESS when the catalogue is absent). Upstream serves no knowledge "
+        "route: its reads report agent and company state, never recorded lessons.",
+    ),
+    "channel.steer": (
+        UNMAPPED, None,
+        "Queues a mid-run steering hint into our own message bus "
+        "(`.fleet/steers/`), delivered to one in-flight directive without a kill "
+        "or re-dispatch. Upstream serves no message bus (ADR-0011 keeps steering "
+        "local); its nearest route "
+        "(POST /heartbeat-runs/:runId/runtime-requests/:requestId/resolve) "
+        "answers a request the run itself raised, keyed by a requestId our verb "
+        "never has — an input we cannot even address, so it is refuted rather "
+        "than recorded as a mismatch.",
+    ),
     "board.status": (
         UNMAPPED, None,
         "The dispatch frontier and the live claims. Upstream can list work items "
@@ -503,10 +553,42 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
         "The claim-ledger audit. Upstream's activity log is append-only and immutable "
         "but records activity entries, not dispatch claims — a different object.",
     ),
+    "board.liveness": (
+        UNMAPPED, None,
+        "Whether the board's freshness contract has an installed producer, read "
+        "from the LIVE crontab. Upstream serves no view of a host's scheduler: its "
+        "nearest route (GET /health) answers for a process it guards, not for a "
+        "scheduled job that is supposed to exist.",
+    ),
+    "board.dangling": (
+        UNMAPPED, None,
+        "The open issues whose declared `Parent:` is CLOSED — a dependency-integrity "
+        "read over the epic graph, which the claim path refuses as `epic-closed`. "
+        "Upstream can list work items (GET /companies/:companyId/issues) but serves "
+        "no parent or dependency view.",
+    ),
+    "board.focus": (
+        UNMAPPED, None,
+        "Resolves the ONE active epic, its open children and the pooled set (epic "
+        "#707) — our focus rule, not upstream's. Upstream's issue list answers no "
+        "'which epic is active' question.",
+    ),
+    "board.pool": (
+        UNMAPPED, None,
+        "The out-of-epic pool epic focus parked (`.board/pool.jsonl`). Upstream "
+        "serves no pool: the parking decision is ours, so the view is ours.",
+    ),
     "board.claim": (
         UNMAPPED, None,
         "Claiming an issue before work is our board protocol (GR-3/GR-20). Upstream's "
         "runner carries claim authority but serves no claim route.",
+    ),
+    "board.dispatch": (
+        UNMAPPED, None,
+        "The A2A arbitration that proves issue -> epic -> lane ownership before a "
+        "directive is routed, and names the evidence it checked. Upstream's "
+        "equivalent authority lives in the runner's semantic-action catalog — a "
+        "module, not an HTTP route — the same reason board.held is unmapped.",
     ),
     "board.release": (
         UNMAPPED, None,
@@ -521,6 +603,19 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
         UNMAPPED, None,
         "Refreshes `.board/snapshot.json` from GitHub. Upstream serves no route into "
         "that file.",
+    ),
+    "board.trigger": (
+        UNMAPPED, None,
+        "Performs the ONE bounded board refresh the `snapshot-stale` refusal names "
+        "as its remedy, and parks the directive when freshness does not return. It "
+        "is board.snapshot's other entry point, so it is unmapped for the same "
+        "reason: upstream serves no route into `.board/snapshot.json`.",
+    ),
+    "board.queue": (
+        UNMAPPED, None,
+        "Reports and validates the owner's committed dispatch queue (duplicates, "
+        "unknown numbers, cycles). Upstream serves no dispatch queue; the write "
+        "that moves an issue through ours is the claim path (board.claim).",
     ),
     "recover.status": (
         UNMAPPED, None,
@@ -557,6 +652,15 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
     "closure.collect": (
         UNMAPPED, None,
         "Collects a work item's terminal artifacts. Upstream serves no equivalent.",
+    ),
+    "closure.retire": (
+        UNMAPPED, None,
+        "Retires a `.fleet/sent/` directive whose issue closed without a change of "
+        "its own, moving the record to `.fleet/done/` stamped with the reason and "
+        "the superseding issue. Upstream keeps no sent-directive store; its nearest "
+        "route (PATCH /issues/:id, the mutable field write closure.close is already "
+        "measured against) acts on the issue row, not on our record of what was "
+        "dispatched.",
     ),
 }
 

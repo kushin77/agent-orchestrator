@@ -44,6 +44,7 @@ import liveness as liveness_mod  # noqa: E402
 import order  # noqa: E402
 import pool as pool_mod  # noqa: E402
 import owner_queue as queue_mod  # noqa: E402
+import queue_freshness  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 from model import parse_file_claims  # noqa: E402
 
@@ -674,7 +675,15 @@ def cmd_queue(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return EXIT_CANNOT_ASSESS
-        snapshot = snapshot_mod.load(snapshot_path)
+        try:
+            snapshot = snapshot_mod.load(snapshot_path)
+        except (OSError, ValueError) as exc:
+            print(
+                f"queue --fix: CANNOT-ASSESS — {snapshot_path} is unreadable ({exc}); "
+                f"refresh it with: {REFRESH_COMMAND}",
+                file=sys.stderr,
+            )
+            return EXIT_CANNOT_ASSESS
         if snapshot_mod.is_stale(snapshot, args.stale_minutes):
             age = snapshot_mod.age_minutes(snapshot)
             print(
@@ -718,7 +727,19 @@ def cmd_queue(args: argparse.Namespace) -> int:
         snapshot_path = Path(args.snapshot)
         snapshot = None
         if snapshot_path.exists():
-            snapshot = snapshot_mod.load(snapshot_path)
+            # An UNREADABLE board is CANNOT-ASSESS, never a traceback: a caller
+            # that reads rc 1 from an uncaught JSONDecodeError cannot tell "the
+            # committed queue is wrong" from "the board could not be read", and
+            # unassessable is explicitly not a verdict (issue #1189).
+            try:
+                snapshot = snapshot_mod.load(snapshot_path)
+            except (OSError, ValueError) as exc:
+                print(
+                    f"queue --check: CANNOT-ASSESS — {snapshot_path} is unreadable ({exc}); "
+                    f"refresh it with: {REFRESH_COMMAND}",
+                    file=sys.stderr,
+                )
+                return EXIT_CANNOT_ASSESS
             if snapshot_mod.is_stale(snapshot, args.stale_minutes):
                 age = snapshot_mod.age_minutes(snapshot)
                 print(
@@ -751,7 +772,15 @@ def cmd_queue(args: argparse.Namespace) -> int:
         if not snapshot_path.exists():
             print(f"queue --next: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
             return EXIT_CANNOT_ASSESS
-        snapshot = snapshot_mod.load(snapshot_path)
+        try:
+            snapshot = snapshot_mod.load(snapshot_path)
+        except (OSError, ValueError) as exc:
+            print(
+                f"queue --next: CANNOT-ASSESS — {snapshot_path} is unreadable ({exc}); "
+                f"refresh it with: {REFRESH_COMMAND}",
+                file=sys.stderr,
+            )
+            return EXIT_CANNOT_ASSESS
         held = claims.active_claims(claims.read_ledger(args.ledger))
         ready = [n for n in queue_mod.next_claimable(snapshot, data) if n not in held]
         if not ready:
@@ -765,6 +794,49 @@ def cmd_queue(args: argparse.Namespace) -> int:
 
     print(f"queue: {args.queue} not validated — pass --next or --check")
     return EXIT_OK
+
+
+def cmd_freshness(args: argparse.Namespace) -> int:
+    """Assert the committed board snapshot's age is inside the tolerance this
+    consumer declares (issue #1189).
+
+    The check that owns this artifact (``scripts/check-dispatch-queue.sh``) runs
+    offline, so the board is a *committed* point-in-time file and the 15-minute
+    liveness threshold ``controls.yaml`` declares for a running loop can never be
+    met — arming the check with it made the check permanently CANNOT-ASSESS, which
+    ``verify.sh`` folds into SKIP and the reviewer reads as a pass. This verb
+    states the age a committed artifact CAN honour and refuses beyond it, naming
+    the file, the timestamp, the age, the tolerance and the ONE refresh verb.
+
+    Tri-state, fail-closed: ``0`` inside the tolerance / ``1`` outside it or
+    unaged (a named violation) / ``2`` unreadable or absent — never a pass.
+    """
+    now = None
+    if args.now:
+        try:
+            now = queue_freshness.parse_iso(args.now)
+        except ValueError as exc:
+            print(f"freshness: CANNOT-ASSESS — --now {args.now!r} is not a timestamp ({exc})", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+    try:
+        verdict = queue_freshness.assess(
+            Path(args.snapshot), max_age_hours=args.max_age_hours, now=now
+        )
+    except queue_freshness.CannotAssess as exc:
+        print(f"freshness: CANNOT-ASSESS — {exc} (refresh it with: {queue_freshness.REFRESH_COMMAND})", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if verdict.ok:
+        print(f"freshness: OK — {verdict.render()}")
+        return EXIT_OK
+    for finding in verdict.findings:
+        print(f"  FAIL  {finding.render()}", file=sys.stderr)
+    print(
+        "freshness: FAIL — the committed board snapshot is outside the age this "
+        "consumer tolerates (see above), so every exists/open answer is against a "
+        f"stale frontier (refresh it with: {queue_freshness.REFRESH_COMMAND})",
+        file=sys.stderr,
+    )
+    return EXIT_NOT_OK
 
 
 def add_paths(parser: argparse.ArgumentParser) -> None:
@@ -959,6 +1031,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="drop issues CLOSED on the (fresh) board snapshot from the committed queue file (issue #1113)",
     )
     queue_cmd.set_defaults(func=cmd_queue)
+
+    fresh = sub.add_parser(
+        "freshness",
+        help="assert the committed board snapshot's age is inside the tolerance this consumer declares",
+    )
+    fresh.add_argument("--snapshot", default=str(snapshot_mod.DEFAULT_PATH))
+    fresh.add_argument(
+        "--max-age-hours",
+        type=float,
+        default=None,
+        help=f"the tolerated age in hours (default: {queue_freshness.DEFAULT_MAX_AGE_HOURS:g})",
+    )
+    fresh.add_argument(
+        "--now",
+        default=None,
+        help=(
+            "NEGATIVE-CONTROL SEAM: evaluate the age at this instant instead of the "
+            "wall clock, so a gate can provoke the refusal deterministically. The "
+            "gate's assertion on the real snapshot never passes it."
+        ),
+    )
+    fresh.set_defaults(func=cmd_freshness)
     return parser
 
 

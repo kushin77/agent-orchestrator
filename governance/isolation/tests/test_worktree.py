@@ -16,6 +16,7 @@ import pytest
 from governance.isolation.identity import mint
 from governance.isolation.worktree import (
     MACHINE_MANAGED_PATHS,
+    MACHINE_MANAGED_PREFIXES,
     ProvisionRefused,
     close,
     enable_worktree_config,
@@ -125,7 +126,36 @@ def board_state(lane, value: int) -> None:
 
 def test_the_declared_machine_managed_set_is_exactly_the_board_state():
     """Widening what a reclaim may discard is a deliberate act, not a side effect."""
-    assert MACHINE_MANAGED_PATHS == (".board/focus.json",)
+    assert MACHINE_MANAGED_PATHS == (".board/focus.json", ".board/snapshot.json")
+    assert MACHINE_MANAGED_PREFIXES == (".fleet/",)
+
+
+def test_a_lane_dirty_only_with_untracked_fleet_dir_is_reclaimed(lane, repo: Path):
+    """`.fleet/` is gitignored runtime state on master; older checkouts predate that
+    rule and still show it as untracked, which held 134 worktrees for ever (#1265).
+    """
+    fleet = lane.worktree / ".fleet"
+    fleet.mkdir(parents=True, exist_ok=True)
+    (fleet / "x").write_text("runtime\n", encoding="utf-8")
+
+    assert uncommitted_paths(lane.worktree) == [".fleet/x"]
+    assert machine_managed_uncommitted(lane.worktree) == [".fleet/x"]
+    assert foreign_uncommitted(lane.worktree) == []
+    assert close(lane, repo) == []
+    assert not lane.worktree.exists()
+
+
+def test_fleet_dir_plus_a_real_source_file_is_not_machine_managed(lane, repo: Path):
+    """The prefix exemption must not swallow real lane work sitting alongside it."""
+    fleet = lane.worktree / ".fleet"
+    fleet.mkdir(parents=True, exist_ok=True)
+    (fleet / "x").write_text("runtime\n", encoding="utf-8")
+    (lane.worktree / "wip.txt").write_text("half-finished\n", encoding="utf-8")
+
+    assert foreign_uncommitted(lane.worktree) == ["wip.txt"]
+    kept = close(lane, repo)
+    assert kept and "wip.txt" in kept[0]
+    assert lane.worktree.exists()
 
 
 def test_a_lane_dirty_only_in_machine_managed_state_is_reclaimed(lane, repo: Path):

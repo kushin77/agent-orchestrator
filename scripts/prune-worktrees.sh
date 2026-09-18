@@ -32,7 +32,9 @@
 #   * a worktree whose ONLY uncommitted paths are DECLARED runtime state — files a
 #     MACHINE rewrote, not the lane — is no longer kept for ever (#830 measured 11
 #     of 66 keeps held by a single such file). The declared set is READ, in exactly
-#     one place, from `governance/isolation/worktree.py`'s MACHINE_MANAGED_PATHS;
+#     one place, from `governance/isolation/worktree.py`'s MACHINE_MANAGED_PATHS
+#     and MACHINE_MANAGED_PREFIXES (the latter for a whole gitignored directory
+#     such as `.fleet/`, rather than one file at a time);
 #     if it cannot be read NOTHING is excused and the stricter rule stands.
 #   * LANE BRANCHES get a reaper (--branches): a local branch whose own change is
 #     provably on origin/master is reapable. "Landed" is decided by CONTENT
@@ -275,7 +277,10 @@ preserved() { # preserved <sha> — is this commit reachable outside the worktre
 # FAIL CLOSED. An unreadable or unparsable declaration excuses NOTHING, so a lane
 # whose dirt is real is still kept. Widening what may be discarded is never the
 # safe direction for a failure.
-machine_managed_paths() { # machine_managed_paths — the declared runtime-state paths, one per line
+machine_managed_paths() { # machine_managed_paths — the declared runtime-state paths and prefixes, one per line
+  # Exact paths are printed bare; a declared PREFIX is printed with a trailing
+  # "*" marker so the bash matcher below can tell the two apart without a
+  # second file or a second round of parsing.
   python3 - "$root" <<'PY'
 import ast
 import sys
@@ -287,25 +292,50 @@ try:
 except (OSError, SyntaxError, ValueError):
     sys.exit(3)
 
-value = None
+names = {"MACHINE_MANAGED_PATHS": None, "MACHINE_MANAGED_PREFIXES": None}
 for node in tree.body:
     targets = [node.target] if isinstance(node, ast.AnnAssign) else getattr(node, "targets", [])
     for target in targets:
-        if isinstance(target, ast.Name) and target.id == "MACHINE_MANAGED_PATHS":
+        if isinstance(target, ast.Name) and target.id in names:
             try:
-                value = ast.literal_eval(node.value)
+                names[target.id] = ast.literal_eval(node.value)
             except ValueError:
                 sys.exit(3)
-if not isinstance(value, (list, tuple)) or not all(isinstance(item, str) for item in value):
+
+paths = names["MACHINE_MANAGED_PATHS"]
+prefixes = names["MACHINE_MANAGED_PREFIXES"] or ()
+if not isinstance(paths, (list, tuple)) or not all(isinstance(item, str) for item in paths):
     sys.exit(3)
-for item in value:
+if not isinstance(prefixes, (list, tuple)) or not all(isinstance(item, str) for item in prefixes):
+    sys.exit(3)
+for item in paths:
     print(item)
+for item in prefixes:
+    print(item + "*")
 PY
 }
 
 if ! machine_managed_paths > "$declared" 2>/dev/null; then
   : > "$declared"
 fi
+
+is_declared_managed() { # is_declared_managed <path-name> — exact match or declared-prefix match
+  local name="$1" line
+  [ -s "$declared" ] || return 1
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    case "$line" in
+      *'*')
+        case "$name" in
+          "${line%\*}"*) return 0 ;;
+        esac
+        ;;
+      *)
+        [ "$name" = "$line" ] && return 0 ;;
+    esac
+  done < "$declared"
+  return 1
+}
 
 foreign_dirt() { # foreign_dirt <worktree> — uncommitted paths that are NOT declared runtime state
   local path="$1" count=0 entry name listing
@@ -320,7 +350,7 @@ foreign_dirt() { # foreign_dirt <worktree> — uncommitted paths that are NOT de
     case "$name" in
       *" -> "*) name="${name##* -> }" ;;
     esac
-    if [ -s "$declared" ] && grep -qxF -- "$name" "$declared"; then
+    if is_declared_managed "$name"; then
       continue
     fi
     count=$((count + 1))

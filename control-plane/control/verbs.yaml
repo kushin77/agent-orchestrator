@@ -677,6 +677,25 @@ verbs:
       decision; the write that moves an issue through the queue is the claim
       path (board.claim).
 
+  - id: board.freshness
+    source: governance/dispatch/cli.py
+    local: freshness
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: >-
+      Answers whether the committed board snapshot's age is inside the
+      tolerance this consumer declares (issue #1189): a tri-state,
+      fail-closed assessment (OK inside the tolerance / FAIL outside it or
+      unaged / CANNOT-ASSESS unreadable or absent), naming the file, the
+      timestamp, the age and the ONE refresh verb (board.trigger) as the
+      remedy. Read-only: it changes no dispatch decision and asserts nothing
+      into any rail, so it declares no audit action, exactly like
+      board.queue, the other freshness-adjacent read this file declares.
+
   # -- governance/reconcile/cli.py: session reconciliation -------------------
   - id: recover.status
     source: governance/reconcile/cli.py

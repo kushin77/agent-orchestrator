@@ -8,6 +8,7 @@
     "CLAIMS": {"outcome": "ok", "rows": ["#565 held by ao-rc10 (lane control-plane)"]},
     "FOCUS": {"outcome": "ok", "rows": ["active epic #707 EPIC: single-epic-focused BAU", "children 7 open · 0 closed", "pooled 67 waiting", "agents the pool (max_agents 0)"]},
     "QUEUE": {"outcome": "ok", "rows": ["next claimable: #566", "queue: valid (no duplicates, no cycles)"]},
+    "FRESHNESS": {"outcome": "ok", "rows": ["freshness: OK — snapshot aged 4.2h, tolerance 24h"]},
     "POOL": {"outcome": "ok", "rows": ["#619 parked (out-of-epic)", "#620 parked (out-of-epic)", "2 waiting · drained when focus is none"]},
     "LIVENESS": {"outcome": "ok", "rows": ["verdict self-refresh · ok", "ao-fleet-snapshot-refresh not installed (declared enabled:false)"]},
     "DANGLING": {"outcome": "ok", "rows": ["7 open issue(s) dangle on a closed parent", "#132 declares Parent #125, which is closed"]},
