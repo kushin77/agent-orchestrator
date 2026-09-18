@@ -62,6 +62,31 @@ declare_runtime_state() { # declare_runtime_state <repo> <path>...
     >"$repo/governance/isolation/worktree.py"
 }
 
+declare_runtime_state_with_prefixes() { # declare_runtime_state_with_prefixes <repo> <paths...> -- <prefixes...>
+  local repo="$1"
+  shift
+  local paths=() prefixes=() target=paths arg
+  for arg in "$@"; do
+    if [ "$arg" = "--" ]; then
+      target=prefixes
+      continue
+    fi
+    if [ "$target" = "paths" ]; then
+      paths+=("$arg")
+    else
+      prefixes+=("$arg")
+    fi
+  done
+  local body="" prefix_body="" path prefix
+  for path in "${paths[@]}"; do body="$body\"$path\", "; done
+  for prefix in "${prefixes[@]}"; do prefix_body="$prefix_body\"$prefix\", "; done
+  mkdir -p "$repo/governance/isolation"
+  {
+    printf 'MACHINE_MANAGED_PATHS: tuple[str, ...] = (%s)\n' "$body"
+    printf 'MACHINE_MANAGED_PREFIXES: tuple[str, ...] = (%s)\n' "$prefix_body"
+  } >"$repo/governance/isolation/worktree.py"
+}
+
 reap() { # reap <repo> <args...>
   local repo="$1"
   shift
@@ -126,6 +151,30 @@ if [ -d "$rebound_focus" ] && [ ! -d "$rebound_other" ]; then
   ok "the declaration is READ from its owner, not copied into the reaper"
 else
   bad "the reaper disagreed with the declaration it is supposed to read"
+fi
+
+echo "== prune-worktrees: declared PREFIXES — .fleet/ runtime state (#1265) =="
+
+prefix_repo="$work/prefix"
+make_repo "$prefix_repo"
+declare_runtime_state_with_prefixes "$prefix_repo" ".board/focus.json" -- ".fleet/"
+
+fleet_only="$work/lane-fleet-only"
+dirty_lane "$prefix_repo" "$fleet_only" ".fleet/x"
+reap "$prefix_repo" --apply >"$work/out.fleet_only.txt" 2>&1
+if [ -d "$fleet_only" ]; then
+  bad "a worktree dirty ONLY with untracked .fleet/x was kept — the prefix declaration is not read"
+else
+  ok "a worktree dirty only with untracked .fleet/x is machine-managed and reapable"
+fi
+
+fleet_plus_real="$work/lane-fleet-plus-real"
+dirty_lane "$prefix_repo" "$fleet_plus_real" ".fleet/x" "lane-work.txt"
+reap "$prefix_repo" --apply >"$work/out.fleet_plus_real.txt" 2>&1
+if [ -d "$fleet_plus_real" ]; then
+  ok ".fleet/ plus a real modified/untracked file still keeps its worktree"
+else
+  bad "a worktree with .fleet/ plus real lane work was removed — the prefix exemption is too wide"
 fi
 
 echo "== prune-worktrees: item 2 — lane branches, by CONTENT not ancestry (#830) =="

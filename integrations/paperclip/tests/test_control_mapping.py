@@ -247,12 +247,56 @@ def test_an_unmapped_row_says_so_and_says_why(table):
 
 
 def test_the_state_distribution_is_pinned(registry, table):
-    """A re-classification is visible here rather than in a reader's head."""
+    """A re-classification is visible here rather than in a reader's head.
+
+    The distribution moved when the 14 verbs declared after #557's base were
+    classified (#1262): one maps (``channel.follow``, the per-directive log tail
+    upstream serves as ``GET /heartbeat-runs/:runId/log``) and thirteen have no
+    upstream counterpart. Pinning the shape makes the next re-classification a
+    deliberate edit here instead of a silent drift.
+    """
     counts = {state: 0 for state in mapping_mod.STATES}
     for row in table:
         counts[row.state] += 1
-    assert counts == {MAPPED: 8, MISMATCH: 8, UNMAPPED: 33}, counts
-    assert len(table) == 49, "the RC-2 vocabulary declared 49 verbs at #557's base"
+    assert counts == {MAPPED: 9, MISMATCH: 8, UNMAPPED: 46}, counts
+    assert len(table) == 63, "the RC-2 registry declares 63 verbs at #1262's base"
+
+
+def test_the_verbs_declared_after_this_table_was_written_are_classified(table):
+    """The regression #1262 names: ONE unclassified verb refuses the WHOLE table.
+
+    Fourteen verbs were added to the registry after this table's base and none had
+    a row, so :func:`build_table` raised on the first of them (``fleet.drop``) and
+    every test needing the table errored — the mapping was red on master while no
+    gate ran it. Pinned by name and state so the refusal cannot return silently,
+    and so the one MAPPED row among them is not read as an unmapped one.
+    """
+    added = {
+        "fleet.drop": UNMAPPED,
+        "fleet.dead-letter": UNMAPPED,
+        "channel.log": UNMAPPED,
+        "channel.follow": MAPPED,
+        "channel.kb": UNMAPPED,
+        "channel.steer": UNMAPPED,
+        "board.liveness": UNMAPPED,
+        "board.dangling": UNMAPPED,
+        "board.focus": UNMAPPED,
+        "board.pool": UNMAPPED,
+        "board.dispatch": UNMAPPED,
+        "board.trigger": UNMAPPED,
+        "board.queue": UNMAPPED,
+        "closure.retire": UNMAPPED,
+    }
+    rows = {row.verb: row for row in table}
+    assert set(added) <= set(rows), sorted(set(added) - set(rows))
+    assert {verb: rows[verb].state for verb in added} == added
+    assert rows["fleet.drop"].upstream is None, (
+        "fleet.drop must name no route: paperclip serves no dead-letter store for a "
+        "queued directive to be dropped into"
+    )
+    assert rows["channel.follow"].upstream.key == "GET /heartbeat-runs/:runId/log"
+    for verb in added:
+        assert rows[verb].why.strip(), f"{verb}: a row with no reason is silence"
 
 
 def test_the_one_mapped_write_is_a_filing_not_an_action(table):

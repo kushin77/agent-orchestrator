@@ -60,6 +60,23 @@
 #   or a refusal that cannot be ATTRIBUTED to the rule under test) is rc 2,
 #   CANNOT-ASSESS, never 0.
 #
+# EVIDENCE SELF-CONTAINMENT (issue #936)
+#   The scratch dir is removed by `trap cleanup EXIT`, so a message that names a
+#   path INSIDE it points at evidence that is gone before the reader can look, and
+#   the cause cannot be established from the report alone. Every probe failure
+#   therefore (a) INLINES the terraform log's CAUSE-NAMING TAIL into the report, so
+#   the report stands alone, and (b) copies the full log OUT of the scratch dir to
+#   a sibling `<scratch>.evidence/` directory whose name carries this run's pid and
+#   clock — never a fixed `/tmp/<name>`, which two lanes on one box would share.
+#
+#   And the two failure MEANINGS are NAMED rather than conflated:
+#     * `mutant-not-accepted` (rc 1, NOT-OK) — the probe COMPLETED and the refusal
+#       SURVIVED with the rule deleted, so it does not come from the rule under
+#       test: a real finding about the rule;
+#     * `probe-incomplete` (rc 2, CANNOT-ASSESS) — the probe DID NOT COMPLETE, so
+#       the mutant was neither ACCEPTED nor refused and the gate proves nothing.
+#       That is not a finding about the rule and must never read as one.
+#
 # THE DEFAULT PATH IS OFFLINE. There is no network call anywhere on it. The live
 # probe is opt-in (`--live`, or `AO_EDGE_HOST`) and is never on the `make verify`
 # path.
@@ -90,6 +107,59 @@ EDGE_HOST="${AO_EDGE_HOST:-ai.purebliss.app}"
 SCRATCH=""
 cleanup() { [ -n "$SCRATCH" ] && rm -rf "$SCRATCH" || true; }
 trap cleanup EXIT
+
+# The evidence dir lives BESIDE the scratch dir so `cleanup` does not take it: it
+# is the one place a failed probe can leave the FULL terraform log. Its name
+# carries this run's pid and clock because two lanes on one box must never share a
+# path (issue #936). Empty until a probe failure needs it.
+EVIDENCE_DIR=""
+
+# tf_log_tail <log> [limit] : the CAUSE-NAMING tail of a terraform log, on ONE
+# line, so it can be embedded in a single report line. The report must stand alone
+# (#936): the log itself lives in a scratch dir the EXIT trap removes.
+tf_log_tail() {
+  local log="$1" limit="${2:-12}"
+  if [ ! -f "$log" ]; then
+    printf '<no terraform log was written at %s>' "$log"
+    return 0
+  fi
+  awk -v limit="$limit" '
+    NF { line[++n] = $0 }
+    END {
+      start = (n > limit) ? n - limit + 1 : 1
+      out = ""
+      for (i = start; i <= n; i++) out = (out == "" ? line[i] : out " | " line[i])
+      printf "%s", (out == "" ? "<log is empty>" : out)
+    }' "$log" 2>/dev/null || printf '<log unreadable at %s>' "$log"
+}
+
+# tf_preserve <log> : copy a log OUT of the scratch dir and print where it went.
+# Prints `<not preserved>` when the copy cannot be made — never fatal, because the
+# INLINED tail from tf_log_tail is the primary evidence and the report never
+# depends on this succeeding.
+tf_preserve() {
+  local log="$1" dest
+  if [ ! -f "$log" ]; then
+    printf '<no terraform log to preserve>'
+    return 0
+  fi
+  if [ -z "$EVIDENCE_DIR" ]; then
+    EVIDENCE_DIR="$(dirname "$SCRATCH")/$(basename "$SCRATCH").evidence"
+    if ! mkdir -p "$EVIDENCE_DIR" 2>/dev/null; then
+      EVIDENCE_DIR=""
+      printf '<not preserved>'
+      return 0
+    fi
+  fi
+  # The probe's own scratch subdir is part of the name (`tf-mutant-plan-default.log`),
+  # so two probes failing in one run cannot overwrite each other's evidence.
+  dest="$EVIDENCE_DIR/$(basename "$(dirname "$log")")-$(basename "$log")"
+  if cp -f "$log" "$dest" 2>/dev/null; then
+    printf '%s' "$dest"
+  else
+    printf '<not preserved>'
+  fi
+}
 
 usage() {
   cat <<'TEXT'
@@ -510,11 +580,11 @@ tf_probe() {
   # 1. The committed DEFAULT posture: surface ON, retired route OFF.
   tf_write_root "$scratch" "$rel" false false
   if ! ( cd "$scratch" && TF_DATA_DIR="$scratch/.tfd" terraform init -backend=false -plugin-dir="$cache" -input=false ) > "$scratch/init.log" 2>&1; then
-    echo "CANNOT terraform init failed offline in the probe scratch (see $scratch/init.log)"
+    echo "CANNOT terraform init failed offline in the probe scratch (cause tail: $(tf_log_tail "$scratch/init.log"); full log: $(tf_preserve "$scratch/init.log"))"
     return 2
   fi
   if ! tf_plan "$scratch" "$scratch/plan-default.log"; then
-    echo "CANNOT the default-posture plan did not complete offline (see $scratch/plan-default.log)"
+    echo "CANNOT the default-posture plan did not complete offline (cause tail: $(tf_log_tail "$scratch/plan-default.log"); full log: $(tf_preserve "$scratch/plan-default.log"))"
     return 2
   fi
 
@@ -523,7 +593,7 @@ tf_probe() {
   local adds
   adds="$(awk '/^Plan: /{print $2; exit}' "$scratch/plan-default.log")"
   if [ -z "$adds" ] || [ "$adds" -le 0 ]; then
-    echo "CANNOT the default posture planned no resource at all (Plan: ${adds:-none}), so 'no edge route' is vacuous"
+    echo "CANNOT the default posture planned no resource at all (Plan: ${adds:-none}), so 'no edge route' is vacuous (cause tail: $(tf_log_tail "$scratch/plan-default.log"); full log: $(tf_preserve "$scratch/plan-default.log"))"
     return 2
   fi
 
@@ -547,7 +617,7 @@ tf_probe() {
   case "$incoherent" in
     *"$VALIDATION_TOKEN"*) : ;;
     *)
-      echo "CANNOT the incoherent combination was refused but NOT by name — $VALIDATION_TOKEN is absent from the refusal, so this probe cannot attribute it to the rule under test"
+      echo "CANNOT the incoherent combination was refused but NOT by name — $VALIDATION_TOKEN is absent from the refusal, so this probe cannot attribute it to the rule under test (refusal tail: $(tf_log_tail "$scratch/plan-incoherent.log"); full log: $(tf_preserve "$scratch/plan-incoherent.log"))"
       return 2
       ;;
   esac
@@ -590,7 +660,7 @@ report_stream() {
 # self_test : rc 0 when every property is provably load-bearing.
 self_test() {
   local base="$SCRATCH/fixtures" pristine="$SCRATCH/pristine"
-  local rc=0 mut out fixture missing
+  local rc=0 mut out fixture missing probe_rc
 
   echo "== the properties, provoked =="
   mkdir -p "$pristine/$MODULE_REL" "$pristine/docs" || return 2
@@ -648,12 +718,21 @@ self_test() {
       rc=1
     else
       out="$(tf_probe "$fixture/$MODULE_REL" "$SCRATCH/tf-mutant")"
-      # `%q` rather than `%s`: a whitespace-only probe result must not be able to
-      # masquerade as "still refused", and an EMPTY one must not read as proof.
-      if [[ "$out" == *"FINDING incoherent-combination-accepted "* ]]; then
-        echo "  OK    with the refusal deleted, the incoherent combination is ACCEPTED — the behavioural half is load-bearing"
+      probe_rc=$?
+      # Three MEANINGS, NAMED (#936). "the mutant was ACCEPTED", "the probe did
+      # not complete", and "the probe completed and the mutant was still refused"
+      # are three different facts: collapsing them into one rc 1 both deleted the
+      # cause and reported a cannot-assess as if it were a finding about the rule.
+      # The probe's OWN exit code decides which, because tf_probe returns 0 only
+      # when it ran to a verdict (an EMPTY result with rc 0 means it ran and found
+      # nothing, not that it failed to run).
+      if [ "$probe_rc" -ne 0 ]; then
+        printf 'check-edge-cutover: CANNOT-ASSESS [probe-incomplete] — the behavioural PROBE DID NOT COMPLETE (rc=%s), so the mutant was neither ACCEPTED nor refused: the gate proves nothing here and this is NOT a finding about the rule under test. The probe said (self-contained; the terraform log tail is inlined):\n%s\n' "$probe_rc" "${out:-<no output from the probe>}" >&2
+        if [ "$rc" -eq 0 ]; then rc=2; fi
+      elif [[ "$out" == *"FINDING incoherent-combination-accepted "* ]]; then
+        echo "  OK    the mutant was ACCEPTED — with the refusal deleted the incoherent combination is accepted, so the behavioural half is load-bearing"
       else
-        printf 'check-edge-cutover: FAIL — the behavioural mutant was NOT accepted, so the refusal may come from something other than the rule under test. The probe said (%q):\n%s\n' "$out" "$out" >&2
+        printf 'check-edge-cutover: NOT-OK [mutant-not-accepted] — the probe COMPLETED and the refusal SURVIVED with the rule deleted, so it does not come from %s: a real finding about the rule under test. The probe said:\n%s\n' "$VALIDATION_TOKEN" "${out:-<no output from the probe>}" >&2
         rc=1
       fi
     fi
@@ -788,7 +867,13 @@ echo "  declaration : $DECL_REL"
 echo "  module      : $MODULE_REL"
 echo "  host        : $EDGE_HOST (live probe only; the default path is offline)"
 
-if ! self_test; then
+self_test
+self_test_rc=$?
+if [ "$self_test_rc" -eq 2 ]; then
+  echo "check-edge-cutover: CANNOT-ASSESS — the gate could not prove itself and could not COMPLETE (the named CANNOT-ASSESS reason is above), so its verdict means nothing" >&2
+  exit 2
+fi
+if [ "$self_test_rc" -ne 0 ]; then
   echo "check-edge-cutover: FAILED — the gate could not prove itself, so its verdict means nothing" >&2
   exit 1
 fi

@@ -105,8 +105,39 @@ least one of:
 | a **session beat** | `.fleet/sessions/<id>.json` names its worktree, its branch or its issue |
 | a **claim record** | a live claim on the issue, from `.board/claims/` + `.board/claims.jsonl` |
 | the **landing history** | `.fleet/lifecycle/<issue>.json`, journalled by `governance/lifecycle`'s close-out once an item's work landed |
+| the **landing proof** | `governance/reconcile/landing.py` — the artifact's *work* is on the default branch (#1291) |
 
-An artifact no record explains is **reported by name**.
+Those last two are deliberately separate, because the first one is **gitignored
+runtime state**: measured at `origin/master 99f6b37` (2026-09-18), the audit
+reported 35 findings in the real tree and **25 of them were false** — lane
+branches and worktrees whose work was already on the default branch, reported as
+orphans only because no close-out journal happened to exist for them. Every false
+finding red the composite gate, and on this box that gate is a fleet-wide
+serialization point (16 open pull requests at the time).
+
+The landing proof reads the same fact from the default branch's **tracked**
+history, which every checkout has, and it never uses a name as evidence:
+
+| Proof | What it establishes | The case it exists for |
+|---|---|---|
+| `landed:ancestor:<sha>` | the tip itself is on the default branch | a merge-commit or direct landing |
+| `landed:tree-contained:<sha>` | every path the tip changed is byte-identical on the default branch | a **squash merge**, whose tip is an ancestor of nothing |
+| `landed:patch-identity:<sha>` | a commit on the default branch carries the tip's own `git patch-id` | a squash landing whose files a **later sibling also edited** |
+
+Candidate landing commits are generated from the default branch's own subjects
+(`Closes #n` / `#n`) — and the **proof is the patch, never the name**, which is
+what separates a landed lane from an abandoned one whose issue number merely
+appears in history. Two limits are deliberate: a **worktree** is only explained
+when it holds **nothing uncommitted** (the proofs speak about committed work, and
+uncommitted work is on no branch at all — measured: both of the two artifacts that
+stopped being false findings this way had `HEAD` already on the default branch
+and uncommitted paths beside it), and the default-branch ref being absent grants
+no excuse at all (a fixture root has no `origin/master`, and an excuse that cannot
+be proven is never given).
+
+Measured effect on the real tree at `ca5fcda`: **23 branch findings → 10**, and
+the two worktrees whose `HEAD` had landed but which hold uncommitted work stayed
+findings. The residue is what §7 below quarantines by name.
 
 **The audit removes nothing.** It has no `apply`, it calls no destructive
 operation, and the `AuditOps` port it reads through has no such method for it to
@@ -139,7 +170,64 @@ belongs to its own lane. The audit is a read-only addition to a report that
 already exists, so it is declared as one — and `status` without `--disk` behaves
 exactly as before.
 
-## 7. Board reporting
+## 7. Named quarantine — the residue the gate must report, not red on (#1291)
+
+Two facts have to be reconciled, and either one alone is a defect:
+
+* `AGENTS.md` **rule 17**: an orphan whose work exists nowhere else **keeps** its
+  worktree, its branch and its claim, and is *reported on every pass until someone
+  resolves it*. The worker is forbidden to discard it.
+* a red `make verify` is not a report — it is a **fleet-wide serialization
+  point**: on 2026-09-18 one red check held 16 open pull requests.
+
+And the age grace does not resolve them, it only *defers* them: measured at
+`99f6b37`, the real-tree finding count went **27 → 30 → 31 in seven minutes with
+no commit in between**, every new one an artifact crossing the 24-hour grace
+while the fleet worked (~8-10 new violations per hour).
+
+`governance/reconcile/real-tree-quarantine.json` reconciles them in this
+repository's own idiom for legacy drift (`governance/lifecycle/baseline.json`,
+rule 16), and it is checked in both directions:
+
+| Rule | Effect |
+|---|---|
+| every exemption is **named** | one entry per artifact: `kind`, `name`, the `tip` it was **measured at**, and a `reason` — no pattern, no prefix, no wildcard |
+| a **new** artifact is **never** absorbed | it is not in the document, so it fails immediately |
+| an artifact whose **tip has moved** is **never** absorbed | it is a different artifact; it fails, and the lapsed entry is named as it fails |
+| an entry that **excuses nothing** | the artifact is gone or no longer unmatched: the verdict names it in `stale_quarantine` and exits **1** — the document can only shrink |
+| it is a **lease** | entries are honoured only while the declared tracking issue is `open` **and** the declared measurement is younger than the declared `max_age_hours`; a missing, malformed, expired or not-open declaration is never read as "still excused" |
+
+Quarantined artifacts are still reported on **every pass**, by name, in the
+verdict (`QUARANTINED <kind> <name> @<tip> — <reason>`), which is what satisfies
+rule 17's "reported until someone resolves it": the tracking issue carries the
+resolution, and the document carries the record of what is unresolved.
+
+```bash
+$ bash scripts/check-reconcile.sh
+real-tree-baseline: 128 unmatched artifact(s) on disk, 538 baselined, 52 young (< 24h, not failed), …
+  quarantine: honoured — #1291 open, measured 0.0h ago (lease 24h, by governance/reconcile (issue #1291 lane))
+  QUARANTINED branch issue-1106-gate-location-independence @a3484089df62 — 3 path(s) changed, …
+real-tree-baseline: OK — no new unbaselined-and-old artifact
+check-reconcile: OK — …
+```
+
+The gate proves the rules rather than asserting them (§6e): a fixture entry
+naming a real, present, unmatched artifact at its exact tip **is** honoured; an
+entry that matches nothing **fails** by name; an artifact whose tip has moved is
+**not** absorbed; a lease that is closed or past its declared age honours
+**nothing** and fails by name; and an unreadable document is **CANNOT-ASSESS**,
+never a pass.
+
+**What this costs, stated plainly.** The lease is a *lease*: after
+`max_age_hours` (24, declared in the document) the exemptions stop being honoured
+until someone re-measures the tracking issue and records it — one reviewed edit.
+That is deliberate (a declaration nobody can falsify is decorative, and
+`governance/lifecycle` takes the same fail-closed line, treating an *unknown*
+tracking state as stale), but it does mean the gate reds on a stale declaration
+even when nothing on disk drifted. A new artifact crossing the grace window also
+reds, by design: green means "nothing new and unresolved", not "nothing left".
+
+## 8. Board reporting
 
 A finding must reach the board, not only a log line. A `shelved`, `failed` or
 `suspect` outcome files a GitHub issue carrying the named violation and its
@@ -155,7 +243,7 @@ genuinely new shelve files again.
 - **Offline-testable.** The board effects are an injected port, exercised by
   `governance/reconcile/tests/test_reconcile_boardreport.py` with no network.
 
-## 8. `elite` artifacts (issue #885)
+## 9. `elite` artifacts (issue #885)
 
 Four artifacts, each read by name from the code that used to hard-code (or
 never had) its equivalent:
@@ -224,9 +312,9 @@ detected by `ledger.verify()`; a hand-corrupted ledger line fails schema
 validation by name; and a session whose recorded worktree is deleted out from
 under it is reported as `drift` by `status --live`.
 
-## 9. A filed finding reaches a terminal state (#973)
+## 10. A filed finding reaches a terminal state (#973)
 
-§7 files a finding once per fingerprint and never files it again. Filing was
+§8 files a finding once per fingerprint and never files it again. Filing was
 idempotent; **unfiling did not exist.** The only `resolve` call in the repository
 was the `shelved:` key below, so a `lifecycle:*` fingerprint lived in
 `.fleet/board-reports.json` for ever.

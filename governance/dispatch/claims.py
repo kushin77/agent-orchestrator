@@ -632,13 +632,17 @@ def _arbitrate_unaudited(
 
     # The epic half of the provenance: an issue whose declared epic is closed has
     # no owner to work under, so the unit cannot prove issue -> epic -> lane.
+    # The detail names the closed parent AND the remedy, in the SAME wording
+    # `order.eligible` uses (issue #1259): the refusal a lane hits at `claim` and
+    # the report `status` prints must not tell a reader two different things, and a
+    # refusal that names only the cause is a dead end for a permanently-stuck unit.
     epic_number = issue.parent
     epic = snapshot.get(epic_number) if epic_number is not None else None
     if epic is not None and epic.closed:
         raise ClaimRefused(
             REASON_EPIC_CLOSED,
             f"#{issue_number}'s epic is closed — evidence: {board} {_issue_evidence(issue)}; "
-            f"epic {_issue_evidence(epic)}",
+            f"epic {_issue_evidence(epic)} — {order.closed_parent_remedy(epic)}",
         )
     if issue.is_epic:
         raise ClaimRefused(

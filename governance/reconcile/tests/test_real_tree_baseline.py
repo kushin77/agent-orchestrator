@@ -24,6 +24,7 @@ from governance.reconcile.real_tree_baseline import (  # noqa: E402
     BaselineUnavailable,
     check_real_tree,
     load_baseline,
+    load_quarantine,
 )
 from governance.reconcile.sweep import RepoOps  # noqa: E402
 
@@ -460,3 +461,194 @@ def test_vanished_count_is_recorded_on_the_ledger(scratch_repo: Path, tmp_path: 
     records = [r for r in ledger.read(scratch_repo) if r["kind"] == ledger.REAL_TREE_VERDICT]
     assert records, "check_real_tree must write a real-tree-verdict ledger record"
     assert records[-1]["vanished"] == 1
+
+
+# --- the named, leased quarantine (#1291) ------------------------------------
+#
+# Exemptions are the only thing in this mechanism that can turn a finding into a
+# pass, so every test here is about what they must REFUSE to excuse: an artifact
+# the document does not name, an artifact whose tip has moved, and a lease that is
+# closed or older than its own declared bound. The positive half — an entry naming
+# a real, present, unmatched artifact at its exact tip IS honoured — exists so the
+# refusals cannot be satisfied by a rule that simply excuses nothing.
+
+
+def _write_quarantine(
+    path: Path,
+    entries: list[dict],
+    *,
+    tracked_by: str = "#1291",
+    state: str = "open",
+    measured_at: float | None = None,
+    max_age_hours: float = 24,
+) -> None:
+    moment = time.time() if measured_at is None else measured_at
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "note": "test",
+                "tracked_by": tracked_by,
+                "tracking": {
+                    "state": state,
+                    "measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(moment)),
+                    "measured_by": "the test suite",
+                    "max_age_hours": max_age_hours,
+                },
+                "quarantine": entries,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _ancient_branch(repo: Path, name: str) -> str:
+    """A branch, 30 days old, belonging to no baseline: a real finding."""
+    now = time.time()
+    _git(repo, "checkout", "-q", "-b", name)
+    _git_commit_with_date(repo, f"{name} lane", when_epoch=now - 30 * 24 * 3600)
+    _git(repo, "checkout", "-q", "master")
+    return _git(repo, "rev-parse", name).strip()
+
+
+def test_a_named_entry_at_the_recorded_tip_is_honoured(scratch_repo: Path, tmp_path: Path):
+    """The positive half: without it, a rule that excused nothing would pass."""
+    tip = _ancient_branch(scratch_repo, "issue-rule17-work")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [{"kind": "branch", "name": "issue-rule17-work", "tip": tip, "reason": "rule 17: work exists nowhere else"}],
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert verdict.ok, verdict.describe()
+    assert [e.name for e in verdict.quarantined] == ["issue-rule17-work"]
+    assert "issue-rule17-work" not in {e.name for e in verdict.new_violations}
+    assert "issue-rule17-work" in verdict.describe(), "a quarantined artifact is still reported by name"
+
+
+def test_an_entry_that_matches_nothing_fails_as_a_stale_exemption(scratch_repo: Path, tmp_path: Path):
+    """The shrink: the document can only ever lose entries, never rot in place."""
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [{"kind": "branch", "name": "issue-long-gone", "tip": "0" * 40, "reason": "nothing is there"}],
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert not verdict.ok
+    assert [e.name for e in verdict.stale_quarantine] == ["issue-long-gone"]
+    assert "issue-long-gone" in verdict.describe()
+
+
+def test_an_artifact_whose_tip_has_moved_is_not_absorbed(scratch_repo: Path, tmp_path: Path):
+    """A moved branch is a different artifact: it fails immediately, by name."""
+    tip = _ancient_branch(scratch_repo, "issue-moved")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [{"kind": "branch", "name": "issue-moved", "tip": "f" * 40, "reason": "recorded at some other tip"}],
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert not verdict.ok
+    assert "issue-moved" in {e.name for e in verdict.new_violations}
+    assert "issue-moved" in {e.name for e in verdict.stale_quarantine}
+    assert tip  # the recorded tip and the real one are what the verdict compared
+
+
+@pytest.mark.parametrize(
+    "lease",
+    [
+        {"state": "closed"},
+        {"state": "open", "measured_at": time.time() - 30 * 3600, "max_age_hours": 24},
+    ],
+    ids=["tracking-issue-closed", "measurement-past-its-lease"],
+)
+def test_a_lease_that_does_not_hold_honours_nothing(scratch_repo: Path, tmp_path: Path, lease):
+    """An exemption nobody can show is current is not an exemption."""
+    tip = _ancient_branch(scratch_repo, "issue-loan")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [{"kind": "branch", "name": "issue-loan", "tip": tip, "reason": "would be honoured"}],
+        **lease,
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert not verdict.ok
+    assert verdict.quarantined == ()
+    assert "#1291" in {e.name for e in verdict.stale_quarantine}
+    assert "issue-loan" in {e.name for e in verdict.new_violations}
+
+
+def test_an_unreadable_quarantine_is_cannot_assess(scratch_repo: Path, tmp_path: Path):
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    document.write_text("{ not json", encoding="utf-8")
+    verdict = check_real_tree(scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo))
+    assert not verdict.assessable
+    assert not verdict.ok
+    assert "CANNOT-ASSESS" in verdict.describe()
+
+
+def test_an_entry_without_a_tip_is_refused_outright(scratch_repo: Path, tmp_path: Path):
+    """A name alone would excuse whatever appeared under it later."""
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(document, [{"kind": "branch", "name": "issue-unpinned", "reason": "no tip"}])
+    verdict = check_real_tree(scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo))
+    assert not verdict.assessable
+    assert "tip" in verdict.reason
+
+
+def test_an_absent_quarantine_document_excuses_nothing(scratch_repo: Path, tmp_path: Path):
+    _ancient_branch(scratch_repo, "issue-unexcused")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    verdict = check_real_tree(
+        scratch_repo,
+        baseline,
+        quarantine_path=tmp_path / "not-written.json",
+        ops=RepoOps(scratch_repo),
+        grace_hours=24,
+    )
+    assert not verdict.ok
+    assert verdict.quarantined == ()
+    assert "issue-unexcused" in {e.name for e in verdict.new_violations}
+
+
+def test_the_real_quarantine_document_is_well_formed_and_every_entry_is_pinned():
+    """The tracked document is load-bearing: it is read, and every entry pins a tip.
+
+    Its entries name artifacts whose work exists nowhere else (AGENTS.md rule 17),
+    so this asserts the *shape* that makes them safe to honour — never their
+    number, which is allowed to shrink as the fleet resolves them.
+    """
+    document = REPO_ROOT / "governance" / "reconcile" / "real-tree-quarantine.json"
+    assert document.exists(), "the named quarantine must exist for the gate to be honest about it"
+    lease, entries = load_quarantine(document)
+    assert lease.tracked_by.startswith("#")
+    assert lease.state in {"open", "closed"}
+    assert lease.max_age_hours > 0
+    assert entries, "an empty document cannot excuse the artifacts the gate reports"
+    keys = [(entry.kind, entry.name) for entry in entries]
+    assert len(keys) == len(set(keys)), "two entries for one artifact: which one is the record?"
+    for entry in entries:
+        assert entry.kind in {"branch", "worktree"}
+        assert entry.tip and len(entry.tip) == 40
+        assert len(entry.reason.strip()) > 40, f"the reason must say something: {entry.name}"

@@ -533,17 +533,40 @@ else
     "chosen=$(field "$work/mutant-out.txt" CHOSEN) dead=$(field "$work/mutant-out.txt" DEAD) verify=$(field "$work/mutant-out.txt" VERIFY)"
 fi
 
-python3 - "$mutant/governance/isolation/worktree.py" <<'PY'
-import sys, pathlib
+if ! python3 - "$mutant/governance/isolation/worktree.py" <<'PY'
+import re, sys, pathlib
 path = pathlib.Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
-before = 'MACHINE_MANAGED_PATHS: tuple[str, ...] = (".board/focus.json",)'
-after = "MACHINE_MANAGED_PATHS: tuple[str, ...] = ()"
-if before not in text:
-    raise SystemExit("the declared machine-managed set moved; the mutant cannot apply")
-path.write_text(text.replace(before, after), encoding="utf-8")
-print("  OK    the machine-managed set is emptied (the pre-fix default, for #834)")
+original = text
+
+# MACHINE_MANAGED_PATHS: anchor on the literal ASSIGNMENT, not a frozen tuple
+# body — #1265 changed the body (added .board/snapshot.json) without moving
+# the assignment, and a body-only anchor then silently stopped matching, so
+# the mutant never landed and the control passed for the wrong reason.
+paths_pattern = re.compile(
+    r'MACHINE_MANAGED_PATHS: tuple\[str, \.\.\.\] = \([^)]*\)'
+)
+if not paths_pattern.search(text):
+    raise SystemExit("MACHINE_MANAGED_PATHS assignment moved; the mutant cannot apply")
+text = paths_pattern.sub('MACHINE_MANAGED_PATHS: tuple[str, ...] = ()', text, count=1)
+
+# MACHINE_MANAGED_PREFIXES (#1265): must also be emptied, or a lane dirty only
+# under a declared prefix (.fleet/) stays excused even with PATHS emptied.
+prefixes_pattern = re.compile(
+    r'MACHINE_MANAGED_PREFIXES: tuple\[str, \.\.\.\] = \([^)]*\)'
+)
+if not prefixes_pattern.search(text):
+    raise SystemExit("MACHINE_MANAGED_PREFIXES assignment not found; the mutant cannot apply")
+text = prefixes_pattern.sub('MACHINE_MANAGED_PREFIXES: tuple[str, ...] = ()', text, count=1)
+
+if text == original:
+    raise SystemExit("mutant made no change to the file; MUTANT-APPLIED check failed")
+path.write_text(text, encoding="utf-8")
+print("  OK    the machine-managed set is emptied (the pre-fix default, for #834/#1265)")
 PY
+then
+  bad "the machine-managed set could not be emptied" "the mutant did not apply"
+fi
 
 mutant_lane="$(python3 "$mutant/$isolation_cli" open --issue 834 --agent gate --lane mutant-board --suffix mutant \
   --main "$scratch" --root "$lanes" --base HEAD --allow-tmpfs-root 2>/dev/null)" || mutant_lane=""

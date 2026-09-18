@@ -111,6 +111,33 @@ def test_the_pre_flight_agrees_that_a_closed_epic_is_not_eligible(board):
     assert verdict.reason == REASON_EPIC_CLOSED
 
 
+def test_an_epic_closed_arbitration_names_the_remedy_not_only_the_cause(board, tmp_path, base_time):
+    """Issue #1259: the claim-path refusal must tell a lane what to DO.
+
+    `status`/`dangling` named the dead-end, but the verb a lane actually runs
+    (`claim`, and therefore the `Verify:` of #1259) named only the cause. Both
+    now derive from `order.REMEDY_REPARENT`.
+    """
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        _arbitrate(board, 705, tmp_path, base_time)
+
+    detail = excinfo.value.detail
+    assert excinfo.value.reason == REASON_EPIC_CLOSED
+    assert "#704" in detail, "the closed parent must be named by number"
+    assert "closed epic" in detail, "the closed parent must be named by title"
+    assert order.REMEDY_REPARENT in detail, "the ONE shared remedy phrase must be named"
+
+
+def test_the_pre_flight_and_the_arbitration_name_the_same_remedy(board, tmp_path, base_time):
+    """One refusal, two consumers (#1259): `eligible` and `claim` must agree."""
+    remedy = order.closed_parent_remedy(board.get(704))
+    verdict = order.eligible(board, 705)
+    assert remedy in verdict.detail
+    with pytest.raises(claims.ClaimRefused) as excinfo:
+        _arbitrate(board, 705, tmp_path, base_time)
+    assert remedy in excinfo.value.detail
+
+
 def test_an_open_issue_under_an_open_epic_is_eligible(board):
     assert order.eligible(board, 703, active_claims=frozenset({700})).eligible is True
 
