@@ -1,0 +1,185 @@
+# infra/cloudbuild/relay.yaml — the DISPOSITION of the Cloud Build surface.
+#
+# Issue #1295 (parent #706). The owner direction of 2026-09-18 moves the
+# deployment path — the PR gate (`make verify`), the terraform apply and the
+# web-image build/push — onto the shared-services pair. Cloud Build's role
+# "shrinks to, at most, relaying a GitHub commit status from the shared-services
+# run (or is retired when a GitHub App posts the status directly)".
+#
+# This file is the machine-readable half of that sentence, ONE ENTRY PER TRIGGER
+# YAML IN THIS DIRECTORY. It exists because the gate that read this directory
+# before #1295 knew about TWO of its five triggers: `scripts/check-cloudbuild.sh`
+# asserted `verify-trigger.yaml` and `apply-trigger.yaml` and never looked at
+# `web-image-trigger.yaml`, `rollout-promote-trigger.yaml` or
+# `rollout-rollback-trigger.yaml`. A trigger nothing accounts for is a trigger
+# nothing can retire, so an entry here is now REQUIRED for every
+# `*-trigger.yaml`, and an entry with no file behind it is refused — the list is
+# checked in both directions and cannot rot into a fiction.
+#
+# WHAT THIS FILE DOES NOT CLAIM. Cloud Build is NOT retired as of this commit,
+# and no trigger was deleted. Measured when this file was written: all five
+# trigger yamls already declare `disabled: true`, and arming a live trigger is
+# an out-of-band `gcloud builds triggers update` that no commit performs. The
+# relocation is therefore DECLARED here and NOT OBSERVED — see the `parity`
+# block at the foot of this file for exactly which half is unverifiable from a
+# checkout, and why it is reported as CANNOT-ASSESS rather than as a pass.
+#
+# The dispositions are a closed vocabulary of three, because a disposition that
+# can say anything accounts for nothing:
+#
+#   superseded  the trigger's function is declared to move to a named fleet job
+#               in infra/fleet/jobs.yaml. The yaml is NOT deleted: deleting the
+#               only auditable record of an interface whose replacement is not
+#               yet running would remove evidence rather than reduce surface.
+#   relay-only  the trigger survives with one job: relaying a status that the
+#               pair already posted. It must name the context it relays.
+#   retained    the trigger is outside this issue's named scope, stays declared
+#               `disabled: true`, and is accounted for BY NAME so it is not
+#               invisible.
+
+schema: cloudbuild-disposition-v1
+issue: 1295
+parent: 706
+
+triggers:
+  # -------------------------------------------------------------------------
+  # The PR gate. The pair posts the status itself, via the GitHub App token the
+  # fleet already holds — so there is no status left for a relay to carry, and
+  # this trigger is superseded rather than reduced to relay-only.
+  # -------------------------------------------------------------------------
+  - name: control-plane-verify
+    file: infra/cloudbuild/verify-trigger.yaml
+    disposition: superseded
+    replaced_by: verify-runner
+    guard:
+      substitution: _ENABLE_VERIFY
+      registry_flag: ci_cd.verify_trigger
+    reason: >
+      `make verify` for pull requests runs on the pair (`verify-runner`), which
+      posts the commit status directly. A relay would be a second hop for a
+      status that already arrives; the direction's parenthetical — "or is
+      retired when a GitHub App posts the status directly" — is this case.
+
+  # -------------------------------------------------------------------------
+  # The apply. The ONLY apply route (GR-5) moves to the pair; the build config
+  # stays the single declaration of the per-surface ladder so the ladder is not
+  # duplicated into infra/fleet/jobs.yaml.
+  # -------------------------------------------------------------------------
+  - name: control-plane-apply
+    file: infra/cloudbuild/apply-trigger.yaml
+    disposition: superseded
+    replaced_by: control-plane-apply
+    guard:
+      substitution: _ENABLE_APPLY
+      registry_flag: ci_cd.apply_trigger
+    reason: >
+      The apply runs as the deployer service account on the pair. This trigger
+      yaml remains the ONE declaration of the twenty-substitution surface
+      ladder and the web image tag that the replacement job reads; retiring the
+      route is therefore a move of the runner, not of the declaration.
+
+  # -------------------------------------------------------------------------
+  # The web image. Note the measured asymmetry the gate now reports: unlike
+  # apply.yaml and both rollout configs, `web-image.yaml` carries NO flag gate —
+  # its tag gate refuses an empty or `latest` tag, but nothing in the build
+  # config refuses to run when a flag is off. Its `disabled: true` trigger is
+  # the only thing holding it, which is precisely the class of control #1267
+  # measured as terminal-not-green-and-lost.
+  # -------------------------------------------------------------------------
+  - name: control-plane-web-image
+    file: infra/cloudbuild/web-image-trigger.yaml
+    disposition: superseded
+    replaced_by: control-plane-web-image
+    guard:
+      substitution: null
+      registry_flag: null
+      note: >
+        No build-config flag gate exists (measured at 7bb410d68: web-image.yaml
+        gates the TAG, not the RUN). Declared null rather than named after the
+        apply's flag, because a substitution this trigger does not carry would
+        be a guard the gate could not verify — a formality.
+    reason: >
+      The build and push run on the pair as `control-plane-web-image`, under the
+      same guard as the apply it feeds.
+
+  # -------------------------------------------------------------------------
+  # The rollout pair. NOT named by issue #1295's direction, so NOT superseded:
+  # they are accounted for by name and stay declared disabled. Recorded here
+  # rather than left out, because "not in scope" and "not accounted for" look
+  # identical from a gate's point of view.
+  # -------------------------------------------------------------------------
+  - name: control-plane-rollout-promote
+    file: infra/cloudbuild/rollout-promote-trigger.yaml
+    disposition: retained
+    replaced_by: null
+    surviving_rule: kushin77/GCP-GateKeeper#140
+    guard:
+      substitution: _ENABLE_ROLLOUT
+      registry_flag: null
+      note: >
+        The registry entry this flag names (`ci_cd.rollout_promote`) is added at
+        go-live, per the trigger's own comment — so it is deliberately null here
+        rather than asserted, which would red on a correct tree.
+    reason: >
+      Flag promotion is a separate deliberate step (off to canary to gradual to
+      full, each with verify_green + approval_code + audit_record) and is not
+      part of the deployment path this issue moves. It remains declared
+      `disabled: true` — and it is a Cloud Build step that SURVIVES, so
+      GCP-GateKeeper#140's portable rule applies to it (the gatekeeper is the
+      Cloud Build SME, per #1263/#1264/#1267).
+
+  - name: control-plane-rollout-rollback
+    file: infra/cloudbuild/rollout-rollback-trigger.yaml
+    disposition: retained
+    replaced_by: null
+    surviving_rule: kushin77/GCP-GateKeeper#140
+    guard:
+      substitution: _ENABLE_ROLLOUT
+      registry_flag: null
+      note: Same registry-entry reason as control-plane-rollout-promote.
+    reason: >
+      The declared rollback path, also outside this issue's named scope, also
+      remaining declared `disabled: true`, and also a surviving Cloud Build
+      step for GCP-GateKeeper#140's purposes.
+
+# ---------------------------------------------------------------------------
+# THE LIVE HALF. #1263's surviving rule, restated here because #1263 itself was
+# closed as superseded: the declared configuration must match what is LIVE.
+#
+# MEASURED 2026-09-18, with gcloud present on this box and the read-back
+# succeeding (`bash scripts/check-cloudbuild.sh --live`):
+#
+#   * control-plane-verify, control-plane-apply and control-plane-web-image are
+#     ARMED in the live project while every yaml here declares
+#     `disabled: true`. That is real declared-vs-live drift, and it is the
+#     measured mechanism behind the direction's own rationale — the armed PR
+#     verify trigger is what cost this week's Cloud Build PR drain.
+#   * control-plane-rollout-promote and control-plane-rollout-rollback do NOT
+#     exist in the project at all (never imported).
+#   * roughly three dozen further armed triggers (capital-*, erp-crm-*,
+#     gatekeeper-*, pr-gate, ...) are live and are NOT declared under
+#     infra/cloudbuild; they belong to other surfaces, and #1263's scope note
+#     already records the capital-* set as being retired.
+#
+# The read-back is therefore NOT opt-in because it is unobservable — it is
+# opt-in because a live project's arming state is not this repository's code,
+# and a gate of record that reddened every lane for another surface's armed
+# trigger would be ignored within a day. `--live` is the verb that refuses by
+# name on demand; the declared half runs on every `make verify` run.
+#
+# An unobservable read-back is CANNOT-ASSESS (exit 2), never a pass: the watchdog
+# drift control this repository already paid for (#739 — an unreadable HEAD that
+# read back as `healthy`) is the same defect class.
+# ---------------------------------------------------------------------------
+parity:
+  live_source: gcloud builds triggers list --project purebliss-ghl --format=json
+  probe: scripts/check-cloudbuild.sh --live
+  unobservable: CANNOT-ASSESS
+  measured: "2026-09-18"
+  measured_declared_but_armed_live:
+    - control-plane-verify
+    - control-plane-apply
+    - control-plane-web-image
+  measured_declared_but_not_imported:
+    - control-plane-rollout-promote
+    - control-plane-rollout-rollback

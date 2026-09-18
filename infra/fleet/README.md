@@ -304,6 +304,42 @@ across `test_env_contract_state_rw.py`, `test_secrets_contract.py` and
 named from inside that gate script, so it is covered by
 `scripts/check-gate-coverage.sh` rather than merely present.
 
+## The deployment path runs on this image (#1295)
+
+`infra/fleet/jobs.yaml` declares the jobs that the owner direction of
+2026-09-18 moves off Cloud Build: `verify-runner` (the PR gate, checked out into
+a scratch worktree and run as `bash scripts/verify.sh verify`),
+`control-plane-apply` and `control-plane-web-image`. They run in this image, so
+their toolchain is the fleet image's toolchain rather than a Cloud Build runner
+image — which is what makes toolchain parity a property asserted here (see
+the gate above) instead of a per-build fixup.
+
+Three things the declaration is held to, each refused by name by
+`scripts/check-deploy-path.sh`:
+
+- **the identity is the service account Terraform imports.** The gate matches
+the declared address against `infra/terraform/import.tf`, so a declaration that
+names a machine account no definition creates fails. `assume: workload-identity`
+is refused while no workload-identity pool is declared under `infra/` — a
+mechanism with nothing behind it is a formality, so the declared value is
+`unprovisioned` with its prerequisite named.
+- **the status context is ONE name, in three places:** the job declaration, the
+poster's default (`scripts/gate-status.sh`) and the branch-protection policy
+(`governance/platform/branch-protection.yaml`). Two names for one control is how
+a required check becomes permanently unsatisfiable, so a half-rename is refused
+with all three values printed.
+- **a non-verdict is never published.** The run's outcome classification
+(`infra/fleet/verify_status.py`) is driven by the gate: a red run is published
+as a failure that NAMES the failing check, `CANNOT-ASSESS` is published as an
+error (never a pass), and a `PARKED` run publishes nothing and is re-queued by
+name (#1267's surviving rule).
+
+What is NOT claimed, and is reported as CANNOT-ASSESS rather than as a pass:
+that the pair actually runs these jobs. The two runtime halves of #1295 — a PR
+really carrying a green status with no Cloud Build run, and an apply really
+attributable to the deployer identity in an audit log — are facts about a live
+host this checkout cannot reach, and no gate here turns either into a green.
+
 ## Provenance
 
 The image was written for this repository against the issue's own inventory; no

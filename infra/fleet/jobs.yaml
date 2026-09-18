@@ -1,0 +1,234 @@
+# infra/fleet/jobs.yaml — the DEPLOYMENT-PATH jobs, declared on the shared-services pair.
+#
+# Issue #1295 (parent #706). The owner direction of 2026-09-18 moves the whole
+# deployment path off Cloud Build and onto the shared-services container pair
+# (the #706 cutover target): the PR gate (`make verify`), the terraform apply
+# and the web-image build/push. Cloud Build's measured cost this week was about
+# five hours of the PR drain, to things the pair already controls — a
+# five-concurrent cap, `queueTtl` expiry, a foreign zombie sweep cancelling PR
+# builds, a runner image that did not match the dev box, and trigger-definition
+# drift.
+#
+# This file DECLARES that job set, in the same spirit as
+# `infra/fleet/inventory.yaml`: a declaration is worth nothing unless a gate can
+# refuse the tree that stops matching it. `scripts/check-deploy-path.sh` is that
+# gate, and it is the reason this file is a contract rather than a comment.
+#
+# ============================================================================
+# WHAT THIS FILE DOES NOT CLAIM — read this before quoting it as done.
+#
+# It does not claim any of these jobs RUNS. Issue #1295's acceptance has two
+# halves that are RUNTIME facts about a live host this checkout cannot reach:
+#
+#   * "a PR gets a green `shared-services/verify` status within one verify
+#     duration of its push, with no Cloud Build run" — UNVERIFIED here. Nothing
+#     in this lane posted a status, and nothing observed the pair.
+#   * "an apply is only ever attributable to the pair's deployer identity
+#     (audit log)" — UNVERIFIED here. No audit log was read; no apply ran.
+#
+# Neither is claimed, and the gate below cannot turn either into a green. What
+# IS claimed and provable offline is the DECLARATION: the job set, its flag
+# posture (GR-5: ship OFF), the identity each job may use, the SINGLE status
+# context, the states that are terminal-not-green, and the Cloud Build surface
+# each job accounts for.
+# ============================================================================
+
+schema: fleet-deploy-jobs-v1
+issue: 1295
+parent: 706
+direction: deployment + verify execute on shared-services, not Cloud Build
+
+# ---------------------------------------------------------------------------
+# The venue. The pair is where the fleet image runs, so the runner's toolchain
+# is the fleet's OWN image rather than a Cloud Build runner image — which is
+# what makes toolchain parity a property of that image (#1264's surviving rule,
+# superseded into #1295) instead of a per-build fixup. That property is already
+# asserted: `scripts/check-fleet-cron-image.sh` builds the image and refuses a
+# package the image grew that `infra/fleet/inventory.yaml` does not declare.
+# ---------------------------------------------------------------------------
+venue:
+  name: shared-services
+  kind: container-pair
+  cutover_issue: 706
+  image:
+    name: agent-fleet-cron
+    dockerfile: infra/fleet/Dockerfile
+    inventory: infra/fleet/inventory.yaml
+    assertion: scripts/check-fleet-cron-image.sh
+
+# ---------------------------------------------------------------------------
+# 1. THE JOBS.
+#
+# Each job names the Cloud Build trigger it accounts for (`replaces_trigger`),
+# the flag that gates it, and the identity it may run as. The gate reads all
+# three and refuses a job whose trigger is undeclared, whose flag is not OFF
+# (GR-5), or whose identity is anything but the deployer service account.
+# ---------------------------------------------------------------------------
+jobs:
+  # -------------------------------------------------------------------------
+  # 1.1 verify-runner — the gate of record, run on the pair.
+  #
+  # THE STATUS CONTEXT IS THE WHOLE CONTROL, so read the two notes under
+  # `status` before changing the name.
+  # -------------------------------------------------------------------------
+  - name: verify-runner
+    role: gate-of-record
+    replaces_trigger: control-plane-verify
+    event:
+      type: pull_request
+      branch: ^master$
+      arrival: >
+        a webhook, or a one-minute poll on the existing fleet cron rung when no
+        webhook is reachable from the pair (fleet/cron.py owns the schedule).
+    checkout:
+      into: scratch-worktree
+      ref: master plus the PR head
+      note: >
+        A scratch worktree, never the pair's checkout: two PRs verified
+        concurrently must not share a tree, and `scripts/verify.sh` takes an
+        exclusive per-worktree lock, so sharing one would PARK the second run
+        instead of verifying it.
+    command: bash scripts/verify.sh verify
+    capacity:
+      serial_per_pr: true
+      width: declared by the capacity gate, never unbounded
+      gate: scripts/check-capacity-gate.sh
+      note: >
+        Serial per PR because one PR verified twice concurrently is duplicated
+        work; N-wide across PRs, where N is the same measured ceiling
+        (pool, disjoint lanes, RAM and scratch headroom) that bounds the lanes.
+        Issue #724 measured what an unbounded gate costs: 49 concurrent gate
+        runs, 43 of them stacked in two worktrees, for about sixteen hours.
+    status:
+      # The context is ONE name, and it must be the SAME string in three
+      # places: here, the poster's default, and the branch-protection policy.
+      # Two names for one control is how a required check becomes permanently
+      # unsatisfiable — protection waits for a context nothing ever writes.
+      context: ao/gate-of-record
+      poster: scripts/gate-status.sh
+      outcome_helper: infra/fleet/verify_status.py
+      sha: the PR head commit
+      red_by_check_name: true
+      # DELTA, NAMED RATHER THAN SILENTLY TAKEN (#1295's own wording).
+      # Issue #1295 says the context should be `shared-services/verify`. It is
+      # not, yet: `scripts/gate-status.sh` defaults to `ao/gate-of-record` and
+      # `governance/platform/branch-protection.yaml` declares the same string
+      # as `required_status_contexts`, and `scripts/check-gate-status.sh`
+      # already fails when those two disagree. Renaming the context to
+      # `shared-services/verify` is therefore a ONE lock-step change across
+      # three files — the poster's default, the policy, and this line — and the
+      # policy file is not this lane's to edit. The gate below refuses a
+      # half-rename by name, so the change cannot land in two pieces.
+      rename_blocked_by:
+        - scripts/gate-status.sh
+        - governance/platform/branch-protection.yaml
+        - infra/fleet/jobs.yaml
+    identity:
+      # The pair holds a GitHub App installation token; it is minted by the
+      # fleet's own tooling, never committed (GR-6).
+      github_app_token: true
+      service_account: null
+      # The direction's boundary applies to the whole deployment path, not only
+      # to the apply: this job must not run from a workstation, and it must not
+      # be a Cloud Build step — that is the relocation the issue is about.
+      never: [laptop, cloud-build]
+    terminal_not_green:
+      # #1267's surviving rule, kept because Cloud Build was not what made it
+      # true: EXPIRED / CANCELLED / PARKED are terminal-NOT-GREEN. None of them
+      # is a verdict, so none of them publishes a status, and each is re-queued
+      # BY NAME instead of being waited on and quietly lost.
+      - state: parked
+        codes: [10, 11, 12]
+        means: the gate never started (worktree held, box cap reached, or the permit store is unusable)
+        publishes: none
+        requeue: by-name
+      - state: expired
+        means: the job's own deadline passed before the gate started
+        publishes: none
+        requeue: by-name
+      - state: cancelled
+        means: the run was stopped before it produced a verdict
+        publishes: none
+        requeue: by-name
+    never: [ignored, silently-lost, published-as-a-verdict]
+
+  # -------------------------------------------------------------------------
+  # 1.2 control-plane-apply — the ONLY apply route, now a pair job.
+  # -------------------------------------------------------------------------
+  - name: control-plane-apply
+    role: apply-route
+    replaces_trigger: control-plane-apply
+    event:
+      type: push
+      branch: ^master$
+    command: the flag-gated terraform apply pipeline
+    flags:
+      guard:
+        substitution: _ENABLE_APPLY
+        registry_flag: ci_cd.apply_trigger
+        default: "false"
+      ladder:
+        # The per-surface ladder (services.* rendered as -var, the web image
+        # tag, the project id, the deployer role class) stays declared ONCE, in
+        # the trigger yaml this job replaces, until the apply build config
+        # itself is ported. Restating its twenty substitutions here would create
+        # exactly the second source this repository refuses; the job names the
+        # one place instead. `scripts/check-cloudbuild.sh` asserts that file
+        # still ships disabled with `_ENABLE_APPLY` false, so the ladder cannot
+        # move without this job's own guard moving with it.
+        declared_in: infra/cloudbuild/apply-trigger.yaml
+    identity:
+      service_account: control-plane-deployer@purebliss-ghl.iam.gserviceaccount.com
+      declared_by: infra/terraform/modules/deployer-sa
+      # MEASURED, not asserted: this tree declares NO workload-identity pool or
+      # provider (a search for `workload_identity` under `infra/` returns
+      # nothing at 7bb410d68). Issue #1295's wording is "via workload
+      # identity"; declaring that here would be a mechanism with no
+      # implementation behind it, which is the formality GR-12 rejects. So the
+      # value is `unprovisioned` and the prerequisite is named; the gate refuses
+      # `workload-identity` while no pool is declared, by name.
+      assume: unprovisioned
+      prerequisite: a declared workload-identity pool and provider, bound to the pair
+      never: [laptop, cloud-build, console]
+    terminal_not_green:
+      - state: flagged-off
+        means: the guard flag is "false", so the pipeline refuses every run
+        publishes: none
+        requeue: by-name
+
+  # -------------------------------------------------------------------------
+  # 1.3 control-plane-web-image — the web-surface image build and push.
+  # -------------------------------------------------------------------------
+  - name: control-plane-web-image
+    role: image-build
+    replaces_trigger: control-plane-web-image
+    event:
+      type: push
+      branch: ^master$
+    command: build portal/Dockerfile and push to Artifact Registry
+    flags:
+      guard:
+        substitution: _ENABLE_APPLY
+        registry_flag: ci_cd.apply_trigger
+        default: "false"
+      ladder:
+        declared_in: infra/cloudbuild/apply-trigger.yaml
+        note: >
+          The web image is a prerequisite of the apply, not a separate promote:
+          `web_image_tag` is the input the web-surface module needs at apply
+          time, so the same guard gates the build.
+    substitutions:
+      _AR_REPO: us-central1-docker.pkg.dev/purebliss-ghl/ao-images
+      _IMAGE: portal
+      _TAG: $SHORT_SHA
+    identity:
+      service_account: control-plane-deployer@purebliss-ghl.iam.gserviceaccount.com
+      declared_by: infra/terraform/modules/deployer-sa
+      assume: unprovisioned
+      prerequisite: a declared workload-identity pool and provider, bound to the pair
+      never: [laptop, cloud-build, console]
+    terminal_not_green:
+      - state: flagged-off
+        means: the guard flag is "false", so nothing builds or pushes
+        publishes: none
+        requeue: by-name

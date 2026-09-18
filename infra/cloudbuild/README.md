@@ -16,6 +16,30 @@
 | `verify-trigger.yaml` | Importable pull_request trigger for `verify.yaml` (disabled by default). |
 | `apply-trigger.yaml`  | Importable push trigger for `apply.yaml` (disabled by default). |
 | `web-image-trigger.yaml` | Importable push trigger for `web-image.yaml` (disabled by default). |
+| `rollout-promote-trigger.yaml` | Importable tag trigger for `rollout-promote.yaml` (disabled by default). |
+| `rollout-rollback-trigger.yaml` | Importable pubsub trigger for `rollout-rollback.yaml` (disabled by default). |
+| `relay.yaml` | The DISPOSITION of every trigger above: one entry per `*-trigger.yaml`, checked in both directions by `scripts/check-cloudbuild.sh`. |
+
+## Where this surface is going (#1295)
+
+The owner direction of 2026-09-18 moves the deployment path — the PR gate
+(`make verify`), the terraform apply and the web-image build/push — onto the
+shared-services container pair, and reduces Cloud Build to, at most, a status
+relay. `infra/cloudbuild/relay.yaml` records the disposition of every trigger,
+and `infra/fleet/jobs.yaml` declares the fleet jobs that take the work over.
+
+What is DECLARED and measured by the gate: every trigger ships
+`disabled: true`; every trigger is accounted for by name; a `superseded`
+trigger names a fleet job that exists and the fleet job names it back;
+`retained` means the trigger is outside this issue's named scope and stays
+declared disabled.
+
+What is NOT claimed: Cloud Build is not retired as of this commit, and no
+trigger was deleted. Arming a live trigger is an out-of-band
+`gcloud builds triggers update` that no commit performs, so the relocation is a
+declaration here and not an observation. `scripts/check-cloudbuild.sh --live`
+is the read-back against the project's real trigger list, and with no `gcloud`
+and no credentials it reports CANNOT-ASSESS — never a pass.
 
 ## Flag-gate (GR-5) — everything ships OFF
 
@@ -25,8 +49,14 @@
 | `control-plane-apply`  | `ci_cd.apply_trigger`  | `disabled: true` | `_ENABLE_APPLY: "false"` |
 
 `scripts/check-cloudbuild.sh` (wired into `make verify`) asserts: every YAML
-here parses, both triggers are `disabled: true`, and the `_ENABLE_*`
-substitutions mirror the OFF default.
+here parses; EVERY `*-trigger.yaml` — not the two the gate used to know about —
+is `disabled: true` with the guard substitution its `relay.yaml` entry names set
+to `"false"`; every trigger is accounted for in `relay.yaml` and every entry
+names a trigger that exists; and a `superseded` trigger names a fleet job that
+`infra/fleet/jobs.yaml` declares. It proves it can fail: seven planted defects
+(an enabled trigger, an unaccounted trigger, a name mismatch, a phantom
+account, a guard flag flipped on, an unknown replacement, an absent registry
+flag) are each refused by name on every run.
 
 ## Workbook-surface switches (issue #644, workbook-13)
 
