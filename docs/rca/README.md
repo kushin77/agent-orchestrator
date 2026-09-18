@@ -12,10 +12,5 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
 ## Index
 
 - [`2026-09-16-pr-queue-clearing.md`](2026-09-16-pr-queue-clearing.md) — the
-  zero-byte gate-lock wedge (RCA-0015) and the shared-core-file collision
-  class (RCA-0016) from a 17-PR queue-clearing session.
-- [`2026-09-17-pr-pileup.md`](2026-09-17-pr-pileup.md) — 16 open PRs, none
-  landing: master red on four named checks (`check-lifecycle-reclaim.sh`,
-  `check-gate-lock.sh`, `check-fleet-jobs.sh`, `check-fleet-cron-dev-run.sh`)
-  starves every lane's autonomous-merge gate by inheritance, while lane
-  dispatch keeps opening new PRs with no shared throughput gate.
+  zero-byte gate-lock wedge (RCA-0007) and the shared-core-file collision
+  class (RCA-0008) from a 17-PR queue-clearing session.
