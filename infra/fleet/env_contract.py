@@ -190,6 +190,19 @@ VARS: tuple[Var, ...] = (
         code="portal-healthz-url-invalid",
         why="issue #1329: the URL promote_portal.py polls after a recreate before deciding healthy/rollback.",
     ),
+    Var(
+        name="AO_RUNNER_HOST_ROLE",
+        default="standby",
+        kind="one-of",
+        choices=("primary", "standby"),
+        code="runner-host-role-invalid",
+        why=(
+            "issue #1343: whether THIS host runs the PR runner rung (fleet/runner/cli.py). "
+            "`primary` is the shared-services pair only: fleet/cron.py renders the `runner` "
+            "line only when this says primary, and cli.py refuses `host-role-not-primary` "
+            "otherwise. The default is standby, so a host that says nothing merges nothing."
+        ),
+    ),
 )
 
 BY_NAME: dict[str, Var] = {var.name: var for var in VARS}

@@ -72,7 +72,7 @@ OK, NOT_OK, CANNOT_ASSESS = 0, 1, 2
 
 ROLE_ENV = "AO_RUNNER_HOST_ROLE"
 PRIMARY = "primary"
-REPO_SLUG = os.environ.get("AO_REPO", "kushin77/agent-orchestrator")
+REPO_SLUG = "kushin77/agent-orchestrator"
 
 
 def runner_dir() -> Path:

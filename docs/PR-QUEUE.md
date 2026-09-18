@@ -81,6 +81,17 @@ glob list emptied) is proven to diverge — the same PR that was gate-changing
 becomes ready. It is registered in `scripts/verify.sh` as the `pr-queue`
 check and never sets `AO_QUEUE_APPLY=1`.
 
+## The runner consumes the queue's seams (issue #1343)
+
+`fleet/runner/` — the scheduled shared-services PR runner (docs/PR-RUNNER.md)
+— does not re-plan the queue: it verifies each open head in a held scratch
+worktree, posts `ao/gate-of-record` for that exact sha, and then merges a green
+head by calling this script's merged-tree seam (`scripts/pr-queue.sh
+--check-merged-tree <pr> --head <sha> --against-base origin/master`, #1332)
+followed by `scripts/merge-pr.sh`. Master + PR must be green together at the
+moment of merging; a checkout without the seam is `merged-tree-seam-missing`
+and the runner merges nothing.
+
 ## The PR contract (issue #1254 step 5 / #1328)
 
 Every PR body carries a `## Classification` block (`.github/PULL_REQUEST_TEMPLATE.md`,

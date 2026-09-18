@@ -1,0 +1,14 @@
+{
+  "doc": "lesson 7: a failed gate-lock prune plans no verify",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 14,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "prune": {
+    "ok": false,
+    "detail": "store-unusable"
+  }
+}

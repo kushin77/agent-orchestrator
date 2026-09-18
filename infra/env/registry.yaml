@@ -261,6 +261,16 @@ variables:
     secret: false
     required_by: [deploy, ops]
     readers: [infra/fleet/promote_portal.py]
+  # -- PR runner (issue #1343, parent #1295) -----------------------------------
+  - name: AO_RUNNER_HOST_ROLE
+    purpose: >-
+      the host role for the PR runner rung: `primary` on the shared-services
+      pair (192.168.168.42) renders and runs `fleet/runner/cli.py run --once
+      --apply`; the default `standby` renders nothing and cli.py refuses
+      `host-role-not-primary`. Declared in infra/fleet/env_contract.py.
+    secret: false
+    required_by: [deploy, ops]
+    readers: [fleet/cron.py, fleet/runner/cli.py, infra/fleet/env_contract.py]
 
   - name: KEYDB_HOST
     purpose: >-
