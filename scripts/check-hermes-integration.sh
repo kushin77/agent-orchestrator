@@ -21,7 +21,11 @@
 #
 # Offline by construction: `check` and `project` are pure functions of the tree
 # and never import the transport; the only network path (HttpTransport) lives in
-# the `probe` verb, which this gate never calls.
+# the `probe` verb, which this gate never calls. The adapter does import the seam
+# it shares with `integrations/paperclip/` (issue #1208,
+# `integrations/_seam/`), so the scratch tree below carries that package too —
+# without it the mutation control would measure a missing module rather than the
+# mutation.
 #
 # Exit-code contract (repo convention, GR-12): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 set -u
@@ -90,6 +94,7 @@ trap 'rm -rf "$scratch"' EXIT
 
 mkdir -p "$scratch/integrations"
 cp -R "$root/integrations/hermes" "$scratch/integrations/"
+cp -R "$root/integrations/_seam" "$scratch/integrations/"
 for rel in \
   registry/personas/cards/hermes.yaml \
   registry/profiles/seeds/hermes.1.0.0.yaml \
