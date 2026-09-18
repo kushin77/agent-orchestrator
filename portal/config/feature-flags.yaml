@@ -78,3 +78,15 @@ surfaces:
       authorization decision (the module types no role of its own). Offline: the
       ERP-06 surface is transport-free, so the module renders with no socket, no
       network and no deployment.
+  fleet_board:
+    default: off
+    phase: 11
+    description: >
+      Fleet board (issue #880, EPIC #878 lane L1): the live issue roster the
+      fleet CLI/cron already treat as source of truth
+      (.board/snapshot.json + .board/claims.jsonl), joined per issue and
+      validated row-by-row against portal/schemas/fleet-board-row.schema.json
+      by portal.server.livestore.load_board_rows before it is served. Served
+      read-only at GET /api/board/rows. A row a malformed source document
+      produced is refused by name (issue number + defect) rather than served,
+      never a fabricated or best-effort row.

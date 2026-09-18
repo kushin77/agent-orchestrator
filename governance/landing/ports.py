@@ -113,8 +113,26 @@ class LandingOps(Protocol):
     def commit_subjects(self, base: str, rev: str) -> Tuple[str, ...]:
         """The subjects of the lane's own commits (the PR's what-changed list)."""
 
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        """The files the lane's diff touches (``git diff --name-only base...rev``).
+
+        Used to MEASURE the ``Gate-changing:`` declaration in the composed PR
+        body against ``scripts/lib/gate-paths.txt`` — never hard-coded.
+        """
+
     def remote_branch_head(self, branch: str) -> Optional[str]:
         """The remote head of ``branch``, or None when the branch is not pushed."""
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        """The merge base of ``left`` and ``right``, or None when there is none.
+
+        Used ONLY to decide whether publishing master's health after a merge
+        is honest (fix #5 follow-up, #1114): a lane's own attestation
+        measured the LANE head, and relabelling that as a measurement of
+        master's post-squash head is only fair when the lane head already
+        contained master's pre-merge tip — i.e. ``merge_base(lane_head,
+        master_head) == master_head``. Never used for anything else.
+        """
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         """The pull request whose head is ``branch`` (any state), or None."""
@@ -127,6 +145,16 @@ class LandingOps(Protocol):
 
     def run_contract(self, *, pr_number: Optional[int]) -> CommandResult:
         """Run the pre-merge contract (``scripts/merge-gate.sh run``)."""
+
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        """Publish the gate of record as a GitHub commit status (ADR-0028).
+
+        ``rc`` is the pre-merge contract's own normalised tri-state (0/1/2),
+        never a subprocess return code passed through unexamined. The exit
+        code of the returned :class:`CommandResult` is the *poster's*
+        outcome: 0 means the status was posted (and read back), anything else
+        means it was not — a failed or unreadable poster, never a guess.
+        """
 
     def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
         """Run the landed-contract trailer precondition over the commits to be squashed."""
@@ -191,6 +219,10 @@ class GitHubOps:
         out = self._git_text("log", "--no-merges", "--format=%s", f"{base}..{rev}")
         return tuple(line for line in out.splitlines() if line.strip())
 
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        out = self._git_text("diff", "--name-only", f"{base}...{rev}")
+        return tuple(line for line in out.splitlines() if line.strip())
+
     def remote_branch_head(self, branch: str) -> Optional[str]:
         out = self._git_text("ls-remote", "--heads", "origin", branch)
         for line in out.splitlines():
@@ -198,6 +230,16 @@ class GitHubOps:
             if len(parts) == 2 and parts[1].endswith(f"/{branch}"):
                 return parts[0]
         return None
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        result = self._git("merge-base", left, right)
+        if not result.ok:
+            # No common ancestor (or either name is unresolvable in this
+            # checkout) — an honest "cannot tell", not an exception. The
+            # caller (the master-attestation guard) treats this as "not
+            # already at master", the safe default.
+            return None
+        return result.stdout.strip() or None
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         result = self._gh(
@@ -260,6 +302,20 @@ class GitHubOps:
         if pr_number:
             env["AO_PR_NUMBER"] = str(pr_number)
         return _run(["bash", str(self.root / "scripts" / "merge-gate.sh"), "run"], cwd=self.root, env=env)
+
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        """``bash scripts/gate-status.sh post --sha <sha> --rc <rc>`` (ADR-0028, #1072).
+
+        Run from the repo root, exactly as the poster's own header documents.
+        The mapping from a gate outcome to a commit-status state lives ONLY in
+        ``scripts/gate-status-map.py`` — this port does not re-decide it, it
+        just runs the poster and reports what the poster reported.
+        """
+        return _run(
+            ["bash", str(self.root / "scripts" / "gate-status.sh"), "post", "--sha", sha, "--rc", str(rc)],
+            cwd=self.root,
+            env=self.env,
+        )
 
     def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
         """The merge precondition over the artifact that lands (issue #998).
@@ -360,8 +416,14 @@ class RecordingOps:
     def commit_subjects(self, base: str, rev: str) -> Tuple[str, ...]:
         return self.reads.commit_subjects(base, rev)
 
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        return self.reads.changed_files(base, rev)
+
     def remote_branch_head(self, branch: str) -> Optional[str]:
         return self.reads.remote_branch_head(branch)
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        return self.reads.merge_base(left, right)
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         return self.reads.pull_request_for(branch)
@@ -377,6 +439,10 @@ class RecordingOps:
     def run_contract(self, *, pr_number: Optional[int]) -> CommandResult:
         self._plan("contract", f"bash scripts/merge-gate.sh run (AO_PR_NUMBER={pr_number or 'unset'})")
         return CommandResult(argv=("bash", "scripts/merge-gate.sh", "run"), rc=0)
+
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        self._plan("gate-status", f"bash scripts/gate-status.sh post --sha {sha} --rc {rc}")
+        return CommandResult(argv=("bash", "scripts/gate-status.sh", "post"), rc=0)
 
     def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
         self._plan("landed-contract", f"bash scripts/check-pr-contract.sh --landed --range {base}..{head}")

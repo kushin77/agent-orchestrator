@@ -267,10 +267,32 @@ cookie="$(python3 -c 'import json, sys; doc = json.load(open(sys.argv[1])); prin
 #: overlay left behind in the checkout cannot silently revert the promotion.
 clean_state="$work/no-overlay-engaged.json"
 
-# --- phase A: the registry as committed (the surface ships flag-gated OFF) ---
-echo "== phase A: the committed registry (surfaces.$surface absent/off) =="
-start_server a "$root/infra/feature-flags/registry.yaml" "$clean_state" \
-  || cannot_assess "the console did not start with the committed registry"
+# --- phase A: NEGATIVE CONTROL — a fixture registry with the surface forced
+# back to the pre-go-live, UNPROMOTED posture (#1043) --------------------------
+# NOTE (#1043): issue #1027 (commit 32e8c24) deliberately promoted
+# surfaces.fleet_projection/remote_control/operator_terminal for the #607
+# go-live, so the COMMITTED registry now ships this surface ON, not off. That
+# shipped posture is asserted directly in phase A2 below. This phase keeps the
+# OFF/404 half of the matrix alive as a genuine negative control by building a
+# scratch, unpromoted COPY of the registry (never mutating the committed file)
+# — a fixture that must still read dark.
+echo "== phase A: NEGATIVE CONTROL — fixture registry, surfaces.$surface forced unpromoted =="
+unpromoted_registry="$work/registry-unpromoted.yaml"
+python3 - "$root/infra/feature-flags/registry.yaml" "$unpromoted_registry" "$surface" <<'PY'
+import sys
+import yaml
+
+source, target, surface = sys.argv[1:4]
+doc = yaml.safe_load(open(source, encoding="utf-8").read())
+doc["surfaces"] = {name: (dict(entry) if isinstance(entry, dict) else entry) for name, entry in doc["surfaces"].items()}
+doc["surfaces"][surface] = dict(doc["surfaces"][surface])
+doc["surfaces"][surface]["default"] = "off"
+doc["surfaces"][surface]["promoted"] = False
+with open(target, "w", encoding="utf-8") as fh:
+    yaml.safe_dump(doc, fh, sort_keys=False)
+PY
+start_server a "$unpromoted_registry" "$clean_state" \
+  || cannot_assess "the console did not start with the unpromoted fixture registry"
 expect_status "GET /views/fleet.html (flag OFF)" 200 /views/fleet.html
 expect_body_has "GET /views/fleet.html (flag OFF)" "Fleet"
 expect_status "GET /api/fleet/snapshot (flag OFF)" 404 /api/fleet/snapshot
@@ -282,6 +304,22 @@ if stop_server "$server_pid"; then
   ok "phase A server stopped ($server_pid), no survivor"
 else
   bad "phase A server $server_pid survived the kill"
+fi
+server_pid=""
+
+# --- phase A2: the registry AS COMMITTED — the surface ships promoted ON,
+# read-controlled from the first request (#1043: the shipped go-live posture,
+# asserted directly against infra/feature-flags/registry.yaml, no fixture) ---
+echo "== phase A2: the committed registry (surfaces.$surface promoted on, #1027/#607) =="
+start_server a2 "$root/infra/feature-flags/registry.yaml" "$clean_state" \
+  || cannot_assess "the console did not start with the committed registry"
+expect_status "GET /api/fleet/snapshot (committed, no cookie)" 401 /api/fleet/snapshot
+expect_body_has "GET /api/fleet/snapshot (committed, no cookie)" "unauthorized"
+expect_status "GET /api/healthz (committed, promoted)" 200 /api/healthz
+if stop_server "$server_pid"; then
+  ok "phase A2 server stopped ($server_pid), no survivor"
+else
+  bad "phase A2 server $server_pid survived the kill"
 fi
 server_pid=""
 

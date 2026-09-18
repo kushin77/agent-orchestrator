@@ -1,6 +1,6 @@
 # FLEET-PARITY.md — dual-run parity harness (issue #714, EPIC #706 D6)
 
-EPIC #706 ports the fleet's three cron jobs off this laptop into a container on
+EPIC #706 ports the fleet's cron jobs off this laptop into a container on
 shared-services. Before any cutover, the container persona must be shown to
 agree with the host persona — measured, not asserted. `infra/fleet/parity.py`
 is that measurement.

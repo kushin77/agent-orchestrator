@@ -47,6 +47,7 @@
     {
       "name": "snapshot-refresh",
       "marker": "ao-fleet-snapshot-refresh",
+      "refreshes": "board-snapshot",
       "schedule": "*/10 * * * *",
       "command": "/usr/bin/python3 governance/dispatch/cli.py snapshot --from-github",
       "user": "",

@@ -4,7 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conftest import manifest, refusal_subjects
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_modules_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+manifest = _conftest.manifest
+refusal_subjects = _conftest.refusal_subjects
 
 from governance.modules import health, registry
 from governance.modules.model import (
@@ -80,7 +96,7 @@ def test_target_pending_is_never_shipped_and_names_its_blocker(built) -> None:
 
 
 def test_a_target_that_landed_unregistered_is_refused_by_name(consumer, hub, tmp_path) -> None:
-    from conftest import write_targets
+    write_targets = _conftest.write_targets
 
     targets = write_targets(
         tmp_path / "landed.json",
@@ -99,7 +115,7 @@ def test_a_target_that_landed_unregistered_is_refused_by_name(consumer, hub, tmp
 
 def test_a_target_that_landed_mandatory_is_derived_not_declared(consumer, make_hub, tmp_path) -> None:
     """The state flips when the hub lands it — target-pending is not sticky."""
-    from conftest import write_targets
+    write_targets = _conftest.write_targets
 
     modules = (
         {"dir": "alpha", "manifest": manifest("alpha", mandatory=True, assets=["alpha.json"])},
@@ -152,7 +168,7 @@ def test_registered_entries_resolve_their_consumer_assets(built) -> None:
 
 
 def test_findings_round_trip(built, consumer, hub, tmp_path) -> None:
-    from conftest import write_targets
+    write_targets = _conftest.write_targets
 
     targets = write_targets(
         tmp_path / "bad.json",
@@ -167,7 +183,7 @@ def test_findings_round_trip(built, consumer, hub, tmp_path) -> None:
 
 
 def test_a_target_carrying_no_id_is_refused(built, consumer, hub, tmp_path) -> None:
-    from conftest import write_targets
+    write_targets = _conftest.write_targets
 
     targets = write_targets(
         tmp_path / "noid.json",
@@ -219,7 +235,7 @@ def test_paths_are_recorded_relative_to_the_repo_when_possible(tmp_path, hub, ta
     """A relative hub root stays relative, so the document is checkout-portable."""
     import shutil
 
-    from conftest import write_repo
+    write_repo = _conftest.write_repo
 
     repo = write_repo(tmp_path / "portable")
     shutil.copytree(hub, repo / "vendor" / "CMR")

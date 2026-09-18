@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-15T04:28:44Z",
+  "generated_at": "2026-09-17T18:42:35Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -11,7 +11,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-01-28T21:54:20Z"
+      "closed_at": "2026-01-28T21:54:20Z",
+      "files": []
     },
     {
       "number": 2,
@@ -22,7 +23,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-01-28T21:54:19Z"
+      "closed_at": "2026-01-28T21:54:19Z",
+      "files": []
     },
     {
       "number": 3,
@@ -33,7 +35,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T23:48:46Z"
+      "closed_at": "2026-09-08T23:48:46Z",
+      "files": []
     },
     {
       "number": 4,
@@ -50,7 +53,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T23:48:45Z"
+      "closed_at": "2026-09-08T23:48:45Z",
+      "files": []
     },
     {
       "number": 5,
@@ -67,7 +71,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T17:42:07Z"
+      "closed_at": "2026-09-08T17:42:07Z",
+      "files": []
     },
     {
       "number": 6,
@@ -84,7 +89,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T17:54:47Z"
+      "closed_at": "2026-09-08T17:54:47Z",
+      "files": []
     },
     {
       "number": 7,
@@ -101,7 +107,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T17:48:39Z"
+      "closed_at": "2026-09-08T17:48:39Z",
+      "files": []
     },
     {
       "number": 8,
@@ -118,7 +125,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T17:37:50Z"
+      "closed_at": "2026-09-08T17:37:50Z",
+      "files": []
     },
     {
       "number": 9,
@@ -135,7 +143,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:10:58Z"
+      "closed_at": "2026-09-08T18:10:58Z",
+      "files": []
     },
     {
       "number": 10,
@@ -152,7 +161,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:27:56Z"
+      "closed_at": "2026-09-08T18:27:56Z",
+      "files": []
     },
     {
       "number": 11,
@@ -169,7 +179,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:28:40Z"
+      "closed_at": "2026-09-08T18:28:40Z",
+      "files": []
     },
     {
       "number": 12,
@@ -186,7 +197,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:10:20Z"
+      "closed_at": "2026-09-08T18:10:20Z",
+      "files": []
     },
     {
       "number": 13,
@@ -203,7 +215,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:10:28Z"
+      "closed_at": "2026-09-08T18:10:28Z",
+      "files": []
     },
     {
       "number": 14,
@@ -220,7 +233,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:33:42Z"
+      "closed_at": "2026-09-08T18:33:42Z",
+      "files": []
     },
     {
       "number": 15,
@@ -237,7 +251,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:50:50Z"
+      "closed_at": "2026-09-08T18:50:50Z",
+      "files": []
     },
     {
       "number": 16,
@@ -254,7 +269,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T19:16:32Z"
+      "closed_at": "2026-09-08T19:16:32Z",
+      "files": []
     },
     {
       "number": 17,
@@ -271,7 +287,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:49:12Z"
+      "closed_at": "2026-09-08T18:49:12Z",
+      "files": []
     },
     {
       "number": 18,
@@ -288,7 +305,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T19:06:23Z"
+      "closed_at": "2026-09-08T19:06:23Z",
+      "files": []
     },
     {
       "number": 19,
@@ -305,7 +323,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:51:18Z"
+      "closed_at": "2026-09-08T18:51:18Z",
+      "files": []
     },
     {
       "number": 20,
@@ -322,7 +341,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T19:09:07Z"
+      "closed_at": "2026-09-08T19:09:07Z",
+      "files": []
     },
     {
       "number": 21,
@@ -339,7 +359,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T19:35:18Z"
+      "closed_at": "2026-09-08T19:35:18Z",
+      "files": []
     },
     {
       "number": 22,
@@ -356,7 +377,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T19:29:09Z"
+      "closed_at": "2026-09-08T19:29:09Z",
+      "files": []
     },
     {
       "number": 23,
@@ -373,7 +395,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T19:55:53Z"
+      "closed_at": "2026-09-08T19:55:53Z",
+      "files": []
     },
     {
       "number": 24,
@@ -390,7 +413,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T20:05:14Z"
+      "closed_at": "2026-09-08T20:05:14Z",
+      "files": []
     },
     {
       "number": 25,
@@ -407,7 +431,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T19:33:22Z"
+      "closed_at": "2026-09-08T19:33:22Z",
+      "files": []
     },
     {
       "number": 26,
@@ -424,7 +449,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T20:22:06Z"
+      "closed_at": "2026-09-08T20:22:06Z",
+      "files": []
     },
     {
       "number": 27,
@@ -441,7 +467,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T20:22:25Z"
+      "closed_at": "2026-09-08T20:22:25Z",
+      "files": []
     },
     {
       "number": 28,
@@ -458,7 +485,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T20:23:58Z"
+      "closed_at": "2026-09-08T20:23:58Z",
+      "files": []
     },
     {
       "number": 29,
@@ -475,7 +503,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T21:01:35Z"
+      "closed_at": "2026-09-08T21:01:35Z",
+      "files": []
     },
     {
       "number": 30,
@@ -492,7 +521,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T20:48:37Z"
+      "closed_at": "2026-09-08T20:48:37Z",
+      "files": []
     },
     {
       "number": 31,
@@ -509,7 +539,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T21:20:01Z"
+      "closed_at": "2026-09-08T21:20:01Z",
+      "files": []
     },
     {
       "number": 32,
@@ -526,7 +557,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T21:25:03Z"
+      "closed_at": "2026-09-08T21:25:03Z",
+      "files": []
     },
     {
       "number": 33,
@@ -543,7 +575,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T21:40:45Z"
+      "closed_at": "2026-09-08T21:40:45Z",
+      "files": []
     },
     {
       "number": 34,
@@ -560,7 +593,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T21:59:49Z"
+      "closed_at": "2026-09-08T21:59:49Z",
+      "files": []
     },
     {
       "number": 35,
@@ -577,7 +611,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T22:03:17Z"
+      "closed_at": "2026-09-08T22:03:17Z",
+      "files": []
     },
     {
       "number": 36,
@@ -594,7 +629,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T21:54:25Z"
+      "closed_at": "2026-09-08T21:54:25Z",
+      "files": []
     },
     {
       "number": 37,
@@ -611,7 +647,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T22:18:18Z"
+      "closed_at": "2026-09-08T22:18:18Z",
+      "files": []
     },
     {
       "number": 38,
@@ -628,7 +665,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T22:26:36Z"
+      "closed_at": "2026-09-08T22:26:36Z",
+      "files": []
     },
     {
       "number": 39,
@@ -645,7 +683,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T22:47:46Z"
+      "closed_at": "2026-09-08T22:47:46Z",
+      "files": []
     },
     {
       "number": 40,
@@ -662,7 +701,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T22:43:37Z"
+      "closed_at": "2026-09-08T22:43:37Z",
+      "files": []
     },
     {
       "number": 41,
@@ -679,7 +719,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T22:49:27Z"
+      "closed_at": "2026-09-08T22:49:27Z",
+      "files": []
     },
     {
       "number": 42,
@@ -696,7 +737,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T23:02:03Z"
+      "closed_at": "2026-09-08T23:02:03Z",
+      "files": []
     },
     {
       "number": 43,
@@ -713,7 +755,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T23:03:29Z"
+      "closed_at": "2026-09-08T23:03:29Z",
+      "files": []
     },
     {
       "number": 44,
@@ -730,7 +773,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T23:24:50Z"
+      "closed_at": "2026-09-08T23:24:50Z",
+      "files": []
     },
     {
       "number": 45,
@@ -747,7 +791,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T23:22:20Z"
+      "closed_at": "2026-09-08T23:22:20Z",
+      "files": []
     },
     {
       "number": 46,
@@ -764,7 +809,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T23:46:12Z"
+      "closed_at": "2026-09-08T23:46:12Z",
+      "files": []
     },
     {
       "number": 47,
@@ -781,7 +827,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T22:59:56Z"
+      "closed_at": "2026-09-08T22:59:56Z",
+      "files": []
     },
     {
       "number": 48,
@@ -798,7 +845,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:26:58Z"
+      "closed_at": "2026-09-08T18:26:58Z",
+      "files": []
     },
     {
       "number": 49,
@@ -815,7 +863,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T18:07:19Z"
+      "closed_at": "2026-09-08T18:07:19Z",
+      "files": []
     },
     {
       "number": 58,
@@ -832,7 +881,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-08T20:42:58Z"
+      "closed_at": "2026-09-08T20:42:58Z",
+      "files": []
     },
     {
       "number": 98,
@@ -846,7 +896,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-09T00:12:24Z"
+      "closed_at": "2026-09-09T00:12:24Z",
+      "files": []
     },
     {
       "number": 101,
@@ -860,7 +911,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:05Z"
+      "closed_at": "2026-09-13T13:37:05Z",
+      "files": []
     },
     {
       "number": 102,
@@ -874,7 +926,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:07Z"
+      "closed_at": "2026-09-13T13:37:07Z",
+      "files": []
     },
     {
       "number": 103,
@@ -888,7 +941,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:09Z"
+      "closed_at": "2026-09-13T13:37:09Z",
+      "files": []
     },
     {
       "number": 104,
@@ -902,7 +956,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:11Z"
+      "closed_at": "2026-09-13T13:37:11Z",
+      "files": []
     },
     {
       "number": 105,
@@ -916,7 +971,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:13Z"
+      "closed_at": "2026-09-13T13:37:13Z",
+      "files": []
     },
     {
       "number": 106,
@@ -930,7 +986,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:15Z"
+      "closed_at": "2026-09-13T13:37:15Z",
+      "files": []
     },
     {
       "number": 107,
@@ -944,7 +1001,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:17Z"
+      "closed_at": "2026-09-13T13:37:17Z",
+      "files": []
     },
     {
       "number": 108,
@@ -958,7 +1016,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:20Z"
+      "closed_at": "2026-09-13T13:37:20Z",
+      "files": []
     },
     {
       "number": 109,
@@ -972,7 +1031,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:37:22Z"
+      "closed_at": "2026-09-13T13:37:22Z",
+      "files": []
     },
     {
       "number": 110,
@@ -986,7 +1046,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:13Z"
+      "closed_at": "2026-09-13T13:50:13Z",
+      "files": []
     },
     {
       "number": 111,
@@ -1000,7 +1061,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:15Z"
+      "closed_at": "2026-09-13T13:50:15Z",
+      "files": []
     },
     {
       "number": 112,
@@ -1014,7 +1076,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:17Z"
+      "closed_at": "2026-09-13T13:50:17Z",
+      "files": []
     },
     {
       "number": 113,
@@ -1028,7 +1091,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:19Z"
+      "closed_at": "2026-09-13T13:50:19Z",
+      "files": []
     },
     {
       "number": 114,
@@ -1042,7 +1106,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:21Z"
+      "closed_at": "2026-09-13T13:50:21Z",
+      "files": []
     },
     {
       "number": 115,
@@ -1056,7 +1121,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:23Z"
+      "closed_at": "2026-09-13T13:50:23Z",
+      "files": []
     },
     {
       "number": 116,
@@ -1070,7 +1136,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:25Z"
+      "closed_at": "2026-09-13T13:50:25Z",
+      "files": []
     },
     {
       "number": 117,
@@ -1084,7 +1151,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:27Z"
+      "closed_at": "2026-09-13T13:50:27Z",
+      "files": []
     },
     {
       "number": 118,
@@ -1098,7 +1166,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:29Z"
+      "closed_at": "2026-09-13T13:50:29Z",
+      "files": []
     },
     {
       "number": 119,
@@ -1112,7 +1181,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T13:50:31Z"
+      "closed_at": "2026-09-13T13:50:31Z",
+      "files": []
     },
     {
       "number": 120,
@@ -1123,7 +1193,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T15:44:30Z"
+      "closed_at": "2026-09-13T15:44:30Z",
+      "files": []
     },
     {
       "number": 121,
@@ -1134,7 +1205,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T15:44:32Z"
+      "closed_at": "2026-09-13T15:44:32Z",
+      "files": []
     },
     {
       "number": 122,
@@ -1145,7 +1217,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T15:49:23Z"
+      "closed_at": "2026-09-13T15:49:23Z",
+      "files": []
     },
     {
       "number": 123,
@@ -1156,7 +1229,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T15:49:26Z"
+      "closed_at": "2026-09-13T15:49:26Z",
+      "files": []
     },
     {
       "number": 124,
@@ -1167,7 +1241,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T15:49:28Z"
+      "closed_at": "2026-09-13T15:49:28Z",
+      "files": []
     },
     {
       "number": 125,
@@ -1180,7 +1255,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:58:26Z"
+      "closed_at": "2026-09-14T02:58:26Z",
+      "files": []
     },
     {
       "number": 126,
@@ -1193,7 +1269,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:09:21Z"
+      "closed_at": "2026-09-14T21:09:21Z",
+      "files": []
     },
     {
       "number": 127,
@@ -1206,7 +1283,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:09:23Z"
+      "closed_at": "2026-09-14T21:09:23Z",
+      "files": []
     },
     {
       "number": 128,
@@ -1219,7 +1297,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:09:24Z"
+      "closed_at": "2026-09-14T21:09:24Z",
+      "files": []
     },
     {
       "number": 129,
@@ -1232,7 +1311,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:35:41Z"
+      "closed_at": "2026-09-14T21:35:41Z",
+      "files": []
     },
     {
       "number": 130,
@@ -1243,7 +1323,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:55:31Z"
+      "closed_at": "2026-09-13T21:55:31Z",
+      "files": []
     },
     {
       "number": 131,
@@ -1256,33 +1337,46 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T22:20:48Z"
+      "closed_at": "2026-09-14T22:20:48Z",
+      "files": []
     },
     {
       "number": 132,
       "title": "CMR vendor compliance gap: shared-services",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
-        "epic:vendor-compliance"
+        "area:standards",
+        "class:enterprise",
+        "epic:vendor-compliance",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
       ],
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "",
+      "files": []
     },
     {
       "number": 133,
       "title": "CMR vendor compliance gap: googleworkspace",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
-        "epic:vendor-compliance"
+        "area:standards",
+        "class:enterprise",
+        "epic:vendor-compliance",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
       ],
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "",
+      "files": []
     },
     {
       "number": 134,
@@ -1295,7 +1389,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:17:29Z"
+      "closed_at": "2026-09-14T21:17:29Z",
+      "files": []
     },
     {
       "number": 135,
@@ -1308,7 +1403,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:45:35Z"
+      "closed_at": "2026-09-14T20:45:35Z",
+      "files": []
     },
     {
       "number": 136,
@@ -1321,7 +1417,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:09:26Z"
+      "closed_at": "2026-09-14T21:09:26Z",
+      "files": []
     },
     {
       "number": 137,
@@ -1334,7 +1431,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:32:46Z"
+      "closed_at": "2026-09-14T20:32:46Z",
+      "files": []
     },
     {
       "number": 138,
@@ -1352,7 +1450,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:11:18Z"
+      "closed_at": "2026-09-14T03:11:18Z",
+      "files": []
     },
     {
       "number": 139,
@@ -1369,7 +1468,8 @@
       "parent": 138,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T18:02:43Z"
+      "closed_at": "2026-09-13T18:02:43Z",
+      "files": []
     },
     {
       "number": 140,
@@ -1388,7 +1488,8 @@
         139
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T18:14:23Z"
+      "closed_at": "2026-09-13T18:14:23Z",
+      "files": []
     },
     {
       "number": 141,
@@ -1406,7 +1507,8 @@
       "parent": 138,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:18:48Z"
+      "closed_at": "2026-09-13T19:18:48Z",
+      "files": []
     },
     {
       "number": 142,
@@ -1425,7 +1527,8 @@
         140
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T20:33:55Z"
+      "closed_at": "2026-09-13T20:33:55Z",
+      "files": []
     },
     {
       "number": 143,
@@ -1445,7 +1548,8 @@
         142
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T20:53:02Z"
+      "closed_at": "2026-09-13T20:53:02Z",
+      "files": []
     },
     {
       "number": 144,
@@ -1463,7 +1567,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:35:22Z"
+      "closed_at": "2026-09-14T04:35:22Z",
+      "files": []
     },
     {
       "number": 145,
@@ -1481,7 +1586,8 @@
       "parent": 144,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:24:19Z"
+      "closed_at": "2026-09-14T04:24:19Z",
+      "files": []
     },
     {
       "number": 146,
@@ -1498,7 +1604,8 @@
       "parent": 144,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:56:28Z"
+      "closed_at": "2026-09-14T03:56:28Z",
+      "files": []
     },
     {
       "number": 147,
@@ -1516,7 +1623,8 @@
       "parent": 144,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:28:45Z"
+      "closed_at": "2026-09-14T03:28:45Z",
+      "files": []
     },
     {
       "number": 148,
@@ -1527,6 +1635,7 @@
         "area:fleet",
         "class:enterprise",
         "gdc:enterprise",
+        "incident",
         "priority:P1",
         "source:cannibalized",
         "type:feature"
@@ -1534,7 +1643,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T17:41:21Z"
+      "closed_at": "2026-09-13T17:41:21Z",
+      "files": []
     },
     {
       "number": 149,
@@ -1552,7 +1662,8 @@
       "parent": 144,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:56:32Z"
+      "closed_at": "2026-09-14T03:56:32Z",
+      "files": []
     },
     {
       "number": 150,
@@ -1570,7 +1681,8 @@
       "parent": 144,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:28:49Z"
+      "closed_at": "2026-09-14T03:28:49Z",
+      "files": []
     },
     {
       "number": 151,
@@ -1587,7 +1699,8 @@
       "parent": 144,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:28:52Z"
+      "closed_at": "2026-09-14T03:28:52Z",
+      "files": []
     },
     {
       "number": 152,
@@ -1605,7 +1718,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T17:36:29Z"
+      "closed_at": "2026-09-13T17:36:29Z",
+      "files": []
     },
     {
       "number": 154,
@@ -1623,7 +1737,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T17:38:50Z"
+      "closed_at": "2026-09-13T17:38:50Z",
+      "files": []
     },
     {
       "number": 157,
@@ -1633,6 +1748,7 @@
       "labels": [
         "area:board",
         "class:enterprise",
+        "incident",
         "phase:8-autonomous-ops",
         "pillar:governance",
         "priority:P1",
@@ -1641,12 +1757,13 @@
       "parent": 144,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T17:50:06Z"
+      "closed_at": "2026-09-13T17:50:06Z",
+      "files": []
     },
     {
       "number": 160,
       "title": "EPIC: Session Fleet Operating Model \u2014 Brain / Fleet Brain / Epic Subagent Fleet (e2e IT department)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:session-fleet",
@@ -1661,7 +1778,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T01:44:54Z",
+      "files": []
     },
     {
       "number": 161,
@@ -1679,7 +1797,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:19:52Z"
+      "closed_at": "2026-09-13T19:19:52Z",
+      "files": []
     },
     {
       "number": 162,
@@ -1697,7 +1816,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T18:08:14Z"
+      "closed_at": "2026-09-13T18:08:14Z",
+      "files": []
     },
     {
       "number": 163,
@@ -1715,7 +1835,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:39:55Z"
+      "closed_at": "2026-09-13T19:39:55Z",
+      "files": []
     },
     {
       "number": 164,
@@ -1734,7 +1855,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:21:29Z"
+      "closed_at": "2026-09-13T19:21:29Z",
+      "files": []
     },
     {
       "number": 165,
@@ -1753,7 +1875,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:22:30Z"
+      "closed_at": "2026-09-13T19:22:30Z",
+      "files": []
     },
     {
       "number": 166,
@@ -1771,7 +1894,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:46:39Z"
+      "closed_at": "2026-09-13T19:46:39Z",
+      "files": []
     },
     {
       "number": 167,
@@ -1789,7 +1913,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:53:29Z"
+      "closed_at": "2026-09-13T19:53:29Z",
+      "files": []
     },
     {
       "number": 170,
@@ -1806,7 +1931,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T01:08:09Z"
+      "closed_at": "2026-09-14T01:08:09Z",
+      "files": []
     },
     {
       "number": 171,
@@ -1826,7 +1952,8 @@
         162
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T18:14:12Z"
+      "closed_at": "2026-09-13T18:14:12Z",
+      "files": []
     },
     {
       "number": 174,
@@ -1844,7 +1971,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T19:51:56Z"
+      "closed_at": "2026-09-14T19:51:56Z",
+      "files": []
     },
     {
       "number": 175,
@@ -1864,7 +1992,8 @@
         171
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T18:24:57Z"
+      "closed_at": "2026-09-13T18:24:57Z",
+      "files": []
     },
     {
       "number": 178,
@@ -1885,7 +2014,8 @@
         171
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T18:41:19Z"
+      "closed_at": "2026-09-13T18:41:19Z",
+      "files": []
     },
     {
       "number": 180,
@@ -1903,7 +2033,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:54:55Z"
+      "closed_at": "2026-09-14T03:54:55Z",
+      "files": []
     },
     {
       "number": 181,
@@ -1924,7 +2055,8 @@
         180
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:01:17Z"
+      "closed_at": "2026-09-14T04:01:17Z",
+      "files": []
     },
     {
       "number": 184,
@@ -1944,7 +2076,8 @@
         175
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:08:57Z"
+      "closed_at": "2026-09-13T19:08:57Z",
+      "files": []
     },
     {
       "number": 186,
@@ -1964,7 +2097,8 @@
         175
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:15:07Z"
+      "closed_at": "2026-09-13T19:15:07Z",
+      "files": []
     },
     {
       "number": 190,
@@ -1984,7 +2118,8 @@
         186
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T19:26:47Z"
+      "closed_at": "2026-09-13T19:26:47Z",
+      "files": []
     },
     {
       "number": 218,
@@ -1997,7 +2132,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:58:02Z"
+      "closed_at": "2026-09-14T16:58:02Z",
+      "files": []
     },
     {
       "number": 219,
@@ -2010,7 +2146,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:38:07Z"
+      "closed_at": "2026-09-14T00:38:07Z",
+      "files": []
     },
     {
       "number": 220,
@@ -2023,7 +2160,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:25:02Z"
+      "closed_at": "2026-09-14T02:25:02Z",
+      "files": []
     },
     {
       "number": 232,
@@ -2034,7 +2172,11 @@
       "parent": 219,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:48:41Z"
+      "closed_at": "2026-09-13T21:48:41Z",
+      "files": [
+        "fleet/telemetry.py",
+        "fleet/tests/test_telemetry.py"
+      ]
     },
     {
       "number": 233,
@@ -2045,7 +2187,11 @@
       "parent": 219,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:08:15Z"
+      "closed_at": "2026-09-13T22:08:15Z",
+      "files": [
+        "fleet/terminal.py",
+        "fleet/tests/test_terminal_telemetry.py"
+      ]
     },
     {
       "number": 234,
@@ -2056,7 +2202,12 @@
       "parent": 219,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:37:43Z"
+      "closed_at": "2026-09-14T00:37:43Z",
+      "files": [
+        "fleet/summary.py",
+        ".gitignore",
+        "fleet/tests/test_summary.py"
+      ]
     },
     {
       "number": 237,
@@ -2067,7 +2218,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:05:26Z"
+      "closed_at": "2026-09-13T21:05:26Z",
+      "files": []
     },
     {
       "number": 239,
@@ -2078,7 +2230,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:24:53Z"
+      "closed_at": "2026-09-14T02:24:53Z",
+      "files": []
     },
     {
       "number": 240,
@@ -2089,12 +2242,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:24:52Z"
+      "closed_at": "2026-09-14T02:24:52Z",
+      "files": []
     },
     {
       "number": 241,
       "title": "Generated-cron reconciler (leaderboard pattern, later)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "epic:session-fleet"
@@ -2102,7 +2256,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T20:09:05Z",
+      "files": []
     },
     {
       "number": 242,
@@ -2113,7 +2268,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:09:41Z"
+      "closed_at": "2026-09-13T21:09:41Z",
+      "files": []
     },
     {
       "number": 244,
@@ -2124,7 +2280,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:38:11Z"
+      "closed_at": "2026-09-13T21:38:11Z",
+      "files": []
     },
     {
       "number": 245,
@@ -2135,7 +2292,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:27:21Z"
+      "closed_at": "2026-09-13T21:27:21Z",
+      "files": []
     },
     {
       "number": 248,
@@ -2146,7 +2304,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:32:22Z"
+      "closed_at": "2026-09-13T21:32:22Z",
+      "files": []
     },
     {
       "number": 249,
@@ -2157,7 +2316,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:32:24Z"
+      "closed_at": "2026-09-13T21:32:24Z",
+      "files": []
     },
     {
       "number": 251,
@@ -2168,7 +2328,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:45:15Z"
+      "closed_at": "2026-09-13T21:45:15Z",
+      "files": []
     },
     {
       "number": 253,
@@ -2182,7 +2343,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:04:54Z"
+      "closed_at": "2026-09-13T22:04:54Z",
+      "files": []
     },
     {
       "number": 254,
@@ -2196,7 +2358,8 @@
       "parent": 253,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:01:48Z"
+      "closed_at": "2026-09-13T22:01:48Z",
+      "files": []
     },
     {
       "number": 255,
@@ -2210,7 +2373,8 @@
       "parent": 253,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:53:01Z"
+      "closed_at": "2026-09-13T21:53:01Z",
+      "files": []
     },
     {
       "number": 256,
@@ -2224,7 +2388,8 @@
       "parent": 253,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:47:29Z"
+      "closed_at": "2026-09-13T21:47:29Z",
+      "files": []
     },
     {
       "number": 257,
@@ -2238,7 +2403,8 @@
       "parent": 253,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:47:57Z"
+      "closed_at": "2026-09-13T21:47:57Z",
+      "files": []
     },
     {
       "number": 258,
@@ -2252,7 +2418,8 @@
       "parent": 253,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:47:47Z"
+      "closed_at": "2026-09-13T21:47:47Z",
+      "files": []
     },
     {
       "number": 259,
@@ -2266,7 +2433,8 @@
       "parent": 253,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T21:54:13Z"
+      "closed_at": "2026-09-13T21:54:13Z",
+      "files": []
     },
     {
       "number": 263,
@@ -2284,7 +2452,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:01:04Z"
+      "closed_at": "2026-09-13T22:01:04Z",
+      "files": []
     },
     {
       "number": 265,
@@ -2295,7 +2464,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:05:02Z"
+      "closed_at": "2026-09-13T22:05:02Z",
+      "files": []
     },
     {
       "number": 269,
@@ -2312,7 +2482,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:27:37Z"
+      "closed_at": "2026-09-13T22:27:37Z",
+      "files": []
     },
     {
       "number": 271,
@@ -2326,7 +2497,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:40:39Z"
+      "closed_at": "2026-09-13T22:40:39Z",
+      "files": []
     },
     {
       "number": 272,
@@ -2340,7 +2512,8 @@
       "parent": 271,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:20:00Z"
+      "closed_at": "2026-09-13T22:20:00Z",
+      "files": []
     },
     {
       "number": 273,
@@ -2354,7 +2527,8 @@
       "parent": 271,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:35:55Z"
+      "closed_at": "2026-09-13T22:35:55Z",
+      "files": []
     },
     {
       "number": 274,
@@ -2368,7 +2542,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:05:03Z"
+      "closed_at": "2026-09-13T23:05:03Z",
+      "files": []
     },
     {
       "number": 275,
@@ -2382,7 +2557,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:05:03Z"
+      "closed_at": "2026-09-13T23:05:03Z",
+      "files": []
     },
     {
       "number": 276,
@@ -2396,7 +2572,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:35:02Z"
+      "closed_at": "2026-09-13T22:35:02Z",
+      "files": []
     },
     {
       "number": 277,
@@ -2410,7 +2587,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:35:02Z"
+      "closed_at": "2026-09-13T22:35:02Z",
+      "files": []
     },
     {
       "number": 278,
@@ -2424,7 +2602,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:05:04Z"
+      "closed_at": "2026-09-13T23:05:04Z",
+      "files": []
     },
     {
       "number": 279,
@@ -2438,7 +2617,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:47:27Z"
+      "closed_at": "2026-09-13T22:47:27Z",
+      "files": []
     },
     {
       "number": 280,
@@ -2452,7 +2632,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:12:16Z"
+      "closed_at": "2026-09-13T23:12:16Z",
+      "files": []
     },
     {
       "number": 281,
@@ -2466,7 +2647,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:47:27Z"
+      "closed_at": "2026-09-13T22:47:27Z",
+      "files": []
     },
     {
       "number": 284,
@@ -2482,7 +2664,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:17:11Z"
+      "closed_at": "2026-09-13T23:17:11Z",
+      "files": []
     },
     {
       "number": 285,
@@ -2498,7 +2681,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:47:27Z"
+      "closed_at": "2026-09-13T22:47:27Z",
+      "files": []
     },
     {
       "number": 286,
@@ -2514,12 +2698,13 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:36:24Z"
+      "closed_at": "2026-09-14T16:36:24Z",
+      "files": []
     },
     {
       "number": 287,
       "title": "lane audit accepts a ticket ref on the subject line, and real lanes are never audited",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -2531,7 +2716,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T20:25:53Z",
+      "files": []
     },
     {
       "number": 288,
@@ -2547,7 +2733,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T01:01:58Z"
+      "closed_at": "2026-09-14T01:01:58Z",
+      "files": []
     },
     {
       "number": 292,
@@ -2563,7 +2750,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:37:53Z"
+      "closed_at": "2026-09-13T22:37:53Z",
+      "files": []
     },
     {
       "number": 294,
@@ -2579,7 +2767,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:44:32Z"
+      "closed_at": "2026-09-13T22:44:32Z",
+      "files": []
     },
     {
       "number": 297,
@@ -2597,7 +2786,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T22:49:14Z"
+      "closed_at": "2026-09-13T22:49:14Z",
+      "files": []
     },
     {
       "number": 299,
@@ -2616,7 +2806,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:50:09Z"
+      "closed_at": "2026-09-13T23:50:09Z",
+      "files": []
     },
     {
       "number": 300,
@@ -2636,7 +2827,8 @@
         274
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:46:13Z"
+      "closed_at": "2026-09-13T23:46:13Z",
+      "files": []
     },
     {
       "number": 301,
@@ -2655,7 +2847,8 @@
       "parent": 299,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:46:13Z"
+      "closed_at": "2026-09-13T23:46:13Z",
+      "files": []
     },
     {
       "number": 302,
@@ -2674,7 +2867,8 @@
       "parent": 299,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:45:41Z"
+      "closed_at": "2026-09-13T23:45:41Z",
+      "files": []
     },
     {
       "number": 303,
@@ -2693,7 +2887,8 @@
       "parent": 299,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:01:21Z"
+      "closed_at": "2026-09-13T23:01:21Z",
+      "files": []
     },
     {
       "number": 304,
@@ -2711,7 +2906,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:22:13Z"
+      "closed_at": "2026-09-13T23:22:13Z",
+      "files": []
     },
     {
       "number": 309,
@@ -2724,7 +2920,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:56:37Z"
+      "closed_at": "2026-09-14T20:56:37Z",
+      "files": []
     },
     {
       "number": 310,
@@ -2735,7 +2932,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:52:11Z"
+      "closed_at": "2026-09-14T00:52:11Z",
+      "files": []
     },
     {
       "number": 311,
@@ -2746,7 +2944,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:46:11Z"
+      "closed_at": "2026-09-14T00:46:11Z",
+      "files": []
     },
     {
       "number": 312,
@@ -2757,7 +2956,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:34:34Z"
+      "closed_at": "2026-09-14T00:34:34Z",
+      "files": []
     },
     {
       "number": 313,
@@ -2771,7 +2971,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:18:41Z"
+      "closed_at": "2026-09-14T00:18:41Z",
+      "files": []
     },
     {
       "number": 315,
@@ -2785,7 +2986,8 @@
       "parent": 313,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:45:55Z"
+      "closed_at": "2026-09-13T23:45:55Z",
+      "files": []
     },
     {
       "number": 316,
@@ -2799,7 +3001,8 @@
       "parent": 313,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:18:39Z"
+      "closed_at": "2026-09-14T00:18:39Z",
+      "files": []
     },
     {
       "number": 317,
@@ -2818,7 +3021,8 @@
       "parent": 299,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-13T23:29:41Z"
+      "closed_at": "2026-09-13T23:29:41Z",
+      "files": []
     },
     {
       "number": 319,
@@ -2836,7 +3040,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:03:08Z"
+      "closed_at": "2026-09-14T03:03:08Z",
+      "files": []
     },
     {
       "number": 320,
@@ -2854,7 +3059,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:43:21Z"
+      "closed_at": "2026-09-14T02:43:21Z",
+      "files": []
     },
     {
       "number": 321,
@@ -2872,7 +3078,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:41:53Z"
+      "closed_at": "2026-09-14T00:41:53Z",
+      "files": []
     },
     {
       "number": 322,
@@ -2890,7 +3097,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:25:06Z"
+      "closed_at": "2026-09-14T02:25:06Z",
+      "files": []
     },
     {
       "number": 323,
@@ -2908,7 +3116,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:02:58Z"
+      "closed_at": "2026-09-14T03:02:58Z",
+      "files": []
     },
     {
       "number": 326,
@@ -2919,7 +3128,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:04:41Z"
+      "closed_at": "2026-09-14T00:04:41Z",
+      "files": []
     },
     {
       "number": 327,
@@ -2930,7 +3140,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:04:41Z"
+      "closed_at": "2026-09-14T00:04:41Z",
+      "files": []
     },
     {
       "number": 329,
@@ -2941,7 +3152,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:09:01Z"
+      "closed_at": "2026-09-14T17:09:01Z",
+      "files": []
     },
     {
       "number": 330,
@@ -2954,7 +3166,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:27:03Z"
+      "closed_at": "2026-09-14T00:27:03Z",
+      "files": []
     },
     {
       "number": 331,
@@ -2967,7 +3180,8 @@
       "parent": 323,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:24:57Z"
+      "closed_at": "2026-09-14T02:24:57Z",
+      "files": []
     },
     {
       "number": 332,
@@ -2982,7 +3196,8 @@
         331
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:43:25Z"
+      "closed_at": "2026-09-14T02:43:25Z",
+      "files": []
     },
     {
       "number": 333,
@@ -2997,7 +3212,8 @@
         331
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:31:24Z"
+      "closed_at": "2026-09-14T03:31:24Z",
+      "files": []
     },
     {
       "number": 334,
@@ -3008,7 +3224,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T00:26:43Z"
+      "closed_at": "2026-09-14T00:26:43Z",
+      "files": []
     },
     {
       "number": 337,
@@ -3019,7 +3236,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:09:15Z"
+      "closed_at": "2026-09-14T17:09:15Z",
+      "files": []
     },
     {
       "number": 338,
@@ -3033,7 +3251,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:11:06Z"
+      "closed_at": "2026-09-14T18:11:06Z",
+      "files": []
     },
     {
       "number": 339,
@@ -3047,7 +3266,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:11:24Z"
+      "closed_at": "2026-09-14T13:11:24Z",
+      "files": []
     },
     {
       "number": 340,
@@ -3061,7 +3281,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:33:38Z"
+      "closed_at": "2026-09-14T04:33:38Z",
+      "files": []
     },
     {
       "number": 341,
@@ -3075,7 +3296,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:19:33Z"
+      "closed_at": "2026-09-14T04:19:33Z",
+      "files": []
     },
     {
       "number": 342,
@@ -3089,7 +3311,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:19:35Z"
+      "closed_at": "2026-09-14T04:19:35Z",
+      "files": []
     },
     {
       "number": 343,
@@ -3103,7 +3326,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:00:35Z"
+      "closed_at": "2026-09-14T05:00:35Z",
+      "files": []
     },
     {
       "number": 344,
@@ -3117,7 +3341,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:59:59Z"
+      "closed_at": "2026-09-14T13:59:59Z",
+      "files": []
     },
     {
       "number": 345,
@@ -3131,7 +3356,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:19:37Z"
+      "closed_at": "2026-09-14T04:19:37Z",
+      "files": []
     },
     {
       "number": 346,
@@ -3145,7 +3371,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:03:09Z"
+      "closed_at": "2026-09-14T05:03:09Z",
+      "files": []
     },
     {
       "number": 347,
@@ -3159,7 +3386,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:19:35Z"
+      "closed_at": "2026-09-14T05:19:35Z",
+      "files": []
     },
     {
       "number": 348,
@@ -3173,7 +3401,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:43:30Z"
+      "closed_at": "2026-09-14T02:43:30Z",
+      "files": []
     },
     {
       "number": 349,
@@ -3187,7 +3416,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:37:36Z"
+      "closed_at": "2026-09-14T04:37:36Z",
+      "files": []
     },
     {
       "number": 350,
@@ -3201,7 +3431,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:56:57Z"
+      "closed_at": "2026-09-14T03:56:57Z",
+      "files": []
     },
     {
       "number": 351,
@@ -3215,7 +3446,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:05:19Z"
+      "closed_at": "2026-09-14T05:05:19Z",
+      "files": []
     },
     {
       "number": 358,
@@ -3230,7 +3462,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:47:45Z"
+      "closed_at": "2026-09-14T17:47:45Z",
+      "files": []
     },
     {
       "number": 359,
@@ -3243,7 +3476,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:34:16Z"
+      "closed_at": "2026-09-14T02:34:16Z",
+      "files": []
     },
     {
       "number": 360,
@@ -3256,7 +3490,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:45:22Z"
+      "closed_at": "2026-09-14T15:45:22Z",
+      "files": []
     },
     {
       "number": 361,
@@ -3267,7 +3502,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T01:28:44Z"
+      "closed_at": "2026-09-14T01:28:44Z",
+      "files": []
     },
     {
       "number": 363,
@@ -3278,7 +3514,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T01:38:37Z"
+      "closed_at": "2026-09-14T01:38:37Z",
+      "files": []
     },
     {
       "number": 365,
@@ -3289,12 +3526,13 @@
       "parent": 360,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:22:51Z"
+      "closed_at": "2026-09-14T18:22:51Z",
+      "files": []
     },
     {
       "number": 366,
       "title": "P0: Fleet crash-loop / code-drift DEADLOCK \u2014 watchdog never respawns a drifted crash-looping loop, and a crashed run re-dispatches its directive forever",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "epic:session-fleet"
@@ -3302,7 +3540,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T00:46:34Z",
+      "files": []
     },
     {
       "number": 367,
@@ -3315,7 +3554,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:48:49Z"
+      "closed_at": "2026-09-14T20:48:49Z",
+      "files": []
     },
     {
       "number": 368,
@@ -3333,7 +3573,8 @@
       "parent": 359,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:27:35Z"
+      "closed_at": "2026-09-14T02:27:35Z",
+      "files": []
     },
     {
       "number": 369,
@@ -3350,7 +3591,8 @@
       "parent": 359,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:31:55Z"
+      "closed_at": "2026-09-14T02:31:55Z",
+      "files": []
     },
     {
       "number": 370,
@@ -3368,7 +3610,8 @@
       "parent": 359,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:29:34Z"
+      "closed_at": "2026-09-14T02:29:34Z",
+      "files": []
     },
     {
       "number": 375,
@@ -3387,7 +3630,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:30:56Z"
+      "closed_at": "2026-09-14T02:30:56Z",
+      "files": []
     },
     {
       "number": 382,
@@ -3402,7 +3646,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T02:45:41Z"
+      "closed_at": "2026-09-14T02:45:41Z",
+      "files": []
     },
     {
       "number": 384,
@@ -3420,7 +3665,8 @@
       "parent": 138,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T03:08:11Z"
+      "closed_at": "2026-09-14T03:08:11Z",
+      "files": []
     },
     {
       "number": 388,
@@ -3438,7 +3684,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:04:10Z"
+      "closed_at": "2026-09-14T04:04:10Z",
+      "files": []
     },
     {
       "number": 399,
@@ -3457,7 +3704,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:11:03Z"
+      "closed_at": "2026-09-14T18:11:03Z",
+      "files": []
     },
     {
       "number": 400,
@@ -3477,7 +3725,8 @@
       "parent": 399,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:43:35Z"
+      "closed_at": "2026-09-14T04:43:35Z",
+      "files": []
     },
     {
       "number": 401,
@@ -3498,7 +3747,8 @@
         400
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T12:52:38Z"
+      "closed_at": "2026-09-14T12:52:38Z",
+      "files": []
     },
     {
       "number": 402,
@@ -3519,7 +3769,8 @@
         400
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:19:05Z"
+      "closed_at": "2026-09-14T05:19:05Z",
+      "files": []
     },
     {
       "number": 403,
@@ -3540,7 +3791,8 @@
         401
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:02:49Z"
+      "closed_at": "2026-09-14T14:02:49Z",
+      "files": []
     },
     {
       "number": 409,
@@ -3559,7 +3811,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:49:17Z"
+      "closed_at": "2026-09-14T14:49:17Z",
+      "files": []
     },
     {
       "number": 410,
@@ -3578,7 +3831,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:33:58Z"
+      "closed_at": "2026-09-14T14:33:58Z",
+      "files": []
     },
     {
       "number": 411,
@@ -3597,7 +3851,8 @@
       "parent": 409,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:11:19Z"
+      "closed_at": "2026-09-14T13:11:19Z",
+      "files": []
     },
     {
       "number": 412,
@@ -3618,7 +3873,8 @@
         411
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:38:25Z"
+      "closed_at": "2026-09-14T13:38:25Z",
+      "files": []
     },
     {
       "number": 413,
@@ -3640,7 +3896,8 @@
         412
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:58:40Z"
+      "closed_at": "2026-09-14T13:58:40Z",
+      "files": []
     },
     {
       "number": 414,
@@ -3661,7 +3918,8 @@
         400
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T12:52:32Z"
+      "closed_at": "2026-09-14T12:52:32Z",
+      "files": []
     },
     {
       "number": 415,
@@ -3683,7 +3941,8 @@
         401
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:06:08Z"
+      "closed_at": "2026-09-14T13:06:08Z",
+      "files": []
     },
     {
       "number": 416,
@@ -3704,7 +3963,8 @@
         400
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:20:29Z"
+      "closed_at": "2026-09-14T05:20:29Z",
+      "files": []
     },
     {
       "number": 417,
@@ -3725,7 +3985,8 @@
         400
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:20:34Z"
+      "closed_at": "2026-09-14T05:20:34Z",
+      "files": []
     },
     {
       "number": 418,
@@ -3747,7 +4008,8 @@
         403
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:18:04Z"
+      "closed_at": "2026-09-14T14:18:04Z",
+      "files": []
     },
     {
       "number": 419,
@@ -3768,7 +4030,8 @@
         400
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T05:20:39Z"
+      "closed_at": "2026-09-14T05:20:39Z",
+      "files": []
     },
     {
       "number": 420,
@@ -3799,7 +4062,8 @@
         419
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:18:12Z"
+      "closed_at": "2026-09-14T14:18:12Z",
+      "files": []
     },
     {
       "number": 422,
@@ -3818,7 +4082,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:25:56Z"
+      "closed_at": "2026-09-14T13:25:56Z",
+      "files": []
     },
     {
       "number": 423,
@@ -3837,7 +4102,8 @@
       "parent": 422,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:50:12Z"
+      "closed_at": "2026-09-14T04:50:12Z",
+      "files": []
     },
     {
       "number": 424,
@@ -3858,7 +4124,8 @@
         402
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:06:02Z"
+      "closed_at": "2026-09-14T13:06:02Z",
+      "files": []
     },
     {
       "number": 425,
@@ -3879,7 +4146,8 @@
         415
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:18:14Z"
+      "closed_at": "2026-09-14T13:18:14Z",
+      "files": []
     },
     {
       "number": 426,
@@ -3899,7 +4167,8 @@
       "parent": 422,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:53:47Z"
+      "closed_at": "2026-09-14T04:53:47Z",
+      "files": []
     },
     {
       "number": 427,
@@ -3918,7 +4187,8 @@
       "parent": 422,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:50:17Z"
+      "closed_at": "2026-09-14T04:50:17Z",
+      "files": []
     },
     {
       "number": 428,
@@ -3935,7 +4205,8 @@
       "parent": 338,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T04:40:12Z"
+      "closed_at": "2026-09-14T04:40:12Z",
+      "files": []
     },
     {
       "number": 445,
@@ -3956,7 +4227,8 @@
         423
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:09:22Z"
+      "closed_at": "2026-09-14T17:09:22Z",
+      "files": []
     },
     {
       "number": 447,
@@ -3977,7 +4249,8 @@
         445
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:12:47Z"
+      "closed_at": "2026-09-14T17:12:47Z",
+      "files": []
     },
     {
       "number": 448,
@@ -3996,7 +4269,8 @@
       "parent": 409,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:06:30Z"
+      "closed_at": "2026-09-14T13:06:30Z",
+      "files": []
     },
     {
       "number": 457,
@@ -4007,7 +4281,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:23:48Z"
+      "closed_at": "2026-09-14T13:23:48Z",
+      "files": []
     },
     {
       "number": 461,
@@ -4026,7 +4301,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:49:15Z"
+      "closed_at": "2026-09-14T14:49:15Z",
+      "files": []
     },
     {
       "number": 462,
@@ -4045,7 +4321,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:40:29Z"
+      "closed_at": "2026-09-14T15:40:29Z",
+      "files": []
     },
     {
       "number": 463,
@@ -4065,7 +4342,8 @@
       "parent": 461,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:59:02Z"
+      "closed_at": "2026-09-14T13:59:02Z",
+      "files": []
     },
     {
       "number": 464,
@@ -4084,7 +4362,8 @@
       "parent": 461,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T13:50:53Z"
+      "closed_at": "2026-09-14T13:50:53Z",
+      "files": []
     },
     {
       "number": 465,
@@ -4105,7 +4384,8 @@
         463
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:12:04Z"
+      "closed_at": "2026-09-14T14:12:04Z",
+      "files": []
     },
     {
       "number": 466,
@@ -4128,7 +4408,8 @@
         465
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:36:35Z"
+      "closed_at": "2026-09-14T14:36:35Z",
+      "files": []
     },
     {
       "number": 467,
@@ -4148,7 +4429,8 @@
       "parent": 462,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:07:33Z"
+      "closed_at": "2026-09-14T15:07:33Z",
+      "files": []
     },
     {
       "number": 468,
@@ -4169,7 +4451,8 @@
         467
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:21:16Z"
+      "closed_at": "2026-09-14T15:21:16Z",
+      "files": []
     },
     {
       "number": 469,
@@ -4190,7 +4473,8 @@
         467
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:21:19Z"
+      "closed_at": "2026-09-14T15:21:19Z",
+      "files": []
     },
     {
       "number": 472,
@@ -4208,7 +4492,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:44:13Z"
+      "closed_at": "2026-09-14T14:44:13Z",
+      "files": []
     },
     {
       "number": 473,
@@ -4226,7 +4511,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:40:32Z"
+      "closed_at": "2026-09-14T15:40:32Z",
+      "files": []
     },
     {
       "number": 474,
@@ -4245,7 +4531,8 @@
       "parent": 472,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:16:50Z"
+      "closed_at": "2026-09-14T14:16:50Z",
+      "files": []
     },
     {
       "number": 475,
@@ -4265,7 +4552,8 @@
         464
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:17:02Z"
+      "closed_at": "2026-09-14T14:17:02Z",
+      "files": []
     },
     {
       "number": 476,
@@ -4285,7 +4573,8 @@
         474
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:35:44Z"
+      "closed_at": "2026-09-14T14:35:44Z",
+      "files": []
     },
     {
       "number": 477,
@@ -4305,7 +4594,8 @@
         474
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:35:47Z"
+      "closed_at": "2026-09-14T14:35:47Z",
+      "files": []
     },
     {
       "number": 478,
@@ -4324,7 +4614,8 @@
       "parent": 473,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:07:37Z"
+      "closed_at": "2026-09-14T15:07:37Z",
+      "files": []
     },
     {
       "number": 479,
@@ -4344,7 +4635,8 @@
         478
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:21:23Z"
+      "closed_at": "2026-09-14T15:21:23Z",
+      "files": []
     },
     {
       "number": 480,
@@ -4364,7 +4656,8 @@
         478
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:21:27Z"
+      "closed_at": "2026-09-14T15:21:27Z",
+      "files": []
     },
     {
       "number": 481,
@@ -4387,7 +4680,8 @@
         477
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:41:32Z"
+      "closed_at": "2026-09-14T14:41:32Z",
+      "files": []
     },
     {
       "number": 488,
@@ -4405,7 +4699,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:54:42Z"
+      "closed_at": "2026-09-14T17:54:42Z",
+      "files": []
     },
     {
       "number": 494,
@@ -4423,7 +4718,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:26:29Z"
+      "closed_at": "2026-09-14T15:26:29Z",
+      "files": []
     },
     {
       "number": 495,
@@ -4442,7 +4738,8 @@
       "parent": 494,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T14:50:45Z"
+      "closed_at": "2026-09-14T14:50:45Z",
+      "files": []
     },
     {
       "number": 496,
@@ -4462,7 +4759,8 @@
         495
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:09:29Z"
+      "closed_at": "2026-09-14T15:09:29Z",
+      "files": []
     },
     {
       "number": 497,
@@ -4482,7 +4780,8 @@
         495
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:09:34Z"
+      "closed_at": "2026-09-14T15:09:34Z",
+      "files": []
     },
     {
       "number": 498,
@@ -4502,7 +4801,8 @@
         495
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:09:40Z"
+      "closed_at": "2026-09-14T15:09:40Z",
+      "files": []
     },
     {
       "number": 499,
@@ -4525,7 +4825,8 @@
         498
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:22:02Z"
+      "closed_at": "2026-09-14T15:22:02Z",
+      "files": []
     },
     {
       "number": 500,
@@ -4544,7 +4845,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:16:55Z"
+      "closed_at": "2026-09-14T17:16:55Z",
+      "files": []
     },
     {
       "number": 501,
@@ -4564,7 +4866,8 @@
       "parent": 500,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:20:22Z"
+      "closed_at": "2026-09-14T15:20:22Z",
+      "files": []
     },
     {
       "number": 502,
@@ -4585,7 +4888,8 @@
         501
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:25:03Z"
+      "closed_at": "2026-09-14T16:25:03Z",
+      "files": []
     },
     {
       "number": 503,
@@ -4606,7 +4910,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:00:38Z"
+      "closed_at": "2026-09-14T16:00:38Z",
+      "files": []
     },
     {
       "number": 504,
@@ -4627,7 +4932,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:20:26Z"
+      "closed_at": "2026-09-14T15:20:26Z",
+      "files": []
     },
     {
       "number": 505,
@@ -4648,7 +4954,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:20:31Z"
+      "closed_at": "2026-09-14T15:20:31Z",
+      "files": []
     },
     {
       "number": 506,
@@ -4658,6 +4965,7 @@
       "labels": [
         "class:elite",
         "gdc:enterprise",
+        "incident",
         "phase:5-observability-finops",
         "pillar:observability-finops",
         "priority:P2",
@@ -4669,7 +4977,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:20:35Z"
+      "closed_at": "2026-09-17T04:50:12Z",
+      "files": []
     },
     {
       "number": 507,
@@ -4690,7 +4999,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:20:39Z"
+      "closed_at": "2026-09-14T15:20:39Z",
+      "files": []
     },
     {
       "number": 508,
@@ -4711,7 +5021,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:20:42Z"
+      "closed_at": "2026-09-14T15:20:42Z",
+      "files": []
     },
     {
       "number": 509,
@@ -4732,7 +5043,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:20:46Z"
+      "closed_at": "2026-09-14T15:20:46Z",
+      "files": []
     },
     {
       "number": 511,
@@ -4754,7 +5066,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:31:36Z"
+      "closed_at": "2026-09-14T16:31:36Z",
+      "files": []
     },
     {
       "number": 512,
@@ -4776,7 +5089,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:20:20Z"
+      "closed_at": "2026-09-14T16:20:20Z",
+      "files": []
     },
     {
       "number": 513,
@@ -4798,7 +5112,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:03:48Z"
+      "closed_at": "2026-09-14T17:03:48Z",
+      "files": []
     },
     {
       "number": 514,
@@ -4820,7 +5135,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:50:01Z"
+      "closed_at": "2026-09-14T16:50:01Z",
+      "files": []
     },
     {
       "number": 515,
@@ -4842,7 +5158,8 @@
         502
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:38:11Z"
+      "closed_at": "2026-09-14T16:38:11Z",
+      "files": []
     },
     {
       "number": 516,
@@ -4861,7 +5178,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:01:16Z"
+      "closed_at": "2026-09-14T18:01:16Z",
+      "files": []
     },
     {
       "number": 517,
@@ -4880,7 +5198,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:47:30Z"
+      "closed_at": "2026-09-14T16:47:30Z",
+      "files": []
     },
     {
       "number": 522,
@@ -4891,7 +5210,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:30:50Z"
+      "closed_at": "2026-09-14T16:30:50Z",
+      "files": []
     },
     {
       "number": 524,
@@ -4908,7 +5228,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:58:10Z"
+      "closed_at": "2026-09-14T15:58:10Z",
+      "files": []
     },
     {
       "number": 525,
@@ -4925,7 +5246,8 @@
       "parent": 524,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:27:14Z"
+      "closed_at": "2026-09-14T15:27:14Z",
+      "files": []
     },
     {
       "number": 526,
@@ -4944,7 +5266,8 @@
         525
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:52:46Z"
+      "closed_at": "2026-09-14T15:52:46Z",
+      "files": []
     },
     {
       "number": 545,
@@ -4955,7 +5278,8 @@
       "parent": 462,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:35:56Z"
+      "closed_at": "2026-09-14T15:35:56Z",
+      "files": []
     },
     {
       "number": 546,
@@ -4966,7 +5290,8 @@
       "parent": 462,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:36:28Z"
+      "closed_at": "2026-09-14T15:36:28Z",
+      "files": []
     },
     {
       "number": 551,
@@ -4986,7 +5311,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:44:17Z"
+      "closed_at": "2026-09-14T20:44:17Z",
+      "files": []
     },
     {
       "number": 552,
@@ -5005,7 +5331,8 @@
       "parent": 551,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T15:56:17Z"
+      "closed_at": "2026-09-14T15:56:17Z",
+      "files": []
     },
     {
       "number": 553,
@@ -5026,7 +5353,8 @@
         552
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:33:04Z"
+      "closed_at": "2026-09-14T16:33:04Z",
+      "files": []
     },
     {
       "number": 554,
@@ -5048,7 +5376,8 @@
         553
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:07:26Z"
+      "closed_at": "2026-09-14T17:07:26Z",
+      "files": []
     },
     {
       "number": 555,
@@ -5069,7 +5398,8 @@
         554
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:52:33Z"
+      "closed_at": "2026-09-14T17:52:33Z",
+      "files": []
     },
     {
       "number": 556,
@@ -5091,7 +5421,8 @@
         555
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:25:38Z"
+      "closed_at": "2026-09-14T18:25:38Z",
+      "files": []
     },
     {
       "number": 557,
@@ -5112,7 +5443,8 @@
         553
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:07:20Z"
+      "closed_at": "2026-09-14T17:07:20Z",
+      "files": []
     },
     {
       "number": 558,
@@ -5134,7 +5466,8 @@
         557
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:42:27Z"
+      "closed_at": "2026-09-14T17:42:27Z",
+      "files": []
     },
     {
       "number": 559,
@@ -5160,7 +5493,8 @@
         557
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:32:15Z"
+      "closed_at": "2026-09-14T20:32:15Z",
+      "files": []
     },
     {
       "number": 563,
@@ -5181,7 +5515,8 @@
         552
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:07:32Z"
+      "closed_at": "2026-09-14T17:07:32Z",
+      "files": []
     },
     {
       "number": 565,
@@ -5202,7 +5537,8 @@
         563
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:25:45Z"
+      "closed_at": "2026-09-14T18:25:45Z",
+      "files": []
     },
     {
       "number": 566,
@@ -5226,7 +5562,8 @@
         565
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:23:22Z"
+      "closed_at": "2026-09-14T20:23:22Z",
+      "files": []
     },
     {
       "number": 567,
@@ -5243,7 +5580,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:07:54Z"
+      "closed_at": "2026-09-14T17:07:54Z",
+      "files": []
     },
     {
       "number": 568,
@@ -5254,7 +5592,8 @@
       "parent": 500,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T16:19:10Z"
+      "closed_at": "2026-09-14T16:19:10Z",
+      "files": []
     },
     {
       "number": 578,
@@ -5271,7 +5610,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:16:11Z"
+      "closed_at": "2026-09-14T17:16:11Z",
+      "files": []
     },
     {
       "number": 579,
@@ -5282,7 +5622,8 @@
       "parent": 500,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T17:10:22Z"
+      "closed_at": "2026-09-14T17:10:22Z",
+      "files": []
     },
     {
       "number": 590,
@@ -5301,7 +5642,8 @@
       "parent": 422,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:27:49Z"
+      "closed_at": "2026-09-14T18:27:49Z",
+      "files": []
     },
     {
       "number": 591,
@@ -5320,7 +5662,8 @@
       "parent": 590,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:13:55Z"
+      "closed_at": "2026-09-14T18:13:55Z",
+      "files": []
     },
     {
       "number": 592,
@@ -5339,7 +5682,8 @@
       "parent": 590,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T18:14:04Z"
+      "closed_at": "2026-09-14T18:14:04Z",
+      "files": []
     },
     {
       "number": 603,
@@ -5355,7 +5699,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:09:40Z"
+      "closed_at": "2026-09-14T20:09:40Z",
+      "files": []
     },
     {
       "number": 605,
@@ -5375,7 +5720,8 @@
       "parent": 269,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:00:16Z"
+      "closed_at": "2026-09-14T20:00:16Z",
+      "files": []
     },
     {
       "number": 606,
@@ -5391,12 +5737,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:03:17Z"
+      "closed_at": "2026-09-14T20:03:17Z",
+      "files": []
     },
     {
       "number": 607,
       "title": "EPIC: bring the developed fleet single-pane-of-glass + live surfaces to production at ai.purebliss.app",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5407,7 +5754,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T03:26:37Z",
+      "files": []
     },
     {
       "number": 608,
@@ -5418,7 +5766,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:50:24Z"
+      "closed_at": "2026-09-14T20:50:24Z",
+      "files": []
     },
     {
       "number": 609,
@@ -5429,7 +5778,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T19:56:56Z"
+      "closed_at": "2026-09-14T19:56:56Z",
+      "files": []
     },
     {
       "number": 612,
@@ -5440,7 +5790,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:39:51Z"
+      "closed_at": "2026-09-14T21:39:51Z",
+      "files": []
     },
     {
       "number": 613,
@@ -5456,7 +5807,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:04:36Z"
+      "closed_at": "2026-09-14T20:04:36Z",
+      "files": []
     },
     {
       "number": 614,
@@ -5467,12 +5819,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:50:29Z"
+      "closed_at": "2026-09-14T20:50:29Z",
+      "files": []
     },
     {
       "number": 616,
       "title": "EPIC: Git-ecosystem templates & governance \u2014 class/pattern/template/env/clobber/RCA/orphan gaps (issue #608)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5483,7 +5836,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T21:11:28Z",
+      "files": []
     },
     {
       "number": 617,
@@ -5499,7 +5853,8 @@
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:35:09Z"
+      "closed_at": "2026-09-14T20:35:09Z",
+      "files": []
     },
     {
       "number": 618,
@@ -5515,12 +5870,13 @@
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T20:41:13Z"
+      "closed_at": "2026-09-14T20:41:13Z",
+      "files": []
     },
     {
       "number": 619,
       "title": "RC-14: Owner-approved go-live run \u2014 phase 0 + phase 7 promotions",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5531,7 +5887,8 @@
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T19:16:27Z",
+      "files": []
     },
     {
       "number": 620,
@@ -5547,12 +5904,13 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:03:46Z"
+      "closed_at": "2026-09-15T03:03:46Z",
+      "files": []
     },
     {
       "number": 621,
       "title": "Shell-patterns doctrine + enforcement gate (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5563,7 +5921,8 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T12:46:27Z",
+      "files": []
     },
     {
       "number": 622,
@@ -5579,7 +5938,8 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:51:52Z"
+      "closed_at": "2026-09-15T01:51:52Z",
+      "files": []
     },
     {
       "number": 623,
@@ -5595,12 +5955,13 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:51:34Z"
+      "closed_at": "2026-09-15T01:51:34Z",
+      "files": []
     },
     {
       "number": 624,
       "title": "Git-config boilerplate: .gitattributes + commit.template bootstrap gate (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5611,7 +5972,8 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T20:42:21Z",
+      "files": []
     },
     {
       "number": 625,
@@ -5627,7 +5989,8 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T02:35:17Z"
+      "closed_at": "2026-09-15T02:35:17Z",
+      "files": []
     },
     {
       "number": 626,
@@ -5643,12 +6006,13 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:52:02Z"
+      "closed_at": "2026-09-15T01:52:02Z",
+      "files": []
     },
     {
       "number": 627,
       "title": "Canonical git/env variable registry doc (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5659,7 +6023,8 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T21:06:11Z",
+      "files": []
     },
     {
       "number": 628,
@@ -5675,12 +6040,13 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:23:25Z"
+      "closed_at": "2026-09-15T03:23:25Z",
+      "files": []
     },
     {
       "number": 629,
       "title": "Docs index gate: every tracked docs/*.md is indexed (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5691,12 +6057,13 @@
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T21:08:10Z",
+      "files": []
     },
     {
       "number": 630,
       "title": "Wire the git-ecosystem gates into make verify (EPIC #616)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -5711,7 +6078,8 @@
         625
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T21:11:14Z",
+      "files": []
     },
     {
       "number": 631,
@@ -5729,7 +6097,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:26:34Z"
+      "closed_at": "2026-09-15T01:26:34Z",
+      "files": []
     },
     {
       "number": 632,
@@ -5748,7 +6117,8 @@
       "parent": 631,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:27:16Z"
+      "closed_at": "2026-09-14T23:27:16Z",
+      "files": []
     },
     {
       "number": 633,
@@ -5769,7 +6139,8 @@
         632
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:37:51Z"
+      "closed_at": "2026-09-14T23:37:51Z",
+      "files": []
     },
     {
       "number": 634,
@@ -5788,7 +6159,8 @@
       "parent": 631,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:27:24Z"
+      "closed_at": "2026-09-14T23:27:24Z",
+      "files": []
     },
     {
       "number": 635,
@@ -5809,7 +6181,8 @@
         634
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:37:58Z"
+      "closed_at": "2026-09-14T23:37:58Z",
+      "files": []
     },
     {
       "number": 636,
@@ -5828,7 +6201,8 @@
       "parent": 631,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:27:31Z"
+      "closed_at": "2026-09-14T23:27:31Z",
+      "files": []
     },
     {
       "number": 637,
@@ -5850,7 +6224,8 @@
         633
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:56:10Z"
+      "closed_at": "2026-09-14T23:56:10Z",
+      "files": []
     },
     {
       "number": 638,
@@ -5871,7 +6246,8 @@
         632
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:38:05Z"
+      "closed_at": "2026-09-14T23:38:05Z",
+      "files": []
     },
     {
       "number": 639,
@@ -5893,7 +6269,8 @@
         636
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:38:13Z"
+      "closed_at": "2026-09-14T23:38:13Z",
+      "files": []
     },
     {
       "number": 640,
@@ -5914,7 +6291,8 @@
         639
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:56:18Z"
+      "closed_at": "2026-09-14T23:56:18Z",
+      "files": []
     },
     {
       "number": 641,
@@ -5935,7 +6313,8 @@
         639
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:56:26Z"
+      "closed_at": "2026-09-14T23:56:26Z",
+      "files": []
     },
     {
       "number": 642,
@@ -5958,7 +6337,8 @@
         640
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:03:04Z"
+      "closed_at": "2026-09-15T01:03:04Z",
+      "files": []
     },
     {
       "number": 643,
@@ -5980,7 +6360,8 @@
         639
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:56:34Z"
+      "closed_at": "2026-09-14T23:56:34Z",
+      "files": []
     },
     {
       "number": 644,
@@ -6002,12 +6383,13 @@
         642
       ],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:20:57Z"
+      "closed_at": "2026-09-15T01:20:57Z",
+      "files": []
     },
     {
       "number": 645,
       "title": "EPIC: ERP module \u2014 indexer-fed enterprise integration of the ERPNext feature surface (e2e-mandatory, ordered by #612)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6022,12 +6404,13 @@
       "parent": 4,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T15:30:56Z",
+      "files": []
     },
     {
       "number": 646,
       "title": "ERP-01: Module foundation \u2014 integrations/erp skeleton, manifest, indexer data contract",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6042,12 +6425,13 @@
       "parent": 645,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T19:56:37Z",
+      "files": []
     },
     {
       "number": 647,
       "title": "ERP-02: Core document model \u2014 ERPNext doctype surface as schemas + workflow data",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6062,12 +6446,13 @@
       "parent": 645,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T20:04:34Z",
+      "files": []
     },
     {
       "number": 648,
       "title": "ERP-03: Transactional spine \u2014 selling to stock to accounting closed loop",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6084,12 +6469,13 @@
         647
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T23:38:34Z",
+      "files": []
     },
     {
       "number": 649,
       "title": "ERP-04: Procurement + manufacturing \u2014 RFQ/PO/receipts, BOM, work orders",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6106,12 +6492,13 @@
         647
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T12:26:29Z",
+      "files": []
     },
     {
       "number": 650,
       "title": "ERP-05: CRM, projects, quality + support documents and flows",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6126,12 +6513,13 @@
       "parent": 645,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T08:50:52Z",
+      "files": []
     },
     {
       "number": 651,
       "title": "ERP-06: REST API + OpenAPI surface over the indexer-fed model",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6148,12 +6536,13 @@
         647
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T00:11:49Z",
+      "files": []
     },
     {
       "number": 652,
       "title": "ERP-07: Portal frontend integration \u2014 module surfaces behind the erp-module flag",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6170,12 +6559,13 @@
         651
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T13:34:59Z",
+      "files": []
     },
     {
       "number": 653,
       "title": "ERP-08: Tenant RBAC + guardrail scoping for ERP data",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6192,12 +6582,13 @@
         646
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T20:42:14Z",
+      "files": []
     },
     {
       "number": 654,
       "title": "ERP-09: FinOps metering + usage telemetry for ERP operations",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6214,12 +6605,13 @@
         647
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T23:22:05Z",
+      "files": []
     },
     {
       "number": 655,
       "title": "ERP-10: Enterprise e2e \u2014 cannibalized ERPNext e2e patterns, mandatory module stage",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:erp-module",
@@ -6238,16 +6630,18 @@
         653
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T14:54:53Z",
+      "files": []
     },
     {
       "number": 665,
       "title": "EPIC: ERPNext & DeepSeek FinOps \u2014 token-optimal subscription engine from CRM hook to ledger (operator mandate)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M32 - ERPNext & DeepSeek FinOps (ledger-faithful subscription engine)",
       "labels": [
         "area:erp-module",
         "class:elite",
+        "epic:erp-finops",
         "gdc:enterprise",
         "phase:5-observability-finops",
         "pillar:observability-finops",
@@ -6257,7 +6651,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "",
+      "files": []
     },
     {
       "number": 666,
@@ -6275,7 +6670,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:10:37Z"
+      "closed_at": "2026-09-14T21:10:37Z",
+      "files": []
     },
     {
       "number": 667,
@@ -6293,7 +6689,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:10:41Z"
+      "closed_at": "2026-09-14T21:10:41Z",
+      "files": []
     },
     {
       "number": 668,
@@ -6311,7 +6708,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:10:45Z"
+      "closed_at": "2026-09-14T21:10:45Z",
+      "files": []
     },
     {
       "number": 669,
@@ -6329,7 +6727,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:10:48Z"
+      "closed_at": "2026-09-14T21:10:48Z",
+      "files": []
     },
     {
       "number": 670,
@@ -6347,12 +6746,13 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:10:51Z"
+      "closed_at": "2026-09-14T21:10:51Z",
+      "files": []
     },
     {
       "number": 671,
       "title": "PF-6: CRM\u2192ERPNext webhook bridges (conversion events \u2192 accounting modules)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -6365,7 +6765,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T21:42:37Z",
+      "files": []
     },
     {
       "number": 672,
@@ -6383,7 +6784,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:10:55Z"
+      "closed_at": "2026-09-14T21:10:55Z",
+      "files": []
     },
     {
       "number": 673,
@@ -6401,7 +6803,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:10:58Z"
+      "closed_at": "2026-09-14T21:10:58Z",
+      "files": []
     },
     {
       "number": 674,
@@ -6419,12 +6822,13 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:11:02Z"
+      "closed_at": "2026-09-14T21:11:02Z",
+      "files": []
     },
     {
       "number": 675,
       "title": "PF-10: E2E sandbox simulation \u2014 sign-up \u2192 ERPNext billing \u2192 revenue recognition",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -6437,7 +6841,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T00:37:42Z",
+      "files": []
     },
     {
       "number": 676,
@@ -6455,7 +6860,8 @@
       "parent": 665,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:11:06Z"
+      "closed_at": "2026-09-14T21:11:06Z",
+      "files": []
     },
     {
       "number": 677,
@@ -6471,7 +6877,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:14:49Z"
+      "closed_at": "2026-09-14T21:14:49Z",
+      "files": []
     },
     {
       "number": 678,
@@ -6487,7 +6894,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:09:17Z"
+      "closed_at": "2026-09-14T21:09:17Z",
+      "files": []
     },
     {
       "number": 680,
@@ -6500,7 +6908,8 @@
       "parent": 129,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:33:11Z"
+      "closed_at": "2026-09-14T21:33:11Z",
+      "files": []
     },
     {
       "number": 690,
@@ -6518,7 +6927,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:21:37Z"
+      "closed_at": "2026-09-14T21:21:37Z",
+      "files": []
     },
     {
       "number": 691,
@@ -6534,12 +6944,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T21:26:23Z"
+      "closed_at": "2026-09-14T21:26:23Z",
+      "files": []
     },
     {
       "number": 692,
       "title": "A2A: terminal-loop refusal handling \u2014 self-heal snapshot, dead-letter terminal refusals, bounded backoff",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6551,7 +6962,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T00:01:13Z",
+      "files": []
     },
     {
       "number": 693,
@@ -6568,12 +6980,13 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T04:07:43Z"
+      "closed_at": "2026-09-15T04:07:43Z",
+      "files": []
     },
     {
       "number": 694,
       "title": "A2A: orphan-claim auto-reconcile \u2014 loop invokes reconcile sweep, not 'escalate pending'",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6587,7 +7000,8 @@
         304
       ],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T00:23:33Z",
+      "files": []
     },
     {
       "number": 695,
@@ -6604,12 +7018,13 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T04:01:03Z"
+      "closed_at": "2026-09-15T04:01:03Z",
+      "files": []
     },
     {
       "number": 696,
       "title": "EPIC: eliminate the cross-agent waiting bottleneck \u2014 contract-first, self-wiring, never-idle dispatch",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6622,7 +7037,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T03:46:16Z",
+      "files": []
     },
     {
       "number": 697,
@@ -6641,7 +7057,8 @@
       "parent": 696,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T22:44:26Z"
+      "closed_at": "2026-09-14T22:44:26Z",
+      "files": []
     },
     {
       "number": 698,
@@ -6660,12 +7077,13 @@
       "parent": 696,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T22:49:04Z"
+      "closed_at": "2026-09-14T22:49:04Z",
+      "files": []
     },
     {
       "number": 699,
       "title": "DG-3: Branch-stacking / speculative execution against upstream HEAD",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6679,7 +7097,8 @@
       "parent": 696,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T03:37:33Z",
+      "files": []
     },
     {
       "number": 700,
@@ -6698,7 +7117,8 @@
       "parent": 696,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T22:44:33Z"
+      "closed_at": "2026-09-14T22:44:33Z",
+      "files": []
     },
     {
       "number": 701,
@@ -6717,12 +7137,13 @@
       "parent": 696,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T22:44:41Z"
+      "closed_at": "2026-09-14T22:44:41Z",
+      "files": []
     },
     {
       "number": 702,
       "title": "DG-6: Finer-grained ownership + TTL reaping \u2014 stop a slow neighbor blocking the chain",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6736,7 +7157,8 @@
       "parent": 696,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T03:15:49Z",
+      "files": []
     },
     {
       "number": 703,
@@ -6753,7 +7175,8 @@
       "parent": 125,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T22:11:25Z"
+      "closed_at": "2026-09-14T22:11:25Z",
+      "files": []
     },
     {
       "number": 705,
@@ -6769,16 +7192,18 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T22:00:50Z"
+      "closed_at": "2026-09-14T22:00:50Z",
+      "files": []
     },
     {
       "number": 706,
       "title": "EPIC: Port the fleet's cron automation into a shared-services container (dev -> dual-run -> cutover)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
         "area:fleet",
         "class:elite",
+        "epic:cron-automation",
         "gdc:enterprise",
         "phase:8-autonomous-ops",
         "pillar:autonomous-ops",
@@ -6788,7 +7213,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "",
+      "files": []
     },
     {
       "number": 707,
@@ -6806,12 +7232,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T02:25:05Z"
+      "closed_at": "2026-09-15T02:25:05Z",
+      "files": []
     },
     {
       "number": 708,
       "title": "EPIC: Fleet runaway prevention & governance controls - A2A arbitration, gate admission, board triggers, infra-limit guards",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6824,12 +7251,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T05:04:36Z",
+      "files": []
     },
     {
       "number": 709,
       "title": "fleet-cron: container image + entrypoint (dev-first, builds locally) [D1]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6842,12 +7270,13 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T01:18:29Z",
+      "files": []
     },
     {
       "number": 710,
       "title": "fleet-cron: dev-first local run with jobs in dry-run [D2]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6860,12 +7289,13 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T13:24:33Z",
+      "files": []
     },
     {
       "number": 711,
       "title": "fleet-cron: state volumes + secrets wiring (flag-gated OFF) [D3]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6878,12 +7308,13 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T17:20:14Z",
+      "files": []
     },
     {
       "number": 712,
       "title": "fleet-cron: healthcheck + structured logging + restart policy [D4]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6896,12 +7327,13 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T19:52:47Z",
+      "files": []
     },
     {
       "number": 713,
       "title": "fleet-cron: single-writer lease (parity prerequisite) [D5]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6914,12 +7346,13 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T00:37:09Z",
+      "files": []
     },
     {
       "number": 714,
       "title": "fleet-cron: dual-run parity harness + evidence [D6]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6932,12 +7365,13 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T13:02:30Z",
+      "files": []
     },
     {
       "number": 715,
       "title": "fleet-cron: cutover runbook, rollback + decommission [D7]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -6950,7 +7384,8 @@
       "parent": 706,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T20:23:54Z",
+      "files": []
     },
     {
       "number": 716,
@@ -6968,7 +7403,8 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:29:10Z"
+      "closed_at": "2026-09-14T23:29:10Z",
+      "files": []
     },
     {
       "number": 717,
@@ -6986,7 +7422,8 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:37:07Z"
+      "closed_at": "2026-09-14T23:37:07Z",
+      "files": []
     },
     {
       "number": 718,
@@ -7004,7 +7441,8 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T02:14:14Z"
+      "closed_at": "2026-09-15T02:14:14Z",
+      "files": []
     },
     {
       "number": 719,
@@ -7022,7 +7460,8 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:56:11Z"
+      "closed_at": "2026-09-14T23:56:11Z",
+      "files": []
     },
     {
       "number": 720,
@@ -7040,7 +7479,8 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T00:10:08Z"
+      "closed_at": "2026-09-15T00:10:08Z",
+      "files": []
     },
     {
       "number": 721,
@@ -7058,7 +7498,8 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T00:09:30Z"
+      "closed_at": "2026-09-15T00:09:30Z",
+      "files": []
     },
     {
       "number": 722,
@@ -7076,7 +7517,8 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T00:16:16Z"
+      "closed_at": "2026-09-15T00:16:16Z",
+      "files": []
     },
     {
       "number": 723,
@@ -7094,12 +7536,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T00:53:31Z"
+      "closed_at": "2026-09-15T00:53:31Z",
+      "files": []
     },
     {
       "number": 724,
       "title": "gate admission control: one composite gate per worktree + box-wide cap [G2]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7112,12 +7555,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T20:27:55Z",
+      "files": []
     },
     {
       "number": 725,
       "title": "composite-gate coverage: an unwired check fails by name [G3]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7130,12 +7574,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T23:50:04Z",
+      "files": []
     },
     {
       "number": 726,
       "title": "A2A dispatch arbitration: prove issue -> epic -> lane ownership [G4]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7148,12 +7593,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T22:15:51Z",
+      "files": []
     },
     {
       "number": 727,
       "title": "board triggers: refresh-or-park on a stale snapshot [G5]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7166,12 +7612,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T21:36:29Z",
+      "files": []
     },
     {
       "number": 728,
       "title": "runaway + queue-liveness latching alarm [G6]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7184,12 +7631,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T00:38:22Z",
+      "files": []
     },
     {
       "number": 729,
       "title": "infra-limit guard + record the episode in the canonical ledger [G7]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7202,12 +7650,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T04:48:19Z",
+      "files": []
     },
     {
       "number": 730,
       "title": "portal go-live: supply the auth-gate env from Secret Manager (JWKS mirror + ROOT_ADMIN_EMAILS)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -7219,12 +7668,13 @@
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T11:58:59Z",
+      "files": []
     },
     {
       "number": 731,
       "title": "portal go-live: reconcile & cut ai.purebliss.app over (Cloudflare vs GCP)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -7236,12 +7686,13 @@
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T19:35:56Z",
+      "files": []
     },
     {
       "number": 732,
       "title": "portal: documented offline dev run (stopgap, NOT the production surface)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -7253,7 +7704,8 @@
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T18:08:57Z",
+      "files": []
     },
     {
       "number": 733,
@@ -7270,7 +7722,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:00:58Z"
+      "closed_at": "2026-09-14T23:00:58Z",
+      "files": []
     },
     {
       "number": 739,
@@ -7287,12 +7740,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:34:51Z"
+      "closed_at": "2026-09-14T23:34:51Z",
+      "files": []
     },
     {
       "number": 740,
       "title": "P0: 31 lanes hold 46 unpushed commits, and the epic fan-out produced 27 source-file collisions (GR-3 violated in bulk)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7304,7 +7758,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T05:04:14Z",
+      "files": []
     },
     {
       "number": 742,
@@ -7321,7 +7776,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-14T23:18:27Z"
+      "closed_at": "2026-09-14T23:18:27Z",
+      "files": []
     },
     {
       "number": 754,
@@ -7338,7 +7794,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:35:39Z"
+      "closed_at": "2026-09-15T01:35:39Z",
+      "files": []
     },
     {
       "number": 763,
@@ -7356,12 +7813,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T00:48:52Z"
+      "closed_at": "2026-09-15T00:48:52Z",
+      "files": []
     },
     {
       "number": 764,
       "title": "Autonomous landing: one code-native driver to push, PR, merge at green evidence, and close (no human step)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7374,12 +7832,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T23:10:54Z",
+      "files": []
     },
     {
       "number": 766,
       "title": "An AREA label ('area:incident-response') is used as an incident marker: 4/4 holders are work items, and the gate was red on master for a finding no lane could fix",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:lessons",
@@ -7391,7 +7850,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T00:02:55Z",
+      "files": []
     },
     {
       "number": 767,
@@ -7408,7 +7868,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T00:36:48Z"
+      "closed_at": "2026-09-15T00:36:48Z",
+      "files": []
     },
     {
       "number": 771,
@@ -7426,7 +7887,8 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:34:30Z"
+      "closed_at": "2026-09-15T01:34:30Z",
+      "files": []
     },
     {
       "number": 773,
@@ -7443,7 +7905,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:23:40Z"
+      "closed_at": "2026-09-15T01:23:40Z",
+      "files": []
     },
     {
       "number": 774,
@@ -7461,12 +7924,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:46:19Z"
+      "closed_at": "2026-09-15T01:46:19Z",
+      "files": []
     },
     {
       "number": 777,
       "title": "Rename the fleet's role vocabulary to enterprise terms (brain/sister/dumb-terminal -> a declared glossary) with a versioned contract migration",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7478,7 +7942,8 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T17:33:42Z",
+      "files": []
     },
     {
       "number": 778,
@@ -7495,12 +7960,13 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T01:42:40Z"
+      "closed_at": "2026-09-15T01:42:40Z",
+      "files": []
     },
     {
       "number": 780,
       "title": "The watchdog's stale-checkout remedy cannot bootstrap itself \u2014 the code that fast-forwards the checkout lives in the checkout",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7512,7 +7978,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T17:05:46Z",
+      "files": []
     },
     {
       "number": 785,
@@ -7523,12 +7990,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:01:44Z"
+      "closed_at": "2026-09-15T03:01:44Z",
+      "files": []
     },
     {
       "number": 786,
       "title": "Close-out: record-verification is permanently unsatisfiable once the lane is reclaimed, and nothing enforces the ordering",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7539,12 +8007,13 @@
       "parent": 707,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T18:00:14Z",
+      "files": []
     },
     {
       "number": 793,
       "title": "Governance is declared in governance/** but not enforced at spawn \u2014 local and fleet subagents obey different rules, and one lane ran 26 gates",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7556,7 +8025,8 @@
       "parent": 708,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T23:14:01Z",
+      "files": []
     },
     {
       "number": 794,
@@ -7574,12 +8044,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:49:21Z"
+      "closed_at": "2026-09-15T03:49:21Z",
+      "files": []
     },
     {
       "number": 796,
       "title": "`sent` is treated as `done`: a dispatched directive that dies suppresses its issue forever, and the brain idles with ready work",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7591,23 +8062,25 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T20:09:36Z",
+      "files": []
     },
     {
       "number": 797,
       "title": "rename the operator terminal surface to AgentConsole (human-facing name)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T20:10:40Z",
+      "files": []
     },
     {
       "number": 799,
       "title": "The fleet acceptance test FAILS: a fleet lane produces no work product and loops unbounded when one stage refuses",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7619,18 +8092,22 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-17T00:38:11Z",
+      "files": []
     },
     {
       "number": 800,
       "title": "EPIC: AgentConsole \u2014 the enterprise operator console product",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
-      "labels": [],
+      "labels": [
+        "incident"
+      ],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T08:54:11Z",
+      "files": []
     },
     {
       "number": 801,
@@ -7641,7 +8118,8 @@
       "parent": 800,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:39:51Z"
+      "closed_at": "2026-09-15T03:39:51Z",
+      "files": []
     },
     {
       "number": 802,
@@ -7652,15 +8130,19 @@
       "parent": 800,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:49:40Z"
+      "closed_at": "2026-09-15T03:49:40Z",
+      "files": []
     },
     {
       "number": 803,
       "title": "EPIC: Enterprise readiness \u2014 strong engineering, absent delivery controls (master unprotected, no required checks, GR-15 violated)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:fleet",
         "class:elite",
+        "epic:delivery-controls",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
         "priority:P1",
         "type:epic"
@@ -7668,12 +8150,13 @@
       "parent": 4,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "",
+      "files": []
     },
     {
       "number": 804,
       "title": "mktemp -d and the unfinished-marker scanner are mutually unsatisfiable (missing leading word boundary)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7684,7 +8167,8 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-16T00:00:59Z",
+      "files": []
     },
     {
       "number": 807,
@@ -7699,7 +8183,8 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:35:12Z"
+      "closed_at": "2026-09-15T03:35:12Z",
+      "files": []
     },
     {
       "number": 809,
@@ -7715,7 +8200,8 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:46:58Z"
+      "closed_at": "2026-09-15T03:46:58Z",
+      "files": []
     },
     {
       "number": 812,
@@ -7732,7 +8218,8 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T03:57:28Z"
+      "closed_at": "2026-09-15T03:57:28Z",
+      "files": []
     },
     {
       "number": 813,
@@ -7743,7 +8230,8 @@
       "parent": 800,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T04:16:04Z"
+      "closed_at": "2026-09-15T04:16:04Z",
+      "files": []
     },
     {
       "number": 816,
@@ -7759,12 +8247,13 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "2026-09-15T04:10:01Z"
+      "closed_at": "2026-09-15T04:10:01Z",
+      "files": []
     },
     {
       "number": 821,
       "title": "sent is not done: `channel.py consume` is inbox-only, so a brain-minted directive can never satisfy `consume-directive` (118 stranded)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -7775,7 +8264,2460 @@
       "parent": 160,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": ""
+      "closed_at": "2026-09-15T08:50:07Z",
+      "files": []
+    },
+    {
+      "number": 822,
+      "title": "AgentConsole: the epic's completion RCA (enterprise class requires one)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 800,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T08:53:46Z",
+      "files": []
+    },
+    {
+      "number": 830,
+      "title": "fix(fleet): the worktree reaper shipped for #516 and is scheduled nowhere \u2014 the pile rebuilt, and 302 branches have no reaper at all",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:19:07Z",
+      "files": []
+    },
+    {
+      "number": 832,
+      "title": "landed-history trailer block: reconcile the #826 squash commit (4e3d62da) and document the colon-less-keyword trap",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "gate",
+        "governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T20:46:06Z",
+      "files": []
+    },
+    {
+      "number": 834,
+      "title": "governance/lifecycle: the close-out wedges on three measured cases (directive with no inbox copy, a dead lane record, board state in the lane worktree)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "epic:session-fleet",
+        "process",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T16:41:34Z",
+      "files": []
+    },
+    {
+      "number": 835,
+      "title": "pr-contract: the landing path composes a trailer paragraph the rule refuses (a bare `Closes #<n>` line)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "epic:session-fleet",
+        "process",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T21:39:54Z",
+      "files": []
+    },
+    {
+      "number": 836,
+      "title": "The landed-trailer control's two remedies contradict: master is red on a landed commit whose trailer cannot be fixed",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T20:57:13Z",
+      "files": []
+    },
+    {
+      "number": 840,
+      "title": "close-out: a PARKED verification (admission rc 10/11) is reported as VERIFY_EVIDENCE_MISSING, with a remediation the cap makes unreachable",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T23:44:28Z",
+      "files": []
+    },
+    {
+      "number": 841,
+      "title": "P0: the fleet's executor cannot run \u2014 every subagent run dies on an unrecognized model, and nothing signals it",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T22:28:46Z",
+      "files": []
+    },
+    {
+      "number": 843,
+      "title": "Two checks in the gate of record report a FALSE RED under load (session-isolation, pytest-chat) \u2014 the same tree passes 6/6 when run directly",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T22:56:05Z",
+      "files": []
+    },
+    {
+      "number": 845,
+      "title": "medium: the runner hold flaps every cycle \u2014 the release predicate is resolvability, and the hold is also taken for capability [G5]",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-15T22:44:27Z",
+      "files": []
+    },
+    {
+      "number": 848,
+      "title": "check-gitignore is red for every lane that claims locally: .board/claims/ is runtime state .gitignore does not cover",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T18:44:33Z",
+      "files": []
+    },
+    {
+      "number": 852,
+      "title": "The same false-negative idiom (printf | grep -q under pipefail) remains in four other gate checks",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T00:08:42Z",
+      "files": []
+    },
+    {
+      "number": 854,
+      "title": "close-out: a transient gate PARK strands VERIFY_EVIDENCE_MISSING, because reclaim-lane then removes the only tree the evidence could come from",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T19:49:53Z",
+      "files": []
+    },
+    {
+      "number": 861,
+      "title": "A directive for an issue closed while it sits in sent has no retire path, and the loop still spends K attempts on it",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "pillar:autonomous-ops",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T01:10:38Z",
+      "files": []
+    },
+    {
+      "number": 865,
+      "title": "make verify is red on master since 7fb7923: three piped-`grep -q` sites the ratchet refuses by name (#852 follow-up)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T17:38:28Z",
+      "files": []
+    },
+    {
+      "number": 866,
+      "title": "fleet: check-verdict-contains is red on master \u2014 3 new containment sites block every lane's make verify",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T17:38:29Z",
+      "files": []
+    },
+    {
+      "number": 868,
+      "title": "A baseline ratchet reds the gate for every lane that branched before it (master red after #852)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T12:01:05Z",
+      "files": []
+    },
+    {
+      "number": 871,
+      "title": "check-isolation-landed produced a false red in the gate of record, and its own output disproves it (#852 idiom, fired)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T12:14:14Z",
+      "files": []
+    },
+    {
+      "number": 873,
+      "title": "EPIC: enterprise control coverage \u2014 every platform/SaaS spine rule (AO-GR-12\u202620) traceable to a control that can fail",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:16:55Z",
+      "files": []
+    },
+    {
+      "number": 874,
+      "title": "Enterprise control coverage: the Part B map, the Control: lines, and the gate that keeps them true",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "phase:7-control-plane",
+        "pillar:control-plane",
+        "type:task"
+      ],
+      "parent": 873,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T12:50:29Z",
+      "files": []
+    },
+    {
+      "number": 875,
+      "title": "AO-GR-15: the tenant-isolation integrity suite exists and no gate runs it",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "phase:6-identity-rbac",
+        "pillar:identity-rbac",
+        "type:task"
+      ],
+      "parent": 873,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T12:32:54Z",
+      "files": []
+    },
+    {
+      "number": 877,
+      "title": "Retire the measured shell-pattern gaps (SP-7 SP-8) and enforce them (EPIC #616, after #621)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "epic:git-governance",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 616,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 878,
+      "title": "EPIC: every surface to elite, zero-human operation, paperclip/hermes at the head",
+      "state": "OPEN",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "pillar:control-plane",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 880,
+      "title": "lane L1: Portal live surfaces (load all new)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:27:52Z",
+      "files": []
+    },
+    {
+      "number": 881,
+      "title": "lane L2: Portal env / Secret Manager",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:27:52Z",
+      "files": []
+    },
+    {
+      "number": 882,
+      "title": "lane L3: Atomic-commit gates",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:24:05Z",
+      "files": []
+    },
+    {
+      "number": 883,
+      "title": "lane L4: Class / pattern / template canon",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:24:24Z",
+      "files": []
+    },
+    {
+      "number": 884,
+      "title": "lane L5: IaC",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:27:52Z",
+      "files": []
+    },
+    {
+      "number": 885,
+      "title": "lane L6: Fleet reconcile / runaway",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T05:51:27Z",
+      "files": []
+    },
+    {
+      "number": 886,
+      "title": "lane L7: Telemetry",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:27:53Z",
+      "files": []
+    },
+    {
+      "number": 887,
+      "title": "lane L8: CMR intent & management",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:23:38Z",
+      "files": []
+    },
+    {
+      "number": 888,
+      "title": "lane L9: Paperclip activation & org management",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:23:46Z",
+      "files": []
+    },
+    {
+      "number": 889,
+      "title": "lane L10: Hermes head",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:model-gateway",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:24:11Z",
+      "files": []
+    },
+    {
+      "number": 890,
+      "title": "lane L11: Control coverage",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:27:53Z",
+      "files": []
+    },
+    {
+      "number": 891,
+      "title": "gates: 3 committed suites (162 passing tests) are run by no gate \u2014 and check-drift cannot see two of them",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T16:49:46Z",
+      "files": []
+    },
+    {
+      "number": 894,
+      "title": "task(gateway): claude-anthropic module parity with deepseek controls (child of #878)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:model-gateway",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T16:27:55Z",
+      "files": []
+    },
+    {
+      "number": 896,
+      "title": "AO-GR-13: the verification artifact carries no identity, so the auditor's independence is not observable on it",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 873,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T14:08:46Z",
+      "files": []
+    },
+    {
+      "number": 897,
+      "title": "fix(gates): the shell-pattern gate refuses a file that landed after it \u2014 master is red",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T13:39:54Z",
+      "files": []
+    },
+    {
+      "number": 900,
+      "title": "Terraform module for the fleet-cron container on shared-services, flag-gated OFF",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:iac",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T20:07:58Z",
+      "files": []
+    },
+    {
+      "number": 901,
+      "title": "Fold the worktree reaper (#830) into the fleet-cron container rung set",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:iac",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T01:00:25Z",
+      "files": []
+    },
+    {
+      "number": 902,
+      "title": "Cutover policy: drain local jobs, then freeze host crontab in favor of the remote pair",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:iac",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T20:23:55Z",
+      "files": []
+    },
+    {
+      "number": 914,
+      "title": "rollout: promoted stages cannot be persisted \u2014 validator requires every committed flag off (blocks #607)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:iac",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T15:29:23Z",
+      "files": []
+    },
+    {
+      "number": 917,
+      "title": "Session close-out governance: close every session, reconcile orphans, and make session identity visible to the sweeper",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 918,
+      "title": "session identity: GIT_COMMITTER_* is minted but absent from the spawn envelope",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T16:18:39Z",
+      "files": []
+    },
+    {
+      "number": 922,
+      "title": "Fleet acceptance test: the runnable parity instrument and a drop the loop cannot swallow (#799 delta)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:feature"
+      ],
+      "parent": 799,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T00:38:11Z",
+      "files": []
+    },
+    {
+      "number": 923,
+      "title": "The fleet's code prose still names retired roles (comments/docstrings), while the contract declares the new vocabulary",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "epic:session-fleet",
+        "type:task"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T01:38:46Z",
+      "files": []
+    },
+    {
+      "number": 928,
+      "title": "dispatch: enforce the owner's ordered queue \u2014 refuse out-of-order claims",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:58:19Z",
+      "files": []
+    },
+    {
+      "number": 931,
+      "title": "[bug] check-verdict-contains under-counts: four pipe-into-grep shapes escape its \"must never under-count\" anchor",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 933,
+      "title": "make gate is red on master: portal/tests/test_finops_reports.py::test_live_cost_budget_and_usage_per_agent_is_served (pre-existing)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T20:43:07Z",
+      "files": []
+    },
+    {
+      "number": 934,
+      "title": "A lane that follows the doctrine cannot pass make verify: the prescribed identity env defeats the isolation gates, and the mandated claim ledger is unignored (#848)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 160,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T18:44:33Z",
+      "files": []
+    },
+    {
+      "number": 935,
+      "title": "rollout: register surfaces.edge_cutover (deferred by #731 \u2014 surfaces.* rows + rollout registration)",
+      "state": "OPEN",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 731,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 936,
+      "title": "check-edge-cutover.sh deletes the terraform log that names its own failure cause",
+      "state": "OPEN",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 731,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 938,
+      "title": "check-secrets: the placeholder exemption never fires \u2014 RE_PLACE starts with a PCRE (?i) under grep -E",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T00:38:01Z",
+      "files": []
+    },
+    {
+      "number": 939,
+      "title": "fix(gates): fleet-cron-dev-run is red on origin/master, so make verify is red for every lane (#706 stack blocked)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T20:44:11Z",
+      "files": []
+    },
+    {
+      "number": 940,
+      "title": "fix(gates): fleet-cron-dev-run is red on origin/master, so make verify is red for every lane (#706 stack blocked)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T00:47:11Z",
+      "files": []
+    },
+    {
+      "number": 942,
+      "title": "integrations/hermes is missing while integrations/paperclip is held at faang \u2014 peer-integration class asymmetry",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T00:37:02Z",
+      "files": []
+    },
+    {
+      "number": 943,
+      "title": "check-module-registry and check-module-brief cannot assess on a default checkout (vendor/CMR uninitialised) and skip on every make verify",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T22:16:27Z",
+      "files": []
+    },
+    {
+      "number": 944,
+      "title": "no declared environment-variable surface, and infra/ is not a declared surface root",
+      "state": "OPEN",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "epic:git-governance",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 945,
+      "title": "no system/app (addon) structure here \u2014 declare the exemption and how the SPoG is mounted by the OS",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T22:41:51Z",
+      "files": []
+    },
+    {
+      "number": 946,
+      "title": "EPIC #607 residual: the owner-executed go-live (GCP + approval codes + run-half cutover)",
+      "state": "OPEN",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 948,
+      "title": "gate-lock: a zero-byte owner-less worktree lock blocks lifecycle reclaim while gate-lock reports the worktree free",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T00:34:45Z",
+      "files": []
+    },
+    {
+      "number": 949,
+      "title": "gap(module): repo root missing cmr-pin.yaml \u2014 no declared hub pin/admission record",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:53:43Z",
+      "files": []
+    },
+    {
+      "number": 950,
+      "title": "gap(hermes): no feature-flag registry entry for hermes (paperclip has one)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:model-gateway",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T00:37:52Z",
+      "files": []
+    },
+    {
+      "number": 951,
+      "title": "gap(module): no guardrail policy for paperclip or hermes agents",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:guardrails-security",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:58:49Z",
+      "files": []
+    },
+    {
+      "number": 952,
+      "title": "gap(hermes): no tenant/RBAC binding for hermes in identity/",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:identity-rbac",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:57:48Z",
+      "files": []
+    },
+    {
+      "number": 953,
+      "title": "gap(module): no rate card and no operator persona instructions for paperclip/hermes",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T20:40:56Z",
+      "files": []
+    },
+    {
+      "number": 954,
+      "title": "the go-live ladder cannot promote surfaces.fleet_projection \u2014 the SPoG the epic delivers is unreachable by the declared path",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T20:16:49Z",
+      "files": []
+    },
+    {
+      "number": 955,
+      "title": "e2e: the go-live delivery capstone \u2014 promotion \u2192 live state \u2192 a served SPoG (EPIC #607)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T20:19:40Z",
+      "files": []
+    },
+    {
+      "number": 956,
+      "title": "Landing driver: a gate PARK (rc 10/11/12) is refused as a red contract, so a green lane cannot land while the cap is full",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T00:30:41Z",
+      "files": []
+    },
+    {
+      "number": 966,
+      "title": "rollout-state declares flags no plan phase reaches, and check_rollout only enforces the reverse direction",
+      "state": "OPEN",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 967,
+      "title": "nothing projects a promotion's live state into the registry declaration the portal reads \u2014 the last manual step",
+      "state": "OPEN",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 968,
+      "title": "load_fleet_console() puts <repo>/fleet on sys.path, shadowing the telemetry package (latent ModuleNotFoundError)",
+      "state": "OPEN",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 971,
+      "title": "telemetry: 3 metering tests red on master \u2014 fixtures still price the retired claude-sonnet-4-5 id (#895 follow-up)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:10:57Z",
+      "files": []
+    },
+    {
+      "number": 973,
+      "title": "[lifecycle] LANE_NOT_RECLAIMED \u2014 #241",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 974,
+      "title": "master is red at 117d312: docs-lint, git-config, isolation-landed \u2014 all three attributed, none from the e2e wave",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T21:59:15Z",
+      "files": []
+    },
+    {
+      "number": 977,
+      "title": "fleet-cron: rungs acquire the single-writer lease before running (D5 wiring, after #713)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:07:24Z",
+      "files": []
+    },
+    {
+      "number": 978,
+      "title": "fleet-cron: watchdog honours the cutover freeze flag (D7 wiring, after #715)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:41:46Z",
+      "files": []
+    },
+    {
+      "number": 982,
+      "title": "check-isolation-landed is red on master: two squash-merges (#960, #976) landed without a ticket trailer",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T22:47:01Z",
+      "files": []
+    },
+    {
+      "number": 985,
+      "title": "isolation-landed red again: f7a7a12 (#976) landed without the trailing ticket trailer \u2014 record it in the baseline",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T22:07:06Z",
+      "files": []
+    },
+    {
+      "number": 988,
+      "title": "check-ungated-suites red: #976's integrations/erp/webhooks suite is committed but undeclared",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T22:28:48Z",
+      "files": []
+    },
+    {
+      "number": 990,
+      "title": "make verify red on master: integrations/erp/webhooks is an ungated suite (#976 regression)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 665,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T23:21:02Z",
+      "files": []
+    },
+    {
+      "number": 992,
+      "title": "[lifecycle] VERIFY_EVIDENCE_MISSING \u2014 #955",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 995,
+      "title": "erp-webhooks-bridge flag is not in the central registry \u2014 ships flag-gated OFF but is unpromotable",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 665,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:49:22Z",
+      "files": []
+    },
+    {
+      "number": 998,
+      "title": "landing path merges PRs without the trailing ticket trailer, so every trailer-less squash re-reds isolation-landed \u2014 enforce at merge, not after",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:50:15Z",
+      "files": []
+    },
+    {
+      "number": 999,
+      "title": "isolation-landed red: b85cae4 + b3d7144 (#946 lane) landed without the trailing trailer \u2014 record both",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-16T23:27:24Z",
+      "files": []
+    },
+    {
+      "number": 1001,
+      "title": "squash-merge keeps dropping ticket trailers \u2014 master red on check-isolation-landed for the third time today (#960/#976, then #996/#991)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:24:05Z",
+      "files": []
+    },
+    {
+      "number": 1003,
+      "title": "lifecycle close-out verifies the frozen lane head, so an already-merged item can owe VERIFY_EVIDENCE_MISSING forever (#955)",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1006,
+      "title": "check-verdict-contains is red on master again \u2014 2 new piped-grep sites (#961, #963) block every lane's make verify",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T05:12:00Z",
+      "files": []
+    },
+    {
+      "number": 1011,
+      "title": "master is red on docs-lint: 3 tracked docs are not indexed in docs/README.md (FLEET-CRON-PARITY, FLEET-LEASE, FLEET-PARITY)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:48:32Z",
+      "files": []
+    },
+    {
+      "number": 1013,
+      "title": "e2e: the capstone suite proves the platform and delivery journeys but nothing proves the conversational surface (EPIC #500 / M30)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:observability-finops",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:49:40Z",
+      "files": []
+    },
+    {
+      "number": 1014,
+      "title": "fleet/tests + governance/lifecycle/tests cannot be collected together (conftest module-identity collision), and the lifecycle CLI needs PYTHONPATH=fleet for a bare `import lease`",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T02:24:49Z",
+      "files": []
+    },
+    {
+      "number": 1017,
+      "title": "apply route renders only the workbook switches \u2014 wire the core service ladder (enable_web/portal/\u2026, web_image_tag, project_id) into apply.yaml",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:control-plane",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T02:56:41Z",
+      "files": []
+    },
+    {
+      "number": 1019,
+      "title": "e2e: prove the #665 FinOps loop's unproven links \u2014 the CRM\u2192ERPNext webhook bridge and cache-optimal inference \u2192 metered cost",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:erp-module",
+        "class:elite",
+        "gdc:enterprise",
+        "phase:5-observability-finops",
+        "pillar:observability-finops",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:49:44Z",
+      "files": []
+    },
+    {
+      "number": 1025,
+      "title": "the money path reads the live clock in 11 places behind 6 duplicate seams, and 63 test modules pin a date literal \u2014 so a green can expire with the calendar (#506)",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:observability-finops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1028,
+      "title": "institutionalize the #506 date bomb across RCA / pattern / class / template / system-app (learn it once, refuse it mechanically thereafter)",
+      "state": "OPEN",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
+      "labels": [
+        "area:lessons",
+        "class:enterprise",
+        "epic:git-governance",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1029,
+      "title": "futureproof the AgentConsole hosting: a binding gate + runbook + ledger RCA for the 'declared \u2260 exercised' class",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "incident",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 607,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T03:26:44Z",
+      "files": []
+    },
+    {
+      "number": 1033,
+      "title": "lessons: record the #506 date bomb as INC-0007 / RCA-0009 with its corrective actions and the open PP-1 suggestion (parent #1028)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:governance",
+        "type:task"
+      ],
+      "parent": 1028,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:52:14Z",
+      "files": []
+    },
+    {
+      "number": 1034,
+      "title": "the last four untracked master reds block every lane's landing \u2014 lifecycle-reclaim, gate-lock, fleet-jobs, fleet-cron-dev-run (clean-checkout measured)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:07:06Z",
+      "files": []
+    },
+    {
+      "number": 1039,
+      "title": "python: the #506 date bomb as PP-1 in a Python pattern canon, and the measured refusal of a static check (parent #1028)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T03:55:14Z",
+      "files": []
+    },
+    {
+      "number": 1042,
+      "title": "governance/*/tests share 10 duplicate test basenames \u2014 pytest cannot collect governance/ as one tree",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:07:13Z",
+      "files": []
+    },
+    {
+      "number": 1043,
+      "title": "the #607/#1027 SPoG promotion left three gates asserting the pre-go-live posture \u2014 operator-terminal, e2e and portal-offline-spog are red on master",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:48:33Z",
+      "files": []
+    },
+    {
+      "number": 1046,
+      "title": "console refuses the gate's tenant-agnostic os-session-token \u2014 ai.purebliss.app login loops (ERR_TOO_MANY_REDIRECTS)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:48:58Z",
+      "files": []
+    },
+    {
+      "number": 1048,
+      "title": "console sign-out loops: logout clears only the console token, not the gate session (ai.purebliss.app)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T04:48:58Z",
+      "files": []
+    },
+    {
+      "number": 1052,
+      "title": "governance(lessons): single RCA id authority + gate-asserted counts (RCA-0007/0008 double-booked)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T05:22:36Z",
+      "files": []
+    },
+    {
+      "number": 1053,
+      "title": "feat(scripts): pr-queue.sh \u2014 ordered serial squash-merge queue with offline gate",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T05:22:51Z",
+      "files": []
+    },
+    {
+      "number": 1054,
+      "title": "feat(pr-contract): declared + verified Gate-changing field in the PR template",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T05:22:44Z",
+      "files": []
+    },
+    {
+      "number": 1060,
+      "title": "template: ask the #506 clock invariant at filing time \u2014 fleet-task brief, PR template and the module-admission contract (parent #1028)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1028,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T06:16:33Z",
+      "files": []
+    },
+    {
+      "number": 1071,
+      "title": "fleet/gatelock.py cannot be imported as a package: a bare `import lease` kills the lifecycle close-out tool and reds check-github-lifecycle (25 violations)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:08:05Z",
+      "files": []
+    },
+    {
+      "number": 1072,
+      "title": "ADR-0028 step 1b: wire the gate-status poster into the landing driver so a real ao/gate-of-record status is observed (#803)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P1"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:17:45Z",
+      "files": []
+    },
+    {
+      "number": 1073,
+      "title": "CODEOWNERS per pillar + gate; retire the vestigial github-actions dependabot ecosystem (#803 row 12)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P1"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T13:17:52Z",
+      "files": []
+    },
+    {
+      "number": 1074,
+      "title": "Release plan: name the version the product commits to (v1.0.0) and the SemVer contract it promises (#803 P1-7)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P1"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:17:08Z",
+      "files": []
+    },
+    {
+      "number": 1077,
+      "title": "master red: the committed board snapshot is 2 days stale, so the ticket projection and every PMO view are red on a clean checkout",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1078,
+      "title": "master red: check-rbac-head-binding cannot collect the identity/rbac suite (ModuleNotFoundError: No module named 'rbac') while its own probe is green",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:19:01Z",
+      "files": []
+    },
+    {
+      "number": 1082,
+      "title": "check-portal-auth-env maps an INTERRUPTED pytest suite to FAIL, reporting a red it cannot evidence",
+      "state": "OPEN",
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1098,
+      "title": "fix(lifecycle): a squash-merged item can never record verification \u2014 the lane must equal the PR head the merge replaced",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:governance",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:21:26Z",
+      "files": []
+    },
+    {
+      "number": 1102,
+      "title": "gate: wire check-squash-message.sh into make verify and the fleet merge path (#1001 follow-up)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:autonomous-ops",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 878,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:34:45Z",
+      "files": []
+    },
+    {
+      "number": 1106,
+      "title": "verify red cluster A: gate-lock + lifecycle-reclaim fail with 'No module named fleet' from a detached worktree; git-config demands per-worktree identity (#803 flip precondition)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:53:22Z",
+      "files": []
+    },
+    {
+      "number": 1107,
+      "title": "verify red cluster B: ticket projection refuses (INC-0007 \u2192 #1029 unresolved) and takes pmo-rollup + lessons-sync + cross-repo-lessons red (#803 flip precondition)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T14:53:19Z",
+      "files": []
+    },
+    {
+      "number": 1108,
+      "title": "verify red cluster C: fleet-jobs probes, fleet-cron-dev-run compose health, .fleet lease files not gitignored (#803 flip precondition)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:32:39Z",
+      "files": []
+    },
+    {
+      "number": 1109,
+      "title": "gate-lock: a holder reaps its own leftover on exit; the watchdog sweeps only its own worktree (RCA 2026-09-17 fix #3)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:07:09Z",
+      "files": []
+    },
+    {
+      "number": 1113,
+      "title": "check-dispatch-queue: 19 closed issues still queued, exposed by a fresh board snapshot (#1107 follow-up)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:17:40Z",
+      "files": []
+    },
+    {
+      "number": 1114,
+      "title": "dispatch: refuse to open new lanes while master is red, except lanes that fix master (RCA 2026-09-17 fix #5)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:12:55Z",
+      "files": []
+    },
+    {
+      "number": 1123,
+      "title": "master red: check-cross-repo-lessons \u2014 19 hub ledger records have no counterpart declaration and are not listed local-only",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:lessons",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1130,
+      "title": "verify red cluster D: landing driver's composed PR body lacks the Gate-changing line (check-landing + check-pr-contract), and 4 landed squash commits lack ticket trailers (check-isolation-landed) (#803 flip precondition)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:22:27Z",
+      "files": []
+    },
+    {
+      "number": 1136,
+      "title": "wire write-master-attestation into scripts/verify.sh once #1127 lands (follow-up to #1114)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1138,
+      "title": "Declare the repo merge-message policy as code (squash = PR title + PR body) with a read-back gate; baseline the 5 trailer-less squash commits (#803)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:32:42Z",
+      "files": []
+    },
+    {
+      "number": 1145,
+      "title": "the merge queue proves the message but never the work: merging #1118 made master red on verdict-contains, plus 4 measured pr-queue.sh defects",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1146,
+      "title": "master red: check-gitignore \u2014 .verify/attestation.schema.json is tracked under a root the gate declares wholly generated",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1147,
+      "title": "check-pr-contract --pr uses a two-dot range, so it judges a lane by master's files and refuses correct PRs (every lane cut from an older master)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1148,
+      "title": "P1: `/healthz` job-set check cannot fail \u2014 `EXPECTED_JOBS = 3` is a stale literal, so a document missing the 4th enabled rung (`ao-fleet-reap`) still answers 200",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:cron-automation",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1149,
+      "title": "lifecycle: a merged item's evidence subject must be the tree that landed, not the branch tip that advanced after the squash",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1152,
+      "title": "check-verdict-contains is red on master again \u2014 3 piped-grep sites from #1118 (#1145)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1145,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1153,
+      "title": "check-verdict-contains: fix or record scripts/prune-worktrees.sh + check-prune-worktrees.sh (piped-grep idiom, 2+1 sites)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1154,
+      "title": "master red: check-isolation-landed \u2014 origin/master's own tip d3eb77f carries no trailer and is not recorded in governance/isolation/landed-baseline.json",
+      "state": "CLOSED",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T17:41:56Z",
+      "files": []
+    },
+    {
+      "number": 1156,
+      "title": "Measured E2E gap analysis: system-app + app-model + governance (declared to implemented to gated to exercised)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T18:28:51Z",
+      "files": []
+    },
+    {
+      "number": 1157,
+      "title": "P1: infra/fleet/dev_run.py writes the whole process environment \u2014 including live API keys \u2014 into .verify/dev-run/decision.json",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1158,
+      "title": "PMO: board metadata conformance pass \u2014 labels, milestones, epic membership, chain edges (open board)",
+      "state": "CLOSED",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T18:13:58Z",
+      "files": []
+    },
+    {
+      "number": 1159,
+      "title": "fix(fleet): the reaper's \"in use\" test cannot see a peer session's live worktree \u2014 10 live trees classified removable",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1160,
+      "title": "the filing default derives area:governance, which does not exist \u2014 every defaulted filing is refused by GitHub while filing-check stays green",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1161,
+      "title": "check-system-app-declaration.sh observes category:\"system\" only in .json/.yaml/.yml, so its \"the tree matches the claim\" line cannot see a .ts declaration",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1162,
+      "title": "the terminal cockpit client (control-plane/cockpit/) is run by make cockpit and gated by nothing; its suite is undeclared",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1163,
+      "title": "this repo's own module.json is never validated against cmr.module/v1, though the admission contract requires it of every child",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1164,
+      "title": "governance/dupcheck/check-duplicates.sh implements the ADR-0010 no-fork rule and is invoked by no gate \u2014 the rule is advisory",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1168,
+      "title": "governance/dispatch: frontier() names an epic-closed issue that claim refuses (measured: status says #132, eligible refuses it)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1170,
+      "title": "gate-lock: 160 zero-byte leftover worktree locks accumulate; doctor sits permanently at rc 13 and no safe prune verb exists",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1172,
+      "title": "master red (recurrence): check-isolation-landed refuses origin/master again \u2014 0aa836c (#1171) landed direct with no trailer, 3 min after #1169 cleared the previous one",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T17:57:18Z",
+      "files": []
+    },
+    {
+      "number": 1174,
+      "title": "bootstrap .fleet/master-attestation.json once the box gate cap frees (follow-up to #1114/#1119/#1136)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1175,
+      "title": "e2e tagging: one declared tag authority, tag -> gate derivation, and a gate that can fail",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1176,
+      "title": "check-paperclip-routines is CANNOT-ASSESS on master (rc 2) and is skipped by the composite: ao-fleet-reap is scheduled but no routine claims it",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1178,
+      "title": "Lessons ledger -> board: make every record's linkage real, and provable on real data",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:lessons",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1179,
+      "title": "governance/dispatch: the entry point is dead by construction \u2014 no producer for the board liveness contract, silent epic-closed dead-end, and frontier() naming work claim refuses",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
     }
   ]
 }

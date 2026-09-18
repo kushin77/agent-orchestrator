@@ -8,11 +8,12 @@
 name: control-plane-apply
 disabled: true
 description: Flag-gated terraform apply as the deployer SA (only apply route).
-github:
-  owner: kushin77
-  name: agent-orchestrator
+repositoryEventConfig:
   push:
     branch: ^master$
+  repository: projects/purebliss-ghl/locations/us-central1/connections/capital-gh/repositories/agent-orchestrator
+  repositoryType: GITHUB
+serviceAccount: projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com
 filename: infra/cloudbuild/apply.yaml
 # The FULL service ladder (core services + paperclip/chat surfaces +
 # workbook/ERP switches), the promoted web image tag and the project id are
@@ -38,4 +39,11 @@ substitutions:
   _ENABLE_SANDBOX_RUNTIME: "false"
   _ENABLE_ERP_MODULE: "false"
   _WEB_IMAGE_TAG: "0000000000000000000000000000000000000000"
-  _PROJECT_ID: "false"
+  _PROJECT_ID: "purebliss-ghl"
+  _ENABLE_DEPLOYER: "true"
+  _DEPLOYER_ROLE_CLASS: "minimal"
+  # One-time bootstrap identity: the deployer SA doesn't exist yet, so the
+  # first apply (the one that creates it) must run as an already-privileged
+  # account. Cut over to control-plane-deployer@purebliss-ghl... in a
+  # follow-up PR once that first apply has run.
+  _DEPLOYER_SA: "projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com"

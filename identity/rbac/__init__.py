@@ -1,9 +1,18 @@
 """Agent Org RBAC / role model - the platform's authorization contract (issue #12).
 
-Self-contained package under ``identity/rbac/``. Importable as ``rbac`` when
-``identity/`` is on ``sys.path`` (the tests arrange this in ``tests/conftest.py``)
-and as ``identity.rbac`` once a later identity-phase lane adds an
-``identity/__init__.py``.
+Self-contained package under ``identity/rbac/``. Intra-package imports are
+**relative** (issue #1078), so the package is importable under either of the two
+names this repo uses for it - ``rbac``, with ``identity/`` on ``sys.path`` (what
+``tests/conftest.py`` and ``scripts/check-rbac-head-binding.sh`` arrange), and
+``identity.rbac`` - and neither form needs a caller to have mutated ``sys.path``
+first.
+
+The earlier absolute ``from rbac.model import ...`` made the package importable
+*only* when ``identity/`` happened to be on ``sys.path``. An importer that
+reached the package by its qualified name - pytest's ``--import-mode=importlib``,
+which imports a conftest's parent package chain *before* the conftest body (and
+so before its ``sys.path`` bootstrap) runs - therefore executed this module
+first and died with ``ModuleNotFoundError: No module named 'rbac'``.
 
 Public surface
 --------------
@@ -31,7 +40,7 @@ Public surface
   ``is_persona_bound``, opt-in only per tenant (GR-28: no default binding).
 """
 
-from rbac.model import (
+from .model import (
     DEFAULT_ROLE_ADMIN_PERMISSION,
     PERMISSIONS,
     ROLE_LEVEL_ORG,
@@ -56,21 +65,21 @@ from rbac.model import (
     split_permission,
 )
 
-from rbac.resolve import (
+from .resolve import (
     ScopeResolution,
     authorize,
     effective_permissions,
     resolve_scope,
 )
 
-from rbac.bindings import (
+from .bindings import (
     LastAdministratorError,
     UnknownRoleError,
     grant_role,
     revoke_role,
 )
 
-from rbac.guard import (
+from .guard import (
     AUTHORIZATION_DENIED_EVENT,
     SCOPE_DENIAL_PERMISSION,
     Decision,
@@ -84,8 +93,8 @@ from rbac.guard import (
     start_agent_session,
 )
 
-from rbac.store import InMemoryStore
-from rbac.presets import (
+from .store import InMemoryStore
+from .presets import (
     BUILTIN_TENANT_TYPES,
     CSUITE_PACK_KEY,
     RolePack,
@@ -99,7 +108,7 @@ from rbac.presets import (
     seed_org,
 )
 
-from rbac.boundaries import (
+from .boundaries import (
     BOUNDARY_BUDGET,
     BOUNDARY_CAPABILITIES,
     BOUNDARY_LANES,
@@ -118,7 +127,7 @@ from rbac.boundaries import (
     load_csuite_boundaries,
 )
 
-from rbac.skills import (
+from .skills import (
     PLATFORM_ORG,
     VISIBILITIES,
     VISIBILITY_PLATFORM,
@@ -134,7 +143,7 @@ from rbac.skills import (
     partition_by_visibility,
 )
 
-from rbac.head_bindings import (
+from .head_bindings import (
     FORBIDDEN_PERMISSIONS,
     HEAD_AGENTS_PACK_KEY,
     HERMES_PERSONA_ID,

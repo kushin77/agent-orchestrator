@@ -1,0 +1,221 @@
+# governance/tagging/rules.yaml — tag set -> required gates (issue #1175).
+#
+# The taxonomy says what a tag may BE. This file says what a tag IMPLIES: given a
+# tag set, which gates must pass. That derivation is the end-to-end half — it is
+# what turns classification into the CI/CD, PR, SDLC and FinOps consequences of
+# describing work a particular way.
+#
+# THE GATE NAMES ARE NOT PROSE. Every gate below is written in one of two
+# resolvable forms and `scripts/check-tagging.sh` REFUSES a rule that names
+# something that does not exist:
+#
+#   make:<target>   resolves against the Makefile's target list
+#   check:<name>    resolves against scripts/check-<name>.sh (the checks
+#                   `scripts/verify.sh` discovers, #698)
+#
+# That is deliberate: rename a gate and this file goes red BY NAME instead of
+# quietly describing a pipeline that no longer exists. A plan that cannot be
+# wrong is a formality (GR-12).
+#
+# `channel` says WHERE the gate runs in the delivery lifecycle, so the rendered
+# plan answers the operator's question directly (CI? PR? CD? operations?):
+#
+#   pr  — the merge contract, run on the pull request before merge
+#   ci  — the build gate, run on every push
+#   cd  — the release/rollout gate, run when a verified commit promotes
+#   ops — the operational gate, run against live state
+
+schema: ao.tagging/rules-v1
+apiVersion: agent-orchestrator/v1
+kind: TagRules
+
+# Applied to every tag set, whatever it declares. These are the bedrock checks
+# docs/QA-GATE.md already treats as unconditional.
+baseline:
+  - {gate: make:shell-syntax, channel: ci}
+  - {gate: check:python-syntax, channel: ci}
+  - {gate: make:yaml-lint, channel: ci}
+  - {gate: make:json-lint, channel: ci}
+  - {gate: make:docs-lint, channel: ci}
+  - {gate: check:pr-contract, channel: pr}
+  - {gate: make:secrets, channel: ci}
+
+rules:
+
+  # -- posture ---------------------------------------------------------------
+  # Infrastructure is DECLARED, never clicked, and new infrastructure ships
+  # flag-gated OFF (GR-5). The floor is `pro`: security, secrets, auth and IaC
+  # work never start below the measured-audit tier.
+  - id: posture-iac
+    description: >-
+      IaC-postured work owes the declared-infrastructure gates and the
+      flag-gated-OFF posture, at the elevated FinOps floor the doctrine sets for
+      infrastructure.
+    when:
+      dimension: posture
+      includes: [iac]
+    gates:
+      - {gate: make:terraform, channel: ci}
+      - {gate: make:tf-validate, channel: ci}
+      - {gate: make:tf-fmt, channel: ci}
+    require_declaration: flag-gated-off
+    finops_floor: pro
+
+  - id: posture-saas
+    description: >-
+      A multi-tenant SaaS surface owes identity and boundary evidence: the
+      agent/tenant identity parity gate and the cross-repo boundary gate.
+    when:
+      dimension: posture
+      includes: [saas]
+    gates:
+      - {gate: make:agent-identity-parity, channel: ci}
+      - {gate: make:cross-repo-boundary, channel: ci}
+    finops_floor: pro
+
+  # "No human needed" is a CLAIM, and a claim is only honest if something can
+  # falsify it. The two gates below are exactly that: bounded work (#723, no
+  # directive retried forever) and the runaway guard. An escalation marker
+  # contradicts the claim outright, so it is forbidden rather than warned.
+  - id: posture-no-human-needed
+    description: >-
+      The lane must complete with zero operator input: bounded retries with a
+      terminal dead-letter state, and no escalation marker in the artifacts.
+    when:
+      dimension: posture
+      includes: [no-human-needed]
+    gates:
+      - {gate: check:runaway-guard, channel: ci}
+      - {gate: check:dead-letter, channel: ci}
+    forbid_markers: [escalation, "operator-question"]
+    finops_floor: flash
+
+  - id: posture-human-gated
+    description: >-
+      An operator gate is required before merge, so the pre-merge contract is
+      the gate of record for this work.
+    when:
+      dimension: posture
+      includes: [human-gated]
+    gates:
+      - {gate: make:merge-gate, channel: pr}
+
+  - id: posture-overall
+    description: >-
+      Cross-cutting work carries no extra gate of its own; it declares `overall`
+      so the dimension is never silently absent.
+    when:
+      dimension: posture
+      includes: [overall]
+    gates: []
+
+  # -- lifecycle (SDLC stage) ------------------------------------------------
+  - id: lifecycle-plan
+    description: >-
+      Planning work is gated on the board contract: the board gate and the epic
+      focus rule that keeps the plan a dependency chain instead of a backlog.
+    when:
+      dimension: lifecycle
+      includes: [plan]
+    gates:
+      - {gate: make:board-gate, channel: pr}
+      - {gate: make:epic-focus, channel: pr}
+
+  - id: lifecycle-build
+    description: >-
+      Build work owes the syntax gates and the declared pytest suites.
+    when:
+      dimension: lifecycle
+      includes: [build]
+    gates:
+      - {gate: make:tests, channel: ci}
+
+  - id: lifecycle-verify
+    description: >-
+      Verification work owes the composite gate and the coverage check that
+      refuses a check nobody names.
+    when:
+      dimension: lifecycle
+      includes: [verify]
+    gates:
+      - {gate: make:verify, channel: ci}
+      - {gate: make:gate-coverage, channel: ci}
+
+  - id: lifecycle-release
+    description: >-
+      Release work owes the CD half: feature flags must ship OFF, the Cloud Build
+      declarations must be valid, and the promotion owes a master attestation.
+    when:
+      dimension: lifecycle
+      includes: [release]
+    gates:
+      - {gate: make:feature-flags, channel: cd}
+      - {gate: make:cloudbuild, channel: cd}
+      - {gate: make:master-attestation, channel: cd}
+
+  - id: lifecycle-operate
+    description: >-
+      Operating work owes the observability declaration and the fleet-state
+      projection, so "it runs" is a measured claim rather than an assumption.
+    when:
+      dimension: lifecycle
+      includes: [operate]
+    gates:
+      - {gate: make:monitoring-declaration, channel: ops}
+      - {gate: make:fleet-state, channel: ops}
+
+  - id: lifecycle-retire
+    description: >-
+      Retiring work owes end-to-end closure: the GitHub lifecycle gate and the
+      orphan-reconciliation gate, so nothing is left half-terminal.
+    when:
+      dimension: lifecycle
+      includes: [retire]
+    gates:
+      - {gate: make:github-lifecycle, channel: ops}
+      - {gate: make:reconcile, channel: ops}
+
+  # -- class (quality rung, borrowed from governance/conformance/policy.yaml) --
+  - id: class-enterprise
+    description: >-
+      From `enterprise` up, the work is held to the board conformance gate.
+    when:
+      class_at_least: enterprise
+    gates:
+      - {gate: make:conformance, channel: pr}
+    finops_floor: flash
+
+  - id: class-faang
+    description: >-
+      From `faang` up, the surface-class gate applies and the FinOps floor rises
+      to the measured-audit tier.
+    when:
+      class_at_least: faang
+    gates:
+      - {gate: make:surface-class, channel: pr}
+    finops_floor: pro
+
+  - id: class-elite
+    description: >-
+      `elite` owes provenance and the closed learning loop: the lessons ledger
+      and the cross-reference spine.
+    when:
+      class_at_least: elite
+    gates:
+      - {gate: make:lessons, channel: ops}
+      - {gate: make:cross-reference, channel: ops}
+    finops_floor: pro
+
+# The FinOps ladder this file's floors are expressed in. Ranks come from the
+# borrowed tier vocabulary; a floor is expressed by RANK so a rename in the
+# authority cannot silently invert the comparison.
+finops:
+  floors_by_rank:
+    flash: 1
+    pro: 2
+    auditor: 3
+  notes: >-
+    A floor is a floor, not a preference: a lane may escalate above it on
+    observed difficulty and may never start below it. Security, secrets, auth and
+    IaC work are floored at `pro` by the doctrine, which is why `posture:iac`
+    carries that floor here.
