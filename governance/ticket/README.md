@@ -18,6 +18,7 @@ projection cannot drift from the contract it enforces.
 ```bash
 python3 governance/ticket/cli.py project   # write the projected store
 python3 governance/ticket/cli.py verify    # re-derive, prove rebuildability, compare
+python3 governance/ticket/cli.py freshness # is the board snapshot inside the tolerance?
 bash scripts/check-ticket-projection.sh    # the gate (in `make verify`)
 make ticket                                # the gate, as a make target
 ```
@@ -73,7 +74,12 @@ writer.
   claim for an unknown issue, a budget charge for an unknown issue. A duplicate
   ledger id is reported, never silently resolved, and an unreadable or
   un-attachable gate attestation is reported as a note — evidence is appended,
-  not authority, and a stale committed snapshot is normal.
+  not authority.
+* **A dated input.** The board snapshot must carry an age inside the tolerance
+  this consumer declares, or the projection refuses (see *The input's
+  freshness*). A snapshot one refresh behind is normal for an *appended* receipt
+  — it is not authority-tracked — but it is never normal for the graph the
+  reference rules resolve against.
 * **No unbacked node.** A ticket no ledger supplies a field for fails, naming it.
 * **One receipt.** A `facets.budget.receipt` that no `evidence[]` receipt on the
   same ticket carries fails — the contract's mismatch #10, closed.
@@ -92,6 +98,48 @@ store to the rebuild, so a stale store is (correctly) reported as stale — and 
 store is left in place, so the finding stays reproducible until `project`
 regenerates it.
 
+## The input's freshness (issue #1077)
+
+The projection resolves references against a **committed point-in-time
+artifact**, so a clean checkout can be asked about a board that has already
+moved. That is not hypothetical: one stale file reddened `check-ticket-projection`
+and `check-pmo-rollup` — two gates of record — for two days, and because the
+failure belonged to no lane it starved *every* lane's landing.
+
+There are two detectors, and only one of them can be exact:
+
+| Detector | Code | Reads the clock | Fires when |
+|---|---|---|---|
+| the reference rule | `reference-unresolved` | no | a committed ledger names an issue the snapshot does not carry — so the snapshot is provably older than the ledger |
+| the stated tolerance | `board-snapshot-stale`, `board-snapshot-unaged` | `generated_at` | the snapshot is older than the age this consumer tolerates, or carries no usable age |
+
+The **tolerance is 72 hours**, declared once in [`freshness.py`](freshness.py) —
+deliberately *not* the 15-minute `SNAPSHOT_STALENESS_MINUTES` in
+[`governance/policy/lease.py`](../policy/lease.py) that the dispatch loop uses.
+That one is a *liveness* tolerance for a loop that can refresh inside a single
+cycle; a committed artifact verified offline can never meet it, so a gate armed
+with it would be permanently red — a formality (GR-12). 72h is the **backstop**
+for rot the reference rule cannot see (the board moved, but no committed ledger
+references the new issues, so the PMO views quietly report a smaller, older
+board); `freshness.py` records the measured refresh cadence behind the number.
+
+Absence fails closed: a snapshot with no `generated_at`, or one whose
+`generated_at` is not a timestamp, is refused rather than trusted — the same
+posture as the dispatch gate's `age_minutes() -> inf`.
+
+**The refresh, and who runs it.** One verb does it:
+
+```bash
+python3 governance/dispatch/cli.py snapshot --from-github
+```
+
+That is the *writer* half of the same rule (RCA-0014 / `CA-0018`, #727), and the
+discipline is: **a lane that makes the board move refreshes the snapshot in the
+same lane**, so the artifact is committed by the change that invalidated it
+rather than by whichever unrelated PR happens to notice. Nothing in this package
+fetches: `scripts/verify.sh` is offline by design, so it *detects* staleness and
+names the remedy inside the refusal instead of performing it.
+
 ## The negative-control seam
 
 Two CLI options exist **only** so the gate can show that the rules can fail:
@@ -103,6 +151,12 @@ Two CLI options exist **only** so the gate can show that the rules can fail:
   two-writer field, a producer mismatch, an unknown field or an unbacked ticket.
   The records only ever influence the projected output — no caller in the fleet
   passes either option.
+* `freshness --now <timestamp>` evaluates the snapshot's age at a fixed instant
+  instead of the wall clock, so the gate can provoke `board-snapshot-stale` and
+  `board-snapshot-unaged` deterministically. The gate's assertion on the **real**
+  snapshot never passes it — that one is measured against the true clock.
+  (Unlike `--stamp`, this seam is on a *read-only* verb: it changes a verdict,
+  never an artifact.)
 
 [`scripts/check-ticket-projection.sh`](../../scripts/check-ticket-projection.sh)
 provokes each refusal for real and fails if any control passes: a check that

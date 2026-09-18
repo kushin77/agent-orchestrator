@@ -61,6 +61,12 @@ CODE_BUDGET_RECEIPT_UNBACKED = "budget-receipt-unbacked"
 CODE_STORE_MISMATCH = "store-mismatch"
 CODE_NON_DETERMINISTIC = "projection-non-deterministic"
 
+#: Input freshness (issue #1077): the committed board snapshot is a
+#: point-in-time artifact, and a consumer that never states the age it tolerates
+#: cannot tell "the board does not carry this reference" from "my copy is old".
+CODE_BOARD_UNAGED = "board-snapshot-unaged"
+CODE_BOARD_STALE = "board-snapshot-stale"
+
 CODE_LESSON_JOIN_AMBIGUOUS = "lesson-join-ambiguous"
 CODE_LEDGER_DUPLICATE = "ledger-duplicate-id"
 CODE_EVIDENCE_UNATTACHED = "evidence-unattached"
