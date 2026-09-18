@@ -99,6 +99,14 @@ that carries them.
 | `rca-review-overdue` | deviation | the RCA was not re-read within the cadence |
 | `corrective-action-open` | deviation | the action is still in flight, tracked by its issue |
 | `suggestion-open` | deviation | the improvement idea is still open |
+| `doc-rca-id-unknown` | error | issue #1052: a `docs/rca/*.md` writeup cites an `RCA-NNNN` id that is not a recorded ledger id |
+| `doc-rca-artifact-mismatch` | error | issue #1052: a `docs/rca/*.md` heading MINTS (starts with) an `RCA-NNNN` id whose ledger `artifact` names a different file — a lightweight doc may CITE a ledger RCA, it may not MINT one |
+| `readme-incident-count-mismatch` | error | issue #1052: the hand-written incident count below ("The incidents recorded so far") does not match the ledger's actual count |
+| `board-link-missing` | error | issue #1178: a `LESSON-*`/`SUGGEST-*` that reaches no board issue and declares no `orphan` reason — silence is what left twenty records unreachable |
+| `board-link-dangling` | error | issue #1178: an incident's `origin`, an orphan's `ticket` or an open action's `remediation_issue` names a board issue the committed snapshot does not carry |
+| `board-link-unlabelled` | error | issue #1178: the ledger names the issue as an incident's origin and the board does not carry the `incident` label, so the board rule cannot select it |
+| `board-link-orphan` | deviation | issue #1178: a record that reaches no board issue, reported with its declared reason |
+| `board-link-goal-unresolved` | deviation | issue #1178: the record reaches an issue that has neither an epic (`Parent: #N`) nor a milestone |
 
 `--strict` escalates every deviation to an error. That is the honest position:
 the in-flight work and the historical backlog are real and named, and a
@@ -123,11 +131,77 @@ label, and the by-hand exemptions that followed made it unable to fail at all:
 | `SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL` | *this* repository's policy names the record label and has no exemption path |
 | `REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL` | the same verdict against the REAL ledger, policy and snapshot — the four area-label holders measured, not assumed |
 | `MUTANT-DROPS-THE-REFUSAL` | the control's own control: a scratch copy of the checker with the selector forced off must STOP refusing, or the probe above proves nothing |
+| `DOC-RCA-UNKNOWN-ID-IS-REFUSED` | issue #1052: a `docs/rca/*.md` writeup citing an `RCA-NNNN` id the ledger never recorded is refused |
+| `DOC-RCA-CITATION-IS-ACCEPTED` | citing a KNOWN ledger id in prose, without minting it, is accepted |
+| `DOC-RCA-MINT-MISMATCH-IS-REFUSED` | a heading that MINTS a ledger id whose `artifact` names a different file is refused — the exact double-booking shape of the pre-fix `docs/rca/2026-09-16-pr-queue-clearing.md` |
+| `README-INCIDENT-COUNT-MISMATCH-IS-REFUSED` | a README incident count that does not match the ledger is refused |
+| `README-INCIDENT-COUNT-MATCH-IS-ACCEPTED` | the same sentence, with the ledger's real count, is accepted |
+| `REAL-DOCS-RCA-HAVE-NO-UNKNOWN-IDS` | the REAL `docs/rca/` tree cites only ids the REAL ledger holds |
+| `REAL-README-INCIDENT-COUNT-MATCHES-LEDGER` | the REAL README's count matches the REAL ledger's count |
+| `MUTANT-DROPS-DOC-RCA-REFUSAL` | the doc-rca-id-unknown refusal, proven able to fail, via the same generic mutant driver |
+| `MUTANT-DROPS-README-REFUSAL` | the readme-incident-count-mismatch refusal, proven able to fail, via the same generic mutant driver |
+| `DUPLICATE-ID-IS-REFUSED` | refusal (a) of issue #1052: two ledger lines sharing one id is still refused, named |
+| `MUTANT-DROPS-DUPLICATE-ID-REFUSAL` | the duplicate-id refusal, proven able to fail |
 
 The last probe is the one that matters most. A control proved only against a
 fixture never sees reality, and a probe that fires under every mutation proves
 nothing — so the mutant is built, the refusal is observed to disappear, and the
 harness reports it by name.
+
+## The board linkage: ledger -> issue -> epic (issue #1178)
+
+A register that cannot be reached from the board is an island. The only
+direction this module enforced was *labelled issue -> ledger record*, and the
+label selected an empty set on real data, so the rule could fail only against
+the mutants above. [`linkage.py`](linkage.py) makes the other direction —
+**ledger -> issue -> epic** — a measurement and a rule.
+
+```bash
+python3 governance/lessons/cli.py linkage                # the census
+python3 governance/lessons/cli.py linkage --orphans-only # just the unreachable
+```
+
+A record reaches the board when a path of its own fields gets there: its
+`origin` (kind `issue`), the `remediation_issue` of an action, or the `rca` /
+`incident` record it names. **A pull request is not a ticket**: a `pr`, `commit`
+or `event` origin declares where a record came from but is not a board node, so
+it does not make the record reachable. A reachable record whose issue has
+neither a `Parent: #N` epic nor a milestone has reached an *issue* but no
+*goal*, which is a deviation.
+
+Three rules make it binding:
+
+1. **Silence is refused.** A `LESSON-*`/`SUGGEST-*` that reaches no board issue
+   must declare it: `"orphan": {"reason": "..."}`. The thirteen records that
+   were unreachable and silent now carry that declaration, each with the reason
+   (their RCA traces to a pull request or a recorded event, not to an issue).
+   The declaration is a *claim*, not an exemption: a false one is refused, and
+   the `orphan.ticket` it may carry must resolve on the board.
+2. **A dangling reference is refused.** An incident's `origin` was never
+   resolved against the board before this issue — only an RCA's was — so an
+   incident could name an issue that no longer existed and nothing saw it.
+3. **The label lands where the ledger names it.** `board-link-unlabelled`
+   requires every issue the ledger names as an `INC-*` origin to carry the
+   `incident` record label. This is the inverse of `board-incident-without-rca`,
+   and it is what keeps the scope declaration from being empty: the holder set
+   is derived from the ledger, not from the label. On `origin/master` before
+   this issue the gate measured **1** holder (the label was on #1029 alone,
+   whose `INC-0007` names it) while `cli.py status` printed **0** — `status`
+   called `check_ledger(..., snapshot=None)` and so could never count a holder
+   at all. `status` now loads the snapshot, and five issues carry the label.
+
+**The measured census** (this revision, 75 records): 34 reach a board issue, 26
+of those reach a goal, 41 are orphans, 0 references dangle. An orphan whose
+provenance is a PR or an event is reported as a deviation rather than hidden:
+the remedy is a board issue, and the filings that would close the largest
+groups are listed in the lane issue (#1178) rather than mass-created as a proxy
+for the rule.
+
+The two probes that matter are `REAL-DATA-LABEL-REMOVAL-IS-REFUSED` and
+`REAL-DATA-DECLARATION-REMOVAL-IS-REFUSED`: they take the **real** ledger and
+the **real** committed snapshot, remove exactly one real fact, and require the
+real check to refuse it by id. A rule proved only against a fixture has not
+been shown able to fail on the data it actually reads.
 
 ## Escalation, ownership and review cadence
 
@@ -186,8 +260,14 @@ than stored again here.
 
 ## The incidents recorded so far
 
-Six real incidents from this repository's own history, each with an artifact,
-a corrective action and a lesson:
+Seventeen real incidents from this repository's own history, each with an
+artifact, a corrective action and a lesson — a `LESSON-*` once the change has
+landed, a `SUGGEST-*` while it is still in flight — the eleven recorded below,
+and the six the EPIC #708 wave registered in its own section. That count is
+gate-asserted, not hand-maintained: `scripts/check-lessons.sh` fails
+(`readme-incident-count-mismatch`) if this sentence and the ledger's actual
+incident count ever diverge again (issue #1052 — a prior hand-merge conflict
+in PR #1036 forced a manual union of two independently-authored counts).
 
 | Incident | Origin | RCA | What it was |
 |---|---|---|---|
@@ -197,19 +277,27 @@ a corrective action and a lesson:
 | `INC-0004` | #157 | [`RCA-0004`](rca/RCA-0004-claim-replay-historical-truth.md) | the claim audit judged a historical claim by today's snapshot |
 | `INC-0005` | #157 | [`RCA-0005`](rca/RCA-0005-stale-snapshot-frontier.md) | a 19-minute-old snapshot named a closed issue as the frontier (**open**, #170) |
 | `INC-0006` | #800 | [`RCA-0006`](rca/RCA-0006-agentconsole-wrong-host.md) | the AgentConsole go-live was planned against this repository's own Cloud Run pipeline while the fleet's hosting contract fixes the remote shared-services cluster as the only live host |
+| `INC-0007` | #1029 | [`RCA-0007`](rca/RCA-0007-declared-not-exercised-golive.md) | Epic #607's go-live was declared for months and never exercised — the declarations were not backed by an exercised path (recorded by the #1029 lane) |
+| `INC-0008` | #506 | [`RCA-0008`](rca/RCA-0008-date-bomb-seed-without-evaluation.md) | the two tests that were #506's acceptance proof pinned the quota **seed** day while the runner resolved the **evaluation** bucket from the live clock, so `47 passed` expired with the calendar and a quota-exhausted tenant was allowed for three days (**open**: the fix is PR #1026, unmerged) |
+| `INC-0015` | #997 | [`RCA-0015`](rca/RCA-0015-zero-byte-gate-lock-wedge.md) | a leftover 0-byte gate lock was read as a live claim, wedging the box-wide concurrency cap and parking every other worktree's gate with no indication which lock caused it — promoted from `docs/rca/2026-09-16-pr-queue-clearing.md` (issue #1052) |
+| `INC-0016` | #1036 | [`RCA-0016`](rca/RCA-0016-shared-core-file-collision.md) | three PRs collided extending the same shared "core" files with no append-only procedure; the class recurred against this ledger and README in PR #1036 — promoted from `docs/rca/2026-09-16-pr-queue-clearing.md` (issue #1052) |
+| `INC-0017` | #1052 | [`RCA-0017`](rca/RCA-0017-rca-id-double-booking.md) | `docs/rca/2026-09-16-pr-queue-clearing.md` minted `RCA-0007`/`RCA-0008` in its own headings, double-booking ids the ledger already held for a different incident, and this README's hand-written incident count needed a hand-merge in PR #1036 |
 
-## Measured state (2026-09-15)
+## Measured state (2026-09-17)
 
 `bash scripts/check-lessons.sh` on this branch, exit code 0. Both parts are
-quoted, the provoked control included; the long policy refusals are elided:
+quoted, the provoked control included; the long policy refusals and the
+per-suggestion/per-action deviation lines are elided:
 
 ```text
-incidents: 6 (5 closed) | rcas: 6 | corrective actions: 8 (1 open) | lessons: 4
-| suggestions: 4 | board issues carrying the `incident` record label: 0
+incidents: 17 (9 closed) | rcas: 17 | corrective actions: 21 (10 open) | lessons: 7
+| suggestions: 13 | board issues carrying the `incident` record label: 5 | ledger
+records reaching the board: 34 of 75 (41 orphaned)
   WARNING suggestion-open         SUGGEST-0001 is open (owner: gate lane); ...
+  WARNING board-link-orphan       LESSON-0001 declares itself board-orphaned (lesson); ...
   WARNING corrective-action-open  CA-0007 is open; remediation is tracked in #170
-lessons: OK (6 incident(s), 4 lesson(s) enforced, 5 deviation(s) tracked)
-  probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s), scanned=0, errors=[]
+lessons: OK (17 incident(s), 7 lesson(s) enforced, 72 deviation(s) tracked)
+  probe AREA-LABEL-IS-NOT-AN-INCIDENT: PASS — a CLOSED issue labelled 'area:incident-response' produced 0 board finding(s) and is not among the 1 scanned record-labelled issue(s) ([901]); errors=[]
   probe RECORD-LABEL-WITHOUT-A-RECORD-IS-REFUSED: PASS — code=board-incident-without-rca subject=#900 errors=['board-incident-without-rca']
   probe LEDGER-INCIDENT-WITHOUT-RCA-IS-REFUSED: PASS — code=incident-without-rca count=1 errors=['corrective-action-unlinked', 'incident-without-rca', 'unknown-reference', 'unknown-reference']
   probe RECORD-LABEL-WITH-A-RECORD-IS-ACCEPTED: PASS — scanned=1 board finding(s)=0 errors=[] (the ledger traces #900)
@@ -217,12 +305,37 @@ lessons: OK (6 incident(s), 4 lesson(s) enforced, 5 deviation(s) tracked)
   probe EXEMPTIONS-CANNOT-BE-DECLARED: PASS — board.exemptions is not a supported scope declaration (...); the retired refs #141/#494/#495/#497 cannot be declared
   probe AREA-LABEL-CANNOT-BE-THE-RECORD-LABEL: PASS — board.incident_label='area:incident-response' is an AREA label (...)
   probe SHIPPED-POLICY-DECLARES-THE-RECORD-LABEL: PASS — incident_label='incident' exemptions attribute=False cadence=180
-  probe REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL: PASS — snapshot: 0 issue(s) carry 'incident' (scanned=0), 4 carry 'area:incident-response' and 0 of them is treated as an incident; board findings=0 errors=[] retired refs reported=(none)
+  probe REAL-BOARD-HAS-NO-UNRECORDED-RECORD-LABEL: PASS — snapshot: 5 issue(s) carry 'incident' (scanned=5), 4 carry 'area:incident-response' and 0 of them is treated as an incident; board findings=0 errors=[] retired refs reported=(none)
   probe MUTANT-DROPS-THE-REFUSAL: PASS — NOT-REFUSED board-incident-without-rca (the probe is proven able to fail)
-  PROBES: PASS (10 of 10)
+  probe DOC-RCA-UNKNOWN-ID-IS-REFUSED: PASS — code=doc-rca-id-unknown count=1 errors=['doc-rca-id-unknown']
+  probe DOC-RCA-CITATION-IS-ACCEPTED: PASS — doc-rca finding(s)=0 errors=[]
+  probe DOC-RCA-MINT-MISMATCH-IS-REFUSED: PASS — code=doc-rca-artifact-mismatch count=1 errors=['doc-rca-artifact-mismatch']
+  probe README-INCIDENT-COUNT-MISMATCH-IS-REFUSED: PASS — code=readme-incident-count-mismatch count=1 errors=['readme-incident-count-mismatch']
+  probe README-INCIDENT-COUNT-MATCH-IS-ACCEPTED: PASS — finding(s)=0 errors=[]
+  probe REAL-DOCS-RCA-HAVE-NO-UNKNOWN-IDS: PASS — doc-rca finding(s)=0
+  probe REAL-README-INCIDENT-COUNT-MATCHES-LEDGER: PASS — finding(s)=0
+  probe MUTANT-DROPS-DOC-RCA-REFUSAL: PASS — NOT-HELD doc-rca-id-unknown (the probe is proven able to fail)
+  probe MUTANT-DROPS-README-REFUSAL: PASS — NOT-HELD readme-incident-count-mismatch (the probe is proven able to fail)
+  probe DUPLICATE-ID-IS-REFUSED: PASS — code=duplicate-id count=1 errors=['duplicate-id']
+  probe MUTANT-DROPS-DUPLICATE-ID-REFUSAL: PASS — NOT-HELD duplicate-id (the probe is proven able to fail)
+  probe BOARD-LINK-MISSING-IS-REFUSED: PASS — code=board-link-missing subject=LESSON-0002 errors=['board-link-missing']
+  probe BOARD-LINK-ORPHAN-DECLARATION-IS-ACCEPTED: PASS — missing=0 orphan-deviations=4 errors=[]
+  probe BOARD-LINK-DANGLING-ORIGIN-IS-REFUSED: PASS — code=board-link-dangling subject=INC-0001 count=1 errors=[...]
+  probe BOARD-LINK-UNLABELLED-IS-REFUSED: PASS — code=board-link-unlabelled subject=#901 errors=['board-link-unlabelled']
+  probe BOARD-LINK-LABEL-PRESENT-IS-ACCEPTED: PASS — finding(s)=0 errors=[]
+  probe REAL-LEDGER-HAS-NO-SILENT-ORPHAN: PASS — the REAL ledger: 0 silent orphan(s), 0 dangling reference(s), errors=[]
+  probe REAL-BOARD-LINKAGE-CENSUS-IS-NOT-EMPTY: PASS — the REAL ledger names 5 issue(s) as an incident origin; 5 carry `incident`; the board rule scanned 5; unlabelled=0
+  probe REAL-DATA-LABEL-REMOVAL-IS-REFUSED: PASS — the REAL ledger names 5 issue(s); removed 'incident' from #148 and the REAL check reported 1 finding(s) for it, errors=['board-link-unlabelled']
+  probe REAL-DATA-DECLARATION-REMOVAL-IS-REFUSED: PASS — the REAL ledger carries 13 declaration(s); removed LESSON-0001's and the REAL check reported 1 finding(s) for it, errors=['board-link-missing']
+  probe MUTANT-DROPS-BOARD-LINK-MISSING: PASS — NOT-HELD board-link-missing (the probe is proven able to fail)
+  probe MUTANT-DROPS-BOARD-LINK-DANGLING: PASS — NOT-HELD board-link-dangling (the probe is proven able to fail)
+  probe MUTANT-DROPS-BOARD-LINK-UNLABELLED: PASS — NOT-HELD board-link-unlabelled (the probe is proven able to fail)
+  PROBES: PASS (33 of 33)
 negative-control: OK — an area label cannot manufacture an incident, a
 record-labelled issue with no ledger record is still refused, no exemption can
-be declared, and the refusal is proven able to fail
+be declared, the refusal is proven able to fail, and the ledger -> board linkage
+(a silent orphan, a dangling reference, an incident-origin issue with no record
+label) is refused on the real ledger and board with one real fact changed
 ```
 
 The real-board probe is the measurement the fix is about: **4 issues carry
@@ -234,6 +347,29 @@ holder, and then unable to fail (issue #766).
 Five errors were raised and fixed while seeding the ledger — five artifacts
 that were not yet committed (`rca-artifact-untracked`). That is the gate doing
 its job on its own author: an uncommitted RCA does not exist (`RCA-0002`).
+
+### The EPIC #708 wave (2026-09-14)
+
+Six incidents from the fleet runaway-prevention wave. Each one is **open** against
+the child issue that carries its corrective action, and each RCA is a committed
+artifact in [`rca/`](rca/). The wave's incidents carry an `event` origin rather
+than an issue origin because the committed board snapshot does not reach them —
+which is `INC-0014` itself.
+
+| Incident | Tracked by | RCA | What it was |
+|---|---|---|---|
+| `INC-0009` | #729 | [`RCA-0009`](rca/RCA-0009-infra-limits-tmpfs-exhaustion.md) | a shared 16 GiB `/tmp` filled to 100 %, and a 0-byte write passed as evidence |
+| `INC-0010` | #726 | [`RCA-0010`](rca/RCA-0010-a2a-no-arbitration.md) | agent-to-agent dispatch with no arbiter between two claimants |
+| `INC-0011` | #724 | [`RCA-0011`](rca/RCA-0011-gate-stacking.md) | gates stacked on one box with no lock and no queue |
+| `INC-0012` | #723 | [`RCA-0012`](rca/RCA-0012-uncapped-redispatch.md) | an uncapped retry stacked 137+ gates and starved the box |
+| `INC-0013` | #725 | [`RCA-0013`](rca/RCA-0013-inert-gate.md) | delivered gates that no gate invokes |
+| `INC-0014` | #727 | [`RCA-0014`](rca/RCA-0014-stale-snapshot-no-trigger.md) | a committed snapshot with a timestamp, a tolerance and no trigger |
+
+Six errors were raised and fixed while recording the EPIC #708 wave — the six
+new RCA artifacts, each refused as `rca-artifact-untracked` until it was
+committed. That is the gate doing its job on its own author a second time: an
+uncommitted RCA does not exist (`RCA-0002`), and five errors had already been
+raised the same way when this ledger was seeded.
 
 ## Layout
 

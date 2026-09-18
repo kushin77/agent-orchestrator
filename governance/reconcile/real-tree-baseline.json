@@ -1,0 +1,2698 @@
+{
+  "note": "Real-tree baseline for governance/reconcile's disk audit (#740, item 1 of the Bounded proposal). scripts/check-reconcile.sh now runs `audit()` against THIS repository's real working tree (read-only; nothing here is ever removed), on top of the existing synthetic-fixture proofs. Every worktree/branch it reports UNMATCHED at the time this baseline was recorded is listed below by name, so the gate starts failing on any NEW unexplained artifact from this commit forward, without needing to resolve the pre-existing count first. An entry here is REMOVED only by an explicit, reviewed edit to this file (e.g. once its worktree/branch is reclaimed, or a session beat/claim/landing record starts explaining it) -- never silently, and never as a blanket allow. A STALE entry (baselined but no longer unmatched) fails the gate exactly like a NEW unbaselined violation, by name, so this list cannot grow into a permanent excuse.",
+  "measured_at": "2026-09-17 (re-measured, #740 follow-up: age grace)",
+  "measured_head": "d0a20d6f8e070dda52449b4df49eef77f31b542e",
+  "measured_by": "governance/reconcile/real_tree_baseline.py generation, issue #740",
+  "entries": [
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a01e3a67cd7761947",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a021419ee353f1166",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a0729443710281255",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a156cd27cbfda305b",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a23255851fc17056a",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a263b76cf2b889911",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a2bf0d1fdd5ae7387",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a3112c97ac486df58",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a34b9bbd8442e6db7",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a365a02a8d6d3fc8c",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a37040484642f33eb",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a3984ddeefc8be344",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a7400858aa1f2aaa2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a77a288896ac80d54",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a8c336d64f1d62a3f",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-aa739e0cd436c5ed5",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-aa7928a2ce700c832",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ab366b0d5a03c8418",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ab36b72664843337d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ada458afb43e3bbf0",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae21c1b75566fee9b",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae435f19c21682b9d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-aee05bb7d5d33848d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-af4c46127412059c3",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-af8c75eecab58db64",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1011-197351db",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1013-d2d27ce6",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1019-16ff454d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1028-3ec9daca",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1028-lessons",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1028-masterbase",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-145-sme-1789348038",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-145-sme-harvest",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-174-089bac20",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-300mech-red",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-341-23cb260d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-342-7750547c",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-345-8c4ff7d5",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-350-54756813",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-366-4adf5d58",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-366-cc11e978",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-366-d9af928c",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-621-218572f4",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-621-shell-patterns",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-624-16f9f3db",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-627-a38a4384",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-629-53df7604",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-648-d7e34469",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-649-erp-ops",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-649-postmerge",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-651-da02b916",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-652-erp-portal",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-654-76f49ece",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-655-erp-e2e",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-716-2dbaa28d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-717-bc75516d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-718-088c7b54",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-719-ec0153bd",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-720-b24366f5",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-721-56d2e1ea",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-722-04a78fa8",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-728-48a78fdf",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-729-80c3d2f0",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-763-9ce2da41",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-771-c1d9ca3d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-774-27f89f94",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-777-095b6256",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-777-lane",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-786",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-786-507a704a",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-799-0269e4b6",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-841-7556c57d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-848-dc3de7f",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-861-7b3e9291",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-865-verdict-ratchet",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-934-c825762e",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-942-hermes",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-943-moduleassess",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-945-systemapp",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-948-gatelock",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-955-dd8d119d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-974-8933cc9e",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-985-8e8b190f",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-988-598aa2a8",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-990-b25602d8",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-995-569627dd",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-999-1988754d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-rc9b",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao337-hermes",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao706-gate",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao706-stack",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/mq-862",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/mq-904",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/mq-905",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/mq-906",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/mq-921",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/mq-930",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao-fix-921",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao-master-verify",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao-masterred-f45f14f",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao1001-pristine",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao1001-tipwt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao1001-wt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao1013-master",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao1017-wt.VgaW0F",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao1028-bisect",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao160-base",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao506-bisect",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao506-master",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao506-wt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao607-qa.2UKkTi",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao780-wt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao786-wt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao906check",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao938-wt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao939-wt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao943-probe",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao998-wt-a7d3e9",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/aoe2e-wt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/fix-1008",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/fix-1008-master",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/verify-1008",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/verify-master-check",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-10-registry-service",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1001-baseline-fed4e7d4",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1011",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1013",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1017-apply-core-ladder",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1019",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1028",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1028-lessons",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1029-evidence-fix",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-11-persona-registry",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-12-agent-org-rbac",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-13-versioned-prompt-library",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-132-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-133-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-14-onboarding",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-140-class-conformance",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-141-rca-lessons",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-142-58950fde",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-142-ca67f096",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-143-b1a3209d",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-144-wire2-7c67c1f4",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-145",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-145-sme-harvest",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-146-fleet-cce69929",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-147-cto-c9b7daae",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-148-leaderboard-registry",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-149-smeroute-e33794c2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-15-provider-adapters",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-150-authority-dc0e84c6",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-151-rollup-75a80505",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-152-chronological-dispatch",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-152-fix-doc-rule-text",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-157-claim-gate",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-16-gateway-proxy",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-161-session-contract",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-162-steering-channel",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-163-fleet-dispatcher",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-164-finops-chooser",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-165-fleet-issue-template",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-167-f85f43c7",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-17-finops-chooser",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-170",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-174",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-18-model-health",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-180",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-181",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-19-cache-limits",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-20-mcp-gateway",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-21-durable-engine",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-218",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-218-stranded",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-22-task-queue",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-220-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-23-agent-loop",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-232-67e1e8c2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-232-976ae4d0",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-232-e49545a2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-233-8b4fcd33",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-234-487c3aa7",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-239-240-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-24-multiagent",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-241",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-241-cron-reconciler",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-241-w2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-244-merge-mandate",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-25-agent-memory",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-251-enterprise-kb",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-254-registry",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-255-gateway",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-256-portal",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-258-infra",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-26-policy-gate",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-263",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-263-a014c9c4",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-269",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-27-dlp",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-274",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-276-277-d73a17e2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-279-qafix",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-28-guard-honesty",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-284-gates",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-287",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-287-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-29-qa-gate",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-292",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-294",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-297",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-30-isolation",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-300-routing-policy",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-302-report",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-304",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-309-stranded",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-31-audit-ledger",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-310",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-312",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-319-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-32-telemetry",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-320-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-322-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-323-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-33-metering",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-330",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-331-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-332-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-333-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-337",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-337-adopt",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-339-bridge",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-34-budgets",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-340",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-341",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-341-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-341-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-342",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-342-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-342-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-343",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-345-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-345-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-346",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-347",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-348-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-349",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-35-sso",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-350-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-350-mech",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-351",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-36-entitlements",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-361",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-363",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-366",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-366-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-366-deadlock",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-366-local",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-366-superseded-98c868f019f76a630fba1eb7a37aa129c47d58d3",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-366-w2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-366-w2-local",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-368",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-369",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-37-api-edge",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-370",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-38-cp-api",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-384",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-388",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-39-portal",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-40-agent-packs",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-400-contract",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-401-ticket",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-403-pmo",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-41-consumer-sdk",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-411-deploy",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-412",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-413-openapi",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-414-heartbeat",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-416-approvals",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-417-secrets",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-418-routines",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-419-skills",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-42-instruction-layer",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-420-wire",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-420w-routines",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-428",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-43-merge-governance",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-44-sync-drift",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-445",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-447",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-448",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-45-rollout",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-457",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-46-e2e",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-463",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-464",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-465",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-466",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-47-spike-canonical-copy",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-48-spike-elevatediq",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-49-spike-eiq-ai-recovery",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-495-monitoring",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-496-declare",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-497-export",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-498-fleethealth",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-499-wire",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-5-repo-foundation",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-501",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-502",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-503",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-504",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-505",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-506",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-507",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-508",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-509",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-525",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-526",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-555",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-559",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-565",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-578",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-58-sandbox",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-590",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-591",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-592",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-6-cicd-iac",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-605",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-606",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-606-web-image",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-607",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-607-golive-surfaces",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-607-hosting-gate",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-607-promotions",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-617",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-618",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-619",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-620",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-621",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-621-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-622",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-623",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-624-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-626",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-627-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-629-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-646-erp-foundation",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-647-erp-core-model",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-648-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-649-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-649-erp-ops",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-650-erp-crm",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-651-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-652",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-653-erp-auth",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-654-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-655-erp-e2e",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-666",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-667",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-668",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-669",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-670",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-672",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-673",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-674",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-676",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-692",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-693",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-694",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-695",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-697",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-698",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-7-golden-rules",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-700",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-701",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-703",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-708-wire-runaway-guard",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-711",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-712",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-713",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-714-local",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-715",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-716",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-717",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-719",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-720",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-721",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-722",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-724",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-725",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-726",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-728",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-729",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-729-land",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-731",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-732",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-733",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-739",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-741-fleet-durability",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-756-lessons-false-positive",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-763",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-764",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-766",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-771",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-773",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-774",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-777",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-777-w2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-780",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-780-watchdog-bootstrap",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-785",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-786",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-786-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-794",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-796-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-799-w2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-8-cannibalization-index",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-802",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-803-platform-protection",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-804",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-808-adr-gate-status",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-812-gr15",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-816-specdrift",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-821",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830-fix906",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830-local",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830-local2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830-work",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-832",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-834",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-835",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-836",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-840",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-841-brain-di",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-843",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-848",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-848-gitignore",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-852",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-854",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-861-w2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-865",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-866-verdict-contains",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-868",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-871",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-874",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-896",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-897-shell-patterns",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-9-agent-profile-schema",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-900",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-914-rollout-live-state",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-928",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-933",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-934-w2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-938-secrets-exemption",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-939-dev-run",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-942-hermes",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-943-module-assess",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-945-system-app",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-948-gatelock-zerobyte",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-949",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-950",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-951",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-952",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-953",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-954",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-955",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-956",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-971",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-974",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-977-978",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-985",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-988",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-990",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-995",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-998-landing-trailer",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-999",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-a2a-direct-control",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-a2a-escalation",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-agentconsole-rename",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-beater-lifecycle",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-board-evidence",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-brain-directed-claims",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-brain-outbox-order",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-brain-profile-controls",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-consume-controls",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-control-plane-oob",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-decompose-validator",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-dslink",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-fleet-control",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-fleet-listener",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-fleet-runtime-ignores",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-gap-fleet-hermetic",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-health-heartbeat",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-heartbeat",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-idle-heartbeat",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-in-run-heartbeat",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-inflight-not-consumed",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-launcher-decompose",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-loop-owns-claim",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-operator-brain-rung",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-order-kinds",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-pause-release",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-pc-gap",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-pc-upstream",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-python-syntax-gate",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-queue-order",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc1",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc10-1789408411-28890",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc11-10433rc11",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc11-1789410596",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc2",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc2-inline",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc3-1789403742-2892436",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc4-1789405748-2892436",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc5-1789408420-2892436",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc6-k7x",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc7-1789405736-3593",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc9",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc9-1789405045-2892436",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rc9b",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rca-completion",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-rcgap",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-reap-and-tail",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-runtime-ignores-runs",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-send-inline",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-session-launchers",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-singleton-guard",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-snapshot-audit-chronology",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-snapshot-refresh",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-status-truth",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-stop-release",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-tenantless-gate-token",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-terminal-hardening",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-terminal-heldcheck",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-test-isolation",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-wait-trigger",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-wave-fixes",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-worktree-hygiene",
+      "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    }
+  ]
+}

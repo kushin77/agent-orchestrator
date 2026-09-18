@@ -24,6 +24,8 @@ Two claims are pinned here, and each has a negative control:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from governance.lifecycle.closeout import (
     CANNOT_ASSESS,
     NOT_OK,
@@ -35,7 +37,23 @@ from governance.lifecycle.closeout import (
     describe,
 )
 
-from conftest import FakeOps, clean_item, parked_verification
+import importlib.util as _importlib_util  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_lifecycle_tests_conftest", Path(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+FakeOps = _conftest.FakeOps
+clean_item = _conftest.clean_item
+parked_verification = _conftest.parked_verification
 
 LANE = {"session_id": "s-269", "present": True}
 

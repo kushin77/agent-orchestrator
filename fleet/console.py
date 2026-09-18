@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Fleet console — the live dashboard for the `fleet` tmux session.
 
-WHY it exists: the brain, sister and monitor rungs run DETACHED (the watchdog and
+WHY it exists: the director, dispatcher and monitor rungs run DETACHED (the watchdog and
 cron own their lifecycle) and each writes its stream to `.fleet/<rung>.log`. The
-operator's view of "is the fleet doing what I asked?" was therefore spread across
+principal's view of "is the fleet doing what I asked?" was therefore spread across
 a heartbeat JSON, the dispatch ledger, the wave plan files, the event log and the
-watchdog log — five commands, none of them live, none of them showing the brain.
+watchdog log — five commands, none of them live, none of them showing the director.
 This renders all of it in one frame, redrawn every ``REFRESH_SECONDS``.
 
 Design rule: every section is built by a PURE function over a plain dict, and
 ``snapshot()`` is the only part that reads the repo. That is what lets the tests
-assert exactly what the operator sees, without a TTY and without a running fleet.
+assert exactly what the principal sees, without a TTY and without a running fleet.
 
 Usage:
     python3 fleet/console.py            # self-refreshing dashboard (Ctrl-C exits)
@@ -119,7 +119,7 @@ def fit_width() -> int:
     """Narrow the frame to the terminal it is drawn in, and return the width.
 
     The dashboard's home is a tmux pane, which is narrow: a fixed 96-column frame
-    wraps mid-section and the operator reads a scrambled screen. Only a real
+    wraps mid-section and the principal reads a scrambled screen. Only a real
     terminal moves the width — piped output (a log, a script, a test) keeps the
     deterministic default.
     """
@@ -184,7 +184,7 @@ def newest_json(directory: Path, limit: int) -> list[dict]:
     """The `limit` newest messages in a mailbox directory, oldest first.
 
     Ordered by the message timestamp, not by filename: message ids are uuid4, so a
-    filename sort returns them in arbitrary order and the operator reads a stale
+    filename sort returns them in arbitrary order and the principal reads a stale
     line as if it were the current one.
     """
     messages: list[dict] = []

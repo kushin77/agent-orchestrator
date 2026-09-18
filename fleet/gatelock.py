@@ -1,6 +1,6 @@
 """Gate admission control: one composite gate per worktree, bounded box-wide.
 
-Operator-measured (2026-09-14): **49 concurrent ``make verify`` runs, 43 of them
+Principal-measured (2026-09-14): **49 concurrent ``make verify`` runs, 43 of them
 stacked in two worktrees, ~16 hours of duplicated work.** Nothing bounded them —
 every dispatcher could start a gate, and every gate ran to completion.
 
@@ -83,7 +83,15 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import lease
+try:
+    # Package-relative: how this module is reached when imported as
+    # `fleet.gatelock` (e.g. `governance/lifecycle/gate.py`, which only puts
+    # the repo ROOT — not `fleet/` — on `sys.path`).
+    from fleet import lease
+except ImportError:
+    # Script-style: `python3 fleet/gatelock.py ...` or `PYTHONPATH=fleet`,
+    # where `fleet/` itself is on `sys.path` and `fleet` is not a package.
+    import lease
 
 MODULE = "gate-lock"
 
@@ -613,9 +621,37 @@ def _hold(fds: list[int], records: list[Path], watch_pid: int | None) -> int:
             break
         time.sleep(HOLDER_POLL_SECONDS)
 
-    for path in records:
+    # RCA 2026-09-17 fix #3: reap the worktree lock ON THIS EXIT PATH, not just
+    # release's — a truncate-only ending here is exactly what manufactured the
+    # 157 leftover 0-byte files `docs/rca/2026-09-17-pr-pileup.md` measured,
+    # because a clean holder exit (normal, SIGTERM/SIGINT/SIGHUP above, or the
+    # watched gate dying) never routes back through `release`. Unlinking here
+    # is safe by the same proof `_reap_free_lock` uses: this process's own fd
+    # (``fds[0]``) is STILL the flock on ``lock_path``, so no other holder can
+    # exist for that path — the flock, not the bytes, is the exclusion
+    # primitive (issue #948). This is a *self* reap (the holder reaps ITS OWN
+    # lock), not the box-wide auto-heal RCA-0015
+    # (governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md) reviewed
+    # and refused — that risk is a sweeper racing a DIFFERENT worktree's
+    # in-flight `acquire`, which cannot happen here because this holder only
+    # ever touches the one path it was minted for.
+    #
+    # The permit slot is a different story: it is a fixed, reused pool
+    # (`permit_paths`), and `acquire`'s permit loop has no `_flock_fresh`
+    # re-check the way the worktree-lock loop does, so unlinking a permit file
+    # would let two future gates flock two different inodes both named the
+    # same slot path. Permit records stay truncated-to-0, never unlinked.
+    lock_path = records[0]
+    for path in records[1:]:
         try:
             os.truncate(path, 0)
+        except OSError:
+            pass
+    try:
+        os.unlink(lock_path)
+    except OSError:
+        try:
+            os.truncate(lock_path, 0)
         except OSError:
             pass
     for fd in fds:
@@ -895,6 +931,42 @@ def release(
             if holder_state.owner is not None and holder_state.owner.worktree == resolved:
                 truncate_record(candidate)
     return f"{MODULE}: RELEASED worktree={resolved} holder={holder} (was {named})"
+
+
+def reap_own_worktree(
+    worktree: str | os.PathLike[str],
+    *,
+    root: str | os.PathLike[str] | None = None,
+) -> bool:
+    """Reap ONE worktree's own leftover lock, proven free, never box-wide.
+
+    RCA 2026-09-17 fix #3, and RCA-0015
+    (governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md) before it,
+    already ruled a box-wide sweep unsafe: ``_reap_free_lock`` cannot unlink a
+    lock a live holder flocks, but a sweeper walking every worktree can still
+    race a DIFFERENT worktree's in-flight ``acquire`` between that acquirer's
+    ``os.open(O_CREAT)`` and its ``_try_lock`` — the file is briefly unflocked
+    and looks exactly like a leftover, so the sweep would unlink it, the
+    acquirer's ``_flock_fresh`` re-check would fail, and a legitimately
+    starting gate would report rc 12 CANNOT-ASSESS for a key it never touched.
+
+    Scoped to exactly one worktree — the caller's own — this is the same
+    operation a worktree's own ``release`` already performs, just callable
+    from a schedule (the watchdog) without a gate having to be live to call
+    ``release`` first. It never inspects, and never touches, any lock key but
+    the one it was given.
+
+    Returns whether a leftover was found and reaped.
+    """
+    resolved = str(Path(worktree).expanduser().resolve())
+    lock = worktree_lock_path(resolved, store_root(root))
+    state = probe(lock)
+    if state.held:
+        return False
+    if state.record_bytes == 0 and not lock.exists():
+        return False
+    _reap_free_lock(lock)
+    return True
 
 
 def status(

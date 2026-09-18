@@ -6,9 +6,15 @@
 # cannot ship on by accident.
 
 variable "project_id" {
-  description = "GCP project id for the control plane. Required at apply; supplied via tfvars or environment."
+  description = <<-EOT
+    GCP project id for the control plane. The placeholder default keeps
+    `terraform plan` diff-free with every surface flag OFF (issue #884's
+    plan-no-diff acceptance) even though `ao_images` (main.tf) is
+    unconditional; real promotion supplies the real id via tfvars or
+    environment and never applies on the placeholder (GR-5: no ad-hoc apply).
+  EOT
   type        = string
-  default     = null
+  default     = "example-control-plane"
 }
 
 variable "region" {
@@ -149,6 +155,12 @@ variable "enable_erp_module" {
   default     = false
 }
 
+variable "enable_erp_webhooks_bridge" {
+  description = "Enable the CRM→ERPNext webhook bridge (issue #671, EPIC #665). In-module switch: FLAG_ID 'erp-webhooks-bridge' in integrations/erp/webhooks/flags.py. OFF until promoted."
+  type        = bool
+  default     = false
+}
+
 # --- Deployer service account (the ONLY apply route) ------------------------
 
 variable "deployer_enabled" {
@@ -157,10 +169,20 @@ variable "deployer_enabled" {
   default     = false
 }
 
-variable "deployer_roles" {
-  description = "IAM roles granted to the deployer service account at promotion. Empty by default — populated by a reviewed go-live."
-  type        = list(string)
-  default     = []
+variable "deployer_role_class" {
+  description = <<-EOT
+    Selects a named IAM role bundle for the deployer SA from
+    local.deployer_role_bundles (main.tf) — never a raw role list passed
+    through Cloud Build substitutions. "none" (the default) grants nothing;
+    the SA is created inert until a reviewed go-live picks a real class.
+  EOT
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "minimal", "standard"], var.deployer_role_class)
+    error_message = "deployer_role_class must be one of: none, minimal, standard (see local.deployer_role_bundles in main.tf)."
+  }
 }
 
 # --- Container images (placeholders until each phase ships a real build) ----

@@ -14,12 +14,29 @@
 # it, and refuses both an `area:` label in that position and any `board.`
 # `exemptions` list. See governance/lessons/policy.yaml.
 #
+# One RCA id authority (issue #1052): governance/lessons/ledger.jsonl is the
+# only place an INC-*/RCA-*/CA-*/LESSON-*/SUGGEST-* id is minted, so this check
+# also fails a duplicate id, a docs/rca/*.md RCA-NNNN token that is not a
+# ledger id (or that a doc heading MINTS while the ledger's artifact for it is
+# a different file — a lightweight doc may CITE a ledger RCA, never mint one),
+# and a README incident count that does not match the ledger's actual count.
+#
 # PART 2 (issue #766) is the provoked negative control:
 # governance/lessons/negative_control.py plants one fact per probe and requires
 # the named verdict — an area label producing no incident, a record label with
 # no ledger record still refused, both hand-edit routes refused by name, and a
 # mutated copy of the checker in which the refusal must be observed to
 # disappear. A probe that cannot fail proves nothing.
+#
+# PART 1 also carries the ledger -> board linkage (issue #1178): every record's
+# reach from the board is a measurement (governance/lessons/linkage.py), a
+# LESSON-*/SUGGEST-* that reaches no board issue and says nothing is an error,
+# an incident's origin (not only an RCA's) is resolved against the snapshot, and
+# every issue the ledger names as an incident's origin must carry the `incident`
+# record label — so the board rule's scope is derived from the ledger rather
+# than from the label it is checking. Two of the provoked probes change ONE real
+# fact in the real ledger and the real committed snapshot, so the rule is proven
+# able to fail on real data, not only against its own mutants.
 #
 # Deviations (an issue that records an incident still open, an action still in
 # flight, a review past its cadence) are reported with the issue that carries

@@ -433,3 +433,50 @@ def test_eligible_is_pure(focused, snapshot):
     order.eligible(snapshot, 603, focus_path=focused(600))
     order.eligible(snapshot, 601, focus_path=focused(600))
     assert json.dumps(snapshot.to_json(), sort_keys=True) == before
+
+
+# --- collision-aware wave planning (issue #740, dispatch half) --------------
+
+
+def _issue(number, *, files=(), milestone="M"):
+    return Issue(number, f"issue {number}", milestone=milestone, files=files)
+
+
+def test_wave_plan_admits_pairwise_disjoint_candidates():
+    plan = order.wave_plan([
+        _issue(1, files=("a.py",)),
+        _issue(2, files=("b.py",)),
+        _issue(3, files=("c.py", "d.py")),
+    ])
+    assert plan.admitted == (1, 2, 3)
+    assert plan.refusals == ()
+    assert plan.unverifiable == ()
+
+
+def test_wave_plan_refuses_second_child_by_name_on_negative_control():
+    """Negative control: two ready children share a file; the second is refused BY NAME."""
+    plan = order.wave_plan([
+        _issue(716, files=("Makefile", "scripts/verify.sh")),
+        _issue(717, files=("Makefile",)),
+    ])
+    assert plan.admitted == (716,)
+    assert plan.refusals == ("lane-file-collision: Makefile already owned by #716",)
+
+
+def test_wave_plan_reports_unverifiable_children_and_still_admits_them():
+    plan = order.wave_plan([
+        _issue(1, files=()),
+        _issue(2, files=("a.py",)),
+    ])
+    assert 1 in plan.admitted
+    assert plan.unverifiable == (1,)
+    assert plan.refusals == ()
+
+
+def test_wave_plan_is_deterministic_in_input_order():
+    forward = order.wave_plan([_issue(1, files=("x",)), _issue(2, files=("x",))])
+    backward = order.wave_plan([_issue(2, files=("x",)), _issue(1, files=("x",))])
+    assert forward.admitted == (1,)
+    assert backward.admitted == (2,)
+    assert forward.refusals[0].endswith("already owned by #1")
+    assert backward.refusals[0].endswith("already owned by #2")

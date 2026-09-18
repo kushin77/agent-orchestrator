@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cmr.knowledge/live-sync-event/v1",
+  "title": "Knowledge-surface live-sync ledger event",
+  "description": "One JSON-Lines event appended by governance/knowledge/ledger.py, recording a governance/knowledge/live_sync.py pin-drift check or a governance/knowledge/knowledge_controls.py vendor-compliance-gap measurement (issue #887).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["timestamp", "kind", "status", "detail"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "description": "UTC event time, strftime %Y-%m-%dT%H:%M:%SZ.",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["pin-drift-check", "vendor-compliance-gap"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "drift", "warn", "cannot-assess"]
+    },
+    "detail": {
+      "type": "string",
+      "description": "Human-readable detail: the finding code and message, or the gap named (e.g. 'shared-services #132: 4 finding(s) open')."
+    }
+  }
+}

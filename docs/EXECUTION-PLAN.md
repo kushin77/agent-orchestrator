@@ -133,7 +133,10 @@ front, in prose a sibling lane will actually read.
 6. **Verify before done (GR-12):** run the issue's `Verify:` command and
    `make verify`; paste the **actual output** as evidence on the PR.
 7. **Merge after green** (owner autonomous-merge mandate) — never merge failing
-   work.
+   work. `scripts/check-squash-message.sh --pr <n>` runs before every `gh pr
+   merge --squash` (`scripts/pr-queue.sh`); a NOT-OK verdict refuses the merge
+   by name (`squash-message-would-drop-trailer`) and leaves the PR open
+   (issue #1102).
 8. **Close the item out — every artifact terminal.** Merging is not the end of
    the item. Run `python3 governance/lifecycle/cli.py close --issue <n>`: it
    drives the remaining **close-out** steps in dependency order (consume the
@@ -423,3 +426,44 @@ provoked with a real second gate** in the worktree the envelope names.
 `governance/spawn/README.md` is the module's own contract; the suite
 `governance/spawn/tests` is declared in `scripts/pytest-suites.txt` and named
 from inside the check, so it is covered rather than merely declared.
+
+## 11. Tag declaration (mandatory)
+
+Every lane declares its tags before it works, and the declaration is what makes
+the lane's owed gates visible (AO-GR-28, issues #1175 + #1183). The vocabulary
+is the **tag authority** at `governance/tagging/taxonomy.yaml`; the derivation is
+`governance/tagging/rules.yaml`.
+
+**The three declarations a lane owes.**
+
+1. **`class`** — the rung of the CMR quality ladder the work is held to. It sets
+   the FinOps floor (`enterprise` -> `flash`; `faang`/`elite` -> `pro`) and it is
+   **borrowed** from `governance/conformance/policy.yaml`, mirrored and proven
+   equal — the ladder is declared once in this repository, not twice.
+2. **`posture`** — how the work is delivered. `iac` means the infrastructure is
+   **declared** (GR-5), never clicked, and ships flag-gated OFF; `saas` puts the
+   work behind the identity and boundary gates; `no-human-needed` means the lane
+   must finish with **no operator input at all**, which forbids escalation
+   markers and floors the tier at `flash`; `human-gated` means an operator gate
+   precedes merge. These are orthogonal, so `posture` is multi-valued — but
+   `no-human-needed` and `human-gated` together is refused by name.
+3. **`lifecycle`** — the SDLC stage, and therefore which channel's gates apply:
+   `plan` -> `pr`, `build`/`verify` -> `ci`, `release` -> `cd`,
+   `operate`/`retire` -> `ops`.
+
+**Ask for the plan before you work it.**
+
+```bash
+python3 governance/tagging/cli.py plan \
+  --tag class:enterprise --tag posture:iac --tag lifecycle:build --tag finops:pro
+```
+
+The plan names the gates by channel, the FinOps floor, and the declarations the
+work owes (`flag-gated-off` for `posture:iac`). A tier **below** the floor its
+own tags require is refused by name (`finops-floor-unmet`), and the floors are
+compared by **rank read from the file**, never by guessing at string order.
+
+**This section is enforced, not advisory.** `scripts/check-tagging.sh` runs
+inside `make verify` (auto-discovered, #698) and `make lint`; its
+`tagging-mandate` check FAILS naming this document if the rule stops being
+declared here. Run the gate by hand with `make tagging`.

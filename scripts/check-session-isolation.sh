@@ -308,6 +308,81 @@ commit_in() { # commit_in <worktree> <file> <trailer-or-empty>
   fi
 }
 
+# --- 3a2. the speculative-base re-verify gate (issue #699, DG-3) ------------
+# A lane blocked only by file ownership may be cut from the UPSTREAM LANE's
+# branch instead of waiting for its squash-merge (speculative execution). The
+# one new risk that creates is a PR whose attestation still names a stale
+# base — checked here with a real upstream/downstream pair, a real squash
+# landing, and the record file proven byte-identical across every read-only
+# provocation (governance/isolation/speculative.py never mutates on `verify`).
+sha256_of() { # sha256_of <file> — empty string if it does not exist
+  [ -f "$1" ] && sha256sum "$1" | awk '{print $1}'
+}
+
+up_session="$(open_lane 645645 spec-copilot erp-upstream)" || {
+  echo "  CANNOT-ASSESS  speculative-base fixture (could not open the upstream lane)" >&2
+  cannot=$((cannot + 1))
+}
+if [ -n "${up_session:-}" ]; then
+  up_sid="$(printf '%s' "$up_session" | jfield session_id)"
+  up_branch="$(printf '%s' "$up_session" | jfield branch)"
+  up_worktree="$(printf '%s' "$up_session" | jfield worktree)"
+  commit_in "$up_worktree" erp.txt "Refs kushin77/agent-orchestrator#645645"
+
+  down_payload="$(python3 "$cli" open --issue 671671 --agent spec-copilot --lane erp-downstream \
+    --main "$scratch" --root "$lanes" --base "$up_branch" --speculative-base "$up_branch" \
+    --allow-tmpfs-root 2>/dev/null)"
+  down_sid="$(printf '%s' "$down_payload" | jfield session_id)"
+  down_worktree="$(printf '%s' "$down_payload" | jfield worktree)"
+  commit_in "$down_worktree" consumer.txt "Refs kushin77/agent-orchestrator#671671"
+
+  record="$scratch/.fleet/lanes/speculative/$down_sid.json"
+  if [ -z "$down_sid" ] || [ ! -f "$record" ]; then
+    echo "  CANNOT-ASSESS  speculative-base fixture (no attestation was recorded for the downstream lane)" >&2
+    cannot=$((cannot + 1))
+  else
+    expect_fail "speculative lane, upstream not yet landed" "$down_sid" "speculative-base-not-landed"
+    before_sha="$(sha256_of "$record")"
+    expect_fail "speculative lane, re-provoked (attestation must not mutate on a read-only audit)" \
+      "$down_sid" "speculative-base-not-landed"
+    after_sha="$(sha256_of "$record")"
+    if [ "$before_sha" != "$after_sha" ]; then
+      echo "  FAIL  speculative-base attestation changed across a read-only audit ($before_sha -> $after_sha)" >&2
+      fail=$((fail + 1))
+    else
+      echo "  OK    speculative-base attestation is sha256-identical across the read-only audit ($before_sha)"
+    fi
+
+    # The upstream lane lands (squash, exactly as this repo's own landing path
+    # does it), and the downstream lane pulls the now-landed master into its
+    # own branch — the ordinary way a speculative lane picks up a real landing.
+    git -C "$scratch" merge --squash "$up_branch" >/dev/null 2>&1
+    git -C "$scratch" commit -q -m "erp integration (squash)" -m "Refs kushin77/agent-orchestrator#645645" >/dev/null 2>&1
+    git -C "$down_worktree" merge -q master -m "merge landed master" >/dev/null 2>&1
+
+    stale_before_sha="$(sha256_of "$record")"
+    expect_fail "speculative lane, landed but not re-verified (stale merge_base)" \
+      "$down_sid" "speculative-base-stale-merge-base"
+    stale_after_sha="$(sha256_of "$record")"
+    if [ "$stale_before_sha" != "$stale_after_sha" ]; then
+      echo "  FAIL  speculative-base attestation changed across the stale-merge-base audit ($stale_before_sha -> $stale_after_sha)" >&2
+      fail=$((fail + 1))
+    else
+      echo "  OK    speculative-base attestation is sha256-identical across the stale-merge-base audit"
+    fi
+
+    reverify_out="$(python3 "$cli" audit --main "$scratch" --session "$down_sid" --reverify-speculative-base 2>&1)"
+    reverify_rc=$?
+    if [ "$reverify_rc" -ne 0 ]; then
+      echo "  FAIL  speculative lane did not become OK after re-verifying against the final merge base (rc=$reverify_rc)" >&2
+      printf '%s\n' "$reverify_out" | sed 's/^/        /' >&2
+      fail=$((fail + 1))
+    else
+      echo "  OK    speculative lane accepted once its attestation names the final merge base"
+    fi
+  fi
+fi
+
 # --- 3b. the tmpfs refusal (issue #516) -------------------------------------
 # A lane rooted on a RAM-backed filesystem costs RAM and inodes instead of disk
 # and is lost on reboot, so it must be refused BY NAME — and before
@@ -546,6 +621,116 @@ if [ "$killed_rc" -lt 128 ]; then
   verdict_fail=1
 else
   echo "  OK    a signal-killed audit (rc=$killed_rc) is unmeasured, not a claim about the code"
+fi
+
+# --- 3e. the elite-rung artifacts (controls/audit/schema/live, issue #885) --
+# Each new artifact is provoked for real, sha256-restore idiom as elsewhere in
+# this gate (section 4's hermes-style byte-identical restore): mutate a
+# SCRATCH COPY, prove the mutation is refused BY NAME, then restore and prove
+# the restore is byte-identical. The real tree is never touched.
+
+py_controls="$scratch/controls.yaml"
+cp "$root/governance/isolation/controls.yaml" "$py_controls"
+controls_before_sha="$(sha256sum "$py_controls" | awk '{print $1}')"
+
+# (1) control mutated -> refused by name: drop a declared refusal code the
+# surface can still emit; policy.load() must refuse it BY NAME rather than
+# silently accepting a weaker declaration.
+python3 - "$py_controls" <<'PY'
+import sys
+import yaml
+path = sys.argv[1]
+doc = yaml.safe_load(open(path, encoding="utf-8"))
+doc["refusal_codes"] = [c for c in doc["refusal_codes"] if c != "identity-mismatch"]
+yaml.safe_dump(doc, open(path, "w", encoding="utf-8"), sort_keys=False)
+PY
+mutant_sha="$(sha256sum "$py_controls" | awk '{print $1}')"
+if [ "$mutant_sha" = "$controls_before_sha" ]; then
+  echo "check-session-isolation: CANNOT-ASSESS — the controls mutation left the fixture unchanged" >&2
+  exit 2
+fi
+control_out="$(PYTHONPATH="$root" python3 -c '
+import sys
+sys.path.insert(0, sys.argv[2])
+from governance.isolation import policy
+try:
+    policy.load(sys.argv[1])
+    print("NO-REFUSAL")
+except policy.PolicyUnavailable as exc:
+    print(f"REFUSED: {exc}")
+' "$py_controls" "$root" 2>&1)"
+if contains "$control_out" "REFUSED" && contains "$control_out" "identity-mismatch"; then
+  echo "  OK    a controls.yaml missing a declared refusal code is refused by name (identity-mismatch)"
+else
+  echo "check-session-isolation: FAIL — mutating controls.yaml went undetected" >&2
+  printf '%s\n' "$control_out" >&2
+  fail=$((fail + 1))
+fi
+cp "$root/governance/isolation/controls.yaml" "$py_controls"
+controls_restored_sha="$(sha256sum "$py_controls" | awk '{print $1}')"
+if [ "$controls_restored_sha" != "$controls_before_sha" ]; then
+  echo "check-session-isolation: CANNOT-ASSESS — the controls.yaml scratch copy did not restore byte-identical" >&2
+  exit 2
+fi
+echo "  OK    the controls.yaml scratch copy is restored byte-identical (sha256=$controls_restored_sha)"
+
+# (2) audit record missing -> refused: journal.last_for on a lane nothing was
+# ever audited for must read as absent, never as a fabricated clean pass.
+missing_journal_out="$(PYTHONPATH="$root" python3 -c '
+import sys
+sys.path.insert(0, sys.argv[2])
+from governance.isolation import journal
+entry = journal.last_for(sys.argv[1], "no-such-lane-ever-audited")
+print("ABSENT" if entry is None else "PRESENT")
+' "$scratch" "$root" 2>&1)"
+if contains "$missing_journal_out" "ABSENT"; then
+  echo "  OK    a lane journal has never been written for is reported ABSENT, not a fabricated pass"
+else
+  echo "check-session-isolation: FAIL — a missing audit-journal record was not reported absent" >&2
+  printf '%s\n' "$missing_journal_out" >&2
+  fail=$((fail + 1))
+fi
+
+# (3) schema-invalid record -> refused: a hand-crafted journal line missing a
+# required field must be refused by governance/isolation/schema.py, never
+# silently accepted as data.
+bad_schema_out="$(PYTHONPATH="$root" python3 -c '
+import sys
+sys.path.insert(0, sys.argv[1])
+from governance.isolation import schema
+try:
+    schema.validate(schema.JOURNAL_ENTRY, {"schema": "ao.isolation/journal-entry-v1", "ok": True})
+    print("NO-REFUSAL")
+except schema.RecordSchemaViolation as exc:
+    print(f"REFUSED: {exc}")
+' "$root" 2>&1)"
+if contains "$bad_schema_out" "REFUSED"; then
+  echo "  OK    a schema-invalid journal record is refused by governance/isolation/schema.py"
+else
+  echo "check-session-isolation: FAIL — a schema-invalid journal record was not refused" >&2
+  printf '%s\n' "$bad_schema_out" >&2
+  fail=$((fail + 1))
+fi
+
+# (4) live feed vs real store drift -> refused: switch a real, provisioned
+# lane worktree onto a foreign branch behind git's back (never through the
+# CLI) and prove live.py reports the drift by name rather than trusting the
+# recorded branch.
+read -r live_sid live_wt < <(lane_session 887 gate-agent livefeed)
+git -C "$scratch" branch drift-branch >/dev/null 2>&1
+git -C "$live_wt" checkout -q drift-branch >/dev/null 2>&1
+live_out="$(PYTHONPATH="$root" python3 -c '
+import sys
+sys.path.insert(0, sys.argv[2])
+from governance.isolation import live
+print(live.render(sys.argv[1]))
+' "$scratch" "$root" 2>&1)"
+if contains "$live_out" "DRIFT"; then
+  echo "  OK    live.py detects a worktree switched off its recorded branch (DRIFT)"
+else
+  echo "check-session-isolation: FAIL — live.py did not detect real branch drift" >&2
+  printf '%s\n' "$live_out" >&2
+  fail=$((fail + 1))
 fi
 
 # --- 4. vacuity control: the declaration check must be able to fail ---------

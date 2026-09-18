@@ -134,6 +134,50 @@ Outputs: [`catalog.json`](catalog.json) (the tracked catalogue) and
 To add a source, edit [`sources.py`](sources.py) — one declarative entry with a
 kind, glob, owner and whether it is required. Nothing else needs touching.
 
+## Live CMR pin sync (issue #887)
+
+Everything above indexes *static* sources already in the tree. The catalogue
+is only as trustworthy as the CMR standards bundle it was built against, so
+[`live_sync.py`](live_sync.py) is the one place that consumes that pin
+**live**: it reads the repo-root `cmr-pin.yaml`, validates its shape via the
+hub's own `vendor/CMR/sync/validate-cmr-pin.py` (imported by path, never
+re-implemented), resolves the live `vendor/CMR` submodule HEAD, and exposes
+the pinned bundle to the indexer as `PinnedBundle`. A pin whose `bundle_ref`
+no longer equals the live submodule HEAD is refused by name —
+`CMR_PIN_DRIFT` — the same drift condition `scripts/check-cmr-pin.sh` checks
+at the repo root, re-derived here (not imported: it is a one-line
+comparison, not a schema) so the two never define drift differently.
+
+```bash
+# Print the live pinned bundle as JSON; exits 1 on drift, 2 if vendor/CMR is
+# not checked out.
+python3 governance/knowledge/live_sync.py
+
+# The dedicated gate (schema + drift + negative control + vendor-compliance
+# gap report):
+bash scripts/check-cmr-knowledge.sh
+```
+
+[`ledger.py`](ledger.py) is the audit trail: every drift check and
+vendor-compliance gap measurement is appended as one validated JSON-Lines
+event to `sync-ledger.jsonl` (schema:
+[`live-sync-event.schema.json`](live-sync-event.schema.json)), so whether the
+gate actually ran on a given date is answerable from the tree.
+
+[`knowledge_controls.py`](knowledge_controls.py) holds the knowledge
+surface's policy: the no-drift requirement `live_sync` enforces, and the
+vendor-compliance gap registry for issues
+[#132](https://github.com/kushin77/agent-orchestrator/issues/132)
+(shared-services) and
+[#133](https://github.com/kushin77/agent-orchestrator/issues/133)
+(googleworkspace), parented under the CMR vendor-compliance epic (#125).
+`measure_vendor_compliance_gaps()` reads the CMR hub's own generated
+evidence — `vendor/CMR/docs/hygiene-report.md` and
+`vendor/CMR/guardrails/sweep/report.md` — and reports a WARN, named, per
+finding still open against either repo. Closing #132/#133 is cross-repo
+remediation outside this module's scope; `scripts/check-cmr-knowledge.sh`
+reports the gap on every run but does not fail the gate on it.
+
 ## Layout
 
 | File | Role |
@@ -145,6 +189,9 @@ kind, glob, owner and whether it is required. Nothing else needs touching.
 | [`secretpolicy.py`](secretpolicy.py) | credential scanning for indexed assets |
 | [`query.py`](query.py) | search with source-backed evidence |
 | [`cli.py`](cli.py) | build / validate / query / coverage |
+| [`live_sync.py`](live_sync.py) | live CMR pin consumption + drift refusal (`CMR_PIN_DRIFT`) |
+| [`ledger.py`](ledger.py) | append-only audit ledger of sync/gap events |
+| [`knowledge_controls.py`](knowledge_controls.py) | pin-drift policy + #132/#133 vendor-compliance gap measurement |
 
 ## Provenance of this module
 

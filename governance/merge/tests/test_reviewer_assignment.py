@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from gate import green_gate
 from model import BlockReason, MergeGovernanceMachine, MergeGovernanceViolation
 from reviewer import (
     AuditorCannotExecuteError,
@@ -63,7 +64,6 @@ class TestReviewerAssignment:
 
         # engine translates it into a blocked PR
         from engine import MergeGovernanceEngine
-        from gate import green_gate
 
         engine = MergeGovernanceEngine(
             gate_check=green_gate(), reviewer_assigner=assigner, owner_carve_out=True

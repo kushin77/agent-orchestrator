@@ -63,8 +63,15 @@ class FakeOps:
         contract_rc: int = 0,
         contract_commit: str | None = None,
         contract_output: str = "MERGE-GATE: PASS",
+        landed_contract_rc: int = 0,
+        landed_contract_output: str = "check-pr-contract: LANDED OK — every merged commit since the enforcement gate carries the ticket trailer",
         closure_rc: int = 0,
         subjects: tuple = ("feat(landing): the lane's own commit subject",),
+        publish_status_rc: int = 0,
+        publish_status_raises: Exception | None = None,
+        master_remote_head: str | None = None,
+        lane_behind_master: bool = False,
+        changed: tuple = (),
     ) -> None:
         self.root = Path(root)
         self.attestation_path = self.root / evidence_mod.ATTESTATION_REL
@@ -73,11 +80,26 @@ class FakeOps:
         self._contract_rc = contract_rc
         self._contract_commit = contract_commit
         self._contract_output = contract_output
+        self._landed_contract_rc = landed_contract_rc
+        self._landed_contract_output = landed_contract_output
         self._closure_rc = closure_rc
         self._subjects = tuple(subjects)
+        self._changed = tuple(changed)
+        self._publish_status_rc = publish_status_rc
+        self._publish_status_raises = publish_status_raises
+        # `master`'s own remote head, as read BEFORE the merge (fix #5 follow-up,
+        # #1114's merge-base guard) — defaults to the lane head, i.e. "master's
+        # tip was already at the commit this lane is built on" (the common
+        # case), so existing tests need no changes. `lane_behind_master=True`
+        # is the negative control: `merge_base` then reports no common tip
+        # with master's remote head, so the guard must refuse to publish.
+        self._master_remote_head = master_remote_head if master_remote_head is not None else head
+        self._lane_behind_master = lane_behind_master
         self.calls: list = []
         self.pushed = False
         self.body = ""
+        self.squash_body = ""
+        self.published_statuses: list = []
 
     # -- reads ---------------------------------------------------------------
     def head_commit(self) -> str:
@@ -89,8 +111,21 @@ class FakeOps:
     def commit_subjects(self, base: str, rev: str) -> tuple:
         return self._subjects
 
+    def changed_files(self, base: str, rev: str) -> tuple:
+        return self._changed
+
     def remote_branch_head(self, branch: str):
+        if branch == "master":
+            return self._master_remote_head
         return self._head if self.pushed else None
+
+    def merge_base(self, left: str, right: str):
+        # A read, like `remote_branch_head`/`head_commit` above — not recorded
+        # in `self.calls` (that list tracks the ordered EFFECTS, and the
+        # existing order-of-operations tests assert it exactly).
+        if self._lane_behind_master:
+            return None
+        return right
 
     def pull_request_for(self, branch: str):
         return self._pr
@@ -118,8 +153,28 @@ class FakeOps:
             argv=("bash", "scripts/merge-gate.sh", "run"), rc=self._contract_rc, stdout=self._contract_output
         )
 
-    def merge_pr(self, number: int) -> str:
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        self.calls.append(("gate-status", f"{sha}:{rc}"))
+        self.published_statuses.append((sha, rc))
+        if self._publish_status_raises is not None:
+            raise self._publish_status_raises
+        return CommandResult(
+            argv=("bash", "scripts/gate-status.sh", "post"),
+            rc=self._publish_status_rc,
+            stdout=f"gate-status: posted ao/gate-of-record for {sha[:12]} (rc={rc})",
+        )
+
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        self.calls.append(("landed-contract", f"{base}..{head}"))
+        return CommandResult(
+            argv=("bash", "scripts/check-pr-contract.sh", "--landed"),
+            rc=self._landed_contract_rc,
+            stdout=self._landed_contract_output,
+        )
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
         self.calls.append(("merge", str(number)))
+        self.squash_body = Path(body_file).read_text(encoding="utf-8")
         return "c" * 40
 
     def delete_branch(self, branch: str) -> str:

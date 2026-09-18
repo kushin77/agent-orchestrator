@@ -574,6 +574,81 @@ else
   bad "vacuity control: a stripped invariant survived the strip"
 fi
 
+# --- 6. code prose (comments + docstrings) in fleet/*.py --------------------
+# Issue #923: #777 migrated the contract surface but declared code prose
+# out-of-scope, "not silently done" (see the glossary's `out_of_scope`). This
+# section makes that declaration a check that can fail: a retired role name
+# used as a NAME inside a `fleet/*.py` comment or docstring is a finding, named
+# by file, line and word — never an artifact identifier (a rung literal, a
+# mailbox path, a printed `[brain]`/`[sister]` tag, a CLI flag value, a
+# hyphenated code identifier like `brain-inbox`), which the detector never
+# visits in the first place (it walks `tokenize.COMMENT` tokens and
+# `ast.get_docstring` text only — see scripts/lib/fleet_code_prose.py).
+prose_checker="scripts/lib/fleet_code_prose.py"
+if [ ! -f "$prose_checker" ]; then
+  bad "$prose_checker is missing: the code-prose surface has no detector"
+else
+  # shellcheck disable=SC2046  (word splitting is intended: a file list)
+  prose_findings="$(python3 "$prose_checker" $(printf '%s\n' fleet/*.py) 2>&1)"
+  prose_rc=$?
+  if [ "$prose_rc" -eq 0 ]; then
+    ok "no retired role name is used as a NAME in a fleet/*.py comment or docstring"
+  elif [ "$prose_rc" -eq 1 ]; then
+    bad "retired role name(s) found in fleet/*.py code prose:"
+    printf '%s\n' "$prose_findings" | sed 's/^/        /' >&2
+  else
+    echo "check-fleet-vocabulary: CANNOT-ASSESS — $prose_checker exited $prose_rc: $prose_findings" >&2
+    exit 2
+  fi
+
+  # Vacuity control: plant a retired name in a scratch docstring and require the
+  # detector to refuse it BY NAME (file, line, word) — a rule never provoked
+  # proves nothing (GR-12).
+  plant_py="$scratch/plant_prose.py"
+  cat >"$plant_py" <<'PYEOF'
+"""A module docstring that names the sister session and reports to the brain."""
+
+
+def handoff():
+    # The sister drains the inbox; the brain never picks work on its own.
+    return None
+PYEOF
+  if plant_out="$(python3 "$prose_checker" "$plant_py" 2>&1)"; then
+    bad "the code-prose detector accepted a planted retired name (the rule matches nothing)"
+  else
+    plant_rc=$?
+    if [ "$plant_rc" -eq 1 ] \
+      && [[ "$plant_out" == *"$plant_py:1: retired term 'sister'"* ]] \
+      && [[ "$plant_out" == *"$plant_py:5: retired term 'sister'"* ]] \
+      && [[ "$plant_out" == *"$plant_py:5: retired term 'brain'"* ]]; then
+      ok "a retired name planted in a docstring and a comment is refused by file, line and word"
+    else
+      bad "the planted retired name was refused but not named by file+line+word: $plant_out"
+    fi
+  fi
+
+  # The other half: a retired name inside a marked legacy-gloss region, and one
+  # used only as an ARTIFACT identifier, must both be ALLOWED — the detector is
+  # not just a blanket regex over the file text.
+  gloss_py="$scratch/gloss_prose.py"
+  cat >"$gloss_py" <<'PYEOF'
+def rung_names():
+    # legacy-gloss:start
+    # "sister" named the loop by its relation to another seat; retired in #777.
+    # legacy-gloss:end
+    CAPABILITY_RUNGS = ("brain", "sister")
+    # it answers via `.fleet/brain/outbox`, the `brain-inbox` subcommand and the
+    # printed [sister] tag — all artifact names, not role names.
+    return CAPABILITY_RUNGS
+PYEOF
+  if python3 "$prose_checker" "$gloss_py" >/tmp/ao-fleet-vocab-gloss.out 2>&1; then
+    ok "a legacy-gloss region and a bare artifact reference are both allowed (the rule is not over-strict)"
+  else
+    bad "the detector refused a declared gloss or an artifact reference: $(cat /tmp/ao-fleet-vocab-gloss.out)"
+  fi
+  rm -f /tmp/ao-fleet-vocab-gloss.out
+fi
+
 # --- verdict ----------------------------------------------------------------
 if [ "$fail" -gt 0 ]; then
   echo "check-fleet-vocabulary: FAIL ($fail violation(s))" >&2

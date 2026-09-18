@@ -21,7 +21,7 @@ instead of being asserted in a docstring:
 * :func:`effective_cap` — ``FLEET_DECOMPOSE_CAP``, else the focus ``wave_cap``,
   else :data:`DEFAULT_CAP`.
 
-The caller (the brain) supplies both the candidate children and the OPEN issues
+The caller (the director) supplies both the candidate children and the OPEN issues
 they are compared against. That is what keeps the duplicate guard honest: it
 never consults the network, so the verdict does not change with whichever board
 happened to be reachable at the moment.
@@ -40,7 +40,19 @@ from __future__ import annotations
 
 import os
 import re
+import sys
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
+
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT / "governance" / "dispatch") not in sys.path:
+    sys.path.insert(0, str(_ROOT / "governance" / "dispatch"))
+
+# Reused, not re-declared (issue #740): the SAME whole-file overlap predicate
+# the claim-time path (`claims.find_file_conflict`) and the ready-wave planner
+# (`order.wave_plan`) use, so "these two lanes collide" cannot drift into three
+# different answers across filing, dispatch and reconcile.
+from model import FileClaim, file_claims_conflict  # noqa: E402
 
 #: The environment knob a wave's size can be pinned with.
 CAP_ENV = "FLEET_DECOMPOSE_CAP"
@@ -153,7 +165,7 @@ def sizing_problem(child: Any, *, depth: int = 1) -> str | None:
     """Why ``child`` is not a MICRO child, or ``None`` when it is.
 
     The one place the sizing rule lives. Every refusal names the child (by title,
-    so the operator can find it) and, for a child that is too *big*, names the
+    so the principal can find it) and, for a child that is too *big*, names the
     parent seam to decompose instead (``RESPLITTABLE``).
     """
     if not isinstance(child, Mapping):
@@ -203,7 +215,7 @@ def _open_tuple(entry: Any) -> tuple[int | None, str, str, str]:
 
     A caller may pass the documented ``(number, title, lane)`` tuple, a longer
     tuple that also carries the ``Verify:`` line, or a mapping with those keys —
-    a board snapshot gives the brain titles and no lane, a live board gives it
+    a board snapshot gives the director titles and no lane, a live board gives it
     everything, and neither shape should force the guard to change.
     """
     if isinstance(entry, Mapping):
@@ -253,6 +265,37 @@ def duplicate_problem(child: Any, open_issues: Iterable[Any]) -> str | None:
     return None
 
 
+def file_collision_problems(children: Sequence[Any]) -> list[str]:
+    """Every pairwise file collision within ``children`` — empty when the wave
+    is provably file-disjoint (issue #740, dispatch half).
+
+    A child with no ``Files:`` declaration is already refused by
+    :func:`sizing_problem` ("names no Files:"), so it never reaches here as a
+    silent pass — this function only ever compares children that DID declare a
+    file set. The predicate is :func:`model.file_claims_conflict` (whole-file,
+    no regions), the same one the claim-time and dispatch-time paths use.
+    """
+    problems: list[str] = []
+    owner: dict[str, int] = {}
+    for index, child in enumerate(children or ()):
+        if not isinstance(child, Mapping):
+            continue
+        title = str(child.get("title", "") or "").strip() or "(untitled)"
+        for path in files(child):
+            holder = owner.get(path)
+            if holder is not None:
+                mine = FileClaim(path=path, regions=None)
+                theirs = FileClaim(path=path, regions=None)
+                if file_claims_conflict(mine, theirs):
+                    problems.append(
+                        f"lane-file-collision: {path} already owned by child {holder} "
+                        f"('{title}' at position {index})"
+                    )
+                    continue
+            owner.setdefault(path, index)
+    return problems
+
+
 def wave_problems(
     children: Sequence[Any],
     *,
@@ -261,7 +304,7 @@ def wave_problems(
 ) -> list[str]:
     """Every reason this WAVE cannot be filed — empty when it can.
 
-    All guards run (rather than stopping at the first), so an operator fixing a
+    All guards run (rather than stopping at the first), so a principal fixing a
     wave sees everything wrong with it in one refusal instead of one per round
     trip. The guards are: the per-child sizing rule, intra-wave duplicates, the
     duplicate guard against the open board, and the wave cap.
@@ -297,6 +340,8 @@ def wave_problems(
         if problem:
             problems.append(problem)
 
+    problems.extend(file_collision_problems(candidates))
+
     if len(candidates) > cap:
         problems.append(
             f"the wave mints {len(candidates)} children, over the cap of {cap} "
@@ -310,13 +355,13 @@ def effective_cap(env: Mapping[str, str] | None = None, *, focus_wave_cap: int |
 
     **The precedence is deliberate and stated here** (the issue allows the focus
     fallback only if it is documented): an explicit ``FLEET_DECOMPOSE_CAP``
-    always wins, because that is the operator speaking *now*; an unset variable
+    always wins, because that is the principal speaking *now*; an unset variable
     defers to the pinned focus's ``wave_cap``, because that is the board speaking
     for this epic; with neither, the module default of 12 applies.
 
     A variable that is *set* but not a positive integer raises ``ValueError``
     instead of falling back: a misconfigured cap is a refusal, never silently
-    defaulted to 12 (the brain reports it and files nothing).
+    defaulted to 12 (the director reports it and files nothing).
     """
     source = os.environ if env is None else env
     raw = str((source or {}).get(CAP_ENV, "") or "").strip()
@@ -333,8 +378,16 @@ def effective_cap(env: Mapping[str, str] | None = None, *, focus_wave_cap: int |
     return DEFAULT_CAP
 
 
-def _micro(title: str, *, files: Sequence[str] = ("fleet/x.py",)) -> dict[str, Any]:
-    """A well-sized child, for the self-control below."""
+def _micro(title: str, *, files: Sequence[str] | None = None) -> dict[str, Any]:
+    """A well-sized child, for the self-control below.
+
+    The default file is derived from the title (issue #740): two synthetic
+    children with the module's OLD shared default (``fleet/x.py``) would now be
+    a real, provable collision, not a harmless self-control fixture.
+    """
+    if files is None:
+        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or "child"
+        files = (f"fleet/x-{slug}.py",)
     return {
         "title": title,
         "lane": "fleet",

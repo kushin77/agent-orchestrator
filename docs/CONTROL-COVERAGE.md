@@ -138,7 +138,7 @@ and the assertion stands: a NEW gap would still be refused by name.
 ```
 $ bash scripts/check-control-coverage.sh
 == the control map ==
-  OK    every rule has a row, every module exists, every control is invoked by a gate
+  OK    every rule has a row, every module exists, every control is invoked by a gate, and every spine Control line matches its row (#873)
 == the shrink-only gap record ==
   OK    every non-enforced rule is recorded
   enforced: 9 of 9 rule(s)
@@ -146,6 +146,8 @@ $ bash scripts/check-control-coverage.sh
   OK    a control script that does not exist is refused
   OK    a control script that exists but NO GATE runs is refused
   OK    a suite the manifest does not declare is refused
+  OK    a rule's Control line deleted from the spine is refused
+  OK    a Control line naming a control not in the map row is refused
 check-control-coverage: OK — … the 0 recorded gap(s) are shrink-only
 RC=0
 ```
@@ -187,7 +189,10 @@ RC=0
    suite runner is itself shown to be invoked by a gate;
 4. a `GAP` row names a control, or a non-`GAP` row names none;
 5. `docs/CONTROL-COVERAGE.md` stops naming a Part B rule;
-6. a non-enforced rule is **not recorded** in the gap record.
+6. a non-enforced rule is **not recorded** in the gap record;
+7. **(#873)** a Part B rule's own `**Control.**` line in `docs/GOLDEN-RULES.md` is
+   missing, or its `modules:`/`controls:` set does not equal — in **both**
+   directions — the same rule's row in this map.
 
 It also proves it can fail. The assertions are one function over a map file, run
 against the real map and then against mutated copies — one provocation per
@@ -199,10 +204,32 @@ a refusal for the wrong reason would not show that the assertion works:
 | a control script that does not exist | the control-exists assertion |
 | a real script in `scripts/` that no gate invokes | the control-is-run assertion |
 | `suite:docs` — a real directory the manifest does not declare | the suite-declaration assertion |
+| a rule's `**Control.**` line deleted from a copy of the spine | the Control-line-exists assertion (#873) |
+| a `**Control.**` line naming a control not in the rule's map row | the Control-line-matches-the-map assertion (#873) |
 
 The second provocation asserts its own precondition (that its target really is
 unwired), so if a later change wires that script into a gate the control fails with
-an explanation rather than silently weakening.
+an explanation rather than silently weakening. The last two mutate a **copy of
+`docs/GOLDEN-RULES.md`**, not the map, reusing the same `assert_map` function the
+first three exercise — there is one harness, not two.
+
+### The spine binding (#873)
+
+Every Part B rule now carries a fourth part after `**Verify.**`:
+
+```
+**Control.** modules: `a/`, `b/` — controls: `check-x.sh`, `suite:dir`
+```
+
+This is not prose: `check-control-coverage.sh` parses it (backticks stripped,
+comma-separated names trimmed) and requires its modules set and controls set to be
+**exactly** the same as the rule's row in `scripts/control-coverage.tsv`, checked in
+both directions — a name added to one side without the other fails by rule and
+name. This is what makes the two sources of truth actually one: previously only the
+TSV row was checked against the repository; the human-readable spine line could say
+anything, or nothing, and no gate would notice. Now the spine line and the map are
+bound, and neither can drift out from under the other without the gate naming
+exactly which rule and which name disagreed.
 
 ## 5. Closing a gap
 

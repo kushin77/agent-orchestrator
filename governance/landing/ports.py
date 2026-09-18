@@ -113,8 +113,26 @@ class LandingOps(Protocol):
     def commit_subjects(self, base: str, rev: str) -> Tuple[str, ...]:
         """The subjects of the lane's own commits (the PR's what-changed list)."""
 
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        """The files the lane's diff touches (``git diff --name-only base...rev``).
+
+        Used to MEASURE the ``Gate-changing:`` declaration in the composed PR
+        body against ``scripts/lib/gate-paths.txt`` — never hard-coded.
+        """
+
     def remote_branch_head(self, branch: str) -> Optional[str]:
         """The remote head of ``branch``, or None when the branch is not pushed."""
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        """The merge base of ``left`` and ``right``, or None when there is none.
+
+        Used ONLY to decide whether publishing master's health after a merge
+        is honest (fix #5 follow-up, #1114): a lane's own attestation
+        measured the LANE head, and relabelling that as a measurement of
+        master's post-squash head is only fair when the lane head already
+        contained master's pre-merge tip — i.e. ``merge_base(lane_head,
+        master_head) == master_head``. Never used for anything else.
+        """
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         """The pull request whose head is ``branch`` (any state), or None."""
@@ -128,8 +146,21 @@ class LandingOps(Protocol):
     def run_contract(self, *, pr_number: Optional[int]) -> CommandResult:
         """Run the pre-merge contract (``scripts/merge-gate.sh run``)."""
 
-    def merge_pr(self, number: int) -> str:
-        """Squash-merge the pull request; return the merge commit."""
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        """Publish the gate of record as a GitHub commit status (ADR-0028).
+
+        ``rc`` is the pre-merge contract's own normalised tri-state (0/1/2),
+        never a subprocess return code passed through unexamined. The exit
+        code of the returned :class:`CommandResult` is the *poster's*
+        outcome: 0 means the status was posted (and read back), anything else
+        means it was not — a failed or unreadable poster, never a guess.
+        """
+
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        """Run the landed-contract trailer precondition over the commits to be squashed."""
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
+        """Squash-merge the pull request with an explicit trailer-bearing message; return the merge commit."""
 
     def delete_branch(self, branch: str) -> str:
         """Delete the remote source branch."""
@@ -188,6 +219,10 @@ class GitHubOps:
         out = self._git_text("log", "--no-merges", "--format=%s", f"{base}..{rev}")
         return tuple(line for line in out.splitlines() if line.strip())
 
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        out = self._git_text("diff", "--name-only", f"{base}...{rev}")
+        return tuple(line for line in out.splitlines() if line.strip())
+
     def remote_branch_head(self, branch: str) -> Optional[str]:
         out = self._git_text("ls-remote", "--heads", "origin", branch)
         for line in out.splitlines():
@@ -195,6 +230,16 @@ class GitHubOps:
             if len(parts) == 2 and parts[1].endswith(f"/{branch}"):
                 return parts[0]
         return None
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        result = self._git("merge-base", left, right)
+        if not result.ok:
+            # No common ancestor (or either name is unresolvable in this
+            # checkout) — an honest "cannot tell", not an exception. The
+            # caller (the master-attestation guard) treats this as "not
+            # already at master", the safe default.
+            return None
+        return result.stdout.strip() or None
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         result = self._gh(
@@ -258,11 +303,62 @@ class GitHubOps:
             env["AO_PR_NUMBER"] = str(pr_number)
         return _run(["bash", str(self.root / "scripts" / "merge-gate.sh"), "run"], cwd=self.root, env=env)
 
-    def merge_pr(self, number: int) -> str:
-        """Squash-merge; the branch is deleted by its own named step, not here."""
-        result = self._gh("pr", "merge", str(number), "--squash")
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        """``bash scripts/gate-status.sh post --sha <sha> --rc <rc>`` (ADR-0028, #1072).
+
+        Run from the repo root, exactly as the poster's own header documents.
+        The mapping from a gate outcome to a commit-status state lives ONLY in
+        ``scripts/gate-status-map.py`` — this port does not re-decide it, it
+        just runs the poster and reports what the poster reported.
+        """
+        return _run(
+            ["bash", str(self.root / "scripts" / "gate-status.sh"), "post", "--sha", sha, "--rc", str(rc)],
+            cwd=self.root,
+            env=self.env,
+        )
+
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        """The merge precondition over the artifact that lands (issue #998).
+
+        The repository sets ``squash_merge_commit_message=COMMIT_MESSAGES``, so
+        the landed commit body is composed from the BRANCH COMMIT MESSAGES, not
+        the PR body: a PR whose body is contract-perfect still lands trailer-less
+        if its commit message lacks the ticket trailer. This runs the shared
+        predicate's landed audit over exactly the commits that will be squashed
+        — ``scripts/check-pr-contract.sh --landed --range <base>..<head>`` — the
+        same parser the landed-history audit (``check-isolation-landed``) runs,
+        moved to *before* the merge rather than after it. One rule, one parser,
+        enforced on the artifact that lands.
+        """
+        return _run(
+            [
+                "bash",
+                str(self.root / "scripts" / "check-pr-contract.sh"),
+                "--landed",
+                "--range",
+                f"{base}..{head}",
+            ],
+            cwd=self.root,
+            env=self.env,
+        )
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
+        """Squash-merge with an explicit trailer-bearing message; the branch delete stays its own step.
+
+        The explicit ``--subject``/``--body-file`` makes the landed artifact
+        deterministic: instead of relying on GitHub's COMMIT_MESSAGES
+        composition, the squash commit body is the one the caller composed and
+        validated, so its trailing ticket trailer survives the merge (issue #998).
+        """
+        result = self._gh(
+            "pr", "merge", str(number), "--squash",
+            "--subject", subject, "--body-file", str(body_file),
+        )
         if not result.ok:
-            raise PortError(f"`gh pr merge {number} --squash` failed (rc={result.rc}): {result.stderr.strip()[-300:]}")
+            raise PortError(
+                f"`gh pr merge {number} --squash --subject ... --body-file ...` failed "
+                f"(rc={result.rc}): {result.stderr.strip()[-300:]}"
+            )
         view = self._gh("pr", "view", str(number), "--json", "state,mergeCommit")
         if not view.ok:
             raise PortError(f"`gh pr view {number}` failed (rc={view.rc}): {view.stderr.strip()[-200:]}")
@@ -320,8 +416,14 @@ class RecordingOps:
     def commit_subjects(self, base: str, rev: str) -> Tuple[str, ...]:
         return self.reads.commit_subjects(base, rev)
 
+    def changed_files(self, base: str, rev: str) -> Tuple[str, ...]:
+        return self.reads.changed_files(base, rev)
+
     def remote_branch_head(self, branch: str) -> Optional[str]:
         return self.reads.remote_branch_head(branch)
+
+    def merge_base(self, left: str, right: str) -> Optional[str]:
+        return self.reads.merge_base(left, right)
 
     def pull_request_for(self, branch: str) -> Optional[PullRequest]:
         return self.reads.pull_request_for(branch)
@@ -338,8 +440,16 @@ class RecordingOps:
         self._plan("contract", f"bash scripts/merge-gate.sh run (AO_PR_NUMBER={pr_number or 'unset'})")
         return CommandResult(argv=("bash", "scripts/merge-gate.sh", "run"), rc=0)
 
-    def merge_pr(self, number: int) -> str:
-        return self._plan("merge", f"gh pr merge {number} --squash")
+    def publish_status(self, *, sha: str, rc: int) -> CommandResult:
+        self._plan("gate-status", f"bash scripts/gate-status.sh post --sha {sha} --rc {rc}")
+        return CommandResult(argv=("bash", "scripts/gate-status.sh", "post"), rc=0)
+
+    def check_landed_contract(self, *, base: str, head: str) -> CommandResult:
+        self._plan("landed-contract", f"bash scripts/check-pr-contract.sh --landed --range {base}..{head}")
+        return CommandResult(argv=("bash", "scripts/check-pr-contract.sh", "--landed"), rc=0)
+
+    def merge_pr(self, number: int, *, subject: str, body_file: Path) -> str:
+        return self._plan("merge", f"gh pr merge {number} --squash --subject {subject!r} --body-file {body_file}")
 
     def delete_branch(self, branch: str) -> str:
         return self._plan("delete-branch", f"git push origin --delete {branch}")

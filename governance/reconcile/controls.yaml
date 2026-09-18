@@ -1,0 +1,40 @@
+# The reconciliation worker's declared controls (issue #885, lane L6).
+#
+# `governance/policy/lease.py` already owns every timing this package shares
+# with the rest of the fleet (the session TTL, the heartbeat interval, the
+# real-tree age-grace window) — this file does NOT restate any of those; it
+# declares the two controls that are `governance/reconcile`'s own and nobody
+# else's:
+#
+#   * `sweep.max_actions_per_pass` — a runaway guard. `sweep --apply` acts on
+#     every orphaned session it finds in one pass; a wrong `--ttl-minutes`, a
+#     wedged clock, or a heartbeat directory an agent seeded by mistake can
+#     turn "reconcile the fleet" into "tear down every worktree at once" with
+#     no human in the loop. This caps how many destructive teardowns
+#     (reclaimed/parked/shelved) one `sweep()` call may perform; the rest are
+#     REFUSED by name (`sweep.batch-limit-exceeded`) and re-evaluated next
+#     pass, never silently dropped.
+#   * `sweep.outcome_codes` — the closed vocabulary the audit ledger
+#     (`ledger.py`) stamps a decision record with. A record whose code is not
+#     declared here is refused rather than written (no-false-green: an
+#     unenforced vocabulary is a vocabulary nobody reviewed).
+#
+# Read by `policy.py`, which is the only reader `sweep.py` and `ledger.py` are
+# allowed to import this through (GR-12/GR-29): a value restated as a bare
+# literal anywhere else in this package is exactly the drift this file exists
+# to prevent.
+
+schema: ao.reconcile/controls-v1
+subject: governance/reconcile
+
+sweep:
+  # A positive integer. 0 refuses every teardown in the pass (used by the
+  # mutation test and the gate provocation to prove the control bites).
+  max_actions_per_pass: 25
+  outcome_codes:
+    reclaimed: reconcile.reclaimed
+    parked: reconcile.parked
+    shelved: reconcile.shelved
+    reported: reconcile.reported
+    failed: reconcile.failed
+    refused: reconcile.batch-limit-exceeded

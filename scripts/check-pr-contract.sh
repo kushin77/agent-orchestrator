@@ -49,6 +49,18 @@
 #   * the PR body's `## Pre-existing red` section is either an explicit `None` or
 #     a reproduction: a `Reproduce:` line naming a command in backticks followed
 #     by a fenced output block.
+#   * the PR body's `## Merge order` section declares `Gate-changing: no` or
+#     `Gate-changing: yes — <paths>` (issue #1054), and the declaration is
+#     cross-checked against the diff: `no` while the range touches
+#     `scripts/verify.sh`/`scripts/gate.sh`/`scripts/merge-gate.sh`/
+#     `scripts/check-*.sh`/`scripts/gate-coverage-baseline.txt` (the glob list
+#     lives in `scripts/lib/gate-paths.txt`, read from THIS repo's checkout —
+#     not the range under test — so the boundary is stable) is refused, and so
+#     is `yes` while the range touches none of them. This is a PR-BODY
+#     obligation, exactly like `Closes`/`AI-assistance`: it is enforced at PR
+#     time only, never by `--landed` (a squash-merge commit carries no PR body
+#     to re-judge, so the enforcement-gate grandfathering does not need to say
+#     anything about it — there is nothing in landed history for it to check).
 #
 # WHY NOT `git interpret-trailers --parse` ALONE: git only recognises the COLON
 # form (`Refs: owner/repo#n`), while this repo's convention — and the exemplary
@@ -305,6 +317,65 @@ PY
   fi
 }
 
+# The Gate-changing declaration, cross-checked against the diff (issue #1054).
+# Reads the glob list from THIS script's own repo (`$root`), never from the
+# repo/range under test — the selftest's scratch repo carries no
+# `scripts/lib/gate-paths.txt`, and a real audit should not let a PR that
+# deletes the path file also delete the cross-check.
+check_gate_changing() { # <body-file> <range>
+  local body="$1" rang="$2" line declared touched matched paths_file
+  line="$(grep -E '^Gate-changing:' "$body" | head -n1)"
+  declared=""
+  if [ -n "$line" ]; then
+    case "$line" in
+      Gate-changing:*'<'*) declared="" ;;
+      *) case "$(printf '%s' "$line" | sed -E 's/^Gate-changing:[[:space:]]*//')" in
+           [Nn]o*)  declared="no" ;;
+           [Yy]es*) declared="yes" ;;
+           *)       declared="" ;;
+         esac
+      ;;
+    esac
+  fi
+  if [ -z "$declared" ]; then
+    findings+=("pr-body-missing-gate-changing")
+    return
+  fi
+
+  touched="$(git -C "$repo" diff --name-only "$rang" 2>/dev/null)"
+  paths_file="$root/scripts/lib/gate-paths.txt"
+  matched="0"
+  if [ -n "$touched" ]; then
+    matched="$(GATE_PATHS_FILE="$paths_file" TOUCHED="$touched" python3 - <<'PY'
+import fnmatch
+import os
+
+paths_file = os.environ["GATE_PATHS_FILE"]
+touched = [line for line in os.environ["TOUCHED"].splitlines() if line]
+globs = []
+try:
+    with open(paths_file, encoding="utf-8") as fh:
+        for raw in fh:
+            g = raw.strip()
+            if not g or g.startswith("#"):
+                continue
+            globs.append(g)
+except OSError:
+    pass
+
+hit = any(fnmatch.fnmatch(f, g) for f in touched for g in globs)
+print(1 if hit else 0)
+PY
+)"
+  fi
+
+  if [ "$declared" = "no" ] && [ "$matched" = "1" ]; then
+    findings+=("pr-body-gate-changing-mismatch-no")
+  elif [ "$declared" = "yes" ] && [ "$matched" = "0" ]; then
+    findings+=("pr-body-gate-changing-mismatch-yes")
+  fi
+}
+
 report() { # [label]
   local label="${1:-check-pr-contract}"
   local f
@@ -317,6 +388,7 @@ report() { # [label]
 run_checks() { # <body-file> <range>
   findings=()
   check_body "$1"
+  check_gate_changing "$1" "$2"
   check_commits "$2"
   if [ "${#findings[@]}" -gt 0 ]; then
     report "check-pr-contract"
@@ -458,6 +530,10 @@ selftest() {
 ## Closes
 
 Closes #288
+
+## Merge order
+
+Gate-changing: no
 
 ## Evidence
 
@@ -666,7 +742,8 @@ Refs kushin77/agent-orchestrator#835" >/dev/null 2>&1
   # 6. a claimed pre-existing red WITH a reproduction is accepted
   reproduced_body="$work/reproduced.md"
   {
-    printf '## Closes\n\nCloses #288\n\n## AI-assistance\n\n'
+    printf '## Closes\n\nCloses #288\n\n## Merge order\n\nGate-changing: no\n\n'
+    printf '## AI-assistance\n\n'
     printf 'AI-assistance: Copilot (Relentless, flash/LOW)\n\n'
     printf '## Pre-existing red\n\nReproduce: `bash scripts/check-secrets.sh`\n\n'
     printf '```\ncheck-secrets: FAIL (1 finding)\n```\n'
@@ -727,6 +804,169 @@ Refs kushin77/agent-orchestrator#835" >/dev/null 2>&1
   else
     printf '  FAIL  a trailer-less enforcement gate went undetected\n%s\n' "$out" >&2
     ok=1
+  fi
+
+  # --- Gate-changing plants (issue #1054) -------------------------------------
+  # plant (a): missing/placeholder `Gate-changing:` line is refused by name.
+  no_gate_body="$work/no-gate-changing.md"
+  cat >"$no_gate_body" <<'MD'
+## Closes
+
+Closes #1054
+
+## AI-assistance
+
+AI-assistance: Copilot (Relentless, flash/LOW)
+
+## Pre-existing red
+
+None
+MD
+  out="$(run_checks "$no_gate_body" "$base..$a_sha" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-missing-gate-changing"* ]]; then
+    printf '  OK    plant (a): a missing Gate-changing line is refused by name\n'
+  else
+    printf '  FAIL  plant (a) went undetected\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # placeholder form (the untouched template) is refused the same way.
+  placeholder_gate_body="$work/placeholder-gate.md"
+  cat >"$placeholder_gate_body" <<'MD'
+## Closes
+
+Closes #1054
+
+## Merge order
+
+Gate-changing: <no | yes — paths>
+
+## AI-assistance
+
+AI-assistance: Copilot (Relentless, flash/LOW)
+
+## Pre-existing red
+
+None
+MD
+  out="$(run_checks "$placeholder_gate_body" "$base..$a_sha" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-missing-gate-changing"* ]]; then
+    printf '  OK    plant (a): the unfilled Gate-changing placeholder is refused by name\n'
+  else
+    printf '  FAIL  the Gate-changing placeholder went undetected\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # plant (b): declared `no` while the range touches a gate path.
+  mkdir -p "$scratch/scripts"
+  printf 'x\n' >"$scratch/scripts/check-plant-b.sh"
+  git -C "$scratch" add scripts/check-plant-b.sh >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "touch a gate path" \
+    -m "Refs kushin77/agent-orchestrator#1054" >/dev/null 2>&1
+  plantb_sha="$(git -C "$scratch" rev-parse HEAD)"
+  gate_no_body="$work/gate-no.md"
+  cat >"$gate_no_body" <<'MD'
+## Closes
+
+Closes #1054
+
+## Merge order
+
+Gate-changing: no
+
+## AI-assistance
+
+AI-assistance: Copilot (Relentless, flash/LOW)
+
+## Pre-existing red
+
+None
+MD
+  out="$(run_checks "$gate_no_body" "${plantb_sha}^..$plantb_sha" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-no"* ]]; then
+    printf '  OK    plant (b): declared no while touching a gate path is refused by name\n'
+  else
+    printf '  FAIL  plant (b) went undetected\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # plant (c): declared `yes` while the range touches none.
+  gate_yes_body="$work/gate-yes.md"
+  cat >"$gate_yes_body" <<'MD'
+## Closes
+
+Closes #1054
+
+## Merge order
+
+Gate-changing: yes — scripts/check-plant-b.sh
+
+## AI-assistance
+
+AI-assistance: Copilot (Relentless, flash/LOW)
+
+## Pre-existing red
+
+None
+MD
+  out="$(run_checks "$gate_yes_body" "$base..$a_sha" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-yes"* ]]; then
+    printf '  OK    plant (c): declared yes while touching no gate path is refused by name\n'
+  else
+    printf '  FAIL  plant (c) went undetected\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # non-vacuity: a correctly declared `yes` against a gate-touching range passes.
+  gate_ok_body="$work/gate-ok.md"
+  cat >"$gate_ok_body" <<'MD'
+## Closes
+
+Closes #1054
+
+## Merge order
+
+Gate-changing: yes — scripts/check-plant-b.sh
+
+## AI-assistance
+
+AI-assistance: Copilot (Relentless, flash/LOW)
+
+## Pre-existing red
+
+None
+MD
+  out="$(run_checks "$gate_ok_body" "${plantb_sha}^..$plantb_sha" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" == *"check-pr-contract: OK"* ]]; then
+    printf '  OK    a correctly declared Gate-changing: yes passes\n'
+  else
+    printf '  FAIL  a correct Gate-changing declaration was refused\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # --- mutant: the Gate-changing check must be load-bearing -------------------
+  # Neuter every Gate-changing finding into a no-op and prove the mutant
+  # diverges from the real script on plant (a): the real gate refuses it, the
+  # mutant accepts it. A mutant byte-identical to the original proves nothing.
+  gate_mutant="$work/check-pr-contract.mutant.sh"
+  sed \
+    -e 's/findings+=("pr-body-missing-gate-changing")/:/' \
+    -e 's/findings+=("pr-body-gate-changing-mismatch-no")/:/' \
+    -e 's/findings+=("pr-body-gate-changing-mismatch-yes")/:/' \
+    "$0" >"$gate_mutant"
+  if cmp -s "$0" "$gate_mutant"; then
+    echo "check-pr-contract: SELFTEST FAIL — the Gate-changing mutant is byte-identical to this script; the mutation proved nothing" >&2
+    ok=1
+  else
+    mutant_out="$(bash "$gate_mutant" --repo "$scratch" --body-file "$no_gate_body" --range "$base..$a_sha" 2>&1)"
+    mutant_rc=$?
+    if [ "$mutant_rc" -eq 0 ]; then
+      printf '  OK    the mutant (Gate-changing check neutered) accepts plant (a); it diverges from the real gate\n'
+    else
+      printf '  FAIL  the mutant still refused plant (a); the check is not load-bearing\n%s\n' "$mutant_out" >&2
+      ok=1
+    fi
   fi
 
   rm -rf "$work"

@@ -77,7 +77,10 @@ INVARIANTS: Tuple[Invariant, ...] = (
             "names a commit, and a summary is not evidence. Close out BEFORE the lane is torn down "
             "(`governance/lifecycle/cli.py close --issue <n>`), or keep the verified commit reachable: "
             "the attestation is measured from one of the two, and the driver refuses to reclaim a lane "
-            "while this invariant is unsatisfied (#786)"
+            "while this invariant is unsatisfied (#786). For a SQUASH-merged pull request the lane may "
+            "instead be a tree cut from the default branch after the merge: it is admitted when it "
+            "contains the commit the squash landed as and that landing carries the same tree as the "
+            "verified head, and the record then names all three commits (#1098)"
         ),
     ),
     Invariant(
@@ -222,3 +225,25 @@ def stage_of(item: dict) -> str:
     if (item.get("claim") or {}).get("live") or (item.get("lane") or {}).get("present"):
         return "closed"
     return TERMINAL_STAGE
+
+
+def _validate_against_policy() -> None:
+    """Refuse, at import time, a closure vocabulary that has drifted from
+    ``controls.yaml`` (issue #885). The check runs exactly once, when this
+    module is first imported — the same "read at load time, refuse
+    immediately" posture ``governance/modules/policy.py`` established for the
+    module registry: a rule this file can emit that ``controls.yaml`` does not
+    declare (or vice versa) is a policy defect, not a silent gap, so it is
+    refused before a single audit or close-out runs against it.
+
+    A gate provocation that wants a mutated policy to be read instead of the
+    packaged one points ``AO_LIFECYCLE_CONTROLS`` (``policy.CONTROLS_ENV``) at
+    its scratch copy; this import-time check then refuses with that file's
+    problem, by name, before any audit or close-out runs.
+    """
+    from governance.lifecycle import policy as _policy  # noqa: PLC0415 - avoids a cycle
+
+    _policy.load_for_model()
+
+
+_validate_against_policy()

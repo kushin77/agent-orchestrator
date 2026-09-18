@@ -31,10 +31,18 @@ apply_path:
 ci_cd:
   verify_trigger:
     default: off
+    promoted: true
     description: PR verify trigger runs `make verify` as a code-native CI status.
   apply_trigger:
     default: off
-    description: Flag-gated terraform apply trigger; the only apply route.
+    promoted: true
+    description: >
+      Flag-gated terraform apply trigger; the only apply route. Promotion
+      here records the reviewed go-live decision; arming the live trigger
+      (`gcloud builds triggers update --no-disabled`, out-of-band, never a
+      commit) is a separate operational step, and apply.yaml's flag-gate
+      still refuses every run while `_ENABLE_APPLY` stays "false"
+      (infra/cloudbuild/apply-trigger.yaml).
 
 # Per-service promotion state. `tf_flag` maps to the matching variable in
 # infra/terraform/variables.tf (all default false).
@@ -260,6 +268,21 @@ services:
       served contract, documents are ERP-06's own answers, and the
       authorization decision stays ERP-08's.
 
+  erp_webhooks_bridge:
+    default: off
+    promoted: false
+    phase: 7
+    tf_flag: enable_erp_webhooks_bridge
+    description: >
+      CRM→ERPNext webhook bridge (issue #671, EPIC #665): the conversion-event
+      bridges in integrations/erp/webhooks/ (bridge.py, hooks.py) that post CRM
+      conversion events directly to ERPNext accounting modules. The in-module
+      switch is FLAG_ID "erp-webhooks-bridge" in
+      integrations/erp/webhooks/flags.py, read fail-closed by flags.is_enabled().
+      No separate process and no terraform resource: the code ships inside the
+      existing ERP module, and the variable is the switch, not a resource count.
+      OFF until a reviewed go-live promotes it.
+
   # The fleet-cron container pair on the shared-services on-prem HA cluster
   # (issue #900, EPIC #706, lane L5 #884): 2 replicas, active-active, on
   # nodes 192.168.168.31 / .42. Own `tf_flag` (not any of the seven
@@ -286,8 +309,8 @@ services:
 # surface's `default` is `off`, so the gate is code-enforced, not advisory.
 surfaces:
   fleet_projection:
-    default: off
-    promoted: false
+    default: on
+    promoted: true
     service: portal
     tf_flag: enable_portal
     description: >
@@ -412,8 +435,8 @@ surfaces:
       inherited rather than re-implemented. Offline in tests: provider traffic
       goes through the proxy's scriptable transport rig.
   remote_control:
-    default: off
-    promoted: false
+    default: on
+    promoted: true
     service: portal
     tf_flag: enable_portal
     description: >
@@ -551,8 +574,8 @@ surfaces:
       rather than `enable_guardrails`: the kill switch for tool execution is
       independent of the guardrails service flag.
   operator_terminal:
-    default: off
-    promoted: false
+    default: on
+    promoted: true
     service: portal
     tf_flag: enable_portal
     description: >

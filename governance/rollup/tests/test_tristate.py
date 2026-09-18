@@ -11,7 +11,33 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from conftest import ROLLUP_DIR, build_report, inventory, org, run_cli, sme, write_tree
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_rollup_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+
+# Persistent handle for the lazy in-function "model" imports below (see
+# governance/rollup/tests/conftest.py for the rationale: issues #699, #702,
+# #1042).
+import model as _rollup_model  # noqa: E402
+ROLLUP_DIR = _conftest.ROLLUP_DIR
+build_report = _conftest.build_report
+inventory = _conftest.inventory
+org = _conftest.org
+run_cli = _conftest.run_cli
+sme = _conftest.sme
+write_tree = _conftest.write_tree
 
 TENANT = {"alpha": {"ceiling": 300.0, "repos": ["fx/one"]}}
 CLEAN = [inventory("fx/one", "alpha", [sme()])]
@@ -190,7 +216,10 @@ def test_cannot_assess_dominates_not_ok(tmp_path):
 
 
 def test_every_cannot_assess_status_maps_to_a_non_zero_exit_code():
-    from model import EXIT_CODES, STATUS_CANNOT_ASSESS, STATUS_NOT_OK, STATUS_OK
+    EXIT_CODES = _rollup_model.EXIT_CODES
+    STATUS_CANNOT_ASSESS = _rollup_model.STATUS_CANNOT_ASSESS
+    STATUS_NOT_OK = _rollup_model.STATUS_NOT_OK
+    STATUS_OK = _rollup_model.STATUS_OK
 
     assert EXIT_CODES == {STATUS_OK: 0, STATUS_NOT_OK: 1, STATUS_CANNOT_ASSESS: 2}
     assert EXIT_CODES[STATUS_CANNOT_ASSESS] != 0

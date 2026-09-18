@@ -41,7 +41,7 @@ and the gate can require that each one has been provoked.
 | Invariant | Broken means |
 |---|---|
 | `PR_NOT_MERGED` | A verified change that never landed. |
-| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name the pull request's **head commit** — a squash merge creates a *new* commit, so demanding that evidence name the merge commit would fail every correctly-merged item. What matters is that the tree which was verified is the tree that landed. |
+| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name the pull request's **head commit** — a squash merge creates a *new* commit, so demanding that evidence name the merge commit would fail every correctly-merged item. What matters is that the tree which was verified is the tree that landed. A lane may therefore stand for that head only when it **is** the verified commit, or — for a *merged* pull request — contains the commit the squash landed as **and** that landing carries the same tree (§3.6, #1098). |
 | `BRANCH_NOT_DELETED` | The branch outlived its issue. |
 | `CLAIM_STILL_HELD` | A closed issue still claims a lane, blocking re-dispatch. |
 | `DIRECTIVE_NOT_CONSUMED` | A pending directive re-executes the order the moment the claim frees. |
@@ -297,6 +297,57 @@ gate was **green** has its invariant *satisfied*; the same lane with a **red** g
 an unreachable commit, is still refused by name; and disabling either half of the fix
 reproduces the wedge, so neither half is decoration.
 
+### 3.6 A squash merge decides which commit a lane can be measured against (#1098)
+
+§3.5 names the commit as what proves the tree. That is right, and it was **half** the
+problem: for a **squash-merged** pull request the commit that was verified — the branch
+tip — is not an ancestor of anything on the default branch. The merge created a *new*
+commit carrying the same tree, so a lane cut from the default branch (the correct venue,
+rule 15) can never be **at** the verified head, and `record-verification` refused it:
+
+```
+failed    record-verification: RuntimeError: lane head 96ae0fba19c3 is not the verified commit a06badc9eb80
+```
+
+Measured on #714, #977 and #978 — all three merged, none closable, all three left
+carrying `VERIFY_EVIDENCE_MISSING`. The obvious remedy (reset the lane to the branch tip)
+satisfied the equality and then measured an **obsolete tree**: the composite gate is not
+tree-local, so its repo-wide invariants failed for reasons unrelated to the change —
+measured at PR #984's head, **19 of 145 checks failed**, for a tree no green attestation
+had ever existed for.
+
+The rule is therefore widened in exactly one direction, and the second arm needs **both**
+of its halves:
+
+| A lane may stand for the verified commit when | |
+|---|---|
+| it **is** the verified commit | unchanged — the equality arm, and the only arm for an item that has not merged |
+| it **contains the landing**, *and* the landing carries the **verified tree** | the squash arm. `landing` is the commit the merge landed as, offered only when the pull request is genuinely merged |
+
+The tree half is what keeps the doctrine intact — "the tree which was verified is the
+tree that landed" — so a lane containing a landing built from *other* content is refused
+rather than measured as if it proved this item. The record then names **all three**
+commits, because each answers a different question:
+
+```json
+{"verify": {"ok": true, "commit": "<the verified head — what the evidence is against>",
+            "landing": "<the commit the squash landed as>",
+            "measured": "<the tree the gate actually ran in>",
+            "via": "contains", "source": "lane"}}
+```
+
+`commit` deliberately keeps naming the **verified** commit: that is the convention the
+audit, the invariant's own text, the table above and every pre-existing record use, and
+re-pointing it at the measured tree would have silently invalidated each of them. The lane
+is the measurement; the verified commit is the subject; the record says which is which.
+
+All of it is provoked in
+[`check-lifecycle-verify-order.sh`](../../scripts/check-lifecycle-verify-order.sh) against
+a **real** squash merge: a lane that contains the landing is **admitted** and journalled;
+a lane containing no landing of the item's, and a lane containing a landing built from
+other content, are both **refused by name**; and removing either the containment arm or
+the tree check reproduces the wrong answer, so neither half is decoration.
+
 ## 4. Auditing, and why it is offline
 
 `cli.py collect` reaches GitHub; `cli.py audit` never does. The rules are asserted
@@ -335,7 +386,37 @@ The execution loop ([`fleet/terminal.py`](../../fleet/terminal.py)) runs close-o
 after every dispatch and carries its verdict in the report, so a partial close
 reaches the brain instead of being discovered later by hand.
 
-## 7. Board reporting
+## 7. Declared controls, decision ledger, frozen schema, live feed (issue #885)
+
+Four artifacts make the package's evidence machine-checkable rather than
+prose, per the surface-class ladder (`governance/conformance/surfaces.py`):
+
+| Artifact | File | Read by |
+|---|---|---|
+| **controls** | [`controls.yaml`](controls.yaml) + [`policy.py`](policy.py) | `model.py` (import-time: the closed invariant vocabulary must match `controls.yaml` in both directions — a drift is `PolicyUnavailable`, CANNOT-ASSESS); `directive.py` `retire` (`policy.load_for_model().check_retire` — the reason-length floor and the superseded-by requirement, not a hard-coded check) |
+| **audit** (decision ledger) | [`ledger.py`](ledger.py), written to `.fleet/lifecycle/ledger.jsonl` | `directive.consume` and `directive.retire` (exactly one record per call: `ok` or `refused`, schema-validated before it is written); `cli.py` `cmd_close` (one record per close-out verdict) |
+| **schema** | [`lifecycle.schema.json`](lifecycle.schema.json) | `ledger.py` (validates every record against `$defs/ledgerRecord` before appending, reusing `governance/modules/schema.py`'s stdlib-only validator rather than a second implementation) |
+| **live feed** | [`live.py`](live.py), exposed through the existing verb `cli.py status --live` | an operator or another gate wanting every in-scope item's stage in one call, derived from `model.stage_of` on the SAME record `audit`/`status`/`close` already read — never a second collection |
+
+`controls.yaml` declares two judgments that used to live only in code:
+
+* the **closed vocabulary** — one entry per `model.INVARIANTS` code, so an
+  invariant this package can emit that `controls.yaml` does not declare (or
+  vice versa) is a policy defect refused at import time, not a rule nobody
+  reviewed;
+* the **retire preconditions** — `retire.min_reason_length` and
+  `retire.require_superseded_by`, read by `directive.py`'s `retire` instead of
+  the bare `not reason.strip()` it used to carry, so the threshold is
+  reviewable and can be raised without a code change (`AO_LIFECYCLE_CONTROLS`
+  overrides which file is read, for the gate's own mutation provocation).
+
+`scripts/check-github-lifecycle.sh` provokes one violation per new artifact —
+a control mutated (refused by name), a missing ledger record (refused), a
+schema-invalid record (refused), and a live feed that has drifted from the
+record it claims to project (refused) — the sha256-restore idiom the rest of
+the script already uses.
+
+## 8. Board reporting
 
 A finding must reach the board, not only a log line. `cli.py audit --apply` and
 `cli.py close --apply` file a GitHub issue per non-terminal artifact carrying the

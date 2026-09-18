@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Dumb-terminal loop (sister side) — never idles, always watches, escalates.
+"""Dumb-terminal loop (dispatcher side) — never idles, always watches, escalates.
 
-This is the loop the sister runs so the fleet never stops: it watches the
-inbox, runs a code-native subagent per directive via the agent CLI, reports
-the result, and escalates any failure to the brain. An empty inbox is just
+This is the loop the dispatcher runs so the fleet never stops: it watches the
+inbox, runs a code-native executor per directive via the agent CLI, reports
+the result, and escalates any failure to the director. An empty inbox is just
 another poll cycle — there is no IDLE exit.
 
 The directive's FinOps block is NOT decorative (#218): `model.tier` selects the
@@ -41,7 +41,7 @@ import runaway
 import runners
 import runtime
 import singleton
-import telemetry
+import runslog
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -50,7 +50,7 @@ if str(ROOT) not in sys.path:
 from governance import spawn  # noqa: E402  (the spawn envelope, issue #793)
 
 #: The standing directive (`fleet/directive.json`) — "the DSv4FNone order, in code".
-#: Every subagent prompt carries its standing clauses verbatim rather than a
+#: Every executor prompt carries its standing clauses verbatim rather than a
 #: paraphrase, so the mandate travels with the order and cannot drift from it.
 DIRECTIVE_PATH = ROOT / "fleet" / "directive.json"
 
@@ -103,8 +103,8 @@ SESSION_BEAT_SECONDS = DEFAULT_BEAT_SECONDS
 
 # --- the FinOps block selects the runner (issue #218) ------------------------
 #
-# The brain's `model.tier`/`model.thinking` used to be printed into the prompt and
-# otherwise ignored: every subagent ran `claude -p`, so the `pro/low` floor raised
+# The director's `model.tier`/`model.thinking` used to be printed into the prompt and
+# otherwise ignored: every executor ran `claude -p`, so the `pro/low` floor raised
 # for a security lane bought nothing and the FinOps block was decorative. It now
 # selects the runner invocation, and a block this build cannot execute REFUSES the
 # dispatch rather than falling back to the default runner.
@@ -123,7 +123,7 @@ SESSION_BEAT_SECONDS = DEFAULT_BEAT_SECONDS
 # instead of being dispatched at whatever the map happens to hold.
 #
 # BYOK credentials are deliberately absent: `ANTHROPIC_AUTH_TOKEN` and
-# `ANTHROPIC_BASE_URL` come from the operator's environment or a secret manager
+# `ANTHROPIC_BASE_URL` come from the principal's environment or a secret manager
 # and are never written here (GR-6). This module exports only the tier, the model
 # and the thinking effort — which is what a BYOK-wired wrapper needs to honour it.
 TIER_RUNNERS: dict[str, dict[str, str]] = {
@@ -132,10 +132,10 @@ TIER_RUNNERS: dict[str, dict[str, str]] = {
     "auditor": {"model": "deepseek-v4-pro", "flag": "--model"},
 }
 
-#: The base runner command when the operator passes none. The tier does not
+#: The base runner command when the principal passes none. The tier does not
 #: replace it — it selects the model that command is invoked with. ``FLEET_RUNNER``
 #: (documented in ``fleet/README.md`` and, until #733, read by nothing) sets the same
-#: default, so an operator can point the fleet at an absolute runner path from the
+#: default, so a principal can point the fleet at an absolute runner path from the
 #: environment cron gives it.
 DEFAULT_RUNNER = "claude -p"
 
@@ -186,7 +186,7 @@ def resolve_dispatch(
     a fallback for a declared tier), while a declared value this build cannot
     route is refused by name. The high floor is honoured too: a security/secrets/
     auth/IaC lane whose block sits below the policy's floor is refused rather than
-    silently raised, so the operator sees what was ordered.
+    silently raised, so the principal sees what was ordered.
     """
     try:
         policy = finops_policy()
@@ -323,9 +323,9 @@ def build_envelope(
 ) -> dict:
     """The spawn envelope for one directive: every governance fact, in one document.
 
-    Before #793 the governance a fleet subagent obeyed was PROSE inlined into the
+    Before #793 the governance a fleet executor obeyed was PROSE inlined into the
     prompt, where nothing could check that a spawn had carried it, and a locally
-    spawned subagent shared none of it. The envelope is produced by
+    spawned executor shared none of it. The envelope is produced by
     `governance/spawn` — the SAME producer the local path calls — so the two
     regimes converge by construction, and a document missing a required field is
     refused by name before any child exists.
@@ -359,7 +359,7 @@ def build_prompt(
     env: dict[str, str] | None = None,
     context: dict | None = None,
 ) -> str:
-    """The subagent prompt: one issue, one worktree, one session identity, one envelope.
+    """The executor prompt: one issue, one worktree, one session identity, one envelope.
 
     The prompt CONSUMES the spawn envelope (#793) instead of restating governance.
     It used to inline the standing mandate, the identity, the trailer and the
@@ -370,10 +370,10 @@ def build_prompt(
     both spawn paths, and an envelope that cannot be validated raises
     `spawn.EnvelopeRefused` rather than being spawned with a warning.
 
-    The claim is *owned by the loop*, not by the subagent: a subagent that died
+    The claim is *owned by the loop*, not by the executor: an executor that died
     mid-task used to leave its claim wedged until the 24h TTL, because nobody
     was left to release it. The loop claims before the spawn and releases in a
-    `finally`, so a dead subagent can no longer strand an issue.
+    `finally`, so a dead executor can no longer strand an issue.
 
     The session identity travels with the order too. An agent that does not know
     which branch it is on cannot keep its commits traceable to the ticket, so the
@@ -381,7 +381,7 @@ def build_prompt(
 
     The mandate comes FIRST. The standing directive's live-CI/CD-SDLC and
     replaceability clauses are frontloaded ahead of the order itself, because a
-    subagent that reads only the first lines must still know that it is gated
+    executor that reads only the first lines must still know that it is gated
     (real `Verify:` + `make verify` output is the evidence), that its commit must
     be atomic and green, and that it may be replaced at any moment — so it
     executes only this directive, keeps every fact it needs in artifacts, and
@@ -389,7 +389,7 @@ def build_prompt(
 
     The prompt also carries a CONTEXT PACK (#220) — the issue's title, body and
     acceptance criteria, its lane and its own ``Verify:`` clause, plus the lessons
-    a previous lane already paid for — so the subagent does not have to rediscover
+    a previous lane already paid for — so the executor does not have to rediscover
     the work it was ordered to do. `context` is supplied by the loop, which also
     records it with the run; when absent it is built from the committed board
     snapshot (offline).
@@ -437,7 +437,7 @@ def resolve_runner(runner: str) -> tuple[list[str] | None, str]:
     The documented form is ``--runner "claude -p"``: only ``argv[0]`` is the
     executable and the rest is that runner's own vocabulary, passed through
     untouched. A runner that already names a path is used exactly as given — an
-    operator who writes a file means that file.
+    principal who writes a file means that file.
 
     Resolution is explicit here rather than inherited from the shell because the
     loop is cron's child and inherits cron's minimal PATH (#733: ``~/.local/bin``
@@ -478,7 +478,7 @@ def preflight(runner: str) -> tuple[bool, str]:
 def start_session_beat(env: dict | None, pid: int) -> object | None:
     """Beat a per-session heartbeat for the lane this dispatch owns (#304).
 
-    The pid recorded is the **subagent's**, not this loop's: a lane has to go
+    The pid recorded is the **executor's**, not this loop's: a lane has to go
     stale when *its* process dies, and the loop outlives every lane it dispatches,
     so a loop pid would keep every orphan looking alive forever.
     """
@@ -517,7 +517,7 @@ def _pump_child_stdout(child, directive_id: str, captured: list[str]) -> None:
     The pipe makes the child line-buffer its output (a plain file redirect would
     block-buffer it and the `follow` view would lag); this thread drains it so
     the loop can ``wait`` without a pipe-buffer deadlock, and every line lands
-    in `.fleet/runs/<directive>.log` the moment the subagent writes it — the
+    in `.fleet/runs/<directive>.log` the moment the executor writes it — the
     per-directive live log stream `channel follow --directive <id>` tails
     (issue #367).
     """
@@ -548,16 +548,16 @@ def run_once(
     slot: dict | None = None,
     context: dict | None = None,
 ) -> tuple[int, str]:
-    """Run one subagent for one directive; return (exit code, captured output).
+    """Run one executor for one directive; return (exit code, captured output).
 
     Uses Popen rather than `subprocess.run` so the child is reachable from the
-    stop handler: a stopped loop must take its subagent down with it instead of
-    orphaning it. The session environment is injected here, so the subagent and
+    stop handler: a stopped loop must take its executor down with it instead of
+    orphaning it. The session environment is injected here, so the executor and
     everything it spawns commit under its own identity.
 
     The run's context pack (#220) is `context`, or the pack the loop parked on the
     slot. Resolving it from the slot keeps this call's shape unchanged for callers
-    that predate the pack, while still putting what the subagent was told into the
+    that predate the pack, while still putting what the executor was told into the
     prompt it receives.
 
     The FinOps block selects the runner here (#218): `runner` is the base command
@@ -578,7 +578,7 @@ def run_once(
     # The spawn envelope is a PRECONDITION, not a suggestion (#793): `build_command`
     # consumes it, and an envelope that cannot be validated refuses the spawn here
     # — before any child exists, with its own exit code, naming every field at
-    # fault. Before this, the governance a subagent obeyed was prose in the prompt
+    # fault. Before this, the governance an executor obeyed was prose in the prompt
     # and nothing could refuse a spawn that omitted it.
     try:
         command = build_command(directive, str(dispatch["runner"]), agent_id, worktree, env, pack)
@@ -611,7 +611,7 @@ def run_once(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            # The FinOps block is exported LAST: it is the authority the operator
+            # The FinOps block is exported LAST: it is the authority the principal
             # asked for, the lane environment carries identity. PATH comes from
             # `runtime.runner_env`, so the runner's own directory is on the child's
             # PATH and anything the runner resolves by name still resolves for it.
@@ -654,7 +654,7 @@ def provision_worktree(
     Provisioning goes through ``governance/isolation`` rather than creating a
     worktree here, because the point is not the directory: the module mints the
     session id and stamps the session's signature into that worktree's *own*
-    config, so the subagent's commits are attributable to the agent that made
+    config, so the executor's commits are attributable to the agent that made
     them instead of to whoever's checkout they happen to share. Returns
     (path, branch, env), or None when provisioning failed — the caller then runs
     in the shared checkout and must say so.
@@ -695,7 +695,7 @@ def provision_worktree(
 
 
 def claim_issue(issue: int, agent_id: str, lane: str, directive_id: str) -> tuple[bool, str]:
-    """The loop takes the claim, so a dead subagent can never strand one."""
+    """The loop takes the claim, so a dead executor can never strand one."""
     result = subprocess.run(
         [
             "python3", str(ROOT / "governance" / "dispatch" / "cli.py"), "claim",
@@ -713,7 +713,7 @@ def release_issue(issue: int, agent_id: str) -> tuple[bool, str]:
     """Release a claim; report the outcome rather than swallowing it.
 
     A silent release failure is how a finished run left #167 held for the next
-    operator to find, so the caller now gets the channel's own words. A claim
+    principal to find, so the caller now gets the channel's own words. A claim
     that is *already* free is not a failure, though: ``not-claimed`` is a benign
     no-op (the graceful-stop path releases once and the run's ``finally`` used to
     report the second, refused release as "release FAILED" — #281).
@@ -781,7 +781,7 @@ def closeout_issue(issue: int) -> str:
     while the source branch, the claim, the authorisation directive and the lane
     worktree were all still live — five separate drifts, none of them noticed by
     a gate. Close-out runs here and its verdict travels with the report, so a
-    partial close reaches the brain instead of being found later by hand.
+    partial close reaches the director instead of being found later by hand.
 
     The step itself is `governance/lifecycle` (`LIFECYCLE_CLI` above): it names
     the closure invariants and drives them in dependency order, reporting what
@@ -802,11 +802,11 @@ def closeout_issue(issue: int) -> str:
 
 
 def stop_and_release(reason: str) -> None:
-    """A stopped loop must not strand any claim: take every subagent down, free all.
+    """A stopped loop must not strand any claim: take every executor down, free all.
 
-    Observed live: restarting the sister loop mid-run killed it before the
+    Observed live: restarting the dispatcher loop mid-run killed it before the
     `finally`, so #167 stayed claimed by an agent that no longer existed — the
-    exact wedge the reap tool exists to clean, recreated by an operator restart.
+    exact wedge the reap tool exists to clean, recreated by a principal restart.
     With a pool the same must hold for *every* in-flight child: a stop takes all
     N down and releases each claim exactly once.
     """
@@ -888,7 +888,7 @@ GATE_CANNOT_ASSESS = "CANNOT-ASSESS"
 
 
 def looks_refused(output: str) -> bool:
-    """A *hint* that a subagent stopped on a refusal — never the verdict.
+    """A *hint* that an executor stopped on a refusal — never the verdict.
 
     Kept deliberately as a hint only (#279): used as a verdict it matched a
     quoted ``REFUSED`` in an otherwise successful run and downgraded it, while
@@ -913,7 +913,7 @@ def gh_issue_field(issue: int, jq: str) -> str | None:
     """Read one field of issue #issue from the real board; None when unreachable.
 
     The loop reads the board itself so the verdict rests on GitHub's state, not
-    on a subagent's claim about it. ``None`` means "cannot assess", which is
+    on an executor's claim about it. ``None`` means "cannot assess", which is
     never a pass.
     """
     try:
@@ -937,9 +937,9 @@ def issue_verify_command(issue: int) -> str | None:
     return extract_verify_command(gh_issue_field(issue, ".body") or "")
 
 
-# --- context pack (#220): what the subagent is TOLD, not just ordered ---------
+# --- context pack (#220): what the executor is TOLD, not just ordered ---------
 #
-# A directive used to carry the operator's prose and nothing else, so the subagent
+# A directive used to carry the principal's prose and nothing else, so the executor
 # rediscovered the issue it was ordered to do — its acceptance criteria, its lane,
 # and, most expensively, the lessons a previous lane already paid for. The pack is
 # assembled here, from artifacts that are committed (the board snapshot and the
@@ -977,7 +977,7 @@ def pack_verify_clause(body: str) -> str | None:
     :func:`extract_verify_command`: the clause the pack SHOWS, the clause the
     envelope CARRIES and the clause the loop RUNS are three views of one rule, and
     three readers would be three chances to disagree. Here the clause is only ever
-    *told* to the subagent, so it is read tolerantly (``**Verify:** ...`` plus
+    *told* to the executor, so it is read tolerantly (``**Verify:** ...`` plus
     prose still yields its clause).
     """
     return spawn.sources.verify_text(body)
@@ -1135,7 +1135,7 @@ def issue_context(
 
 
 def render_context_pack(pack: dict) -> str:
-    """The pack as the text the subagent reads — a warning is never omitted."""
+    """The pack as the text the executor reads — a warning is never omitted."""
     lines = [f"CONTEXT PACK — issue #{pack.get('issue')} (assembled offline by the sister):"]
     lines.append(f"Title: {pack.get('title') or '(unavailable)'}")
     lines.append(f"Lane: {pack.get('lane') or 'unassigned'}")
@@ -1171,6 +1171,48 @@ def context_summary(pack: dict) -> str:
 def live_issue_body(issue: int) -> str | None:
     """The issue's body from the live board — the pack's fallback, never its default."""
     return gh_issue_field(issue, ".body")
+
+
+#: Push-on-commit (issue #740, dispatch half): a lane that commits and is never
+#: pushed is how #708's 31-lane, 46-commit stranding happened — the loop's
+#: success path required the gate to pass first, and a gate that never ran (or
+#: never passed) meant the push step, which lived AFTER the gate, never ran
+#: either. The fix pushes immediately after the runner exits, BEFORE gating, so
+#: the branch survives on the remote regardless of what the gate later decides.
+PUSH_STRANDED = "stranded"
+PUSH_OK = "pushed"
+PUSH_SKIPPED = "skipped"
+
+
+def push_lane_branch(
+    branch: str | None, worktree: Path | None, timeout: float, directive_id: str = ""
+) -> tuple[str, str]:
+    """Push ``branch`` from ``worktree`` to its remote right after the run.
+
+    Returns ``(outcome, detail)`` with outcome one of ``PUSH_OK``,
+    ``PUSH_SKIPPED`` (no isolated lane / no branch — nothing to push) or
+    ``PUSH_STRANDED`` (a push that was owed and failed). ``PUSH_STRANDED`` is
+    NEVER silent: the caller names it, by directive, in the run record.
+    """
+    if not branch or worktree is None:
+        return PUSH_SKIPPED, "no isolated lane branch to push"
+    cwd = str(worktree)
+    try:
+        done = subprocess.run(
+            ["git", "push", "--set-upstream", "origin", branch],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return PUSH_STRANDED, f"stranded: `git push origin {branch}` timed out after {timeout}s"
+    except (OSError, subprocess.SubprocessError) as exc:
+        return PUSH_STRANDED, f"stranded: `git push origin {branch}` could not run ({exc})"
+    if done.returncode == 0:
+        return PUSH_OK, f"pushed {branch} to origin"
+    tail = ((done.stdout or "") + (done.stderr or "")).strip()[-300:]
+    return PUSH_STRANDED, f"stranded: `git push origin {branch}` rc={done.returncode}: {tail or 'no output'}"
 
 
 def run_gate(command: str, cwd: str, timeout: float) -> tuple[str, str]:
@@ -1273,7 +1315,7 @@ RUNS = runtime.FLEET_DIR / "runs"
 REPORTED = runtime.FLEET_DIR / "reported"
 
 #: The bounded worker pool: this many directives run concurrently, env-overridable
-#: so an operator can widen or narrow the fleet without a code change.
+#: so a principal can widen or narrow the fleet without a code change.
 DEFAULT_POOL_SIZE = 10
 
 #: The pinned focus (governance/dispatch/focus.py owns its schema). Read for one
@@ -1282,7 +1324,7 @@ FOCUS_PATH = ROOT / ".board" / "focus.json"
 
 
 def pool_size() -> int:
-    """Up to this many subagents run at once; ``FLEET_SISTER_POOL`` overrides it."""
+    """Up to this many executors run at once; ``FLEET_SISTER_POOL`` overrides it."""
     raw = os.environ.get("FLEET_SISTER_POOL", str(DEFAULT_POOL_SIZE))
     try:
         size = int(raw)
@@ -1335,7 +1377,7 @@ def resolve_capacity(directive: dict) -> tuple[capacity.Capacity, capacity.Lane]
 
 
 #: Live per-directive run slots, keyed by directive id. The old single ``IN_FLIGHT``
-#: dict could track exactly one run; a pool of N concurrent subagents needs one
+#: dict could track exactly one run; a pool of N concurrent executors needs one
 #: slot per child, each carrying its own issue, agent id, child process, release
 #: flag and heartbeat thread. Guarded by ``RUNS_LOCK``: the loop thread, each
 #: worker thread and the signal handler all touch it.
@@ -1369,7 +1411,7 @@ def unregister_run(directive_id: str) -> None:
 def stream_run_event(directive_id: str, text: str) -> None:
     """Append one loop-owned event to a run's live log stream (issue #367).
 
-    The subagent's stdout rides the pump (`_pump_child_stdout`); this carries
+    The executor's stdout rides the pump (`_pump_child_stdout`); this carries
     the loop's own events — dispatch resolved, claim taken, lane provisioned,
     steer delivered, verdict — so `channel follow` shows the whole run, not
     only the child's half of it.
@@ -1415,7 +1457,7 @@ def deliver_pending_steers() -> list[str]:
     Called by the loop every cycle (issue #367): the steer is injected into the
     running child's stdin (the mid-run hint), echoed into the run's live log
     stream, stamped into the run marker, and consumed from the queue — so the
-    brain steers a stuck run without killing or re-dispatching it. A steer
+    director steers a stuck run without killing or re-dispatching it. A steer
     whose run is not live yet stays pending (an early steer is not lost); one
     whose run already finished is consumed, because a hint for a finished run
     must never steer the NEXT run of the same directive.
@@ -1480,7 +1522,7 @@ def held_action(holder: str | None, agent_id: str, state: str) -> str:
       ordered, and nobody would ever report the result.
     * ``self-heal`` — our own run died mid-task (a restart): reap the dead claim
       and dispatch in the same cycle, because the work was never reported.
-    * ``orphaned`` — someone else's untracked claim: escalate so the brain
+    * ``orphaned`` — someone else's untracked claim: escalate so the director
       decides; never consume, never steal.
     """
     if state == "live":
@@ -1506,7 +1548,7 @@ def work_held(directive: dict, is_paused: bool) -> bool:
     """Pause holds WORK, never controls.
 
     A paused loop that also stopped reading its inbox could not be resumed: the
-    operator's `resume` was delivered and sat unread until the flag was cleared by
+    principal's `resume` was delivered and sat unread until the flag was cleared by
     hand. Controls are therefore always processed; only dispatch waits.
     """
     return bool(is_paused and not directive.get("control"))
@@ -1521,7 +1563,7 @@ def mark_run(directive_id: str, issue: int, agent_id: str, context: dict | None 
     """Record that this loop is tracking a run for a directive.
 
     Written atomically (tmp + rename): readers outside the loop (the JSON gate,
-    the brain, an operator) can otherwise catch a torn file mid-write — which is
+    the director, a principal) can otherwise catch a torn file mid-write — which is
     exactly how it was caught, by `json-lint` reading a half-written registry.
 
     The marker is per-directive, so N concurrent runs produce N markers. ``pid``
@@ -1530,7 +1572,7 @@ def mark_run(directive_id: str, issue: int, agent_id: str, context: dict | None 
     ``refresh_run``) so the marker doubles as that child's heartbeat.
 
     The run's CONTEXT PACK rides here too (#220): a reviewer can read
-    `.fleet/runs/<directive>.json` and see exactly what the subagent was told —
+    `.fleet/runs/<directive>.json` and see exactly what the executor was told —
     the issue's title and acceptance text, its lane, its ``Verify:`` clause and
     the prior lessons, warnings included.
     """
@@ -1556,7 +1598,7 @@ def refresh_run(directive_id: str, child_pid: int | None = None) -> None:
 
     The single ``sister.heartbeat.json`` can only name one child, so each run's
     own marker carries its liveness instead: the beater advances ``ts`` and
-    records the subagent pid while the child works. ``pid`` is left untouched,
+    records the executor pid while the child works. ``pid`` is left untouched,
     so the prune/watchdog liveness semantics are unchanged.
     """
     target = RUNS / f"{directive_id}.json"
@@ -1591,12 +1633,12 @@ def record_run(
     The FinOps block the run actually dispatched at rides here too (#218) so the
     claim is measurable rather than asserted: `tier`, `thinking` and `runner` are
     the very field names `fleet/summary.py` (#219/#234) already aggregates, and
-    `model` names the model the tier selected. `telemetry.build_record` fixes the
+    `model` names the model the tier selected. `runslog.build_record` fixes the
     schema's REQUIRED fields; these are additive, so an older reader is unaffected.
     """
     try:
         with RECORD_LOCK:
-            record = telemetry.build_record(
+            record = runslog.build_record(
                 run_id=directive_id,
                 issue=str(issue),
                 agent=agent_id,
@@ -1610,8 +1652,8 @@ def record_run(
                 record["thinking"] = dispatch.get("thinking")
                 record["model"] = dispatch.get("model")
                 record["runner"] = dispatch.get("runner")
-            telemetry.append_record(telemetry.RUNS_LOG, record)
-    except (telemetry.TelemetryError, OSError) as exc:
+            runslog.append_record(runslog.RUNS_LOG, record)
+    except (runslog.TelemetryError, OSError) as exc:
         print(f"[terminal] telemetry record for {directive_id} rejected: {exc}", file=sys.stderr, flush=True)
 
 
@@ -1646,7 +1688,7 @@ def report_once(
     loop would repeat the same report forever. ``severity`` is the escalation
     severity for a non-``result`` message (ignored for ``result``); the runaway
     guard's terminal notice raises it to ``critical`` (#723), because a retired
-    directive is work that will never be done unless an operator acts.
+    directive is work that will never be done unless a principal acts.
     """
     REPORTED.mkdir(parents=True, exist_ok=True)
     path = REPORTED / f"{directive_id}.json"
@@ -1977,7 +2019,7 @@ def dead_letter_inventory() -> list[dict]:
     """Every retired directive's normalised record, newest first (the list verb).
 
     Reads through ``runaway.record_shape`` rather than the raw files so the
-    answer an operator gets from the verb is the same shape the store writes,
+    answer a principal gets from the verb is the same shape the store writes,
     whether the drop came from the guard or from a peer's ``control:drop``.
     """
     state = runaway.inventory(guard_base())
@@ -1995,7 +2037,7 @@ def dead_letter_inventory() -> list[dict]:
 # `channel watch` until the board is fresh again) rather than re-dispatched.
 #
 # A PARK is not a dead letter: the dead letter retires an order for ever, a park
-# keeps it as the operator's pending work. The two compose — the park holds the
+# keeps it as the principal's pending work. The two compose — the park holds the
 # directive and the runaway guard still counts the attempt, so neither the park
 # nor the budget can be bypassed.
 
@@ -2014,7 +2056,7 @@ def board_trigger(
     shells out to ``gh``, which the gate cannot reach). A refused network is a
     first-class outcome — ``refresh`` reports it and the trigger parks — never an
     unhandled crash. The transition is reported ONCE, with the snapshot's
-    ``generated_at`` and the threshold it tripped, so the operator reads the
+    ``generated_at`` and the threshold it tripped, so the principal reads the
     board's age instead of a refusal repeated every cycle.
 
     Returns the trigger's :class:`StaleTrigger`; the annotation is ``object``
@@ -2055,7 +2097,7 @@ def board_trigger(
     return trigger
 
 
-# --- controls (the operator's levers, relayed by the brain) -------------------
+# --- controls (the principal's levers, relayed by the director) -------------------
 #
 # The loop is the only place these can be honoured: it owns the run, the queue
 # cursor and the process. `control.py` sends them; this decides what they mean.
@@ -2096,7 +2138,7 @@ RUNNER_PREFLIGHT_ID = "runner-preflight"
 RUNNER_CAPABILITY_ID = "runner-capability"
 #: Records the queue hold THIS loop took for an unresolvable runner, together with
 #: the stamp it wrote into `.fleet/paused`, so the hold can be released when the
-#: runner resolves — and never releases an operator's pause.
+#: runner resolves — and never releases a principal's pause.
 RUNNER_HOLD = runtime.FLEET_DIR / "runner-hold.json"
 
 
@@ -2121,7 +2163,7 @@ def hold_queue_for_runner(detail: str) -> bool:
     The hold IS `.fleet/paused`, deliberately: `work_held` then holds exactly the
     WORK while every control is still read, because a loop that stopped reading its
     inbox could not be resumed (the measured failure `work_held` documents). We
-    record the stamp we wrote, so the hold is *ours* — an operator's pause is never
+    record the stamp we wrote, so the hold is *ours* — a principal's pause is never
     released by the preflight, and ours is released the moment the runner resolves.
     """
     record = read_runner_hold()
@@ -2142,10 +2184,10 @@ def hold_queue_for_runner(detail: str) -> bool:
 
 
 def release_runner_hold() -> str:
-    """Clear a queue hold this loop took; never an operator's pause.
+    """Clear a queue hold this loop took; never a principal's pause.
 
     Returns the line to print when one was released, or "" when there was nothing
-    of ours to release (an operator who ran `resume` leaves no flag; a pause they
+    of ours to release (a principal who ran `resume` leaves no flag; a pause they
     set themselves carries their own stamp and is left alone).
     """
     record = read_runner_hold()
@@ -2166,7 +2208,7 @@ def apply_control(action: str, directive: dict, agent_id: str) -> str:
     """Translate a control action into a verdict the loop acts on.
 
     * ``continue`` — handled here; keep going.
-    * ``dispatch-override`` — an operator override: skip the held-check (the
+    * ``dispatch-override`` — a principal override: skip the held-check (the
       caller already reaped the holder) and dispatch this directive.
     * ``drop`` — retire the named directive to the dead-letter mailbox (#754).
     * ``dead-letter`` — list the mailbox (a read, handled here).
@@ -2322,10 +2364,10 @@ def _run_child(
     worktree: Path | None,
     lane_env: dict[str, str],
 ) -> tuple[int, str]:
-    """Run one subagent and release its lane; the loop owns the claim.
+    """Run one executor and release its lane; the loop owns the claim.
 
     This is the body of one pool worker up to and including the release: it
-    executes the subagent, then in ``finally`` clears the run marker, releases the
+    executes the executor, then in ``finally`` clears the run marker, releases the
     claim exactly once and unregisters the slot, so a dead child can never strand
     an issue. The verdict and the report are the loop's own worker's job (the
     nested ``run_worker`` inside ``loop``), run on the same thread so the run path
@@ -2372,11 +2414,12 @@ def loop(args: argparse.Namespace) -> int:
         lane_env: dict[str, str],
         run_started_at: str,
         dispatch: dict | None = None,
+        branch: str | None = None,
     ) -> None:
-        """One worker's full life: run the subagent, then derive and report the verdict.
+        """One worker's full life: run the executor, then derive and report the verdict.
 
         The claim is already taken and the lane provisioned by the loop; this runs
-        the subagent (via ``_run_child``, which releases the claim in ``finally``),
+        the executor (via ``_run_child``, which releases the claim in ``finally``),
         then derives the verdict from evidence the loop runs itself and reports it.
         One worker = one directive = one lane = one report.
         """
@@ -2388,9 +2431,21 @@ def loop(args: argparse.Namespace) -> int:
             return
         where = f"worktree {worktree}" if worktree else "shared checkout"
         tail = (output.strip()[-600:]) or f"runner exited {rc} with no output"
-        # The FinOps block leads the report: the brain's record of the run names
+        # The FinOps block leads the report: the director's record of the run names
         # the tier the runner actually executed at, not the tier it asked for.
         tail = f"[{where}] {finops_line(dispatch)} | {tail}"
+        # Push-on-commit (#740): immediately after the runner exits and BEFORE
+        # gating, so a lane's commit survives on the remote regardless of what
+        # the gate later decides. A failed/impossible push is named as
+        # `stranded` in the run record — never silent (the #708 incident this
+        # closes was 31 lanes, 46 commits, exactly none of them pushed).
+        push_outcome, push_detail = push_lane_branch(branch, worktree, args.timeout, directive_id)
+        tail = f"{tail} | push: {push_outcome} ({push_detail})"
+        if push_outcome == PUSH_STRANDED:
+            # Never silent (#740): a stranded push is streamed by directive NAME
+            # the moment it is known, independent of any later truncation of the
+            # run record's 200-char tail.
+            stream_run_event(directive_id, f"{PUSH_STRANDED}: directive {directive_id} — {push_detail}")
         # The verdict comes from evidence the loop runs itself — the issue's own
         # Verify: command, `make verify`, and the real board state — never from
         # the runner's prose (#279).
@@ -2403,8 +2458,8 @@ def loop(args: argparse.Namespace) -> int:
         closeout = closeout_issue(issue) if (rc == 0 and gate_ok) else f"SKIPPED (gate {gate_outcome})"
         landed, landing_detail = landed_evidence(issue)
         run_status, prose_hint = verdict(rc, output, gate_ok, landed)
-        # `run_status` stays in telemetry's own vocabulary (started/done/failed —
-        # fleet/telemetry.py), so a run the loop could not assess is recorded
+        # `run_status` stays in runslog's own vocabulary (started/done/failed —
+        # fleet/runslog.py), so a run the loop could not assess is recorded
         # `failed`, never `done`, with CANNOT-ASSESS named in the detail.
         tail = (
             f"{tail} | gate-outcome: {gate_outcome} | {gate_detail} | {landing_detail} | "
@@ -2446,7 +2501,7 @@ def loop(args: argparse.Namespace) -> int:
     idle_printed = False
     paused_printed = False
     while True:
-        # Mid-run steering (issue #367): deliver any steer the brain queued for a
+        # Mid-run steering (issue #367): deliver any steer the director queued for a
         # live run before this cycle does anything else.
         delivered_steers = deliver_pending_steers()
         if delivered_steers:
@@ -2535,7 +2590,7 @@ def loop(args: argparse.Namespace) -> int:
             # does not resolve, or it cannot honour the model) and released only when
             # NEITHER holds — one predicate for the pair, so the two cannot contradict each
             # other in the same log (#845). `release_runner_hold` still refuses to touch an
-            # operator's own pause, whatever this decides.
+            # principal's own pause, whatever this decides.
             released = release_runner_hold()
             if released:
                 print(f"[terminal] {released}", flush=True)
@@ -2698,7 +2753,7 @@ def loop(args: argparse.Namespace) -> int:
                     print(f"[terminal] override reap rc={reap.returncode}: {reap.stdout.strip()[:120]}", flush=True)
                 override = True
             elif control_outcome == "drop":
-                # Issue #754: a peer (or the operator, relaying through the brain)
+                # Issue #754: a peer (or the principal, relaying through the director)
                 # says a named directive is dead. Retire it through the SAME
                 # implementation the automatic path uses, consume the control, and
                 # ACK naming what was dropped — a control that silently did nothing
@@ -2743,7 +2798,7 @@ def loop(args: argparse.Namespace) -> int:
                 continue
             elif control_outcome == "list-dead-letter":
                 # A read: answer with the mailbox and consume, so the loop never
-                # re-reads it. The mailbox is listed by verb, never by an operator
+                # re-reads it. The mailbox is listed by verb, never by a principal
                 # walking the runtime directory.
                 records = dead_letter_inventory()
                 body = (
@@ -2781,7 +2836,7 @@ def loop(args: argparse.Namespace) -> int:
         if work_held(directive, paused()):
             # Pause holds *work*, never controls: a paused loop that stopped reading
             # the inbox could not be resumed — measured, `resume` was delivered and
-            # sat unread until an operator cleared the flag by hand.
+            # sat unread until a principal cleared the flag by hand.
             write_heartbeat("paused", started_at=started_at, commit=commit)
             if not paused_printed:
                 print("[terminal] PAUSED — holding the queue (resume to continue)", flush=True)
@@ -2813,7 +2868,7 @@ def loop(args: argparse.Namespace) -> int:
         # / `/tmp` headroom moves with every other process on the box (#718). A
         # directive the ceiling cannot take is HELD, not consumed: it stays in the
         # inbox for a later slot, exactly as the pool-full path always did. The
-        # decision NAMES the bound that held it, so an operator tuning one knob can
+        # decision NAMES the bound that held it, so a principal tuning one knob can
         # see whether that knob is the one binding.
         resolved, lane = resolve_capacity(directive)
         decision = capacity.admit(lane, capacity=resolved, active=capacity_lanes())
@@ -2951,7 +3006,7 @@ def loop(args: argparse.Namespace) -> int:
         )
         stream_run_event(directive_id, f"executing directive (issue {issue}) — {finops_line(dispatch)}")
         lane = (directive.get("task") or {}).get("lane") or ""
-        # What the subagent is TOLD, not just ordered (#220): the issue's identity,
+        # What the executor is TOLD, not just ordered (#220): the issue's identity,
         # acceptance text and Verify: clause from the board snapshot (offline), the
         # lane, and the lessons a previous lane already paid for. The live board is
         # the body fallback only — the snapshot is the primary, offline source.
@@ -3005,7 +3060,7 @@ def loop(args: argparse.Namespace) -> int:
             stream_run_event(directive_id, f"no isolated lane for #{issue} — shared checkout")
         else:
             stream_run_event(directive_id, f"isolated lane provisioned for #{issue}: {tree[0]}")
-        worktree, _branch, lane_env = tree if tree else (None, None, {})
+        worktree, lane_branch, lane_env = tree if tree else (None, None, {})
         # One worker = one lane = one claim = one run marker = one report. The
         # claim is taken here (by the loop) and released in the worker's `finally`,
         # so a dead child can never strand an issue.
@@ -3021,7 +3076,7 @@ def loop(args: argparse.Namespace) -> int:
         slot["dispatch"] = dispatch
         worker = threading.Thread(
             target=run_worker,
-            args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at, dispatch),
+            args=(directive, slot, agent_id, issue, worktree, lane_env, run_started_at, dispatch, lane_branch),
             name=f"fleet-run-{directive_id}",
             daemon=True,
         )

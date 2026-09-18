@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.lifecycle import directive, gate  # noqa: E402
+from governance.lifecycle import directive, gate, ledger, live  # noqa: E402
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
 from governance.lifecycle.closeout import CloseOutResult, closeout, describe  # noqa: E402
 from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
@@ -200,6 +200,54 @@ def lane_head(record: dict) -> str:
         ["git", "-C", str(record.get("worktree") or ""), "rev-parse", "HEAD"], capture_output=True, text=True
     )
     return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def commit_is_contained(worktree: Path, ancestor: str, descendant: str) -> bool:
+    """Does ``descendant`` contain ``ancestor`` — is the work in that tree at all?
+
+    The relation a lane needs when its pull request was **squash-merged** (#1098). The
+    squash creates a *new* commit on the default branch, so the branch tip the merge
+    replaced is not an ancestor of it, and a lane cut from the default branch (the
+    correct venue, rule 15) can never *equal* the verified head commit. It does
+    **contain** the commit the merge landed as — and the default branch still contains
+    that commit, so a gate run in such a lane measures the current tree, which is the
+    only tree whose repo-wide invariants are meaningful.
+
+    ``merge-base --is-ancestor`` exits 1 for "no" and 128 when the repository cannot
+    answer at all (a commit it does not hold, no such path). Both are *not contained*:
+    this fails closed, because a control that cannot fail is a formality (GR-12).
+    """
+    if not ancestor or not descendant:
+        return False
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "merge-base", "--is-ancestor", ancestor, descendant],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def trees_are_identical(worktree: Path, left: str, right: str) -> bool:
+    """Do two commits carry the **same tree** — is this the tree that landed?
+
+    The link that licenses measuring a lane which does not equal the verified commit.
+    "What matters is that the tree which was verified is the tree that landed"
+    (``governance/lifecycle/README.md``): a squash merge preserves the tree, so the
+    landing's tree and the verified head's tree are the *same object*. Without this
+    check ``commit_is_contained`` alone would admit a lane that contains a landing
+    built from **different** content — a measurement of work nobody verified.
+
+    ``git diff --quiet`` exits 0 for identical trees, 1 for differing ones and 128 when
+    a commit is unknown; only 0 is a match, so this fails closed too.
+    """
+    if not left or not right:
+        return False
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "diff", "--quiet", left, right],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
 
 
 def select_lane(records: list[dict] | None, commit: str = "") -> dict | None:
@@ -417,6 +465,21 @@ class GhOps:
         return (result.stdout or "").strip()
 
     def merge_pull_request(self, number: int) -> str:
+        # Refuse BEFORE merging if the composed squash message would drop the
+        # ticket trailer (#1102) — named squash-message-would-drop-trailer so
+        # the refusal matches scripts/check-squash-message.sh's own vocabulary.
+        check = subprocess.run(
+            ["bash", str(self.root / "scripts" / "check-squash-message.sh"), "--pr", str(number)],
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+        )
+        if check.returncode != 0:
+            raise RuntimeError(
+                f"PR {number} is squash-message-would-drop-trailer: "
+                f"scripts/check-squash-message.sh --pr {number} exited {check.returncode}; "
+                f"{(check.stdout or check.stderr).strip()[-300:]}"
+            )
         # The local delete-branch step fails while the main checkout holds master;
         # the merge itself lands, and step 3 deletes the branch explicitly.
         try:
@@ -462,7 +525,37 @@ class GhOps:
             "so the item has no green verification"
         )
 
-    def record_verification(self, issue: int, commit: str) -> str:
+    def _admissible(self, worktree: Path, head: str, commit: str, landing: str) -> str:
+        """``"equals"``, ``"contains"`` or ``""`` — how this lane may stand for ``commit``.
+
+        Two ways, and only two (#1098):
+
+        * **equals** — the lane IS the verified commit. The unchanged case.
+        * **contains** — the pull request was **squash-merged**, so the verified head
+          commit is not an ancestor of anything on the default branch; the commit the
+          merge *landed as* is, and a lane cut from the default branch contains it.
+          Admitted only when **both** halves hold: the lane contains the landing
+          (``commit_is_contained``) **and** the landing carries the very tree that was
+          verified (``trees_are_identical``). The second half is what keeps this honest
+          — it is the doctrine read literally ("the tree which was verified is the tree
+          that landed"), and without it a lane containing a landing built from other
+          content would be measured as if it proved this item.
+
+        ``landing`` is non-empty only for a **merged** pull request, which is the whole
+        reason the second arm is unreachable for an item still in flight: an unmerged
+        item's verified commit is its head, and its lane must be *at* it.
+        """
+        if not commit:
+            return "equals"  # no verified commit named: the legacy lane path, unchanged
+        if head == commit:
+            return "equals"
+        if landing and commit_is_contained(worktree, landing, head) and trees_are_identical(
+            worktree, commit, landing
+        ):
+            return "contains"
+        return ""
+
+    def record_verification(self, issue: int, commit: str, landing: str = "") -> str:
         """Record a green attestation for ``commit``, from the lane or from the commit.
 
         The lane is the first source: the gate is re-run in it, and the attestation it
@@ -479,6 +572,17 @@ class GhOps:
         not the worktree — is what proves it; a commit that is still in the object
         store can still be measured.
 
+        A lane that is not *at* ``commit`` is admitted only when ``landing`` — the
+        commit a **squash merge** landed as — is contained by it and carries the same
+        tree (#1098). The record then names **all three**: ``commit`` (the verified
+        commit the evidence is against, whose meaning is unchanged), ``landing`` and
+        ``measured`` (the tree the gate actually ran in), with ``via: "contains"``.
+        ``commit`` deliberately keeps naming the *verified* commit rather than the
+        measured tree: that is the convention the audit, the invariant's own text, the
+        README table and every existing record use, and re-pointing it would have
+        silently invalidated each of them. The lane is the measurement; the verified
+        commit is the subject; the record says which is which.
+
         A run that did not happen writes **no journal**. ``.fleet/lifecycle``'s
         presence is another module's landing record — ``governance/reconcile``
         reads a journal file as "this issue's work landed" — so writing one for a
@@ -491,10 +595,24 @@ class GhOps:
         if lane is not None and lane["worktree_exists"]:
             worktree = Path(lane["worktree"])
             head = self._run(["git", "-C", str(worktree), "rev-parse", "HEAD"])
-            if commit and head != commit:
-                raise RuntimeError(f"lane head {head[:12]} is not the verified commit {commit[:12]}")
+            via = self._admissible(worktree, head, commit, landing)
+            if not via:
+                raise RuntimeError(
+                    f"lane head {head[:12]} is not the verified commit {commit[:12]} and does not "
+                    f"contain it: a lane must be at the verified commit, or be a tree cut after the "
+                    f"landing {landing[:12] or '(none recorded)'} that contains it and carries the "
+                    "same tree as the verified commit (#1098)"
+                )
             self._gate_in(worktree, head[:12])
-            write_journal(issue, {"verify": {"ok": True, "commit": head, "source": "lane"}}, self.root)
+            record: dict = {"ok": True, "commit": commit or head, "source": "lane"}
+            if via == "contains":
+                record.update({"landing": landing, "measured": head, "via": via})
+            write_journal(issue, {"verify": record}, self.root)
+            if via == "contains":
+                return (
+                    f"verify green at {record['commit'][:12]} (measured in the lane at {head[:12]}, "
+                    f"which contains the landing {landing[:12]})"
+                )
             return f"verify green at {head[:12]}"
         if any(record["worktree_exists"] for record in records):
             # A live lane exists yet the resolution did not return it (#834). The gate
@@ -685,7 +803,18 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
+    if not args.live and args.issue is None:
+        print("status: CANNOT-ASSESS — pass --issue <n> or --live", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
     record = collect_from_github()
+    if args.live:
+        # The live feed (issue #885): every in-scope item's stage, projected from
+        # the SAME record `status` (without `--live`) and `audit` already read —
+        # not a second collection, so the projection cannot drift from what those
+        # verbs saw. `live.check_live` (the gate's drift provocation) fails loudly
+        # if this ever changes to read a second, possibly stale, source.
+        print(json.dumps(live.project(record), indent=2))
+        return EXIT_OK
     item = next((entry for entry in record["items"] if entry["issue"] == args.issue), None)
     if item is None:
         print(f"status: CANNOT-ASSESS — #{args.issue} is outside the audit scope", file=sys.stderr)
@@ -712,9 +841,31 @@ def cmd_close(args: argparse.Namespace) -> int:
     print(describe(result))
     _print_board_reports(result.board_reports)
     _advance_focus_if_epic_closed(item, result)
+    _record_close_decision(args.issue, result)
     if result.cannot_assess:
         return EXIT_CANNOT_ASSESS
     return EXIT_OK if result.ok else EXIT_NOT_OK
+
+
+def _record_close_decision(issue: int, result: CloseOutResult) -> None:
+    """One append-only ledger record per close-out call (issue #885).
+
+    ``ok``/``cannot-assess`` are ``decision`` records (nothing was refused; a
+    park is a decision to wait, not a defect); a remaining finding is a
+    ``refusal``, named by the first invariant code still owed so the trail can
+    be grepped by code the same way the board report is.
+    """
+    subject = f"#{issue}"
+    if result.remaining:
+        code = result.remaining[0].code
+        ledger.record_decision(
+            ROOT, action="close", subject=subject, outcome=ledger.OUTCOME_REFUSED,
+            detail=describe(result), code=code,
+        )
+        return
+    ledger.record_decision(
+        ROOT, action="close", subject=subject, outcome=ledger.OUTCOME_OK, detail=describe(result),
+    )
 
 
 def _advance_focus_if_epic_closed(item: dict, result: CloseOutResult) -> None:
@@ -829,7 +980,11 @@ def build_parser() -> argparse.ArgumentParser:
     audit_cmd.set_defaults(func=cmd_audit)
 
     status_cmd = sub.add_parser("status", help="where one item sits, and what it still owes")
-    status_cmd.add_argument("--issue", type=int, required=True)
+    status_cmd.add_argument("--issue", type=int, default=None, help="required unless --live is given")
+    status_cmd.add_argument(
+        "--live", action="store_true",
+        help="project every in-scope item's stage instead of one issue's status (issue #885)",
+    )
     status_cmd.set_defaults(func=cmd_status)
 
     close_cmd = sub.add_parser("close", help="drive one item to hygiene, in dependency order")

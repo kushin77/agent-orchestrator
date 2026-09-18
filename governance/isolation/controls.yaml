@@ -1,0 +1,68 @@
+# The lane-isolation surface's declared control policy (issue #885).
+#
+# `identity.py` and `speculative.py` used to hard-code the thresholds that
+# decide isolation: the repo slug a "Refs" trailer points at, the branch/
+# worktree naming prefixes, the reserved signature domain, the session-id
+# length, the refusal-code vocabulary those two modules can emit, and the
+# default landing branch `speculative.verify()` re-checks a claim against.
+# Nobody could review *which* values those were without reading the source,
+# and a value baked into code cannot be mutated in a test to prove the code
+# actually reads it (no-false-green, AGENTS.md GR-12/GR-29).
+#
+# This file is that declaration. `policy.py` loads and validates it, and
+# `identity.py` / `speculative.py` read it instead of carrying their own
+# copies of these numbers — grep-provable: both modules call
+# `governance.isolation.policy.load()` rather than defining the constant
+# themselves. `governance/isolation/tests/test_controls.py` mutates a value in
+# a temporary copy of this file and proves the behaviour that value governs
+# changes, and `scripts/check-session-isolation.sh` provokes the same mutation
+# against the real CLI.
+#
+# The refusal-code vocabulary below is closed in the same direction the
+# `governance/modules/controls.yaml` reference declares its own: every code
+# `governance.isolation.violation.Violation` instances are built with under
+# `audit.py` / `speculative.py` must appear here, and `policy.py` refuses to
+# load a declaration that is missing one (checked against
+# `governance.isolation.model.KNOWN_CODES`).
+
+schema: ao.isolation/controls-v1
+subject: governance/isolation
+
+identity:
+  # The repo every generated "Refs" trailer points at, unless a caller
+  # overrides it (identity.mint(repo_slug=...)).
+  repo_slug_default: kushin77/agent-orchestrator
+  # Canonical branch prefix -- a branch is named after the issue it belongs to.
+  branch_prefix: "issue-"
+  # Worktree directory prefix (worktree_name_for).
+  worktree_prefix: ao
+  # Reserved TLD (RFC 2606): a signature that can never resolve to a person.
+  identity_domain: agents.invalid
+  # Length (hex chars) of the deterministic session id (session_id_for).
+  session_id_len: 12
+  # The ticket trailer template, formatted with {slug} and {issue}.
+  commit_trailer_template: "Refs {slug}#{issue}"
+
+speculative:
+  # The branch a speculative-base claim is re-verified against when a caller
+  # does not name one explicitly (speculative.verify/claim/reverify).
+  default_base: master
+
+# The closed refusal-code vocabulary this surface's Violation-producing
+# modules (audit.py, speculative.py) may emit. Declared once so a code that
+# reaches a caller but is not declared here is a code nobody reviewed.
+refusal_codes:
+  - branch-does-not-name-issue
+  - worktree-missing
+  - worktree-not-linked
+  - branch-mismatch
+  - identity-not-lane-local
+  - identity-mismatch
+  - identity-leaked-to-shared-config
+  - commit-missing-ticket-trailer
+  - commit-trailer-check-unavailable
+  - commit-authored-by-another-session
+  - commit-authorship-unmeasurable
+  - speculative-base-not-landed
+  - speculative-base-stale-merge-base
+  - speculative-base-unmeasurable

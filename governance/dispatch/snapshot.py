@@ -43,17 +43,33 @@ if str(ROOT / "fleet") not in sys.path:
 from governance.policy import lease  # noqa: E402
 import runtime  # noqa: E402
 from model import Issue, Snapshot  # noqa: E402
+import policy as dispatch_policy  # noqa: E402
 
 DEFAULT_PATH = Path(".board/snapshot.json")
 
 #: The repo board a snapshot is refreshed from by default.
 DEFAULT_REPO = "kushin77/agent-orchestrator"
 
-# A snapshot older than this is refused as stale (issue #170): the board moves
-# faster than an hour-old artifact, and answering confidently from stale data is
-# the failure mode the gate exists to prevent. Declared once in
-# governance/policy/lease.py.
-DEFAULT_STALENESS_MINUTES = lease.SNAPSHOT_STALENESS_MINUTES
+
+def _default_staleness_minutes() -> int:
+    """The staleness threshold, read from the package's declared controls.
+
+    A snapshot older than this is refused as stale (issue #170): the board
+    moves faster than an hour-old artifact, and answering confidently from
+    stale data is the failure mode the gate exists to prevent. The value comes
+    from ``controls.yaml`` (issue #885), which is itself cross-checked against
+    ``governance/policy/lease.SNAPSHOT_STALENESS_MINUTES`` (issue #322, the
+    single upstream source) — a policy that cannot be read is never silently
+    treated as "no threshold", so this falls back to the lease value only when
+    the declared controls cannot be loaded at all (e.g. PyYAML missing).
+    """
+    try:
+        return dispatch_policy.stale_minutes()
+    except dispatch_policy.PolicyUnavailable:
+        return lease.SNAPSHOT_STALENESS_MINUTES
+
+
+DEFAULT_STALENESS_MINUTES = _default_staleness_minutes()
 
 _PARENT_RE = re.compile(r"^\s*(?:parent|part[-_ ]of)\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
 _BLOCKED_RE = re.compile(r"^\s*blocked[-_ ]by\s*:\s*#?([0-9]+(?:\s*,\s*#?[0-9]+)*)", re.I | re.M)
@@ -63,8 +79,31 @@ _EDGE_LINE_RE = re.compile(
 )
 
 
+_FILES_RE = re.compile(
+    r"^[ \t]*Files(?:[ \t]+owned)?(?:[ \t]*\(disjoint\))?[ \t]*:[ \t]*(.+?)[ \t]*$", re.I | re.M
+)
+
+
 def _numbers(blob: str) -> list[int]:
     return [int(part) for part in re.findall(r"[0-9]+", blob)]
+
+
+def parse_files(body: str) -> tuple[str, ...]:
+    """Extract the declared ``Files: a, b`` / ``Files owned (disjoint): a, b``
+    convention from an issue body (issue #740, dispatch half).
+
+    Every ``Files:``-shaped line in the body is unioned (a child may restate
+    ownership in more than one place), order-preserved, de-duplicated. An issue
+    with no such line returns an empty tuple — UNVERIFIABLE, not "owns nothing".
+    """
+    text = body or ""
+    found: list[str] = []
+    for match in _FILES_RE.finditer(text):
+        for part in match.group(1).replace(",", "\n").splitlines():
+            candidate = part.strip().strip("`")
+            if candidate and candidate not in found:
+                found.append(candidate)
+    return tuple(found)
 
 
 def parse_edges(body: str) -> tuple[int | None, tuple[int, ...], tuple[str, ...]]:
@@ -143,7 +182,9 @@ def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at:
     issues: dict[int, Issue] = {}
     for record in records:
         number = int(record["number"])
-        parent, blocked, cross_refs = parse_edges(str(record.get("body", "") or ""))
+        body_text = str(record.get("body", "") or "")
+        parent, blocked, cross_refs = parse_edges(body_text)
+        declared_files = parse_files(body_text)
         milestone = record.get("milestone") or {}
         milestone_title = milestone.get("title", "") if isinstance(milestone, dict) else str(milestone or "")
         labels = record.get("labels") or []
@@ -160,6 +201,7 @@ def build_snapshot(records: Iterable[dict[str, Any]], source: str, generated_at:
             blocked_by=blocked,
             cross_refs=cross_refs,
             closed_at=str(record.get("closedAt") or ""),
+            files=declared_files,
         )
     return Snapshot(generated_at=generated_at or now_iso(), source=source, issues=issues)
 
@@ -241,6 +283,7 @@ def load(path: Path | str = DEFAULT_PATH, apply_queue: bool = True) -> Snapshot:
         number = int(entry["number"])
         blocked = entry.get("blocked_by") or []
         cross_refs = entry.get("cross_refs") or []
+        declared_files = entry.get("files") or []
         issues[number] = Issue(
             number=number,
             title=str(entry.get("title", "") or ""),
@@ -250,6 +293,7 @@ def load(path: Path | str = DEFAULT_PATH, apply_queue: bool = True) -> Snapshot:
             parent=int(entry["parent"]) if entry.get("parent") is not None else None,
             blocked_by=tuple(sorted(int(number) for number in blocked)),
             cross_refs=tuple(sorted(str(ref) for ref in cross_refs)),
+            files=tuple(str(f) for f in declared_files),
         )
     snapshot = Snapshot(
         generated_at=str(data.get("generated_at", "") or ""),

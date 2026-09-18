@@ -542,6 +542,35 @@ verbs:
     exposed: true
     refusals: [401, 403, 503]
 
+  - id: board.liveness
+    source: governance/dispatch/cli.py
+    local: liveness
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: >-
+      Answers whether the board's freshness contract has an installed producer,
+      read from the LIVE crontab (#1179). Read-only, and it names a definite
+      defect as a finding rather than a pass — `cannot-assess` when the crontab
+      or the manifest cannot be read.
+
+  - id: board.dangling
+    source: governance/dispatch/cli.py
+    local: dangling
+    effect_class: read
+    capability: board:read
+    audit: null
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 503]
+    note: >-
+      Reports the open issues whose declared `Parent:` is CLOSED (#1179): they
+      are refused `epic-closed` and were previously named by nothing. Read-only
+      — it reports the dead-end and its remedy, it does not re-parent anything.
+
   - id: board.focus
     source: governance/dispatch/cli.py
     local: focus
@@ -744,3 +773,20 @@ verbs:
       Drives a work item to hygiene and closes it. Irreversible in this
       vocabulary: it writes a terminal closure record and mutates an external
       board; no verb here reopens it.
+
+  - id: closure.retire
+    source: governance/lifecycle/cli.py
+    local: retire
+    effect_class: irreversible
+    capability: board:admin
+    audit: closure.retire
+    idempotent: true
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: >-
+      Retires a .fleet/sent/ directive whose issue is closed WITHOUT a change
+      of its own (superseded, issue #861) — the second terminal mode next to
+      closure.close's "landed" gate. Irreversible: it moves the record to
+      .fleet/done/ and stamps it with the retirement reason and the
+      superseding issue(s); nothing here reopens it. Idempotent: retiring an
+      already-retired directive is a no-op, not a refusal.

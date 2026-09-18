@@ -23,7 +23,25 @@ from governance.reconcile.sweep import (
     sweep,
 )
 
-from conftest import AGENT, BRANCH, SESSION, WORKTREE, FakeOps  # noqa: E402
+import importlib.util as _importlib_util  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_reconcile_tests_conftest", Path(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+AGENT = _conftest.AGENT
+BRANCH = _conftest.BRANCH
+SESSION = _conftest.SESSION
+WORKTREE = _conftest.WORKTREE
+FakeOps = _conftest.FakeOps
 
 OLD = 1_000_000.0
 NOW = OLD + 20 * 60  # past a 15-minute TTL
@@ -207,3 +225,67 @@ def test_the_real_port_refuses_an_unknown_session_id(tmp_path: Path):
     ops = RepoOps(tmp_path)
     assert ops.worktree_present("") is False
     assert ops.worktree_present(str(tmp_path)) is True
+
+
+# --- controls (#885): the batch-limit refusal + the append-only ledger ------
+
+from governance.reconcile import ledger as reconcile_ledger  # noqa: E402
+from governance.reconcile import policy as reconcile_policy  # noqa: E402
+from governance.reconcile.sweep import REFUSED_OUTCOME  # noqa: E402
+
+
+def _controls(limit: int) -> reconcile_policy.Controls:
+    return reconcile_policy.Controls(
+        max_actions_per_pass=limit,
+        outcome_codes={
+            "reclaimed": "reconcile.reclaimed",
+            "parked": "reconcile.parked",
+            "shelved": "reconcile.shelved",
+            "reported": "reconcile.reported",
+            "failed": "reconcile.failed",
+            "refused": "reconcile.batch-limit-exceeded",
+        },
+    )
+
+
+def test_batch_limit_refuses_beyond_the_control(root: Path):
+    """The #885 brief's mutation test: change a control value -> behaviour
+    changes / refused by name."""
+    beat(root, session_id="a", issue=1, at=OLD)
+    beat(root, session_id="b", issue=2, at=OLD)
+    report = sweep(root, at=NOW, apply=True, ops=FakeOps(on_main=True), controls=_controls(1))
+    outcomes = {a.session_id: a.outcome for a in report.actions}
+    assert sorted(outcomes.values()) == sorted([RECLAIMED, REFUSED_OUTCOME])
+    assert REFUSED_OUTCOME in outcomes.values()
+
+
+def test_batch_limit_zero_refuses_everything(root: Path):
+    beat(root, session_id="a", issue=1, at=OLD)
+    report = sweep(root, at=NOW, apply=True, ops=FakeOps(on_main=True), controls=_controls(0))
+    assert all(a.outcome == REFUSED_OUTCOME for a in report.actions)
+
+
+def test_dry_run_never_refuses_on_the_batch_limit(root: Path):
+    """A dry run never touches disk, so the limit — a limit on ACTIONS taken —
+    must not fire on a plan."""
+    beat(root, session_id="a", issue=1, at=OLD)
+    report = sweep(root, at=NOW, apply=False, ops=FakeOps(on_main=True), controls=_controls(0))
+    assert all(a.outcome != REFUSED_OUTCOME for a in report.actions)
+
+
+def test_every_sweep_decision_writes_exactly_one_ledger_record(root: Path):
+    beat(root, session_id="a", issue=1, at=OLD)
+    beat(root, session_id="b", issue=2, at=OLD)
+    sweep(root, at=NOW, apply=True, ops=FakeOps(on_main=True))
+    records = reconcile_ledger.read(root)
+    assert len(records) == 2
+    assert {r["session_id"] for r in records} == {"a", "b"}
+
+
+def test_a_refused_decision_produces_exactly_one_named_ledger_record(root: Path):
+    beat(root, session_id="a", issue=1, at=OLD)
+    sweep(root, at=NOW, apply=True, ops=FakeOps(on_main=True), controls=_controls(0))
+    records = reconcile_ledger.read(root)
+    assert len(records) == 1
+    assert records[0]["outcome"] == REFUSED_OUTCOME
+    assert records[0]["code"] == "reconcile.batch-limit-exceeded"

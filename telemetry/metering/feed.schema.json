@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-orchestrator/telemetry/metering/feed.schema.json",
+  "title": "telemetry/metering live usage feed row (issue #886)",
+  "description": "One tenant's current cumulative usage/spend row, as served by telemetry/metering/feed.py's LiveUsageFeed to the portal. Validated by feed.py before every row is returned -- a row that fails this schema is refused (FeedValidationError), never served.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "tenantId",
+    "calls",
+    "billableCalls",
+    "unmeteredCalls",
+    "inputTokens",
+    "outputTokens",
+    "costUsd",
+    "asOf"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "calls": { "type": "integer", "minimum": 0 },
+    "billableCalls": { "type": "integer", "minimum": 0 },
+    "unmeteredCalls": { "type": "integer", "minimum": 0 },
+    "inputTokens": { "type": "integer", "minimum": 0 },
+    "outputTokens": { "type": "integer", "minimum": 0 },
+    "costUsd": { "type": "number", "minimum": 0 },
+    "asOf": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

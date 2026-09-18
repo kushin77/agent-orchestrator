@@ -43,7 +43,7 @@ base         ``AO_RUNAWAY_BACKOFF``   ``30`` seconds; the delay after attempt
                                             *n* is ``min(base * 2**(n-1), 300)``
 ============ ====================== ======= ==================================
 
-``30`` and not ``retry.sh``'s ``5``: the sister loop's poll cycle is ~30s
+``30`` and not ``retry.sh``'s ``5``: the dispatcher loop's poll cycle is ~30s
 (``terminal.py --watch-timeout 30``), so a 5s base would elapse inside a single
 cycle and the "spacing" would be decorative. With the defaults the four waits
 are 30/60/120/240s and the fifth failure is terminal.
@@ -79,7 +79,7 @@ simply not returned by ``channel watch``: ``cmd_watch`` filters on
 :func:`dispatchable` exactly as it already filters ``--skip``ped ids, so the loop
 keeps polling, the order stays in the inbox, and the worker slot stays free.
 
-CLI (operator)::
+CLI (principal)::
 
     python3 fleet/runaway.py status                    # counts, no judgement
     python3 fleet/runaway.py show --directive <id>     # one directive's history
@@ -91,7 +91,7 @@ Exit codes are the repo tri-state: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 A SECOND CALLER (issue #754)
 ----------------------------
 Retiring a directive is not only the guard's business. A peer agent or an
-operator can *know* an order is dead — the issue's work already landed on
+principal can *know* an order is dead — the issue's work already landed on
 `master`, the directive was re-minted from a stale queue — and must be able to
 say so over the control channel instead of `mv`-ing a file out of
 `.fleet/inbox/` while the loop reads it. That is `control:drop`, and it calls
@@ -132,7 +132,7 @@ DEFAULT_ATTEMPT_CAP = 5
 ENV_ATTEMPT_CAP = "AO_RUNAWAY_ATTEMPTS"
 ENV_BACKOFF = "AO_RUNAWAY_BACKOFF"
 
-#: How many reasons a record keeps; the history is for the operator's eye, and an
+#: How many reasons a record keeps; the history is for the principal's eye, and an
 #: unbounded list on a wedged directive is itself a (small) runaway.
 REASON_HISTORY = 8
 
@@ -359,7 +359,7 @@ def dead_lettered(directive_id: str, base: Path | str | None = None) -> bool:
 #:
 #: The record has TWO callers — the automatic path (`terminal.guard_retire`, when
 #: the attempt budget is exhausted) and the operator/A2A verb
-#: (`control:drop`, when a peer tells the sister an order is dead). They must
+#: (`control:drop`, when a peer tells the dispatcher an order is dead). They must
 #: produce the *same shape*, and the only way to guarantee that is for the shape
 #: to be built in one function that both call. This tuple is the contract the
 #: gate asserts against, so a field cannot be added to one caller's record and
@@ -436,7 +436,7 @@ def record_attempt(
     A refused claim and a crashed run increment the SAME counter, and the
     self-heal path counts as an attempt rather than restarting the budget (an
     acceptance criterion, not an implementation detail). ``reason`` is kept in a
-    bounded history so the operator sees WHY the directive is being retired
+    bounded history so the principal sees WHY the directive is being retired
     instead of a bare number.
     """
     cap = attempt_cap()
@@ -529,7 +529,7 @@ def dead_letter(
 
     The order is MOVED out of the inbox into ``<fleet>/dead-letter/`` (so it can
     never be returned again) and the artifact carries the original envelope, the
-    attempt history and the reason — the audit an operator needs to re-order it.
+    attempt history and the reason — the audit a principal needs to re-order it.
     The counter record is stamped terminal too, so a reader of ``attempts/``
     cannot mistake it for a live budget.
 
@@ -596,7 +596,7 @@ def forget(directive_id: str, base: Path | str | None = None) -> bool:
 
 
 def rearm(directive_id: str, base: Path | str | None = None) -> bool:
-    """Return a retired directive to the queue — the operator's explicit override.
+    """Return a retired directive to the queue — the principal's explicit override.
 
     The ONLY route out of the terminal state, and deliberately a human verb:
     the guard's whole point is that a directive does not come back on its own.
@@ -625,7 +625,7 @@ def inventory(base: Path | str | None = None) -> dict:
     }
 
 
-# --- operator CLI ------------------------------------------------------------
+# --- principal CLI ------------------------------------------------------------
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -668,7 +668,7 @@ def cmd_rearm(args: argparse.Namespace) -> int:
 def cmd_dead_letter(args: argparse.Namespace) -> int:
     """List/inspect the dead-letter mailbox — a verb, never a filesystem read.
 
-    The issue asks for this explicitly: an operator (or the brain) must be able
+    The issue asks for this explicitly: a principal (or the director) must be able
     to see WHAT was dropped and WHY without reaching into the runtime directory.
     With no ``--directive`` it lists every retired order with its one-line
     summary; with one, it prints the full normalised record (the same

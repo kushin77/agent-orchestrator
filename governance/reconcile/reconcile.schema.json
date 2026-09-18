@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.reconcile/record-v1",
+  "title": "governance/reconcile persisted record shapes (issue #885)",
+  "$comment": "Validated by the stdlib-only subset validator in governance/modules/schema.py (reused, not copied, per the #885 brief). Each top-level $def freezes one shape this package persists or emits; ledger.py and live.py both validate against this file before writing or reporting.",
+  "$defs": {
+    "heartbeat-record": {
+      "type": "object",
+      "required": ["session_id", "issue", "agent", "lane", "worktree", "branch", "pid", "at", "at_iso", "state", "note"],
+      "properties": {
+        "session_id": {"type": "string"},
+        "issue": {"type": "integer"},
+        "agent": {"type": "string"},
+        "lane": {"type": "string"},
+        "worktree": {"type": "string"},
+        "branch": {"type": "string"},
+        "pid": {"type": ["integer", "null"]},
+        "at": {"type": "number"},
+        "at_iso": {"type": "string"},
+        "state": {"type": "string", "enum": ["running", "shelved"]},
+        "note": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "baseline-entry": {
+      "type": "object",
+      "required": ["kind", "name", "reason"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["worktree", "branch"]},
+        "name": {"type": "string"},
+        "reason": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "ledger-record": {
+      "type": "object",
+      "required": ["schema", "kind", "at", "at_iso"],
+      "properties": {
+        "schema": {"const": "ao.reconcile/ledger-record-v1"},
+        "kind": {"type": "string", "enum": ["sweep-decision", "real-tree-verdict"]},
+        "at": {"type": "number"},
+        "at_iso": {"type": "string"},
+        "session_id": {"type": "string"},
+        "issue": {"type": "integer"},
+        "agent": {"type": "string"},
+        "outcome": {"type": "string", "enum": ["reclaimed", "parked", "shelved", "reported", "failed", "refused"]},
+        "code": {"type": "string"},
+        "reason": {"type": "string"},
+        "assessable": {"type": "boolean"},
+        "ok": {"type": "boolean"},
+        "new_violations": {"type": "integer"},
+        "stale_entries": {"type": "integer"},
+        "young": {"type": "integer"},
+        "vanished": {"type": "integer"}
+      },
+      "additionalProperties": false
+    },
+    "live-row": {
+      "type": "object",
+      "required": ["session_id", "issue", "worktree", "branch", "worktree_present", "match"],
+      "properties": {
+        "session_id": {"type": "string"},
+        "issue": {"type": "integer"},
+        "worktree": {"type": "string"},
+        "branch": {"type": "string"},
+        "worktree_present": {"type": "boolean"},
+        "match": {"type": "string", "enum": ["matched", "drift"]},
+        "detail": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$ref": "#/$defs/ledger-record"
+}

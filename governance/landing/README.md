@@ -54,9 +54,16 @@ workflow file and nothing to click (GR-15, GR-5).
                                                     AI-assistance, Pre-existing red, Evidence
   3. judge the pre-flight attestation      contract bash scripts/merge-gate.sh run
                                                     (AO_PR_NUMBER set: the PR body is enforced)
+                                    gate-status  bash scripts/gate-status.sh post --sha <pr-head>
+                                                    --rc <contract-rc>  (ADR-0028 — every outcome,
+                                                    before the merge decision)
   4. consult governance/merge's verdict    verdict  re-read the attestation the contract just
                                                     wrote, against the PR's own head commit
-  5. print the ordered plan                 merge   gh pr merge <n> --squash
+  5. print the ordered plan                 landed-contract bash scripts/check-pr-contract.sh
+                                                    --landed --range <base>..<head> (the commits to be
+                                                    squashed must carry the trailing ticket trailer)
+                                            merge   gh pr merge <n> --squash --subject <title>
+                                                    --body-file <trailer-bearing message>
   6. change nothing                        delete   git push origin --delete <branch>
                                             close   python3 governance/lifecycle/cli.py close
                                                     --issue <n>
@@ -89,6 +96,50 @@ workflow file and nothing to click (GR-15, GR-5).
    *reported*, never traded for a claim.
 6. **A dry run writes nothing at all** — no remote change and no local file, so
    "changes nothing" is a property a control can check by looking, not a promise.
+
+## The gate-of-record status (ADR-0028, #1072)
+
+The driver publishes the gate of record as a GitHub commit status at the PR
+boundary — immediately after the pre-merge contract (`scripts/merge-gate.sh
+run`) has run against the pull request's own head commit, and **before** the
+merge decision:
+
+```bash
+bash scripts/gate-status.sh post --sha <pr-head> --rc <contract-rc>
+```
+
+`<contract-rc>` is the contract's own normalised outcome (0/1/2), never a raw
+subprocess return code. This is posted for **every** contract outcome, not
+just a green one: a red contract publishes `failure`, a CANNOT-ASSESS contract
+publishes `error` — so a red commit is decorated red and is never left blank
+(the #739 defect class this repo has repeatedly fixed). An attributed
+pre-existing red still publishes `failure`: only the *merge decision* is
+softened by attribution, never the status posted for the commit.
+
+**A failed or unreadable poster is a named CANNOT-ASSESS refusal**
+(`gate-status-unpublished`) — the merge is refused and nothing is merged, no
+`landed-contract` check runs, and no PR gets squashed on a commit whose gate
+status could not be confirmed published. This is fail-closed by construction:
+a poster that could not run is treated exactly like a red gate, never like a
+pass.
+
+A dry run **plans** the step (`gate-status`, action `planned`) and posts
+nothing — `LandingOps.publish_status` is never called in dry-run mode, the
+same discipline every other write in this driver follows.
+
+The step is recorded in `LandingResult.steps` (action `gate-status`) and
+carried into `as_dict()` / the `.verify/landing-<n>.json` record and report, so
+it is auditable exactly like every other step.
+
+**The escape hatch (ADR-0028's own).** `governance/platform/branch-protection.yaml`
+does not yet require the `ao/gate-of-record` context — declaring it a required
+check is a separate, deliberate step taken only once a real status has been
+observed on a real commit. If the poster ever wedges the merge queue (the
+runner stops posting, or `gh`/network is unavailable), the operator escape is
+to re-run `bash scripts/branch-protection.sh apply` with
+`required_status_checks` removed from the policy file, exactly as ADR-0028
+documents — never to bypass this driver's own refusal, which stays
+fail-closed by design.
 
 ## Pre-existing reds: attributed by measurement, never by a claim
 

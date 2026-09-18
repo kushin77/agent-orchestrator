@@ -156,6 +156,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 fleet_root = Path(sys.argv[1]).resolve()
@@ -180,6 +181,37 @@ import brain  # noqa: E402
 import claims as claims_mod  # noqa: E402
 import markers  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
+
+sys.path.insert(0, str(repo_root))
+from governance.landing import evidence as landing_evidence  # noqa: E402
+
+# The master-health guard (RCA 2026-09-17 fix #5) refuses any dispatch — a
+# fresh send or a re-arm's resend alike — unless a green, head-fresh
+# attestation is on disk. This driver is testing the re-arm/dedup machinery,
+# not master-health, so it publishes a green attestation for the REAL
+# origin/master head (the same head `brain.current_master_head()` will read
+# from this checkout) before any probe runs, exactly the way
+# `governance/landing/engine.py`'s `land()` does after a squash-merge.
+_real_master_head = subprocess.run(
+    ["git", "-C", str(repo_root), "rev-parse", "--verify", "-q", "origin/master"],
+    capture_output=True,
+    text=True,
+).stdout.strip()
+if _real_master_head:
+    landing_evidence.write_master_attestation(
+        brain.MASTER_ATTESTATION,
+        landing_evidence.Attestation(
+            path=brain.MASTER_ATTESTATION,
+            state=landing_evidence.STATE_READ,
+            result="PASS",
+            rc=0,
+            commit=_real_master_head,
+            branch="master",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            verified_by="check-dispatch-reconcile.sh fixture",
+        ),
+        commit=_real_master_head,
+    )
 
 CAP = int(os.environ["AO_RUNAWAY_ATTEMPTS"])
 OLD = 3600.0
@@ -632,6 +664,237 @@ if env -u AO_FLEET_DIR PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cachepr
 else
   tail -n 20 "$work/pytest.log" >&2
   bad "fleet/tests/test_dispatch_markers.py is not green"
+fi
+
+# --- 6. per-file lease overlap predicate (issue #702) -----------------------
+# governance/dispatch/model.py::regions_overlap is the ONE predicate deciding
+# whether two claims naming the same file conflict. A mutant that treats
+# overlapping regions as disjoint (`return False` instead of the real interval
+# test) must let a second, conflicting claim through — provoked against a
+# scratch copy of governance/dispatch + governance/policy, never the real tree.
+model_sha_before="$(digest governance/dispatch/model.py)"
+lease_scratch="$work/tree-OVERLAP-AS-DISJOINT"
+mkdir -p "$lease_scratch/governance"
+cp -R "$root/governance/dispatch" "$lease_scratch/governance/dispatch"
+cp -R "$root/governance/policy" "$lease_scratch/governance/policy"
+# claims.py resolves ROOT from its own file location and puts ROOT/fleet on
+# sys.path (it imports fleet's `runtime` module for the namespaced sent dir),
+# so the scratch layout needs a real `fleet/` too — symlinked, never copied,
+# since it is not the code under test here.
+ln -s "$root/fleet" "$lease_scratch/fleet" 2>/dev/null
+
+lease_anchor='return a_start <= b_end and b_start <= a_end'
+lease_replacement='return False  # MUTATED (#702 provocation)'
+lease_target="$lease_scratch/governance/dispatch/model.py"
+if ! python3 - "$lease_target" "$lease_anchor" "$lease_replacement" <<'PY'
+import sys
+from pathlib import Path
+
+path, anchor, replacement = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+source = path.read_text(encoding="utf-8")
+count = source.count(anchor)
+if count != 1:
+    print(f"the mutation anchor matched {count} times, not once", file=sys.stderr)
+    raise SystemExit(3)
+path.write_text(source.replace(anchor, replacement), encoding="utf-8")
+print("MUTANT-APPLIED:", anchor, "->", replacement)
+PY
+then
+  bad "the OVERLAP-AS-DISJOINT mutation could not be applied"
+else
+  probe_script="$lease_scratch/governance/dispatch/_probe_702.py"
+  cat > "$probe_script" <<'PY'
+"""Standalone probe: two overlapping-region claims on one file must conflict."""
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+PKG_DIR = str(Path(__file__).resolve().parent)
+if PKG_DIR not in sys.path:
+    sys.path.insert(0, PKG_DIR)
+
+import claims  # noqa: E402
+import focus  # noqa: E402
+import pool  # noqa: E402
+import owner_queue  # noqa: E402
+from model import FileClaim, Issue, Snapshot  # noqa: E402
+
+tmp = Path(sys.argv[1])
+focus.DEFAULT_PATH = str(tmp / "absent-focus.json")
+pool.POOL_PATH = tmp / "no-pool.jsonl"
+owner_queue.DEFAULT_PATH = tmp / "no-queue.yaml"
+
+now = datetime(2026, 9, 16, 0, 0, 0, tzinfo=timezone.utc)
+issues = {
+    601: Issue(601, "frontier", milestone="M1"),
+    602: Issue(602, "second frontier item", milestone="M1"),
+}
+snapshot = Snapshot(generated_at="2026-09-16T00:00:00Z", source="probe", issues=issues)
+ledger = tmp / "claims.jsonl"
+locks = tmp / "locks"
+
+claims.claim(
+    601, "agent-a", "lane", snapshot, ledger=ledger, lock_dir=locks, now=now,
+    files=(FileClaim(path="shared.py", regions=((1, 20),)),),
+)
+try:
+    claims.claim(
+        602, "agent-b", "lane", snapshot, ledger=ledger, lock_dir=locks, now=now,
+        files=(FileClaim(path="shared.py", regions=((10, 15),)),),
+    )
+except claims.ClaimRefused as exc:
+    print(f"CORRECTLY-REFUSED: {exc.reason}")
+    sys.exit(0)
+print("WRONGLY-ACCEPTED: overlapping regions were treated as disjoint")
+sys.exit(1)
+PY
+  if python3 "$probe_script" "$work/state-OVERLAP-AS-DISJOINT" > "$work/OVERLAP-AS-DISJOINT.log" 2>&1; then
+    cat "$work/OVERLAP-AS-DISJOINT.log" >&2
+    bad "OVERLAP-AS-DISJOINT mutant was NOT refused (the gate must be able to fail — GR-12)"
+  else
+    grep -q "WRONGLY-ACCEPTED" "$work/OVERLAP-AS-DISJOINT.log" && \
+      ok "OVERLAP-AS-DISJOINT was refused by name (the mutant let a real overlap through, and the probe caught it)" || \
+      { cat "$work/OVERLAP-AS-DISJOINT.log" >&2; bad "OVERLAP-AS-DISJOINT failed, but not for the reason the provocation targets"; }
+  fi
+fi
+
+model_sha_after="$(digest governance/dispatch/model.py)"
+if [ "$model_sha_before" = "$model_sha_after" ]; then
+  ok "the real governance/dispatch/model.py is sha256-identical before and after the #702 provocation"
+else
+  bad "the #702 provocation modified the real tree ($model_sha_before -> $model_sha_after)"
+fi
+
+if env -u AO_FLEET_DIR PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
+     governance/dispatch/tests/test_file_leases.py > "$work/pytest-702.log" 2>&1; then
+  ok "governance/dispatch/tests/test_file_leases.py is green ($(tail -n 1 "$work/pytest-702.log" | tr -d '\r'))"
+else
+  tail -n 20 "$work/pytest-702.log" >&2
+  bad "governance/dispatch/tests/test_file_leases.py is not green"
+fi
+
+# --- 7. branch-stacking, `claim --base <upstream-branch>` (DG-3, issue #699) -
+# `governance/dispatch/claims.py::speculative_claim` accepts `--base` ONLY when
+# it names the branch of one of the issue's own open blockers (proved against
+# `Snapshot.blockers_open`, never taken on the caller's say-so). A mutant that
+# widens the exemption — accepting ANY real `issue-<n>` branch as the
+# speculative base, whether or not it is actually blocking this issue — must
+# let an out-of-order claim through: the probe below is exactly that claim,
+# `--base` naming a real branch (`issue-999`) that is NOT #602's blocker.
+spec_sha_before="$(digest governance/dispatch/claims.py)"
+spec_scratch="$work/tree-SPECULATIVE-BYPASS"
+mkdir -p "$spec_scratch/governance"
+cp -R "$root/governance/dispatch" "$spec_scratch/governance/dispatch"
+cp -R "$root/governance/policy" "$spec_scratch/governance/policy"
+cp -R "$root/governance/isolation" "$spec_scratch/governance/isolation"
+ln -s "$root/fleet" "$spec_scratch/fleet" 2>/dev/null
+
+spec_anchor='if upstream_issue is None or upstream_issue not in open_blockers:'
+spec_replacement='if upstream_issue is None:  # MUTATED (#699 provocation): any upstream, any issue'
+spec_target="$spec_scratch/governance/dispatch/claims.py"
+if ! python3 - "$spec_target" "$spec_anchor" "$spec_replacement" <<'PY'
+import sys
+from pathlib import Path
+
+path, anchor, replacement = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+source = path.read_text(encoding="utf-8")
+count = source.count(anchor)
+if count != 1:
+    print(f"the mutation anchor matched {count} times, not once", file=sys.stderr)
+    raise SystemExit(3)
+path.write_text(source.replace(anchor, replacement), encoding="utf-8")
+print("MUTANT-APPLIED:", anchor, "->", replacement)
+PY
+then
+  bad "the SPECULATIVE-BYPASS mutation could not be applied"
+else
+  spec_probe="$spec_scratch/governance/dispatch/_probe_699.py"
+  cat > "$spec_probe" <<'PY'
+"""Standalone probe (#699): `--base` naming a real branch that is NOT the
+blocking issue's own branch must never be accepted, even under a mutant that
+widens the speculative exemption to any resolvable `issue-<n>` branch."""
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+PKG_DIR = str(Path(__file__).resolve().parent)
+if PKG_DIR not in sys.path:
+    sys.path.insert(0, PKG_DIR)
+
+import claims  # noqa: E402
+import focus  # noqa: E402
+import pool  # noqa: E402
+import owner_queue  # noqa: E402
+from model import Issue, Snapshot  # noqa: E402
+
+tmp = Path(sys.argv[1])
+repo = tmp / "repo"
+repo.mkdir(parents=True)
+
+
+def git(*args):
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True,
+                    env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": str(repo), "GIT_CONFIG_NOSYSTEM": "1"})
+
+
+subprocess.run(["git", "init", "-q", "-b", "master", str(repo)], check=True, capture_output=True, text=True)
+git("config", "user.name", "Probe")
+git("config", "user.email", "probe@example.com")
+(repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+git("add", "seed.txt")
+git("commit", "-q", "-m", "seed")
+git("branch", "issue-603")  # #602's REAL blocker
+git("branch", "issue-999")  # a real branch, but NOT #602's blocker
+git("checkout", "-q", "-b", "issue-602")
+
+focus.DEFAULT_PATH = str(tmp / "absent-focus.json")
+pool.POOL_PATH = tmp / "no-pool.jsonl"
+owner_queue.DEFAULT_PATH = tmp / "no-queue.yaml"
+
+now = datetime(2026, 9, 16, 0, 0, 0, tzinfo=timezone.utc)
+issues = {
+    602: Issue(602, "blocked by 603", milestone="M1", blocked_by=(603,)),
+    603: Issue(603, "upstream", milestone="M1"),
+}
+snapshot = Snapshot(generated_at="2026-09-16T00:00:00Z", source="probe", issues=issues)
+ledger = tmp / "claims.jsonl"
+locks = tmp / "locks"
+
+try:
+    claims.claim(
+        602, "agent-x", "lane", snapshot, ledger=ledger, lock_dir=locks, now=now,
+        speculative_base="issue-999", main=repo,
+    )
+except claims.ClaimRefused as exc:
+    print(f"CORRECTLY-REFUSED: {exc.reason}")
+    sys.exit(0)
+print("WRONGLY-ACCEPTED: an out-of-order claim was let through by --base")
+sys.exit(1)
+PY
+  if python3 "$spec_probe" "$work/state-SPECULATIVE-BYPASS" > "$work/SPECULATIVE-BYPASS.log" 2>&1; then
+    cat "$work/SPECULATIVE-BYPASS.log" >&2
+    bad "SPECULATIVE-BYPASS mutant was NOT refused (the gate must be able to fail — GR-12)"
+  else
+    grep -q "WRONGLY-ACCEPTED" "$work/SPECULATIVE-BYPASS.log" && \
+      ok "SPECULATIVE-BYPASS was refused by name (the mutant let an out-of-order claim through, and the probe caught it)" || \
+      { cat "$work/SPECULATIVE-BYPASS.log" >&2; bad "SPECULATIVE-BYPASS failed, but not for the reason the provocation targets"; }
+  fi
+fi
+
+spec_sha_after="$(digest governance/dispatch/claims.py)"
+if [ "$spec_sha_before" = "$spec_sha_after" ]; then
+  ok "the real governance/dispatch/claims.py is sha256-identical before and after the #699 provocation"
+else
+  bad "the #699 provocation modified the real tree ($spec_sha_before -> $spec_sha_after)"
+fi
+
+if env -u AO_FLEET_DIR PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
+     governance/dispatch/tests/test_speculative_claim.py > "$work/pytest-699.log" 2>&1; then
+  ok "governance/dispatch/tests/test_speculative_claim.py is green ($(tail -n 1 "$work/pytest-699.log" | tr -d '\r'))"
+else
+  tail -n 20 "$work/pytest-699.log" >&2
+  bad "governance/dispatch/tests/test_speculative_claim.py is not green"
 fi
 
 echo

@@ -51,7 +51,7 @@ class TestNoForceAnywhere:
         ops.pull_request_for("issue-764")
         ops.open_pr(branch="issue-764", base="master", title="t", body_file=tmp_path / "body.md")
         ops.run_contract(pr_number=11)
-        ops.merge_pr(11)
+        ops.merge_pr(11, subject="t", body_file=tmp_path / "body.md")
         ops.delete_branch("issue-764")
         ops.close_lifecycle(764)
         offenders = [
@@ -64,11 +64,22 @@ class TestNoForceAnywhere:
 
     def test_the_merge_is_a_squash_merge_without_an_implicit_branch_delete(self, recorded, tmp_path):
         """The branch delete is its own named step (rule 16), not a side effect."""
-        ports.GitHubOps(tmp_path).merge_pr(11)
+        ports.GitHubOps(tmp_path).merge_pr(11, subject="the subject", body_file=tmp_path / "squash.md")
         merge = next(call["argv"] for call in recorded if "merge" in call["argv"])
         assert merge[:2] == ["gh", "pr"]
         assert "--squash" in merge
+        assert "--subject" in merge and "the subject" in merge
+        assert "--body-file" in merge and str(tmp_path / "squash.md") in merge
         assert "--delete-branch" not in merge
+
+    def test_the_landed_contract_is_the_shared_predicate_over_the_commits_to_squash(self, recorded, tmp_path):
+        """The merge precondition validates the artifact that lands (issue #998)."""
+        ports.GitHubOps(tmp_path).check_landed_contract(base="master", head="a" * 40)
+        argv = recorded[0]["argv"]
+        assert argv[0] == "bash"
+        assert argv[1].endswith("scripts/check-pr-contract.sh")
+        assert "--landed" in argv and "--range" in argv
+        assert argv[-1] == "master.." + "a" * 40
 
 
 class TestTheContractEnvironment:
@@ -116,7 +127,7 @@ class TestFailuresAreNamed:
 
         monkeypatch.setattr(ports, "_run", _run)
         with pytest.raises(ports.PortError):
-            ports.GitHubOps(tmp_path).merge_pr(11)
+            ports.GitHubOps(tmp_path).merge_pr(11, subject="t", body_file=tmp_path / "body.md")
 
 
 class TestRecordingOps:
@@ -124,7 +135,7 @@ class TestRecordingOps:
         reads = ports.GitHubOps(tmp_path)
         recording = ports.RecordingOps(reads=reads)
         recording.push("issue-764")
-        recording.merge_pr(11)
+        recording.merge_pr(11, subject="t", body_file=tmp_path / "body.md")
         recording.delete_branch("issue-764")
         recording.close_lifecycle(764)
         assert [planned.action for planned in recording.planned] == [

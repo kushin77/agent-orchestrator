@@ -146,6 +146,24 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     that had no branch left to run on.
     (`scripts/check-lifecycle-verify-order.sh` provokes the ordering, its negative
     controls, and both halves of the fix.)
+
+    **A squash merge decides which commit a lane can be measured against (#1098).**
+    The same invariant has a second half, and it is the same failure: for a
+    **squash-merged** pull request the commit that was verified — the branch tip — is
+    **not** an ancestor of anything on the default branch, because the merge created a
+    *new* commit carrying the same tree. A lane cut from the default branch (the
+    correct venue, rule 15) can therefore never be *at* the verified head, and the
+    only tree that satisfies equality is the obsolete branch tip — which the
+    non-tree-local checks then fail. Measured on #714, #977 and #978: all three
+    merged, none closable, all three left on `VERIFY_EVIDENCE_MISSING`; at PR #984's
+    head, 19 of 145 checks failed for a tree no green attestation ever existed for.
+    A lane may stand for the verified commit when it **is** that commit, or — for a
+    merged pull request — when it **contains the commit the squash landed as** *and*
+    that landing carries the **verified tree**; the record then names the verified
+    commit, the landing and the tree the gate actually ran in. The tree half is not
+    decoration: containing *a* landing is not the claim, containing *the verified
+    work* is. (`scripts/check-lifecycle-verify-order.sh` provokes all three shapes
+    against a real squash merge, plus a mutant that removes each half.)
 17. **Orphan reconciliation (institutional, issue #304).** A session records a
     **heartbeat** in `.fleet/sessions/<session_id>.json` while it runs, refreshed
     on an interval. A session whose beat passes the TTL (15 minutes) is orphaned;
@@ -233,6 +251,28 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     the process **immediately**, bypassing claim release and child teardown. An
     operator must never be advised to send a signal that is an abrupt kill.
     (Spine: AO-GR-27.)
+25. **Every governed artifact is tagged, and a tag set derives its gates
+    (institutional, issues #1175 + #1183).** The **tag authority** — one
+    declared vocabulary at `governance/tagging/taxonomy.yaml` — classifies every
+    governed artifact:
+    issue, PR, branch, commit, surface, release. It **borrows** wherever an
+    authority already exists and never re-declares one: the `class` ladder from
+    `governance/conformance/policy.yaml`, the FinOps tiers from
+    `governance/finops/policy.json` — each **mirrored and proven equal** by the
+    gate, because a borrow that reads its own values can never fail. Two
+    dimensions carry the delivery and lifecycle half: **`posture`** (`overall` |
+    `saas` | `iac` | `no-human-needed` | `human-gated`) and **`lifecycle`**
+    (`plan` | `build` | `verify` | `release` | `operate` | `retire`). A tag set
+    **derives the gates it owes**, by channel (`pr`/`ci`/`cd`/`ops`) and at the
+    FinOps floor the doctrine sets, so classification has consequences instead
+    of being a description; `posture:no-human-needed` and `posture:human-gated`
+    are mutually exclusive and both at once is refused by name. **The declaration
+    is half the rule:** this file, `docs/GOLDEN-RULES.md`, `docs/GOVERNANCE.md`,
+    `docs/EXECUTION-PLAN.md` and `docs/QA-GATE.md` each declare it, and
+    `scripts/check-tagging.sh`'s `tagging-mandate` check FAILS naming the
+    document **and** the marker the moment one stops — that is what keeps the
+    rule constitutional rather than advisory (AO-GR-4, GR-29). (Spine:
+    AO-GR-28.)
 
 ## Directory layout (pillar-aligned)
 
@@ -305,6 +345,7 @@ The gate must be green before any PR or merge; its output is the evidence.
 - `docs/EXECUTION-PLAN.md` — parallel dispatch contract, lane ownership,
   phase/wave sequencing.
 - `docs/GOVERNANCE.md` — branch, provenance, session-label, review conventions.
+- `docs/INFRA-LIMITS.md` — the sandbox + ephemeral-storage contract (issue #729): the shared `/tmp` limit, the read-back-non-empty write rule, and `scripts/check-infra-limits.sh`.
 - `CONTRIBUTING.md` — human contributor workflow.
 - `RELEASING.md` — SemVer release process.
 - GitHub issues board — the canonical roadmap; EPIC-00 = issue #4.

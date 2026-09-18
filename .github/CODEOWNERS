@@ -1,0 +1,41 @@
+# .github/CODEOWNERS — declared ownership map (issue #1073).
+#
+# This is a single-owner repo today, so every rule below resolves to the same
+# owner. The value of this file is the DECLARED map, not the owner diversity:
+# it names one rule per pillar/cross-cutting directory (docs/ARCHITECTURE.md,
+# AGENTS.md) so a reviewer requirement can later be attached per area without
+# discovering the boundaries from scratch, and so `scripts/check-codeowners.sh`
+# has something concrete to hold to the tree (every pillar dir present, every
+# rule naming a path that exists, no stale entries).
+#
+# A second owner is added PER RULE, as an area gains a distinct reviewer, and
+# is NEVER added via the default (`*`) line — the default stays the fallback
+# owner for anything not named below, not a blanket second reviewer for every
+# pillar.
+#
+# GitHub reads the LAST matching rule, so the default comes first and every
+# more specific rule follows it.
+
+# Default owner — fallback for anything not matched below.
+*                 @kushin77
+
+# Five-pillar architecture (docs/ARCHITECTURE.md).
+/registry/        @kushin77
+/gateway/         @kushin77
+/engine/          @kushin77
+/guardrails/      @kushin77
+/telemetry/       @kushin77
+
+# Cross-cutting tenant identity/RBAC, control-plane/portal, autonomous
+# ops/governance.
+/identity/        @kushin77
+/control-plane/   @kushin77
+/portal/          @kushin77
+/governance/      @kushin77
+
+# Infrastructure, tooling, docs, CI-adjacent config, fleet automation.
+/infra/           @kushin77
+/scripts/         @kushin77
+/docs/            @kushin77
+/.github/         @kushin77
+/fleet/           @kushin77

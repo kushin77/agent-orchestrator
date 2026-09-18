@@ -10,11 +10,11 @@ idempotent.
 Safety, the one rule a watchdog must never break: **a run in flight is never
 restarted just to update code.** A *missing* loop is respawned regardless — its
 run is already orphaned and the fresh loop self-heals the claim. A *drifted*
-(healthy but old-code) sister is respawned only when idle.
+(healthy but old-code) dispatcher is respawned only when idle.
 
 Every rung this module spawns is started detached with its stdout+stderr
 appended to a per-rung capture log, `.fleet/<rung>.log`. Spawning used to send
-both streams to `DEVNULL`, so the brain — the middle rung of the hierarchy — was
+both streams to `DEVNULL`, so the director — the middle rung of the hierarchy — was
 unobservable from anywhere: no window, no log, no way in. The watchdog is the
 spawn authority, so the capture path is defined here and read by
 `fleet/console.py` (the dashboard) and `fleet/run-fleet.sh` (the tail windows).
@@ -29,7 +29,7 @@ The pass measures a second thing (issue #319): whether the running rung implemen
 the capabilities `fleet/channel.py` declares for it. A rung on an old commit
 reports `CAPABILITY STALE` naming each missing capability — "the loop is old" and
 "the loop is old, so lanes are not being beat and orphans will never be flagged"
-are different facts, and only the second tells an operator what is absent. A rung
+are different facts, and only the second tells a principal what is absent. A rung
 that is *current* and still missing a declared capability is reported and never
 respawned: no restart adds a capability the build does not have. `python3
 fleet/watchdog.py capabilities` prints that report on its own.
@@ -40,7 +40,7 @@ Measured 2026-09-15: `#739` made the watchdog compare the running commit against
 `origin/master`, and on a mismatch it respawned — but a respawn re-executes the
 *same checkout*. When the drift was the checkout being behind, the watchdog took
 an action that could not change the compared value and repeated it without bound:
-**132 `drifted … — respawned` decisions, 45 clean stops, a brain process never
+**132 `drifted … — respawned` decisions, 45 clean stops, a director process never
 older than 60s, and no work done at all.**
 
 So this module now separates the two cases by name and bounds every remedy:
@@ -56,7 +56,7 @@ attempt cap with exponential backoff (the same harvested contract as
 `fleet/runaway.py`). A remedy that does not change the observed state is **not
 retried forever**: after the cap the watchdog **escalates once**, naming both
 commits and the checkout, and **parks** the rung — it never retries it again until
-an operator rearms it (`python3 fleet/watchdog.py rearm --rung <name>`) or the
+a principal rearms it (`python3 fleet/watchdog.py rearm --rung <name>`) or the
 rung's state changes on its own. A drifted rung that is busy is *recorded* as
 pending drift and acted on when the run completes, instead of being dropped every
 tick.
@@ -67,7 +67,7 @@ executes `python3 fleet/watchdog.py run` **from the shared checkout**, so the
 watchdog in flight is whatever copy the checkout holds — and when the checkout is
 the stale side, the running watchdog *is* the pre-fix watchdog, whose remedy is
 the code it cannot see. Measured 2026-09-15: the shared checkout sat 5 commits
-behind (`e9cfc10` merged, `HEAD` `b95a8b7`), the sister ran `592b132` for ~5.5
+behind (`e9cfc10` merged, `HEAD` `b95a8b7`), the dispatcher ran `592b132` for ~5.5
 hours, and #773's own evidence records a **human** doing the fast-forward.
 
 Two circularities, and this module now closes both:
@@ -151,7 +151,7 @@ RUNS_DIR = FLEET_DIR / "runs"
 # Respawn verification window (issue #276). After spawning, wait up to
 # VERIFY seconds for a new loop process to appear, and only report success once
 # it has stayed up past SETTLE — a rung that starts and immediately exits is a
-# failure, not a spawn the operator can trust.
+# failure, not a spawn the principal can trust.
 RESPAWN_VERIFY_SECONDS = 10.0
 RESPAWN_SETTLE_SECONDS = 1.0
 RESPAWN_POLL_SECONDS = 0.25
@@ -230,9 +230,9 @@ FAST_FORWARD_TIMEOUT_SECONDS = 60
 # drift and acted on once the run completes. The hold is right. It is also not a
 # bound — a rung whose runs die before they can report presents flight on every
 # tick, so the hold is re-taken on every tick and the drift lock never opens.
-# Measured 2026-09-14: the sister held its own drift lock from 21:32 onward,
+# Measured 2026-09-14: the dispatcher held its own drift lock from 21:32 onward,
 # executing code that predated five merged fixes, while the watchdog respawned the
-# brain in the same tick and wrote the hold into `.fleet/watchdog.log` each time.
+# director in the same tick and wrote the hold into `.fleet/watchdog.log` each time.
 #
 # So the hold gets a budget of its own, counted in respawns DUE. A respawn is due
 # on every tick the rung is drifted (or checkout-behind) and the remedy is reached:
@@ -383,7 +383,7 @@ def crash_loop_verdict(name: str, when: float, record: dict | None = None) -> tu
     """Is this rung crash-looping — `CRASH_LOOP_RESPAWNS` inside the window, changing nothing?
 
     Returns `(crash-looping, why)`. The reason NAMES both constants, because a bound
-    whose numbers are not in the log cannot be audited by the operator reading it.
+    whose numbers are not in the log cannot be audited by the principal reading it.
 
     This is the distinction #366 is about. A run appearing in flight is evidence
     that a run EXISTS; it is not evidence that the run is making progress, and the
@@ -415,7 +415,7 @@ def remedy_parked(name: str, state: str, running: str) -> bool:
     """Has the remedy already PARKED this rung on this observation (#773, #366)?
 
     A park is terminal for the incident — the watchdog stops retrying until an
-    operator rearms it — and `bounded_remedy` is the only thing allowed to decide
+    principal rearms it — and `bounded_remedy` is the only thing allowed to decide
     that. So the in-flight hold must not be able to re-take a parked rung: the hold
     is a deferral, and a deferral that overwrites a park quietly un-parks the rung
     and lets it be acted on again.
@@ -663,7 +663,7 @@ def bootstrap_checkout(
     if before == "unknown":
         # Refuse BEFORE fetching: a directory that does not resolve to a git HEAD is
         # not a checkout that is behind, and a network call would tell us nothing
-        # about it. The refusal names the path, so the operator learns WHICH tree
+        # about it. The refusal names the path, so the principal learns WHICH tree
         # could not be read rather than only that something failed.
         return (
             False,
@@ -711,7 +711,7 @@ def reexec_watchdog(argv: list[str]) -> None:
 
 
 def freshness_line(freshness: dict) -> str:
-    """The one line an operator (and the gate) reads: verdict, both commits, both blobs."""
+    """The one line a principal (and the gate) reads: verdict, both commits, both blobs."""
     return f"{freshness['verdict']} — {freshness['reason']}"
 
 
@@ -771,7 +771,7 @@ def rung_log(name: str) -> Path:
 
     The path is the contract between the writer (this module, and
     `control.py` when it starts a rung), the reader (`fleet/console.py`) and the
-    operator's windows (`fleet/run-fleet.sh` tails exactly this file).
+    principal's windows (`fleet/run-fleet.sh` tails exactly this file).
     """
     return FLEET_DIR / f"{name}.log"
 
@@ -779,7 +779,7 @@ def rung_log(name: str) -> Path:
 def open_log(name: str) -> TextIO:
     """Open a rung's capture log for appending, created if missing, line-buffered.
 
-    Line buffering matters for the operator, not the machine: a rung writes a few
+    Line buffering matters for the principal, not the machine: a rung writes a few
     lines and then blocks on its next poll, so a block-buffered handle would
     leave the window empty for minutes at a time and look like a dead rung.
     """
@@ -797,9 +797,9 @@ def spawn(name: str, command: list[str]) -> subprocess.Popen:
 
     The environment is passed explicitly — ``runtime.runner_env()``, the same PATH
     the executor resolves its runner against. The watchdog is cron's own child, so
-    without this the whole chain (watchdog -> launcher -> loop -> subagent)
-    inherits cron's minimal PATH: measured 2026-09-14 (#733), the sister could not
-    spawn a single subagent because ``~/.local/bin`` was not on it.
+    without this the whole chain (watchdog -> launcher -> loop -> executor)
+    inherits cron's minimal PATH: measured 2026-09-14 (#733), the dispatcher could not
+    spawn a single executor because ``~/.local/bin`` was not on it.
     """
     handle = open_log(name)
     try:
@@ -856,7 +856,7 @@ def run_in_flight() -> bool:
     dispatches, so asking whether that pid was alive answered True for a crashed
     run's leftover marker as long as the loop lived. Measured 2026-09-14: four
     markers ~5.6h old, every one with ``child_pid: null``, each naming the live
-    sister loop — the drift lock was held open on every tick, the sister's own
+    dispatcher loop — the drift lock was held open on every tick, the dispatcher's own
     heartbeat (``state: idle``, ``runs: 0``) was ignored for that decision, and
     the rung stayed on pre-#723 code with no attempt budget.
 
@@ -969,8 +969,8 @@ def respawn(
 
     `name` selects the capture log (`.fleet/<name>.log`) and defaults to the
     launcher's own stem, which is right for every rung whose log is named after
-    its script; the sister passes its rung name explicitly because its launcher
-    is `terminal.sh` while the operator's window is `sister`.
+    its script; the dispatcher passes its rung name explicitly because its launcher
+    is `terminal.sh` while the principal's window is `sister`.
 
     Returns False — so the caller prints `RESPAWN FAILED` and the pass exits
     non-zero — when the spawn itself raises, or when no new rung process appears
@@ -1013,7 +1013,7 @@ def record_pending(
 ) -> dict:
     """Record that a rung needs action but is BUSY — pending drift, not a dropped finding.
 
-    Requirement 3 of #773: the sister logged `drifted … but a run is in flight —
+    Requirement 3 of #773: the dispatcher logged `drifted … but a run is in flight —
     left alone` on **every** tick and so was never updated even after its run
     finished. The protection (never restart a run to update code) is right and is
     kept; dropping the finding is not. The record carries no `next_attempt_at`, so
@@ -1236,7 +1236,7 @@ def rung_action(
     because restarting a build that never had the capability cannot fix it.
 
     Issue #739: the healthy line names BOTH commits — the one the loop is running
-    and the `origin/master` baseline it was judged against — so an operator can
+    and the `origin/master` baseline it was judged against — so a principal can
     audit the comparison instead of trusting the verdict. A comparison against a
     baseline that is stale, or against the local checkout, is invisible in a bare
     `healthy`.
@@ -1286,7 +1286,7 @@ def rung_action(
     ):
         # #366: the hold is a bound, not a policy. A rung whose runs die before they
         # can report presents flight on every tick, so the hold would be re-taken
-        # forever and the drift lock would never open — measured: the sister held its
+        # forever and the drift lock would never open — measured: the dispatcher held its
         # own lock with nothing running. `crash_loop_verdict` is the budget that ends
         # it, and it names N and the window when it does. A rung the remedy has
         # already PARKED is excluded first: a deferral must not un-park an incident
@@ -1303,7 +1303,7 @@ def rung_action(
         escape = ""
     # CANNOT_ASSESS respawns too: the watchdog cannot certify the rung, and a
     # respawn is the only action that can restore a readable comparison. It is
-    # reported with its reason so the operator sees WHY it could not be judged —
+    # reported with its reason so the principal sees WHY it could not be judged —
     # never silently folded into `healthy`.
     outcome, ok = bounded_remedy(
         name,
@@ -1383,6 +1383,42 @@ def watchdog_once(force: bool = False) -> int:
         return _watchdog_once_locked(force)
     finally:
         watchdog_lease.release()
+
+
+def _self_reap_own_gate_lock() -> bool:
+    """Reap THIS checkout's own leftover gate-lock file, never box-wide.
+
+    RCA 2026-09-17 fix #3, and RCA-0015 before it
+    (governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md), already
+    ruled a box-wide sweep unsafe: a sweeper walking every worktree can race
+    a DIFFERENT worktree's in-flight `gatelock.acquire` between that
+    acquirer's `os.open(O_CREAT)` and its `_try_lock` — the file is briefly
+    unflocked and looks exactly like a leftover, so the sweep would unlink
+    it, the acquirer's `_flock_fresh` re-check would fail, and a
+    legitimately starting gate would report rc 12 CANNOT-ASSESS for a key it
+    never touched. Scoped to ``ROOT`` — the one worktree this watchdog
+    process itself runs in — the only acquirer that could ever be in that
+    window is this same checkout, so the race is gone: this is the same
+    operation this worktree's own `gatelock.release` already performs, just
+    runnable on a schedule without a live gate around to call `release`
+    first. `gatelock.health()` (called above, in `_watchdog_once_locked`)
+    stays the box-wide, alert-only, never-reaps sweep; this is a second,
+    narrower, self-owned call site — pulled into its own function so it is
+    unit-testable without exercising the whole watchdog pass.
+
+    Returns whether the call was unassessable (an exception), so the caller
+    can fold that into its own CANNOT-ASSESS verdict.
+    """
+    try:
+        reaped = gatelock.reap_own_worktree(ROOT)
+    except Exception as exc:  # defensive: mirrors this pass's own CANNOT-ASSESS style
+        print(f"[watchdog] gate-lock self-reap: CANNOT-ASSESS — {exc}", flush=True)
+        return True
+    if reaped:
+        print(f"[watchdog] gate-lock self-reap: reaped own leftover for {ROOT}", flush=True)
+    else:
+        print("[watchdog] gate-lock self-reap: nothing to reap", flush=True)
+    return False
 
 
 def _watchdog_once_locked(force: bool) -> int:
@@ -1479,7 +1515,7 @@ def beat_path(rung: str) -> Path:
 
 
 def cmd_rearm(args: argparse.Namespace) -> int:
-    """Clear a rung's attempt record after an operator has fixed the cause (#773).
+    """Clear a rung's attempt record after a principal has fixed the cause (#773).
 
     The escalation ARTIFACT is deliberately kept: the incident happened, and the
     record of it is the audit. What is cleared is the bound's own state, so the

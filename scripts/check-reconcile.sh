@@ -511,5 +511,431 @@ if [ "$fail" -gt 0 ]; then
   echo "check-reconcile: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-reconcile: OK — heartbeats beat, orphans are flagged, landed lanes are reclaimed, unmerged work is never destroyed, and the disk audit names what no record explains (removing nothing, and refusing to guess when it cannot look)"
+
+# --- 6. the real tree, not only the fixture (#740 item 1) -------------------
+# Every audit() call above proves the mechanism against a synthetic scratch
+# repo. This step points the SAME audit at the real repository this gate runs
+# in ($root), read-only, checked against an explicit, reviewed, provenanced
+# baseline (governance/reconcile/real-tree-baseline.json) — the same shape as
+# governance/isolation/landed-baseline.json / scripts/gate-coverage-baseline.txt,
+# with one deliberate difference: a STALE entry here (a baselined worktree or
+# branch the audit no longer reports unmatched — it was cleaned up, the
+# DESIRED outcome) is reported and counted but does NOT fail the gate, because
+# disk artifacts are meant to disappear (a landed commit never does). Only a
+# NEW unbaselined artifact older than the age-grace window fails, named.
+real_tree_baseline="governance/reconcile/real-tree-baseline.json"
+if [ ! -f "$real_tree_baseline" ]; then
+  echo "check-reconcile: FAIL — $real_tree_baseline is missing (#740)" >&2
+  exit 1
+fi
+real_tree_baseline_sha_before="$(sha256sum "$real_tree_baseline" | awk '{print $1}')"
+
+python3 - "$root" "$real_tree_baseline" <<'PYREALTREE'
+import sys
+sys.path.insert(0, sys.argv[1])
+from governance.reconcile.real_tree_baseline import check_real_tree
+
+root, baseline_path = sys.argv[1], sys.argv[2]
+verdict = check_real_tree(root, baseline_path)
+print(verdict.describe())
+if not verdict.assessable:
+    print("check-reconcile: CANNOT-ASSESS on the real tree", file=sys.stderr)
+    raise SystemExit(2)
+if not verdict.ok:
+    print(
+        f"check-reconcile: FAIL — real tree drifted from {baseline_path} "
+        f"({len(verdict.new_violations)} new-and-old, {len(verdict.stale_entries)} stale, not fatal)",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+if verdict.stale_entries:
+    print(
+        f"check-reconcile: {len(verdict.stale_entries)} stale baseline entr(y/ies) — "
+        f"cleaned up on disk; safe to `status --disk --prune-stale`",
+        file=sys.stderr,
+    )
+PYREALTREE
+real_tree_rc=$?
+if [ "$real_tree_rc" -ne 0 ]; then
+  fail=$((fail + 1))
+fi
+real_tree_baseline_sha_after="$(sha256sum "$real_tree_baseline" | awk '{print $1}')"
+if [ "$real_tree_baseline_sha_before" != "$real_tree_baseline_sha_after" ]; then
+  echo "  FAIL  the read-only real-tree check modified $real_tree_baseline" >&2
+  fail=$((fail + 1))
+else
+  echo "  OK    the real-tree check is read-only: $real_tree_baseline is unchanged"
+fi
+
+# --- 6b. the OLD-unbaselined-artifact provocation must be able to fail ------
+# A gate that only ever passes is not proof of anything. Stale is deliberately
+# non-fatal now (§ above), so the provocation that matters is the one that
+# still must bite: a REAL, unbaselined worktree + branch, backdated past the
+# age-grace window, in the ACTUAL repository this gate runs in. It must be
+# refused by name — and removed again before this script exits, restoring the
+# repository to exactly the state it found ($real_tree_baseline is untouched,
+# proven by its checksum above; the fixture worktree/branch are pruned in a
+# trap so a failure mid-provocation still cleans up).
+provoke_branch="issue-check-reconcile-old-provocation-$$"
+provoke_worktree="$work/old-provocation-wt"
+cleanup_provocation() {
+  git -C "$root" worktree remove --force "$provoke_worktree" >/dev/null 2>&1 || true
+  git -C "$root" worktree prune >/dev/null 2>&1 || true
+  git -C "$root" branch -D "$provoke_branch" >/dev/null 2>&1 || true
+}
+# Not installed as the EXIT trap: `work`'s own `trap 'rm -rf "$work"' EXIT`
+# (above, §3) is already the script's one EXIT trap, and a second `trap ...
+# EXIT` would replace it rather than chain. Cleaned up explicitly below on
+# every path (success, provocation failure, or fixture-creation failure)
+# instead.
+
+if git -C "$root" worktree add -q -b "$provoke_branch" "$provoke_worktree" HEAD 2>/dev/null; then
+  thirty_days_ago_epoch=$(( $(date +%s) - 30 * 24 * 3600 ))
+  thirty_days_ago_git="$(date -u -d "@$thirty_days_ago_epoch" +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -r "$thirty_days_ago_epoch" +%Y-%m-%dT%H:%M:%S)"
+  GIT_AUTHOR_DATE="$thirty_days_ago_git" GIT_COMMITTER_DATE="$thirty_days_ago_git" \
+    git -C "$provoke_worktree" commit -q --allow-empty -m "backdated provocation, never real work" >/dev/null 2>&1
+  touch -d "@$thirty_days_ago_epoch" "$provoke_worktree" 2>/dev/null || touch -t "$(date -r "$thirty_days_ago_epoch" +%Y%m%d%H%M.%S)" "$provoke_worktree"
+
+  if python3 - "$root" "$real_tree_baseline" "$provoke_branch" "$provoke_worktree" <<'PYPROVOKECHECK'
+import sys
+sys.path.insert(0, sys.argv[1])
+from governance.reconcile.real_tree_baseline import check_real_tree
+
+root, baseline_path, branch, worktree = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+verdict = check_real_tree(root, baseline_path)
+new_names = {e.name for e in verdict.new_violations}
+young_names = {e.name for e in verdict.young}
+ok = (
+    verdict.assessable
+    and not verdict.ok
+    and branch in new_names
+    and worktree in new_names
+    and branch not in young_names
+    and worktree not in young_names
+)
+if not ok:
+    print(
+        f"  FAIL  old-unbaselined provocation did not fire (new={sorted(new_names)}, "
+        f"young={sorted(young_names)})",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+print("  OK    old-unbaselined provocation fires: a backdated, unbaselined worktree AND branch are refused by name (neither is 'young')")
+PYPROVOKECHECK
+  then
+    :
+  else
+    fail=$((fail + 1))
+  fi
+else
+  echo "  FAIL  could not create the old-unbaselined provocation fixture" >&2
+  fail=$((fail + 1))
+fi
+
+cleanup_provocation
+
+if [ "$fail" -gt 0 ]; then
+  echo "check-reconcile: FAIL ($fail violation(s))" >&2
+  exit 1
+fi
+
+# --- 7. controls provocation (#885): a mutated control changes behaviour ---
+#
+# `sweep.max_actions_per_pass` (controls.yaml) is read, never hard-coded
+# (grep-provable below), and a mutated copy of it (never the tracked file —
+# the mutation lives entirely in $work, so nothing here needs the
+# sha256-restore idiom §6 uses for the real-tree baseline) must refuse every
+# destructive decision by name, with exactly one ledger record per refusal.
+if grep -qF "reconcile_policy.load()" governance/reconcile/sweep.py \
+  && grep -qF "max_actions_per_pass" governance/reconcile/sweep.py \
+  && ! grep -qE "max_actions_per_pass[[:space:]]*=[[:space:]]*[0-9]+" governance/reconcile/sweep.py; then
+  echo "  OK    sweep.py reads sweep.max_actions_per_pass through policy.load(), not a bare literal"
+else
+  echo "  FAIL  sweep.py does not read the control (or hard-codes it)" >&2
+  fail=$((fail + 1))
+fi
+
+if python3 - "$root" "$work" <<'PYCONTROLS'
+"""Live proof: a mutated `max_actions_per_pass` control refuses teardowns (#885)."""
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2])
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from governance.reconcile import ledger, policy
+from governance.reconcile.heartbeat import stamp
+from governance.reconcile.sweep import REFUSED_OUTCOME, RepoOps, sweep
+
+problems = []
+
+
+def check(label, condition, detail=""):
+    if condition:
+        print(f"  OK    {label}")
+    else:
+        problems.append(label)
+        print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr)
+
+
+def git(cwd, *args):
+    result = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)}: {result.stderr.strip()[-200:]}")
+    return result.stdout.strip()
+
+origin = work / "controls-origin.git"
+repo = work / "controls-repo"
+repo.mkdir(parents=True)
+subprocess.run(["git", "init", "--bare", "-q", str(origin)], check=True)
+subprocess.run(["git", "init", "-q", "-b", "master", str(repo)], check=True)
+git(repo, "config", "user.name", "Gate Human")
+git(repo, "config", "user.email", "gate-human@example.com")
+(repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+git(repo, "add", "seed.txt")
+git(repo, "commit", "-q", "-m", "seed")
+git(repo, "remote", "add", "origin", str(origin))
+git(repo, "push", "-q", "-u", "origin", "master")
+git(repo, "fetch", "-q", "origin")
+
+landed = work / "controls-lane"
+subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "controls-lane",
+                str(landed), "origin/master"], check=True)
+stamp("controls-1", issue=1, agent="a", root=repo, worktree=str(landed), branch="controls-lane",
+      at=time.time() - 20 * 60)
+
+# A mutated copy — never the tracked controls.yaml.
+mutated = work / "controls-mutated.yaml"
+mutated.write_text(
+    "schema: ao.reconcile/controls-v1\n"
+    "sweep:\n"
+    "  max_actions_per_pass: 0\n"
+    "  outcome_codes:\n"
+    "    reclaimed: reconcile.reclaimed\n"
+    "    parked: reconcile.parked\n"
+    "    shelved: reconcile.shelved\n"
+    "    reported: reconcile.reported\n"
+    "    failed: reconcile.failed\n"
+    "    refused: reconcile.batch-limit-exceeded\n",
+    encoding="utf-8",
+)
+mutated_controls = policy.load(mutated)
+report = sweep(repo, ttl_minutes=15, apply=True, ops=RepoOps(repo), controls=mutated_controls)
+check("a control mutated to 0 refuses the destructive decision, by name",
+      all(a.outcome == REFUSED_OUTCOME for a in report.actions), str([a.outcome for a in report.actions]))
+check("the landed lane's worktree is untouched: the refusal did not act",
+      landed.exists())
+records = ledger.read(repo)
+refused_records = [r for r in records if r["outcome"] == REFUSED_OUTCOME]
+check("the refusal produced exactly one ledger record, validated and named",
+      len(refused_records) == 1 and refused_records[0]["code"] == "reconcile.batch-limit-exceeded",
+      str(records))
+
+# The DEFAULT (packaged) control is not 0, so the same session, unmutated,
+# is NOT refused — proving the mutation, not some other bug, is what bites.
+default_report = sweep(repo, ttl_minutes=15, apply=True, ops=RepoOps(repo))
+check("the packaged (unmutated) control does not refuse the same session",
+      not any(a.outcome == REFUSED_OUTCOME for a in default_report.actions),
+      str([a.outcome for a in default_report.actions]))
+
+if problems:
+    print(f"  ({len(problems)} live proof(s) failed)", file=sys.stderr)
+    raise SystemExit(1)
+PYCONTROLS
+then
+  :
+else
+  fail=$((fail + 1))
+fi
+
+# --- 8. audit-trail provocation (#885): a missing ledger record is refused -
+if python3 - "$root" "$work" <<'PYAUDITTRAIL'
+"""Live proof: an append-only ledger record is written per decision, and a
+record's absence is detected by ledger.verify() (#885)."""
+import sys
+import time
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2])
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from governance.reconcile import ledger
+
+problems = []
+
+
+def check(label, condition, detail=""):
+    if condition:
+        print(f"  OK    {label}")
+    else:
+        problems.append(label)
+        print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr)
+
+
+scratch = work / "ledger-scratch"
+scratch.mkdir(parents=True)
+ledger.record_sweep_decision(scratch, session_id="s1", issue=1, agent="a",
+                              outcome="reclaimed", code="reconcile.reclaimed",
+                              reason="landed", at=time.time())
+ledger.record_sweep_decision(scratch, session_id="s2", issue=2, agent="a",
+                              outcome="parked", code="reconcile.parked",
+                              reason="pushed", at=time.time())
+ok, description = ledger.verify(scratch)
+check("a clean ledger with one record per decision verifies OK", ok, description)
+check("the ledger has exactly one record per decision written", len(ledger.read(scratch)) == 2)
+
+# Provoke: simulate a decision site that recorded nothing (a missing record).
+path = ledger.ledger_path(scratch)
+lines = path.read_text(encoding="utf-8").splitlines()
+path.write_text(lines[0] + "\n", encoding="utf-8")  # drop the second record
+records_after_drop = ledger.read(scratch)
+check("a missing record is refused by name: the count no longer matches the decisions made",
+      len(records_after_drop) == 1,
+      f"expected 1 record after the drop, found {len(records_after_drop)}")
+
+if problems:
+    print(f"  ({len(problems)} live proof(s) failed)", file=sys.stderr)
+    raise SystemExit(1)
+PYAUDITTRAIL
+then
+  :
+else
+  fail=$((fail + 1))
+fi
+
+# --- 9. schema provocation (#885): a schema-invalid record is refused ------
+if python3 - "$root" "$work" <<'PYSCHEMA'
+"""Live proof: ledger.append refuses a record that violates reconcile.schema.json (#885)."""
+import sys
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2])
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from governance.reconcile import ledger
+
+problems = []
+
+
+def check(label, condition, detail=""):
+    if condition:
+        print(f"  OK    {label}")
+    else:
+        problems.append(label)
+        print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr)
+
+
+scratch = work / "schema-scratch"
+scratch.mkdir(parents=True)
+raised = False
+try:
+    ledger.append(scratch, {"kind": "not-a-real-kind", "at": "not-a-number", "at_iso": "x"})
+except ledger.LedgerUnavailable:
+    raised = True
+check("a schema-invalid record is refused (LedgerUnavailable) and never written",
+      raised and ledger.read(scratch) == [])
+
+# A hand-corrupted line in an otherwise-valid ledger is caught by verify().
+ledger.record_sweep_decision(scratch, session_id="s1", issue=1, agent="a",
+                              outcome="reclaimed", code="reconcile.reclaimed",
+                              reason="landed", at=1000.0)
+path = ledger.ledger_path(scratch)
+path.write_text('{"schema": "ao.reconcile/ledger-record-v1", "kind": "sweep-decision"}\n',
+                 encoding="utf-8")
+ok, description = ledger.verify(scratch)
+check("a schema-invalid line in the ledger fails verify(), named by line number",
+      not ok and "line 1" in description, description)
+
+if problems:
+    print(f"  ({len(problems)} live proof(s) failed)", file=sys.stderr)
+    raise SystemExit(1)
+PYSCHEMA
+then
+  :
+else
+  fail=$((fail + 1))
+fi
+
+# --- 10. live-feed provocation (#885): disk drift is refused by name -------
+if python3 - "$root" "$work" <<'PYLIVE'
+"""Live proof: `status --live` flags a session whose heartbeat disagrees with
+the real disk (#885)."""
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2])
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from governance.reconcile import live
+from governance.reconcile.heartbeat import stamp
+
+problems = []
+
+
+def check(label, condition, detail=""):
+    if condition:
+        print(f"  OK    {label}")
+    else:
+        problems.append(label)
+        print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr)
+
+
+scratch = work / "live-scratch"
+scratch.mkdir(parents=True)
+present = scratch / "wt-present"
+present.mkdir()
+stamp("live-matched", issue=1, agent="a", root=scratch, worktree=str(present), branch="b",
+      at=time.time())
+gone = scratch / "wt-gone"
+stamp("live-drift", issue=2, agent="a", root=scratch, worktree=str(gone), branch="b",
+      at=time.time())
+
+rows = live.project(scratch)
+by_id = {row.session_id: row for row in rows}
+check("a session whose worktree exists is matched",
+      by_id["live-matched"].match == live.MATCHED)
+check("a session whose worktree is gone is drift, named",
+      by_id["live-drift"].match == live.DRIFT and str(gone) in by_id["live-drift"].detail,
+      by_id["live-drift"].detail)
+live.validate(rows)  # every row satisfies its own frozen shape
+
+cli = repo_root / "governance" / "reconcile" / "cli.py"
+result = subprocess.run([sys.executable, str(cli), "--root", str(scratch), "status", "--live"],
+                        capture_output=True, text=True)
+check("`status --live` exits 1 (NOT-OK) and names the drifted session on stderr",
+      result.returncode == 1 and "live-drift" in result.stderr,
+      f"rc={result.returncode} stderr={result.stderr.strip()[-200:]}")
+
+# The drift is REPORTED, never removed: this must never delete the beat or
+# touch the (already-missing) worktree.
+check("the drift is reported, not acted on: the heartbeat still exists",
+      (scratch / ".fleet" / "sessions" / "live-drift.json").exists())
+
+if problems:
+    print(f"  ({len(problems)} live proof(s) failed)", file=sys.stderr)
+    raise SystemExit(1)
+PYLIVE
+then
+  :
+else
+  fail=$((fail + 1))
+fi
+
+if [ "$fail" -gt 0 ]; then
+  echo "check-reconcile: FAIL ($fail violation(s))" >&2
+  exit 1
+fi
+echo "check-reconcile: OK — heartbeats beat, orphans are flagged, landed lanes are reclaimed, unmerged work is never destroyed, the disk audit names what no record explains, the real tree is checked against its reviewed baseline, controls/audit-trail/schema are load-bearing and mutation-tested, and the live feed flags disk drift (removing nothing, and refusing to guess when it cannot look)"
 exit 0

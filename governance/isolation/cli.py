@@ -40,6 +40,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from governance.isolation import journal, live, speculative  # noqa: E402
 from governance.isolation.audit import Violation, audit_lane  # noqa: E402
 from governance.isolation.identity import (  # noqa: E402
     IDENTITY_DOMAIN,
@@ -228,6 +229,15 @@ def cmd_open(args: argparse.Namespace) -> int:
         print(f"open: NOT-OK — {refused}", file=sys.stderr)
         return EXIT_NOT_OK
     write_record(identity, main)
+    if args.speculative_base:
+        # DG-3 (#699): the lane was cut from an upstream LANE'S BRANCH instead of
+        # waiting for its squash-merge. Recording the claim here — not as a
+        # separate verb — is what "claim --base <upstream-branch>" reduces to on
+        # the isolation side: open the lane exactly as any other, but also
+        # attest what it was actually cut from, so the re-verify gate
+        # (governance/isolation/speculative.py) has something to check before
+        # this lane is allowed to open a PR.
+        speculative.claim(main, identity, args.speculative_base, base=speculative.DEFAULT_BASE)
     problems = audit_lane_full(identity, main) if result.ok else []
     payload = {
         "identity": identity.to_json(),
@@ -285,6 +295,17 @@ def cmd_audit(args: argparse.Namespace) -> int:
         if identity is None:
             print(f"audit: CANNOT-ASSESS — no lane record for session {args.session}", file=sys.stderr)
             return EXIT_CANNOT_ASSESS
+        if args.reverify_speculative_base:
+            try:
+                attestation = speculative.reverify(main, identity)
+            except speculative.SpeculationRefused as refused:
+                print(f"audit: CANNOT-ASSESS — {refused}", file=sys.stderr)
+                return EXIT_CANNOT_ASSESS
+            print(
+                f"  re-verified lane {identity.session_id}: merge_base={attestation.merge_base[:8]} "
+                f"git_sha={attestation.git_sha[:8]}",
+                file=sys.stderr,
+            )
         results = {identity.session_id: audit_lane_full(identity, main)}
     else:
         results = {
@@ -307,6 +328,11 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
     failed = 0
     for session_id, problems in sorted(results.items()):
+        # Every verdict is appended to the durable trail before it is reported,
+        # so a refusal (or a clean pass) this run prints is also a record a
+        # later run — or a human — can read back without having re-run the
+        # audit (governance/isolation/journal.py, issue #885).
+        journal.append(main, session_id, problems)
         if problems:
             failed += 1
             print(f"  FAIL  lane {session_id}", file=sys.stderr)
@@ -314,6 +340,12 @@ def cmd_audit(args: argparse.Namespace) -> int:
                 print(f"          {problem}", file=sys.stderr)
         else:
             print(f"  OK    lane {session_id}")
+
+    if args.live:
+        print("  -- live projection (governance/isolation/live.py) --")
+        rendered = live.render(main)
+        print(rendered if rendered else "  (no recorded lanes to project)")
+
     if failed:
         print(f"session-isolation: FAIL ({failed} of {len(results)} lane(s) not isolated)", file=sys.stderr)
         return EXIT_NOT_OK
@@ -466,6 +498,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="accept a RAM-backed worktree root — throwaway gate scratch only; a lane on tmpfs is lost on reboot (#516)",
     )
+    open_cmd.add_argument(
+        "--speculative-base",
+        default="",
+        help=(
+            "the upstream LANE's branch this lane was actually cut from (DG-3, #699), when it differs "
+            "from --base. Recording this is what distinguishes a speculative claim from an out-of-order "
+            "one; governance/isolation/speculative.py's re-verify gate refuses this lane's PR until the "
+            "claim is re-verified against master (see `audit --reverify-speculative-base`)."
+        ),
+    )
     open_cmd.set_defaults(func=cmd_open)
 
     env_cmd = sub.add_parser("env", help="print the session environment (id + signature)")
@@ -487,6 +529,24 @@ def build_parser() -> argparse.ArgumentParser:
     audit_cmd.add_argument("--main", default=default_main())
     audit_cmd.add_argument("--session", default="", help="audit one lane (default: every recorded lane)")
     audit_cmd.add_argument("--all", action="store_true", help="accepted for symmetry with --session")
+    audit_cmd.add_argument(
+        "--reverify-speculative-base",
+        action="store_true",
+        help=(
+            "before auditing, re-verify this lane's speculative-base claim (#699): re-derive merge_base "
+            "and git_sha from git right now and re-record them. Requires --session; refuses (CANNOT-ASSESS) "
+            "a lane with no prior claim. Run this once, right before opening the PR."
+        ),
+    )
+    audit_cmd.add_argument(
+        "--live",
+        action="store_true",
+        help=(
+            "also print a live projection of recorded lane identities and speculative "
+            "attestations against the real worktrees/git right now (governance/isolation/live.py), "
+            "and report drift by name. Does not replace the audit verdict above it."
+        ),
+    )
     audit_cmd.set_defaults(func=cmd_audit)
 
     list_cmd = sub.add_parser("list", help="list provisioned lanes")

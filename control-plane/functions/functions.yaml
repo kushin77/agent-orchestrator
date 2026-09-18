@@ -186,10 +186,46 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng, Manager, Analyst]
 
+  - id: QUEUE
+    title: "Queue — the owner's committed dispatch queue: next claimable, or validate"
+    kind: view
+    endpoints: [board/queue]
+    parameters:
+      - {name: next, type: boolean, required: false, default: false}
+      - {name: check, type: boolean, required: false, default: false}
+      - {name: stale-minutes, type: integer, required: false, default: null}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
   - id: POOL
     title: "Pool — out-of-epic work parked while one epic is in focus"
     kind: view
     endpoints: [board/pool]
+    parameters: []
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: LIVENESS
+    title: "Liveness — whether the board's freshness contract has an installed producer"
+    kind: view
+    endpoints: [board/liveness]
+    parameters: []
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: DANGLING
+    title: "Dangling — open issues whose declared parent is closed, and the remedy"
+    kind: view
+    endpoints: [board/dangling]
     parameters: []
     scope: {capability: board:read, level: org, tenant: platform}
     effect_class: read
@@ -726,3 +762,25 @@ functions:
     audit: closure.close
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng]
+
+  - id: RETIRE
+    title: "Retire a sent/ directive for a superseded issue (#861)"
+    kind: command
+    endpoints: [closure/retire]
+    parameters:
+      - {name: directive, type: string, required: true, default: null}
+      - {name: reason, type: string, required: true, default: null}
+      - {name: superseded-by, type: string, required: true, default: null}
+      - {name: closed, type: boolean, required: false, default: false}
+      - {name: root, type: string, required: false, default: ""}
+    scope: {capability: board:admin, level: org, tenant: platform}
+    effect_class: irreversible
+    audit: closure.retire
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng]
+    note: >-
+      The second terminal mode next to CLOSE's "landed" gate: retires a
+      sent/ directive whose issue is closed WITHOUT a change of its own
+      (superseded). superseded-by is the lever's own space-separated list of
+      issue number(s) (`--superseded-by 723 727 754`); the cockpit passes it
+      as one string token.

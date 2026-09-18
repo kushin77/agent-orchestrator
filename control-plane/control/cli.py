@@ -10,7 +10,7 @@ fleet can actually do:
     fleet/channel.py            17 verbs
     governance/dispatch/cli.py  12 verbs
     governance/reconcile/cli.py  5 verbs
-    governance/lifecycle/cli.py  4 verbs
+    governance/lifecycle/cli.py  5 verbs
 
 Two directions are checked, and both matter:
 
@@ -72,9 +72,13 @@ SOURCES: dict[str, set[str]] = {
     "governance/dispatch/cli.py": {
         "audit", "eligible", "claim", "dispatch", "release", "status", "held",
         "reap", "snapshot", "focus", "pool", "trigger", "queue",
+        # issue #1179: the board's liveness producer is reported by verb, and the
+        # dangling-on-a-closed-epic report gets its own verb rather than being
+        # buried in `status` output a reader can miss.
+        "liveness", "dangling",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
-    "governance/lifecycle/cli.py": {"audit", "status", "close", "collect"},
+    "governance/lifecycle/cli.py": {"audit", "status", "close", "collect", "retire"},
 }
 
 # How to read each file's verb list. A registration TUPLE for control.py (it

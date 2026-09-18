@@ -31,7 +31,26 @@ from governance.reconcile.sweep import (  # noqa: E402
     sweep,
 )
 
-from conftest import AGENT, BRANCH, SESSION, WORKTREE, FakeOps, dead_pid  # noqa: E402
+import importlib.util as _importlib_util  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_reconcile_tests_conftest", Path(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+AGENT = _conftest.AGENT
+BRANCH = _conftest.BRANCH
+SESSION = _conftest.SESSION
+WORKTREE = _conftest.WORKTREE
+FakeOps = _conftest.FakeOps
+dead_pid = _conftest.dead_pid
 
 OLD = 1_000_000.0
 HEAD = "0f1e2d3c"

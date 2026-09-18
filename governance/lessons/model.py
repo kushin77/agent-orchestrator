@@ -185,6 +185,29 @@ CODE_BOARD_INCIDENT_PENDING = "board-incident-pending"
 CODE_RCA_REVIEW_OVERDUE = "rca-review-overdue"
 CODE_CORRECTIVE_ACTION_OPEN = "corrective-action-open"
 CODE_SUGGESTION_OPEN = "suggestion-open"
+CODE_DOC_RCA_ID_UNKNOWN = "doc-rca-id-unknown"
+CODE_DOC_RCA_ARTIFACT_MISMATCH = "doc-rca-artifact-mismatch"
+CODE_README_INCIDENT_COUNT_MISMATCH = "readme-incident-count-mismatch"
+
+# --- ledger -> board linkage (issue #1178) ----------------------------------
+#: A LESSON/SUGGEST that reaches no board issue and says so is refused: silence
+#: is what left twenty records unreachable from the board.
+CODE_BOARD_LINK_MISSING = "board-link-missing"
+#: The same record, with an explicit orphan declaration — reported, not fatal.
+CODE_BOARD_LINK_ORPHAN = "board-link-orphan"
+#: An issue-shaped reference (an incident's origin, an orphan's tracking ticket,
+#: an open action's remediation issue) naming an issue the snapshot lacks.
+CODE_BOARD_LINK_DANGLING = "board-link-dangling"
+#: The record reaches an issue, but that issue has neither an epic nor a
+#: milestone — so the record is not reachable from a *goal*.
+CODE_BOARD_LINK_GOAL_UNRESOLVED = "board-link-goal-unresolved"
+#: The ledger names the issue as an incident's origin and the board does not
+#: carry the record label, so the board rule cannot select it (issue #1178).
+CODE_BOARD_LINK_UNLABELLED = "board-link-unlabelled"
+
+#: The record-level declaration that a record is deliberately board-orphaned.
+#: "Explicitly and visibly declared orphaned, or refused" — never silent.
+ORPHAN_KEY = "orphan"
 
 #: Required keys per kind. Everything else is optional and preserved as-is.
 REQUIRED_FIELDS: Dict[str, Sequence[str]] = {
@@ -433,7 +456,44 @@ def validate_record(entry: Entry) -> List[Finding]:
     elif kind == KIND_LESSON:
         findings.extend(_validate_lesson(entry))
 
+    findings.extend(_validate_orphan(entry))
+
     return findings
+
+
+def _validate_orphan(entry: Entry) -> List[Finding]:
+    """An orphan declaration is a *claim*: it must carry a reason (issue #1178).
+
+    Whether the claim is TRUE — that the record really reaches no board issue —
+    is not decidable here; ``governance/lessons/linkage.py`` computes the reach
+    and refuses a declaration that is redundant, so the field cannot become an
+    exemption list the way the retired ``board.exemptions`` did.
+    """
+    record = entry.record or {}
+    block = record.get(ORPHAN_KEY)
+    if block is None:
+        return []
+    if not isinstance(block, dict):
+        return [
+            Finding(
+                code=CODE_INVALID_FIELD,
+                message="orphan must be an object with a reason",
+                subject=entry.id,
+                line=entry.line,
+                remediation='write orphan as {"reason": "why this record reaches no issue"}',
+            )
+        ]
+    if not str(block.get("reason", "")).strip():
+        return [
+            Finding(
+                code=CODE_RECORD_INCOMPLETE,
+                message="orphan declaration names no reason",
+                subject=entry.id,
+                line=entry.line,
+                remediation="state why the record reaches no board issue",
+            )
+        ]
+    return []
 
 
 def _validate_incident(entry: Entry) -> List[Finding]:

@@ -434,6 +434,64 @@ even on a commit this gate accepts (`bdce21d5` prints only its `Co-authored-by:`
 trailer), so it shows an empty block for a compliant message and would send a lane
 to "fix" a commit the gate already accepts.
 
+## 7.1 Speculative execution — branch-stacking (issue #699, DG-3, ISOLATION half)
+
+A lane blocked only by file *ownership* (not by an unresolved question) does
+not have to wait for the upstream lane's squash-merge before it starts: it may
+cut its worktree from the **upstream lane's branch** instead of `master`. That
+is speculative execution, and it creates exactly one new risk this module
+closes: a PR whose merge base is still the pre-landing branch, checked against
+a version of `master` that no longer exists.
+
+[`speculative.py`](speculative.py) records two things, in the same
+evidence-first spirit as `guardrails/honesty/attestation.py`'s verify
+attestation (`git_sha`, never invented from whole cloth):
+
+* the **speculative base** — the upstream branch (and the exact commit) the
+  lane was cut from. Recorded once, at claim time, and never rewritten: it is
+  the historical fact of where the lane started.
+* the **final merge base** — `git merge-base <base> <branch>`, recorded fresh
+  every time the lane re-verifies. This is the number the gate actually
+  checks: it must equal what git computes *right now*.
+
+```bash
+# 1. Claim: cut from the upstream lane's branch instead of master, and record it.
+python3 governance/isolation/cli.py open --issue 671 --agent copilot-brain --lane erp-consumer \
+  --base issue-645 --speculative-base issue-645
+
+# 2. Work. The gate refuses this lane's PR the whole time issue-645 hasn't landed:
+python3 governance/isolation/cli.py audit --session <session_id>
+# audit: NOT-OK — speculative-base-not-landed: ...
+
+# 3. Once issue-645 lands (squash-merged into master) and this lane has pulled
+#    that master into its own branch, re-verify — mandatory before opening a PR:
+python3 governance/isolation/cli.py audit --session <session_id> --reverify-speculative-base
+```
+
+Refused by name, both checked against **git right now**, never a cached guess:
+
+| Violation | Raised when |
+|---|---|
+| `speculative-base-not-landed` | The speculative base has not reached `master` yet. `git merge --squash` (the landing path `landed.py` documents) drops the original commit's parent link, so raw SHA ancestry is always false after a normal squash-landing — checking it would refuse every speculative lane the instant its upstream landed. Landedness is instead recognised by searching `master`'s own log for the *exact* canonical trailer string (`identity.commit_trailer(issue, slug)` → `Refs <slug>#<issue>`), with a non-digit boundary after it so a landing for issue 6450 cannot satisfy a claim on issue 645. This is **not** the positional trailer-block predicate `trailer.py` delegates to (issue #288) — it is a narrower, cheaper substring search over the whole range, named as such rather than claimed to be the same rule (see `speculative.py:_landed_by_trailer`, and its provocations in `test_speculative.py` for a colliding issue number and a bare `#<issue>` mention with no `Refs <slug>` prefix). Ancestry is the fallback only when the speculative base's branch does not encode an issue at all. |
+| `speculative-base-stale-merge-base` | The attestation's `merge_base` no longer equals `git merge-base <base> <branch>` computed now — master (or the lane) moved since the last re-verify. |
+| `speculative-base-unmeasurable` | The speculative base cannot be resolved at all (rewritten history). Unproven, never a pass (GR-12). |
+
+A lane with **no** speculative-base claim on record is out of scope for this
+check entirely — every other ownership/dispatch gate still applies to it
+unchanged; this module only ever constrains a lane that opted in.
+
+**Dispatch-side API, for the `claim --base <upstream-branch>` follow-up lane**
+(issue #699 DG-3 dispatch half, `governance/dispatch/**` — not implemented
+here): call `governance.isolation.speculative.claim(main, identity,
+upstream_branch, base="master")` at the moment dispatch decides a lane is
+*speculative* rather than *out-of-order* (i.e. exactly the distinction issue
+#699's acceptance criteria require), and
+`governance.isolation.speculative.reverify(main, identity, base="master")`
+once, right before the lane opens its PR. `verify(main, identity, base=...)`
+is what the gate calls — a lane should never call it against itself to
+"pre-clear" a stale claim, since it only reads what `claim`/`reverify` already
+wrote.
+
 ## 8. Tests
 
 `governance/isolation/tests` (declared in [`scripts/pytest-suites.txt`](../../scripts/pytest-suites.txt),
@@ -456,3 +514,61 @@ finding, a predicate that passes while reporting findings, and a baseline that i
 missing or malformed. It also proves that every commit recorded in the committed
 baseline exists in the clone, so a hand-edited entry cannot silently grandfather
 nothing.
+
+## 9. Controls, audit trail, schema, and the live feed (issue #885)
+
+Four artifacts raise this surface off the thresholds and audit trail it
+already had, each read by name rather than existing decoratively:
+
+* **Controls — [`controls.yaml`](controls.yaml) / [`policy.py`](policy.py).**
+  [`identity.py`](identity.py) (`REPO_SLUG_DEFAULT`, `BRANCH_PREFIX`,
+  `WORKTREE_PREFIX`, `IDENTITY_DOMAIN`, `SESSION_ID_LEN`, `COMMIT_TRAILER`) and
+  [`speculative.py`](speculative.py) (`DEFAULT_BASE`) read these thresholds
+  from `policy.load()` at import time instead of hard-coding them —
+  grep-provable: both modules call `governance.isolation.policy` rather than
+  defining the constant themselves. `policy.load()` also closes the
+  refusal-code vocabulary this surface's `Violation`s may carry
+  ([`violation.KNOWN_CODES`](violation.py)) in both directions: a declared
+  code the surface never emits, or an emitted code nobody declared, is
+  `PolicyUnavailable` at load time. [`tests/test_isolation_controls.py`](tests/test_isolation_controls.py)
+  mutates a temporary copy of `controls.yaml` and proves `identity.mint()` and
+  `speculative.DEFAULT_BASE` actually follow it; `scripts/check-session-isolation.sh`
+  §3e provokes the same mutation against the real declaration (sha256-restored
+  after).
+* **Audit trail — [`journal.py`](journal.py).** An append-only JSON-Lines file
+  (`.fleet/lanes/journal.jsonl` under the audited `main`, never rewritten —
+  `append()` opens in append mode) that `cli.py cmd_audit` writes exactly one
+  record to per audited lane, on every run, before it prints the verdict —
+  the durable twin of `audit.py`'s re-derived, in-memory verdict.
+  [`tests/test_journal.py`](tests/test_journal.py) proves a refusal produces
+  exactly one record and that the record validates against
+  `isolation.schema.json`.
+* **Schema — [`isolation.schema.json`](isolation.schema.json) /
+  [`schema.py`](schema.py).** Freezes the four record shapes this package
+  persists: the lane identity record (`worktree.write_record`), the
+  speculative-base attestation (`speculative._write`), a
+  [`landed-baseline.json`](landed-baseline.json) quarantine entry, and a
+  journal entry (`journal.append`). Validated with the stdlib-only
+  JSON-Schema subset validator `governance/modules/schema.py` already
+  implements (issue #591) — reused via `schema.py`'s thin wrapper, not
+  reimplemented. [`tests/test_isolation_schema.py`](tests/test_isolation_schema.py) checks every
+  shape against both a valid and an invalid record, and against every entry
+  actually recorded in `landed-baseline.json`.
+* **Live feed — [`live.py`](live.py).** A read-only projection of every
+  recorded lane identity and speculative attestation against the real
+  worktrees and git state, right now: whether the worktree still exists,
+  whether its current branch matches the recorded one, and whether a
+  speculative attestation's `git_sha` still matches the branch tip. Exposed
+  through the **existing** `audit` verb's `--live` flag
+  (`cli.py audit --live`) rather than a new top-level verb, so
+  `scripts/check-control-verbs.sh` sees no unregistered surface.
+  [`tests/test_isolation_live.py`](tests/test_isolation_live.py) provisions a real lane, switches
+  its worktree onto a foreign branch behind the CLI's back, and proves
+  `live.py` reports the drift by name; `scripts/check-session-isolation.sh`
+  §3e does the same against the real CLI.
+
+`scripts/check-session-isolation.sh` §3e provokes all four: a `controls.yaml`
+missing a declared refusal code refused by name, a never-audited lane's
+journal record reported absent rather than a fabricated pass, a hand-crafted
+schema-invalid journal record refused by `schema.py`, and a real worktree
+switched off its recorded branch detected as `DRIFT` by `live.py`.

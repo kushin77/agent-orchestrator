@@ -50,6 +50,7 @@ from portal.server.live_feed import MAX_REPLAY_LIMIT, LiveFeed
 from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.erp import ErpModuleError, ErpModuleSurface
+from portal.server.livestore import BoardSurface, TelemetryUnavailableError
 from portal.server.org_chart import OrgChartView
 from portal.server.skill_studio import (
     ACTION_AUTHOR,
@@ -170,6 +171,7 @@ class ConsoleApplication:
         task_board_surface: Optional[TaskBoardSurface] = None,
         operator_terminal_enabled: Optional[bool] = None,
         erp_module_surface: Optional[ErpModuleSurface] = None,
+        board_surface: Optional[BoardSurface] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -262,6 +264,14 @@ class ConsoleApplication:
             erp_module_surface
             if erp_module_surface is not None
             else ErpModuleSurface(repo_root=self.repo_root)
+        )
+        # The fleet board (issue #880, EPIC #878 lane L1) — feature-flag-gated
+        # OFF, declared beside the workbook-11 views for the same reason: a
+        # view inside the portal service, no service or terraform variable.
+        self.board = (
+            board_surface
+            if board_surface is not None
+            else BoardSurface(repo_root=self.repo_root)
         )
         # The operator terminal (issue #774) — feature-flag-gated OFF. It
         # composes the fleet projection (read) and the remote control family
@@ -629,6 +639,15 @@ class ConsoleApplication:
                 "(portal/config/feature-flags.yaml surfaces.erp_module)",
             )
 
+        # The fleet board (issue #880) ships the same way, gated before authN.
+        if parts[0] == "board" and not self.board.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the fleet board is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.fleet_board)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -654,6 +673,8 @@ class ConsoleApplication:
                 return self._route_task_board(parts, method, query)
             if parts[0] == "erp":
                 return self._route_erp(parts[1:], method, body)
+            if parts[0] == "board":
+                return self._route_board(parts, method)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -840,6 +861,24 @@ class ConsoleApplication:
         except TaskBoardError as exc:
             raise ApiError(exc.status, exc.code, exc.message) from None
         raise ApiError(404, "not_found", f"no such task-board read: {'/'.join(surface)}")
+
+    def _route_board(self, parts: list[str], method: str) -> Response:
+        """The fleet board (issue #880).
+
+        Reads: ``GET /api/board/rows`` — every schema-valid row joined from
+        ``.board/snapshot.json`` + ``.board/claims.jsonl``, plus any row the
+        schema refused (named, not dropped). GET-only; when the board's flag
+        is off the route never reaches here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the fleet board is GET only")
+        surface = parts[1:]
+        if surface == ["rows"]:
+            try:
+                return self._ok(self.board.rows())
+            except TelemetryUnavailableError as exc:
+                raise ApiError(503, "board_unavailable", str(exc)) from None
+        raise ApiError(404, "not_found", f"no such board read: {'/'.join(surface)}")
 
     def _route_erp(
         self, surface: list[str], method: str, body: dict[str, Any]

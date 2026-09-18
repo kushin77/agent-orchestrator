@@ -106,6 +106,13 @@ AI-originated issues, PRs, commits, and doc sections declare their source:
   `AI-assistance: Copilot (Relentless, flash/LOW)`).
 - **Commit references (GR-2):** every commit references its issue with
   `Refs kushin77/agent-orchestrator#<n>`; every PR closes one with `Closes #<n>`.
+- **Merge order / Gate-changing declaration (issue #1054):** every PR carries
+  `Gate-changing: no` or `Gate-changing: yes — <paths>` in its `## Merge order`
+  section. `scripts/check-pr-contract.sh` cross-checks the declaration against
+  the PR's diff (a `no` that touches a gate script, or a `yes` that touches
+  none, is refused by name) so `scripts/pr-queue.sh` can order gate-changing
+  PRs last mechanically instead of a reviewer reading the file list. The path
+  list lives in `scripts/lib/gate-paths.txt`.
 - **Provenance (GR-10):** cannibalized/harvested assets record source (repo,
   path, license) in the cannibalization index (issue #8). `vendor/CMR` is a
   pinned submodule; `.research/` clones are gitignored.
@@ -128,6 +135,7 @@ AI-originated issues, PRs, commits, and doc sections declare their source:
 - [ ] Docs kept in sync (architecture / execution plan / governance)
 - [ ] AI-assistance + runtime declared
 - [ ] `Closes #<n>` referenced
+- [ ] `## Merge order` / `Gate-changing:` declared and matches the diff
 
 ## 5. Roadmap & work intake
 
@@ -233,3 +241,120 @@ enforced by code:
 
 See `governance/dispatch/README.md` for the reason table, the chain markers
 (`Parent: #n`, `Blocked-by: #n`) and the CLI.
+
+## 9. Spine coverage map (issue #890)
+
+Every rule id in the spine — `AO-GR-1`..`AO-GR-27` in `docs/GOLDEN-RULES.md`,
+plus the hub (`kushin77/CMR`) rules this repo's own doctrine cites by number
+(`GR-2`, `GR-3`, `GR-4`, `GR-5`, `GR-6`, `GR-7`, `GR-8`, `GR-9`, `GR-10`,
+`GR-12`, `GR-17`, `GR-20`, `GR-22` in `AGENTS.md`/`docs/GOLDEN-RULES.md`) —
+maps to a named control in [`governance/controls/spine-coverage.yaml`](../governance/controls/spine-coverage.yaml).
+
+This is deliberately a **superset** of `scripts/control-coverage.tsv` (#874),
+which maps only Part B (`AO-GR-12`..`AO-GR-20`) of the spine and remains the
+row-level source of truth `scripts/check-control-coverage.sh` validates for
+that range. `governance/controls/spine-coverage.yaml` gives the same
+treatment to Part A (`AO-GR-1`..`AO-GR-11`), Part C (`AO-GR-21`..`AO-GR-27`),
+and the hub rules — so a reviewer can walk from **any** rule id in either
+document to the control that enforces it, and a control silently dropped from
+either map is a gate failure, not a missed grep.
+
+### Status vocabulary
+
+The honest three, never a plain pass/fail:
+
+| Status | Meaning |
+|--------|---------|
+| `ENFORCED` | A gate control exists, the file it names is present and invokable, and (for a suite) `scripts/pytest-suites.txt` declares it. |
+| `PARTIAL` | A control exists and runs, but its own row records — in plain language — the part of the rule it does *not* cover. |
+| `GAP` | No control enforces the rule today. Recorded by rule id, never silently dropped or rounded up. |
+| `not-applicable` | A hub rule id that appears in this repo's text only as a range endpoint (e.g. "`GR-1..GR-24`") and is never cited for a specific local decision — out of local scope; the hub repo owns its control. |
+
+Five rules are currently recorded `GAP` (as of #890): `AO-GR-10`
+(cannibalization-index gate), `AO-GR-23` (its `Verify.` block names
+`scripts/check-lane-stranded.sh`, which does not exist in the repository —
+recorded as a missing-gate GAP, not rounded up), `GR-10`, `GR-17`, and
+`GR-22`. These are real gaps, not citation misses; closing each is a
+follow-up issue, not silently patched into this map.
+
+### How to add a control
+
+1. Find (or write) the `scripts/check-*.sh` / `scripts/check-*.py` gate that
+   enforces the rule, or the pytest suite directory that does — and if it's a
+   suite, declare it in `scripts/pytest-suites.txt` so
+   `scripts/run-pytest-suites.sh` actually runs it.
+2. Add or update the rule's row under `rules:` in
+   `governance/controls/spine-coverage.yaml`: `status`, `covered`, `origin`
+   (`local` / `hub-cited` / `hub-uncited`), `modules` (the code paths the
+   control covers), `gate` (comma-separated control files, or `suite:<dir>`),
+   and a `note` if the coverage is partial.
+3. Run `bash scripts/check-spine-coverage.sh` — it parses every rule id out
+   of `AGENTS.md`/`docs/GOLDEN-RULES.md`, requires exactly one row per id,
+   requires every named gate file to exist and be invokable, requires every
+   `suite:` gate to be declared, and refuses any row claiming `covered: true`
+   without a real gate. It runs its own negative control (a mutated copy
+   pointed at a nonexistent gate must be refused **by name**) via
+   `governance/controls/check_spine_coverage.py --self-test`.
+4. Run `python3 -m pytest governance/controls -q`
+   (`governance/controls/tests/test_spine_coverage.py`) before opening a PR.
+
+### Delivery controls (#803)
+
+#803 (branch protection, required checks, CODEOWNERS as delivery controls) is
+an open EPIC this map does not close. The `delivery_controls:` block in
+`governance/controls/spine-coverage.yaml` records the controls #803 is about
+as **present** in this repo today (`scripts/check-branch-protection.sh`,
+`scripts/check-gate-status.sh` + `scripts/check-gate-coverage.sh`,
+`scripts/check-codeowners.sh`) — the residual #803 tracks is making
+GitHub-side branch protection itself IaC-declared (issue #6 / PR #1075), not
+the absence of a local check.
+
+## 9. The tag authority (mandatory)
+
+Every governed artifact — issue, PR, branch, commit, surface, release — is
+classified against one declared vocabulary: the **tag authority** at
+`governance/tagging/taxonomy.yaml` (AO-GR-28, issues #1175 + #1183). This section
+is the governance half of that rule; the mechanism is
+`scripts/check-tagging.sh`, which runs inside `make verify`.
+
+**One authority, borrowed from — never a second copy.** The `class` ladder is
+borrowed from `governance/conformance/policy.yaml` and the FinOps tiers from
+`governance/finops/policy.json`. Those values are **mirrored in the taxonomy and
+proven equal to their authority by the gate**, because a borrow that reads its
+own values can never fail: the mirror is what makes drift detectable. A lane may
+not mint a rung, a tier or a role by editing one side.
+
+**The dimensions.** Board classification (`class`, `type`, `priority`, `area`,
+`pillar`, `phase`, `gdc`, `source`, `epic`) is joined by two this authority adds:
+
+| Dimension | Values | What it decides |
+|---|---|---|
+| `posture` | `overall`, `saas`, `iac`, `no-human-needed`, `human-gated` (multi-valued) | which delivery gates apply: `iac` owes declared-infrastructure plus **flag-gated-OFF**; `saas` owes the identity and boundary evidence; `no-human-needed` must finish with **no operator input at all** and forbids escalation markers; `human-gated` owes the pre-merge contract |
+| `lifecycle` | `plan`, `build`, `verify`, `release`, `operate`, `retire` | which half of the pipeline applies — the SDLC stage, and therefore the `pr`/`ci`/`cd`/`ops` channel a gate runs in |
+
+`posture:no-human-needed` and `posture:human-gated` are **mutually exclusive**
+and both at once is refused by name: a contradiction is not a preference, and
+silently picking a winner is how a plan becomes a guess.
+
+**A tag set derives the gates it owes.** `governance/tagging/rules.yaml` maps a
+tag set to gates by channel, at the FinOps floor the doctrine sets — every gate
+named as `make:<target>` or `check:<name>`, and every name **resolved** against
+the Makefile and the check registry `scripts/verify.sh` builds. Rename a gate and
+the tagging gate fails by name rather than describing a pipeline that no longer
+exists. Ask for the plan with:
+
+```bash
+python3 governance/tagging/cli.py plan --tag class:elite --tag posture:iac --tag lifecycle:release
+```
+
+**Calibration.** `class`, `type`, `priority` and `area` are **required**;
+`posture` and `lifecycle` are **recommended**, reported as deviations and
+escalated only by `--strict`, because the board predates them. Enforcing a
+brand-new dimension against a legacy board would paint the gate red for a reason
+no lane can fix by working its own issue. The prevention half — the filing path
+deriving both dimensions so no NEW issue is born unclassified — is issue #1182.
+
+**This section is enforced, not advisory.** `tagging-mandate` FAILS naming the
+document and the marker the moment `AGENTS.md`, `docs/GOLDEN-RULES.md`, this
+file, `docs/EXECUTION-PLAN.md` or `docs/QA-GATE.md` stops declaring the rule
+(GR-29: a rule only prose carries is advice).

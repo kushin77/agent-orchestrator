@@ -21,12 +21,56 @@ An issue is claimable only when one of these holds:
 | `successor-of-claim` | It declares `Blocked-by: #n` and the agent already advanced #n. |
 | `active-epic-child` | It declares `Parent: #n` and #n is the **active epic** (`.board/focus.json`, epic #707). Stricter than the frontier, never a relaxation. |
 | `brain-directed` | A brain directive recorded in `.fleet/sent` names exactly this issue (`claim --directive <id>`). The brain is the chain. |
+| `speculative_base` | It is `blocked` by an in-flight upstream lane, and `claim --base <upstream-branch>` names that upstream's OWN branch (verified against the issue's actual `blocked_by` edges — see "Branch-stacking" below). |
 
 Everything else is refused with a reason: `unknown-issue`, `issue-closed`,
 `epic-closed`, `blocked`, `already-claimed`, `epic-not-workable`,
 `provenance-mismatch`, `unowned`, `out-of-epic-pooled` (outside the active epic —
-parked, see below), or `no-chain-edge` — the last being kanban scavenging. Epics
-are never claim targets: an epic closes with its children.
+parked, see below), `speculative-base-not-upstream` (`--base` named a branch
+that is not the blocking issue's own — see below), or `no-chain-edge` — the
+last being kanban scavenging. Epics are never claim targets: an epic closes
+with its children.
+
+## Branch-stacking: `claim --base <upstream-branch>` (DG-3, issue #699)
+
+The DISPATCH half of DG-3 (the ISOLATION half is
+`governance/isolation/speculative.py`, documented in
+`governance/isolation/README.md` §7.1). A lane blocked only by file
+*ownership* — not by an unresolved question — does not have to wait for the
+upstream lane's squash-merge: it may cut its worktree from the **upstream
+lane's own branch** instead of waiting for `blocked` to clear, and claim it as
+SPECULATIVE:
+
+```bash
+python3 governance/dispatch/cli.py claim --issue 671 --agent copilot-brain \
+  --lane erp-consumer --base issue-645
+```
+
+`--base` is consulted **only** when the claim would otherwise be refused
+`blocked`, and only when it names the branch of one of the issue's own open
+blockers (`Snapshot.blockers_open`, checked against real board state — never
+taken on the caller's say-so). When it matches, the claim is accepted with
+reason `speculative_base`, and
+`governance.isolation.speculative.claim(main, identity, upstream_branch,
+base="master")` is called so the isolation gate enforces the mandatory
+re-verify before this lane opens its PR.
+
+`--base` never widens any *other* refusal:
+
+* an issue that is not actually `blocked` (wrong milestone frontier, no chain
+  edge, already claimed by another lane, a conflicting file-region lease) is
+  refused with its own reason exactly as it would be without `--base`;
+* `--base` naming a real branch that is **not** the blocking issue's own is
+  refused by name, `speculative-base-not-upstream`, never silently ignored or
+  treated as a plain `blocked`.
+
+`--main <path>` names the repository the isolation attestation is written
+into (default: this checkout). See
+`governance/dispatch/tests/test_speculative_claim.py` for the end-to-end
+fixture (claim → upstream squash-lands → `speculative.reverify` → isolation
+audit accepts) and its negative controls, and
+`scripts/check-dispatch-reconcile.sh` §7 for the gate's own mutation
+provocation.
 
 ## The out-of-epic pool (#707 lane F6 / #721)
 
@@ -107,7 +151,7 @@ sidestepped by calling the mutation directly. Each refusal names what it read:
 | `unowned` | the dispatch and the directive both name no lane | the empty lane and the directive that would have declared one |
 | `provenance-mismatch` | the directive declares an epic or lane the board does not corroborate | the directive file, the declared `task.epic` / `task.lane`, and the board's own edge |
 | `blocked` / `unknown-issue` / `epic-not-workable` | the issue is blocked, absent, or is itself an epic | the snapshot and the issue fields read |
-| `snapshot-stale` | the board is older than `--stale-minutes` (fail closed, exit 2) | the snapshot's age and how to refresh it |
+| `snapshot-stale` | the board is older than `--stale-minutes` (fail closed, exit 2) | the snapshot's age, the ONE bounded refresh it ran (#1179) and the outcome, and the state of the board's liveness producer |
 
 Exit codes stay tri-state: `0` granted, `1` refused, `2` CANNOT-ASSESS (missing or
 stale board). `unowned` applies at the dispatch seam, where a unit no lane owns
@@ -132,6 +176,85 @@ own lane, and a claim still **live** that was taken by a directive
 records written before #726 carry no provenance, and an audit that retro-blames
 them cannot be green on its own repository.
 
+## Board liveness, the in-band refresh, and dangling epics (#1179)
+
+The staleness contract above is a **liveness** tolerance: 15 minutes is honest
+only for a consumer that keeps the board fresh. For a long time the entry point
+was not that consumer — `status`/`eligible`/`claim`/`dispatch` refused with
+"refresh first" and never refreshed, and the one cron rung that could have been a
+producer is declared `"enabled": false` in `config/fleet-jobs.json` (ship-gated
+OFF) while `scripts/check-fleet-jobs.sh` proves the *reconciler* heals drift in a
+**scratch** crontab and never asserts the real one. So the entry point was
+`CANNOT-ASSESS` by construction for anyone not already inside the fleet loop, and
+nothing said so.
+
+**The entry point does not refresh unasked — it NAMES the refresh (issue #1179).**
+The `snapshot-stale` refusal now reports the age, the threshold, the state of the
+board's producer (read from the live crontab), and the one-command remedy;
+`--refresh` runs the ONE bounded refresh in band — the same seam the fleet loop
+runs (`snapshot.refresh`, the single network path and the single place the window
+is applied) — and then decides.
+
+```bash
+python3 governance/dispatch/cli.py status              # names the age, the producer and the remedy
+python3 governance/dispatch/cli.py status --refresh    # refreshes ONCE in band, then decides
+python3 governance/dispatch/cli.py liveness            # is the declared producer installed?
+python3 governance/dispatch/cli.py dangling            # open issues whose parent is CLOSED
+```
+
+It is opt-in on purpose, and that was **measured, not assumed**. Making the
+refresh the default was tried first, and it made a READ verb perform a network
+call and rewrite the tracked `.board/snapshot.json` — so a pytest suite driving
+the loop (`fleet/tests`) rewrote the repository's board during `make verify`:
+measured as `pytest fleet/tests` changing the snapshot's sha256 on the change
+that did it, while pristine `origin/master` leaves it byte-identical. A gate that
+reaches the network, and a read verb that writes a tracked artifact, are both
+defects. The 15-minute threshold is **unchanged**: widening it would convert a
+dead control into a lying one.
+
+`liveness` answers the declared-vs-installed question in the tri-state vocabulary
+and reads the **live crontab** — the blind spot the scratch-crontab reconciler
+proof leaves. It names exactly one verdict:
+
+| verdict | meaning | exit |
+|---|---|---|
+| `installed` | the declared board-refresh rung is enabled AND in the live crontab | 0 |
+| `self-refresh` | no rung is installed, but the entry point refreshes in band — the contract is met | 0 |
+| `declared-but-not-installed` | enabled in the manifest, absent from the live crontab | 1 |
+| `installed-but-declared-off` | the live crontab carries a rung the manifest declares OFF | 1 |
+| `no-producer` | no installed rung, declared OFF, and no in-band refresh | 1 |
+| `cannot-assess` | the crontab or the manifest could not be read | 2 |
+
+A finding is **never a pass**, and `cannot-assess` is never `0`. The `--crontab-file`
+flag is the gate's fixture seam; the default is always the real crontab.
+
+`dangling` reports the other silent dead-end: an issue declaring `Parent:` to a
+**closed** epic is refused `epic-closed` — correctly, the epic that would own the
+work is gone — but nothing named it, so it was invisible *and* permanently
+unclaimable. `status` prints the same finding, and `dangling` exits 1 with the
+remedy:
+
+```
+dangling-epic: #12 declares Parent #7, which is closed (the ownering epic)
+  remediate: re-point the issue's `Parent:` at the open epic that now owns the work
+```
+
+The refusal is deliberately **not** relaxed: the fix is visibility plus a
+reachable re-parenting path, not a silent re-allow.
+
+Finally, `status` advertises the **claimable** frontier (issue #1168). The
+milestone frontier (`order.frontier`) applies every *issue-property* refusal
+`eligible` applies — closed, claimed elsewhere, an epic, epic-closed, blocked — so
+it can never name an issue no reader could take. The epic-focus refusal stays a
+separate question (`order.claimable_frontier`), because the milestone frontier and
+"the active epic's frontier" are genuinely different, and `status` uses the
+focus-aware one so it cannot advertise work `claim` will refuse.
+
+All of it is provoked rather than asserted:
+`scripts/check-dispatch-entrypoint.sh` plants each violation, asserts the rc **and
+the literal refusal string**, and includes a mutant of `order.py` with the
+pre-#1168 frontier predicate that MUST make the disagreement appear by name.
+
 ## Claim protocol
 
 ```bash
@@ -145,7 +268,9 @@ python3 governance/dispatch/cli.py release --issue 139 --agent me
 
 Exit codes follow the repo tri-state convention: `0` OK, `1` refused/NOT-OK,
 `2` CANNOT-ASSESS (for example the snapshot is missing **or stale** — past
-`--stale-minutes`, default 15 minutes).
+`--stale-minutes`, default 15 minutes). A stale board is refused by default and
+the refusal names the producer's state and the remedy (#1179, see "Board
+liveness" above); `--refresh` performs that remedy in band.
 
 * **Claim record** — one JSON object per event. New events are written **one file
   per event** into `.board/claims/` (atomic, collision-proof), so two concurrent
@@ -278,6 +403,7 @@ claim REFUSED: blocked — #889 is blocked by #880, #881, ..., #888 — evidence
 ```bash
 python3 governance/dispatch/cli.py queue --next    # the next claimable issue(s) per the queue
 python3 governance/dispatch/cli.py queue --check   # validate the file (see below)
+python3 governance/dispatch/cli.py queue --fix     # drop issues CLOSED on a fresh board (#1113)
 ```
 
 `--check` validates `governance/dispatch/queue.yaml` structurally (no
@@ -288,6 +414,15 @@ tri-state and fails CLOSED on a stale board: past `--stale-minutes` it
 reports `CANNOT-ASSESS` (exit 2) for the exists/open half rather than a false
 verdict, while the structural half (duplicates, cycles) still runs — that
 half needs no board at all.
+
+`--fix` is the declared mechanism for the defect `--check` only reports
+(issue #1113): against a FRESH `.board/snapshot.json` (same staleness
+contract as `--check` — a stale board is refused with `CANNOT-ASSESS` rather
+than pruning on guessed state), it drops every issue number CLOSED on that
+board from each wave's `issues` list, editing only those lines so the file's
+hand-written commentary survives. It is idempotent — a clean queue prints
+`OK` and rewrites nothing — so it can be re-run after every board refresh
+without hand-editing `queue.yaml` directly.
 
 ### The gate
 
@@ -303,6 +438,56 @@ form a 2-cycle — it must be refused by name (`cycle`), while a clean fixture
 of the same shape must still pass (GR-12 / AO-GR-19: a check that cannot fail
 is a formality).
 
+## Declared controls, audit trail, frozen schema and live feed (issue #885)
+
+Four artifacts, added to raise this surface's measured class
+(`governance/conformance/surfaces.py`) from `pattern` to `elite` with
+genuinely load-bearing evidence, not documentation:
+
+* **`controls.yaml` + `policy.py`** — the closed vocabulary of claim reasons
+  (`ALLOWED_CLAIM_REASONS`), terminal reasons (`TERMINAL_CLAIM_REASONS`) and
+  arbitration refusals (`ARBITRATION_REFUSALS`), plus the staleness threshold,
+  declared as data rather than only as `model.py` constants. `policy.load()`
+  cross-checks the declared vocabulary against `model.py`'s in both
+  directions, and against `governance/policy/lease.CLAIM_TTL_HOURS` (the
+  single upstream TTL source, issue #322) — a drifted or incomplete
+  declaration is `PolicyUnavailable` (CANNOT-ASSESS), never a silent pass.
+  **Read by:** `snapshot.py`'s `DEFAULT_STALENESS_MINUTES`
+  (`snapshot.py:_default_staleness_minutes`), which `claims.arbitrate()` uses
+  as its default `stale_minutes` — change `stale_minutes` in a copy of
+  `controls.yaml` and a board that used to pass staleness now fails it
+  (`tests/test_policy.py`).
+* **`audit.py`** — an append-only JSONL trail of every arbitration outcome
+  (one record per refusal or grant), adjacent to — never a replacement for —
+  the claims ledger `claims.py` already keeps. Written by `claims.arbitrate()`
+  (`claims.py:arbitrate`, which wraps the unaudited judgment in
+  `_arbitrate_unaudited` and appends exactly one record before returning or
+  re-raising). `append()` re-reads the file after writing and requires the
+  pre-write bytes to be an exact prefix of the post-write bytes, serialised
+  with an advisory `fcntl.flock` so concurrent legitimate appends are never
+  mistaken for a rewrite. Read by `tests/test_dispatch_audit.py` and any consumer of
+  `audit.read()`.
+* **`dispatch.schema.json` + `schema.py`** — freezes the four shapes this
+  package persists: `ClaimEvent` (incl. `files`/`provenance`/`speculative_base`
+  reasons), the board's `Issue` row, `queue.yaml`'s wave document, and the new
+  audit record. Validated with the repository's stdlib-only JSON-Schema subset
+  validator (`governance/modules/schema.py`), imported and reused rather than
+  re-implemented — `schema.py:problems`/`schema.py:validate` delegate to it.
+  `audit.append()`'s records and `claims.py`'s `ClaimEvent.to_json()` output
+  both validate against it (`tests/test_schema.py`, `tests/test_dispatch_audit.py`).
+* **`live.py`** — a live projection of the package's real state (`project()`):
+  the live claim set (`claims.active_claims`), the frontier
+  (`order.frontier`/`order.active_milestone`) and the earliest ready wave
+  (`owner_queue`), read fresh from the real ledger and snapshot on every call
+  — never a cached copy. Exposed through the existing `status` verb as
+  `status --live` (`cli.py:cmd_status`) rather than a new top-level verb, so
+  `scripts/check-control-verbs.sh` and `control-plane/functions/tests` are
+  unaffected.
+
+`scripts/check-chronological-dispatch.sh` provokes all four: a mutated control
+refused by name, a missing/short audit trail refused, a schema-invalid record
+refused, and a live projection made to drift from the real store refused.
+
 ## Layout
 
 | File | Role |
@@ -311,7 +496,11 @@ is a formality).
 | `snapshot.py` | Snapshot build, load, hash, chain-marker parsing, `gh` fetch |
 | `order.py` | Eligibility rules (including a closed epic) and frontier/milestone resolution |
 | `claims.py` | Ledger (directory + frozen legacy file), single-claim lock, TTL take-over, snapshot-staleness refusal, A2A arbitration, audit, both self-controls |
-| `cli.py` | `status` / `eligible` / `dispatch` / `claim` / `release` / `held` / `reap` / `snapshot` / `audit` / `queue` |
+| `cli.py` | `status` (with `--live`) / `eligible` / `dispatch` / `claim` / `release` / `held` / `reap` / `snapshot` / `audit` / `queue` |
 | `owner_queue.py` | Owner queue (#928): loads `queue.yaml`, overlays its implied `blocked_by` edges, validates, reports next-claimable |
 | `queue.yaml` | The owner's committed, ordered wave queue (#928) |
-| `tests/` | Eligibility, lock, TTL, audit, arbitration, the CLI refusal seam, the owner queue (`test_queue.py`) and the anti-formality controls |
+| `policy.py` / `controls.yaml` | Dispatch's declared acceptance policy (issue #885) |
+| `audit.py` | Append-only arbitration audit trail (issue #885) |
+| `schema.py` / `dispatch.schema.json` | Frozen record shapes + stdlib-only validator reuse (issue #885) |
+| `live.py` | Live claim/frontier/ready-wave projection, exposed via `status --live` (issue #885) |
+| `tests/` | Eligibility, lock, TTL, audit, arbitration, the CLI refusal seam, the owner queue (`test_queue.py`), the declared controls, the audit trail, the frozen schema, the live feed, and the anti-formality controls |

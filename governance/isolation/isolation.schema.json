@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kushin77.github.io/agent-orchestrator/governance/isolation/isolation.schema.json",
+  "title": "ao.isolation/v1 \u2014 the record shapes this surface persists (issue #885)",
+  "description": "Freezes the shapes governance/isolation writes to disk: a lane identity record (worktree.write_record), a speculative-base attestation (speculative._write), a landed-baseline.json quarantine entry, and a journal entry (journal.append). Validated with the stdlib-only subset validator governance/modules/schema.py already implements (reused, not re-implemented) by governance/isolation/tests/test_schema.py, and provoked by scripts/check-session-isolation.sh against a schema-invalid record.",
+  "$defs": {
+    "lane_identity": {
+      "type": "object",
+      "description": "One SessionIdentity, as written by worktree.write_record / read by worktree.read_record.",
+      "required": [
+        "session_id",
+        "issue",
+        "agent_id",
+        "lane",
+        "branch",
+        "worktree",
+        "repo_slug",
+        "author_name",
+        "author_email"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "integer"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "lane": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        },
+        "repo_slug": {
+          "type": "string"
+        },
+        "author_name": {
+          "type": "string"
+        },
+        "author_email": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "speculative_attestation": {
+      "type": "object",
+      "description": "One SpeculativeAttestation, as written by speculative._write / read by speculative.read.",
+      "required": [
+        "session_id",
+        "branch",
+        "speculative_base",
+        "speculative_base_sha",
+        "merge_base",
+        "git_sha"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "speculative_base": {
+          "type": "string"
+        },
+        "speculative_base_sha": {
+          "type": "string"
+        },
+        "merge_base": {
+          "type": "string"
+        },
+        "git_sha": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "landed_baseline_entry": {
+      "type": "object",
+      "description": "One quarantine row of landed-baseline.json's `entries` array.",
+      "required": [
+        "sha",
+        "code",
+        "why"
+      ],
+      "properties": {
+        "sha": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "commit-missing-ticket-trailer",
+            "commit-ref-outside-the-trailer-block"
+          ]
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "journal_entry": {
+      "type": "object",
+      "description": "One line of journal.jsonl, as written by journal.append.",
+      "required": [
+        "schema",
+        "ts",
+        "session_id",
+        "ok",
+        "codes"
+      ],
+      "properties": {
+        "schema": {
+          "const": "ao.isolation/journal-entry-v1"
+        },
+        "ts": {
+          "type": "number"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

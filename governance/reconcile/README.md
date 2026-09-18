@@ -153,5 +153,74 @@ genuinely new shelve files again.
 - **Dry-run by default.** No board write happens without `--apply`; a dry-run
   pass prints `board: dry-run — would file for …`.
 - **Offline-testable.** The board effects are an injected port, exercised by
-  `governance/reconcile/tests/test_boardreport.py` with no network.
+  `governance/reconcile/tests/test_reconcile_boardreport.py` with no network.
+
+## 8. `elite` artifacts (issue #885)
+
+Four artifacts, each read by name from the code that used to hard-code (or
+never had) its equivalent:
+
+| Artifact | File | Read by |
+|---|---|---|
+| **controls** | [`controls.yaml`](controls.yaml) + [`policy.py`](policy.py) | `sweep.py` (`sweep()`, `policy.load()`) reads `sweep.max_actions_per_pass` and `sweep.outcome_codes` — never a bare literal |
+| **audit trail** | [`ledger.py`](ledger.py) | `sweep.py` (one `sweep-decision` record per `Action`) and `real_tree_baseline.py` (one `real-tree-verdict` record per `check_real_tree()` call) |
+| **schema** | [`reconcile.schema.json`](reconcile.schema.json) | `ledger.py` (validates every record before writing) and `live.py` (validates every projected row) |
+| **live feed** | [`live.py`](live.py), through `status --live` | `cli.py`'s `cmd_status` |
+
+**Controls.** `governance/policy/lease.py` already owns every timing this
+package *shares* with the rest of the fleet (session TTL, heartbeat interval,
+the real-tree age-grace window). `controls.yaml` declares the two controls
+that are this package's **own**:
+
+* `sweep.max_actions_per_pass` — a runaway guard. `sweep --apply` acts on
+  every orphaned session it finds in one pass; without a cap, a wrong
+  `--ttl-minutes` or a wedged clock turns "reconcile the fleet" into "tear
+  down every worktree at once." Once the cap is reached, every further
+  destructive decision this pass is `refused` (outcome `refused`, code
+  `reconcile.batch-limit-exceeded`) and re-evaluated next pass — never
+  dropped. `sweep.py:sweep()` reads it through `policy.load()`
+  (`governance/reconcile/sweep.py`, the `resolved_controls` seam) instead of
+  a hard-coded number; `governance/reconcile/tests/test_reconcile_policy.py` and
+  `test_sweep.py::test_batch_limit_*` prove the mutation: a temp copy with
+  `max_actions_per_pass: 0` refuses every destructive decision, by name.
+* `sweep.outcome_codes` — the closed vocabulary `ledger.py` stamps a decision
+  record with; a code not declared here is refused (`ControlsUnavailable`)
+  rather than written.
+
+**Audit trail.** `ledger.py` appends one JSON line per sweep decision
+(including a `refused` one) and per `real_tree_baseline.check_real_tree()`
+call, to `.fleet/reconcile/ledger.jsonl` under the reconciled root — never
+rewritten, never truncated. Every record is validated against
+`reconcile.schema.json#/$defs/ledger-record` **before** it is written
+(`ledger.append` → `validate_record`); `ledger.verify()` re-checks every line
+on demand, which is how the gate's schema-invalid provocation is expressed.
+`test_ledger.py::test_refusal_produces_exactly_one_record` and
+`test_sweep.py::test_a_refused_decision_produces_exactly_one_named_ledger_record`
+prove the "one refusal → one record, validated" requirement.
+
+**Schema.** `reconcile.schema.json` freezes four shapes this package
+persists or emits: the heartbeat record, the real-tree-baseline entry, the
+ledger record, and the live-feed row. Validated through
+`governance/modules/schema.py` (reused, not copied, per the stdlib-only
+subset-validator convention `governance/modules` and the hermes/paperclip
+`faang` surfaces already established) — no third-party JSON-Schema library,
+so the check stays offline and deterministic.
+
+**Live feed.** `live.py` projects every session heartbeat against the real
+disk — not a cache, a live query re-run on every call — and tags each row
+`matched` or `drift`: a session whose heartbeat still names a worktree that is
+no longer there (a hand `rm -rf`, a teardown that crashed mid-way) is `drift`,
+named. Exposed through the existing `status` verb (`status --live`), the same
+reasoning §6 already gives for `--disk`: a new CLI verb is a surface the
+control-plane verb registry gates, and that contract belongs to its own lane.
+
+```bash
+python3 governance/reconcile/cli.py status --live
+```
+
+`scripts/check-reconcile.sh` §7–§10 provoke each artifact in turn: a mutated
+control (limit `0`) refuses every teardown by name; a deleted ledger record is
+detected by `ledger.verify()`; a hand-corrupted ledger line fails schema
+validation by name; and a session whose recorded worktree is deleted out from
+under it is reported as `drift` by `status --live`.
 

@@ -1,0 +1,12 @@
+# Gate-sensitive path globs (issue #1054). One glob per line; blank lines and
+# `#` comments are ignored. Readers:
+#   - scripts/check-pr-contract.sh — cross-checks a PR's `Gate-changing:`
+#     declaration against these paths (declared `no` while touching one, or
+#     `yes` while touching none, is refused by name).
+#   - scripts/pr-queue.sh — orders gate-changing PRs last in the merge queue;
+#     if this file is absent it falls back to the same literal, inline.
+scripts/verify.sh
+scripts/gate.sh
+scripts/merge-gate.sh
+scripts/check-*.sh
+scripts/gate-coverage-baseline.txt

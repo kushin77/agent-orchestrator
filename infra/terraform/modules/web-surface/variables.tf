@@ -79,15 +79,31 @@ variable "create_dns_zone" {
   description = "Create the DNS managed zone (true) or resolve a pre-existing one by name (false). Only meaningful with create_gcp_edge_route = true, because the zone exists to hold that route's record; it defaults to false so a default deploy creates no zone."
   type        = bool
   default     = false
+}
 
-  # The incoherent combination is refused BY NAME rather than applied (issue
-  # #731): a zone whose only purpose was to hold the retired route's record is a
-  # zone that holds nothing. Before this, `create_dns_zone` defaulted true while
-  # the route was retired, so the module's own default declaration asked for an
-  # orphan zone.
-  validation {
-    condition     = !var.create_dns_zone || var.create_gcp_edge_route
-    error_message = "create-dns-zone-orphan: create_dns_zone = true declares a DNS managed zone to hold the GCP edge route's record, but create_gcp_edge_route = false means that route is RETIRED and no record will be created in it (docs/EDGE-CUTOVER.md). Declare the route with create_gcp_edge_route = true, or leave create_dns_zone = false."
+# The incoherent combination is refused BY NAME rather than applied (issue
+# #731): a zone whose only purpose was to hold the retired route's record is a
+# zone that holds nothing. Before this, `create_dns_zone` defaulted true while
+# the route was retired, so the module's own default declaration asked for an
+# orphan zone.
+#
+# A `variable` validation block may only reference the variable it belongs
+# to — Terraform refuses `var.create_gcp_edge_route` inside
+# create_dns_zone's own validation with "Invalid reference in variable
+# validation" (this broke `terraform init` for the whole stack, caught while
+# running the real bootstrap apply, issue #411/#1136). A `check` block can
+# reference both variables, but its `assert` only WARNS — `terraform plan`
+# still exits 0, which check-edge-cutover.sh's mutation proof catches as
+# "incoherent-combination-accepted" (the refusal must hard-fail, not warn).
+# A `lifecycle.precondition` on an unconditionally-created resource is the
+# construct that both allows the cross-variable reference and hard-fails
+# plan/apply.
+resource "terraform_data" "create_dns_zone_orphan_guard" {
+  lifecycle {
+    precondition {
+      condition     = !var.create_dns_zone || var.create_gcp_edge_route
+      error_message = "create-dns-zone-orphan: create_dns_zone = true declares a DNS managed zone to hold the GCP edge route's record, but create_gcp_edge_route = false means that route is RETIRED and no record will be created in it (docs/EDGE-CUTOVER.md). Declare the route with create_gcp_edge_route = true, or leave create_dns_zone = false."
+    }
   }
 }
 

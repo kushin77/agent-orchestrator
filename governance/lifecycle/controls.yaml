@@ -1,0 +1,76 @@
+# The lifecycle package's declared acceptance policy (issue #885, lane L6).
+#
+# Two judgments used to live only in code, unreviewable and untunable without a
+# diff to model.py or directive.py:
+#
+#   * which invariant codes the closure vocabulary is allowed to carry (the
+#     ladder `model.py.INVARIANTS` must not silently grow or shrink relative to
+#     what this file, and the gate provoking it, know about);
+#   * what a `retire` (directive.py) request must supply before a stranded
+#     order for a superseded issue may be moved to `.fleet/done/` — the reason
+#     text and the superseded-by citation the closure comment (#861) always
+#     asked for in prose, never machine-held.
+#
+# `policy.py` is the only reader. `model.py` reads it at import time to refuse a
+# vocabulary drift (no-false-green: an invariant nobody declared here cannot be
+# gated); `directive.py.retire` reads `retire.min_reason_length` instead of the
+# bare `not reason.strip()` it used to hard-code, so the threshold can be
+# reviewed and tightened without touching the module that enforces it.
+schema: ao.lifecycle/controls-v1
+subject: governance/lifecycle
+
+closure_invariants:
+  # The closed vocabulary, one entry per `model.py` invariant code, so a code
+  # this file does not carry is a policy defect (`PolicyUnavailable`,
+  # CANNOT-ASSESS) rather than a rule nobody reviewed. `subject_kind` mirrors
+  # `model.Invariant.subject_kind` byte-for-byte so the two cannot drift.
+  codes:
+    - code: PR_NOT_MERGED
+      subject_kind: item
+    - code: VERIFY_EVIDENCE_MISSING
+      subject_kind: item
+    - code: BRANCH_NOT_DELETED
+      subject_kind: item
+    - code: CLAIM_STILL_HELD
+      subject_kind: item
+    - code: DIRECTIVE_NOT_CONSUMED
+      subject_kind: item
+    - code: LANE_NOT_RECLAIMED
+      subject_kind: item
+    - code: CLOSING_EVIDENCE_MISSING
+      subject_kind: item
+    - code: ISSUE_NOT_CLOSED
+      subject_kind: item
+    - code: CHILD_NOT_CLOSED
+      subject_kind: epic
+    - code: EPIC_CHILD_MARKER_MISSING
+      subject_kind: epic
+    - code: FILING_LABELS_MISSING
+      subject_kind: item
+    - code: QUARANTINE_STALE
+      subject_kind: baseline
+
+retire:
+  # Preconditions `directive.retire` enforces beyond "closed and named" — the
+  # attribution `directive.py`'s own docstring already promises in prose
+  # ("an unattributed retirement is indistinguishable from a hand-edit"). Read
+  # by `directive.retire` via `policy.load().retire`; changing a value here
+  # changes the refusal threshold without a code change, and is exercised by
+  # `governance/lifecycle/tests/test_policy.py` and the gate's control-mutation
+  # provocation.
+  # 1 (not 8): the pre-#885 gate was `not reason.strip()` — any non-empty
+  # reason passed. Keeping the packaged floor at the old semantics is
+  # deliberate (the retire verb landed the same night, #1007/#1012/#1022, and
+  # must keep working); the control is still fully load-bearing — `policy.load`
+  # refuses < 1 — and raising it is a one-line declared change, exercised by
+  # `tests/test_policy.py::test_directive_retire_reads_the_policy_threshold_not_a_hardcoded_check`.
+  min_reason_length: 1
+  require_superseded_by: true
+
+quarantine:
+  # `audit.audit`'s legacy-quarantine rule (baseline.json, issue #269 §5): an
+  # entry is honoured only while its tracking issue is open. Declared here so
+  # the rule is a fact `policy.py` states rather than a comment beside the
+  # code that enforces it.
+  require_tracked_by: true
+  stale_disposition: reported

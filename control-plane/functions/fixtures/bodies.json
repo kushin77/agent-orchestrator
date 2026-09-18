@@ -7,7 +7,10 @@
     "DISPATCHES": {"outcome": "ok", "rows": ["issue #565 dispatched to ao-rc10 · ack received"]},
     "CLAIMS": {"outcome": "ok", "rows": ["#565 held by ao-rc10 (lane control-plane)"]},
     "FOCUS": {"outcome": "ok", "rows": ["active epic #707 EPIC: single-epic-focused BAU", "children 7 open · 0 closed", "pooled 67 waiting", "agents the pool (max_agents 0)"]},
+    "QUEUE": {"outcome": "ok", "rows": ["next claimable: #566", "queue: valid (no duplicates, no cycles)"]},
     "POOL": {"outcome": "ok", "rows": ["#619 parked (out-of-epic)", "#620 parked (out-of-epic)", "2 waiting · drained when focus is none"]},
+    "LIVENESS": {"outcome": "ok", "rows": ["verdict self-refresh · ok", "ao-fleet-snapshot-refresh not installed (declared enabled:false)"]},
+    "DANGLING": {"outcome": "ok", "rows": ["7 open issue(s) dangle on a closed parent", "#132 declares Parent #125, which is closed"]},
     "WAVES": {"outcome": "ok", "rows": ["wave #551 12/19 done", "#565 eligible"]},
     "EVENTS": {"outcome": "ok", "rows": ["13:57 dispatch claim #565", "13:58 verify started"]},
     "WATCHDOG": {"outcome": "ok", "rows": ["2 sessions, 0 orphaned, 0 suspect"]},
@@ -48,6 +51,7 @@
     "SWEEP": {"outcome": "ok", "rows": ["one pass: 0 reclaimed, 0 parked, 0 shelved"], "receipt": "cmd_8f21d4"},
     "STAMP": {"outcome": "ok", "rows": ["heartbeat stamped for ao-rc10"], "receipt": "cmd_8f21d5"},
     "CLEAR": {"outcome": "ok", "rows": ["heartbeat cleared"], "receipt": "cmd_8f21d6"},
-    "CLOSE": {"outcome": "ok", "rows": ["#565 closed with evidence"], "receipt": "cmd_8f21d7"}
+    "CLOSE": {"outcome": "ok", "rows": ["#565 closed with evidence"], "receipt": "cmd_8f21d7"},
+    "RETIRE": {"outcome": "ok", "rows": ["brain-directive-a2a-692-6b3951b31bb3db7d retired for #692 (superseded by #723, #727, #754)"], "receipt": "cmd_8f21d9"}
   }
 }

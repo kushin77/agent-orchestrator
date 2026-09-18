@@ -13,28 +13,110 @@ the live state pass 2 recorded, projected into the declaration the portal reads.
 So the probe runs once per module and the tests assert different facts about that
 one delivery, exactly as ``e2e/tests/test_workbook11_portal_surfaces.py`` does for
 the portal surfaces.
+
+WHY this file moved to a fixture registry (issue #1043). ``REQUIRED_SURFACE``
+(``surfaces.fleet_projection``) was deliberately promoted by #1027
+(commit ``32e8c24``, the #607 go-live): the committed
+``infra/feature-flags/registry.yaml`` now ships it with ``default: on`` /
+``promoted: true``. That is the product doing exactly what EPIC #607 asked for,
+not a regression — so "the surface ships unpromoted" is no longer a fact this
+repository's committed declarations can prove, and a capstone that asserted it
+anyway would be asserting a product state the product has left behind it.
+
+The decision (#1043): promotion stays, the test moves. The claims this suite
+still owes — "an unpromoted surface is absent to every caller" and "a rollback
+of a promoted surface returns it to dark without a commit" — are general
+properties of the rollout engine and the portal's surface gate, not properties
+that only hold while the committed registry happens to ship the flag off. So
+they are proven here against a CONTROLLED FIXTURE: a copy of this repository's
+own rollout declarations with only ``infra/feature-flags/registry.yaml``
+edited to hold the required surface unpromoted, fed to ``probe_delivery``
+through its own ``declarations_root`` seam — the same seam the module already
+uses to point the probe at another checkout — and driven by the real
+``project_registry`` / ``observe_surface`` / ``registry_declares_on`` loaders,
+never a reimplementation of what "declared" or "served" means. Every other
+stage (``declared``, ``refused``, ``promoted``, ``served``, the negative
+controls) is untouched: none of them depend on the shipped registry's default
+for this surface, only on the rollout declarations and the live-state the
+ladder itself records, so the fixture proves the dark/rollback claims without
+weakening anything the other stages already proved over the real, shipped
+posture.
 """
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import pytest
+import yaml
 
 from e2e.go_live_delivery import (
+    DECLARATIONS,
+    REPO_ROOT,
     REQUIRED_FLAG,
     REQUIRED_PHASE,
-    REPO_ROOT,
+    REQUIRED_SURFACE,
     Delivery,
     project_registry,
     probe_delivery,
+    registry_declares_on,
     serves_the_client,
     served_verdict,
 )
 
 
 @pytest.fixture(scope="module")
-def delivery(tmp_path_factory) -> Delivery:
-    """One delivery: the ladder, its live state, the reads and the controls."""
-    return probe_delivery(tmp_path_factory.mktemp("go-live-delivery"))
+def fixture_declarations_root(tmp_path_factory) -> object:
+    """A controlled copy of this repo's rollout declarations.
+
+    Every file the probe reads through ``declarations_root`` is copied
+    byte-for-byte from the real checkout EXCEPT ``registry.yaml``, where the
+    required surface's ``default``/``promoted`` are forced back to how #1027
+    found them (off / unpromoted). This is the fixture #1043 calls for: it lets
+    the suite still prove "unpromoted ships dark" and "rollback lands dark"
+    without asserting that the committed, shipped registry is itself
+    unpromoted — which, post-go-live, it deliberately is not.
+    """
+    repo_root = Path(REPO_ROOT)
+    root = tmp_path_factory.mktemp("go-live-declarations-fixture")
+
+    rollout_dir = root / "infra" / "rollout"
+    rollout_dir.mkdir(parents=True, exist_ok=True)
+    for name in DECLARATIONS:
+        shutil.copy2(repo_root / "infra" / "rollout" / name, rollout_dir / name)
+
+    flags_dir = root / "infra" / "feature-flags"
+    flags_dir.mkdir(parents=True, exist_ok=True)
+    registry_src = repo_root / "infra" / "feature-flags" / "registry.yaml"
+    document = yaml.safe_load(registry_src.read_text(encoding="utf-8"))
+    surfaces = document["surfaces"]
+    assert REQUIRED_SURFACE in surfaces, (
+        f"fixture setup: {REQUIRED_SURFACE!r} is not declared in {registry_src}"
+    )
+    surfaces[REQUIRED_SURFACE]["default"] = False
+    surfaces[REQUIRED_SURFACE]["promoted"] = False
+    (flags_dir / "registry.yaml").write_text(
+        yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
+    )
+
+    return root
+
+
+@pytest.fixture(scope="module")
+def delivery(tmp_path_factory, fixture_declarations_root) -> Delivery:
+    """One delivery: the ladder, its live state, the reads and the controls.
+
+    Driven with ``declarations_root=fixture_declarations_root`` (#1043): the
+    real repository's plan/stage-model/live-state, but a registry copy that
+    still ships the required surface unpromoted, so the dark/rollback stages
+    keep proving what they always proved — over a fixture the suite controls,
+    not the shipped posture #1027 promoted.
+    """
+    return probe_delivery(
+        tmp_path_factory.mktemp("go-live-delivery"),
+        declarations_root=fixture_declarations_root,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -177,10 +259,42 @@ def test_the_promoted_surface_is_served_to_an_authenticated_client_only(delivery
 
 
 # --------------------------------------------------------------------------- #
+# Stage 4.5 — the shipped, promoted posture itself (#1043)
+# --------------------------------------------------------------------------- #
+def test_the_required_surface_ships_promoted_in_the_committed_registry():
+    """The premise the fixture above exists BECAUSE of: measured on the real file.
+
+    Not delivery-derived, not fixture-derived — read straight off the checkout's
+    own ``infra/feature-flags/registry.yaml``, the same file ``dark``'s fixture
+    deliberately does NOT use below. #1027 (commit 32e8c24, the #607 go-live)
+    promoted this surface for real; if that promotion were ever reverted the
+    fixture-based tests below would keep passing on the fixture alone and this
+    is the one assertion that would catch it — the capstone still asserts the
+    promoted posture, just not by making the dark/rollback claims depend on it.
+    """
+    committed = Path(REPO_ROOT) / "infra" / "feature-flags" / "registry.yaml"
+    document = yaml.safe_load(committed.read_text(encoding="utf-8"))
+    entry = document["surfaces"][REQUIRED_SURFACE]
+
+    assert registry_declares_on(committed, REQUIRED_SURFACE) is True, (
+        f"{REQUIRED_SURFACE} no longer ships promoted in {committed} — "
+        "the #1027 go-live this suite is named after has been reverted"
+    )
+    assert entry.get("promoted") is True
+    assert entry.get("default") in (True, "on")
+
+
+# --------------------------------------------------------------------------- #
 # Stage 5 — dark
 # --------------------------------------------------------------------------- #
 def test_the_surface_is_absent_while_it_ships_unpromoted(delivery):
-    """Unpromoted means ABSENT, not merely unauthorised — to every caller."""
+    """Unpromoted means ABSENT, not merely unauthorised — to every caller.
+
+    Measured over the controlled fixture registry (#1043), not the committed
+    one: #1027 promoted this surface for real, so the committed registry no
+    longer ships it off. The fixture holds it off so this general claim about
+    the portal's surface gate still has somewhere true to be measured.
+    """
     dark = delivery.dark
 
     assert dark["declaresOn"] is False
@@ -198,7 +312,14 @@ def test_the_surface_is_absent_while_it_ships_unpromoted(delivery):
 # Stage 6 — rolled back
 # --------------------------------------------------------------------------- #
 def test_a_rollback_returns_the_surface_to_dark_without_a_commit(delivery):
-    """Both halves of the withdrawal: the ladder's rollback and the runtime overlay."""
+    """Both halves of the withdrawal: the ladder's rollback and the runtime overlay.
+
+    Also over the fixture (#1043): the ladder promotes the surface to `full`
+    on the fixture's own live-state (asserted below as `stageBefore == "full"`,
+    i.e. genuinely promoted first), then rolls it back — proving the rollback
+    claim without depending on the shipped registry being unpromoted, which
+    post-#1027 it is not.
+    """
     rolled = delivery.rolledBack
 
     # the ladder's rollback: audited, and it leaves no stale live-state entry

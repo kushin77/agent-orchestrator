@@ -4,7 +4,7 @@
 Run these from the brain/human terminal to steer and maintain the fleet without
 stopping it:
 
-    python3 fleet/control.py start      # start both rungs (brain + sister)
+    python3 fleet/control.py start      # start both rungs (director + dispatcher)
     python3 fleet/control.py status     # rungs, pause/stop flags, tracked runs
     python3 fleet/control.py pause      # hold the queue (the run in flight finishes)
     python3 fleet/control.py resume     # pull the next order again
@@ -16,7 +16,7 @@ stopping it:
     python3 fleet/control.py override --issue N   # force #N past a live claim
     python3 fleet/control.py drop --directive <id> --reason "<text>"  # dead-letter a wedged directive
     python3 fleet/control.py dead-letter [--directive <id>]  # inspect the dead-letter mailbox
-    python3 fleet/control.py poke       # ping the sister; it acks (liveness)
+    python3 fleet/control.py poke       # ping the dispatcher; it acks (liveness)
     python3 fleet/control.py halt       # stop the fleet
     python3 fleet/control.py debug      # full non-destructive state dump
     python3 fleet/control.py watch      # idle-watch the slog (same as listen)
@@ -25,7 +25,7 @@ stopping it:
     python3 fleet/control.py live       # ensure the rungs, then attach to the live `fleet` session
     python3 fleet/control.py attach     # alias for live
 
-`live` is the operator's way in. It starts only the rungs that are missing (the
+`live` is the principal's way in. It starts only the rungs that are missing (the
 same rule `start` follows) and then attaches to a tmux session named `fleet` with
 a `dashboard` window (`fleet/console.py`), a `brain` window, a `sister` window and
 a `monitor` window — the last three tailing `.fleet/<rung>.log`. The session is a
@@ -33,10 +33,10 @@ VIEW, never the host: the rungs run detached and the watchdog/cron owns their
 lifecycle, so attaching, detaching or killing the session never touches a run in
 flight. `--dry-run` prints the exact tmux commands instead of running them.
 
-Roles (see fleet/profiles/brain.md and fleet/directive.json): the sister is a
-DUMB terminal (DeepSeek v4.1 Flash, no thinking); the brain is DSv4PM with human
-override and issues every order; THIS terminal is where the operator overrides
-the entire fleet. The operator orders the brain — never the sister directly
+Roles (see fleet/profiles/brain.md and fleet/directive.json): the dispatcher is a
+DUMB terminal (DeepSeek v4.1 Flash, no thinking); the director is DSv4PM with human
+override and issues every order; THIS terminal is where the principal overrides
+the entire fleet. The principal orders the director — never the dispatcher directly
 (the channel refuses it).
 """
 
@@ -58,7 +58,7 @@ import runtime
 
 ROOT = Path(__file__).resolve().parent.parent
 CHANNEL = str(ROOT / "fleet" / "channel.py")
-# The operator's live session. One name, used by the verb, by run-fleet.sh and by
+# The principal's live session. One name, used by the verb, by run-fleet.sh and by
 # the header of the dashboard, so "attach to the fleet" means exactly one thing.
 SESSION = runtime.SESSION
 # The runtime dir relative to the checkout (or absolute when AO_FLEET_DIR points
@@ -69,7 +69,7 @@ try:
     FLEET_SUBDIR = runtime.FLEET_DIR.relative_to(runtime.ROOT)
 except ValueError:
     FLEET_SUBDIR = runtime.FLEET_DIR
-# The rungs the operator wants to see, in the order the windows are created.
+# The rungs the principal wants to see, in the order the windows are created.
 LIVE_RUNGS = ("brain", "sister", "monitor")
 
 # The mailboxes a directive can occupy, and the two terminal stores. The NAMES
@@ -96,7 +96,7 @@ def _run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
 
 
 def _send_control(action: str, task: dict | None = None, body: str | None = None) -> None:
-    """Send one control verb to the sister over the existing channel.
+    """Send one control verb to the dispatcher over the existing channel.
 
     ``task`` carries the target of a control that acts on a NAMED directive
     (``drop`` names the order it is retiring) — the control's own id and the
@@ -137,7 +137,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 
 
 def _loop_pid() -> int | None:
-    """The sister loop's pid, from its heartbeat — the handle for out-of-band signals.
+    """The dispatcher loop's pid, from its heartbeat — the handle for out-of-band signals.
 
     Process levers cannot travel by mailbox alone: the loop is blocked in the
     child run while a task is in flight, so a control message would sit unread
@@ -171,7 +171,7 @@ def cmd_poke(args: argparse.Namespace) -> int:
 
 
 def cmd_start(args: argparse.Namespace) -> int:
-    """Start whichever rungs are missing; clear stale queue flags when the sister starts.
+    """Start whichever rungs are missing; clear stale queue flags when the dispatcher starts.
 
     Three traps found by sweeping the controls live: a `stopping` flag left behind by
     a loop that died would kill every newly started loop at its first cycle; a
@@ -180,7 +180,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 
     Each rung is started detached with stdout+stderr appended to `.fleet/<rung>.log`
     — the same capture path the watchdog uses. Starting a rung into `DEVNULL` made
-    the window the operator then attaches to show nothing at all.
+    the window the principal then attaches to show nothing at all.
     """
     rungs = (
         ("brain", "fleet/brain.py", "fleet/brain.sh"),
@@ -279,10 +279,10 @@ def cmd_restart(args: argparse.Namespace) -> int:
 
 
 def cmd_override(args: argparse.Namespace) -> int:
-    """Operator override: order the BRAIN to force a named issue past a live claim.
+    """Principal override: order the DIRECTOR to force a named issue past a live claim.
 
-    The hierarchy holds even for an override — the operator orders the brain, the
-    brain issues the control. The brain reaps the holder and the loop dispatches.
+    The hierarchy holds even for an override — the principal orders the director, the
+    director issues the control. The director reaps the holder and the loop dispatches.
     """
     order = {
         "type": "directive",
@@ -305,16 +305,16 @@ def cmd_halt(args: argparse.Namespace) -> int:
 
 
 def cmd_drop(args: argparse.Namespace) -> int:
-    """Operator lever: retire a wedged directive to the dead-letter mailbox.
+    """Principal lever: retire a wedged directive to the dead-letter mailbox.
 
     THE DEFECT THIS ROUTE EXISTS FOR (#799, measured on 2026-09-15)
-    The verb used to *only* order the sister to dead-letter the directive, and
-    answered "the sister will dead-letter directive …". That is a message the loop
+    The verb used to *only* order the dispatcher to dead-letter the directive, and
+    answered "the dispatcher will dead-letter directive …". That is a message the loop
     must PROCESS, so the remedy for a loop that cannot drain its mailbox had to
-    travel through the mailbox that loop was not draining: the operator issued the
+    travel through the mailbox that loop was not draining: the principal issued the
     drop and, 13 cycles later, the runaway guard retired the order instead — the
-    operator's own lever was redundant, and it failed with ``FileNotFoundError``
-    once the sister had consumed the message anyway. A control that only takes
+    principal's own lever was redundant, and it failed with ``FileNotFoundError``
+    once the dispatcher had consumed the message anyway. A control that only takes
     effect once the loop is healthy is not a control.
 
     THE ROUTE IS CHOSEN BY WHERE THE ORDER IS, because that is what decides
@@ -593,7 +593,7 @@ def ensure_logs() -> list[Path]:
 
 
 def live_layout() -> list[list[str]]:
-    """The tmux argv list that builds the operator's live session.
+    """The tmux argv list that builds the principal's live session.
 
     Pure construction, so `--dry-run` can print exactly what would run and the
     tests can assert the layout without a tmux server or an attached terminal.
@@ -623,13 +623,13 @@ def _tmux(argv: list[str]) -> int:
 
 
 def _attach() -> int:
-    """Attach the operator's terminal to the session. Kept separate so tests can
+    """Attach the principal's terminal to the session. Kept separate so tests can
     prove the layout without ever running `tmux attach`."""
     return subprocess.call(["tmux", "attach", "-t", SESSION], cwd=ROOT)
 
 
 def cmd_live(args: argparse.Namespace) -> int:
-    """Ensure the rungs are up, then put the operator in front of the live fleet."""
+    """Ensure the rungs are up, then put the principal in front of the live fleet."""
     logs = ensure_logs()
     # The events window tails the audit stream; create it so `tail -f` has a
     # file to follow even before the first directive is written.

@@ -42,6 +42,8 @@ from model import (
     CODE_CORRECTIVE_ACTION_UNRECORDED,
     CODE_CORRECTIVE_ACTION_WITHOUT_EVIDENCE,
     CODE_CORRECTIVE_ACTION_WITHOUT_OWNER,
+    CODE_DOC_RCA_ARTIFACT_MISMATCH,
+    CODE_DOC_RCA_ID_UNKNOWN,
     CODE_DUPLICATE_ID,
     CODE_EDGE_UNRESOLVED,
     CODE_EVIDENCE_UNRESOLVABLE,
@@ -59,6 +61,7 @@ from model import (
     CODE_RCA_REVIEW_OVERDUE,
     CODE_RCA_WITHOUT_CORRECTIVE_ACTION,
     CODE_RCA_WITHOUT_ORIGIN,
+    CODE_README_INCIDENT_COUNT_MISMATCH,
     CODE_SUGGESTION_OPEN,
     CODE_SUGGESTION_WITHOUT_OWNER,
     CODE_SUGGESTION_WITHOUT_REMEDIATION,
@@ -89,6 +92,10 @@ from model import (
 # ``remediation_issue`` for itself.
 import edges as _edges  # noqa: E402
 
+# The ledger -> board linkage layer (issue #1178): the measured census, and the
+# rules that make a record's reachability binding rather than incidental.
+import linkage as _linkage  # noqa: E402
+
 LEDGER_RELPATH = "governance/lessons/ledger.jsonl"
 TEMPLATE_RELPATH = "governance/lessons/rca-template.md"
 POLICY_RELPATH = "governance/lessons/policy.yaml"
@@ -110,6 +117,46 @@ AREA_LABEL_PREFIX = "area:"
 
 RE_ISSUE_REF = re.compile(r"^#(\d+)$")
 RE_SHA = re.compile(r"^[0-9a-f]{7,40}$")
+
+#: A single RCA id token, anywhere in a doc's text (issue #1052: one RCA id
+#: authority — the ledger). ``\b`` on both sides so ``RCA-0007b`` is not
+#: mistaken for ``RCA-0007``.
+RE_RCA_TOKEN = re.compile(r"\bRCA-(\d+)\b")
+
+#: A heading that STARTS with an RCA id (after the ``#`` markers and
+#: whitespace) MINTS that id — it declares the document to BE that RCA's
+#: artifact, the exact shape of the double-booking defect (issue #1052:
+#: ``docs/rca/2026-09-16-pr-queue-clearing.md`` titled itself
+#: ``RCA-0007 / RCA-0008`` while the ledger already held both under a
+#: different artifact). An id that appears later in a heading, or anywhere in
+#: prose, is a CITATION and carries no such claim.
+RE_RCA_HEADING_MINT = re.compile(r"^#{1,6}\s*(RCA-\d+)\b")
+
+#: docs/rca/ RCA writeups are lightweight and may cite a ledger RCA, but the
+#: ledger — ``governance/lessons/ledger.jsonl`` — is the only place an id is
+#: minted (issue #1052).
+DOCS_RCA_RELDIR = "docs/rca"
+
+#: The sentence in this module's own README that hand-counts the ledger's
+#: incidents (``## The incidents recorded so far``). Matched case-insensitively
+#: so "Fourteen"/"fourteen" are equivalent; the gate asserts the number against
+#: the ledger rather than trusting the prose.
+RE_README_INCIDENT_COUNT = re.compile(
+    r"\b([A-Za-z-]+)\s+real incidents\b", re.IGNORECASE
+)
+
+#: English number words the README count is allowed to spell out. The ledger
+#: this module has ever tracked is nowhere near needing more than this.
+NUMBER_WORDS: Dict[str, int] = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+    "nineteen": 19, "twenty": 20, "twenty-one": 21, "twenty-two": 22,
+    "twenty-three": 23, "twenty-four": 24, "twenty-five": 25,
+    "twenty-six": 26, "twenty-seven": 27, "twenty-eight": 28,
+    "twenty-nine": 29, "thirty": 30,
+}
 
 
 class LedgerUnavailable(Exception):
@@ -402,8 +449,15 @@ def check_ledger(
     findings.extend(_check_lessons(lessons, root=root, probe=probe))
     findings.extend(_check_actions(actions, rcas, root=root, probe=probe))
     findings.extend(_check_review_cadence(rcas, today=today, policy=active_policy))
+    findings.extend(_check_doc_rca_ids(ledger, root=root))
+    findings.extend(_check_readme_incident_count(incidents, root=root))
     if snapshot is not None:
         findings.extend(_check_board(incidents, snapshot, policy=active_policy))
+        findings.extend(
+            _linkage.findings(
+                ledger.records.values(), snapshot, label=active_policy.incident_label
+            )
+        )
 
     counts = {
         "incidents": len(incidents),
@@ -429,6 +483,16 @@ def check_ledger(
         ),
         "artifacts_checked": len(rcas),
     }
+
+    # The ledger -> board census (issue #1178). Derived from the same records
+    # and the same snapshot as the rules above, so the summary and the findings
+    # can never disagree about the same revision.
+    if snapshot is not None:
+        counts.update(
+            _linkage.counts(
+                ledger.records.values(), snapshot, label=active_policy.incident_label
+            )
+        )
 
     if strict:
         findings = [
@@ -866,6 +930,118 @@ def _check_evidence(
                     remediation="cite the %s as #<number>" % kind,
                 )
             )
+    return findings
+
+
+def _check_doc_rca_ids(ledger: Ledger, *, root: Path) -> List[Finding]:
+    """One RCA id authority (issue #1052): the ledger, not ``docs/rca/``.
+
+    Every ``RCA-NNNN`` token in a ``docs/rca/*.md`` writeup must already be a
+    recorded ledger id — a lightweight doc may CITE an RCA the ledger knows
+    about, but it may never MINT a fresh one. A heading that STARTS with the
+    id (``# RCA-0007 — ...``) is a mint claim: it is refused unless the
+    ledger's own ``artifact`` for that id names this very file, which never
+    happens for a ``docs/rca/`` writeup (the ledger's RCA artifacts live under
+    ``governance/lessons/rca/``) — so a doc may cite an id later in a heading
+    or in prose, never open one with it.
+    """
+    findings: List[Finding] = []
+    docs_dir = Path(root) / DOCS_RCA_RELDIR
+    if not docs_dir.is_dir():
+        return findings
+    rca_records = {
+        rid: rec for rid, rec in ledger.records.items() if rec.get("kind") == KIND_RCA
+    }
+    for path in sorted(docs_dir.glob("*.md")):
+        text = _read_text(path)
+        if text is None:
+            continue
+        try:
+            doc_relpath = relpath(path.relative_to(root))
+        except ValueError:
+            doc_relpath = relpath(path)
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            for match in RE_RCA_TOKEN.finditer(line):
+                rca_id = match.group(0)
+                if rca_id not in rca_records:
+                    findings.append(
+                        Finding(
+                            code=CODE_DOC_RCA_ID_UNKNOWN,
+                            message=(
+                                "%s:%d cites %s, which is not a recorded ledger id"
+                                % (doc_relpath, lineno, rca_id)
+                            ),
+                            subject=doc_relpath,
+                            remediation=(
+                                "record %s in governance/lessons/ledger.jsonl before "
+                                "citing it, or fix the id" % rca_id
+                            ),
+                        )
+                    )
+            mint = RE_RCA_HEADING_MINT.match(line)
+            if mint is None:
+                continue
+            rca_id = mint.group(1)
+            record = rca_records.get(rca_id)
+            if record is None:
+                # already reported above as an unknown id
+                continue
+            artifact = relpath(record.get("artifact", ""))
+            if artifact != doc_relpath:
+                findings.append(
+                    Finding(
+                        code=CODE_DOC_RCA_ARTIFACT_MISMATCH,
+                        message=(
+                            "%s:%d mints %s, but the ledger's artifact for %s is %s "
+                            "— a lightweight doc may CITE a ledger RCA, it may not "
+                            "MINT one"
+                            % (doc_relpath, lineno, rca_id, rca_id, artifact or "(none)")
+                        ),
+                        subject=rca_id,
+                        remediation=(
+                            "cite %s instead of heading the section with it (put "
+                            "other words first), or make this file the ledger "
+                            "artifact for %s" % (rca_id, rca_id)
+                        ),
+                    )
+                )
+    return findings
+
+
+def _check_readme_incident_count(incidents, *, root: Path) -> List[Finding]:
+    """The README's hand-written incident count must match the ledger (#1052).
+
+    ``governance/lessons/README.md`` says "Fourteen real incidents from this
+    repository's own history..."; that number is derived, not authored, so the
+    gate asserts it against the ledger's actual incident count rather than
+    trusting prose two lanes can independently hand-merge into drift (#1036).
+    """
+    findings: List[Finding] = []
+    path = Path(root) / "governance" / "lessons" / "README.md"
+    text = _read_text(path)
+    if text is None:
+        return findings
+    match = RE_README_INCIDENT_COUNT.search(text)
+    if match is None:
+        return findings
+    word = match.group(1).lower()
+    claimed = NUMBER_WORDS.get(word)
+    actual = len(incidents)
+    if claimed is None or claimed != actual:
+        findings.append(
+            Finding(
+                code=CODE_README_INCIDENT_COUNT_MISMATCH,
+                message=(
+                    "governance/lessons/README.md claims %r real incidents but the "
+                    "ledger records %d" % (match.group(1), actual)
+                ),
+                subject="governance/lessons/README.md",
+                remediation=(
+                    "update the prose count to match the ledger's incident count "
+                    "(%d), or state it in a form the gate can derive" % actual
+                ),
+            )
+        )
     return findings
 
 

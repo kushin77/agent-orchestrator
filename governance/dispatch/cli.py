@@ -39,14 +39,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import claims  # noqa: E402
 import focus as focus_mod  # noqa: E402
+import live as live_mod  # noqa: E402
+import liveness as liveness_mod  # noqa: E402
 import order  # noqa: E402
 import pool as pool_mod  # noqa: E402
 import owner_queue as queue_mod  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
+from model import parse_file_claims  # noqa: E402
 
 EXIT_OK = 0
 EXIT_NOT_OK = 1
 EXIT_CANNOT_ASSESS = 2
+
+#: The remedy every staleness refusal names — and, since issue #1179, also runs.
+REFRESH_COMMAND = "python3 governance/dispatch/cli.py snapshot --from-github"
 
 #: The capacity gate lives with the loop it bounds (``fleet/capacity.py``, #718).
 #: Imported LAZILY and by path: `focus` is the verb that reports the fan-out, but
@@ -70,6 +76,98 @@ def _load_snapshot(path: Path) -> snapshot_mod.Snapshot:
     verb reads the board through one seam.
     """
     return snapshot_mod.load(path)
+
+
+def _refresh_board(args: argparse.Namespace) -> str:
+    """Run the ONE bounded board refresh; return a one-line account of it.
+
+    This is the SAME seam the fleet loop runs (`fleet/terminal.board_trigger` ->
+    `snapshot.refresh_or_park`) and the same one every staleness refusal names —
+    there is exactly one path that touches the network and exactly one place the
+    bounded window is applied.
+
+    It is **opt-in** (issue #1179). It was briefly the default, and that was
+    measured to be wrong: it made a READ verb perform a network call and rewrite
+    the tracked `.board/snapshot.json`, so a pytest suite (`fleet/tests`) driving
+    the loop rewrote the repository's board mid-`make verify` — measured as
+    `pytest fleet/tests` changing the snapshot's sha256 on this branch while
+    pristine `origin/master` leaves it byte-identical. A gate that reaches the
+    network, and a read verb that writes a tracked artifact, are both defects; the
+    entry point now names the remedy instead of performing it unasked.
+    """
+    if not getattr(args, "refresh", False):
+        return (
+            "no refresh attempted — run this verb with --refresh to run the one bounded "
+            f"board refresh in band, or: {REFRESH_COMMAND}"
+        )
+    if not args.repo:
+        return "no refresh attempted — no board repo was named (--repo)"
+    refreshed, detail = snapshot_mod.refresh(
+        Path(args.snapshot),
+        repo=args.repo,
+        window_seconds=getattr(args, "refresh_window", None),
+    )
+    return f"one bounded refresh {'succeeded' if refreshed else 'failed'}: {detail}"
+
+
+def _stale_board(
+    verb: str, args: argparse.Namespace, snapshot: snapshot_mod.Snapshot, age: float
+) -> tuple[snapshot_mod.Snapshot, float] | None:
+    """The staleness verdict for ``verb``: a usable board, or a named refusal.
+
+    Returns the (possibly refreshed) board and its age on success. On failure it
+    prints the refusal and returns ``None``: the refusal names the age, the
+    threshold, the refresh ATTEMPT and its outcome, and whether any board producer
+    is installed at all — so a dead control reads as a dead control rather than as
+    a bare age. Tri-state: an unassessable board is exit 2, never a pass.
+    """
+    if not snapshot_mod.is_stale(snapshot, args.stale_minutes):
+        return snapshot, age
+
+    attempt = _refresh_board(args)
+    try:
+        refreshed = _load_snapshot(Path(args.snapshot))
+    except (OSError, ValueError) as exc:
+        print(
+            f"{verb}: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m); "
+            f"{attempt}; the refreshed snapshot is unreadable ({exc})",
+            file=sys.stderr,
+        )
+        return None
+    refreshed_age = snapshot_mod.age_minutes(refreshed)
+    if not snapshot_mod.is_stale(refreshed, args.stale_minutes):
+        print(f"{verb}: snapshot was stale ({age:.1f}m); {attempt}", file=sys.stderr)
+        return refreshed, refreshed_age
+
+    print(
+        f"{verb}: CANNOT-ASSESS — snapshot-stale ({refreshed_age:.1f}m > {args.stale_minutes}m); "
+        f"{attempt} — refresh first: {REFRESH_COMMAND}",
+        file=sys.stderr,
+    )
+    # Name the producer's state too, so "the board is stale" cannot be read as a
+    # transient hiccup when in fact nothing on this host can refresh it.
+    board_liveness = liveness_mod.assess()
+    if board_liveness.finding:
+        print(f"{verb}: {board_liveness.finding}", file=sys.stderr)
+    elif board_liveness.detail:
+        print(f"{verb}: board refresher — {board_liveness.detail}", file=sys.stderr)
+    return None
+
+
+def _board_verdict(verb: str, args: argparse.Namespace) -> tuple[snapshot_mod.Snapshot, float] | None:
+    """Load the board and clear staleness for ``verb``, or print the refusal."""
+    snapshot_path = Path(args.snapshot)
+    if not snapshot_path.exists():
+        print(f"{verb}: CANNOT-ASSESS — {snapshot_path} is missing (refresh it with: {REFRESH_COMMAND})", file=sys.stderr)
+        return None
+    try:
+        snapshot = _load_snapshot(snapshot_path)
+    except (OSError, ValueError) as exc:
+        print(f"{verb}: CANNOT-ASSESS — {snapshot_path} is unreadable ({exc})", file=sys.stderr)
+        return None
+    age = snapshot_mod.age_minutes(snapshot)
+    print(f"{verb}: snapshot age {age:.1f}m (threshold {args.stale_minutes}m)", file=sys.stderr)
+    return _stale_board(verb, args, snapshot, age)
 
 
 def cmd_audit(args: argparse.Namespace) -> int:
@@ -107,20 +205,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
 
 def cmd_eligible(args: argparse.Namespace) -> int:
-    snapshot_path = Path(args.snapshot)
-    if not snapshot_path.exists():
-        print(f"eligible: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+    assessed = _board_verdict("eligible", args)
+    if assessed is None:
         return EXIT_CANNOT_ASSESS
-    snapshot = _load_snapshot(snapshot_path)
-    age = snapshot_mod.age_minutes(snapshot)
-    print(f"eligible: snapshot age {age:.1f}m (threshold {args.stale_minutes}m)", file=sys.stderr)
-    if snapshot_mod.is_stale(snapshot, args.stale_minutes):
-        print(
-            f"eligible: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m) "
-            "— refresh first: python3 governance/dispatch/cli.py snapshot --from-github",
-            file=sys.stderr,
-        )
-        return EXIT_CANNOT_ASSESS
+    snapshot, _age = assessed
     events = claims.read_ledger(args.ledger)
     live = claims.active_claims(events)
     held_by_self = frozenset(number for number, claim in live.items() if claim.agent == args.agent)
@@ -138,14 +226,20 @@ def cmd_eligible(args: argparse.Namespace) -> int:
 
 
 def cmd_claim(args: argparse.Namespace) -> int:
-    snapshot_path = Path(args.snapshot)
-    if not snapshot_path.exists():
-        print(f"claim: CANNOT-ASSESS — {snapshot_path} is missing", file=sys.stderr)
+    assessed = _board_verdict("claim", args)
+    if assessed is None:
         return EXIT_CANNOT_ASSESS
-    snapshot = _load_snapshot(snapshot_path)
-    age = snapshot_mod.age_minutes(snapshot)
-    print(f"claim: snapshot age {age:.1f}m (threshold {args.stale_minutes}m)", file=sys.stderr)
+    snapshot, _age = assessed
+    snapshot_path = Path(args.snapshot)
+    # The digest is taken AFTER the staleness handling: a successful in-band
+    # refresh (#1179) rewrites the file, and a digest of the pre-refresh bytes
+    # would record evidence for a board the claim was not judged against.
     digest = snapshot_mod.content_sha256(snapshot_path)
+    try:
+        files = parse_file_claims(json.loads(args.files), where="--files") if args.files else ()
+    except (ValueError, json.JSONDecodeError) as exc:
+        print(f"claim: CANNOT-ASSESS — --files is not valid: {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
     try:
         event = claims.claim(
             args.issue,
@@ -159,6 +253,9 @@ def cmd_claim(args: argparse.Namespace) -> int:
             ttl_hours=args.ttl_hours,
             directive_id=args.directive,
             stale_minutes=args.stale_minutes,
+            files=files,
+            speculative_base=args.base,
+            main=Path(args.main) if args.main else claims.ROOT,
         )
     except claims.ClaimRefused as exc:
         print(f"claim REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
@@ -175,21 +272,11 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
     evidence checked, so the caller learns *why* the unit is unowned rather than
     discovering it when the work is already half-done.
     """
+    assessed = _board_verdict("dispatch", args)
+    if assessed is None:
+        return EXIT_CANNOT_ASSESS
+    snapshot, _age = assessed
     snapshot_path = Path(args.snapshot)
-    if not snapshot_path.exists():
-        print(
-            f"dispatch: CANNOT-ASSESS — {snapshot_path} is missing "
-            "(refresh it with: python3 governance/dispatch/cli.py snapshot --from-github)",
-            file=sys.stderr,
-        )
-        return EXIT_CANNOT_ASSESS
-    try:
-        snapshot = _load_snapshot(snapshot_path)
-    except ValueError as exc:
-        print(f"dispatch: CANNOT-ASSESS — {exc}", file=sys.stderr)
-        return EXIT_CANNOT_ASSESS
-    age = snapshot_mod.age_minutes(snapshot)
-    print(f"dispatch: snapshot age {age:.1f}m (threshold {args.stale_minutes}m)", file=sys.stderr)
     try:
         arbitration = claims.arbitrate(
             args.issue,
@@ -234,23 +321,131 @@ def cmd_status(args: argparse.Namespace) -> int:
     age = snapshot_mod.age_minutes(snapshot)
     print(f"snapshot: {snapshot.source} generated {snapshot.generated_at} ({len(snapshot.issues)} issues)")
     print(f"snapshot age: {age:.1f}m (threshold {args.stale_minutes}m)")
-    if snapshot_mod.is_stale(snapshot, args.stale_minutes):
-        print(
-            f"status: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m) "
-            "— refresh first: python3 governance/dispatch/cli.py snapshot --from-github",
-            file=sys.stderr,
-        )
+    assessed = _stale_board("status", args, snapshot, age)
+    if assessed is None:
         return EXIT_CANNOT_ASSESS
+    snapshot, age = assessed
     events = claims.read_ledger(args.ledger)
     live = claims.active_claims(events)
+    held = frozenset(live)
+    focus_path = Path(getattr(args, "focus", focus_mod.DEFAULT_PATH))
     milestone = order.active_milestone(snapshot, frozenset())
-    frontier = order.frontier(snapshot, milestone) if milestone else None
     print(f"active milestone: {milestone or '<none>'}")
-    print(f"frontier: #{frontier.number} {frontier.title}" if frontier else "frontier: <none>")
+    if milestone:
+        # Advertise the CLAIMABLE frontier (issue #1168): the milestone frontier
+        # alone named work `claim` refuses, which is how `status` came to promise
+        # a reader an issue the claim path would not let them take.
+        advertised = order.claimable_frontier(snapshot, milestone, held, focus_path)
+        if advertised is not None:
+            print(f"frontier: #{advertised.number} {advertised.title}")
+        else:
+            print(f"frontier: <none> — no candidate in {milestone!r} is claimable")
+            # ...which is normally because an epic focus is active and pooled that
+            # milestone. A bare `<none>` would read as "nothing to do"; name the
+            # frontier the fleet IS driving, still only if it is claimable.
+            active_epic = focus_mod.active(snapshot, focus_path)
+            if active_epic is not None:
+                print(f"active epic: #{active_epic.number} {active_epic.title}")
+                ready = next(
+                    (
+                        child
+                        for child in focus_mod.open_children(snapshot, active_epic.number)
+                        if order.eligible(
+                            snapshot,
+                            child.number,
+                            claimed_by_others=held,
+                            focus_path=focus_path,
+                        ).eligible
+                    ),
+                    None,
+                )
+                if ready is not None:
+                    print(f"active-epic frontier: #{ready.number} {ready.title}")
+        disagreement = order.unclaimable_frontier(snapshot, milestone, held, focus_path)
+        if disagreement:
+            print(f"  {disagreement} (the milestone frontier is not claimable)", file=sys.stderr)
+    else:
+        print("frontier: <none>")
+    # Is there anything that can actually keep this board live? (issue #1179)
+    board_liveness = liveness_mod.assess()
+    print(
+        f"board refresher: {board_liveness.verdict}"
+        + (f" — {board_liveness.detail}" if board_liveness.detail else "")
+    )
+    if board_liveness.finding:
+        print(f"  {board_liveness.finding}", file=sys.stderr)
+    # Dangling-on-a-closed-epic issues are refused `epic-closed` — correctly — but
+    # were named by nothing, so they were invisible AND permanently unclaimable
+    # (issue #1179). Report them with their remedy.
+    dangling = order.dangling_epic_findings(snapshot)
+    if dangling:
+        print(
+            f"dangling-epic: {len(dangling)} open issue(s) declare a Parent that is closed",
+            file=sys.stderr,
+        )
+        for finding in dangling:
+            print(f"  {finding}", file=sys.stderr)
+        print(f"  {order.REMEDIATION_REPARENT}", file=sys.stderr)
+    else:
+        print("dangling-epic: none — every open issue's declared parent is open")
     print(f"live claims: {len(live)}")
     for issue, claim in sorted(live.items()):
         print(f"  #{issue} held by {claim.agent} ({claim.lane}) since {claim.at} reason={claim.reason}")
+    if getattr(args, "live", False):
+        projection = live_mod.project(snapshot, ledger=args.ledger)
+        print(live_mod.render(projection))
     return EXIT_OK
+
+
+def cmd_liveness(args: argparse.Namespace) -> int:
+    """Does the board's liveness contract have a producer — and is it the declared one?
+
+    The defect this verb exists for (issue #1179): a refresh job was declared and
+    a reconciler proved it could heal drift *in a scratch crontab*, while nothing
+    asserted the REAL crontab, so nothing noticed the producer was absent. Tri-state
+    0/1/2, and an unreadable crontab or manifest is 2 — never a pass.
+    """
+    verdict = liveness_mod.assess(
+        manifest_path=Path(args.manifest) if args.manifest else None,
+        crontab_file=Path(args.crontab_file) if args.crontab_file else None,
+        self_refresh=not args.no_self_refresh,
+    )
+    print(json.dumps(verdict.to_json(), indent=2))
+    if not verdict.assessable:
+        print(f"liveness: CANNOT-ASSESS — {verdict.detail}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if verdict.finding:
+        print(f"liveness: NOT-OK — {verdict.finding}", file=sys.stderr)
+        return EXIT_NOT_OK
+    print(f"liveness: OK — {verdict.detail or verdict.verdict}")
+    return EXIT_OK
+
+
+def cmd_dangling(args: argparse.Namespace) -> int:
+    """Report open issues whose declared parent is CLOSED (issue #1179).
+
+    Exit 0 = none, 1 = the board has dangling issues (each named, with the
+    remedy), 2 = the board cannot be assessed. The `epic-closed` refusal itself is
+    deliberately NOT relaxed: the epic that would own the work is gone, so the fix
+    is visibility plus a reachable re-parenting path, not a silent re-allow.
+    """
+    assessed = _board_verdict("dangling", args)
+    if assessed is None:
+        return EXIT_CANNOT_ASSESS
+    snapshot, _age = assessed
+    findings = order.dangling_epic_findings(snapshot)
+    if not findings:
+        print("dangling-epic: none — every open issue's declared parent is open")
+        return EXIT_OK
+    print(
+        f"dangling-epic: {len(findings)} open issue(s) dangle on a closed parent; "
+        "they are refused `epic-closed` and can never be claimed until re-parented",
+        file=sys.stderr,
+    )
+    for finding in findings:
+        print(f"  {finding}", file=sys.stderr)
+    print(f"  {order.REMEDIATION_REPARENT}", file=sys.stderr)
+    return EXIT_NOT_OK
 
 
 def cmd_focus(args: argparse.Namespace) -> int:
@@ -468,6 +663,55 @@ def cmd_queue(args: argparse.Namespace) -> int:
         print(f"queue: CANNOT-ASSESS — {queue_path} is missing", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
 
+    if args.fix:
+        snapshot_path = Path(args.snapshot)
+        if not snapshot_path.exists():
+            print(
+                f"queue --fix: CANNOT-ASSESS — {snapshot_path} is missing "
+                "(refresh it with: python3 governance/dispatch/cli.py snapshot --from-github)",
+                file=sys.stderr,
+            )
+            return EXIT_CANNOT_ASSESS
+        snapshot = snapshot_mod.load(snapshot_path)
+        if snapshot_mod.is_stale(snapshot, args.stale_minutes):
+            age = snapshot_mod.age_minutes(snapshot)
+            print(
+                f"queue --fix: CANNOT-ASSESS — snapshot-stale ({age:.1f}m > {args.stale_minutes}m); "
+                "closed/open state needs a fresh board — refresh first: "
+                "python3 governance/dispatch/cli.py snapshot --from-github",
+                file=sys.stderr,
+            )
+            return EXIT_CANNOT_ASSESS
+        text = queue_path.read_text(encoding="utf-8")
+        new_text, removed = queue_mod.prune_closed_text(text, snapshot)
+        if removed:
+            queue_path.write_text(new_text, encoding="utf-8")
+            listed = ", ".join(f"#{n}" for n in removed)
+            print(f"queue --fix: dropped {len(removed)} closed issue(s) from {queue_path}: {listed}")
+        else:
+            print(f"queue --fix: OK ({queue_path} has no closed issues)")
+        # Self-verify (GR-12/AO-GR-19: a check that cannot fail is a
+        # formality): re-load and re-validate what was just written against
+        # the same snapshot. A prune whose regex missed a wave shape (e.g. a
+        # future block-style `issues:` list) must be caught here, not reported
+        # as a false "OK" (issue #1113).
+        rewritten = queue_mod.load(queue_path)
+        survivors = [
+            problem
+            for problem in queue_mod.validate(rewritten, snapshot)
+            if "already closed" in problem
+        ]
+        if survivors:
+            print(
+                f"queue --fix: FAIL — {len(survivors)} closed issue(s) survived the prune "
+                "(the file's 'issues:' shape was not recognized):",
+                file=sys.stderr,
+            )
+            for problem in survivors:
+                print(f"  - {problem}", file=sys.stderr)
+            return EXIT_NOT_OK
+        return EXIT_OK
+
     if args.check:
         snapshot_path = Path(args.snapshot)
         snapshot = None
@@ -528,6 +772,30 @@ def add_paths(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--locks", default=str(claims.DEFAULT_LOCK_DIR))
     parser.add_argument("--stale-minutes", type=int, default=snapshot_mod.DEFAULT_STALENESS_MINUTES)
     parser.add_argument("--pool", default=str(pool_mod.POOL_PATH))
+    # The liveness half of the staleness contract (issue #1179). OFF by default
+    # and opt-in: a refusal that names its own remedy should offer it, but a READ
+    # verb must not perform a network call or rewrite a tracked artifact unless
+    # the caller asked — measured: making it the default let a pytest suite drive
+    # a real board refresh during `make verify`.
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help=(
+            "on a stale snapshot, run the ONE bounded board refresh in band (the same "
+            "seam the fleet loop uses) before deciding"
+        ),
+    )
+    parser.add_argument(
+        "--refresh-window",
+        type=float,
+        default=None,
+        help="seconds the in-band refresh may take (default: the trigger window)",
+    )
+    parser.add_argument(
+        "--repo",
+        default=snapshot_mod.DEFAULT_REPO,
+        help="the GitHub board a refresh reads (default: %(default)s)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -551,7 +819,28 @@ def build_parser() -> argparse.ArgumentParser:
     claim.add_argument("--lane", default="")
     claim.add_argument("--ttl-hours", type=int, default=claims.DEFAULT_TTL_HOURS)
     claim.add_argument("--base-commit", default="")
+    claim.add_argument(
+        "--base",
+        default="",
+        help=(
+            "speculative branch-stacking (DG-3, #699): the upstream lane's OWN branch "
+            "this claim is cut from. Accepted ONLY when the issue would otherwise be "
+            "refused `blocked` by that exact upstream (refused by name, "
+            "speculative-base-not-upstream, if --base names any other branch); never "
+            "bypasses out-of-order/already-claimed/file-region refusals"
+        ),
+    )
+    claim.add_argument(
+        "--main",
+        default="",
+        help="the repository the isolation attestation is written into (default: this checkout)",
+    )
     claim.add_argument("--directive", default="", help="brain directive id authorizing this claim")
+    claim.add_argument(
+        "--files",
+        default="",
+        help='JSON list of per-file leases, e.g. \'[{"path":"a.py","regions":[[1,10]]}]\' (#702)',
+    )
     claim.set_defaults(func=cmd_claim)
 
     dispatch = sub.add_parser(
@@ -574,7 +863,34 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="show the active milestone, frontier and live claims")
     add_paths(status)
+    status.add_argument("--focus", default=str(focus_mod.DEFAULT_PATH), help="the pinned focus to resolve against")
+    status.add_argument(
+        "--live", action="store_true",
+        help="also print the live projection (issue #885): claim set, frontier and ready wave, read fresh",
+    )
     status.set_defaults(func=cmd_status)
+
+    dangling = sub.add_parser(
+        "dangling", help="report open issues whose declared parent is closed (issue #1179)"
+    )
+    add_paths(dangling)
+    dangling.set_defaults(func=cmd_dangling)
+
+    liveness = sub.add_parser(
+        "liveness", help="does the board's liveness contract have an installed producer? (issue #1179)"
+    )
+    liveness.add_argument("--manifest", default="", help="the fleet-jobs manifest to read the declaration from")
+    liveness.add_argument(
+        "--crontab-file",
+        default="",
+        help="read this file INSTEAD of the live crontab (the gate's fixture seam; the real crontab is the default)",
+    )
+    liveness.add_argument(
+        "--no-self-refresh",
+        action="store_true",
+        help="declare that the entry point has no in-band refresh (makes a missing producer a finding)",
+    )
+    liveness.set_defaults(func=cmd_liveness)
 
     held = sub.add_parser("held", help="print the live claim holder of an issue (exit 0 = held, 1 = free)")
     add_paths(held)
@@ -614,7 +930,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_paths(trigger)
     trigger.add_argument("--directive", required=True, help="the deferred directive's id")
-    trigger.add_argument("--repo", default=snapshot_mod.DEFAULT_REPO)
+    # `--repo` comes from add_paths (#1179); redeclaring it here conflicted.
     trigger.add_argument(
         "--fleet-dir",
         default="",
@@ -629,9 +945,16 @@ def build_parser() -> argparse.ArgumentParser:
     queue_cmd.add_argument("--snapshot", default=str(snapshot_mod.DEFAULT_PATH))
     queue_cmd.add_argument("--ledger", default=str(claims.DEFAULT_CLAIMS_DIR))
     queue_cmd.add_argument("--stale-minutes", type=int, default=snapshot_mod.DEFAULT_STALENESS_MINUTES)
+    # `queue` reads no repo and runs no refresh: its staleness refusal is its own
+    # declared contract, so it keeps its own `--stale-minutes` and no `--repo`.
     queue_cmd.add_argument("--next", action="store_true", help="print the next claimable issue(s)")
     queue_cmd.add_argument(
         "--check", action="store_true", help="validate the file: no duplicates, all numbers known, no cycles"
+    )
+    queue_cmd.add_argument(
+        "--fix",
+        action="store_true",
+        help="drop issues CLOSED on the (fresh) board snapshot from the committed queue file (issue #1113)",
     )
     queue_cmd.set_defaults(func=cmd_queue)
     return parser
