@@ -23,7 +23,7 @@
       "id": "chat-completions",
       "default": "on",
       "flags": ["deepseek.chat"],
-      "desc": "OpenAI-compatible chat/completions chat with Bearer auth and typed output validation."
+      "desc": "OpenAI-compatible chat/completions chat with Bearer auth and typed output validation. Provider-specific: the claude-anthropic module's equivalent base chat capability is its own messages-api feature, since the two providers speak different wire protocols (OpenAI-compatible chat/completions vs Messages API)."
     },
     {
       "id": "tier-routing",

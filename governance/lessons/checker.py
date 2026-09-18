@@ -92,6 +92,10 @@ from model import (
 # ``remediation_issue`` for itself.
 import edges as _edges  # noqa: E402
 
+# The ledger -> board linkage layer (issue #1178): the measured census, and the
+# rules that make a record's reachability binding rather than incidental.
+import linkage as _linkage  # noqa: E402
+
 LEDGER_RELPATH = "governance/lessons/ledger.jsonl"
 TEMPLATE_RELPATH = "governance/lessons/rca-template.md"
 POLICY_RELPATH = "governance/lessons/policy.yaml"
@@ -449,6 +453,11 @@ def check_ledger(
     findings.extend(_check_readme_incident_count(incidents, root=root))
     if snapshot is not None:
         findings.extend(_check_board(incidents, snapshot, policy=active_policy))
+        findings.extend(
+            _linkage.findings(
+                ledger.records.values(), snapshot, label=active_policy.incident_label
+            )
+        )
 
     counts = {
         "incidents": len(incidents),
@@ -474,6 +483,16 @@ def check_ledger(
         ),
         "artifacts_checked": len(rcas),
     }
+
+    # The ledger -> board census (issue #1178). Derived from the same records
+    # and the same snapshot as the rules above, so the summary and the findings
+    # can never disagree about the same revision.
+    if snapshot is not None:
+        counts.update(
+            _linkage.counts(
+                ledger.records.values(), snapshot, label=active_policy.incident_label
+            )
+        )
 
     if strict:
         findings = [

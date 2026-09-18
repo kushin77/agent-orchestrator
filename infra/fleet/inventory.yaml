@@ -32,13 +32,14 @@ image:
   build: docker build -f infra/fleet/Dockerfile -t agent-fleet-cron:dev .
   verify: docker run --rm agent-fleet-cron:dev python3 fleet/cron.py status
 
-# 1. THE SCHEDULE — three crontab lines, and one owner for all three.
+# 1. THE SCHEDULE — one crontab line per enabled job, and one owner for all of
+# them.
 #
 # `fleet/cron.py` is the only writer: it owns the markers (which is how a
 # foreign crontab line is never touched), the interval, the log paths and the
 # interpreter path. The image holds NO second copy of any of that; the
 # entrypoint asks the module to install. Measured at gate time against
-# `fleet/cron.MARKERS`, so adding a fourth line to the module without recording
+# `fleet/cron.MARKERS`, so adding a line to the module without recording
 # it here fails the gate.
 schedule:
   owner: fleet/cron.py
@@ -160,7 +161,7 @@ packages:
 # than against a reader's memory. A job with no dry-run form is declared
 # `not-dispatched` WITH its reason — the watchdog's pass spawns the rungs, so a
 # dry-run of it is a contradiction rather than a flag, and saying so is what
-# keeps the third job present in the evidence instead of quietly absent.
+# keeps that job present in the evidence instead of quietly absent.
 #
 # The state mounts are read-only, and that is a MEASUREMENT in the decision
 # document: each root's flags are read from /proc/self/mountinfo, and the
