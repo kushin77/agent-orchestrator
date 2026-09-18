@@ -25,9 +25,19 @@
 #      read by people, and either one alone rots.
 #   3. The tree still matches the claim: no `addons/` or `apps/` directory, and
 #      no `category: "system"` app declaration, anywhere outside the excluded
-#      trees. If the structure appears, the exemption no longer holds and the
+#      trees — in ANY of the DECLARED shapes (`SCANNED_SUFFIXES`: `.json`
+#      `.jsonc` `.json5` `.yaml` `.yml` `.toml` `.ts` `.tsx` `.js` `.jsx`
+#      `.mjs` `.cjs`), each matched with the declaration shape its file type can
+#      express. If the structure appears, the exemption no longer holds and the
 #      gate refuses BY NAME, so a lane that lands an app here must update the
 #      declaration instead of leaving the doc lying.
+#      The breadth is DECLARED, and it is the same list in three places — this
+#      tuple, the `OK` line, and `docs/MODULE-ADMISSION.md` §9 — because a gate
+#      that reads only three extensions while printing "the tree matches the
+#      claim" is blind to every other shape (issue #1161). That is not a
+#      hypothetical shape: the app model this exemption names is owned by
+#      `kushin77/shared-frontend`, which registers its apps in
+#      `shell/src/addons.ts` — a `.ts` file.
 #   4. The SPoG route the declaration names RESOLVES: the declared view file
 #      exists, the declared route ends in that view's basename, and the declared
 #      surface flag is really declared in `infra/feature-flags/registry.yaml`.
@@ -40,9 +50,14 @@
 #   and provokes each refusal against a mutated copy, on the same code path:
 #   (a) the `os_apps` block deleted, (b) `hosts` flipped to true, (c) the marker
 #   deleted from the document, (d) the document's owner made to disagree with
-#   `module.json`, (e) an `addons/` directory added. Each MUST be rc 1 AND
-#   name what it refused. The unmutated staged copy must produce the SAME rc as
-#   the real root — so the controls cannot pass by the gate refusing everything.
+#   `module.json`, (e) an `addons/` directory added, (f) a `category: "system"`
+#   app planted in EACH declared suffix — so a suffix dropped from the allowlist
+#   turns its own control red instead of silently narrowing the observation
+#   again — and (g) the negative half: prose ABOUT the declaration, and a
+#   commented-out app block, must NOT be refused, so the widened scan cannot
+#   pass by matching everything. Each MUST be rc 1 AND name what it refused.
+#   The unmutated staged copy must produce the SAME rc as the real root — so
+#   the controls cannot pass by the gate refusing everything.
 #   `--no-controls` skips them, for driving the check against a deliberately
 #   damaged scratch tree (the external provocation).
 #
@@ -112,8 +127,67 @@ EXCLUDED = {
     "dist", "build", ".mypy_cache", ".pytest_cache",
 }
 
+# THE BREADTH OF THE OBSERVATION, DECLARED (issue #1161).
+#
+# This scan used to read only `.json`/`.yaml`/`.yml`, and said so only in its own
+# code, so a `category: "system"` app declared in ANY other file type was
+# invisible to it while the gate printed "the tree matches the claim". The shape
+# a gate cannot see is the shape the app model's owner actually writes: the
+# model this exemption names is owned by `kushin77/shared-frontend`, whose
+# native-app registration lives in `shell/src/addons.ts`.
+#
+# So the breadth is a DECLARED allowlist, and the same tuple drives all three
+# places that state it: this scan, the `OK` line, and `docs/MODULE-ADMISSION.md`
+# §9. A declaration in TypeScript source now counts exactly as one in JSON.
+SCANNED_SUFFIXES = (
+    # data shapes
+    ".json", ".jsonc", ".json5", ".yaml", ".yml", ".toml",
+    # source shapes — the OS host and its shell declare the SAME app here
+    ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
+)
+DATA_SUFFIXES = (".json", ".jsonc", ".json5", ".yaml", ".yml", ".toml")
+CODE_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
+
+# The DECLARATION shape, per file type. A single "search for the substring
+# anywhere" pattern would fire on prose and comments, so each pattern is
+# anchored on the structural punctuation of the shape it belongs to — the member
+# separator, the closing brace/bracket, or the end of the line. Prose ABOUT the
+# declaration ("an OS function's app carries category: system") therefore does
+# not fire; `comment_lines` below skips commented-out code on top of that.
+#
+# JSON, JSONC and a quoted key in source: `"category": "system",` or `}`.
 JSON_SYSTEM_APP = re.compile(r'"category"\s*:\s*"system"\s*[,\}]')
-YAML_SYSTEM_APP = re.compile(r"(?m)^[ \t]*category[ \t]*:[ \t]*[\"']?system[\"']?[ \t]*$")
+# YAML, and a JSONC/TOML line: the pair and (as in TOML) an optional trailing
+# comment — a declaration carrying a note is still a declaration.
+YAML_SYSTEM_APP = re.compile(
+    r"(?m)^[ \t]*category[ \t]*:[ \t]*[\"']?system[\"']?[ \t]*(?:#.*)?$")
+# TOML: `category = "system"` (optionally followed by a comment).
+TOML_SYSTEM_APP = re.compile(
+    r"(?m)^[ \t]*category[ \t]*=[ \t]*[\"']?system[\"']?[ \t]*(?:#.*)?$")
+# Source (`.ts`/`.js`/…): an object member, quoted or bare — the shape
+# shared-frontend uses in `shell/src/addons.ts` — at a line start or after the
+# opening brace / a separator, and followed by a separator, a closer, or the end
+# of the line.
+CODE_SYSTEM_APP = re.compile(
+    r"""(?m)
+    (?: ^[ \t]* | [{,][ \t]* )
+    ["']?category["']? [ \t]*: [ \t]*
+    ["']system["']
+    [ \t]*
+    (?: [,}\];] | $ )
+    """,
+    re.VERBOSE,
+)
+
+# Which shapes each suffix is measured with. A source file also gets the JSON
+# pair (a `.ts` file can carry one), but never the reverse: the line-anchored
+# YAML/TOML pair would fire on an indented `category: "system"` line in a `.ts`
+# file that is prose or a commented-out block, and the code shape was not written
+# for YAML.
+SHAPES = {suffix: ((JSON_SYSTEM_APP, YAML_SYSTEM_APP, TOML_SYSTEM_APP)
+                   if suffix in DATA_SUFFIXES
+                   else (JSON_SYSTEM_APP, CODE_SYSTEM_APP))
+          for suffix in SCANNED_SUFFIXES}
 
 
 def read(path):
@@ -147,24 +221,68 @@ def parse_marker(text):
     return values, None
 
 
+def comment_lines(text):
+    """The 0-based lines whose content is inside a comment.
+
+    Conservative in exactly ONE direction: a marker counts only when it is the
+    line's FIRST non-space token, so a `//` inside a URL, or a `#` inside a
+    colour or a shell parameter, can never hide a real declaration — a false
+    negative here would be a gate passing a tree it cannot see, which is the
+    defect this check exists for. What it does catch is a commented-out app
+    block: that is prose about the declaration, not a declaration.
+    """
+    inside, lines = False, set()
+    for index, line in enumerate(text.splitlines()):
+        stripped = line.lstrip()
+        if inside:
+            lines.add(index)
+            if "*/" in stripped:
+                inside = False
+            continue
+        if stripped.startswith("/*"):
+            lines.add(index)
+            if "*/" not in stripped[2:]:
+                inside = True
+        elif stripped.startswith(("//", "#", "*", "--")):
+            lines.add(index)
+    return lines
+
+
 def scan_tree(root):
-    """Measured app structure: (root-level addon dirs, category:"system" hits)."""
+    """Measured app structure: (root-level addon dirs, category:"system" hits).
+
+    The breadth is the DECLARED `SCANNED_SUFFIXES` allowlist, and each suffix is
+    matched with the shapes its file type can express (`SHAPES`). A hit is
+    reported as `path:line`, so the refusal names what it found.
+    """
     stray_dirs = [n for n in ("addons", "apps") if os.path.isdir(os.path.join(root, n))]
     hits = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(d for d in dirnames if d not in EXCLUDED)
         for name in sorted(filenames):
-            if not name.endswith((".json", ".yaml", ".yml")):
+            patterns = SHAPES.get(os.path.splitext(name)[1].lower())
+            if not patterns:
                 continue
             path = os.path.join(dirpath, name)
             try:
                 text = read(path)
             except OSError:
                 continue
-            match = JSON_SYSTEM_APP.search(text) or YAML_SYSTEM_APP.search(text)
-            if match:
-                line = text.count("\n", 0, match.start()) + 1
-                hits.append("%s:%d" % (os.path.relpath(path, root), line))
+            commented = comment_lines(text)
+            for pattern in patterns:
+                # The first match of this shape that is NOT inside a comment: a
+                # commented-out declaration must not mask a live one further
+                # down the same file.
+                found = None
+                for match in pattern.finditer(text):
+                    line = text.count("\n", 0, match.start()) + 1
+                    if line - 1 not in commented:
+                        found = line
+                        break
+                if found is None:
+                    continue
+                hits.append("%s:%d" % (os.path.relpath(path, root), found))
+                break
     return stray_dirs, hits
 
 
@@ -296,6 +414,58 @@ def evaluate(root):
     return (1 if findings else 0), findings, notes
 
 
+# The same app declaration, ONE FILE TYPE AT A TIME — the point of issue #1161
+# made mechanical. Each plant is built from the suffix's own shape family (so a
+# suffix cannot be added to `SCANNED_SUFFIXES` without its plant following), and
+# `plant_for` returns the line the declaration lands on so the control can assert
+# the refusal NAMES it rather than merely counting a failure.
+DATA_PLANT = '{\n  "id": "sys-monitor",\n  "category": "system"\n}\n'
+YAML_PLANT = ('apps:\n  - id: sys-monitor\n'
+              '    category: "system" # the OS app marker\n')
+TOML_PLANT = '[app]\nid = "sys-monitor"\ncategory = "system"\n'
+CODE_PLANT = ('export const ADDONS = [\n'
+              '  { id: "sys-monitor", category: "system", component: App },\n'
+              '];\n')
+PLANTS = {suffix: (TOML_PLANT if suffix == ".toml" else
+                   YAML_PLANT if suffix in (".yaml", ".yml") else
+                   CODE_PLANT if suffix in CODE_SUFFIXES else
+                   DATA_PLANT)
+          for suffix in SCANNED_SUFFIXES}
+
+# The negative half: this is what a declaration looks like when it is prose or
+# commented out. Neither may be refused.
+PROSE_SOURCE = '''// An OS function's app is marked with `category: "system"` in the host's
+// `registry/modules.json`; this module hosts none, so it declares the exemption
+// instead. A commented-out app block is prose about the declaration, not one:
+// export const ADDONS = [{ category: "system", component: App }];
+/*
+export const ADDONS = [
+  { id: "sys-monitor", category: "system", component: App },
+];
+*/
+const NOTE = "an OS function's app carries category: system, not a manifest";
+'''
+PROSE_YAML = ('# category: "system" marks an OS function\'s app in the host\n'
+              '# registry/modules.json; this module hosts none.\n'
+              'notes: []\n')
+
+
+def plant_for(suffix):
+    """(text, line) — a `category: "system"` app declared in that suffix.
+
+    `line` is computed with the SAME patterns `scan_tree` matches with, so the
+    control asserts the file:line the gate will actually report. A line of 0
+    means no pattern of that suffix can see the plant, which the control treats
+    as a failed precondition rather than a silent pass.
+    """
+    text = PLANTS[suffix]
+    for pattern in SHAPES[suffix]:
+        match = pattern.search(text)
+        if match:
+            return text, text.count("\n", 0, match.start()) + 1
+    return text, 0
+
+
 def stage(root, scratch):
     """A scratch copy of exactly the inputs the rule reads.
 
@@ -351,9 +521,17 @@ def provoke(base, real_rc):
     def rebuild(mutate_manifest=None, mutate_doc=None):
         """Restore the staged subject from the real root, then mutate it once.
 
+        The staged tree is REMOVED first, not copied over: `stage` only writes the
+        inputs it knows about, so without this a plant left behind by the
+        previous provocation stays in the subject and the next verdict is about
+        two mutations at once. Measured while adding the breadth controls — 12
+        accumulated plants turned the prose negative control red with 13 findings
+        that named none of the prose.
+
         Returns whether the mutation actually changed the file — read BEFORE the
         write, because opening for write truncates.
         """
+        shutil.rmtree(base, ignore_errors=True)
         stage(ROOT, base)
         if mutate_manifest is not None:
             path = os.path.join(base, MANIFEST)
@@ -404,6 +582,44 @@ def provoke(base, real_rc):
     os.makedirs(os.path.join(base, "addons", "some-app"), exist_ok=True)
     check("an addons/ directory is refused, by name", "addons/ directory")
 
+    # (f) The BREADTH, provoked: one plant per declared suffix, each in the shape
+    # that suffix can express. A suffix dropped from `SCANNED_SUFFIXES` — the
+    # defect this issue is about, arriving from the other side — turns its own
+    # control red instead of silently narrowing the observation again while the
+    # `OK` line keeps its wording.
+    for suffix in SCANNED_SUFFIXES:
+        rebuild()
+        rel = "shell/src/sys-monitor%s" % suffix
+        text, line = plant_for(suffix)
+        path = os.path.join(base, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        check("a `category: \"system\"` app in a %s file is refused, by name"
+              % suffix, "%s:%d" % (rel, line), changed=line > 0)
+
+    # (g) The negative half — it must not match everything. Prose ABOUT the
+    # declaration, and a commented-out app block, are not declarations; the
+    # verdict must be the same as the clean staged copy, and neither plant may be
+    # named in a finding.
+    rebuild()
+    negative = {
+        "shell/src/prose-about-the-declaration.ts": PROSE_SOURCE,
+        "config/notes.yaml": PROSE_YAML,
+    }
+    for rel, text in negative.items():
+        path = os.path.join(base, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+    rc_prose, prose_findings = evaluate(base)[:2]
+    named = [f for f in prose_findings if any(rel in f for rel in negative)]
+    results.append(("prose about the declaration, and a commented-out app block, "
+                    "are NOT refused",
+                    rc_prose == real_rc and not named,
+                    "rc=%d (root rc=%d), findings=%d, names-a-plant=%s"
+                    % (rc_prose, real_rc, len(prose_findings), bool(named))))
+
     return results
 
 
@@ -422,8 +638,10 @@ if rc == 0:
     print("  OK    module.json declares the app/addon exemption (hosts=false, "
           "model_owner names the OS host that owns the model)")
     print("  OK    the declaration document agrees with module.json")
-    print("  OK    the tree matches the claim: no addons/, no apps/, no "
-          "category: \"system\" app outside vendor/")
+    print("  OK    the tree matches the claim: no addons/, no apps/, and no "
+          "category: \"system\" declaration in any scanned shape (%s) outside "
+          "vendor/ and the other excluded trees (runtime state, peer lane "
+          "worktrees, build caches)" % " ".join(SCANNED_SUFFIXES))
 
 if RUN_CONTROLS:
     print("== the refusals, provoked ==")

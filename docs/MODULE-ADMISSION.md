@@ -196,16 +196,35 @@ gate refuses any claim that does not hold.
 
 ## 9. The app/addon model is not here — declared, and gated (issue #945)
 
-Status: **declared and gated** (2026-09-16, issue #945). The gate is
+Status: **declared and gated** (2026-09-16, issue #945; observation breadth
+widened 2026-09-18, issue #1161). The gate is
 `scripts/check-system-app-declaration.sh`; `module.json` carries the same
 declaration as data (`os_apps`).
 
 This repository carries no `addons/`, no `apps/`, and no `category: "system"`
-app anywhere outside `vendor/` — and that absence is **correct by design, not an
-oversight**. Until this section existed, nothing said which of the two it was: a
-reader (or an agent) asking *"where is the system-app structure?"* got the same
-empty result for "by design" and for "forgotten". An undeclared exemption is not
-an exemption; it is an absence that reads as a gap.
+declaration **in any of the shapes the gate scans** — `.json`, `.jsonc`,
+`.json5`, `.yaml`, `.yml`, `.toml`, `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`
+— anywhere outside `vendor/` and the other trees the gate excludes (runtime
+state, peer lane worktrees, build caches; the list is `EXCLUDED` in the gate, and
+it is the *same* list the gate's `OK` line names). That absence is **correct by
+design, not an oversight**. Until this section existed, nothing said which of the
+two it was: a reader (or an agent) asking *"where is the system-app structure?"*
+got the same empty result for "by design" and for "forgotten". An undeclared
+exemption is not an exemption; it is an absence that reads as a gap.
+
+**Why that list, and not just three extensions** (issue #1161): the first
+version of the gate read only `.json`/`.yaml`/`.yml`, so the claim above was
+broader than the observation — a `category: "system"` app in *any other* file
+type was invisible while the gate printed `OK the tree matches the claim`. The
+missed shape is not hypothetical: the app model this exemption names is owned by
+`kushin77/shared-frontend`, whose native-app registration lives in
+**`shell/src/addons.ts`** — a `.ts` file (§9.1). A gate blind to the shape the
+model's owner actually writes is a formality, so the observation was widened to
+the declared allowlist above, each suffix matched with the declaration shape its
+file type can express, and a plant for **every** declared suffix now sits in the
+gate's own control set — so the breadth cannot silently narrow again. The
+negative half is controlled too: prose *about* the declaration, and a
+commented-out app block, are not refused.
 
 ### 9.1 Which repo owns the app/addon model
 
@@ -226,12 +245,22 @@ ships services, surfaces, libraries and contracts — never an `addons/<id>/`.
 A second app model invented here would be exactly the thing this section exists
 to prevent.
 
-Measured, one command each (a reader can re-take these at any time):
+Measured, one command each (a reader can re-take these at any time). The gate is
+the canonical re-derive; the greps below are the *same breadth by hand*, and they
+are deliberately looser than the gate (no punctuation anchoring, no
+comment-skipping), so "no output" from them means the gate's narrower observation
+is certainly clean:
 
 ```bash
+bash scripts/check-system-app-declaration.sh --no-controls                   # rc 0, no FAIL
 find . -maxdepth 2 -type d \( -name addons -o -name apps \) | grep -v vendor   # (no output)
-grep -rniE '^[[:space:]]*"category"[[:space:]]*:[[:space:]]*"system"' \
-  --include=*.json --include=*.yaml --include=*.yml . | grep -v vendor         # (no output)
+grep -rnE "\"?category\"?[[:space:]]*:[[:space:]]*[\"']system[\"']" \
+  --include=*.json --include=*.jsonc --include=*.json5 --include=*.yaml \
+  --include=*.yml --include=*.toml --include=*.ts --include=*.tsx \
+  --include=*.js --include=*.jsx --include=*.mjs --include=*.cjs . \
+  | grep -vE '^\./(vendor|\.research|\.board|\.fleet|\.verify|\.portal|\.claude)/'   # (no output)
+grep -rnE "^[[:space:]]*category[[:space:]]*=[[:space:]]*[\"']?system" \
+  --include=*.toml . | grep -v vendor                                      # (no output)
 python3 -c 'import json;print(json.load(open("module.json"))["os_apps"])'
 ```
 
@@ -282,10 +311,12 @@ make verify
 
 The gate refuses, **by name**, a deleted `os_apps` block, `hosts: true`, a
 deleted or disagreeing marker, an `addons/` directory that appears in the tree,
-a declared SPoG view or surface that does not resolve, and an `ARCHITECTURE.md`
-that no longer points at this section. It provokes each of those against a
-staged copy of its own inputs on every run, so a check that cannot fail cannot
-pass (AO-GR-4).
+a `category: "system"` declaration in **any** of the scanned shapes, a declared
+SPoG view or surface that does not resolve, and an `ARCHITECTURE.md` that no
+longer points at this section. It provokes each of those against a staged copy of
+its own inputs on every run — including one plant per scanned extension, so
+dropping an extension from the allowlist turns its own control red — and a check
+that cannot fail cannot pass (AO-GR-4).
 
 ## 10. The clock invariant (issue #506, `RCA-0008`)
 
