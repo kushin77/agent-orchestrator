@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "note": "Named, leased exemptions for the real-tree worktree/branch audit (issue #1291), scoped to the repository instance they were measured in (issue #1321). Each entry excuses ONE artifact — kind, name, and the tip the exemption was measured at — and only while the lease below holds AND this document is in force in the venue the check is running in: `venue.git_common_dir` names the repository instance (every worktree of one checkout, lane worktrees included, answers it; no other clone does). At that venue every rule bites: a new artifact is never absorbed (it is not listed), an artifact whose tip has moved is not absorbed (it is no longer the artifact named here), and an entry that no longer targets an unmatched artifact FAILS as a stale exemption until it is removed in a reviewed edit. At ANOTHER venue the whole document is inert — reported entry by entry as NOT-APPLICABLE, honouring nothing (an artifact that is unmatched there stays a finding: this document does not speak for that checkout) and not fatal (a stale exemption is a claim about THIS disk, which another checkout cannot observe). That distinction is the fix for #1317, which emptied this document because its entries could never be honoured on a pristine clone — a true measurement whose remedy un-quarantined all of them on the one box that has them. Every entry is the AGENTS.md rule 17 class: work that exists nowhere else, which the worker is forbidden to discard, so it must be reported rather than silently red — and reported rather than silently reaped.",
-  "tracked_by": "#1311",
+  "note": "Named, leased exemptions for the real-tree worktree/branch audit (issues #1291, #1311, #1321). Each entry excuses ONE artifact — kind, name, and the tip the exemption was measured at — and only while the lease below holds AND this document is in force in the venue the check is running in: `venue.git_common_dir` names the repository instance (every worktree of one checkout, lane worktrees included, answers it; no other clone does). At that venue every rule bites: a new artifact is never absorbed (it is not listed); an artifact whose tip has moved is not absorbed (it is no longer the artifact named here); an entry that no longer targets an unmatched artifact FAILS as a stale exemption; and an entry that is honoured but no longer NEEDED is REFUTED and FAILS by name (issue #1311) — an artifact whose whole committed work is already on the default branch by `git patch-id --stable`, and a worktree that holds no uncommitted work of its own, is holding nothing an exemption protects, and its home is real-tree-baseline.json instead. That rule is why this document shrank from 25 entries to 7 in the #1311 edit: 15 were refuted by exactly that proof and 3 more had their work preserved on a remote branch (measured live with `git ls-remote`), so all 18 moved to the reviewed baseline. At ANOTHER venue the whole document is inert — reported entry by entry as NOT-APPLICABLE, honouring nothing (an artifact that is unmatched there stays a finding: this document does not speak for that checkout) and not fatal (a stale exemption is a claim about THIS disk, which another checkout cannot observe). That distinction is the fix for #1317, which emptied this document because its entries could never be honoured on a pristine clone — a true measurement whose remedy un-quarantined all of them on the one box that has them. This document's tracker moved once more in the #1311 edit: its predecessor #1311 was the tracker for the whole set while it shrank from 25 entries to 7, and the residual would have lapsed the moment #1311 closed — so the lease names #1338, the issue that owns the 7 remaining per-artifact owner calls, measured open over REST at write time. Closing a tracker lapses its exemptions; the tracker is therefore always an issue that is meant to stay open while entries remain. Every remaining entry is the AGENTS.md rule 17 class, re-measured at the timestamp in its own reason: work that exists nowhere else, which the worker is forbidden to discard, so it must be reported rather than silently red — and reported rather than silently reaped.",
+  "tracked_by": "#1338",
   "tracking": {
     "state": "open",
-    "measured_at": "2026-09-18T17:50:33Z",
-    "measured_by": "governance/reconcile (issue #1321 lane)",
+    "measured_at": "2026-09-18T20:07:12Z",
+    "measured_by": "governance/reconcile (issue #1311 lane)",
     "max_age_hours": 24,
-    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1311 -> state=open at 2026-09-18T17:50:33Z"
+    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1338 -> state=open at 2026-09-18T20:07:12Z"
   },
   "venue": {
     "git_common_dir": "/home/akushnir/agent-orchestrator/.git",
@@ -19,151 +19,43 @@
       "kind": "branch",
       "name": "issue-1028-canon",
       "tip": "88ea96d70a3f2c424dc6e72565be072038caa995",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-1028-tpl",
-      "tip": "f11abe47bb1748084fbd8f1f40b92d7091968570",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-1056",
-      "tip": "9d065ae3118fbafa7de00e6c67e68831ddcca77d",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip IS contained in a remote-tracking ref, so the work is preserved elsewhere. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-1106-gate-location-independence",
-      "tip": "a3484089df6263011759169a9c7217c44ae1005f",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-1107-ticket-projection-reds",
-      "tip": "e34e7b6e00300f532fe1236bb77c81ff3fe46bbf",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-1113-dispatch-queue-prune",
-      "tip": "159cf0058698ca0139a72e8acedbeb95abacbf19",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
+      "reason": "AGENTS.md rule 17 (keep-and-report), re-measured 2026-09-18T19:46:51Z by the #1311 lane (origin/master f9729e585ae7). Its work is on NO default-branch commit: the refuter the gate runs (`real_tree_baseline._Surplus`, patch identity over the default branch's commits touching its changed paths) compared 16 candidate(s) against `git patch-id --stable` = e691e5c35b16 and matched none; its tip is an ancestor of nothing on origin/master and is carried by no remote-tracking ref (`git for-each-ref --contains` empty). `origin/issue-1028-canon` exists at a1a8b50e8d6e and does NOT contain this tip (`git merge-base --is-ancestor` rc 1), so the commit exists only on this box. Discarding it is the worker's decision to have authorised, not a cleanup. Resolution on #1311: land it, push it, or authorise its deletion — this entry goes with it."
     },
     {
       "kind": "branch",
       "name": "issue-1114-dispatch-master-green",
       "tip": "d084114b73e84e3037bbecd94c12224aa80f0739",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-1154",
-      "tip": "53cb02c50ab0720b44973a3416ac9f1fe9475334",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-830-reap-rung",
-      "tip": "025381c3b5b160f17693c7e0b6ebfde4443bab81",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
+      "reason": "AGENTS.md rule 17 (keep-and-report), re-measured 2026-09-18T19:46:51Z by the #1311 lane (origin/master f9729e585ae7). Its work is on NO default-branch commit: the refuter the gate runs (`real_tree_baseline._Surplus`, patch identity over the default branch's commits touching its changed paths) compared 101 candidate(s) against `git patch-id --stable` = 6b1f931cc10f and matched none (the candidate bound is 60; a proof past it is deliberately not claimed); its tip is an ancestor of nothing on origin/master and is carried by no remote-tracking ref (`git for-each-ref --contains` empty). Discarding it is the worker's decision to have authorised, not a cleanup. Resolution on #1311: land it, push it, or authorise its deletion — this entry goes with it."
     },
     {
       "kind": "branch",
       "name": "issue-830-reaper-schedule",
       "tip": "af843aaf82895ab57d184a5bcf690d3e1f3a6d7e",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "branch",
-      "name": "issue-944",
-      "tip": "5b5ef426cbd799cb1391367eef4b4ec77b727dd3",
-      "reason": "AGENTS.md rule 17 (keep-and-report): no commit on the default branch carries its work under the audit's own proofs (ancestry, tree containment, patch identity against the default branch's own subjects); its tip IS contained in a remote-tracking ref, so the work is preserved elsewhere. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
+      "reason": "AGENTS.md rule 17 (keep-and-report), re-measured 2026-09-18T19:46:51Z by the #1311 lane (origin/master f9729e585ae7). Its work is on NO default-branch commit: the refuter the gate runs (`real_tree_baseline._Surplus`, patch identity over the default branch's commits touching its changed paths) compared 7 candidate(s) against `git patch-id --stable` = 4c9bf17614f0 and matched none; its tip is an ancestor of nothing on origin/master and is carried by no remote-tracking ref (`git for-each-ref --contains` empty). `origin/issue-830-reaper-schedule` exists at 3748194c2d40 and does NOT contain this tip (`git merge-base --is-ancestor` rc 1), so the commit exists only on this box. Discarding it is the worker's decision to have authorised, not a cleanup. Resolution on #1311: land it, push it, or authorise its deletion — this entry goes with it."
     },
     {
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a1b5cf2e0dceac199",
       "tip": "d084114b73e84e3037bbecd94c12224aa80f0739",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD d084114b73e8 is on no default branch the audit's proofs can find, and it holds 1 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a23016a2ba69986a5",
-      "tip": "bc7a5af04af41ccf4165464a1ead74dd295533c7",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD bc7a5af04af4 is on no default branch the audit's proofs can find, and it holds 2 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a325a56496fb44b99",
-      "tip": "159cf0058698ca0139a72e8acedbeb95abacbf19",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 159cf0058698 is on no default branch the audit's proofs can find, and it holds 4 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a607b2f079f40da5a",
-      "tip": "d99f2131e109400484e825a7df08f3fe3c52f490",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD d99f2131e109 is on no default branch the audit's proofs can find, and it holds 2 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a66fa2d39da316c8e",
-      "tip": "3ede1026cd45c92361796607fca8d8cb2ecae604",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 3ede1026cd45 is on no default branch the audit's proofs can find, and it holds 2 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a67aa5cb2076746ba",
-      "tip": "a3484089df6263011759169a9c7217c44ae1005f",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD a3484089df62 is on no default branch the audit's proofs can find, and it holds 4 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a74d2950557431f05",
-      "tip": "0f5476689c44d5a095eb4a3e88727247118533cd",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 0f5476689c44 is on no default branch the audit's proofs can find, and it holds 3 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-acd285c4246994a4f",
-      "tip": "126c05f21a39d5caa6aa9bafa6027792dd8d2329",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 126c05f21a39 is on no default branch the audit's proofs can find, and it holds 1 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
+      "reason": "AGENTS.md rule 17 (keep-and-report), re-measured 2026-09-18T19:46:51Z by the #1311 lane (origin/master f9729e585ae7). Its HEAD d084114b73e8 is on NO default-branch commit by patch identity (101 candidate(s) compared, bound 60) and is carried by no remote-tracking ref, so the committed work at its HEAD exists only on this box; its own dirty path(s) are machine-managed (.board/focus.json), so the exemption rests on those unmerged commits, not on uncommitted work. Discarding it is the worker's decision to have authorised, not a cleanup. Resolution on #1311: land it, push it, or authorise its deletion — this entry goes with it."
     },
     {
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ad284eb1ac275c0c6",
       "tip": "9e5a61528752b6f982b7877886ceb9d264b18553",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 9e5a61528752 is already on the default branch, but the worktree holds 1 uncommitted path(s), which are on no branch at all; its tip IS contained in a remote-tracking ref, so the work is preserved elsewhere. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae391267f79052e9c",
-      "tip": "e34e7b6e00300f532fe1236bb77c81ff3fe46bbf",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD e34e7b6e0030 is on no default branch the audit's proofs can find, and it holds 1 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
+      "reason": "AGENTS.md rule 17 (keep-and-report), re-measured 2026-09-18T19:46:51Z by the #1311 lane (origin/master f9729e585ae7). Its HEAD 9e5a61528752 is already on the default branch (an ancestor of origin/master), but it holds UNCOMMITTED WORK OF ITS OWN — governance/ticket/tests/conftest.py — which is on no branch at all: that is what this exemption protects, and the audit's landing proofs deliberately grant nothing for a dirty worktree. Discarding it is the worker's decision to have authorised, not a cleanup. Resolution on #1311: land it, push it, or authorise its deletion — this entry goes with it."
     },
     {
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-afc588dba96686e4e",
       "tip": "47ac6de35e0435d71ea4dd1b4d5487ec46623173",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 47ac6de35e04 is on no default branch the audit's proofs can find, and it holds 2 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/ao-worktrees/ao-1056-c58e7589",
-      "tip": "9d065ae3118fbafa7de00e6c67e68831ddcca77d",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 9d065ae3118f is on no default branch the audit's proofs can find, and it holds 0 uncommitted path(s); its tip IS contained in a remote-tracking ref, so the work is preserved elsewhere. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
-      "name": "/home/akushnir/ao-worktrees/ao-1154",
-      "tip": "53cb02c50ab0720b44973a3416ac9f1fe9475334",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 53cb02c50ab0 is on no default branch the audit's proofs can find, and it holds 0 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
+      "reason": "AGENTS.md rule 17 (keep-and-report), re-measured 2026-09-18T19:46:51Z by the #1311 lane (origin/master f9729e585ae7). Its HEAD 47ac6de35e04 is on NO default-branch commit by patch identity (45 candidate(s) compared, bound 60) and is carried by no remote-tracking ref, so the committed work at its HEAD exists only on this box; its own dirty path(s) are machine-managed (.fleet/reconcile/ledger.jsonl, .fleet/watchdog.lease), so the exemption rests on those unmerged commits, not on uncommitted work. Discarding it is the worker's decision to have authorised, not a cleanup. Resolution on #1311: land it, push it, or authorise its deletion — this entry goes with it."
     },
     {
       "kind": "worktree",
       "name": "/tmp/ao968-pristine",
       "tip": "96ae0fba19c36764e1f0251070d7c77bb17b4a5d",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 96ae0fba19c3 is already on the default branch, but the worktree holds 1 uncommitted path(s), which are on no branch at all; its tip IS contained in a remote-tracking ref, so the work is preserved elsewhere. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
+      "reason": "AGENTS.md rule 17 (keep-and-report), re-measured 2026-09-18T19:46:51Z by the #1311 lane (origin/master f9729e585ae7). Its HEAD 96ae0fba19c3 is already on the default branch (an ancestor of origin/master), but it holds UNCOMMITTED WORK OF ITS OWN — portal/tests/test_fleet_syspath_isolation.py — which is on no branch at all: that is what this exemption protects, and the audit's landing proofs deliberately grant nothing for a dirty worktree. Discarding it is the worker's decision to have authorised, not a cleanup. Resolution on #1311: land it, push it, or authorise its deletion — this entry goes with it."
     }
   ]
 }

@@ -54,6 +54,7 @@
         "vanished": {"type": "integer"},
         "quarantined": {"type": "integer"},
         "stale_quarantine": {"type": "integer"},
+        "refuted_quarantine": {"type": "integer"},
         "inapplicable_quarantine": {"type": "integer"},
         "venue": {"type": "string"}
       },

@@ -195,6 +195,7 @@ rule 16), and it is checked in both directions:
 | a **new** artifact is **never** absorbed | it is not in the document, so it fails immediately |
 | an artifact whose **tip has moved** is **never** absorbed | it is a different artifact; it fails, and the lapsed entry is named as it fails |
 | an entry that **excuses nothing** | the artifact is gone or no longer unmatched: the verdict names it in `stale_quarantine` and exits **1** — the document can only shrink |
+| an entry that **is no longer needed** | the artifact's whole committed work is on the default branch by patch identity, and (for a worktree) it holds no uncommitted work **of its own**: the verdict names it in `refuted_quarantine` as `REFUTED-QUARANTINE` and exits **1**. A landed-by-content artifact is not the rule 17 class — its home is the reviewed baseline, and the reap is the reaper's (#1311) |
 | it is a **lease** | entries are honoured only while the declared tracking issue is `open` **and** the declared measurement is younger than the declared `max_age_hours`; a missing, malformed, expired or not-open declaration is never read as "still excused" |
 | it declares its **venue** | the repository instance the exemptions were measured in (`venue.git_common_dir`). At that venue every rule above bites; at any other the whole document is **inert** — each entry reported as `NOT-APPLICABLE`, **honouring nothing** (an artifact that *is* unmatched there stays a finding) and **not fatal** (a stale exemption is a claim about the declared venue's disk, which that checkout cannot observe). Entries with no venue at all are **CANNOT-ASSESS** |
 
@@ -227,12 +228,41 @@ exemptions.
 
 ```bash
 $ bash scripts/check-reconcile.sh
-real-tree-baseline: 124 unmatched artifact(s) on disk, 538 baselined, 38 young (< 24h, not failed), …
-  quarantine: honoured — #1311 open, measured 0.0h ago (lease 24h, by governance/reconcile (issue #1321 lane))
-  QUARANTINED branch issue-1106-gate-location-independence @a3484089df62 — AGENTS.md rule 17 …
+real-tree-baseline: 134 unmatched artifact(s) on disk, 557 baselined, 49 young (< 24h, not failed), …
+  quarantine: honoured — #1311 open, measured 0.0h ago (lease 24h, by governance/reconcile (issue #1311 lane))
+  7 quarantined by name (reported, not failed)
+  QUARANTINED branch issue-1114-dispatch-master-green @d084114b73e8 — AGENTS.md rule 17 …
 real-tree-baseline: OK — no new unbaselined-and-old artifact
 check-reconcile: OK — …
 ```
+
+**Why a refutation, and why #1317 was also right about the reasons (#1311).**
+Every rule above measures an entry against *itself*: gone, moved, lapsed. None of
+them re-measures the claim the entry exists to make — that this work exists
+nowhere else — so an entry whose premise has quietly become false is honoured,
+reported, and excusing, forever. Measured on #1311: **five of the document's 23
+entries** said "no commit on the default branch carries its work" while a commit
+did, with an **identical** `git patch-id --stable`, because the squash that
+landed them named the pull request in its subject and the issue nowhere in a
+`Closes #n` line — exactly the miss `landing.py`'s declared candidate rule cannot
+see. So an honoured entry is also re-measured for whether it is still needed, by
+`landing.RepoLanding.surplus_patch_identity` (the default branch's commits
+**touching a path the artifact changed**, patch-compared — a necessary condition
+for an identical patch, not a heuristic) plus
+`governance/isolation/worktree.foreign_uncommitted` (the repository's own
+declaration of the paths a reclaim must refuse). An exemption that is not needed
+is **REFUTED** and fails.
+
+It is refuted, not withdrawn: the artifact *is* on disk and the audit still
+cannot explain it, so the entry stays honoured and the verdict carries **one**
+named failure — the demand that the document shrink. Refutation is evaluated only
+for entries **in force** (same venue, live lease), and every unreadable state (no
+default ref, a failed `git`, an unmeasurable status, a candidate list past its
+bound) leaves the exemption **standing**, because the proof's only power is to
+ask for a protection to be given up. That rule is what took this document from 25
+entries to 7: 15 refuted by exactly that proof, plus 3 whose work a live
+`git ls-remote` shows on a remote branch, all 18 recorded in the reviewed
+baseline.
 
 The gate proves the rules rather than asserting them (§6e): a fixture entry
 naming a real, present, unmatched artifact at its exact tip **is** honoured; an
@@ -241,7 +271,11 @@ entry that matches nothing **fails** by name; an artifact whose tip has moved is
 **nothing** and fails by name; an entry measured in **another repository
 instance** is inert — reported by name, honouring nothing, not fatal; entries
 with no venue (missing or empty) are **CANNOT-ASSESS**; and an unreadable
-document is **CANNOT-ASSESS**, never a pass.
+document is **CANNOT-ASSESS**, never a pass. The **refutation** rule above is
+proved by the package suite instead (`governance/reconcile/tests`: the negative
+control that must fire, plus the controls where it must not — no default ref, a
+worktree holding its own uncommitted work, a document measured elsewhere), not by
+§6e, whose fixtures predate it.
 
 **What this costs, stated plainly.** The lease is a *lease*: after
 `max_age_hours` (24, declared in the document) the exemptions stop being honoured
@@ -255,7 +289,12 @@ The same one-edit cost applies when a quarantined artifact is resolved: the entr
 no longer excuses anything and must go in the same reviewed edit, which is what
 keeps the document shrinking instead of rotting. **A quarantine is a snapshot of
 one box's unresolved work, not a property of the repository** — it is honest
-exactly as long as its entries are re-measured against the disk they name.
+exactly as long as its entries are re-measured against the disk they name. That
+is also why an entry's `reason` is a *measurement*, not a label: the #1311 pass
+re-measured all 23 and found 15 of them protecting nothing (the artifact's work
+on the default branch, or a worktree holding only machine-managed residue) and 3
+more preserved on a remote branch — 18 entries and their premises replaced by one
+reviewed edit, which is the only honest way this list was ever going to shrink.
 
 ## 8. Board reporting
 
