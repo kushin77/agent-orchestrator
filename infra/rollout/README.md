@@ -40,6 +40,7 @@ itself still lands as a PR → gate → merge.
 | `go_live.py` | The ordered, resumable, owner-gated **go-live driver** (issue #619): ONE command for the whole phase 0 -> 8 run, enforcing `strict-by-phase` and the declared 24h hold itself. |
 | `audit/` | One evidence record per transition plus the hash-chained `promotion-audit.jsonl`; format and rules in [`audit/README.md`](audit/README.md). |
 | `surface_guard.py` | The console surface's **rollback anchor** (issue #802): reads the surface's own readiness and withdraws it when the reading fails. |
+| `projection.py` | The **projection** (issue #967): turns a promotion's live state into the served surface declaration the console reads (`surfaces.<name>.default` in `infra/feature-flags/registry.yaml`), reports an unprojected promotion **by name**, and applies the edit surgically - or refuses when it cannot locate the line. |
 | `checks/check_rollout.py` | Honest offline gate (all checks can fail; `--self-test`). |
 | `tests/` | Pytest suite (stage model, default-OFF, gate, gradual, rollback, audit, plan, gate). |
 
@@ -273,6 +274,72 @@ go-live gate. `make verify` (the repo gate) stays green because every YAML
 here parses, every flag defaults OFF, and the rollout Cloud Build declarations
 follow the #6 conventions.
 
+## The projection — a promotion becomes the declaration the console serves (issue #967)
+
+Promotion and serving are two documents on purpose. The ladder records a
+**flag's** stage in [`live-state.yaml`](live-state.yaml) (the only committed
+file that may record a stage above `off`); the console decides whether a
+surface answers from `infra/feature-flags/registry.yaml`'s
+`surfaces.<name>.default`, read fail-closed by `portal/server/fleet.py` with the
+runtime rollback overlay on top (issue #802). Measured before this landed:
+**nothing turned the first into the second** - no `portal/` code read the live
+state, and `checks/check_rollout.py::check_registry_parity` asked only whether a
+promoted flag *has* a registry row, never whether that row *reflects* the
+promotion. So a completed, owner-approved go-live could leave the surface dark
+until a human edited the declaration by hand: the last manual step between a
+promotion and a served surface.
+
+**The manual step is named as the projection, and it is gated.**
+
+```bash
+python3 -m infra.rollout.projection --check   # exit 0 clean / 1 unprojected / 2 CANNOT-ASSESS
+python3 -m infra.rollout.projection --write    # apply it, surgically (then review + commit)
+```
+
+`--check` answers, for every promotion the live state records, which declaration
+it owes and whether that declaration reflects it - reporting an unprojected one
+**by name**:
+
+```
+UNPROJECTED services.org_chart -> declaration surfaces.org_chart.default is 'off' while live-state records stage 'canary'
+```
+
+`--write` applies the coupling: it rewrites that entry's own `default:` line to
+`on` (and `promoted: true` when the entry declares it), leaving every comment,
+comment block and unrelated row **byte-identical** - a re-emitted YAML document
+would have destroyed the ~600 lines of recorded rationale this registry is made
+of. It **refuses** (rc 2, CANNOT-ASSESS, nothing written) when it cannot locate
+exactly one such line, because a projector that guesses is worse than a manual
+step; a second `--write` is a byte-identical no-op.
+
+**Why an ambient side effect is refused.** A deploy that silently rewrites a
+reviewed IaC declaration is exactly what `apply_path` (GR-5) and
+`e2e/go_live_delivery.py::project_registry` refuse - "a reviewed IaC change is
+what couples them". So the projector removes the *hand editing*, not the review:
+the diff it produces is reviewed and committed, and the PR is the audit record.
+
+**What it deliberately does not write.** Only `surfaces.<name>`. A promotion's
+`services.<name>` row and its `ci_cd.<name>` row must stay `off` -
+`scripts/check-feature-flags.py` (in `make verify`) fails
+`services.<x>.default` that is not off, and `services.<x>.promoted: true` while
+it is off, so a promotion may not be recorded there at all; arming a ci_cd
+trigger is the out-of-band `_ENABLE_*` step. A promotion whose flag has no
+`surfaces.<name>` partner is reported too (`NO-SERVED-SURFACE` /
+`EXEMPT`), **with its reason**, so the check is total rather than silently
+one-directional. A surface declared `on` that no live-state entry justifies is
+reported as an `OBSERVATION` (a reviewed PR promoted it outside the ladder) and
+is not a finding: this gate is the promotion → declaration direction.
+
+The gate of record is [`../../scripts/check-rollout-projection.sh`](../../scripts/check-rollout-projection.sh)
+(auto-wired into `scripts/verify.sh` by `scripts/discover-checks.sh`): it drives
+a **genuine sandboxed promotion** with the real ladder CLI, asserts the check
+reports it by name, then asserts that after `--write` the sandbox is clean **and
+the console's own reader** (`portal.server.fleet.read_surface_default`) answers
+`on` from the projected declaration while the shipped one answers `off` - i.e.
+the served surface reflects the promotion with **no hand edit** - plus the
+surgical-write, idempotence and refusal controls, all in a scratch sandbox (the
+committed declarations are byte-identical before and after).
+
 ## How to promote a real flag (go-live)
 
 1. **Record an approval-as-code file** for the exact flag and target stage,
@@ -303,6 +370,14 @@ follow the #6 conventions.
    (each with its own approval + audit record). Prefer the ordered driver
    (`go_live.py`) above: it drives the whole ladder, enforces the phase order
    and the declared hold, and writes the per-transition evidence records.
+6. **Project the promotion** into the declaration the console serves, and commit
+   that as a reviewed change (issue #967 - see the projection section above):
+   ```bash
+   python3 -m infra.rollout.projection --check   # names every promotion still unprojected
+   python3 -m infra.rollout.projection --write    # the declaration line the console reads
+   ```
+   Skipping this is now detectable rather than assumed: the projection gate in
+   `make verify` reports the promotion **by name** until its surface is served.
 
 The offline `demo` subcommand runs the whole loop (promote → canary-fail →
 auto rollback to off) against a temporary audit log and asserts the audit

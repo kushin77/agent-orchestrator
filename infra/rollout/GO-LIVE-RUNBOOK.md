@@ -134,6 +134,38 @@ python3 infra/rollout/go_live.py --phase 0 --canary-health-ok \
   --actor deployer-sa --approvals-dir infra/rollout/approvals
 ```
 
+## After each promotion — project it into the declaration the console serves (issue #967)
+
+The ladder records a **flag's** stage in [`live-state.yaml`](live-state.yaml);
+the console decides whether a surface answers from
+`infra/feature-flags/registry.yaml`'s `surfaces.<name>.default`
+(`portal/server/fleet.py`, with the runtime rollback overlay on top). The
+coupling between the two is declared in [`projection.py`](projection.py), and a
+promotion that has not been carried across it is **detectable rather than
+assumed**:
+
+```bash
+# 1. is anything the ladder promoted still unprojected? (names each one)
+python3 -m infra.rollout.projection --check
+
+# 2. the projection itself — review the diff and commit it (the PR is the audit record)
+python3 -m infra.rollout.projection --write
+```
+
+Exit codes are tri-state: **0** every promotion is projected, **1** one or more
+is unprojected (reported by name, with the declaration behind it), **2** a
+declaration could not be read or the line to project into could not be located —
+the projector refuses rather than guessing, and a refusal writes nothing.
+
+`--write` touches exactly the named entry's own `default:` line (and its
+`promoted:` flag), leaving every comment and unrelated row byte-identical; a
+second run is a no-op. The gate of record is
+[`../../scripts/check-rollout-projection.sh`](../../scripts/check-rollout-projection.sh),
+part of `make verify`: it drives a genuine sandboxed promotion and asserts that
+the check reports it by name, that after `--write` the console's own reader
+answers `on` from the projected declaration (and `off` from the shipped one),
+and that `--write` refuses when the line cannot be located.
+
 ## Acceptance (epic #607)
 
 ```bash
@@ -141,6 +173,10 @@ python3 infra/rollout/go_live.py --phase 0 --canary-health-ok \
 # rollout-state.yaml stays the declared-default document and never carries a
 # promoted stage - live-state.yaml is the committed record of what is live)
 grep -nE '^[[:space:]]+stage: "?full"?$' infra/rollout/live-state.yaml
+
+# every promotion the record carries is projected into the declaration the
+# console serves (issue #967) - exit 0 means nothing is left unprojected
+python3 -m infra.rollout.projection --check
 
 # the driver agrees: every requested transition is promoted and recorded
 python3 infra/rollout/go_live.py --preflight
