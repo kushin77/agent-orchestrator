@@ -38,7 +38,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .model import Finding, FindingCategory, ScanReport, Severity
 from .store import TenantScopedStore
@@ -74,9 +74,6 @@ def scan_dataset(dataset: Dict[str, Any], *, target: str = "dataset",
     records = dataset.get("records", {})
     if not isinstance(records, dict):
         raise ValueError("dataset.records must be a mapping")
-
-    # Buckets that exist in the records but reference no tenant namespace.
-    known_buckets = set(tenants) | reserved
 
     # --- D1: orphaned buckets / records ----------------------------------
     for bucket in sorted(records):
