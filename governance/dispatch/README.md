@@ -146,7 +146,7 @@ sidestepped by calling the mutation directly. Each refusal names what it read:
 | Refusal | Refused when | Evidence named |
 |---|---|---|
 | `issue-closed` | the issue is closed in the board | the snapshot (source, generation, digest) and the issue's `state` / `closed_at` |
-| `epic-closed` | the issue declares a `Parent:` edge to a closed epic | the same, for both the issue and the epic |
+| `epic-closed` | the issue declares a `Parent:` edge to a closed epic | the same, for both the issue and the epic, **plus the closed parent by name and the remedy that clears the refusal** (#1259) |
 | `already-claimed` | a live claim holds the unit (another agent, or another lane) | the holder's agent **and lane**, since when, plus the ledger and lock path |
 | `unowned` | the dispatch and the directive both name no lane | the empty lane and the directive that would have declared one |
 | `provenance-mismatch` | the directive declares an epic or lane the board does not corroborate | the directive file, the declared `task.epic` / `task.lane`, and the board's own edge |
@@ -241,6 +241,25 @@ dangling-epic: #12 declares Parent #7, which is closed (the ownering epic)
 
 The refusal is deliberately **not** relaxed: the fix is visibility plus a
 reachable re-parenting path, not a silent re-allow.
+
+**The refusal itself names the remedy (issue #1259).** #1179 named the dead-end in
+the *report* (`status`/`dangling`) but the *refusal* a lane actually hits —
+`claim`/`dispatch`/`eligible` — still answered with a bare cause, so the agent that
+hit the dead end was the one reader never told what to do, and the state is
+**permanent** until the board is re-pointed. Both surfaces now derive from ONE
+phrase (`order.REMEDY_REPARENT`): the report via `order.REMEDIATION_REPARENT` and
+the refusal via `order.closed_parent_remedy(parent)`, which `order.eligible` (and
+`order.frontier`, which applies the same predicate) and the claim-time arbitration
+(`claims._arbitrate_unaudited`) both call. The refusal still stands; it is simply no
+longer a dead end:
+
+```
+$ python3 governance/dispatch/cli.py claim --issue 11 --agent me --lane governance
+claim REFUSED: epic-closed — #11's epic is closed — evidence: <in-memory snapshot>
+  (source …) issue #11 state=OPEN parent=#10 …; epic issue #10 state=CLOSED …
+  — remedy: re-point the issue's `Parent:` at the open epic that now owns the work
+  (or close the issue if the work is gone) — its declared parent #10 (the closed epic) is closed
+```
 
 Finally, `status` advertises the **claimable** frontier (issue #1168). The
 milestone frontier (`order.frontier`) applies every *issue-property* refusal
@@ -415,6 +434,35 @@ reports `CANNOT-ASSESS` (exit 2) for the exists/open half rather than a false
 verdict, while the structural half (duplicates, cycles) still runs — that
 half needs no board at all.
 
+### The two ages, and which one the committed queue is judged against (#1189)
+
+`--stale-minutes` defaults to the **liveness** threshold (`controls.yaml`, 15
+minutes). That is honest for a *running loop*, which can refresh and re-check
+inside one cycle — and it is NOT what a committed artifact can honour: an offline
+gate reads a file that is already hours old in any clean checkout. Armed with the
+15-minute bound, the `dispatch-queue` check refused `snapshot-stale` on **every**
+run, `scripts/verify.sh` recorded its rc 2 as **SKIP** while the verdict line still
+read as a pass for everything else, and the finding the check exists for — six
+queued issues that had already closed — stayed invisible behind it.
+
+The tolerance the committed queue is judged against is therefore declared once, in
+`governance/dispatch/queue_freshness.py` (**72h**), and stated as its own
+assertion, deliberately OUTSIDE `queue --check`:
+
+```bash
+python3 governance/dispatch/cli.py freshness            # the age this consumer tolerates
+python3 governance/dispatch/cli.py freshness --now ...  # gate-only seam: provoke the refusal
+```
+
+A 15-minute bound is left exactly where it belongs (`claims.arbitrate`'s liveness
+default, unchanged): two different questions about one file must not collapse into
+one number, or the fleet loop's real guard reds the gate and the gate's real
+finding hides behind the loop's guard. `freshness` is tri-state and fails CLOSED —
+`0` inside the tolerance / `1` outside it or unaged, naming the file, the
+timestamp, the age, the tolerance and the ONE refresh verb (`board-snapshot-stale`
+/ `board-snapshot-unaged`, the codes the ticket projection already uses for this
+same artifact) / `2` absent or unreadable, never a pass.
+
 `--fix` is the declared mechanism for the defect `--check` only reports
 (issue #1113): against a FRESH `.board/snapshot.json` (same staleness
 contract as `--check` — a stale board is refused with `CANNOT-ASSESS` rather
@@ -430,13 +478,21 @@ without hand-editing `queue.yaml` directly.
 bash scripts/check-dispatch-queue.sh   # part of `make verify` (dispatch-queue)
 ```
 
-Runs `governance/dispatch/tests/test_queue.py` (out-of-order claim refused,
-in-order accepted, closed issues drop out of the chain, `--check` catches a
-cycle), validates the committed queue against the committed snapshot, and
-PROVOKES the cycle detector with a fixture queue whose `blocked_by` overrides
-form a 2-cycle — it must be refused by name (`cycle`), while a clean fixture
-of the same shape must still pass (GR-12 / AO-GR-19: a check that cannot fail
-is a formality).
+Runs `governance/dispatch/tests/test_queue.py` and
+`governance/dispatch/tests/test_queue_freshness.py`, asserts the committed
+board snapshot's age is inside the tolerance this consumer declares (see
+above), validates the committed queue against a board inside that tolerance
+(naming every queued number the board has since CLOSED), and PROVOKES every
+rule it applies — a fixture queue whose `blocked_by` overrides form a 2-cycle
+must be refused by name (`cycle`), a fixture queue naming a CLOSED issue must
+be refused by name (`already closed`), a clean fixture of the same shape must
+still pass, an aged fixture must be refused in the `board-snapshot-stale`
+vocabulary while one inside the tolerance is accepted, an unaged or garbled
+one must be `board-snapshot-unaged`, and an absent board or a bad invocation
+must be `CANNOT-ASSESS` (rc 2, never a pass). The control count is asserted,
+so a control that silently stops running is a failure rather than a quiet
+reduction of the gate's own coverage (GR-12 / AO-GR-19: a check that cannot
+fail is a formality).
 
 ## Declared controls, audit trail, frozen schema and live feed (issue #885)
 

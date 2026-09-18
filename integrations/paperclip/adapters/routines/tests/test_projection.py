@@ -7,7 +7,7 @@ from pathlib import Path
 from integrations.paperclip.adapters.routines import pmo as pmo_mod
 from integrations.paperclip.adapters.routines.model import ROUTINES, RoutineSpec
 from integrations.paperclip.adapters.routines.projection import project, render
-from integrations.paperclip.adapters.routines.tests.conftest import build_schedule_tree
+from integrations.paperclip.adapters.routines.tests.conftest import build_schedule_tree, job
 
 
 def _markers(view) -> list[str]:
@@ -17,7 +17,13 @@ def _markers(view) -> list[str]:
 def test_every_scheduled_entry_projects_to_exactly_one_routine(schedule_tree: Path) -> None:
     view = project(schedule_tree, pmo_root=schedule_tree)
     assert view.findings == []
-    assert len(view.routines) == 3
+    assert len(view.routines) == 4
+    assert sorted(_markers(view)) == [
+        "ao-fleet-prune",
+        "ao-fleet-reap",
+        "ao-fleet-reconcile",
+        "ao-fleet-watchdog",
+    ]
     for routine in view.routines:
         assert routine.owner
         assert routine.trigger.raw
@@ -49,22 +55,21 @@ def test_a_routine_whose_schedule_the_code_lacks_is_refused(schedule_tree: Path)
 
 
 def test_a_scheduled_entry_no_routine_claims_is_reported_as_drift(tmp_path: Path) -> None:
-    def add_entry(text: str) -> str:
-        text = text.replace(
-            "MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER)",
-            'MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, "ao-fleet-extra")',
-        )
-        return text.replace(
-            "        reconcile_line(interval),\n    ]",
-            "        reconcile_line(interval),\n"
-            '        "*/5 * * * * cd /tmp && /usr/bin/python3 fleet/extra.py run '
-            '>> /tmp/extra.log 2>&1 # ao-fleet-extra",\n    ]',
-        )
+    def enable_gated(manifest: dict) -> None:
+        # The manifest's ship-gated job is flipped ON with no routine change: a
+        # marked line enters the schedule that the registry does not claim. The
+        # mutation goes through the manifest because that is where the schedule
+        # lives (`fleet/cron.py` renders it from there, issue #241/#962), and the
+        # anchor is asserted to match exactly one job — a moved anchor must fail
+        # loudly rather than provoke nothing (#1176).
+        entry = job(manifest, "scan-pr-failures")
+        assert entry["enabled"] is False, "the anchor moved: the job is not ship-gated OFF"
+        entry["enabled"] = True
 
-    view = project(build_schedule_tree(tmp_path, mutate=add_entry), pmo_root=tmp_path)
+    view = project(build_schedule_tree(tmp_path, mutate=enable_gated), pmo_root=tmp_path)
     assert [finding.code for finding in view.findings] == ["schedule-unprojected"]
-    assert view.findings[0].subject == "ao-fleet-extra"
-    assert len(view.routines) == 3
+    assert view.findings[0].subject == "ao-fleet-scan-pr-failures"
+    assert len(view.routines) == 4
 
 
 def test_a_routine_with_no_owner_fails_closed(schedule_tree: Path) -> None:
@@ -134,4 +139,4 @@ def test_an_unbuildable_pmo_is_a_note_not_a_pass_over_nothing(
     projection = project(schedule_tree, pmo_root=schedule_tree)
     assert any(note.startswith("pmo-unavailable") for note in projection.notes)
     # the schedule still projects; the agreement is the part that is unavailable
-    assert len(projection.routines) == 3
+    assert len(projection.routines) == 4

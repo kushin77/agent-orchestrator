@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "note": "Named, leased exemptions for the real-tree worktree/branch audit (issue #1291). Each entry excuses ONE artifact \u2014 kind, name, and the tip the exemption was measured at \u2014 and only while the lease below holds. A new artifact is never absorbed (it is not listed), an artifact whose tip has moved is not absorbed (it is no longer the artifact named here), and an entry that no longer targets an unmatched artifact FAILS as a stale exemption until it is removed in a reviewed edit. Every entry here is the AGENTS.md rule 17 class: work that exists nowhere else, which the worker is forbidden to discard, so it must be reported rather than silently red \u2014 and reported rather than silently reaped. Resolve the artifact (land it, push it, or authorise its deletion on #1291) and the entry must go with it.",
+  "tracked_by": "#1291",
+  "tracking": {
+    "state": "open",
+    "measured_at": "2026-09-18T15:41:29Z",
+    "measured_by": "governance/reconcile (issue #1291 lane)",
+    "max_age_hours": 24,
+    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1291 -> state=open"
+  },
+  "quarantine": [
+    {
+      "kind": "branch",
+      "name": "issue-1028-canon",
+      "tip": "88ea96d70a3f2c424dc6e72565be072038caa995",
+      "reason": "7 path(s) changed, 1 already identical on the default branch, tip 88ea96d70a3f: work exists nowhere but this box \u2014 no remote ref contains `88ea96d70a3f` and no commit on the default branch carries its patch; #1028 is named in the default branch's history (b77ccc916eb5) but no commit there carries this artifact's patch, so it is not the landing of this work"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1028-tpl",
+      "tip": "f11abe47bb1748084fbd8f1f40b92d7091968570",
+      "reason": "3 path(s) changed, 1 already identical on the default branch, tip f11abe47bb17: work exists nowhere but this box \u2014 no remote ref contains `f11abe47bb17` and no commit on the default branch carries its patch; #1028 is named in the default branch's history (b77ccc916eb5) but no commit there carries this artifact's patch, so it is not the landing of this work"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1056",
+      "tip": "9d065ae3118fbafa7de00e6c67e68831ddcca77d",
+      "reason": "1 path(s) changed, 0 already identical on the default branch, tip 9d065ae3118f: preserved only on `origin/issue-1056` \u2014 not on the default branch, so this is the parked class (rule 17): the work is safe, the issue is not closed; #1056 is named in the default branch's history (ad2713d924e9) but no commit there carries this artifact's patch, so it is not the landing of this work"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1106-gate-location-independence",
+      "tip": "a3484089df6263011759169a9c7217c44ae1005f",
+      "reason": "3 path(s) changed, 1 already identical on the default branch, tip a3484089df62: work exists nowhere but this box \u2014 no remote ref contains `a3484089df62` and no commit on the default branch carries its patch"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1107-ticket-projection-reds",
+      "tip": "e34e7b6e00300f532fe1236bb77c81ff3fe46bbf",
+      "reason": "2 path(s) changed, 0 already identical on the default branch, tip e34e7b6e0030: work exists nowhere but this box \u2014 no remote ref contains `e34e7b6e0030` and no commit on the default branch carries its patch"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1113-dispatch-queue-prune",
+      "tip": "159cf0058698ca0139a72e8acedbeb95abacbf19",
+      "reason": "5 path(s) changed, 3 already identical on the default branch, tip 159cf0058698: work exists nowhere but this box \u2014 no remote ref contains `159cf0058698` and no commit on the default branch carries its patch"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1114-dispatch-master-green",
+      "tip": "d084114b73e84e3037bbecd94c12224aa80f0739",
+      "reason": "11 path(s) changed, 6 already identical on the default branch, tip d084114b73e8: work exists nowhere but this box \u2014 no remote ref contains `d084114b73e8` and no commit on the default branch carries its patch"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830-reap-rung",
+      "tip": "025381c3b5b160f17693c7e0b6ebfde4443bab81",
+      "reason": "3 path(s) changed, 1 already identical on the default branch, tip 025381c3b5b1: work exists nowhere but this box \u2014 no remote ref contains `025381c3b5b1` and no commit on the default branch carries its patch; #830 is named in the default branch's history (c67e6a3857e4) but no commit there carries this artifact's patch, so it is not the landing of this work"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830-reaper-schedule",
+      "tip": "af843aaf82895ab57d184a5bcf690d3e1f3a6d7e",
+      "reason": "1 path(s) changed, 0 already identical on the default branch, tip af843aaf8289: work exists nowhere but this box \u2014 no remote ref contains `af843aaf8289` and no commit on the default branch carries its patch; #830 is named in the default branch's history (c67e6a3857e4) but no commit there carries this artifact's patch, so it is not the landing of this work"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-944",
+      "tip": "5b5ef426cbd799cb1391367eef4b4ec77b727dd3",
+      "reason": "6 path(s) changed, 2 already identical on the default branch, tip 5b5ef426cbd7: preserved only on `origin/issue-944` \u2014 not on the default branch, so this is the parked class (rule 17): the work is safe, the issue is not closed; #944 is named in the default branch's history (074e3d481cfc) but no commit there carries this artifact's patch, so it is not the landing of this work"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a1b5cf2e0dceac199",
+      "tip": "d084114b73e84e3037bbecd94c12224aa80f0739",
+      "reason": "lane worktree on `issue-1114-dispatch-master-green` holding 1 uncommitted path(s); committed tip `d084114b73e8` is on no remote ref; uncommitted: `board/focus.json`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a23016a2ba69986a5",
+      "tip": "bc7a5af04af41ccf4165464a1ead74dd295533c7",
+      "reason": "lane worktree on `issue-873-spine-control-lines` holding 2 uncommitted path(s); committed tip `bc7a5af04af4` is on no remote ref; uncommitted: `.fleet/reconcile/ledger.jsonl`, `.fleet/watchdog.lease`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a325a56496fb44b99",
+      "tip": "159cf0058698ca0139a72e8acedbeb95abacbf19",
+      "reason": "lane worktree on `issue-1113-dispatch-queue-prune` holding 4 uncommitted path(s); committed tip `159cf0058698` is on no remote ref; uncommitted: `board/focus.json`, `.fleet/reconcile.lease` (+2 more), so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a607b2f079f40da5a",
+      "tip": "d99f2131e109400484e825a7df08f3fe3c52f490",
+      "reason": "lane worktree on `fix/885-real-tree-vanished` holding 2 uncommitted path(s); committed tip `d99f2131e109` is on no remote ref; uncommitted: `.fleet/reconcile/ledger.jsonl`, `.fleet/watchdog.lease`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a66fa2d39da316c8e",
+      "tip": "3ede1026cd45c92361796607fca8d8cb2ecae604",
+      "reason": "lane worktree on `l6/885-dispatch-elite` holding 2 uncommitted path(s); committed tip `3ede1026cd45` is on no remote ref; uncommitted: `board/focus.json`, `.fleet/watchdog.lease`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a67aa5cb2076746ba",
+      "tip": "a3484089df6263011759169a9c7217c44ae1005f",
+      "reason": "lane worktree on `issue-1106-gate-location-independence` holding 4 uncommitted path(s); committed tip `a3484089df62` is on no remote ref; uncommitted: `board/focus.json`, `.fleet/reconcile.lease` (+2 more), so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a74d2950557431f05",
+      "tip": "0f5476689c44d5a095eb4a3e88727247118533cd",
+      "reason": "lane worktree on `l6/885-isolation-elite` holding 3 uncommitted path(s); committed tip `0f5476689c44` is on no remote ref; uncommitted: `board/focus.json`, `.fleet/reconcile.lease` (+1 more), so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-acd285c4246994a4f",
+      "tip": "126c05f21a39d5caa6aa9bafa6027792dd8d2329",
+      "reason": "lane worktree on `l6/885-lifecycle-elite` holding 1 uncommitted path(s); committed tip `126c05f21a39` is on no remote ref; uncommitted: `.fleet/watchdog.lease`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ad284eb1ac275c0c6",
+      "tip": "9e5a61528752b6f982b7877886ceb9d264b18553",
+      "reason": "lane worktree on `worktree-agent-ad284eb1ac275c0c6` holding 1 uncommitted path(s); committed tip `9e5a61528752` IS on the default branch, but the 1 uncommitted path(s) below are on no branch; uncommitted: `overnance/ticket/tests/conftest.py`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae391267f79052e9c",
+      "tip": "e34e7b6e00300f532fe1236bb77c81ff3fe46bbf",
+      "reason": "lane worktree on `issue-1107-ticket-projection-reds` holding 1 uncommitted path(s); committed tip `e34e7b6e0030` is on no remote ref; uncommitted: `.fleet/watchdog.lease`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-afc588dba96686e4e",
+      "tip": "47ac6de35e0435d71ea4dd1b4d5487ec46623173",
+      "reason": "lane worktree on `fix/1042-governance-test-basenames` holding 2 uncommitted path(s); committed tip `47ac6de35e04` is on no remote ref; uncommitted: `.fleet/reconcile/ledger.jsonl`, `.fleet/watchdog.lease`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1056-c58e7589",
+      "tip": "9d065ae3118fbafa7de00e6c67e68831ddcca77d",
+      "reason": "lane worktree on `issue-1056` holding 0 uncommitted path(s); committed tip `9d065ae3118f` is on `origin/issue-1056` and not on the default branch, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    },
+    {
+      "kind": "worktree",
+      "name": "/tmp/ao968-pristine",
+      "tip": "96ae0fba19c36764e1f0251070d7c77bb17b4a5d",
+      "reason": "lane worktree on `HEAD` holding 1 uncommitted path(s); committed tip `96ae0fba19c3` IS on the default branch, but the 1 uncommitted path(s) below are on no branch; uncommitted: `portal/tests/test_fleet_syspath_isolation.py`, so it is the shelve-and-report class (rule 17) \u2014 must not be reclaimed and must not be excused away by its committed half"
+    }
+  ]
+}

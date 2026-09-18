@@ -200,6 +200,19 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng, Manager, Analyst]
 
+  - id: FRESHNESS
+    title: "Freshness — is the committed board snapshot inside the age this consumer tolerates"
+    kind: view
+    endpoints: [board/freshness]
+    parameters:
+      - {name: max-age-hours, type: number, required: false, default: null}
+      - {name: now, type: string, required: false, default: null}
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
   - id: POOL
     title: "Pool — out-of-epic work parked while one epic is in focus"
     kind: view
