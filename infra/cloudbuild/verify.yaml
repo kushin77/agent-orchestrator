@@ -34,6 +34,7 @@ steps:
       - '-lc'
       - |
         set -euo pipefail
+        export AO_PR_NUMBER=$_PR_NUMBER  # hands the runner's PR context to the pr-contract gate (#1341)
         python3 -m pip install --quiet --disable-pip-version-check -r infra/cloudbuild/requirements-verify.txt
         # gates that pin PATH=/usr/bin:/bin must still reach the interpreter the deps went into
         ln -sf /usr/local/bin/python3 /usr/bin/python3

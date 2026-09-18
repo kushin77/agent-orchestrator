@@ -42,6 +42,24 @@ cd "$root" || exit 1
 
 mode="${1:-verify}"
 
+# --- PR context passthrough for the discovered pr-contract gate (#1341) -----
+# `scripts/check-pr-contract.sh` is already auto-discovered (below) and reads
+# its own `_PR_NUMBER`/`PR_NUMBER` env fallback when run with no flags — it is
+# NOT hand-wired here. On a runner that has PR context (AO_PR_NUMBER, the
+# convention `scripts/merge-gate.sh` already uses; or a caller-set
+# `_PR_NUMBER`/`PR_NUMBER`), that number is exported as PR_NUMBER so the
+# discovered check judges the real PR body instead of refusing
+# pr-context-missing. An ordinary local run sets none of these, so the check's
+# own rc 2 CANNOT-ASSESS (a SKIP, never a fail — see the tri-state note above)
+# is unchanged.
+if [ -z "${PR_NUMBER:-}" ]; then
+  if [ -n "${AO_PR_NUMBER:-}" ]; then
+    export PR_NUMBER="$AO_PR_NUMBER"
+  elif [ -n "${_PR_NUMBER:-}" ]; then
+    export PR_NUMBER="$_PR_NUMBER"
+  fi
+fi
+
 # --- admission control (issue #724) -----------------------------------------
 # One composite gate per worktree, bounded box-wide by a permit store outside
 # every workspace. This runs BEFORE any check is discovered and BEFORE `.verify/`

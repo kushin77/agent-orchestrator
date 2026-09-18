@@ -121,9 +121,16 @@ def test_the_real_manifest_validates_and_gates_the_snapshot_job_off():
     enabled = cron.enabled_jobs(manifest)
     assert [job["name"] for job in enabled] == ["watchdog", "prune", "reconcile", "reap"]
     disabled = [job for job in jobs if job not in enabled]
-    assert [job["name"] for job in disabled] == ["snapshot-refresh", "scan-pr-failures"]
+    # promote-portal (#1329/#1336, scheduled-but-disabled by #1341) sits between
+    # the two in manifest order, matching config/fleet-jobs.json.
+    assert [job["name"] for job in disabled] == [
+        "snapshot-refresh",
+        "promote-portal",
+        "scan-pr-failures",
+    ]
     assert [job["marker"] for job in disabled] == [
         cron.SNAPSHOT_REFRESH_MARKER,
+        cron.PROMOTE_MARKER,
         cron.SCAN_PR_FAILURES_MARKER,
     ]
     assert sorted(job["marker"] for job in enabled) == sorted(cron.MARKERS)

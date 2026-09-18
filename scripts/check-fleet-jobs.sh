@@ -142,15 +142,17 @@ probe(
 disabled = [j for j in jobs if j.get("enabled") is not True]
 probe(
     "SHIP-GATED-OFF-SET",
-    [j.get("name") for j in disabled] == ["snapshot-refresh", "scan-pr-failures"]
+    [j.get("name") for j in disabled]
+    == ["snapshot-refresh", "promote-portal", "scan-pr-failures"]
     and [j.get("marker") for j in disabled]
-    == [cron.SNAPSHOT_REFRESH_MARKER, cron.SCAN_PR_FAILURES_MARKER],
+    == [cron.SNAPSHOT_REFRESH_MARKER, cron.PROMOTE_MARKER, cron.SCAN_PR_FAILURES_MARKER],
     "disabled=%s" % [j.get("name") for j in disabled],
 )
 probe(
     "DECLARED-MARKERS-COMPLETE",
     cron.declared_markers(manifest)
-    == cron.MARKERS + (cron.SNAPSHOT_REFRESH_MARKER, cron.SCAN_PR_FAILURES_MARKER),
+    == cron.MARKERS
+    + (cron.SNAPSHOT_REFRESH_MARKER, cron.PROMOTE_MARKER, cron.SCAN_PR_FAILURES_MARKER),
 )
 # Reachability, proved BOTH ways (issue #1207). A disabled job is only "wired"
 # if the declaration — not a code path — is what would install it: with the

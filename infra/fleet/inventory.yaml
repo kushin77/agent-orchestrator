@@ -197,3 +197,44 @@ dev_run:
       discipline: dry-run
       command: "scripts/prune-worktrees.sh"
       why: "the worktree reaper (#207/#516, scheduled by #830/#901) is a report by default; --apply is what removes anything."
+    # ao-fleet-promote-portal is deliberately NOT added here: `roles` is
+    # cross-checked against infra/fleet/dev_run.py's own role table
+    # (scripts/check-fleet-cron-dev-run.sh, inventory-role-drift), and that
+    # harness declares no entry for this marker yet — it dispatches only what
+    # config/fleet-jobs.json enables, and this rung stays `enabled: false`
+    # pending the AR credential (docs/AGENTCONSOLE-HOSTING.md §5c). Adding a
+    # role here the harness cannot match would trade one honest gap for a
+    # gate failure; see the PR's "## Wiring needed".
+
+# 7. THE state-rw SERVICE'S EXTRA SURFACE (issue #1329/#1341, EPIC #706 D3).
+#
+# `docker-compose.agent-cron.yml`'s `agent-cron-rw` service (flag-gated by the
+# `state-rw` compose profile, never started by a bare `up`) is where the
+# promote-portal rung will eventually run `--apply`: recreating the
+# `shared-services-agentconsole` container means talking to the HOST's Docker
+# daemon, which the shared image (section 5's `packages`/`binaries`, built once
+# for every service from the one Dockerfile) does not provide today.
+#
+# This is declared SEPARATELY from `packages`/`binaries` above on purpose:
+# those two lists are cross-checked against `infra/fleet/Dockerfile` in BOTH
+# directions by `scripts/check-fleet-cron-image.sh` (a package/binary listed
+# there that the Dockerfile does not install is `package-uninstalled` /
+# `interpreter-missing`), and `infra/fleet/Dockerfile` is out of this lane's
+# file scope (see the PR's "## Wiring needed"). Recording the requirement here
+# — read by nobody's cross-check yet — is honest about what is NOT yet true,
+# rather than claiming a package the image does not have.
+state_rw:
+  service: agent-cron-rw
+  compose_profile: state-rw
+  needs:
+    - package: docker-ce-cli
+      via: apt
+      alternative: docker.io
+      why: "promote_portal.py's --apply path recreates the host's agentconsole container over the Docker CLI; the shared image installs no Docker client today."
+  docker_socket:
+    mount: /var/run/docker.sock
+    target: /var/run/docker.sock
+    read_only: true
+    scope: agent-cron-rw only — never the sibling agent-cron (dev-run) service
+    why: "least privilege: only the flag-gated, credentialed rung that ever needs to act on a container gets a path to the daemon; the dry-run-only sibling never does."
+  wiring_needed: "infra/fleet/Dockerfile installing docker-ce-cli (or docker.io) for the shared image — out of this lane's file scope."
