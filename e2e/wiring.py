@@ -417,20 +417,32 @@ def write_evidence(work_dir: str, name: str, payload: Dict[str, Any]) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# purebliss five-agent team: offline local provider stubs (issue #257)
+# purebliss five-agent team: the REAL paperclip/hermes adapters own their names
 # --------------------------------------------------------------------------- #
-def install_team_provider_stubs() -> None:
-    """Register offline stub adapters for the two team providers with no live
-    endpoint (paperclip, hermes). Runtime-only, idempotent; no gateway file is
-    edited."""
+def assert_team_providers_registered() -> None:
+    """Require the REAL paperclip + hermes adapters to be registered (issue #255).
+
+    This replaced ``install_team_provider_stubs`` (issue #257): the offline stub
+    adapters it installed were a documented FALLBACK whose guard was a no-op,
+    because the real ``gateway/providers/{paperclip,hermes}.py`` adapters always
+    own those provider names. Installing a stub could therefore only ever mask a
+    missing real adapter; asserting presence keeps the e2e funnel honest about
+    which adapter it exercises.
+    """
+    from providers.hermes import HermesProvider
+    from providers.paperclip import PaperclipProvider
     from providers.registry import PROVIDER_CLASSES
 
-    from e2e._team_providers import HermesProvider, PaperclipProvider
-
-    if "paperclip" not in PROVIDER_CLASSES:
-        PROVIDER_CLASSES["paperclip"] = PaperclipProvider
-    if "hermes" not in PROVIDER_CLASSES:
-        PROVIDER_CLASSES["hermes"] = HermesProvider
+    for name, expected in (
+        ("paperclip", PaperclipProvider),
+        ("hermes", HermesProvider),
+    ):
+        actual = PROVIDER_CLASSES.get(name)
+        if actual is not expected:
+            raise AssertionError(
+                f"the real {name} adapter is not registered: expected "
+                f"{expected.__module__}.{expected.__qualname__}, got {actual!r}"
+            )
 
 
 def _team_provider_configs() -> List[Any]:
@@ -483,12 +495,13 @@ def build_team_gateway(
 ) -> Any:
     """``build_real_gateway`` plus the purebliss team's offline local providers.
 
-    Registers the paperclip + hermes stub adapters, adds their configs, and
-    extends the routing chains so every team provider is routable (issue #257).
+    Requires the real paperclip + hermes adapters to be registered, adds their
+    keyless local configs, and extends the routing chains so every team provider
+    is routable (issue #257).
     """
     from proxy.wiring import build_real_gateway
 
-    install_team_provider_stubs()
+    assert_team_providers_registered()
     wired = build_real_gateway(
         health=health, audit_sink=audit_sink, metering_sink=metering_sink
     )
