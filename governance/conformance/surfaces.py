@@ -15,7 +15,12 @@ Three ideas stay separate, the same discipline `model.py` applies:
   documented rollout/rollback procedure). It is REPORTED on every run and is
   never counted as met; silence would be a false green.
 * **scope** — a declared surface root that exists but is declared by no surface
-  is a finding, so no surface goes unclassified by omission.
+  is a finding, so no surface goes unclassified by omission. Since issue #1256
+  the declared list is not trusted as the *horizon* either: every top-level root
+  the tree actually shows must be declared at or under it, or waived by name
+  with a reason — a root the policy simply never names is refused by name too
+  (`surface-root-unrecorded`), because a whitelist is a measurement with no way
+  to fail and a root outside it is inspected by nothing.
 
 The ladder vocabulary is closed and identical to `model.py` / `policy.yaml`.
 
@@ -47,6 +52,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,6 +78,7 @@ CODE_UNKNOWN = "surface-unknown"
 CODE_PATH_MISSING = "surface-path-missing"
 CODE_PATH_ESCAPES = "surface-path-escapes-root"
 CODE_UNDECLARED = "surface-undeclared"
+CODE_ROOT_UNRECORDED = "surface-root-unrecorded"
 CODE_DUPLICATE = "surface-duplicate"
 CODE_MANUAL = "surface-manual-requirement"
 CODE_CEILING = "surface-class-ceiling"
@@ -192,7 +199,10 @@ class SurfacePolicy:
     requirements: Mapping[str, Tuple[str, ...]]
     surfaces: Tuple[SurfaceSpec, ...]
     surface_roots: Tuple[str, ...]
-    waived_roots: Tuple[str, ...]
+    # Waivers are a mapping of top-level root name to the reason it is not a
+    # product surface: a waiver without a reason is a silent omission, so the
+    # policy loader refuses one instead of honouring it (issue #1256).
+    waived_roots: Mapping[str, str]
 
     def rank(self, name: str) -> int:
         """Position on the ladder; ``-1`` when the name is not a rung."""
@@ -224,6 +234,42 @@ def _as_str_tuple(value, what: str) -> Tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
         raise SurfacePolicyUnavailable("%s must be a list" % what)
     return tuple(str(item) for item in value)
+
+
+def _plain_root_name(name: str) -> bool:
+    return bool(name) and "/" not in name and name not in (".", "..")
+
+
+def _as_waived_roots(value) -> Dict[str, str]:
+    """Parse ``waived_roots`` — a mapping of root name to the reason it is waived.
+
+    A waiver is a recorded decision, never an omission, so a root waived without
+    a reason is refused as a policy defect: silence about *why* a root carries no
+    class is exactly the hole this check exists to close (issue #1256).
+    """
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise SurfacePolicyUnavailable(
+            "waived_roots must be a mapping of root name to the reason it carries "
+            "no class, not %s" % type(value).__name__
+        )
+    waived: Dict[str, str] = {}
+    for name, reason in value.items():
+        root_name = str(name)
+        if not _plain_root_name(root_name):
+            raise SurfacePolicyUnavailable(
+                "waived_roots entry %r must be a plain top-level directory name"
+                % root_name
+            )
+        text = str(reason or "").strip()
+        if not text:
+            raise SurfacePolicyUnavailable(
+                "waived_roots entry %r carries no reason: record why the root is "
+                "not a product surface" % root_name
+            )
+        waived[root_name] = text
+    return waived
 
 
 def load_surface_policy(path: Path) -> SurfacePolicy:
@@ -365,7 +411,7 @@ def load_surface_policy(path: Path) -> SurfacePolicy:
                 "surface_roots entry %r must be a plain top-level directory name"
                 % root_name
             )
-    waived_roots = _as_str_tuple(raw.get("waived_roots"), "waived_roots")
+    waived_roots = _as_waived_roots(raw.get("waived_roots"))
 
     return SurfacePolicy(
         ladder=ladder,
@@ -474,6 +520,80 @@ def _path_problem(relpath: str) -> Optional[str]:
     if any(part == ".." for part in parts):
         return "the path escapes the repository root"
     return None
+
+
+# -- the root sweep (issue #1256) ---------------------------------------------
+
+
+def _git_tracked_roots(root: Path) -> Optional[Tuple[str, ...]]:
+    """Top-level directories the repository itself TRACKS, or None when git cannot say.
+
+    Tracking is the honest definition: a local build artefact (`node_modules/`,
+    `venv/`, `bin/`) or a scratch directory is not part of the artifact, and a
+    control that reded on one would be a false red rather than a finding.
+    """
+    root = Path(root)
+    try:
+        top = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if top.returncode != 0:
+        return None
+    try:
+        if Path(top.stdout.strip()).resolve() != root.resolve():
+            # git walked up to an ANCESTOR repository: its file list is not this
+            # root's, so it cannot answer for this root.
+            return None
+        listing = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if listing.returncode != 0:
+        return None
+    roots = set()
+    for entry in listing.stdout.split("\0"):
+        if "/" not in entry:
+            continue  # a top-level *file* is not a root
+        top_name = entry.split("/", 1)[0]
+        if top_name.startswith("."):
+            continue  # dot-entries are repository metadata / tooling, not roots
+        roots.add(top_name)
+    return tuple(sorted(roots))
+
+
+def _filesystem_roots(root: Path) -> Tuple[str, ...]:
+    try:
+        return tuple(
+            sorted(
+                entry.name
+                for entry in root.iterdir()
+                if entry.is_dir() and not entry.name.startswith(".")
+            )
+        )
+    except OSError:
+        return ()
+
+
+def observed_roots(root: Path) -> Tuple[Tuple[str, ...], str]:
+    """The root set the policy must account for, and where that set was read.
+
+    ``git`` when the root is its own work tree (the gate's venue, and the only
+    honest source for "which roots does this repository have"); ``filesystem``
+    otherwise, which is what a scratch tree in the suite is.
+    """
+    tracked = _git_tracked_roots(root)
+    if tracked is not None:
+        return tracked, "git"
+    return _filesystem_roots(root), "filesystem"
 
 
 @dataclass
@@ -665,16 +785,19 @@ def evaluate_surfaces(
     declared_paths = [
         spec.path.replace("\\", "/").strip().strip("/") for spec in policy.surfaces
     ]
+
+    def _covered(root_name: str) -> bool:
+        return any(
+            path == root_name or path.startswith(root_name + "/")
+            for path in declared_paths
+        )
+
     for root_name in policy.surface_roots:
         if not (root / root_name).is_dir():
             continue
         if root_name in policy.waived_roots:
             continue
-        covered = any(
-            path == root_name or path.startswith(root_name + "/")
-            for path in declared_paths
-        )
-        if not covered:
+        if not _covered(root_name):
             findings.append(
                 Finding(
                     code=CODE_UNDECLARED,
@@ -685,6 +808,35 @@ def evaluate_surfaces(
                     "root by name with a reason",
                 )
             )
+
+    # The sweep (issue #1256). `surface_roots` is a hand-written list, and the
+    # defect it keeps producing is a root that is simply not ON it: the gate then
+    # prints OK because it is not looking. Measured twice — #590 for `governance`
+    # and `integrations`, #1256 for the five module roots — so the list is no
+    # longer trusted as the horizon. Every top-level root the tree shows must be
+    # declared at or under it, or waived by name with a reason; one that is
+    # neither is refused by name. Roots the policy already names as product roots
+    # are held to the narrower rule above, so a root is reported once, not twice.
+    observed, _source = observed_roots(root)
+    for root_name in observed:
+        if root_name in policy.surface_roots:
+            continue
+        if root_name in policy.waived_roots:
+            continue
+        if _covered(root_name):
+            continue
+        findings.append(
+            Finding(
+                code=CODE_ROOT_UNRECORDED,
+                message="top-level root '%s' exists in the tree but the policy "
+                "neither declares a surface at or under it nor waives it with a "
+                "reason" % root_name,
+                subject=root_name,
+                remediation="declare the surface in surfaces.yaml, or add '%s' to "
+                "waived_roots with the reason it is not a product surface"
+                % root_name,
+            )
+        )
 
     return rows, findings
 
@@ -830,6 +982,12 @@ def _module_summary(
     }
 
 
+def _root_sweep_summary(root: Path) -> Dict[str, object]:
+    """What the sweep looked at, so the run says which roots it held to account."""
+    observed, source = observed_roots(root)
+    return {"source": source, "observed": list(observed)}
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     root = Path(args.root)
     policy_path = Path(args.policy) if args.policy else root / SURFACES_RELPATH
@@ -847,6 +1005,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     module_path = Path(args.module) if args.module else root / MODULE_RELPATH
     findings.extend(evaluate_module_class(policy, rows, module_path))
     module = _module_summary(policy, rows, module_path)
+    sweep = _root_sweep_summary(root)
     hard = [f for f in findings if f.severity == SEVERITY_ERROR]
     soft = [f for f in findings if f.severity == SEVERITY_WARNING]
 
@@ -857,6 +1016,7 @@ def cmd_check(args: argparse.Namespace) -> int:
                     "schema": SURFACES_SCHEMA,
                     "surfaces": [row.as_dict() for row in rows],
                     "module": module,
+                    "root_sweep": sweep,
                     "error_count": len(hard),
                     "warning_count": len(soft),
                     "findings": [f.as_dict() for f in findings],
@@ -867,6 +1027,10 @@ def cmd_check(args: argparse.Namespace) -> int:
         )
     else:
         _print_rows(rows)
+        print(
+            "roots      %d top-level root(s) read via %s"
+            % (len(sweep["observed"]), sweep["source"])
+        )
         if module["present"]:
             print(
                 "module     %-16s %-12s floor=%s (%s)"

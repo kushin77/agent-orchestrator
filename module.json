@@ -22,7 +22,7 @@
   },
   "license": "MIT",
   "export_eligibility": "private",
-  "solution_class": "elite",
+  "solution_class": "pattern",
   "features": [
     {
       "id": "agent-registry",
