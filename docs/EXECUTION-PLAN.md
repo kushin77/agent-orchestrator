@@ -68,7 +68,7 @@ edit the baseline itself.
 lands the schema/types change first owns the contract; the others consume the
 field name, never the files.
 
-**Core extension points (RCA-0016, the PR-queue-clearing lessons).** Some
+**Core extension points (RCA-0008, the PR-queue-clearing lessons).** Some
 files are natural, LEGITIMATE extension points for more than one lane in the
 same wave — `fleet/watchdog.py` (a new alarm/remedy type), `fleet/cron.py` (a
 new rung), and any doc a feature is expected to append its own section to
@@ -102,16 +102,6 @@ This is lighter than a lock registry on purpose: the existing dispatch claim
 (`governance/dispatch/cli.py claim`) already names the issue and lane; core
 extension points just require that claim to also name the shared file, up
 front, in prose a sibling lane will actually read.
-
-**Merge order: gate-changing PRs land last** (issue #1053, RCA of the
-2026-09-17 queue-clearing pass). A PR that touches a gate path
-(`scripts/verify.sh`, `scripts/gate.sh`, `scripts/merge-gate.sh`,
-`scripts/check-*.sh`, `scripts/gate-coverage-baseline.txt`) changes what
-every later merge in the queue must satisfy, so it is sequenced after every
-ready, non-gate-changing PR — never interleaved ahead of one, even if it
-claimed the queue first. `scripts/pr-queue.sh` (`docs/PR-QUEUE.md`) plans this
-ordering (and, opt-in, executes it) offline and by rule rather than by a
-human re-deriving it under pressure each time a queue is cleared by hand.
 
 ## 4. Dispatch contract (per soldier/agent)
 
