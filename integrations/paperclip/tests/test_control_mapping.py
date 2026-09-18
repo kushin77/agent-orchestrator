@@ -258,8 +258,8 @@ def test_the_state_distribution_is_pinned(registry, table):
     counts = {state: 0 for state in mapping_mod.STATES}
     for row in table:
         counts[row.state] += 1
-    assert counts == {MAPPED: 9, MISMATCH: 8, UNMAPPED: 46}, counts
-    assert len(table) == 63, "the RC-2 registry declares 63 verbs at #1262's base"
+    assert counts == {MAPPED: 9, MISMATCH: 8, UNMAPPED: 47}, counts
+    assert len(table) == 64, "the RC-2 registry declares 64 verbs after board.freshness (#1309)"
 
 
 def test_the_verbs_declared_after_this_table_was_written_are_classified(table):

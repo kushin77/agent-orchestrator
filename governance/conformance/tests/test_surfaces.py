@@ -25,6 +25,7 @@ from surfaces import (  # noqa: E402
     CODE_MANUAL,
     CODE_PATH_ESCAPES,
     CODE_PATH_MISSING,
+    CODE_ROOT_UNRECORDED,
     CODE_UNDECLARED,
     CODE_UNKNOWN,
     EVIDENCE_KEYS,
@@ -96,7 +97,9 @@ def policy_doc(**overrides) -> dict:
         },
         "requirements": base_requirements(),
         "surface_roots": [],
-        "waived_roots": [],
+        # A waiver is a mapping of root name to the reason it carries no class
+        # (issue #1256); a bare list is refused by the loader.
+        "waived_roots": {},
         "surfaces": [],
     }
     doc.update(overrides)
@@ -143,7 +146,7 @@ def policy_with(**overrides) -> SurfacePolicy:
         },
         surfaces=tuple(doc["surfaces"]),
         surface_roots=tuple(doc["surface_roots"]),
-        waived_roots=tuple(doc["waived_roots"]),
+        waived_roots=dict(doc["waived_roots"]),
     )
 
 
@@ -191,6 +194,29 @@ def test_real_tree_manual_requirements_are_reported():
     # Later rows (#590/#620/#885) also declare `enterprise`+ and are reported
     # too, so this is a superset check.
     assert {f.subject for f in manual} >= {"gateway", "telemetry", "registry"}
+
+
+def test_real_tree_declares_the_five_module_roots():
+    # issue #1256: the five roots the class gate never inspected, now declared at
+    # the rung each one's own evidence measures.
+    policy = load_surface_policy(REAL_POLICY)
+    rows, _ = evaluate_surfaces(policy, ROOT)
+    declared = {row.surface: row for row in rows}
+    for name in ("engine", "guardrails", "identity", "control-plane", "fleet"):
+        assert name in declared, name
+        assert name in policy.surface_roots, name
+        assert declared[name].declared_class == declared[name].measured_class, name
+
+
+def test_real_tree_has_no_unrecorded_root():
+    # The sweep on the real tree: every top-level root it sees is either declared
+    # at or under it or waived with a reason, so the tree is clean — while the
+    # mutation tests above prove that a root which is neither is refused.
+    policy = load_surface_policy(REAL_POLICY)
+    _, findings = evaluate_surfaces(policy, ROOT)
+    assert [f for f in findings if f.code == CODE_ROOT_UNRECORDED] == []
+    assert policy.surface_roots
+    assert all(reason.strip() for reason in policy.waived_roots.values())
 
 
 # -- evidence measurement -----------------------------------------------------
@@ -302,6 +328,59 @@ def test_declared_root_is_not_flagged(tmp_path):
     assert errors(findings) == []
 
 
+# -- the root sweep (issue #1256) ---------------------------------------------
+
+
+def test_a_root_the_policy_never_names_is_refused_by_name(tmp_path):
+    # `surface_roots` is a hand-written list, and a root that is not ON it used
+    # to be inspected by nothing: the gate printed OK because it was not
+    # looking. The sweep derives the root set from the tree, so the omission is
+    # itself the finding — refused by name, as an error.
+    make_surface(tmp_path, "engine")
+    (tmp_path / "portal").mkdir()
+    doc = policy_doc(
+        surfaces=[
+            {"surface": "portal", "path": "portal", "declared_class": "template"}
+        ]
+    )
+    policy = load_surface_policy(write_policy(tmp_path, doc))
+    _, findings = evaluate_surfaces(policy, tmp_path)
+    assert codes(findings) == {CODE_ROOT_UNRECORDED}
+    [unrecorded] = findings
+    assert unrecorded.severity == "error"
+    assert unrecorded.subject == "engine"
+    assert "'engine'" in unrecorded.message
+    assert "waived_roots" in unrecorded.remediation
+
+
+def test_a_root_waived_with_a_reason_is_refused_nothing(tmp_path):
+    # The sweep's negative control: a root WITH a recorded reason must be
+    # refused nothing, so the check cannot be satisfied by matching everything.
+    make_surface(tmp_path, "engine")
+    (tmp_path / "portal").mkdir()
+    doc = policy_doc(
+        surface_roots=["portal"],
+        waived_roots={"engine": "not a product surface, and here is why"},
+        surfaces=[{"surface": "portal", "path": "portal", "declared_class": "template"}],
+    )
+    policy = load_surface_policy(write_policy(tmp_path, doc))
+    _, findings = evaluate_surfaces(policy, tmp_path)
+    assert findings == []
+
+
+def test_a_declared_root_the_sweep_sees_is_refused_nothing(tmp_path):
+    # The other half of the negative control: the same root, declared instead of
+    # waived, is also silent — the sweep is not merely "refuse everything".
+    make_surface(tmp_path, "engine", readme=True, tests=True)
+    doc = policy_doc(
+        surface_roots=["engine"],
+        surfaces=[{"surface": "engine", "path": "engine", "declared_class": "pattern"}],
+    )
+    policy = load_surface_policy(write_policy(tmp_path, doc))
+    _, findings = evaluate_surfaces(policy, tmp_path)
+    assert findings == []
+
+
 def test_surface_duplicate(tmp_path):
     make_surface(tmp_path, "thing")
     policy = policy_with(
@@ -394,6 +473,44 @@ def test_policy_rejects_bad_surface_root(tmp_path):
     doc = policy_doc(surface_roots=["a/b"])
     with pytest.raises(SurfacePolicyUnavailable):
         load_surface_policy(write_policy(tmp_path, doc))
+
+
+def test_policy_rejects_a_waiver_that_is_not_a_mapping(tmp_path):
+    # A bare list of waived names is another list with no way to fail; the shape
+    # is a name -> reason mapping (issue #1256).
+    doc = policy_doc(
+        surfaces=[{"surface": "thing", "path": "thing", "declared_class": "template"}]
+    )
+    doc["waived_roots"] = ["docs"]
+    with pytest.raises(SurfacePolicyUnavailable, match="mapping"):
+        load_surface_policy(write_policy(tmp_path, doc))
+
+
+def test_policy_rejects_a_waiver_without_a_reason(tmp_path):
+    doc = policy_doc(
+        surfaces=[{"surface": "thing", "path": "thing", "declared_class": "template"}]
+    )
+    doc["waived_roots"] = {"docs": "   "}
+    with pytest.raises(SurfacePolicyUnavailable, match="reason"):
+        load_surface_policy(write_policy(tmp_path, doc))
+
+
+def test_policy_rejects_a_waiver_with_a_non_plain_name(tmp_path):
+    doc = policy_doc(
+        surfaces=[{"surface": "thing", "path": "thing", "declared_class": "template"}]
+    )
+    doc["waived_roots"] = {"docs/site": "a nested path is not a root"}
+    with pytest.raises(SurfacePolicyUnavailable, match="plain top-level"):
+        load_surface_policy(write_policy(tmp_path, doc))
+
+
+def test_policy_accepts_a_waiver_with_a_reason(tmp_path):
+    doc = policy_doc(
+        surfaces=[{"surface": "thing", "path": "thing", "declared_class": "template"}]
+    )
+    doc["waived_roots"] = {"docs": "prose, not a product surface"}
+    policy = load_surface_policy(write_policy(tmp_path, doc))
+    assert policy.waived_roots == {"docs": "prose, not a product surface"}
 
 
 def test_policy_rejects_unreadable_file(tmp_path):

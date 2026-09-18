@@ -110,6 +110,22 @@ requirements:
 # Top-level directories that are product surfaces. Each that exists must have at
 # least one declared surface at or under it, or be waived here by name with a
 # reason. No surface root goes unclassified by omission.
+#
+# Since issue #1256 this list is no longer the gate's HORIZON. It was for #590,
+# and it failed the same way twice: a root that is not ON the list is inspected
+# by nothing, and `make surface-class` prints OK because it is not looking. That
+# is how `engine`, `guardrails`, `identity`, `control-plane` and `fleet` — five
+# roots carrying ~750 tracked files between them — came to be held to NO class
+# at all. The checker now derives the root set from the tree (`observed_roots`:
+# the roots the repository itself tracks) and refuses by name
+# (`surface-root-unrecorded`) any top-level root that is neither declared at or
+# under it nor waived below. Adding a top-level root to this repository is
+# therefore a decision the gate makes you record, not something it tolerates in
+# silence.
+#
+# The list is still load-bearing in the narrower direction: a root named here,
+# that exists, and that no declared surface covers is `surface-undeclared`. Keep
+# the two in step — declare the surface, then name its root here.
 surface_roots:
   - portal
   - gateway
@@ -121,7 +137,59 @@ surface_roots:
   # A root is covered by any declared surface path at or below it.
   - governance
   - integrations
-waived_roots: []
+  # Widened by issue #1256. The five module roots the rows below now declare.
+  # Nothing here is aspirational: each is declared at the rung its own evidence
+  # measures, and a declaration one rung above that fails the gate by name.
+  - engine
+  - guardrails
+  - identity
+  - control-plane
+  - fleet
+
+# Roots that are deliberately NOT product surfaces. A waiver is a RECORDED
+# decision, never an omission: the value IS the reason, the checker refuses a
+# waiver that carries none (a bare name would be another list with no way to
+# fail), and each waiver is honoured only for the root it names — a new root
+# still has to be declared or waived on its own.
+waived_roots:
+  config: >-
+    Declarative job data for this repo's own tooling (config/fleet-jobs.json),
+    read by the fleet cron and the runbook. It is INPUT to other surfaces'
+    gates, not a product surface: it ships no contract, suite or control of its
+    own.
+  contrib: >-
+    Contributor-supplied shared-service assets (contrib/shared-services). A
+    drop-in asset, not a surface this repo builds, holds a contract for or
+    gates.
+  docs: >-
+    The cross-cutting documentation tree. Docs are held to the doc gates
+    (scripts/check-docs.sh and friends), which check that links, anchors and
+    declarations resolve. The rungs of this ladder are measured from artifacts
+    shipped UNDER a path (controls, audit, schema, a live-sync module); a prose
+    tree carries none of them, so declaring it a product surface would make the
+    ladder measure prose.
+  e2e: >-
+    The repository's end-to-end harness. Its artifacts ARE tests, and the
+    ladder's `tests` evidence is measured under a product path with files under
+    `tests/` deliberately excluded — so a root that is itself a test tree has no
+    product artifact for the ladder to measure.
+  infra: >-
+    QUARANTINED BY NAME. This is the SAME defect as issue #1256, tracked
+    separately by issue #944 ("infra/ is not a declared surface root"): it is
+    the deploy surface (Terraform + Cloud Build declarations) and it should be
+    DECLARED, not waived. The waiver is recorded here so the new sweep does not
+    report a pre-existing, already-tracked gap as though this lane had found it.
+    Remove this entry when #944 lands.
+  scripts: >-
+    This repository's own gate and tooling tree. Its `check-*` files are
+    consumed as the `gate` evidence OF product surfaces (measure_gate reads
+    scripts/check-*), and a root whose artifacts are other surfaces' evidence is
+    not itself a product surface — the ladder would be measuring the ruler.
+  vendor: >-
+    The pinned CMR hub submodule (vendor/CMR; AGENTS.md forbids editing
+    vendor/). Third-party, pinned by gitlink and verified by
+    scripts/check-cmr-pin.sh, so it is neither this repo's product nor this
+    repo's to assign a class to.
 
 # The declared surfaces. `declared_class` is measured, never aspirational.
 #
@@ -366,3 +434,76 @@ surfaces:
       declared tags and the ledger, exposed through the existing
       `cli.py board --live` verb) that carries it past `faang` to `elite`.
       Declared at the rung its evidence measures, never above it.
+  # Widened by issue #1256. Five module roots that `surface_roots` never named,
+  # so the class gate never inspected them: each could regress a whole rung and
+  # every gate stayed green. Every `declared_class` below is the rung its own
+  # tree MEASURES today, read with the gate's own instrument — not a target, not
+  # an aspiration. Three of the five are named architecture pillars in
+  # docs/ARCHITECTURE.md (engine, guardrails, identity); the other two are the
+  # declared cross-cutting modules. Raising any row by one rung fails
+  # `make surface-class` by name, which is the point.
+  - surface: engine
+    path: engine
+    declared_class: pattern
+    notes: >-
+      The state-machine execution pillar (EPIC-00 phase 3). Contract: a
+      README.md at the root and one under each of conversation, core, loop,
+      memory, multiagent and queue. Suite: engine/conversation/tests/. Real
+      controls: engine/loop/policy.py and engine/queue/backpressure.py. It ships
+      no audit trail, no owned schema, no dedicated scripts/check-* whose name
+      carries "engine" and no live-sync module — so `pattern` is the rung the
+      tree measures, and it is two rungs from the top.
+  - surface: guardrails
+    path: guardrails
+    declared_class: faang
+    notes: >-
+      The security & guardrails pillar (EPIC-00 phase 4) and the strongest of
+      the five. Contract: guardrails/README.md plus a README under each
+      package. Suite: guardrails/chat/tests/. The declared controls:
+      guardrails/policy/controls.yaml + controls.py, read by the policy package
+      rather than carried decoratively. A real audit trail:
+      guardrails/policy/audit.py, guardrails/controls/audit.py,
+      guardrails/dlp/hmac_audit.py and guardrails/honesty/attestation.py. Owned
+      schemas under guardrails/policy/schema/ and guardrails/sandbox/. A
+      dedicated gate: scripts/check-chat-guardrails.sh. There is no live-sync
+      module, so `faang` is the measured rung. This is one rung ABOVE the
+      `enterprise` issue #1256's table estimated, and the delta is the issue's
+      own: that table was read with `measure_path_evidence` alone, which does
+      not include the `gate` evidence `measured_class` counts.
+  - surface: identity
+    path: identity
+    declared_class: pattern
+    notes: >-
+      The tenant identity/RBAC pillar (EPIC-00 phase 6). Contract: a README.md
+      at the root and one under each of chat, cpapi, edges, entitlements,
+      onboarding, rbac and sso. Suite: identity/chat/tests/. The declared access
+      control: identity/rbac/guard.py and identity/cpapi/control.py. A real
+      audit trail: identity/cpapi/audit.py. It owns no schema, which is what
+      holds it below `enterprise`; its name also matches
+      scripts/check-agent-identity-parity.sh and scripts/check-chat-identity.sh,
+      but the missing schema breaks the cumulative chain first, so the measured
+      rung is `pattern`.
+  - surface: control-plane
+    path: control-plane
+    declared_class: pattern
+    notes: >-
+      The control plane and its portal SDK (EPIC-00 phase 7). Contract: a
+      README.md at the root and one under cli, cockpit, control, fleet-template,
+      functions, instructions and sdk. Suite: control-plane/cli/tests/. Owned
+      schemas: control-plane/control/schema/verbs.schema.json,
+      control-plane/functions/schema/functions.schema.json and the four under
+      control-plane/instructions/schema/. It ships no control artifact, no audit
+      trail and no dedicated gate, so `pattern` is the measured rung.
+  - surface: fleet
+    path: fleet
+    declared_class: pattern
+    notes: >-
+      The autonomous ops fleet (the declared cross-cutting module). Contract:
+      fleet/README.md and fleet/CONTRACT.md. Suite: fleet/tests/. The declared
+      controls: fleet/control.py, fleet/decompose_policy.py and
+      fleet/profiles/routing.policy.json. Owned schemas:
+      fleet/schema/health-signal.schema.json and fleet/schema/message.schema.json.
+      A dedicated gate does exist — fourteen scripts/check-fleet-*.sh — but the
+      ladder's `audit` evidence is absent, and the cumulative chain stops at
+      `enterprise` before `gate` is ever reached, so the measured rung is
+      `pattern`.
