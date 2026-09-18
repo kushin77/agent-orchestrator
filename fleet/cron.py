@@ -85,6 +85,21 @@ REAP_MARKER = "ao-fleet-reap"
 REAP_LOG = runtime.FLEET_DIR / "reap.log"
 REAP_SCHEDULE = "47 3 * * *"
 
+# The portal-promotion rung (issue #1329, parent #1295): every N minutes it
+# runs `infra/fleet/promote_portal.py run --apply`, which reads the newest
+# immutable Artifact Registry tag reachable from `origin/master`, compares it
+# to the running `shared-services-agentconsole` container, and recreates,
+# health-gates, rolls back and records as `run_cycle` (promote_portal.py)
+# decides. It is declared here (constants + DECLARED_MARKERS + a `promote`
+# subcommand) the way #906 declared `reap`; unlike `reap` it is NOT added to
+# the enabled `config/fleet-jobs.json` manifest by this lane (out of this
+# lane's file scope — see the PR's "## Wiring needed"), so `install` will not
+# schedule it until a follow-up lane adds a manifest entry mirroring this
+# marker/schedule/command.
+PROMOTE_MARKER = "ao-fleet-promote-portal"
+PROMOTE_LOG = runtime.FLEET_DIR / "promote-portal.log"
+PROMOTE_SCHEDULE = "*/10 * * * *"
+
 # The fifth job the manifest declares, ship-gated OFF (issue #241): refreshing
 # the committed board snapshot is the one network-touching cron path, so it does
 # not change installed behaviour until a principal flips `enabled: true`.
@@ -111,7 +126,7 @@ MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, REAP_MARKER)
 #: Every marker this module has ever owned, enabled or not. `_is_ours` matches
 #: against these so `uninstall`/`reconcile` remove a line whose job is now
 #: disabled or dropped, not just one whose schedule drifted.
-DECLARED_MARKERS = MARKERS + (SNAPSHOT_REFRESH_MARKER, SCAN_PR_FAILURES_MARKER)
+DECLARED_MARKERS = MARKERS + (SNAPSHOT_REFRESH_MARKER, SCAN_PR_FAILURES_MARKER, PROMOTE_MARKER)
 
 INTERPRETER = "/usr/bin/python3"
 FLOCK = "/usr/bin/flock"
@@ -161,6 +176,20 @@ _LEGACY_JOBS = (
         "log": "reap.log",
         "singleton": False,
         "enabled": True,
+    },
+    {
+        "name": "promote-portal",
+        "marker": PROMOTE_MARKER,
+        "schedule": PROMOTE_SCHEDULE,
+        "command": "/usr/bin/python3 infra/fleet/promote_portal.py run --apply",
+        "user": "",
+        "log": "promote-portal.log",
+        "singleton": True,
+        # Ship-gated OFF, same posture as snapshot-refresh/scan-pr-failures:
+        # the manifest (config/fleet-jobs.json) is out of this lane's file
+        # scope, so this entry documents the rung `install` WOULD render once
+        # a follow-up lane flips it on there — see PROMOTE_MARKER's comment.
+        "enabled": False,
     },
 )
 
@@ -549,6 +578,14 @@ def cmd_reap(args: argparse.Namespace) -> int:
     return subprocess.call(command, cwd=ROOT)
 
 
+def cmd_promote(args: argparse.Namespace) -> int:
+    """Run the portal-promotion rung once, now — dry-run unless `--apply` is passed."""
+    command = ["python3", str(ROOT / "infra" / "fleet" / "promote_portal.py"), "run"]
+    if not args.apply:
+        command.append("--dry-run")
+    return subprocess.call(command, cwd=ROOT)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-cron", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -573,6 +610,11 @@ def build_parser() -> argparse.ArgumentParser:
     reap = sub.add_parser("reap", help="run the stale-worktree reaper once (dry-run unless --apply)")
     reap.add_argument("--apply", action="store_true", help="perform the reap (default: dry-run)")
     reap.set_defaults(func=cmd_reap)
+    promote = sub.add_parser(
+        "promote", help="run the portal-promotion rung once (dry-run unless --apply)"
+    )
+    promote.add_argument("--apply", action="store_true", help="perform the promotion (default: dry-run)")
+    promote.set_defaults(func=cmd_promote)
     return parser
 
 

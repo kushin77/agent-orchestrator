@@ -74,6 +74,13 @@ class Var:
                 return None
             allowed = ", ".join(repr(item) for item in self.choices)
             return f"{value!r} is not one of {allowed}"
+        if self.kind == "optional":
+            # Any value, including empty, is valid — used for a var whose
+            # ABSENCE is meaningful (e.g. an auth command that legitimately
+            # has no default) rather than a value this contract can shape-check.
+            return None
+        if self.kind == "nonempty":
+            return None if value.strip() else "must not be empty"
         raise AssertionError(f"unknown rule kind {self.kind!r}")  # pragma: no cover
 
 
@@ -151,6 +158,37 @@ VARS: tuple[Var, ...] = (
             "does. This is independent of AO_FLEET_DRY_RUN: a writable mount is not permission "
             "to apply — dry-run-required still refuses AO_FLEET_DRY_RUN=0 regardless of this flag."
         ),
+    ),
+    Var(
+        name="AO_FLEET_AR_READER_KEY_FILE",
+        default="",
+        kind="optional",
+        code="ar-reader-key-file-invalid",
+        why=(
+            "issue #1329: a mounted Artifact Registry service-account JSON key "
+            "PATH for infra/fleet/promote_portal.py. Optional — the rung accepts "
+            "this OR AO_FLEET_AR_ACCESS_TOKEN_CMD; absent both, it refuses "
+            "ar-auth-missing rather than defaulting to a key it invents."
+        ),
+    ),
+    Var(
+        name="AO_FLEET_AR_ACCESS_TOKEN_CMD",
+        default="",
+        kind="optional",
+        code="ar-access-token-cmd-invalid",
+        why=(
+            "issue #1329: an alternative auth shape for promote_portal.py — a "
+            "COMMAND (never a value) whose stdout is a bearer token for "
+            "Artifact Registry. Optional, same fallback pair as "
+            "AO_FLEET_AR_READER_KEY_FILE above."
+        ),
+    ),
+    Var(
+        name="AO_FLEET_PORTAL_HEALTHZ_URL",
+        default="http://127.0.0.1:18286/api/healthz",
+        kind="nonempty",
+        code="portal-healthz-url-invalid",
+        why="issue #1329: the URL promote_portal.py polls after a recreate before deciding healthy/rollback.",
     ),
 )
 

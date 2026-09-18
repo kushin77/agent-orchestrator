@@ -209,6 +209,26 @@ success criterion (a signed-in session reaching `/api/console/me` with **HTTP
 200**, read from the mounted mirror) is
 `portal/tests/test_auth_gate_secret_env.py`.
 
+### 5c. The promote rung's Artifact Registry credential (issue #1329)
+
+`infra/fleet/promote_portal.py` reads the portal image repository
+(`us-central1-docker.pkg.dev/purebliss-ghl/ao-images/portal`) to pick the tag
+it deploys. It accepts exactly one of two auth shapes, both declared paths/
+commands rather than values (GR-6):
+
+- `AO_FLEET_AR_READER_KEY_FILE` — a service-account JSON key file mounted
+  read-only (`infra/fleet/secrets_contract.py`'s `ar-reader-key` mount); or
+- `AO_FLEET_AR_ACCESS_TOKEN_CMD` — a command whose stdout is a bearer token.
+
+**OWNER ACTION (do this once):** place ONE of the two on the shared-services
+pair — either mount a reader-scoped service-account key at the path
+`AO_FLEET_AR_READER_KEY_FILE` names (default
+`${HOME}/.config/ao/ar-reader-key.json`, see `secrets_contract.py`), or export
+`AO_FLEET_AR_ACCESS_TOKEN_CMD` to a command that prints a valid AR bearer
+token. Neither is created by this repository's tooling — with neither set,
+the rung refuses `ar-auth-missing` (CANNOT-ASSESS), escalates once via the
+fleet channel, and takes no action.
+
 ## 6. Where the console sits relative to the other live surfaces
 
 | Surface | What it is | Live host / port |
@@ -256,7 +276,18 @@ Handed over by direction issue on the shared-services board (never by an edit to
 that repo):
 
 - [ ] Lift the overlay (recommended `infra/docker-compose.agentconsole.yml`).
-- [ ] Build/publish `agent-orchestrator-console` and set `AGENTCONSOLE_IMAGE`.
+- [x] Publish the image and set `AGENTCONSOLE_IMAGE` — **done by the promote
+      rung** (issue #1329): `infra/fleet/promote_portal.py`, scheduled as the
+      `ao-fleet-promote-portal` cron rung (`fleet/cron.py`), reads the newest
+      Artifact Registry `portal:<sha>` tag reachable from `origin/master`,
+      recreates `agentconsole` with `AGENTCONSOLE_IMAGE=<that ref>`, health-
+      gates the result, rolls back and escalates once on failure, and records
+      every cycle to `.fleet/deploys.jsonl` + an `ao/deploy` commit status.
+      The overlay's `agentconsole` service no longer carries a `build:`
+      fallback — `AGENTCONSOLE_IMAGE` is required, and a local build is the
+      separate, opt-in `agentconsole-dev-build` service
+      (`--profile dev-build`). ONE OWNER ACTION REMAINS: place the Artifact
+      Registry read credential on the shared-services pair — see §5c.
 - [ ] Re-check the host port, then publish `${AGENTCONSOLE_PORT:-18286}`.
 - [ ] Seed the state mounts from the host checkout's `.fleet`,
       `.portal/control/ledger` and `.board`, and make the two read-write ones
