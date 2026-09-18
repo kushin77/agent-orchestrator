@@ -1,0 +1,13 @@
+{
+  "schema": "ao.futureproof.known-gaps/v1",
+  "why": "Named, shrinking exemptions for gaps the futureproof capstone (governance/futureproof/e2e.py, issue #1193) MEASURED. An entry is honoured only while it is listed and is matched EXACTLY (mechanism + link + gate), so it cannot widen to cover a different breakage. A broken link with no entry FAILS by name, so a NEW blind or non-falsifiable gate is never waved through; an entry that matches nothing FAILS as a stale exemption and must be removed, so this list can only shrink and can never outlive its fix.",
+  "entries": [
+    {
+      "mechanism": "index",
+      "link": "gate-falsifiable",
+      "gate": "knowledge-index",
+      "issue": 1198,
+      "reason": "scripts/check-knowledge-index.sh is nine lines of dispatch around `governance/knowledge/cli.py validate` and declares no provocation of its own failure path — the only gate in the ten-mechanism table that declares neither a negative control, a self-test nor a mutation. Filed as #1198; the entry must be deleted the moment the gate gains a provoked half, and this capstone fails as a stale exemption if it is not."
+    }
+  ]
+}

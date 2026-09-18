@@ -11,6 +11,7 @@ Subcommands::
 
     check      run every enforcement rule (the gate of record)
     status     summarize the ledger without judging it
+    linkage    census the ledger -> board linkage (issue #1178)
     record     append one validated record to the canonical ledger
     template   print the canonical RCA template
 
@@ -18,6 +19,7 @@ Examples::
 
     python3 governance/lessons/cli.py check
     python3 governance/lessons/cli.py check --strict
+    python3 governance/lessons/cli.py linkage --orphans-only
     python3 governance/lessons/cli.py record --file /tmp/lesson.json
     python3 governance/lessons/cli.py status
 """
@@ -51,6 +53,7 @@ from checker import (  # noqa: E402
     parse_ledger_text,
     write_report,
 )
+import linkage as _linkage  # noqa: E402
 from model import Entry, errors, validate_record, warnings  # noqa: E402
 
 DEFAULT_ROOT = Path(_PKG_DIR).parent.parent
@@ -73,7 +76,7 @@ def _print_findings(findings) -> None:
 
 def _summary(report) -> str:
     counts = report.counts
-    return (
+    line = (
         "incidents: %d (%d closed) | rcas: %d | corrective actions: %d (%d open) | "
         "lessons: %d | suggestions: %d | board issues carrying the `incident` "
         "record label: %d"
@@ -88,6 +91,13 @@ def _summary(report) -> str:
             counts.get("board_incidents_scanned", 0),
         )
     )
+    if "records" in counts:
+        line += " | ledger records reaching the board: %d of %d (%d orphaned)" % (
+            counts.get("with_issue", 0),
+            counts.get("records", 0),
+            counts.get("orphans", 0),
+        )
+    return line
 
 
 def cmd_check(args: argparse.Namespace) -> int:
@@ -182,11 +192,86 @@ def cmd_status(args: argparse.Namespace) -> int:
     except LedgerUnavailable as exc:
         print("lessons: CANNOT-ASSESS — %s" % exc, file=sys.stderr)
         return EXIT_CANNOT_ASSESS
-    report = check_ledger(ledger, root=root, snapshot=None)
+    # The board snapshot is loaded when it is present, so the summary's holder
+    # count is a measurement rather than a constant: without it
+    # `board_incidents_scanned` is 0 by construction and the operator reads an
+    # empty scope that is not there (issue #1178 measured exactly that: `status`
+    # printed 0 while `check` measured 1).
+    snapshot = None
+    snapshot_path = root / SNAPSHOT_RELPATH
+    if snapshot_path.is_file():
+        try:
+            snapshot = load_snapshot(snapshot_path)
+        except (OSError, ValueError):
+            snapshot = None
+    report = check_ledger(ledger, root=root, snapshot=snapshot)
     print(_summary(report))
     if report.findings:
         print("  %d finding(s) in this ledger; run `check` for the gate verdict"
               % len(report.findings))
+    return EXIT_OK
+
+
+def cmd_linkage(args: argparse.Namespace) -> int:
+    """Print the ledger -> board census, and where each record cannot reach."""
+    root = Path(args.root)
+    try:
+        ledger = load_ledger(root / LEDGER_RELPATH)
+    except LedgerUnavailable as exc:
+        print("lessons: CANNOT-ASSESS — %s" % exc, file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    snapshot_path = root / SNAPSHOT_RELPATH
+    if not snapshot_path.is_file():
+        print("lessons: CANNOT-ASSESS — no board snapshot at %s" % snapshot_path,
+              file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    try:
+        snapshot = load_snapshot(snapshot_path)
+    except (OSError, ValueError) as exc:
+        print("lessons: CANNOT-ASSESS — unreadable board snapshot (%s)" % exc,
+              file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if not snapshot:
+        print("lessons: CANNOT-ASSESS — board snapshot holds no issues",
+              file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    records = list(ledger.records.values())
+    rows = _linkage.linkage_map(records, snapshot)
+    census = _linkage.counts(records, snapshot)
+
+    print(
+        "linkage: %d record(s); %d reach a board issue; %d of those reach a goal "
+        "(epic or milestone); %d orphaned (%d explicitly declared)"
+        % (
+            census["records"],
+            census["with_issue"],
+            census["with_goal"],
+            census["orphans"],
+            census["orphans_declared"],
+        )
+    )
+    print(
+        "  board issues the ledger names as an incident origin: %d; carrying the "
+        "`incident` label: %d"
+        % (census["ledger_named_issues"], census["ledger_named_labelled"])
+    )
+    if args.orphans_only:
+        rows = [row for row in rows if not row.reachable]
+    print("  %-14s %-17s %-7s %-40s %s" % ("record", "kind", "issue", "goal", "path"))
+    for row in rows:
+        print(
+            "  %-14s %-17s %-7s %-40s %s"
+            % (
+                row.id,
+                row.kind,
+                ("#%d" % row.issue) if row.issue is not None else "-",
+                row.goal or "-",
+                " -> ".join(row.path),
+            )
+        )
+        if not row.reachable and row.orphan_declared:
+            print("      declared orphan: %s" % (row.orphan_reason or "(no reason)"))
     return EXIT_OK
 
 
@@ -270,6 +355,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_status = sub.add_parser("status", help="summarize the ledger")
     p_status.set_defaults(func=cmd_status)
+
+    p_linkage = sub.add_parser(
+        "linkage", help="census the ledger -> board linkage for every record"
+    )
+    p_linkage.add_argument(
+        "--orphans-only",
+        action="store_true",
+        help="print only the records that reach no board issue",
+    )
+    p_linkage.set_defaults(func=cmd_linkage)
 
     p_record = sub.add_parser("record", help="append one validated record")
     p_record.add_argument("--file", default=None, help="read the record from a file")

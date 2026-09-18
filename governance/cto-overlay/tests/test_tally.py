@@ -4,7 +4,25 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import engine, state_of, summary_of, verdicts_for
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_cto_overlay_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+engine = _conftest.engine
+state_of = _conftest.state_of
+summary_of = _conftest.summary_of
+verdicts_for = _conftest.verdicts_for
 
 
 def test_every_declared_check_is_recorded_exactly_once(make_repo, assess):

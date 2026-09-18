@@ -631,10 +631,14 @@ mutant_dir = work / "mutant"
 mutant_dir.mkdir(exist_ok=True)
 mutant_path = mutant_dir / "gatelock_mutant.py"
 original = MODULE.read_text(encoding="utf-8")
-needle = "def _try_lock(fd: int) -> bool:\n    try:\n"
-mutated = original.replace(
-    needle, "def _try_lock(fd: int) -> bool:\n    return True\n    try:\n", 1
-)
+# `_try_lock`'s body grew a docstring (issue #713) between the `def` line and
+# its `try:`, so a needle anchored on the two being adjacent went stale and
+# never matched — the mutation silently never applied and this control read
+# vacuous (issue #1106). Anchor on the `try:`/`lease.fcntl_flock_nb` call
+# itself instead, which is what actually does the flock and is what the
+# mutation needs to bypass.
+needle = "    try:\n        return lease.fcntl_flock_nb(fd, strict=True)\n"
+mutated = original.replace(needle, "    return True\n" + needle, 1)
 check(
     "the mutation applied to the module under test",
     mutated != original and needle in original,
@@ -774,6 +778,15 @@ orchestrator_files = (
     "scripts/gate-lock.sh",
     "scripts/discover-checks.sh",
     "fleet/gatelock.py",
+    # gatelock.py imports `lease` (package-relative `from fleet import lease`,
+    # falling back to script-style `import lease` when `fleet/` itself is on
+    # sys.path — see fleet/gatelock.py's own comment). Without this sibling
+    # module the real `scripts/verify.sh` started below cannot import
+    # gatelock.py at all: it dies with a bare "No module named 'fleet'" /
+    # "No module named 'lease'" before it ever reaches a check, and gate A's
+    # ADMITTED assertion below fails for a reason that has nothing to do with
+    # the wedge this gate proves (issue #1106).
+    "fleet/lease.py",
 )
 identical = True
 for relative in orchestrator_files:

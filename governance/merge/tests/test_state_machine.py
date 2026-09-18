@@ -15,7 +15,9 @@ from model import (
     InvalidTransition,
     MergeGovernanceMachine,
     MergeGovernanceViolation,
+    MergeSignals,
     PrState,
+    merge_verdict,
 )
 
 
@@ -146,8 +148,6 @@ class TestPolicyRulesAreRecheckedAtConclude:
         machine.begin_verify()
         # no record_verify call; cannot even reach the conclude state, but the
         # policy function itself must refuse when evidence is missing:
-        from model import MergeSignals, merge_verdict
-
         permitted, reasons = merge_verdict(
             MergeSignals(
                 verify_green=False,

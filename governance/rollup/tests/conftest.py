@@ -26,6 +26,29 @@ REPO_ROOT = ROLLUP_DIR.parents[1]
 if str(ROLLUP_DIR) not in sys.path:
     sys.path.insert(0, str(ROLLUP_DIR))
 
+# governance/rollup shares the bare basenames "model" and "schema" with
+# sibling governance/* suites. Evict any stale sys.modules entry from an
+# earlier-collected suite before this directory's test modules do their own
+# bare imports, so they resolve against THIS package's files (issues #699,
+# #702, #1042).
+for _name in ("model", "schema"):
+    sys.modules.pop(_name, None)
+
+# Persistent handle for the lazy in-function import below: a bare
+# ``from model import ...`` executed at TEST-EXECUTION time would run after
+# collection has already imported every governance suite's conftest, so
+# sys.modules may by then hold a sibling suite's "model" (issues #699, #702,
+# #1042). Bound here at collection time instead.
+import model as _rollup_model  # noqa: E402
+
+# governance/rollup/inputs.py does its own module-level ``from model import
+# Org, ...`` the first time it is imported; importing it HERE, immediately
+# after re-binding "model" above, guarantees that first import happens while
+# sys.modules["model"] is still this package's own (rather than lazily, at
+# TEST-EXECUTION time, when a sibling suite may have already re-pointed the
+# bare "model" name — issues #699, #702, #1042).
+import inputs as _rollup_inputs  # noqa: E402
+
 ORG_SCHEMA = "ao.rollup/org-v1"
 INVENTORY_SCHEMA = "ao.rollup/fleet-inventory-v1"
 
@@ -161,8 +184,9 @@ def build_report(root: Path, org_doc: Mapping[str, Any], inventories: Iterable[M
     Goes through the same path the CLI uses (schema validation included), so a
     test cannot accidentally bypass the contract by constructing facts directly.
     """
-    from inputs import load_inputs, with_problems
-    from model import project
+    load_inputs = _rollup_inputs.load_inputs
+    with_problems = _rollup_inputs.with_problems
+    project = _rollup_model.project
 
     org_path = write_tree(root, org_doc, inventories)
     loaded = load_inputs(org_path, Path(root) / "inventory", ROLLUP_DIR / "schema.yaml")

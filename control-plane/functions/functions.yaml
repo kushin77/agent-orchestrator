@@ -211,6 +211,28 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng, Manager, Analyst]
 
+  - id: LIVENESS
+    title: "Liveness — whether the board's freshness contract has an installed producer"
+    kind: view
+    endpoints: [board/liveness]
+    parameters: []
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
+  - id: DANGLING
+    title: "Dangling — open issues whose declared parent is closed, and the remedy"
+    kind: view
+    endpoints: [board/dangling]
+    parameters: []
+    scope: {capability: board:read, level: org, tenant: platform}
+    effect_class: read
+    audit: null
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager, Analyst]
+
   - id: WAVES
     title: "Waves — the wave plan and whether the next item is eligible"
     kind: panel

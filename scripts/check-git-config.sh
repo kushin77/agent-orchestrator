@@ -18,15 +18,27 @@
 #      to the repo root, symlinks included) to this repo's own `.gitmessage`.
 #      Unset, or pointed at any other file, is NOT-OK — a template that does
 #      not resolve to the repo's file is not the governed one.
-#   3. IDENTITY — the lane worktree's OWN config sets both `user.name` and
-#      `user.email` — global/system inheritance does NOT count. When
-#      `extensions.worktreeConfig` is enabled (this repo's linked worktrees),
-#      "own config" is `git config --worktree` (`.git/worktrees/<id>/config.worktree`
-#      — `--local` reads the SHARED main-repo config, not the lane's own file,
-#      under that extension). Otherwise it is `git config --local`. A worktree
-#      that inherits identity only from `~/.gitconfig` fails this check: that
-#      identity did not travel with the lane and is not what a clone of this
-#      worktree would carry.
+#   3. IDENTITY — scoped by issue #1106 to the population the identity
+#      mechanism actually covers:
+#      - a FLEET LANE (a worktree named by a `.fleet/lanes/*.json` record —
+#        i.e. provisioned through `governance/isolation open`, which is what
+#        stamps identity in the first place) must set both `user.name` and
+#        `user.email` in its OWN config — global/system inheritance does NOT
+#        count. When `extensions.worktreeConfig` is enabled (this repo's
+#        linked worktrees), "own config" is `git config --worktree`
+#        (`.git/worktrees/<id>/config.worktree` — `--local` reads the SHARED
+#        main-repo config, not the lane's own file, under that extension).
+#        Otherwise it is `git config --local`. A lane that inherits identity
+#        only from `~/.gitconfig` fails this check: that identity did not
+#        travel with the lane and is not what a clone of the lane would carry.
+#      - any OTHER worktree (the shared main checkout, a bare `git worktree
+#        add`, a detached scratch worktree) was never provisioned by that
+#        mechanism, so nothing ever stamped it — holding it to the strict
+#        rule fails it by construction (measured: even this repo's own main
+#        checkout carries no `--worktree`/`--local` identity, only
+#        `~/.gitconfig`). It only needs its EFFECTIVE identity (`git config
+#        --get user.name`/`user.email`, following the normal resolution
+#        chain) to be non-empty.
 #
 # BOOTSTRAP MODE
 #   `bash scripts/check-git-config.sh --bootstrap` sets `commit.template` to
@@ -210,26 +222,112 @@ else
 fi
 
 # --- 3. identity ---------------------------------------------------------
+# Strict "own config, not inherited" identity is the declared mechanism for a
+# FLEET LANE (governance/isolation/worktree.py's `provision`+`write_record`,
+# driven by `governance/isolation/cli.py open`): minting a lane enables
+# `extensions.worktreeConfig` and stamps `git config --worktree user.name/
+# user.email` itself, so a provisioned lane always has its own copy and the
+# strict check is a real property of that mechanism, not a wish.
+#
+# A worktree this repo never provisioned that way — the shared main checkout,
+# a bare `git worktree add`, or the detached scratch worktree issue #1106 was
+# measured against — was never handed that mechanism to begin with; nothing
+# in this repo ever runs `write_record`/`stamp_identity` against it. Holding
+# it to the strict rule fails it BY CONSTRUCTION, main checkout included
+# (measured: this repo's own main checkout carries no `--worktree`/`--local`
+# user.name/user.email either, only `~/.gitconfig` inheritance) — that is not
+# a property of the code under test, it is just "nobody minted a lane here",
+# so #1106 does not weaken the rule for provisioned lanes; it scopes the rule
+# to the population the mechanism actually covers.
+#
+# Decision (recorded here per issue #1106, and in the issue thread):
+#   - a worktree with a matching `.fleet/lanes/*.json` record (main repo's
+#     record, `worktree` field resolving to this root) is a fleet lane: the
+#     STRICT own-config check applies, unchanged.
+#   - any other worktree (main checkout, a bare `git worktree add`, a
+#     detached scratch worktree) is OUT OF SCOPE for the strict form: it is
+#     enough for the EFFECTIVE identity (`git config --get`, following the
+#     normal worktree -> local -> global -> system chain) to resolve to a
+#     real, non-empty user.name/user.email — the property this checkout can
+#     actually be expected to carry without ever having gone through
+#     `governance/isolation open`.
 echo
-echo "== 3. this worktree's own config sets user.name and user.email =="
-own_scope="--local"
-if [ "$(git -C "$root" config --get extensions.worktreeConfig 2>/dev/null || true)" = "true" ]; then
-  own_scope="--worktree"
+echo "== 3. identity =="
+
+common_dir="$(git -C "$root" rev-parse --git-common-dir 2>/dev/null || true)"
+case "$common_dir" in
+/*) : ;;
+*) common_dir="$root/$common_dir" ;;
+esac
+main_root="$(cd "$(dirname "$common_dir")" 2>/dev/null && pwd || true)"
+root_real="$(realpath -e "$root" 2>/dev/null || echo "$root")"
+
+is_lane=0
+if [ -n "$main_root" ] && [ -d "$main_root/.fleet/lanes" ]; then
+  for record in "$main_root"/.fleet/lanes/*.json; do
+    [ -e "$record" ] || continue
+    if command -v python3 >/dev/null 2>&1; then
+      record_worktree="$(python3 -c '
+import json, sys
+try:
+    print(json.load(open(sys.argv[1]))["worktree"])
+except Exception:
+    pass
+' "$record" 2>/dev/null || true)"
+    else
+      # No python3: fall back to a plain-text extraction of the "worktree"
+      # field rather than silently treating every worktree as a non-lane
+      # (that would quietly downgrade the strict rule for every lane on a
+      # box without python3 — the opposite of "record the decision").
+      record_worktree="$(sed -n 's/.*"worktree"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$record" | head -1)"
+    fi
+    [ -n "$record_worktree" ] || continue
+    record_worktree_real="$(realpath -e "$record_worktree" 2>/dev/null || echo "$record_worktree")"
+    if [ "$record_worktree_real" = "$root_real" ]; then
+      is_lane=1
+      break
+    fi
+  done
 fi
-user_name="$(git -C "$root" config "$own_scope" --get user.name 2>/dev/null || true)"
-user_email="$(git -C "$root" config "$own_scope" --get user.email 2>/dev/null || true)"
-printf '  NOTE  own-config scope: %s\n' "$own_scope"
-if [ -n "$user_name" ]; then
-  printf '  OK    user.name=%s (%s)\n' "$user_name" "$own_scope"
+
+if [ "$is_lane" = "1" ]; then
+  echo "== this worktree is a fleet lane — own config sets user.name and user.email =="
+  own_scope="--local"
+  if [ "$(git -C "$root" config --get extensions.worktreeConfig 2>/dev/null || true)" = "true" ]; then
+    own_scope="--worktree"
+  fi
+  user_name="$(git -C "$root" config "$own_scope" --get user.name 2>/dev/null || true)"
+  user_email="$(git -C "$root" config "$own_scope" --get user.email 2>/dev/null || true)"
+  printf '  NOTE  own-config scope: %s\n' "$own_scope"
+  if [ -n "$user_name" ]; then
+    printf '  OK    user.name=%s (%s)\n' "$user_name" "$own_scope"
+  else
+    printf '  FAIL  user.name is unset in this worktree'"'"'s own config (%s) — global/system inheritance does not count\n' "$own_scope" >&2
+    fail=$((fail + 1))
+  fi
+  if [ -n "$user_email" ]; then
+    printf '  OK    user.email=%s (%s)\n' "$user_email" "$own_scope"
+  else
+    printf '  FAIL  user.email is unset in this worktree'"'"'s own config (%s) — global/system inheritance does not count\n' "$own_scope" >&2
+    fail=$((fail + 1))
+  fi
 else
-  printf '  FAIL  user.name is unset in this worktree'"'"'s own config (%s) — global/system inheritance does not count\n' "$own_scope" >&2
-  fail=$((fail + 1))
-fi
-if [ -n "$user_email" ]; then
-  printf '  OK    user.email=%s (%s)\n' "$user_email" "$own_scope"
-else
-  printf '  FAIL  user.email is unset in this worktree'"'"'s own config (%s) — global/system inheritance does not count\n' "$own_scope" >&2
-  fail=$((fail + 1))
+  echo "== not a fleet lane (no governance/isolation record) — effective identity must resolve =="
+  eff_name="$(git -C "$root" config --get user.name 2>/dev/null || true)"
+  eff_email="$(git -C "$root" config --get user.email 2>/dev/null || true)"
+  printf '  NOTE  no governance/isolation lane record names this worktree — issue #1106 scopes the strict own-config rule to provisioned lanes\n'
+  if [ -n "$eff_name" ]; then
+    printf '  OK    effective user.name=%s\n' "$eff_name"
+  else
+    printf '  FAIL  no effective user.name resolves (worktree, local, global, or system)\n' >&2
+    fail=$((fail + 1))
+  fi
+  if [ -n "$eff_email" ]; then
+    printf '  OK    effective user.email=%s\n' "$eff_email"
+  else
+    printf '  FAIL  no effective user.email resolves (worktree, local, global, or system)\n' >&2
+    fail=$((fail + 1))
+  fi
 fi
 
 # --- verdict ---------------------------------------------------------------

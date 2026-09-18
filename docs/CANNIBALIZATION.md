@@ -217,7 +217,7 @@ These are **not** resolved in this index — they are flagged so a later lane or
 decision records the single source of truth **before** two phases adopt two
 different copies.
 
-### 3.1 Fleet-standard trio: `MODEL-PROFILES` / `SME-PROFILES` / `SOLUTION-CLASSES` — canonical copy **TO BE DECIDED**
+### 3.1 Fleet-standard trio: `MODEL-PROFILES` / `SME-PROFILES` / `SOLUTION-CLASSES` — canonical copy **RESOLVED** (ADR-0010; reaffirmed per doc by ADR-0031)
 
 The identical doc trio exists in **at least three repos** (confirmed present on
 disk):
@@ -228,11 +228,31 @@ disk):
 | shared-frontend | `shared-frontend/docs/MODEL-PROFILES.md`, `SME-PROFILES.md`, `SOLUTION-CLASSES.md` | Labeled the **"fleet-standard trio"** — persona/model/quality docs. |
 | code-indexing | `code-indexing/docs/MODEL-PROFILES.md`, `SME-PROFILES.md`, `SOLUTION-CLASSES.md` | Report explicitly says *"verify which copy is canonical before adopting"*. |
 
-**Action:** a decision record (or the phase-0/phase-1 owner) must pick one
-canonical home (CMR is the natural hub) and make the other two reference-only
-pointers, so the product's persona/model/quality docs don't drift across three
-vendored copies. Until decided, treat **CMR as the working default** and flag any
-adoption with the provenance line `harvested_from: <repo>/<path>` (GR-10).
+**Decision (resolved by
+[ADR-0010](decision-records/ADR-0010-canonical-copy-ownership.md), issue #47;
+reaffirmed per doc by
+[ADR-0031](decision-records/ADR-0031-solution-class-ladder-pin-and-class-ceilings.md),
+issue #883):** the canonical home of all three docs is **`kushin77/CMR`
+`docs/`**, treated as one co-evolving unit. `kushin77/shared-frontend` is the
+recorded **origin lineage** (a reference mirror); `kushin77/code-indexing` is a
+**consumer** whose adapted copies carry GR-10 provenance pointing at CMR. This
+repo reads the trio only from the pinned `vendor/CMR/docs/` path (gitlink =
+`cmr-pin.yaml` `bundle_ref`) and carries no local copy — enforced by
+`governance/dupcheck/check-duplicates.sh scan`, which refuses any of the three
+names outside `vendor/` and `.research/`.
+
+Per-doc evidence of where each is actually maintained today (2026-09-17,
+`grep -rn "MODEL-PROFILES\|SME-PROFILES\|SOLUTION-CLASSES" docs/ AGENTS.md`):
+
+| Doc | Canonical | Where this repo reads it | Evidence |
+|---|---|---|---|
+| `SOLUTION-CLASSES.md` | CMR | `vendor/CMR/docs/` — named by `governance/conformance/surfaces.yaml`, `docs/SURFACE-CLASS.md`, ADR-0010 | the ladder the hub's own `fleet/MANIFEST.tsv` `class` column and every local class gate use |
+| `MODEL-PROFILES.md` | CMR | `vendor/CMR/docs/` (ADR-0010 §Context) | the vendor mirror at pin `b6c49aa` is newer than the CMR snapshot the spike measured — CMR is where edits land |
+| `SME-PROFILES.md` | CMR | `vendor/CMR/docs/` — `docs/REGISTRY-PROVENANCE.md` records `kushin77/CMR docs/SME-PROFILES.md` as the REFERENCE for SME card doctrine | shared-frontend is the origin of the persona spec "(mirrored at CMR)"; the mirror is where the fleet reads it |
+
+Any adoption still carries the provenance line `harvested_from: <repo>/<path>`
+(GR-10). A later split of the trio across homes is a **new** ADR that names
+ADR-0010 in `supersedes`.
 
 ### 3.2 `dprs ≡ git-rca-workspace` — byte-identical (confirmed)
 

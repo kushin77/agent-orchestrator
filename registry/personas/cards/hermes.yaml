@@ -47,6 +47,7 @@ provenance:
   - "kushin77/hermes-agents src/hermes_agent/services/capability_registry.py (code-gen/refactor/test-gen capability routing)"
   - "kushin77/hermes-agents models/model_tiering.py (tier/ceiling/cost model)"
   - "agent-orchestrator registry/profiles/seeds/hermes.1.0.0.yaml (issue #9 seed semantics)"
+  - "agent-orchestrator issue #889 (EPIC #878 lane L10): hermes is the registered head agent for the gateway/registry/module-registry/hermes-integration surface live-sync work; persona-card.schema.json carries no head field (additionalProperties: false), so this is recorded here under the existing provenance key rather than as a new schema field"
 description: |
   Hermes is the purebliss team's coding worker: it works in its own git
   worktree, edits only the files its issue owns, runs the issue's Verify

@@ -1385,6 +1385,42 @@ def watchdog_once(force: bool = False) -> int:
         watchdog_lease.release()
 
 
+def _self_reap_own_gate_lock() -> bool:
+    """Reap THIS checkout's own leftover gate-lock file, never box-wide.
+
+    RCA 2026-09-17 fix #3, and RCA-0015 before it
+    (governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md), already
+    ruled a box-wide sweep unsafe: a sweeper walking every worktree can race
+    a DIFFERENT worktree's in-flight `gatelock.acquire` between that
+    acquirer's `os.open(O_CREAT)` and its `_try_lock` — the file is briefly
+    unflocked and looks exactly like a leftover, so the sweep would unlink
+    it, the acquirer's `_flock_fresh` re-check would fail, and a
+    legitimately starting gate would report rc 12 CANNOT-ASSESS for a key it
+    never touched. Scoped to ``ROOT`` — the one worktree this watchdog
+    process itself runs in — the only acquirer that could ever be in that
+    window is this same checkout, so the race is gone: this is the same
+    operation this worktree's own `gatelock.release` already performs, just
+    runnable on a schedule without a live gate around to call `release`
+    first. `gatelock.health()` (called above, in `_watchdog_once_locked`)
+    stays the box-wide, alert-only, never-reaps sweep; this is a second,
+    narrower, self-owned call site — pulled into its own function so it is
+    unit-testable without exercising the whole watchdog pass.
+
+    Returns whether the call was unassessable (an exception), so the caller
+    can fold that into its own CANNOT-ASSESS verdict.
+    """
+    try:
+        reaped = gatelock.reap_own_worktree(ROOT)
+    except Exception as exc:  # defensive: mirrors this pass's own CANNOT-ASSESS style
+        print(f"[watchdog] gate-lock self-reap: CANNOT-ASSESS — {exc}", flush=True)
+        return True
+    if reaped:
+        print(f"[watchdog] gate-lock self-reap: reaped own leftover for {ROOT}", flush=True)
+    else:
+        print("[watchdog] gate-lock self-reap: nothing to reap", flush=True)
+    return False
+
+
 def _watchdog_once_locked(force: bool) -> int:
     try:
         # Refuse a misconfigured bound BEFORE any rung is acted on: a typo must
@@ -1466,6 +1502,12 @@ def _watchdog_once_locked(force: bool) -> int:
                 "above; run 'bash scripts/gate-lock.sh doctor' or 'status' to act",
                 flush=True,
             )
+    # RCA 2026-09-17 fix #3: a proven-free reap scoped to THIS checkout's own
+    # worktree — never box-wide. See `_self_reap_own_gate_lock` for why a
+    # box-wide sweep stays refused (RCA-0015) while a worktree-scoped one is
+    # safe.
+    if _self_reap_own_gate_lock():
+        unassessable = True
     if failed:
         return channel.EXIT_NOT_OK
     if unassessable:

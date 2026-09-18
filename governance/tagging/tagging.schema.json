@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agent-orchestrator tag authority shapes",
+  "description": "The frozen shapes of the tag authority's own artifacts (issue #1175): the taxonomy, the rules, the controls, and one ledger row. Validated by the repository's stdlib-only subset validator (governance/modules/schema.py), which REFUSES a schema using a keyword it does not implement — an ignored keyword would be a requirement nobody measures. This schema is what makes the authority consumable by another tool (and by `cli.py`, which validates each document before deriving from it) rather than a set of YAML files with an implied shape.",
+  "type": "object",
+  "properties": {
+    "taxonomy": {
+      "type": "object",
+      "description": "governance/tagging/taxonomy.yaml",
+      "required": ["schema", "targets", "dimensions", "refusals"],
+      "properties": {
+        "schema": { "const": "ao.tagging/taxonomy-v1" },
+        "apiVersion": { "type": "string" },
+        "kind": { "const": "TagTaxonomy" },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "required": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "recommended": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "dimensions": {
+          "type": "object",
+          "minItems": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": ["kind", "applies_to"],
+            "properties": {
+              "kind": { "enum": ["borrowed", "closed", "pattern"] },
+              "multi": { "type": "boolean" },
+              "ordered": { "type": "boolean" },
+              "applies_to": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "string" }
+              },
+              "values": { "type": "array", "items": { "type": "string" } },
+              "pattern": { "type": "string" },
+              "description": { "type": "string" },
+              "mutually_exclusive": {
+                "type": "array",
+                "items": { "type": "array", "minItems": 2, "items": { "type": "string" } }
+              },
+              "borrowed_from": {
+                "type": "object",
+                "required": ["path", "pointer"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "pointer": { "type": "string" },
+                  "drift": { "enum": ["exact-set", "subset"] }
+                }
+              },
+              "name_authority": {
+                "type": "object",
+                "required": ["path", "pointer"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "pointer": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "refusals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "rule", "names_in_the_finding", "provoked_by"],
+            "properties": {
+              "id": { "type": "string" },
+              "rule": { "type": "string" },
+              "names_in_the_finding": { "type": "string" },
+              "provoked_by": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "description": "governance/tagging/rules.yaml",
+      "required": ["schema", "baseline", "rules", "finops"],
+      "properties": {
+        "schema": { "const": "ao.tagging/rules-v1" },
+        "apiVersion": { "type": "string" },
+        "kind": { "const": "TagRules" },
+        "baseline": { "type": "array", "items": { "$ref": "#/properties/gate" } },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "when", "gates"],
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "when": {
+                "type": "object",
+                "properties": {
+                  "dimension": { "type": "string" },
+                  "includes": { "type": "array", "items": { "type": "string" } },
+                  "class_at_least": { "type": "string" }
+                }
+              },
+              "gates": { "type": "array", "items": { "$ref": "#/properties/gate" } },
+              "finops_floor": { "type": "string" },
+              "require_declaration": { "type": "string" },
+              "forbid_markers": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "finops": {
+          "type": "object",
+          "required": ["floors_by_rank"],
+          "properties": {
+            "floors_by_rank": {
+              "type": "object",
+              "required": ["flash", "pro", "auditor"],
+              "additionalProperties": { "type": "integer" }
+            },
+            "notes": { "type": "string" }
+          }
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "description": "One required gate, in its resolvable form.",
+      "required": ["gate", "channel"],
+      "properties": {
+        "gate": { "type": "string" },
+        "channel": { "enum": ["pr", "ci", "cd", "ops"] }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "description": "governance/tagging/controls.yaml",
+      "required": ["schema", "controls", "limits"],
+      "properties": {
+        "schema": { "const": "ao.tagging/controls-v1" },
+        "apiVersion": { "type": "string" },
+        "kind": { "const": "TagControls" },
+        "controls": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "rule", "severity"],
+            "properties": {
+              "id": { "type": "string" },
+              "rule": { "type": "string" },
+              "severity": { "enum": ["error", "warning"] },
+              "required": {
+                "type": "object",
+                "additionalProperties": { "type": "array", "items": { "type": "string" } }
+              },
+              "recommended": {
+                "type": "object",
+                "additionalProperties": { "type": "array", "items": { "type": "string" } }
+              },
+              "floors_by_rank": {
+                "type": "object",
+                "additionalProperties": { "type": "integer" }
+              },
+              "dimension": { "type": "string" },
+              "pairs": {
+                "type": "array",
+                "items": { "type": "array", "minItems": 2, "items": { "type": "string" } }
+              },
+              "prefixes": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "required": ["max_dimensions", "max_rules", "max_refusals"],
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "ledger_row": {
+      "type": "object",
+      "description": "One append-only record in the tag authority's ledger (.fleet/tagging/ledger.jsonl). Frozen: an undeclared property is refused, because a record whose shape drifts is not an audit trail.",
+      "additionalProperties": false,
+      "required": ["at", "kind", "subject", "decision"],
+      "properties": {
+        "at": { "type": "string" },
+        "kind": { "enum": ["plan", "check", "board", "lift"] },
+        "subject": { "type": "string" },
+        "decision": { "enum": ["ok", "refused", "cannot-assess"] },
+        "exit_code": { "type": "integer" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "gates": { "type": "integer" },
+        "finops_floor": { "type": "string" },
+        "rules_fired": { "type": "array", "items": { "type": "string" } },
+        "finding_codes": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

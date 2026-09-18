@@ -28,6 +28,18 @@
 #     a remote branch. A worktree parked on a local branch is reported PARKED and
 #     kept, because its owner may still be working in it.
 #
+# TWO MORE GUARANTEES ADDED FOR ISSUE #830:
+#   * a worktree whose ONLY uncommitted paths are DECLARED runtime state — files a
+#     MACHINE rewrote, not the lane — is no longer kept for ever (#830 measured 11
+#     of 66 keeps held by a single such file). The declared set is READ, in exactly
+#     one place, from `governance/isolation/worktree.py`'s MACHINE_MANAGED_PATHS;
+#     if it cannot be read NOTHING is excused and the stricter rule stands.
+#   * LANE BRANCHES get a reaper (--branches): a local branch whose own change is
+#     provably on origin/master is reapable. "Landed" is decided by CONTENT
+#     EQUIVALENCE, never by ancestry — this repo squash-merges, so a fully-landed
+#     branch is NEVER an ancestor of master, and an ancestry test keeps it for
+#     ever. A branch this cannot prove is KEPT.
+#
 # Exit-code contract: 0 OK / 1 NOT-OK (stale worktrees found in --check) /
 # 2 CANNOT-ASSESS.
 #
@@ -37,6 +49,8 @@
 #   bash scripts/prune-worktrees.sh --check          # exit 1 if any stale exist
 #   bash scripts/prune-worktrees.sh --check --strict  # count only work preserved
 #                                                     # outside its own worktree
+#   bash scripts/prune-worktrees.sh --branches        # ALSO report landed lane branches
+#   bash scripts/prune-worktrees.sh --branches --apply  # ...and delete them
 set -uo pipefail
 
 # The repo to operate on is the one this script is RUN IN, not the one it lives
@@ -52,12 +66,16 @@ cd "$root" || exit 2
 apply=0
 check=0
 strict=0
+branches=0
 for arg in "$@"; do
   case "$arg" in
     --apply) apply=1 ;;
     --check) check=1 ;;
     --strict) strict=1 ;;
-    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+    --branches) branches=1 ;;
+    # The help is the header itself, delimited by the first code line rather than
+    # by a line number a later edit can invalidate.
+    -h|--help) awk 'NR > 1 && /^set -uo pipefail/{exit} NR > 1' "$0"; exit 0 ;;
     *) echo "prune-worktrees: unknown argument $arg" >&2; exit 2 ;;
   esac
 done
@@ -72,7 +90,8 @@ current="$root"
 scratch="$(mktemp)"
 live_cwds="$scratch.cwds"
 live_lanes="$scratch.lanes"
-trap 'rm -f "$scratch" "$live_cwds" "$live_lanes"' EXIT
+declared="$scratch.declared"
+trap 'rm -f "$scratch" "$live_cwds" "$live_lanes" "$declared"' EXIT
 
 # cwd of every live process — a worktree in use must never be removed.
 for link in /proc/[0-9]*/cwd; do
@@ -170,6 +189,103 @@ preserved() { # preserved <sha> — is this commit reachable outside the worktre
   landed_in_master "$1" || on_a_remote_branch "$1"
 }
 
+# --- item 3 (issue #830): declared runtime state is not a lane's work --------
+#
+# The dirty test above counts GENERATED runtime state as uncommitted lane work, so
+# a finished lane whose only dirt is a file a MACHINE rewrote can never be
+# reclaimed. The set is DECLARED, in exactly one place — `MACHINE_MANAGED_PATHS` in
+# `governance/isolation/worktree.py` (#834) — and is READ from there, never copied:
+# a second copy here would be a declaration that could disagree with its owner.
+#
+# FAIL CLOSED. An unreadable or unparsable declaration excuses NOTHING, so a lane
+# whose dirt is real is still kept. Widening what may be discarded is never the
+# safe direction for a failure.
+machine_managed_paths() { # machine_managed_paths — the declared runtime-state paths, one per line
+  python3 - "$root" <<'PY'
+import ast
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]) / "governance" / "isolation" / "worktree.py"
+try:
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+except (OSError, SyntaxError, ValueError):
+    sys.exit(3)
+
+value = None
+for node in tree.body:
+    targets = [node.target] if isinstance(node, ast.AnnAssign) else getattr(node, "targets", [])
+    for target in targets:
+        if isinstance(target, ast.Name) and target.id == "MACHINE_MANAGED_PATHS":
+            try:
+                value = ast.literal_eval(node.value)
+            except ValueError:
+                sys.exit(3)
+if not isinstance(value, (list, tuple)) or not all(isinstance(item, str) for item in value):
+    sys.exit(3)
+for item in value:
+    print(item)
+PY
+}
+
+if ! machine_managed_paths > "$declared" 2>/dev/null; then
+  : > "$declared"
+fi
+
+foreign_dirt() { # foreign_dirt <worktree> — uncommitted paths that are NOT declared runtime state
+  local path="$1" count=0 entry name listing
+  # Fast path: a clean worktree needs no second look.
+  [ -z "$(git -C "$path" status --porcelain 2>/dev/null)" ] && { printf '0'; return; }
+  # -uall, so a declared file inside an otherwise-untracked directory is named
+  # individually rather than collapsed to the directory that contains it.
+  listing="$(git -C "$path" status --porcelain --untracked-files=all 2>/dev/null)"
+  while IFS= read -r entry; do
+    [ -z "$entry" ] && continue
+    name="${entry:3}"
+    case "$name" in
+      *" -> "*) name="${name##* -> }" ;;
+    esac
+    if [ -s "$declared" ] && grep -qxF -- "$name" "$declared"; then
+      continue
+    fi
+    count=$((count + 1))
+  done <<< "$listing"
+  printf '%s' "$count"
+}
+
+# --- item 2 (issue #830): lane branches have no reaper ----------------------
+#
+# #830 measured 302 unmatched lane branches that no tool looks at. LANDED IS
+# DECIDED BY CONTENT, NEVER BY ANCESTRY: the landing path squash-merges, so a
+# fully-landed branch is never an ancestor of master and `merge-base --is-ancestor`
+# would call every landed lane "unmerged", keeping it for ever. The test here takes
+# the merge base, lists every path the branch changed since it, and requires
+# origin/master to hold EXACTLY the branch's content for that path. If master moved
+# on and differs anywhere — or nothing can be compared — the branch is KEPT.
+landed_by_content() { # landed_by_content <ref> — is the ref's own change already on origin/master?
+  local ref="$1" base path theirs ours changed=0
+  if git -C "$root" merge-base --is-ancestor "$ref" origin/master 2>/dev/null; then
+    return 0
+  fi
+  base="$(git -C "$root" merge-base "$ref" origin/master 2>/dev/null)" || return 1
+  [ -z "$base" ] && return 1
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    changed=$((changed + 1))
+    theirs="$(git -C "$root" rev-parse --verify --quiet "$ref:$path" 2>/dev/null || true)"
+    ours="$(git -C "$root" rev-parse --verify --quiet "origin/master:$path" 2>/dev/null || true)"
+    if [ "$theirs" != "$ours" ]; then
+      return 1
+    fi
+  done < <(git -C "$root" diff --name-only "$base" "$ref" 2>/dev/null)
+  [ "$changed" -gt 0 ]
+}
+
+# Snapshot BEFORE the sweep: a worktree this run removes must not release the
+# branch it was holding into the same run's reach.
+checked_out="$(git -C "$root" worktree list --porcelain \
+  | awk '/^branch /{ sub("^refs/heads/", "", $2); print $2 }')"
+
 stale=0
 unsafe=0
 while read -r path sha ref; do
@@ -178,10 +294,13 @@ while read -r path sha ref; do
     "$current") continue ;;
   esac
   dirty="$(git -C "$path" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
-  if [ "$dirty" != "0" ]; then
+  if [ "$(foreign_dirt "$path")" != "0" ]; then
     printf '  KEEP   %s — %s uncommitted file(s)\n' "$path" "$dirty"
     unsafe=$((unsafe + 1))
     continue
+  fi
+  if [ "$dirty" != "0" ]; then
+    printf '  NOTE   %s — %s uncommitted path(s), all declared runtime state; not the lane s work (#830)\n' "$path" "$dirty"
   fi
   if grep -qxF -- "$path" "$live_cwds"; then
     printf '  KEEP   %s — in use by a live process\n' "$path"
@@ -220,9 +339,50 @@ done < <(git -C "$root" worktree list --porcelain | awk '
 
 git -C "$root" worktree prune 2>/dev/null || true
 
+branch_stale=0
+branch_kept=0
+if [ "$branches" -eq 1 ]; then
+  while IFS= read -r branch; do
+    [ -z "$branch" ] && continue
+    case "$branch" in
+      master|main|HEAD) continue ;;
+    esac
+    is_checked_out=0
+    while IFS= read -r co_branch; do
+      if [ "$co_branch" = "$branch" ]; then
+        is_checked_out=1
+        break
+      fi
+    done <<< "$checked_out"
+    if [ "$is_checked_out" -eq 1 ]; then
+      continue
+    fi
+    if ! landed_by_content "$branch"; then
+      printf '  KEEP   branch %s — its own change is not provably on origin/master\n' "$branch"
+      branch_kept=$((branch_kept + 1))
+      continue
+    fi
+    branch_stale=$((branch_stale + 1))
+    if [ "$apply" -eq 1 ]; then
+      git -C "$root" branch -D -- "$branch" >/dev/null 2>&1 \
+        && printf '  REMOVED branch %s (its change is on origin/master by content)\n' "$branch" \
+        || printf '  KEEP   branch %s — deletion failed\n' "$branch"
+    else
+      printf '  STALE  branch %s — removable (its change is on origin/master by content)\n' "$branch"
+    fi
+  done < <(git -C "$root" for-each-ref --format='%(refname:short)' refs/heads)
+fi
+
 echo "prune-worktrees: $stale stale, $unsafe kept (dirty, in use, claimed, parked, or unpreserved)"
+if [ "$branches" -eq 1 ]; then
+  echo "prune-worktrees: $branch_stale landed branch(es) reapable, $branch_kept kept (not provably landed)"
+fi
 if [ "$check" -eq 1 ] && [ "$stale" -gt 0 ]; then
   echo "prune-worktrees: NOT-OK — $stale stale worktree(s); run with --apply" >&2
+  exit 1
+fi
+if [ "$check" -eq 1 ] && [ "$branches" -eq 1 ] && [ "$branch_stale" -gt 0 ]; then
+  echo "prune-worktrees: NOT-OK — $branch_stale landed branch(es) still exist; run with --branches --apply" >&2
   exit 1
 fi
 exit 0
