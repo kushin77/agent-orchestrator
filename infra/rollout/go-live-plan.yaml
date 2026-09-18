@@ -11,7 +11,10 @@
 # every flag still travels OFF -> CANARY -> GRADUAL -> FULL through the
 # automated pipeline. infra/rollout/checks/check_rollout.py asserts the plan
 # covers every phase 0-8, that each flag resolves, and that every declared
-# stage is part of the closed stage vocabulary.
+# stage is part of the closed stage vocabulary - and, since #966, that the
+# pairing holds BOTH ways: a flag `rollout-state.yaml` declares but no phase
+# here names is a finding too, because the ordered driver takes its path from
+# THIS file and could otherwise never reach it.
 
 schema_version: 1
 default_stage: "off"
@@ -98,6 +101,25 @@ phases:
       # and has no terraform variable of its own. It is planned here because the
       # rollout state carries it, and the plan must resolve every flag it names.
       - flag: surfaces.operator_terminal
+        go_live_stage: full
+      # The ERP module's three promotion units - ERP-07 (issue #652), the #671
+      # CRM->ERPNext webhook bridge, and the module's own portal switch - are
+      # planned here by #966. They were declared drivable in `rollout-state.yaml`
+      # and named by NO phase, so the ordered ladder, which computes its path
+      # from THIS file, could never reach them: a completed, owner-approved
+      # go-live run left the module dark with nothing red. The registry already
+      # files all three under `phase: 7` (`services.erp_module`,
+      # `services.erp_webhooks_bridge`, and `surfaces.erp_module`, a
+      # `service: portal` switch), so phase 7 is the phase they belong to - and
+      # the gate now refuses the omission in BOTH directions, so the next row
+      # added to the state without a phase fails at the gate instead of being
+      # noticed by an operator. Listing them is a declaration, not a promotion:
+      # every row stays `stage: "off"` until the owner's run walks the ladder.
+      - flag: services.erp_module
+        go_live_stage: full
+      - flag: services.erp_webhooks_bridge
+        go_live_stage: full
+      - flag: surfaces.erp_module
         go_live_stage: full
   "8":
     name: autonomous operations and governance

@@ -68,6 +68,22 @@ when it finds one. It is alert-only, not auto-heal: reaping a lock the caller
 does not own is the "delete every file" regression #948's own fix forbids, so
 this reports by name and leaves removal to the one path already proven
 safe — a worktree's own ``release``.
+
+**Provably-safe prune (#1170).** ``doctor`` can NAME a leftover but never removes
+one, so the leftovers grew unbounded: the box's real store carried **160
+zero-byte owner-less leftovers**, holding ``doctor`` permanently at rc 13 (a red
+that is always red carries no information). ``gate-lock.sh prune [--apply]`` is
+the safe middle — dry-run by default, and it removes a file only when it can
+PROVE the lock is dead, naming everything it keeps. A named leftover goes only
+when its recorded ``owner_pid`` is gone AND its recorded ``worktree`` path is
+absent (never either alone); a 0-byte owner-less file carries no record, so its
+only provable test is the flock itself — taken, and held across the unlink. Both
+halves are re-checked under the flock immediately before the unlink. A held lock
+(a live gate), a lock whose owner pid is still alive, and a lock whose worktree
+path still exists are all refused **by name**, never touched. ``prune`` exits 13
+only when it leaves behind a lock it could not classify as provably dead or
+provably alive (or, in dry-run, one it would remove); a live gate is not such a
+lock, so a normal pass is rc 0.
 """
 
 from __future__ import annotations
@@ -273,13 +289,14 @@ def _read_bytes(path: Path) -> bytes | None:
         raise StoreUnusable(f"cannot read {path}: {exc.strerror or exc}") from exc
 
 
-def read_owner(path: str | os.PathLike[str]) -> Owner | None:
-    """The named owner, or ``None`` when the record is absent, empty, or unreadable.
+def _owner_from_raw(raw: bytes | None) -> Owner | None:
+    """Parse an owner record from bytes already read, or ``None`` when unreadable.
 
-    A 0-byte record is ``None`` on purpose: a write the filesystem dropped must
-    never be read as "no owner".
+    Split out of ``read_owner`` so ``prune`` can make its decision from the SAME
+    bytes it read under its own flock, instead of re-opening the path (which could
+    name a different inode). ``None`` for empty/unreadable bytes is deliberate: a
+    record the filesystem dropped must never be read as "no owner".
     """
-    raw = _read_bytes(Path(path))
     if not raw:
         return None
     try:
@@ -319,6 +336,15 @@ def read_owner(path: str | os.PathLike[str]) -> Owner | None:
         started_ts=started_ts,
         host=str(data.get("host", "")),
     )
+
+
+def read_owner(path: str | os.PathLike[str]) -> Owner | None:
+    """The named owner, or ``None`` when the record is absent, empty, or unreadable.
+
+    A 0-byte record is ``None`` on purpose: a write the filesystem dropped must
+    never be read as "no owner".
+    """
+    return _owner_from_raw(_read_bytes(Path(path)))
 
 
 def record_problem(
@@ -969,6 +995,250 @@ def reap_own_worktree(
     return True
 
 
+# --- prune: the provably-safe reaping of leftovers (#1170) -------------------
+#
+# ``doctor`` has always been able to NAME a leftover but never to remove one,
+# and deliberately so: a box-wide sweep that reaps a lock for a worktree it does
+# not own is the "delete every file" risk class #948 forbids. The cost of that
+# safety is unbounded growth — measured 160 zero-byte owner-less leftovers in the
+# box's real store, holding ``doctor`` permanently at rc 13 so its signal carried
+# no information (a red that is always red is not a signal).
+#
+# The prune below is the safe middle: it removes a file only when it can PROVE
+# the lock is dead, and it names, never removes, everything it cannot prove.
+#
+#   * A NAMED record (non-zero bytes) is provably dead only when BOTH
+#     (B) its recorded ``owner_pid`` is gone AND (C) its recorded ``worktree``
+#     path no longer exists. Never either alone: a live gate keeping its record
+#     (B fails) and a re-acquirable lock for a worktree that still exists
+#     (C fails) are both refused by name.
+#   * A 0-byte owner-less file carries no record at all, so neither (B) nor (C)
+#     is even evaluable. For it the only provable test is the flock itself: take
+#     a non-blocking exclusive ``flock``, and unlink ONLY while holding it. If a
+#     process holds it, refuse and name it. "Zero bytes" alone is never proof of
+#     death — the tmpfs that silently truncates writes is exactly why (#948).
+#
+# In both cases the decision is re-made under the flock, immediately before the
+# unlink, through the SAME ``_try_lock`` / ``_flock_fresh`` machinery ``release``
+# uses — never a second locking path, and never a bare filename glob.
+
+
+def _read_fd_all(fd: int) -> bytes:
+    """Every byte at the fd's current offset. The record is small; loop to be safe."""
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _unlink_holding(path: Path) -> None:
+    """Unlink ``path`` while the caller already holds its flock.
+
+    ``_reap_free_lock`` cannot be reused here: it opens a *second* descriptor and
+    tries to flock it, and a second open file description in the same process is
+    refused by our own held lock — so it would see a held file and skip. This is
+    the same unlink-under-flock discipline, just on the descriptor the caller
+    already flocked (``_prune_lock``).
+    """
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise StoreUnusable(f"cannot remove {path}: {exc.strerror or exc}") from exc
+
+
+def _prune_lock(path: Path, *, apply: bool) -> tuple[str, bool, str]:
+    """Classify one worktree lock, unlinking it only under the provable rule.
+
+    Returns ``(action, needs_attention, line)`` where ``action`` is one of
+    ``REMOVED`` / ``WOULD-REMOVE`` / ``REFUSED`` / ``GONE`` and ``needs_attention``
+    is True only for a file that could NOT be classified as provably dead OR
+    provably alive — i.e. one a human must look at.
+    """
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except FileNotFoundError:
+        return "GONE", False, f"  GONE     {path.name}  (already absent)"
+    except OSError as exc:
+        raise StoreUnusable(f"cannot open {path}: {exc.strerror or exc}") from exc
+    try:
+        # Re-check under the flock, immediately before deciding: a held lock is a
+        # live gate, never a leftover, and is refused by name rather than touched.
+        if not _try_lock(fd):
+            state = probe(path, held=True)
+            return (
+                "REFUSED",
+                False,
+                f"  REFUSED  {path.name}  HELD right now by {owner_text(state)} "
+                f"— refusing to unlink a lock a live process holds",
+            )
+        if not _flock_fresh(fd, path):
+            return (
+                "REFUSED",
+                True,
+                f"  REFUSED  {path.name}  the path changed under the flock; "
+                f"left for the next pass",
+            )
+        raw = _read_fd_all(fd)
+        if not raw:
+            action = "REMOVED" if apply else "WOULD-REMOVE"
+            if apply:
+                _unlink_holding(path)
+            return (
+                action,
+                not apply,
+                f"  {action:<12} {path.name}  (0-byte owner-less; flock taken and held)",
+            )
+        owner = _owner_from_raw(raw)
+        if owner is None:
+            return (
+                "REFUSED",
+                True,
+                f"  REFUSED  {path.name}  the record cannot be read "
+                f"({len(raw)} bytes); a dead owner cannot be proven",
+            )
+        owner_pid = owner.owner_pid
+        if owner_pid is None:
+            return (
+                "REFUSED",
+                True,
+                f"  REFUSED  {path.name}  the record names no owner_pid; "
+                f"a dead owner cannot be proven",
+            )
+        if pid_alive(owner_pid):
+            return (
+                "REFUSED",
+                False,
+                f"  REFUSED  {path.name}  its owner pid {owner_pid} is alive",
+            )
+        worktree = owner.worktree
+        if not worktree:
+            return (
+                "REFUSED",
+                True,
+                f"  REFUSED  {path.name}  the record names no worktree; "
+                f"its absence cannot be proven",
+            )
+        if Path(worktree).expanduser().exists():
+            return (
+                "REFUSED",
+                False,
+                f"  REFUSED  {path.name}  worktree {worktree} still exists",
+            )
+        # Both halves re-checked under the flock, immediately before the unlink.
+        if pid_alive(owner_pid) or Path(worktree).expanduser().exists():
+            return (
+                "REFUSED",
+                True,
+                f"  REFUSED  {path.name}  changed under the flock; "
+                f"left for the next pass",
+            )
+        action = "REMOVED" if apply else "WOULD-REMOVE"
+        if apply:
+            _unlink_holding(path)
+        return (
+            action,
+            not apply,
+            f"  {action:<12} {path.name}  (owner pid {owner_pid} gone, "
+            f"worktree {worktree} absent)",
+        )
+    finally:
+        os.close(fd)
+
+
+@dataclass(frozen=True)
+class PruneOutcome:
+    """What a prune pass did, and whether anything still needs a human."""
+
+    report: str
+    considered: int = 0
+    removed: int = 0
+    would_remove: int = 0
+    refused: int = 0
+    needs_attention: bool = False
+
+    @property
+    def exit_code(self) -> int:
+        return EXIT_HEALTH_ATTENTION if self.needs_attention else EXIT_ADMIT
+
+
+def prune(
+    *, root: str | os.PathLike[str] | None = None, apply: bool = False
+) -> PruneOutcome:
+    """Reap provably-dead worktree leftover locks, naming everything it keeps.
+
+    Dry-run by default: with ``apply=False`` it classifies every lock and reports
+    what it WOULD remove (``WOULD-REMOVE``) without unlinking anything. Pass
+    ``apply=True`` (``gate-lock.sh prune --apply``) to unlink. The safety rule —
+    (B) recorded owner pid gone AND (C) recorded worktree absent, both re-checked
+    under the flock; or, for a 0-byte owner-less file, the flock itself — is in
+    ``_prune_lock``.
+
+    It never signals a process, never touches ``permits/`` (a fixed, reused pool),
+    and never looks outside ``worktrees/``. A lock it cannot prove dead is named
+    and left in place.
+    """
+    base = store_root(root)
+    mode = "apply" if apply else "dry-run"
+    lines = [
+        f"{MODULE}: PRUNE store={base} mode={mode}",
+        "  rule: a named leftover is removed only when its owner pid is gone AND "
+        "its worktree is absent (both re-checked under the flock); a 0-byte "
+        "owner-less file only while holding its flock",
+    ]
+    considered = removed = would_remove = refused = 0
+    unclassifiable = 0
+    worktrees_dir = base / "worktrees"
+    if worktrees_dir.is_dir():
+        for candidate in sorted(worktrees_dir.glob("*.lock")):
+            considered += 1
+            action, needs_attention, line = _prune_lock(candidate, apply=apply)
+            if action == "REMOVED":
+                removed += 1
+            elif action == "WOULD-REMOVE":
+                would_remove += 1
+            elif action == "REFUSED":
+                refused += 1
+                if needs_attention:
+                    unclassifiable += 1
+            lines.append(line)
+    lines.append(
+        f"  {MODULE}: PRUNE-RESULT considered={considered} removed={removed} "
+        f"would-remove={would_remove} refused={refused}"
+    )
+    # rc 13 means "a human must act": either a lock prune could not classify as
+    # provably dead or provably alive, or (dry-run) a leftover it would remove.
+    # A held lock, a live owner pid, and an existing worktree are all
+    # provably-alive refusals — a normal, healthy outcome, never rc 13.
+    attention = unclassifiable > 0 or would_remove > 0
+    if unclassifiable:
+        lines.append(
+            f"  {MODULE}: HEALTH-ATTENTION — {unclassifiable} lock(s) could not be "
+            f"proven dead or alive; a human must look at the lines above"
+        )
+    elif would_remove:
+        lines.append(
+            f"  {MODULE}: DRY-RUN — {would_remove} lock(s) would be removed; "
+            f"re-run with --apply to reap them"
+        )
+    else:
+        lines.append(
+            f"  {MODULE}: OK — every remaining lock is provably alive or was removed"
+        )
+    return PruneOutcome(
+        report="\n".join(lines),
+        considered=considered,
+        removed=removed,
+        would_remove=would_remove,
+        refused=refused,
+        needs_attention=attention,
+    )
+
+
 def status(
     worktree: str | os.PathLike[str] | None = None,
     *,
@@ -1105,6 +1375,21 @@ def _parser() -> argparse.ArgumentParser:
     )
     doctor_cmd.add_argument("--root", default=None)
 
+    prune_cmd = commands.add_parser(
+        "prune",
+        help=(
+            "reap provably-dead worktree leftover locks (#1170): a named leftover "
+            "only when its owner pid is gone AND its worktree is absent, a 0-byte "
+            "owner-less file only while holding its flock; dry-run by default"
+        ),
+    )
+    prune_cmd.add_argument("--root", default=None)
+    prune_cmd.add_argument(
+        "--apply",
+        action="store_true",
+        help="actually unlink the leftovers the rule proves dead (default: dry-run)",
+    )
+
     return parser
 
 
@@ -1130,6 +1415,10 @@ def main(argv: list[str] | None = None) -> int:
             report, needs_attention = health(root=args.root)
             print(report)
             return EXIT_HEALTH_ATTENTION if needs_attention else EXIT_ADMIT
+        if args.command == "prune":
+            outcome = prune(root=args.root, apply=args.apply)
+            print(outcome.report)
+            return outcome.exit_code
         print(status(args.worktree, root=args.root))
         return status_code(args.worktree, root=args.root)
     except Refused as exc:

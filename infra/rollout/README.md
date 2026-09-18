@@ -242,6 +242,31 @@ pytest infra/rollout/tests -p no:cacheprovider            # this suite
 python3 -m infra.rollout.cli demo                         # E2E offline demo
 ```
 
+The plan/state pairing is checked in **both** directions (issue #966).
+`validate_go_live_plan_doc` has always asked whether every flag the plan names
+resolves in `rollout-state.yaml` ("planned but not declared" - a name with no
+declaration, i.e. a typo). The reverse - whether every flag the state declares
+is **reached by some phase** - was unchecked, and the direction nobody checked
+is the one that decides whether a surface can ever ship: the ordered driver
+(`go_live.py`) computes its path from `go-live-plan.yaml`, so a declared,
+drivable flag that no phase names is unreachable forever, with the only symptom
+an operator noticing that a go-live run never mentions it. The same class as
+#954 and #935, one level up.
+
+`check_state_reachability` now refuses it **by name** ("declared but not
+planned"), and the two wordings are deliberately distinct because the fixes
+differ - a row no phase names belongs in a phase (or needs a reasoned exemption
+recorded beside it), while a name with no declaration is a misspelling in the
+plan. `--self-test` carries one probe per direction, each asserting its own
+message, so a one-directional check cannot pass either. Measured when the rule
+landed: `services.erp_module`, `services.erp_webhooks_bridge` and
+`surfaces.erp_module` were all declared and named by no phase; all three are now
+planned in phase 7, which is the phase the registry files each of them under.
+
+`scripts/check-operator-terminal.sh` (part of the repo gate) imports
+`check_all()` and asserts it is empty, so a violation of either direction is
+caught by the gate and not only by this lane's own verification.
+
 The check is not wired into `scripts/verify.sh` (that file and `Makefile` are
 other lanes' assets); run it as part of this lane's verification and the
 go-live gate. `make verify` (the repo gate) stays green because every YAML

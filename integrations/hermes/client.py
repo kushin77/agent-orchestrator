@@ -11,6 +11,12 @@ here as a single seam — the ``Transport`` protocol — with two implementation
   fixture mapping. Both the tests and the ``make verify`` gate use it, which is
   why **the gate never touches the network**.
 
+The seam itself — the ``Transport`` protocol and the offline ``FixtureTransport``
+— is shared with ``integrations/paperclip/`` (``integrations/_seam/``, issue
+#1208), as are ``Response`` and the rendering behind ``error_for_status``. Only
+the live transport is this adapter's own, because only its own wire differs: the
+service is keyless, so it sends no auth header.
+
 The client is **read-only by construction**: every verb is a ``GET`` against the
 service's declared endpoints (``/health``, ``/api/capabilities``, ``/api/router``,
 ``/api/tiering``), and it decides no routing — it only *projects* what the
@@ -22,9 +28,12 @@ from __future__ import annotations
 import json as _json
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, Optional
 
-from .model import Response, error_for_status
+from .._seam.transport import FixtureTransport as _SeamFixtureTransport
+from .._seam.transport import Transport  # noqa: F401 - re-exported at this adapter's seam
+from .._seam.wire import decode
+from .model import BOUNDARY, Response, error_for_status
 
 #: The declared service endpoints (mapping.SERVICE_ENDPOINTS, restated by path).
 HEALTH_PATH = "/health"
@@ -35,13 +44,11 @@ TIERING_PATH = "/api/tiering"
 #: The declared service port (ADR-0012 Context 7).
 SERVICE_PORT = 9501
 
-
-@runtime_checkable
-class Transport(Protocol):
-    """The transport seam: one request, one response, no other coupling."""
-
-    def request(self, method: str, path: str) -> Response:  # pragma: no cover - protocol
-        ...
+# ``Transport`` — the seam's protocol — is the shared one
+# (``integrations/_seam/transport.py``, issue #1208): it is the union of what the
+# two adapters ask of a transport, and it is re-exported above so existing
+# callers keep importing it from here. This adapter's live transport implements
+# it too; it simply never passes a body or a header.
 
 
 class HttpTransport:
@@ -51,6 +58,10 @@ class HttpTransport:
     raised as the typed error their status maps to. This class is the only
     network path in the adapter, and it is instantiated exclusively by the
     ``probe`` verb — never by the gate or the tests.
+
+    The client issues nothing but ``GET``s, so ``json`` and ``headers`` are
+    accepted — the shared ``Transport`` protocol carries them — but are never
+    sent by this adapter.
     """
 
     def __init__(self, base_url: str, *, timeout: float = 10.0) -> None:
@@ -59,69 +70,52 @@ class HttpTransport:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def request(self, method: str, path: str) -> Response:
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Response:
         url = "%s%s" % (self.base_url, path)
-        req = urllib.request.Request(url, method=method.upper())
+        data: Optional[bytes] = None
+        sent: Dict[str, str] = dict(headers or {})
+        if json is not None:
+            data = _json.dumps(json).encode("utf-8")
+            sent.setdefault("Content-Type", "application/json")
+        req = urllib.request.Request(url, data=data, method=method.upper(), headers=sent)
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310
                 raw = resp.read().decode("utf-8")
                 return Response(
                     status=int(resp.status),
-                    body=_decode(raw),
+                    body=decode(raw),
                     headers={k.lower(): v for k, v in resp.headers.items()},
                 )
         except urllib.error.HTTPError as exc:
             detail = ""
             try:
-                detail = str(_decode(exc.read().decode("utf-8")))
+                detail = str(decode(exc.read().decode("utf-8")))
             except Exception:  # pragma: no cover - best-effort body read
                 detail = ""
             raise error_for_status(int(exc.code), path, detail) from exc
 
 
-def _decode(raw: str) -> Any:
-    """Decode a body as JSON, falling back to the raw text."""
-    if not raw:
-        return None
-    try:
-        return _json.loads(raw)
-    except ValueError:
-        return raw
-
-
-class FixtureTransport:
-    """The offline transport: replays canned responses from a fixture.
+class FixtureTransport(_SeamFixtureTransport):
+    """The offline transport: the shared seam's, over this adapter's boundary.
 
     A fixture is a mapping ``{"responses": [ {"method", "path", "status",
-    "body"} ... ]}``. Every call is recorded on ``requests`` (method, path) so
-    the tests can assert the request *shape* — the declared endpoints, nothing
-    else — without a network. An unmatched request raises ``KeyError`` (a loud
-    miss, never a silent default), so a drifted client path fails the tests.
+    "body"} ... ]}``. Every call is recorded on ``requests`` (method, path,
+    headers) so the tests can assert the request *shape* — the declared
+    endpoints, nothing else — without a network. The service is keyless and its
+    ``/health`` is root-level, so the seam is configured here with no path prefix
+    and no auth headers. An unmatched request raises ``KeyError`` (a loud miss,
+    never a silent default), so a drifted client path fails the tests.
     """
 
     def __init__(self, fixture: Dict[str, Any]) -> None:
-        responses = fixture.get("responses") if isinstance(fixture, dict) else None
-        if not isinstance(responses, list):
-            raise ValueError("fixture must be an object with a 'responses' list")
-        self._table: Dict[tuple, Response] = {}
-        for entry in responses:
-            key = (str(entry["method"]).upper(), str(entry["path"]))
-            self._table[key] = Response(
-                status=int(entry.get("status", 200)),
-                body=entry.get("body"),
-                headers={k.lower(): v for k, v in (entry.get("headers") or {}).items()},
-            )
-        self.requests: List[Dict[str, str]] = []
-
-    def request(self, method: str, path: str) -> Response:
-        self.requests.append({"method": method.upper(), "path": path})
-        try:
-            response = self._table[(method.upper(), path)]
-        except KeyError as exc:
-            raise KeyError("no fixture response for %s %s" % (method.upper(), path)) from exc
-        if not response.ok:
-            raise error_for_status(response.status, path)
-        return response
+        super().__init__(fixture, boundary=BOUNDARY)
 
 
 class HermesClient:

@@ -29,7 +29,7 @@ bash -n <file>.sh
 
 - **Precedence:** `AGENTS.md` is canonical. `CLAUDE.md`, `.cursorrules`, and
   this file defer to it and never contradict it. `docs/GOLDEN-RULES.md`
-  (AO-GR-1..20) is the canonical product spine; root `GOLDEN-RULES.md` records
+  (AO-GR-1..28) is the canonical product spine; root `GOLDEN-RULES.md` records
   the CMR vendor-module ratification.
 - **Workflow:** read the issue (its `Verify:` command and lane ownership); touch
   only your lane's files; smallest focused diff; run `make verify` and report
