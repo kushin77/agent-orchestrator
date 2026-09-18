@@ -136,6 +136,34 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 2
 fi
 
+# --- merged-tree evidence (issue #1254 step 6, same rule as pr-queue.sh) ----
+# This is the OTHER path a PR reaches `gh pr merge` from (#1280 made this
+# script the guarded entrypoint the single-PR flow uses); the merged-tree
+# rule belongs here too, not only in the queue's loop, or a single-PR merge
+# through this script would still land on per-head evidence alone. Reuses
+# scripts/pr-queue.sh's own merged-tree functions (one predicate, not a
+# second copy) via its offline test seam.
+pr_view_json="$(gh pr view "$pr_number" --json baseRefName,headRefOid 2>/tmp/mp-view-err.txt)" || {
+  printf 'merge-pr: CANNOT-ASSESS — could not read #%s from gh pr view: %s\n' \
+    "$pr_number" "$(head -c 200 /tmp/mp-view-err.txt)" >&2
+  exit 2
+}
+pr_base_ref="$(printf '%s' "$pr_view_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("baseRefName",""))' 2>/dev/null)"
+pr_head_oid="$(printf '%s' "$pr_view_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("headRefOid",""))' 2>/dev/null)"
+if [ -z "$pr_base_ref" ] || [ -z "$pr_head_oid" ]; then
+  echo "merge-pr: CANNOT-ASSESS — gh pr view #$pr_number did not report baseRefName/headRefOid" >&2
+  exit 2
+fi
+pr_queue_script="$(dirname "${BASH_SOURCE[0]}")/pr-queue.sh"
+if [ ! -f "$pr_queue_script" ]; then
+  echo "merge-pr: CANNOT-ASSESS — scripts/pr-queue.sh is missing; cannot judge merged-tree evidence" >&2
+  exit 2
+fi
+if ! bash "$pr_queue_script" --check-merged-tree "$pr_number" --head "$pr_head_oid" --against-base "origin/$pr_base_ref"; then
+  echo "merge-pr: REFUSED — merged-tree evidence check failed for #$pr_number; gh pr merge was NOT invoked" >&2
+  exit 1
+fi
+
 echo "merge-pr: merging #$pr_number (gh pr merge --squash --delete-branch); the message was verified above"
 # A non-zero exit here is a refusal to RE-CHECK, not proof that nothing landed:
 # `gh pr merge --delete-branch` can exit rc 1 after the merge actually succeeded

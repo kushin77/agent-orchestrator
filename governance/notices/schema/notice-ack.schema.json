@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/governance/notices/schema/notice-ack.schema.json",
+  "title": "Notice acknowledgement (notice-ack/v1)",
+  "description": "One runtime's receipt of one standing notice. The machine that decides whether a record holds is governance/notices/notice_records.py (validate_ack); this schema documents the same rules. An ack is a RECORD, not a counter: a second ack from the same runtime is refused, a re-acknowledgement is a new notice id. An ack whose `runtime` is not a registered runtime is refused by name (ack-from-unregistered-runtime) because it proves nothing, and an ack with no evidence is refused by name (ack-without-evidence) because it says only that something wrote a file.",
+  "type": "object",
+  "required": ["schema", "notice", "runtime", "acked_at", "transport", "evidence"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "notice-ack/v1",
+      "description": "The record version. A record carrying any other value is refused by name."
+    },
+    "notice": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]*$",
+      "description": "The id of the notice being acknowledged. It must match the directory the record sits in."
+    },
+    "runtime": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "The registered runtime that acked. It must match the filename (ack-<runtime>.json) and be in the derived registry."
+    },
+    "acked_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "When the runtime acknowledged, in UTC."
+    },
+    "transport": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The transport that carried it (mailbox:<path> or adapter:<path>), derived by governance/notices/runtime_registry.py unless the caller names it."
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the runtime read, in its own words: the ack is evidence of receipt, so an empty one is refused by name."
+    }
+  }
+}

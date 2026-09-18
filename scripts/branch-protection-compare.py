@@ -39,6 +39,24 @@ def flatten(document: dict) -> dict:
     return out
 
 
+def _normalize_status_checks(value: object) -> object:
+    """Reduce ``required_status_checks`` to the fields the declaration owns.
+
+    GitHub's wire shape carries server-generated fields (``url``,
+    ``contexts_url``, ``checks``) alongside the two the declaration actually
+    controls (``strict``, ``contexts``). Comparing the raw dicts would report
+    drift on every read purely from those generated fields, which is a false
+    positive, not a control — so this keeps only ``strict``/``contexts`` and
+    sorts the contexts so their ORDER cannot manufacture a difference either.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return value
+    contexts = value.get("contexts") or []
+    return {"strict": bool(value.get("strict", False)), "contexts": sorted(contexts)}
+
+
 def compare(declared: dict, live: dict) -> list[tuple[str, object, object]]:
     """Return the (field, declared, live) triples that disagree."""
     want = declared.get("want", {})
@@ -47,6 +65,9 @@ def compare(declared: dict, live: dict) -> list[tuple[str, object, object]]:
     drift = []
     for field, expected in want.items():
         actual = got.get(has.get(field, field))
+        if field == "required_status_checks":
+            actual = _normalize_status_checks(actual)
+            expected = _normalize_status_checks(expected)
         if actual != expected:
             drift.append((field, expected, actual))
     return drift
