@@ -25,16 +25,34 @@ are the snapshot a gateway/guardrail consumes.
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
-import json
+import os
+import sys
 import time
 import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from .errors import (
+# The HS256 JWT codec is the identity lane's canonical one
+# (``identity/sso/jose.py``). This module delegates to it instead of
+# hand-rolling base64url/HMAC (issue #1204), so a signature-verification defect
+# has exactly one place to patch. ``registry/`` is on ``sys.path`` for the
+# ``service`` package, so the repository root (three levels above this file) is
+# inserted here to resolve ``identity.sso`` - the same bootstrap the sibling
+# ``registry/packs`` modules use for their cross-tree imports.
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from identity.sso.errors import (  # noqa: E402
+    SignatureVerificationError as JoseSignatureError,
+    SsoError as JoseError,
+)
+from identity.sso.jose import jwt_encode, jwt_unsign  # noqa: E402
+from identity.sso.model import ALG_HS256  # noqa: E402
+
+from .errors import (  # noqa: E402
     AgentNotActiveError,
     CrossTenantDenied,
     IdentityError,
@@ -42,26 +60,14 @@ from .errors import (
     SessionExpiredError,
     ToolNotAllowedError,
 )
-from .model import STATUS_ACTIVE
-from .store import RegistryStore
+from .model import STATUS_ACTIVE  # noqa: E402
+from .store import RegistryStore  # noqa: E402
 
 ISSUER = "urn:agent-orchestrator:registry"
 DEFAULT_AUDIENCE = ("control-plane",)
 DEFAULT_ROLE = "agent"
 DEFAULT_TTL_SECONDS = 3600
 TOOL_CALL_CLAIM = "tool"
-
-_JSON_KW = {"sort_keys": True, "separators": (",", ":"), "ensure_ascii": False}
-_HEADER = {"alg": "HS256", "typ": "JWT"}
-
-
-def _b64url_encode(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def _b64url_decode(text: str) -> bytes:
-    padding = "=" * (-len(text) % 4)
-    return base64.urlsafe_b64decode(text + padding)
 
 
 @dataclass(frozen=True)
@@ -102,18 +108,14 @@ class AgentSession:
         return (now if now is not None else int(time.time())) >= self.expires_at
 
     def encode(self, signing_key: bytes) -> str:
-        """Encode to an HMAC-SHA256 signed token (header.payload.signature)."""
-        header_part = _b64url_encode(
-            json.dumps(_HEADER, **_JSON_KW).encode("utf-8")
-        )
-        payload_part = _b64url_encode(
-            json.dumps(self.to_claims(), **_JSON_KW).encode("utf-8")
-        )
-        signing_input = f"{header_part}.{payload_part}".encode("ascii")
-        signature = _b64url_encode(
-            hmac.new(signing_key, signing_input, hashlib.sha256).digest()
-        )
-        return f"{header_part}.{payload_part}.{signature}"
+        """Encode to an HMAC-SHA256 signed token (header.payload.signature).
+
+        Delegates to the canonical codec (``identity/sso/jose.py``, issue
+        #1204). The output is byte-identical to what this module emitted before
+        the collapse, so tokens minted by the old code still verify and vice
+        versa.
+        """
+        return jwt_encode(self.to_claims(), alg=ALG_HS256, key=signing_key)
 
     @classmethod
     def decode(
@@ -121,25 +123,23 @@ class AgentSession:
     ) -> "AgentSession":
         """Decode and verify a token; returns the session it carries.
 
-        Raises ``InvalidCredentialError`` on a malformed token or a signature
+        Signature verification is the canonical codec's job
+        (``identity/sso/jose.py``, issue #1204): a constant-time HMAC compare
+        with ``alg`` pinned to HS256, so a ``none`` / algorithm-confusion token
+        is refused before any signature work. Raises
+        ``InvalidCredentialError`` on a malformed token or a signature
         mismatch, and ``SessionExpiredError`` once the token's ``exp`` has
-        passed.
+        passed - the expiry check stays here because the codec is claim-agnostic.
         """
-        parts = token.split(".")
-        if len(parts) != 3:
-            raise InvalidCredentialError("malformed token: expected 3 segments")
-        header_part, payload_part, signature_part = parts
-        signing_input = f"{header_part}.{payload_part}".encode("ascii")
-        expected = _b64url_encode(
-            hmac.new(signing_key, signing_input, hashlib.sha256).digest()
-        )
-        if not hmac.compare_digest(expected, signature_part):
-            raise InvalidCredentialError("token signature does not verify")
         try:
-            payload = json.loads(_b64url_decode(payload_part).decode("utf-8"))
-        except (ValueError, UnicodeDecodeError) as exc:
-            raise InvalidCredentialError("token payload is not valid JSON") from exc
-        session = cls.from_claims(payload)
+            claims = jwt_unsign(token, alg=ALG_HS256, key=signing_key)
+        except JoseSignatureError as exc:
+            raise InvalidCredentialError(
+                "token signature does not verify"
+            ) from exc
+        except JoseError as exc:
+            raise InvalidCredentialError(f"malformed token: {exc}") from exc
+        session = cls.from_claims(claims)
         if session.is_expired(now=now):
             raise SessionExpiredError("token has expired")
         return session
