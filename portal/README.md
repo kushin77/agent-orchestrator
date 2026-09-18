@@ -257,6 +257,46 @@ and the gate runs **before** AuthN, so an unpromoted view is absent rather than
 merely unauthorised. `e2e/workbook11_portal.py` probes all three over the real
 app.
 
+## The fleet board live surface (issue #880, EPIC #878 lane L1)
+
+`portal/server/livestore.py` projects the **same** two files the fleet
+CLI/cron already treat as live state — never a copy or a second store:
+
+* `.board/snapshot.json` — the issue roster (`issues[]`);
+* `.board/claims.jsonl` — the append-only claim/release/reap event log.
+
+`load_board_rows()` joins each issue to its most recent unreleased claim
+(lane, claimed-by agent, claim timestamp) and validates **every row** against
+`portal/schemas/fleet-board-row.schema.json` before it is returned. A row a
+malformed source document produced is refused **by name** — its issue number
+and the specific defect land in `rejected[]` — rather than served
+best-effort; a bad `.board/snapshot.json` row can never silently masquerade as
+a good one. The validator (`_validate_row` / `_validate_value` in
+`livestore.py`) is a small, dependency-free JSON-Schema subset
+(`type`/`required`/`properties`/`additionalProperties`/`enum`/`const`/
+`minimum`/`minLength`), the same posture `gateway/sme-routing/
+jsonschema_lite.py` and `guardrails/policy/schemas.py` take, for the same
+reason: stdlib + PyYAML only, no cross-pillar import.
+
+`BoardSurface` (also in `livestore.py`) is the route-facing wrapper the app
+composes, gated through the same fail-closed `portal.server.config_flags
+.surface_enabled` reader every workbook-11 view uses. Its flag
+(`surfaces.fleet_board`) is declared in `portal/config/feature-flags.yaml`
+and defaults **OFF** (GR-5); the gate runs before AuthN, so an unpromoted
+board is absent, not merely unauthorised.
+
+| Route | Method | Serves |
+|---|---|---|
+| `GET /api/board/rows` | GET only | `{"schema", "rows": [...], "rejected": [...]}` — every schema-valid joined row, plus every named rejection |
+
+`portal/tests/test_board_live_surface.py` covers: the flag ships OFF; the
+schema validates a genuine row; the schema **refuses** a malformed row (four
+negative controls — missing field, wrong type, out-of-enum value, unknown
+field); `load_board_rows()` joins a real snapshot+claims pair and correctly
+drops a released claim back to unclaimed; a corrupt source row is rejected by
+issue number rather than dropped silently; and the served route returns rows
+once the flag is flipped on for the test.
+
 ## The console surface's readiness + rollback (issue #802)
 
 The console declares a liveness route (`GET /api/healthz`) and, since #802, a

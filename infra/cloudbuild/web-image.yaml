@@ -15,7 +15,7 @@
 #   _TAG       — immutable tag, e.g. $COMMIT_SHA (never `latest` for deploys)
 
 options:
-  logging: GCS_ONLY
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
   # The tag must be explicit: deploys never reference a mutable `latest`.

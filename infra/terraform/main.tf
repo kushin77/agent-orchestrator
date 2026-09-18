@@ -72,6 +72,42 @@ module "control_plane_service" {
   region     = var.region
 }
 
+# Named IAM role bundles for the deployer SA (issue #411/#1136 go-live), keyed
+# by var.deployer_role_class — a single tag/substitution selects a bundle
+# instead of a raw role list ever passing through Cloud Build substitutions.
+# "none" is the fail-closed default: the SA exists but can do nothing.
+locals {
+  deployer_role_bundles = {
+    none = []
+
+    # Enough to manage the 7 Cloud Run services + Artifact Registry + the
+    # project APIs this stack enables (run.googleapis.com etc.) — no project
+    # editor/owner grant. roles/logging.logWriter is required to run a Cloud
+    # Build step AS this SA with options.logging = CLOUD_LOGGING_ONLY
+    # (apply.yaml) — without it the deployer SA cannot run the pipeline that
+    # is itself the only thing that can grant it roles.
+    minimal = [
+      "roles/run.admin",
+      "roles/artifactregistry.writer",
+      "roles/serviceusage.serviceUsageAdmin",
+      "roles/iam.serviceAccountUser",
+      "roles/logging.logWriter",
+    ]
+
+    # minimal + state bucket object admin, for when the deployer SA (rather
+    # than a human's own credentials) owns writing infra/terraform state.
+    standard = [
+      "roles/run.admin",
+      "roles/artifactregistry.writer",
+      "roles/serviceusage.serviceUsageAdmin",
+      "roles/iam.serviceAccountUser",
+      "roles/storage.objectAdmin",
+    ]
+  }
+
+  deployer_roles = local.deployer_role_bundles[var.deployer_role_class]
+}
+
 module "deployer" {
   source = "./modules/deployer-sa"
 
@@ -79,7 +115,7 @@ module "deployer" {
   account_id   = "control-plane-deployer"
   display_name = "agent-orchestrator control-plane deployer (flag-gated apply)"
   project_id   = var.project_id
-  roles        = var.deployer_roles
+  roles        = local.deployer_roles
 }
 
 module "web_surface" {
@@ -119,4 +155,15 @@ module "fleet_cron" {
   image                     = var.fleet_cron_image
   ssh_private_key_path      = var.fleet_cron_ssh_private_key_path
   keydb_password_secret_ref = var.fleet_cron_keydb_password_secret_ref
+}
+
+# Bucket-scoped state access for the deployer SA — NOT a project-wide storage
+# role. Once the deployer SA runs apply.yaml's terraform steps itself
+# (_DEPLOYER_SA cutover), it needs to read/write infra/terraform's own
+# backend state, and nothing else in Cloud Storage.
+resource "google_storage_bucket_iam_member" "deployer_tfstate" {
+  count  = var.deployer_enabled ? 1 : 0
+  bucket = "agent-orchestrator-tfstate"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${module.deployer.service_account_email}"
 }

@@ -25,6 +25,7 @@ edge set `order.eligible`/`claims.arbitrate` already read.
 
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -252,3 +253,40 @@ def next_claimable(snapshot: Snapshot, data: dict[str, Any] | None) -> list[int]
         if not overlaid.blockers_open(issue):
             ready.append(number)
     return ready
+
+
+#: Matches a single wave's `issues: [n, n, ...]` line (the only shape the
+#: committed file uses — one wave, one line). Deliberately line-oriented
+#: rather than a full YAML re-dump: the file carries hand-written commentary
+#: (issue #1113) that a `yaml.safe_dump` round-trip would silently discard.
+_ISSUES_LINE_RE = re.compile(r"^(?P<indent>[ \t]*)issues:\s*\[(?P<body>[^\]]*)\]\s*$")
+
+
+def prune_closed_text(text: str, snapshot: Snapshot) -> tuple[str, list[int]]:
+    """Drop issue numbers CLOSED in ``snapshot`` from every wave's ``issues``
+    list, editing only those lines so comments/formatting elsewhere survive.
+
+    Returns ``(new_text, removed)`` where ``removed`` is every dropped number,
+    in the order it was found. Idempotent: a second call against the already
+    -pruned text returns it unchanged with ``removed == []`` (issue #1113).
+    """
+    removed: list[int] = []
+    out_lines: list[str] = []
+    for line in text.splitlines(keepends=True):
+        body_end = len(line.rstrip("\n").rstrip("\r"))
+        newline = line[body_end:]
+        match = _ISSUES_LINE_RE.match(line[:body_end])
+        if match is None:
+            out_lines.append(line)
+            continue
+        numbers = [int(part.strip()) for part in match.group("body").split(",") if part.strip()]
+        kept: list[int] = []
+        for number in numbers:
+            issue = snapshot.get(number)
+            if issue is not None and issue.closed:
+                removed.append(number)
+            else:
+                kept.append(number)
+        rendered = ", ".join(str(number) for number in kept)
+        out_lines.append(f"{match.group('indent')}issues: [{rendered}]{newline}")
+    return "".join(out_lines), removed

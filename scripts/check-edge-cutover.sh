@@ -417,18 +417,21 @@ MUTATIONS = {
         MODULE + "/outputs.tf",
         lambda text: text.replace("one(google_cloud_run_domain_mapping.web[*].name)",
                                   "google_cloud_run_domain_mapping.web[0].name")),
-    # The behavioural mutant: the whole validation RULE is deleted, so the
+    # The behavioural mutant: the whole precondition RULE is deleted, so the
     # incoherent combination must STOP being refused. Removing only its token
     # would leave the rule firing with an unattributed message, which is a
     # different assertion (CANNOT-ASSESS) rather than a proof that the rule is
-    # what refuses it. The deletion is scoped to `create_dns_zone`, because an
-    # earlier variable in the same file carries a validation block of its own.
+    # what refuses it. The deletion is scoped to the
+    # create_dns_zone_orphan_guard resource — a `lifecycle.precondition` on an
+    # unconditional resource, not a `variable` validation block (a variable's
+    # own validation may only reference itself; this rule spans two
+    # variables, issue #411/#1136).
     "incoherent-combination-accepted": lambda: edit(
         MODULE + "/variables.tf",
         lambda text: inside_block(
             text,
-            r'variable\s+"create_dns_zone"\s*\{',
-            lambda block: re.sub(r"(?s)\n\s*validation\s*\{.*?\n\s*\}", "", block, count=1))),
+            r'resource\s+"terraform_data"\s+"create_dns_zone_orphan_guard"\s*\{',
+            lambda block: re.sub(r"(?s)\n\s*precondition\s*\{.*?\n\s*\}", "", block, count=1))),
 }
 
 handler = MUTATIONS.get(mutation)

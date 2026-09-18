@@ -35,10 +35,18 @@ SAME decision document rather than a second source of truth:
   ``stale_after_seconds`` answers 503 even when its stored verdict was ``ok`` —
   a container that stopped updating its own evidence must not keep answering
   "fine" on the strength of the last good answer it happened to write.
-* **all EXPECTED jobs must be present.** A document with a "ok" verdict but a
-  short ``jobs`` list (a role that crashed before it could even report
-  ``not-dispatched``) answers 503 naming the shortfall, rather than 200 for a
-  partial run.
+* **all expected jobs must be present, and the expected set is DERIVED, never
+  written down here.** A document with an "ok" verdict but a ``jobs`` list
+  missing an enabled rung (a role that crashed before it could even report
+  ``not-dispatched``) answers 503 **naming the missing marker**, rather than 200
+  for a partial run. The expected set comes from the schedule's own declaration
+  (``config/fleet-jobs.json``) read **through its single owner**
+  (``fleet/cron.py``'s ``load_manifest`` + ``enabled_jobs``), so the surface and
+  the installer cannot drift — which is exactly how the previous literal
+  (``EXPECTED_JOBS = 3``) came to disagree with a four-rung schedule and answer
+  200 for a document that was missing the fourth rung. An unreadable or empty
+  declaration FAILS CLOSED: the surface refuses, it never falls back to a count
+  it cannot justify.
 
 It is stdlib-only and binds the port it is told to. ``fleet/health.py`` remains
 the fleet's own health SIGNAL (healthy/degraded/failing, rc 0/1/2) and this
@@ -79,17 +87,63 @@ CONTENT_TYPE = "application/json"
 #: The Prometheus exposition media type.
 METRICS_CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
 
-#: The number of scheduled jobs a healthy decision document must report. This
-#: is a LITERAL 3, not a measurement of `fleet/cron.MARKERS` — this module is
-#: stdlib-only by design (it runs standalone as the container's health
-#: surface, imported by neither `fleet/cron.py` nor `dev_run.py` at module
-#: load time) and importing the schedule's owner here only to read its length
-#: would trade that independence for one integer. `scripts/check-fleet-cron-image.sh`
-#: already re-measures `fleet/cron.MARKERS` against `infra/fleet/inventory.yaml`
-#: (`schedule.lines`) elsewhere, so a fourth job is caught there; if that count
-#: ever changes this literal must change with it — there is no gate today that
-#: would catch the two silently disagreeing, and that gap is worth a follow-up.
-EXPECTED_JOBS = 3
+#: The repository root this module lives in, used only to locate the schedule's
+#: declaration: ``infra/fleet/healthz.py`` -> ``<repo>``. The same shape
+#: ``infra/fleet/parity.py`` uses to reach the identical markers.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+#: ``None`` in this cache means "the declaration could not be trusted"; the
+#: sentinel is distinct from ``()`` (an empty declaration), and both refuse.
+#: A `list` rather than `functools.lru_cache` so the one entry can be cleared by
+#: a test or a gate that has just rewritten the manifest.
+_DECLARED_CACHE: list[tuple[str, ...] | None] = []
+
+
+def declared_enabled_markers() -> tuple[str, ...] | None:
+    """The ENABLED schedule markers — or ``None`` when the declaration cannot be trusted.
+
+    Read from ``config/fleet-jobs.json`` **through** ``fleet/cron.py``:
+    ``cron.load_manifest()`` and ``cron.enabled_jobs()`` are the installer's own
+    reader and filter, so enabling or disabling a job in the manifest moves this
+    set and the installed crontab together. There is deliberately no second copy
+    of the schedule here — a literal set (or a literal count) is exactly what
+    drifted: ``EXPECTED_JOBS = 3`` kept answering 200 for a document that was
+    missing the fourth enabled rung (``ao-fleet-reap``).
+
+    ``None`` is the FAIL-CLOSED answer for a declaration that cannot be trusted at
+    all (unreadable, malformed, or failing the renderer's own contract). A
+    declaration that IS readable and valid but enables nothing yields the EMPTY
+    set, which the caller also refuses (503) — with its own reason, because "the
+    schedule owes nothing" and "I could not read the schedule" are different
+    facts and collapsing them would lose the one that is actionable.
+    """
+    if _DECLARED_CACHE:
+        return _DECLARED_CACHE[0]
+
+    known: tuple[str, ...] | None = None
+    try:
+        fleet_dir = str(_REPO_ROOT / "fleet")
+        if fleet_dir not in sys.path:
+            sys.path.insert(0, fleet_dir)
+        import cron  # noqa: PLC0415 — lazy by design: this module must stay
+        # importable, and callable, without the schedule on hand. A failure here
+        # is a refusal (None), never a crash.
+
+        manifest = cron.load_manifest()
+        # A manifest that does not meet the renderer's own contract is refused
+        # rather than read for whatever it happens to contain.
+        if not cron.validate_manifest(manifest):
+            known = tuple(str(job["marker"]) for job in cron.enabled_jobs(manifest))
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, ImportError):
+        known = None
+
+    _DECLARED_CACHE.append(known)
+    return known
+
+
+def reset_declared_cache() -> None:
+    """Forget the derived declaration (a test or gate that has changed the manifest)."""
+    _DECLARED_CACHE.clear()
 
 #: A decision document whose `finished_at` has not advanced in this long is
 #: stale: the run stopped reporting, and #712's acceptance is that this must
@@ -130,15 +184,23 @@ def decision_status(
     document: dict | None,
     now: float | None = None,
     stale_after_seconds: float = DEFAULT_STALE_AFTER_SECONDS,
-    expected_jobs: int = EXPECTED_JOBS,
+    expected_markers: tuple[str, ...] | None = None,
 ) -> tuple[int, dict]:
     """The HTTP status and body for a decision document (pure, so it is testable).
 
     200 only for a run that reached a verdict of ``ok``, left the state roots
-    alone, reported all ``expected_jobs``, and wrote that verdict within
-    ``stale_after_seconds`` of ``now``; 503 for anything else, naming the reason
-    it refused. A container that is up but whose evidence stopped advancing must
-    fail this probe — "the process exists" is deliberately not enough (#712).
+    alone, reported **every enabled rung of the schedule**, and wrote that
+    verdict within ``stale_after_seconds`` of ``now``; 503 for anything else,
+    naming the reason it refused. A container that is up but whose evidence
+    stopped advancing must fail this probe — "the process exists" is
+    deliberately not enough (#712).
+
+    ``expected_markers`` is the expected job set. ``None`` (the default) means
+    *derive it* from the schedule's own declaration through ``fleet/cron.py``;
+    a tuple is used as given, which is the seam the tests and the covering gate
+    drive with. An underivable or EMPTY set is refused (503 ``cannot-assess``),
+    never silently treated as "nothing expected": the previous version compared
+    a literal count and so answered 200 for a document missing the fourth rung.
 
     THE STALENESS CHECK IS SKIPPED WHILE A RUN IS STILL RUNNING. ``dev_run.py``
     (D2, #710) writes its decision document ONCE, after the dispatch, and then
@@ -182,12 +244,32 @@ def decision_status(
             "reason": "a dispatched role wrote to a state root",
             "attributable_changes": changed,
         }
-    if len(jobs) < expected_jobs:
+
+    expected = declared_enabled_markers() if expected_markers is None else tuple(expected_markers)
+    if not expected:
+        return 503, {
+            "status": "cannot-assess",
+            "reason": (
+                "the schedule declaration (config/fleet-jobs.json, read through fleet/cron.py) "
+                "could not be read, so the expected job set is unknown"
+                if expected is None
+                else "the schedule declaration names no enabled job, so nothing can be certified"
+            ),
+            "expected_jobs": None if expected is None else 0,
+        }
+
+    present = [str(job.get("marker") or "") for job in jobs if isinstance(job, dict)]
+    missing = [marker for marker in expected if marker not in present]
+    if missing:
         return 503, {
             "status": "incomplete",
-            "reason": f"{len(jobs)} of {expected_jobs} expected job(s) are present in the decision document",
+            "reason": (
+                f"{len(missing)} of {len(expected)} expected job(s) are missing from the "
+                f"decision document: {', '.join(missing)}"
+            ),
             "jobs": len(jobs),
-            "expected_jobs": expected_jobs,
+            "expected_jobs": len(expected),
+            "missing_jobs": missing,
         }
     if not still_running:
         if age is None:
@@ -207,7 +289,8 @@ def decision_status(
         "dry_run": True,
         "verdict": verdict,
         "jobs": len(jobs),
-        "expected_jobs": expected_jobs,
+        "expected_jobs": len(expected),
+        "expected_markers": list(expected),
         "job_markers": [job.get("marker") for job in jobs],
         "age_seconds": (int(age) if age is not None else None),
         "still_running": still_running,
@@ -224,16 +307,20 @@ def render_metrics(
     document: dict | None,
     now: float | None = None,
     stale_after_seconds: float = DEFAULT_STALE_AFTER_SECONDS,
-    expected_jobs: int = EXPECTED_JOBS,
+    expected_markers: tuple[str, ...] | None = None,
 ) -> str:
     """Prometheus exposition text for the SAME document ``/health`` reads.
 
     Every value here is derived from ``decision_status`` (or the document it
     judges) rather than recomputed a second way, so a scrape and a probe can
-    never disagree about what is healthy.
+    never disagree about what is healthy. When the expected set cannot be
+    derived, ``fleet_cron_jobs_expected`` is **-1** (explicitly unknown) rather
+    than a 0 or a stale count that a consumer would read as a measurement.
     """
     now = time.time() if now is None else now
-    status_code, body = decision_status(document, now, stale_after_seconds, expected_jobs)
+    status_code, body = decision_status(document, now, stale_after_seconds, expected_markers)
+    resolved = declared_enabled_markers() if expected_markers is None else tuple(expected_markers)
+    expected_count = len(resolved) if resolved else -1
     jobs = (document or {}).get("jobs") or []
     age = _age_seconds(document or {}, now)
 
@@ -244,9 +331,9 @@ def render_metrics(
         "# HELP fleet_cron_jobs_present Number of jobs present in the health decision document.",
         "# TYPE fleet_cron_jobs_present gauge",
         f"fleet_cron_jobs_present {len(jobs)}",
-        "# HELP fleet_cron_jobs_expected Number of jobs the schedule is expected to report.",
+        "# HELP fleet_cron_jobs_expected Number of jobs the schedule is expected to report (-1 when the declaration could not be read).",
         "# TYPE fleet_cron_jobs_expected gauge",
-        f"fleet_cron_jobs_expected {expected_jobs}",
+        f"fleet_cron_jobs_expected {expected_count}",
         "# HELP fleet_cron_decision_age_seconds Seconds since the health decision document last advanced.",
         "# TYPE fleet_cron_decision_age_seconds gauge",
         f"fleet_cron_decision_age_seconds {int(age) if age is not None else -1}",
@@ -267,7 +354,7 @@ class _Handler(BaseHTTPRequestHandler):
     #: Set by :func:`serve` — the decision document and a server reference.
     decision_path: Path = Path("decision.json")
     stale_after_seconds: float = DEFAULT_STALE_AFTER_SECONDS
-    expected_jobs: int = EXPECTED_JOBS
+    expected_markers: tuple[str, ...] | None = None
     server_version = "fleet-cron-dev-run/1.0"
 
     def _answer(self, status: int, payload: dict) -> None:
@@ -292,10 +379,10 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         document = load_decision(self.decision_path)
         if path in HEALTH_PATHS:
-            self._answer(*decision_status(document, stale_after_seconds=self.stale_after_seconds, expected_jobs=self.expected_jobs))
+            self._answer(*decision_status(document, stale_after_seconds=self.stale_after_seconds, expected_markers=self.expected_markers))
             return
         if path == METRICS_PATH:
-            self._answer_text(200, render_metrics(document, stale_after_seconds=self.stale_after_seconds, expected_jobs=self.expected_jobs), METRICS_CONTENT_TYPE)
+            self._answer_text(200, render_metrics(document, stale_after_seconds=self.stale_after_seconds, expected_markers=self.expected_markers), METRICS_CONTENT_TYPE)
             return
         self._answer(404, {"status": "not-found", "reason": f"only {list(HEALTH_PATHS) + [METRICS_PATH]} are served"})
 
@@ -312,7 +399,7 @@ def serve(
     decision_path: Path,
     ready: threading.Event | None = None,
     stale_after_seconds: float = DEFAULT_STALE_AFTER_SECONDS,
-    expected_jobs: int = EXPECTED_JOBS,
+    expected_markers: tuple[str, ...] | None = None,
 ) -> ThreadingHTTPServer:
     """Bind ``port`` and answer on a background thread; returns the server to stop."""
     handler = type(
@@ -321,7 +408,7 @@ def serve(
         {
             "decision_path": Path(decision_path),
             "stale_after_seconds": stale_after_seconds,
-            "expected_jobs": expected_jobs,
+            "expected_markers": expected_markers,
         },
     )
     server = ThreadingHTTPServer(("0.0.0.0", port), handler)

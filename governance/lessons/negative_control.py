@@ -38,6 +38,24 @@ What it provokes:
 * ``MUTANT-DROPS-THE-REFUSAL`` — the derived control: a scratch copy of the
   checker with the record-label selector forced off must STOP refusing the
   unrecorded issue, and the harness reports that by name.
+* ``BOARD-LINK-MISSING-IS-REFUSED`` / ``BOARD-LINK-ORPHAN-DECLARATION-IS-ACCEPTED``
+  — issue #1178: a ``LESSON-*``/``SUGGEST-*`` that reaches no board issue and
+  says nothing is an error, and the same record with an explicit orphan
+  declaration is a reported deviation instead.
+* ``BOARD-LINK-DANGLING-ORIGIN-IS-REFUSED`` — an INCIDENT whose origin names an
+  issue the snapshot does not carry (only an RCA's origin was checked before).
+* ``BOARD-LINK-UNLABELLED-IS-REFUSED`` / ``BOARD-LINK-LABEL-PRESENT-IS-ACCEPTED``
+  — an issue the ledger names as an incident's origin must carry the record
+  label, so the scope declaration selects a set the ledger derives.
+* ``REAL-BOARD-LINKAGE-CENSUS-IS-NOT-EMPTY`` and
+  ``REAL-LEDGER-HAS-NO-SILENT-ORPHAN`` — the same verdicts against the REAL
+  ledger and the REAL committed snapshot.
+* ``REAL-DATA-LABEL-REMOVAL-IS-REFUSED`` / ``REAL-DATA-DECLARATION-REMOVAL-IS-REFUSED``
+  — the two probes that make "able to fail on real data" a measurement rather
+  than a claim: ONE real fact is removed from the real ledger/snapshot and the
+  real check must refuse it by id.
+* ``MUTANT-DROPS-BOARD-LINK-*`` — a mutant per refusal, so each is proven able
+  to disappear.
 
 Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 
@@ -82,6 +100,10 @@ TODAY = date(2026, 9, 15)
 RETIRED_EXEMPTIONS = ("#141", "#494", "#495", "#497")
 AREA_LABEL = "area:incident-response"
 RECORD_LABEL = "incident"
+
+#: The modules a mutant copy needs, so the mutated checker imports the mutated
+#: linkage layer rather than the real one (issue #1178).
+MUTANT_FILES = ("checker.py", "model.py", "edges.py", "linkage.py")
 
 #: The single line the derived control flips. Anchored exactly (once) so a
 #: rename in the checker fails this control loudly instead of silently.
@@ -207,9 +229,15 @@ TRACED_ISSUE = 901
 
 
 def _snapshot(subject: Dict[str, Any]) -> Dict[int, Dict[str, Any]]:
-    """The board under test: the probe's subject, plus the traced issue."""
+    """The board under test: the probe's subject, plus the traced issue.
+
+    The traced issue carries the RECORD label because the fixture ledger names
+    it as ``INC-0001``'s origin: since issue #1178 an issue the ledger names
+    that way must show the label, so a fixture that withheld it would make every
+    probe observe that error instead of its own subject.
+    """
     return {
-        TRACED_ISSUE: _issue(TRACED_ISSUE, labels=["area:board"]),
+        TRACED_ISSUE: _issue(TRACED_ISSUE, labels=[RECORD_LABEL]),
         subject["number"]: subject,
     }
 
@@ -291,10 +319,22 @@ def probe_area_label_is_not_an_incident(case: Case) -> Tuple[bool, str]:
     report = case.report(_records("#%d" % TRACED_ISSUE), snapshot)
     board = _board_findings(report)
     scanned = report.counts["board_incidents_scanned"]
-    held = not board and not _errors(report) and scanned == 0
+    subjects = {f.subject for f in report.findings}
+    labelled = sorted(
+        number for number, issue in snapshot.items()
+        if RECORD_LABEL in (issue.get("labels") or [])
+    )
+    held = (
+        not board
+        and not _errors(report)
+        and "#900" not in subjects
+        and labelled == [TRACED_ISSUE]
+        and scanned == 1
+    )
     return held, (
-        "a CLOSED issue labelled %r produced %d board finding(s), scanned=%d, "
-        "errors=%s" % (AREA_LABEL, len(board), scanned, _error_codes(report))
+        "a CLOSED issue labelled %r produced %d board finding(s) and is not among "
+        "the %d scanned record-labelled issue(s) (%s); errors=%s"
+        % (AREA_LABEL, len(board), scanned, labelled, _error_codes(report))
     )
 
 
@@ -344,13 +384,17 @@ def probe_ledger_incident_without_rca_is_refused(case: Case) -> Tuple[bool, str]
 
 def probe_record_label_with_a_record_is_accepted(case: Case) -> Tuple[bool, str]:
     """The detector reads the RECORD: the same issue, backed by ``INC-*``, passes."""
-    snapshot = _snapshot(_issue(900, labels=[RECORD_LABEL]))
+    snapshot = {900: _issue(900, labels=[RECORD_LABEL])}
     report = case.report(_records("#900"), snapshot)
     board = _board_findings(report)
     scanned = report.counts["board_incidents_scanned"]
-    held = not board and not _errors(report) and scanned == 1
-    return held, "scanned=%d board finding(s)=%d errors=%s (the ledger traces #900)" % (
+    labelled = sum(
+        1 for issue in snapshot.values() if RECORD_LABEL in (issue.get("labels") or [])
+    )
+    held = not board and not _errors(report) and scanned == labelled
+    return held, "scanned=%d of %d labelled issue(s) board finding(s)=%d errors=%s (the ledger traces #900)" % (
         scanned,
+        labelled,
         len(board),
         _error_codes(report),
     )
@@ -649,6 +693,361 @@ def probe_mutant_drops_duplicate_id_refusal(case: Case) -> Tuple[bool, str]:
     )
 
 
+# --- issue #1178: the ledger -> board linkage -------------------------------
+#
+# The board rule was enforced over a set the *label* selected, and that set was
+# empty on real data — so it held only against the mutants above. These probes
+# exercise the other direction, ledger -> issue -> epic, and the last two are the
+# ones that matter: a REAL ledger and a REAL snapshot with exactly ONE real fact
+# changed, which must make the REAL check fail. A rule proved only against a
+# fixture has not been shown able to fail on the data it actually reads.
+
+#: The linkage codes, named here rather than read off the checker, so a rename
+#: in model.py turns the probe that asserts them into a FAILURE (which is the
+#: point) instead of a silent no-op.
+CODE_BOARD_LINK_MISSING = "board-link-missing"
+CODE_BOARD_LINK_ORPHAN = "board-link-orphan"
+CODE_BOARD_LINK_DANGLING = "board-link-dangling"
+CODE_BOARD_LINK_UNLABELLED = "board-link-unlabelled"
+
+
+def _linkage_snapshot(subject: Dict[str, Any]) -> Dict[int, Dict[str, Any]]:
+    """An alias kept explicit: the shared board already labels the traced issue."""
+    return _snapshot(subject)
+
+
+def _orphan_chain_records() -> List[Dict[str, Any]]:
+    """A complete ledger whose SECOND chain traces to a pull request.
+
+    A pull request is not a board node, so ``LESSON-0002`` reaches no issue and
+    no epic while every other rule passes — the exact shape of the twenty
+    records that were unreachable and silent.
+    """
+    return _records("#%d" % TRACED_ISSUE) + [
+        {
+            "id": "INC-0002",
+            "kind": "incident",
+            "date": "2026-09-01",
+            "summary": "a failure traced to a pull request",
+            "severity": "high",
+            "class": "false-green",
+            "origin": {"kind": "pr", "ref": "#902"},
+            "status": "closed",
+        },
+        {
+            "id": "RCA-0002",
+            "kind": "rca",
+            "date": "2026-09-02",
+            "incident": "INC-0002",
+            "origin": {"kind": "pr", "ref": "#902"},
+            "artifact": ARTIFACT_RELPATH,
+            "corrective_actions": ["CA-0002"],
+            "status": "closed",
+            "reviewed_at": "2026-09-10",
+        },
+        {
+            "id": "CA-0002",
+            "kind": "corrective-action",
+            "date": "2026-09-03",
+            "rca": "RCA-0002",
+            "action": "fix the mechanism",
+            "status": "closed",
+            "evidence": [{"kind": "commit", "ref": EVIDENCE_SHA}],
+        },
+        {
+            "id": "LESSON-0002",
+            "kind": "lesson",
+            "title": "a learning that reaches no board issue",
+            "rca": "RCA-0002",
+            "date": "2026-09-04",
+            "class": "enterprise",
+            "status": "closed",
+            "evidence": [{"kind": "commit", "ref": EVIDENCE_SHA}],
+        },
+    ]
+
+
+def probe_board_link_missing_is_refused(case: Case) -> Tuple[bool, str]:
+    """A learning that reaches no board issue AND says nothing about it is refused."""
+    snapshot = _linkage_snapshot(_issue(900, labels=["area:board"]))
+    report = case.report(_orphan_chain_records(), snapshot)
+    found = [f for f in report.findings if f.code == CODE_BOARD_LINK_MISSING]
+    held = (
+        len(found) == 1
+        and found[0].subject == "LESSON-0002"
+        and CODE_BOARD_LINK_MISSING in _error_codes(report)
+    )
+    return held, "code=%s subject=%s errors=%s" % (
+        CODE_BOARD_LINK_MISSING,
+        found[0].subject if found else "(none)",
+        _error_codes(report),
+    )
+
+
+def probe_board_link_orphan_declaration_is_accepted(case: Case) -> Tuple[bool, str]:
+    """The same record, explicitly declared orphaned, is reported not refused."""
+    records = _orphan_chain_records()
+    records[-1]["orphan"] = {
+        "reason": "the RCA traces to a pull request, which is not a board node"
+    }
+    snapshot = _linkage_snapshot(_issue(900, labels=["area:board"]))
+    report = case.report(records, snapshot)
+    missing = [f for f in report.findings if f.code == CODE_BOARD_LINK_MISSING]
+    orphan = [f for f in report.findings if f.code == CODE_BOARD_LINK_ORPHAN]
+    held = (
+        not missing
+        and any(f.subject == "LESSON-0002" for f in orphan)
+        and CODE_BOARD_LINK_MISSING not in _error_codes(report)
+    )
+    return held, "missing=%d orphan-deviations=%d errors=%s" % (
+        len(missing),
+        len(orphan),
+        _error_codes(report),
+    )
+
+
+def probe_board_link_dangling_origin_is_refused(case: Case) -> Tuple[bool, str]:
+    """An INCIDENT origin naming an issue the snapshot does not carry.
+
+    Before issue #1178 only an RCA's origin was resolved against the board, so
+    an incident could name an issue that no longer existed and no rule saw it.
+    """
+    snapshot = _linkage_snapshot(_issue(900, labels=["area:board"]))
+    report = case.report(_records("#902"), snapshot)
+    found = [
+        f for f in report.findings
+        if f.code == CODE_BOARD_LINK_DANGLING and f.subject == "INC-0001"
+    ]
+    held = len(found) == 1 and CODE_BOARD_LINK_DANGLING in _error_codes(report)
+    return held, "code=%s subject=INC-0001 count=%d errors=%s" % (
+        CODE_BOARD_LINK_DANGLING,
+        len(found),
+        _error_codes(report),
+    )
+
+
+def probe_board_link_unlabelled_is_refused(case: Case) -> Tuple[bool, str]:
+    """The ledger names #901 as an incident's origin; the board must show it."""
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    # Withhold the label from the very issue the ledger names as the origin —
+    # the defect this rule exists to catch.
+    snapshot[TRACED_ISSUE] = _issue(TRACED_ISSUE, labels=["area:board"])
+    report = case.report(_records("#%d" % TRACED_ISSUE), snapshot)
+    found = [f for f in report.findings if f.code == CODE_BOARD_LINK_UNLABELLED]
+    held = (
+        len(found) == 1
+        and found[0].subject == "#%d" % TRACED_ISSUE
+        and CODE_BOARD_LINK_UNLABELLED in _error_codes(report)
+    )
+    return held, "code=%s subject=%s errors=%s" % (
+        CODE_BOARD_LINK_UNLABELLED,
+        found[0].subject if found else "(none)",
+        _error_codes(report),
+    )
+
+
+def probe_board_link_label_present_is_accepted(case: Case) -> Tuple[bool, str]:
+    """The same ledger, with the label on the named issue, is accepted."""
+    snapshot = _linkage_snapshot(_issue(900, labels=["area:board"]))
+    report = case.report(_records("#%d" % TRACED_ISSUE), snapshot)
+    found = [f for f in report.findings if f.code == CODE_BOARD_LINK_UNLABELLED]
+    held = not found and not _errors(report)
+    return held, "finding(s)=%d errors=%s" % (len(found), _error_codes(report))
+
+
+def _real_report(case: Case, *, ledger, snapshot, policy):
+    c = case.c
+    return c.check_ledger(
+        ledger,
+        root=case.repo,
+        snapshot=snapshot,
+        policy=policy,
+        today=TODAY,
+        git=c.GitProbe(case.repo),
+        generated_at="2026-09-15T00:00:00Z",
+    )
+
+
+def probe_real_data_label_removal_is_refused(case: Case) -> Tuple[bool, str]:
+    """The REAL ledger against the REAL board with ONE real label removed.
+
+    Not a fixture and not a mutant: the data the gate actually reads, minus one
+    fact. The rule must fail, naming the issue whose label the ledger requires.
+    """
+    c = case.c
+    root = case.repo
+    ledger = c.load_ledger(root / c.LEDGER_RELPATH)
+    snapshot = c.load_snapshot(root / c.SNAPSHOT_RELPATH)
+    policy = c.load_policy(root / c.POLICY_RELPATH)
+    named = []
+    for record in ledger.records.values():
+        if record.get("kind") != "incident":
+            continue
+        origin = record.get("origin")
+        if not isinstance(origin, dict) or origin.get("kind") != "issue":
+            continue
+        ref = str(origin.get("ref", "")).strip()
+        if not ref.startswith("#") or not ref[1:].isdigit():
+            continue
+        if int(ref[1:]) in snapshot:
+            named.append(int(ref[1:]))
+    named = sorted(set(named))
+    if not named:
+        return False, "the REAL ledger names no issue as an incident origin"
+    victim = named[0]
+    mutated = {number: dict(issue) for number, issue in snapshot.items()}
+    mutated[victim]["labels"] = [
+        label for label in (mutated[victim].get("labels") or [])
+        if label != policy.incident_label
+    ]
+    report = _real_report(case, ledger=ledger, snapshot=mutated, policy=policy)
+    found = [
+        f for f in report.findings
+        if f.code == CODE_BOARD_LINK_UNLABELLED and f.subject == "#%d" % victim
+    ]
+    held = len(found) == 1 and CODE_BOARD_LINK_UNLABELLED in _error_codes(report)
+    return held, (
+        "the REAL ledger names %d issue(s); removed %r from #%d and the REAL check "
+        "reported %d finding(s) for it, errors=%s"
+        % (len(named), policy.incident_label, victim, len(found), _error_codes(report))
+    )
+
+
+def probe_real_data_declaration_removal_is_refused(case: Case) -> Tuple[bool, str]:
+    """The REAL ledger and REAL board with ONE real orphan declaration removed.
+
+    The same point in the other direction: a real declaration the gate depends
+    on is deleted from the real text, and the real check must now refuse that
+    record by id.
+    """
+    c = case.c
+    root = case.repo
+    ledger = c.load_ledger(root / c.LEDGER_RELPATH)
+    snapshot = c.load_snapshot(root / c.SNAPSHOT_RELPATH)
+    policy = c.load_policy(root / c.POLICY_RELPATH)
+    declared = sorted(
+        record_id
+        for record_id, record in ledger.records.items()
+        if isinstance(record.get("orphan"), dict)
+    )
+    if not declared:
+        return False, "no real record carries an orphan declaration to remove"
+    victim = declared[0]
+    text = (root / c.LEDGER_RELPATH).read_text(encoding="utf-8").splitlines()
+    lines = []
+    for line in text:
+        record = json.loads(line) if line.strip() else {}
+        if record.get("id") == victim:
+            body = dict(record)
+            body.pop("orphan", None)
+            lines.append(json.dumps(body))
+        else:
+            lines.append(line)
+    stripped = c.parse_ledger_text(
+        "\n".join(lines) + "\n", root / c.LEDGER_RELPATH
+    )
+    report = _real_report(case, ledger=stripped, snapshot=snapshot, policy=policy)
+    found = [
+        f for f in report.findings
+        if f.code == CODE_BOARD_LINK_MISSING and f.subject == victim
+    ]
+    held = len(found) == 1 and CODE_BOARD_LINK_MISSING in _error_codes(report)
+    return held, (
+        "the REAL ledger carries %d declaration(s); removed %s's and the REAL check "
+        "reported %d finding(s) for it, errors=%s"
+        % (len(declared), victim, len(found), _error_codes(report))
+    )
+
+
+def probe_real_ledger_has_no_silent_orphan(case: Case) -> Tuple[bool, str]:
+    """The REAL ledger: every learning is board-reachable or declared orphaned."""
+    c = case.c
+    root = case.repo
+    ledger = c.load_ledger(root / c.LEDGER_RELPATH)
+    snapshot = c.load_snapshot(root / c.SNAPSHOT_RELPATH)
+    policy = c.load_policy(root / c.POLICY_RELPATH)
+    report = _real_report(case, ledger=ledger, snapshot=snapshot, policy=policy)
+    silent = [f for f in report.findings if f.code == CODE_BOARD_LINK_MISSING]
+    dangling = [f for f in report.findings if f.code == CODE_BOARD_LINK_DANGLING]
+    return (not silent and not dangling), (
+        "the REAL ledger: %d silent orphan(s), %d dangling reference(s), errors=%s"
+        % (len(silent), len(dangling), _error_codes(report))
+    )
+
+
+def probe_real_board_linkage_census_is_not_empty(case: Case) -> Tuple[bool, str]:
+    """The REAL scope declaration selects a set the LEDGER derives, not nothing.
+
+    The defect this closes: the board rule was satisfied over an empty holder
+    set, so it could only fail against a mutant. Here the holder set is derived
+    from the ledger's incident origins, and every one of them must be labelled.
+    """
+    c = case.c
+    root = case.repo
+    ledger = c.load_ledger(root / c.LEDGER_RELPATH)
+    snapshot = c.load_snapshot(root / c.SNAPSHOT_RELPATH)
+    policy = c.load_policy(root / c.POLICY_RELPATH)
+    report = _real_report(case, ledger=ledger, snapshot=snapshot, policy=policy)
+    counts = report.counts
+    unlabelled = [f for f in report.findings if f.code == CODE_BOARD_LINK_UNLABELLED]
+    held = (
+        counts.get("ledger_named_issues", 0) > 0
+        and counts.get("ledger_named_labelled") == counts.get("ledger_named_issues")
+        and counts.get("board_incidents_scanned", 0) > 0
+        and not unlabelled
+    )
+    return held, (
+        "the REAL ledger names %d issue(s) as an incident origin; %d carry `%s`; "
+        "the board rule scanned %d; unlabelled=%d"
+        % (
+            counts.get("ledger_named_issues", 0),
+            counts.get("ledger_named_labelled", 0),
+            policy.incident_label,
+            counts.get("board_incidents_scanned", 0),
+            len(unlabelled),
+        )
+    )
+
+
+def probe_mutant_drops_board_link_missing(case: Case) -> Tuple[bool, str]:
+    """The board-link-missing refusal must be provably able to fail."""
+    return _run_generic_mutant(
+        case,
+        tag="link-missing",
+        anchor="            elif is_lesson(row.id) or is_suggestion(row.id):\n",
+        replacement="            elif False:  # mutated out\n",
+        probe_name="BOARD-LINK-MISSING-IS-REFUSED",
+        expect_code=CODE_BOARD_LINK_MISSING,
+        filename="linkage.py",
+    )
+
+
+def probe_mutant_drops_board_link_dangling(case: Case) -> Tuple[bool, str]:
+    """The board-link-dangling refusal must be provably able to fail."""
+    return _run_generic_mutant(
+        case,
+        tag="link-dangling",
+        anchor="        for link, ref, field_name in _declaration_codes(by_id[row.id], board):\n",
+        replacement="        for link, ref, field_name in ():  # mutated out\n",
+        probe_name="BOARD-LINK-DANGLING-ORIGIN-IS-REFUSED",
+        expect_code=CODE_BOARD_LINK_DANGLING,
+        filename="linkage.py",
+    )
+
+
+def probe_mutant_drops_board_link_unlabelled(case: Case) -> Tuple[bool, str]:
+    """The board-link-unlabelled refusal must be provably able to fail."""
+    return _run_generic_mutant(
+        case,
+        tag="link-unlabelled",
+        anchor="    for number in ledger_named_issues(records, board):\n",
+        replacement="    for number in ():  # mutated out\n",
+        probe_name="BOARD-LINK-UNLABELLED-IS-REFUSED",
+        expect_code=CODE_BOARD_LINK_UNLABELLED,
+        filename="linkage.py",
+    )
+
+
 def probe_real_docs_rca_have_no_unknown_ids(case: Case) -> Tuple[bool, str]:
     """The REAL ``docs/rca/`` tree cites only ids the ledger actually holds."""
     c = case.c
@@ -734,7 +1133,8 @@ print("MUTANT-VERDICT=NOT-HELD")
 
 
 def _run_generic_mutant(
-    case: Case, *, tag: str, anchor: str, replacement: str, probe_name: str, expect_code: str
+    case: Case, *, tag: str, anchor: str, replacement: str, probe_name: str,
+    expect_code: str, filename: str = "checker.py",
 ) -> Tuple[bool, str]:
     """Build a scratch copy of the checker with ``anchor`` replaced, and rerun
     ``probe_name`` against it in a fresh interpreter — the refusal must be
@@ -743,21 +1143,22 @@ def _run_generic_mutant(
     mutant_dir = mutant / "governance" / "lessons"
     mutant_dir.mkdir(parents=True, exist_ok=True)
     copied = []
-    for name in ("checker.py", "model.py", "edges.py"):
+    for name in MUTANT_FILES:
         source = case.module_dir / name
         if source.is_file():
             shutil.copy2(source, mutant_dir / name)
             copied.append(name)
-    if "checker.py" not in copied:
-        return False, "checker.py is not in %s" % case.module_dir
-    text = (mutant_dir / "checker.py").read_text(encoding="utf-8")
+    if filename not in copied:
+        return False, "%s is not in %s" % (filename, case.module_dir)
+    target = mutant_dir / filename
+    text = target.read_text(encoding="utf-8")
     matches = text.count(anchor)
     if matches != 1:
         return False, "the mutation anchor matched %d time(s), not once" % matches
     mutated = text.replace(anchor, replacement)
     if mutated == text:
         return False, "the mutation was a no-op"
-    (mutant_dir / "checker.py").write_text(mutated, encoding="utf-8")
+    target.write_text(mutated, encoding="utf-8")
 
     driver = mutant / "driver.py"
     driver.write_text(GENERIC_DRIVER_SOURCE, encoding="utf-8")
@@ -835,7 +1236,7 @@ def probe_mutant_drops_the_refusal(case: Case) -> Tuple[bool, str]:
     mutant_dir = mutant / "governance" / "lessons"
     mutant_dir.mkdir(parents=True, exist_ok=True)
     copied = []
-    for name in ("checker.py", "model.py", "edges.py"):
+    for name in MUTANT_FILES:
         source = case.module_dir / name
         if source.is_file():
             shutil.copy2(source, mutant_dir / name)
@@ -905,6 +1306,20 @@ PROBES: Dict[str, Probe] = {
     "MUTANT-DROPS-README-REFUSAL": probe_mutant_drops_readme_refusal,
     "DUPLICATE-ID-IS-REFUSED": probe_duplicate_id_is_refused,
     "MUTANT-DROPS-DUPLICATE-ID-REFUSAL": probe_mutant_drops_duplicate_id_refusal,
+    # issue #1178 — the ledger -> board linkage, provoked on fixtures AND on the
+    # real ledger/board with exactly one real fact changed.
+    "BOARD-LINK-MISSING-IS-REFUSED": probe_board_link_missing_is_refused,
+    "BOARD-LINK-ORPHAN-DECLARATION-IS-ACCEPTED": probe_board_link_orphan_declaration_is_accepted,
+    "BOARD-LINK-DANGLING-ORIGIN-IS-REFUSED": probe_board_link_dangling_origin_is_refused,
+    "BOARD-LINK-UNLABELLED-IS-REFUSED": probe_board_link_unlabelled_is_refused,
+    "BOARD-LINK-LABEL-PRESENT-IS-ACCEPTED": probe_board_link_label_present_is_accepted,
+    "REAL-LEDGER-HAS-NO-SILENT-ORPHAN": probe_real_ledger_has_no_silent_orphan,
+    "REAL-BOARD-LINKAGE-CENSUS-IS-NOT-EMPTY": probe_real_board_linkage_census_is_not_empty,
+    "REAL-DATA-LABEL-REMOVAL-IS-REFUSED": probe_real_data_label_removal_is_refused,
+    "REAL-DATA-DECLARATION-REMOVAL-IS-REFUSED": probe_real_data_declaration_removal_is_refused,
+    "MUTANT-DROPS-BOARD-LINK-MISSING": probe_mutant_drops_board_link_missing,
+    "MUTANT-DROPS-BOARD-LINK-DANGLING": probe_mutant_drops_board_link_dangling,
+    "MUTANT-DROPS-BOARD-LINK-UNLABELLED": probe_mutant_drops_board_link_unlabelled,
 }
 
 
@@ -973,7 +1388,8 @@ def run(repo: Path, module_dir: Path, out=sys.stdout) -> int:
         )
         print(
             "negative-control: NOT-OK — the board/incident rule is not proven "
-            "(issue #766)",
+            "(issue #766), or the ledger -> board linkage is not proven (issue "
+            "#1178)",
             file=sys.stderr,
         )
         return EXIT_NOT_OK
@@ -981,7 +1397,10 @@ def run(repo: Path, module_dir: Path, out=sys.stdout) -> int:
     print(
         "negative-control: OK — an area label cannot manufacture an incident, a "
         "record-labelled issue with no ledger record is still refused, no "
-        "exemption can be declared, and the refusal is proven able to fail"
+        "exemption can be declared, the refusal is proven able to fail, and the "
+        "ledger -> board linkage (a silent orphan, a dangling reference, an "
+        "incident-origin issue with no record label) is refused on the real "
+        "ledger and board with one real fact changed"
     )
     return EXIT_OK
 

@@ -665,6 +665,68 @@ would silently corrupt the evidence chain, and the recurring
 
 ---
 
+### AO-GR-28 — Every governed artifact is tagged, and a tag set derives its gates
+
+**Origin.** Issue #1175 (the tag authority) and issue #1183 (making it
+constitutional). Measured 2026-09-17: classification existed in five places —
+the conformance policy, the surface policy, the FinOps policy, the fleet
+vocabulary and the issue forms — and **none of them could say what a tag
+implies**. A lane could write `class:elite` and nothing connected that word to a
+gate, a FinOps floor, or a lifecycle stage.
+
+**Rule.** One declared vocabulary (`governance/tagging/taxonomy.yaml`)
+classifies every governed artifact — issue, PR, branch, commit, surface,
+release. The vocabulary **borrows** wherever this repository already has an
+authority and never re-declares one: the `class` ladder is borrowed from
+`governance/conformance/policy.yaml` and the FinOps tiers from
+`governance/finops/policy.json`, and the values are **mirrored and proven
+equal** by the gate — a borrow that reads its own values can never fail, so the
+mirror is what makes drift detectable. Two dimensions carry the delivery and
+lifecycle half: **`posture`** (`overall` | `saas` | `iac` | `no-human-needed` |
+`human-gated`) and **`lifecycle`** (`plan` | `build` | `verify` | `release` |
+`operate` | `retire`).
+
+A tag set **derives the gates it owes** — by channel (`pr`/`ci`/`cd`/`ops`) and
+at the FinOps floor the doctrine sets — so classification has consequences
+rather than being a description. Every gate a rule names must **resolve**
+(`make:<target>` against the Makefile, `check:<name>` against the check registry
+`scripts/verify.sh` builds): renaming a gate fails by name rather than describing
+a pipeline that no longer exists. `posture:no-human-needed` and
+`posture:human-gated` are **mutually exclusive** and both at once is refused by
+name — a contradiction is not a preference, and silently picking a winner is how
+a plan becomes a guess.
+
+**Why.** A vocabulary that lives nowhere in particular is a convention, not a
+contract: five copies of a classification scheme is five chances for them to
+disagree, and no way to notice. The failure this rule prevents is the one
+[ADR-0015](decision-records/ADR-0015-routing-seam-single-authority.md) names —
+*two things quietly both being authoritative* — and the mechanism is the
+repository's own mirrored-constant pattern (`governance/vocabulary/fleet.yaml` <->
+`fleet/channel.py`): declare once, mirror where a consumer must be fast, and let
+a gate hold the two equal.
+
+**The mandate is half the rule.** The rule is only constitutional while the
+contract documents declare it, so `AGENTS.md`, this spine, `docs/GOVERNANCE.md`,
+`docs/EXECUTION-PLAN.md` and `docs/QA-GATE.md` each declare it, and
+`scripts/check-tagging.sh`'s `tagging-mandate` check FAILS naming the document
+**and** the marker the moment one stops. A rule only prose carries is advice
+(AO-GR-4); a rule whose declaration is gated is a rule.
+
+**Verify.**
+- `scripts/check-tagging.sh` (in `make verify` by auto-discovery, and `make
+tagging`) — the authority's shape, every borrowed vocabulary proven equal to its
+authority, every rule's gate name resolved, every document against its frozen
+shape, the declared controls against the authority they govern, the generated
+matrix's freshness, and every declared refusal provoked by a real mutant with its
+clean twin accepted.
+- `tagging-mandate` — every marker above present in every contract document,
+  provoked by stripping each marker in a scratch copy and requiring the refusal
+  by name.
+- `python3 governance/tagging/cli.py plan --tag …` — the gates a tag set owes;
+  `… board --live` — what the board actually declares.
+
+---
+
 ## Enforcement & linkage
 
 Golden rules are the top of the product's policy hierarchy. Below them:

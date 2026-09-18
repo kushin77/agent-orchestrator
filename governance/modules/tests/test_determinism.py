@@ -13,7 +13,25 @@ import re
 from pathlib import Path
 
 import pytest
-from conftest import PACKAGE_TARGETS, REAL_HUB, write_repo, write_targets
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_modules_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+PACKAGE_TARGETS = _conftest.PACKAGE_TARGETS
+REAL_HUB = _conftest.REAL_HUB
+write_repo = _conftest.write_repo
+write_targets = _conftest.write_targets
 
 from governance.modules import registry
 from governance.modules.hub import DEFAULT_HUB
@@ -69,7 +87,7 @@ def test_the_document_is_portable(consumer, hub, targets) -> None:
 
 def test_a_default_hub_root_is_recorded_portably(tmp_path) -> None:
     """``vendor/CMR`` is recorded as ``vendor/CMR``, so the document travels."""
-    from conftest import write_hub
+    write_hub = _conftest.write_hub
 
     repo = write_repo(tmp_path / "portable")
     write_hub(repo / DEFAULT_HUB)

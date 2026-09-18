@@ -89,6 +89,19 @@ runtime_roots=(.board .fleet .verify)
 # runtime state that already reached history.
 wholly_generated=(.verify)
 
+# Named exceptions: a tracked, reviewable file under a wholly-generated root
+# that is NOT the runtime state that root exists to keep out of git — checked
+# in by NAME, so an exception is a deliberate, auditable line here, not a
+# root silently downgraded to "mostly generated". `.verify/attestation.schema.json`
+# (#882, closing #1001) is the JSON Schema the verify-gate's own attestation
+# document must conform to (both PASS and FAIL runs): it is source, checked
+# in like any other schema, never written by `scripts/verify.sh` itself
+# (that writes `.verify/attestation.json`, still covered by check 1/2 above,
+# never this list).
+wholly_generated_exceptions=(
+  ".verify/attestation.schema.json"
+)
+
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 root="$script_root"
 overridden=0
@@ -192,6 +205,17 @@ for candidate in "${wholly_generated[@]}"; do
   else
     while IFS= read -r offender; do
       [ -n "$offender" ] || continue
+      exempt=0
+      for allowed in "${wholly_generated_exceptions[@]}"; do
+        if [ "$offender" = "$allowed" ]; then
+          exempt=1
+          break
+        fi
+      done
+      if [ "$exempt" -eq 1 ]; then
+        printf '  OK    %s tracked, but named as a source exception (not runtime state)\n' "$offender"
+        continue
+      fi
       printf '  FAIL  %s (tracked under a wholly generated root — runtime state already in history)\n' \
         "$offender" >&2
       fail=$((fail + 1))
