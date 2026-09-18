@@ -196,17 +196,40 @@ rule 16), and it is checked in both directions:
 | an artifact whose **tip has moved** is **never** absorbed | it is a different artifact; it fails, and the lapsed entry is named as it fails |
 | an entry that **excuses nothing** | the artifact is gone or no longer unmatched: the verdict names it in `stale_quarantine` and exits **1** — the document can only shrink |
 | it is a **lease** | entries are honoured only while the declared tracking issue is `open` **and** the declared measurement is younger than the declared `max_age_hours`; a missing, malformed, expired or not-open declaration is never read as "still excused" |
+| it declares its **venue** | the repository instance the exemptions were measured in (`venue.git_common_dir`). At that venue every rule above bites; at any other the whole document is **inert** — each entry reported as `NOT-APPLICABLE`, **honouring nothing** (an artifact that *is* unmatched there stays a finding) and **not fatal** (a stale exemption is a claim about the declared venue's disk, which that checkout cannot observe). Entries with no venue at all are **CANNOT-ASSESS** |
 
 Quarantined artifacts are still reported on **every pass**, by name, in the
 verdict (`QUARANTINED <kind> <name> @<tip> — <reason>`), which is what satisfies
 rule 17's "reported until someone resolves it": the tracking issue carries the
 resolution, and the document carries the record of what is unresolved.
 
+**Why a venue, and why #1317 was right and wrong (#1321).** An exemption names a
+*disk artifact of one repository instance* — a local branch of this checkout, a
+worktree path on this machine. The document is tracked, so it is read on
+checkouts where that artifact was never there, and read venue-blind every entry
+there "matches nothing" and **fails** as a stale exemption: measured on a
+pristine clone, `0 new-and-old, 538 stale, not fatal; 23 stale quarantine
+exemption(s)` → exit 1. `#1317` measured exactly that and emptied the document,
+which un-quarantined all 23 on the one box that has them and red the fleet
+again — a true measurement whose remedy deleted the record instead of scoping it.
+The two checkouts need *different answers*: at the declared venue the exemptions
+are in force with every tooth above; anywhere else they are inert. Inert is
+fail-closed on the honouring half (the artifact stays a finding, because this
+document does not speak for that checkout) and non-fatal on the staleness half (a
+stale exemption is a claim about the *other* venue's disk).
+
+Declaring a foreign venue cannot buy a green: it honours nothing, so the
+artifacts the entries were hiding come back as findings by name. Nor can dropping
+the venue (CANNOT-ASSESS) or emptying the list (the artifacts then fail as
+unbaselined-and-old). A venue this check cannot read is CANNOT-ASSESS too —
+never read as "some other venue", which would silently stop evaluating
+exemptions.
+
 ```bash
 $ bash scripts/check-reconcile.sh
-real-tree-baseline: 128 unmatched artifact(s) on disk, 538 baselined, 52 young (< 24h, not failed), …
-  quarantine: honoured — #1291 open, measured 0.0h ago (lease 24h, by governance/reconcile (issue #1291 lane))
-  QUARANTINED branch issue-1106-gate-location-independence @a3484089df62 — 3 path(s) changed, …
+real-tree-baseline: 124 unmatched artifact(s) on disk, 538 baselined, 38 young (< 24h, not failed), …
+  quarantine: honoured — #1311 open, measured 0.0h ago (lease 24h, by governance/reconcile (issue #1321 lane))
+  QUARANTINED branch issue-1106-gate-location-independence @a3484089df62 — AGENTS.md rule 17 …
 real-tree-baseline: OK — no new unbaselined-and-old artifact
 check-reconcile: OK — …
 ```
@@ -215,8 +238,10 @@ The gate proves the rules rather than asserting them (§6e): a fixture entry
 naming a real, present, unmatched artifact at its exact tip **is** honoured; an
 entry that matches nothing **fails** by name; an artifact whose tip has moved is
 **not** absorbed; a lease that is closed or past its declared age honours
-**nothing** and fails by name; and an unreadable document is **CANNOT-ASSESS**,
-never a pass.
+**nothing** and fails by name; an entry measured in **another repository
+instance** is inert — reported by name, honouring nothing, not fatal; entries
+with no venue (missing or empty) are **CANNOT-ASSESS**; and an unreadable
+document is **CANNOT-ASSESS**, never a pass.
 
 **What this costs, stated plainly.** The lease is a *lease*: after
 `max_age_hours` (24, declared in the document) the exemptions stop being honoured
@@ -226,6 +251,11 @@ That is deliberate (a declaration nobody can falsify is decorative, and
 tracking state as stale), but it does mean the gate reds on a stale declaration
 even when nothing on disk drifted. A new artifact crossing the grace window also
 reds, by design: green means "nothing new and unresolved", not "nothing left".
+The same one-edit cost applies when a quarantined artifact is resolved: the entry
+no longer excuses anything and must go in the same reviewed edit, which is what
+keeps the document shrinking instead of rotting. **A quarantine is a snapshot of
+one box's unresolved work, not a property of the repository** — it is honest
+exactly as long as its entries are re-measured against the disk they name.
 
 ## 8. Board reporting
 

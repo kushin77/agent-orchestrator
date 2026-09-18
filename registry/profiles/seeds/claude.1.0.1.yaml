@@ -1,4 +1,4 @@
-# AgentProfile seed: claude (senior multi-domain worker + orchestration) v1.0.0
+# AgentProfile seed: claude (senior multi-domain worker + orchestration) v1.0.1
 #
 # PROVENANCE (see seeds/PROVENANCE.md for the full table):
 #   - kushin77/gmail-agent src/agent/claude.ts (governed Claude client: model
@@ -8,12 +8,12 @@
 #   - kushin77/CMR docs/MODEL-PROFILES.md (FinOps model ladder)
 #   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
 id: claude
-version: 1.0.0
+version: 1.0.1
 owner: platform/purebliss
 systemPromptRef: claude/primary@v1
 toolAllowlist:
-  - gh_issue
-  - gh_pr
+  - gh_issue  # role-only: orchestrator issue authoring, not applicable to the analytics worker
+  - gh_pr  # role-only: orchestrator PR authoring, not applicable to the analytics worker
   - file_read
   - file_write
   - shell_exec
@@ -30,9 +30,9 @@ constraintSet:
   - no-unverified-merge
   - no-debug-leftovers
 capabilitySet:
-  - orchestrate
+  - orchestrate  # role-only: orchestrator lane decomposition, not applicable to the analytics worker
   - code-author
-  - code-review
+  - code-review  # role-only: orchestrator review duty, not applicable to the analytics worker
   - research
 defaultModelTier: MED
 memoryScope:

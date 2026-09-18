@@ -41,8 +41,17 @@
 #      by name -- so a pass here cannot be vacuous (GR-12: a gate that cannot fail
 #      is a formality). Every mutation is proven to have LANDED (sha256 before and
 #      after) before its verdict is trusted, and the repository's own files are
-#      proven unchanged, including `git status --porcelain -uall`: the client is a
-#      client (ADR-0026 D5/D6) and writes no fleet state.
+#      proven unchanged: `control-plane/cockpit` byte-for-byte, and the run itself
+#      proven to have added NOTHING to the tree's dirty set -- a SAME-TREE DELTA
+#      against the tree it started from, never the tree's absolute state, because
+#      an absolute assertion's verdict depends on what happened to run before it
+#      in the same worktree (issues #1162 + #1313, PR #1306). The set
+#      `governance/isolation/worktree.py` DECLARES machine-managed
+#      (`MACHINE_MANAGED_PATHS` / `MACHINE_MANAGED_PREFIXES` -- `.board/focus.json`
+#      is rewritten by the board machinery, never by the client) is excluded from
+#      that delta, read from that one authority so this gate cannot disagree with
+#      the worktree reaper (#1285). The client is a client (ADR-0026 D5/D6) and
+#      writes no fleet state.
 #
 # The scratch copy is the repository minus VCS, the pinned submodule, the
 # research clones and the runtime state peers regenerate -- the same venue
@@ -52,8 +61,8 @@
 # reach it.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (no python3, no PyYAML,
-# no sha256sum, a scratch directory that cannot be created). CANNOT-ASSESS never
-# reads as a pass.
+# no sha256sum, a scratch directory that cannot be created, not a git checkout, an
+# unreadable machine-managed declaration). CANNOT-ASSESS never reads as a pass.
 #
 # Usage: bash scripts/check-cockpit.sh
 set -u
@@ -72,12 +81,102 @@ cannot_assess() {
   exit 2
 }
 
+# --- the declared machine-managed set, from its ONE source -------------------
+# `.board/focus.json` is in `governance/isolation/worktree.py`'s
+# `MACHINE_MANAGED_PATHS`: it is rewritten by the board machinery, not by the
+# cockpit client, and a concurrent rewrite during this run is indistinguishable
+# from one this run caused. Reading the declaration from that single authority
+# (the one the worktree reaper consumes, #1285) means this gate cannot disagree
+# with the reaper about what is machine-owned, and narrowing the declaration
+# narrows this gate with it.
+machine_managed_declaration() {
+  python3 - "$root" <<'PYEOF'
+import sys
+
+sys.path.insert(0, sys.argv[1])
+try:
+    from governance.isolation import worktree
+except Exception as exc:  # noqa: BLE001 - an unreadable authority is CANNOT-ASSESS
+    print("governance/isolation/worktree.py could not be imported: %s" % (exc,), file=sys.stderr)
+    raise SystemExit(2)
+for declared in worktree.MACHINE_MANAGED_PATHS:
+    print("P\t%s" % declared)
+for declared in worktree.MACHINE_MANAGED_PREFIXES:
+    print("X\t%s" % declared)
+PYEOF
+}
+
+mm_paths=()
+mm_prefixes=()
+if ! mm_declaration="$(machine_managed_declaration)"; then
+  cannot_assess "the declared machine-managed set is unreadable (governance/isolation/worktree.py)"
+fi
+while IFS=$'\t' read -r mm_kind mm_value; do
+  [ -n "$mm_value" ] || continue
+  case "$mm_kind" in
+    P) mm_paths+=("$mm_value") ;;
+    X) mm_prefixes+=("$mm_value") ;;
+  esac
+done <<< "$mm_declaration"
+
+is_machine_managed() {
+  local candidate="$1" declared
+  for declared in ${mm_paths[@]+"${mm_paths[@]}"}; do
+    [ "$candidate" = "$declared" ] && return 0
+  done
+  for declared in ${mm_prefixes[@]+"${mm_prefixes[@]}"}; do
+    case "$candidate" in "$declared"*) return 0 ;; esac
+  done
+  return 1
+}
+
+# snapshot_tree <out-prefix> -- the tree's dirty set as two comparable files:
+#   <out>.S        one porcelain line per dirty/untracked path this gate must not move
+#   <out>.H        "<path>\t<sha256>" for each of those paths that exists on disk
+#   <out>.skipped  how many dirty paths were skipped as declared machine-managed
+# The hash half is load-bearing: porcelain v1 reports ` M` both for a file that was
+# already dirty on entry and for one this run dirtied, so a status line alone
+# cannot see a second write to an already-dirty file. The two files are kept APART
+# because the two findings are different questions -- a path in only the later set
+# is a creation, a path in both can only be a rewrite -- and one combined file
+# cannot tell them apart: a created file has no prior hash to compare with, so its
+# own hash line would read as "changed". The delta is one-directional (what the run
+# ADDED); a concurrent host writer reverting pre-existing state is not this gate's
+# finding, and the whole-tree comparison this replaced could not tell the two apart
+# at all. A path porcelain QUOTES (a space, a non-ASCII byte) cannot match the
+# declared set and is therefore reported: the uncertain direction is loud, silent is
+# the unsafe one.
+snapshot_tree() {
+  local out="$1" line path skipped=0
+  : > "$out.S"
+  : > "$out.H"
+  git status --porcelain -uall 2>/dev/null \
+    | grep -v -E '^[?][?] scripts/check-cockpit[.]sh$' > "$out.raw" || true
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path="${line:3}"
+    if is_machine_managed "$path"; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    printf '%s\n' "$line" >> "$out.S"
+    [ -f "$path" ] || continue
+    printf '%s\t%s\n' "$path" "$(sha256sum -- "$path" | cut -d' ' -f1)" >> "$out.H"
+  done < "$out.raw"
+  printf '%s\n' "$skipped" > "$out.skipped"
+}
+
 # --- preconditions ----------------------------------------------------------
 command -v python3 >/dev/null 2>&1 || cannot_assess "python3 not found"
 command -v sha256sum >/dev/null 2>&1 \
   || cannot_assess "sha256sum not found (the controls prove their own mutations land)"
 python3 -c 'import yaml' >/dev/null 2>&1 \
   || cannot_assess "PyYAML is not importable, so the RC-10 registry cannot be read"
+# The final assertion measures the tree's dirty set before and after the run, so a
+# tree git cannot read is a CANNOT-ASSESS, never a pass: failing open here is how
+# the assertion would silently stop existing (GR-12).
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+  || cannot_assess "this is not a git checkout, so the run's effect on the tree cannot be measured"
 
 entry="control-plane/cockpit/cockpit/__main__.py"
 for required in \
@@ -111,6 +210,12 @@ TMPD="${TMPDIR:-/tmp}/cockpit.$$.$(date +%s)"
 work="$TMPD"
 repo="$work/repo"
 mkdir -p "$repo" 2>/dev/null || cannot_assess "cannot create a scratch directory under $work"
+
+# The tree this gate must not move, measured before the first driver runs. An
+# earlier check in the composite gate legitimately dirties tracked files in the
+# SAME worktree -- the fleet/brain suite rewrites `.board/focus.json` -- so the
+# assertion at the end compares against THIS, never the tree's absolute state.
+snapshot_tree "$work/tree.before" || true
 
 while IFS= read -r scratch_entry; do
   case "$scratch_entry" in
@@ -726,14 +831,41 @@ else
   echo "  OK    control-plane/cockpit is byte-identical after the run ($client_after)"
 fi
 
-git status --porcelain -uall > "$work/status.txt" 2>/dev/null
-grep -v -E '^[?][?] scripts/check-cockpit[.]sh$' "$work/status.txt" > "$work/status.extra.txt" 2>/dev/null || true
-if [ -s "$work/status.extra.txt" ]; then
+# The property is "the client writes no fleet state", so it is measured as the
+# DELTA this run caused, never as the tree's absolute state: a path that was
+# already dirty on entry is not this gate's business, but one this run CREATES in
+# the dirty set, or one already in it whose BYTES it changes, is -- and each is
+# refused by name. Declared machine-managed paths are excluded (see above).
+snapshot_tree "$work/tree.after" || true
+LC_ALL=C sort "$work/tree.before.S" > "$work/before.S.sorted"
+LC_ALL=C sort "$work/tree.after.S" > "$work/after.S.sorted"
+comm -13 "$work/before.S.sorted" "$work/after.S.sorted" > "$work/created.txt"
+
+# Only a path that was ALREADY dirty can be "rewritten": a path this run created has
+# no earlier hash to compare against, and the creation finding above names it once.
+: > "$work/rewritten.txt"
+while IFS=$'\t' read -r path sha_before; do
+  [ -n "$path" ] || continue
+  sha_after="$(awk -F'\t' -v p="$path" '$1 == p { print $2; exit }' "$work/tree.after.H")"
+  [ -n "$sha_after" ] || continue
+  [ "$sha_after" = "$sha_before" ] || printf '%s\n' "$path" >> "$work/rewritten.txt"
+done < "$work/tree.before.H"
+
+pre_existing="$(wc -l < "$work/before.S.sorted" | tr -d ' ')"
+machine_managed="$(< "$work/tree.before.skipped")"
+[ -n "$machine_managed" ] || machine_managed=0
+printf '   compared %s pre-existing entr(ies); excluded as machine-managed (governance/isolation/worktree.py): %s\n' \
+  "$pre_existing" "$machine_managed"
+if [ -s "$work/created.txt" ] || [ -s "$work/rewritten.txt" ]; then
   echo "  FAIL  the run left changes behind -- the client is a client and writes no fleet state:" >&2
-  sed 's/^/          /' "$work/status.extra.txt" >&2
+  sed 's/^/          /' "$work/created.txt" >&2
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    printf '          %s (its bytes changed during the run)\n' "$path" >&2
+  done < "$work/rewritten.txt"
   FAILED=1
 else
-  echo "  OK    git status shows only this gate's own new file (no fleet state written)"
+  echo "  OK    the run added nothing to the tree's dirty set ($pre_existing pre-existing entry/entries compared, $machine_managed machine-managed excluded, no already-dirty file's bytes changed) -- no fleet state written"
 fi
 
 # --- the verdict -------------------------------------------------------------

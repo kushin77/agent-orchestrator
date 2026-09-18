@@ -71,3 +71,19 @@ published:
     version: 1.1.0
     file: seeds/paperclip.1.1.0.yaml
     sha256: 6d4c533e95862875fd287f1de31fae846980546649444620fc11f826ff612a82
+  # v1.0.1 published 2026-09-18 by issue #1292. #1210 (`982647c`) added the
+  # provider-parity rationale markers (`# role-only:`) as an IN-PLACE edit of the
+  # frozen 1.0.0 seeds above — which this ledger refused (correctly), and which the
+  # RELEASED pack `registry/packs/releases/purebliss-team.1.0.0.yaml` also still
+  # contradicts: it embeds `claude@1.0.0` / `deepseek@1.0.0` with exactly the 1.0.0
+  # hashes above. So the artifact drifted and the record was right. 1.0.0 is
+  # restored to its published bytes; the markers re-publish here as a PATCH —
+  # comment-only, the parsed profile content is identical to 1.0.0.
+  - profile: claude
+    version: 1.0.1
+    file: seeds/claude.1.0.1.yaml
+    sha256: 8ad25c40a9a2d7b9d186836062b51da6055991142a04b49a369676cb726169f5
+  - profile: deepseek
+    version: 1.0.1
+    file: seeds/deepseek.1.0.1.yaml
+    sha256: a901533b39e86d96448f2f59019a2e2417e1cc7a621c9526ba911cc2ae079350

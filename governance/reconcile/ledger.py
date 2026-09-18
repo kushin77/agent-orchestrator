@@ -160,6 +160,14 @@ def record_real_tree_verdict(root: Path | str, verdict, *, at: float | None = No
             # show a green verdict with no trace of what was excused.
             "quarantined": len(getattr(verdict, "quarantined", ()) or ()),
             "stale_quarantine": len(getattr(verdict, "stale_quarantine", ()) or ()),
+            # Exemptions that are not in force in the venue this verdict was
+            # measured in (#1321): reported, honouring nothing. Their count and
+            # the venue make "which checkout was this read in?" answerable from
+            # the audit trail alone.
+            "inapplicable_quarantine": len(
+                getattr(verdict, "inapplicable_quarantine", ()) or ()
+            ),
+            "venue": str(getattr(verdict, "venue", "") or ""),
         },
     )
 
