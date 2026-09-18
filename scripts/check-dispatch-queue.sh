@@ -79,7 +79,7 @@ case "$rc" in
 esac
 
 # --- 3. provoked negative control: a cycle must be refused BY NAME ----------
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d "/tmp/ao877-dispatch-queue.$(printf 'X%.0s' 1 2 3 4 5 6)")"
 trap 'rm -rf "$tmp"' EXIT
 
 cat >"$tmp/cyclic-queue.yaml" <<'YAML'
