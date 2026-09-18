@@ -354,6 +354,14 @@ variables:
     secret: true
     required_by: [local-run, ops]
     readers: [control-plane/cli/aoctl/cli.py, control-plane/cockpit/cockpit/cli.py]
+  - name: AO_TAGGING_LEDGER
+    purpose: >-
+      overrides the tag authority's append-only ledger path (default
+      `.fleet/tagging/ledger.jsonl`), so a gate can drive a round trip in a
+      scratch directory and leave the tree clean.
+    secret: false
+    required_by: [ops]
+    readers: [governance/tagging/ledger.py]
 
 # Read by the tree, deliberately NOT part of the surface a deploy or a local run
 # supplies. Each carries the reason it is exempt; `surface.py` refuses an
