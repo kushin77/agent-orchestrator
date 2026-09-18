@@ -60,9 +60,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fleet"))
 sys.path.insert(0, str(ROOT / "governance" / "dispatch"))
+# The master-health pre-check (RCA 2026-09-17 fix #5) reads the SAME attestation
+# schema/reader landing uses (`governance/landing/evidence.py`) rather than
+# inventing a second notion of "green" — a flat sibling import, same convention
+# as `governance/dispatch`'s `model` above.
+sys.path.insert(0, str(ROOT / "governance" / "landing"))
 
 import channel  # noqa: E402
 import decompose_policy  # noqa: E402
+import evidence as landing_evidence  # noqa: E402
 import markers  # noqa: E402
 import routing  # noqa: E402
 import runtime  # noqa: E402
@@ -113,6 +119,133 @@ PARKED_SUPPRESSED = "terminal marker"
 # (#693). It is refreshed explicitly by `python3 governance/dispatch/cli.py
 # snapshot --from-github` — the only network-touching board read.
 BOARD_PATH = ROOT / ".board" / "snapshot.json"
+
+# Where the cheap, cached master-health verdict lives (RCA 2026-09-17 fix #5).
+# It is the SAME attestation shape landing reads (`governance/landing/evidence.py`
+# — `rc`/`commit`/`result`/`timestamp`), just written for `origin/master`'s own
+# head instead of a lane's. WHO WRITES IT: `governance/landing/engine.py`'s
+# `land()`, right after a successful squash-merge (engine.py, the
+# `master-attestation` step right after the `merge` step) — every landed lane
+# publishes master's own just-measured health at exactly the commit that
+# lands, via `governance.landing.evidence.write_master_attestation` (the same
+# schema, atomic tmp+rename write). This module never runs verify itself and
+# never writes this file — it only reads the cached verdict, which is what
+# keeps the pre-check cheap.
+MASTER_ATTESTATION = FLEET_DIR / "master-attestation.json"
+# The backstop only: an attestation whose COMMIT still matches origin/master's
+# current head (the normal case between merges) never goes stale from wall
+# clock alone — see `master_health_refusal` below. This cap exists only for
+# the degenerate case of a head that has not moved in a very long time (a
+# quiet repo, or a stopped landing driver), so a fact from a week ago is never
+# silently trusted just because nothing has landed since. Generous on
+# purpose: freshness is normally decided by the commit match, not the clock.
+MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS = 86400.0
+
+
+def current_master_head() -> str | None:
+    """`origin/master`'s head SHA, read with NO fetch and NO verify.
+
+    `git rev-parse` here only resolves whatever ref this checkout already has
+    for `origin/master` (a plain local ref lookup — packed or loose, same as
+    reading `.git/refs/remotes/origin/master`); it never reaches the network
+    and never invokes `scripts/verify.sh` or `scripts/merge-gate.sh`, which is
+    what keeps this pre-check as cheap as the reader it borrows from. `None`
+    when the ref cannot be resolved at all (an unborn repo, no such remote) —
+    that is a CANNOT-ASSESS input, same posture as an unreadable attestation.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--verify", "-q", "origin/master"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
+def master_health_refusal(order: dict) -> str | None:
+    """Why no directive may be issued because master itself is not known-green.
+
+    Dispatch opens a lane, and a lane that opens a PR against a red master can
+    never land (RCA 2026-09-17: H2/H3) — landing already refuses at the END:
+    this is the SAME check, cheaply, at the START, so the queue stops
+    inflating with work that cannot land. It reads the cached attestation
+    `MASTER_ATTESTATION` (never runs verify) through the SAME reader landing
+    uses (`landing_evidence.read_attestation`), so "green" means one thing in
+    this fleet.
+
+    Freshness is HEAD-BOUND, not wall-clock: the attestation is fresh exactly
+    when its `commit` names `origin/master`'s current head (`same_commit`,
+    landing's own short-SHA-tolerant comparison) — an attestation for the
+    current head never goes stale merely because time passed between merges,
+    and one for an older head is CANNOT-ASSESS the instant a newer commit
+    lands, however recently it was written. `MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS`
+    (24h) is only the backstop for a head that has not moved in a long time.
+
+    A lane explicitly fixing a red master is exempt — `task.allow_red_master`
+    (a directive flag) or `task.master_red_fix` (an issue labelled as the fix
+    itself) — otherwise nothing could ever repair master. Every other order is
+    admitted only when the cached verdict is head-fresh AND green; absent,
+    unreadable, head-stale, or red all refuse (CANNOT-ASSESS is never a pass,
+    mirroring the honesty tri-state `governance/landing/evidence.py` already
+    uses).
+    """
+    task = order.get("task") or {}
+    if task.get("allow_red_master") or task.get("master_red_fix"):
+        return None
+    attestation = landing_evidence.read_attestation(MASTER_ATTESTATION)
+    if not attestation.readable:
+        return (
+            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} is {attestation.state} "
+            f"({attestation.detail}); dispatch refuses rather than assume master is green"
+        )
+    head = current_master_head()
+    if head is None:
+        return (
+            f"master-health CANNOT-ASSESS — origin/master's head could not be resolved "
+            f"(no fetch, no verify was run); dispatch refuses rather than assume master is green"
+        )
+    if not landing_evidence.same_commit(attestation.commit, head):
+        return (
+            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} names commit "
+            f"{attestation.commit or 'none'}, but origin/master's head is now {head}; dispatch "
+            "refuses a verdict for a commit master has since moved past"
+        )
+    age = time.time() - _attestation_epoch(attestation.timestamp)
+    if age > MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS:
+        return (
+            f"master-health CANNOT-ASSESS — {MASTER_ATTESTATION} matches origin/master's head but "
+            f"is {age:.0f}s old (> the {MASTER_ATTESTATION_WALLCLOCK_CAP_SECONDS:.0f}s backstop cap); "
+            "dispatch refuses rather than trust a verdict this old even at the right commit"
+        )
+    if not attestation.green:
+        return (
+            f"master-health NOT-OK — {MASTER_ATTESTATION} reports "
+            f"result={attestation.result or 'unknown'} exit_code={attestation.rc}; "
+            "master is red, so a new lane's PR could never land (RCA 2026-09-17 fix #5) — "
+            "pass task.allow_red_master (or label the issue a master-red fix) to dispatch anyway"
+        )
+    return None
+
+
+def _attestation_epoch(timestamp: str) -> float:
+    """The attestation's timestamp as epoch seconds, or -inf when unreadable.
+
+    An unparsable/blank timestamp must never read as "just now" (that would
+    silently defeat the TTL and let a stale attestation pass as fresh).
+    """
+    if not timestamp:
+        return float("-inf")
+    try:
+        text = timestamp.replace("Z", "+00:00")
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        return float("-inf")
 
 
 def suppressed(message: str) -> bool:
@@ -612,6 +745,14 @@ def dispatch(order: dict) -> tuple[bool, str]:
         refusal = closure_refusal(number)
         if refusal is not None:
             return False, refusal
+    # The master-health guard (RCA 2026-09-17 fix #5), between the closure guard
+    # and the send: a lane whose issue is open but whose PR could never land
+    # because master itself is red gets refused here too, before anything is
+    # written or sent — same "no marker, no channel call" refusal shape as the
+    # closure guard above.
+    refusal = master_health_refusal(order)
+    if refusal is not None:
+        return False, refusal
     if marker is not None:
         write_marker(marker, order, markers.SENDING, previous=record)
     result = subprocess.run(

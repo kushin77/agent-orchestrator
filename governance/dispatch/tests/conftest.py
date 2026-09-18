@@ -18,6 +18,14 @@ PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PKG_DIR not in sys.path:
     sys.path.insert(0, PKG_DIR)
 
+# governance/dispatch shares the bare basenames "model" and "cli" with sibling
+# governance/* suites. Evict any stale sys.modules entry from an
+# earlier-collected suite before this package's own bare imports (and this
+# directory's test modules' bare imports), so they resolve against THIS
+# package's files (issues #699, #702, #1042).
+for _name in ("model", "cli"):
+    sys.modules.pop(_name, None)
+
 from model import Issue, Snapshot  # noqa: E402
 import focus  # noqa: E402
 import owner_queue  # noqa: E402

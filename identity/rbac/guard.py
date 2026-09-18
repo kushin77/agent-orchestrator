@@ -51,12 +51,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from rbac.model import (
+from .model import (
     PERMISSIONS,
     ScopeNode,
     Session,
 )
-from rbac.resolve import authorize, resolve_scope
+from .resolve import authorize, resolve_scope
 
 # Reserved denial-log fields (observability contract, see module docstring).
 AUTHORIZATION_DENIED_EVENT = "authorization_denied"

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ao.paperclip-live-sync/v1",
+  "title": "paperclip live-sync record",
+  "description": "The frozen shape of one live-sync pull (issue #888): tickets, heartbeats and budgets fetched through the paperclip seam, validated before the audit line is appended. Only the repository's own JSON-Schema subset (integrations/paperclip/mapping.py) is used here, so `live.py` can validate what it emits without a third-party dependency.",
+  "type": "object",
+  "required": ["schema", "ts", "company", "principal", "counts", "tickets", "heartbeats", "budgets"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": ["ao.paperclip-live-sync/v1"]
+    },
+    "ts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "company": {
+      "type": "string",
+      "minLength": 1
+    },
+    "principal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "counts": {
+      "type": "object",
+      "required": ["tickets", "heartbeats", "budgets"],
+      "additionalProperties": false,
+      "properties": {
+        "tickets": { "type": "integer", "minimum": 0 },
+        "heartbeats": { "type": "integer", "minimum": 0 },
+        "budgets": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "tickets": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "heartbeats": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "budgets": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  }
+}

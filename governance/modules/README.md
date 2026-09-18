@@ -54,6 +54,23 @@ folded into the module list.
 | `schema.py` | the stdlib-only subset validator the generator runs on what it emits (#591) |
 | `audit.py` | the **append-only** trail: one record per refusal and per judged name (#591) |
 | `cli.py` | the machine surface |
+| `sync/` | live admission pin probe (issue #889) |
+
+## Live sync
+
+`governance/modules/sync/` (issue #889, lane L10) is a live pin probe: on
+every call `sync.live.probe` re-reads the real admission register (root
+`module.json` `submodules`, via the same `registry.load_register` the build
+uses) and the real standards pin (`cmr-pin.yaml`), and reports each tracked
+target's (`hermes-agents`, `paperclip`, `ollama`) admission state **exactly
+as recorded** — `requested` / `independent` / `undecided`, never upgraded to
+a membership claim (the admission-register doctrine above: a claim, never
+membership). An entry claiming an admission state outside that honest,
+non-membership vocabulary is refused by name (`AdmissionOverclaim`), and a
+tracked target absent from the register is refused by name
+(`UnknownAdmissionTarget`). Tests: `governance/modules/sync/tests/` (offline,
+a scratch copy of the real register + pin), including the negative control
+for an overclaimed admission value.
 
 ## Three artifacts judge a build (issue #591)
 

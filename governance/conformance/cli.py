@@ -368,7 +368,14 @@ def cmd_filing_check(args: argparse.Namespace) -> int:
     # 5. REFUSAL: a required companion the filing and the policy both omit — the
     #    failure that filed #297 (`class:enterprise`, no `priority:`).
     thin_policy = replace(
-        policy, filing_defaults={"type": "feature", "area": "governance", "gdc": "enterprise"}
+        policy,
+        filing_defaults={
+            "type": "feature",
+            "area": "governance",
+            "gdc": "enterprise",
+            "posture": "overall",
+            "lifecycle": "build",
+        },
     )
     try:
         plan_filing(FilingRequest(title="t", body="b"), thin_policy)
@@ -526,6 +533,45 @@ def cmd_filing_check(args: argparse.Namespace) -> int:
         )
     except FilingRefused as exc:
         expect("a dry run shows the same labels the filing would pass", False, exc.loud_message)
+
+    # 14. TAG DIMENSIONS (issue #1182): a filing is BORN with the tag
+    #     authority's two dimensions — `posture` and `lifecycle` — derived from
+    #     the policy's `filing.tags` + `filing.defaults`, so the board stops
+    #     accruing the `required-missing` deviations the tag authority reports.
+    #     The same prevention #297 filed for `priority:` now holds for the tag
+    #     dimensions: a filing that cannot derive them is refused, not filed
+    #     half-classified.
+    base_plan = None
+    try:
+        base_plan = plan_filing(FilingRequest(title="t", body="b"), policy)
+        expect(
+            "derives the tag dimensions for a bare filing",
+            base_plan.label("posture") == "posture:overall"
+            and base_plan.label("lifecycle") == "lifecycle:build",
+            "labels=%s" % ", ".join(base_plan.labels),
+        )
+    except FilingRefused as exc:
+        expect("derives the tag dimensions for a bare filing", False, exc.loud_message)
+
+    tagless_defaults = {
+        name: value
+        for name, value in policy.filing_defaults.items()
+        if name not in ("posture", "lifecycle")
+    }
+    tagless = replace(policy, filing_defaults=tagless_defaults)
+    try:
+        plan_filing(FilingRequest(title="t", body="b"), tagless)
+        expect(
+            "refuses a filing whose tag dimensions cannot be derived",
+            False,
+            "it planned a filing anyway, without the tag dimensions",
+        )
+    except FilingRefused as exc:
+        expect(
+            "refuses a filing whose tag dimensions cannot be derived",
+            set(exc.missing) == {"posture", "lifecycle"},
+            "missing=%s" % ", ".join(exc.missing),
+        )
 
     unmet = [index for index, ok in enumerate(results, start=1) if not ok]
     if unmet:

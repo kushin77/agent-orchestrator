@@ -17,6 +17,14 @@ PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PKG_DIR not in sys.path:
     sys.path.insert(0, PKG_DIR)
 
+# governance/sync's "model" bare basename collides with sibling governance/*
+# suites (synchelpers is unique to this suite, but evicted for symmetry).
+# Evict any stale sys.modules entry from an earlier-collected suite before
+# this package's own bare imports, so they resolve against THIS package's
+# files (issues #699, #702, #1042).
+for _name in ("model", "synchelpers"):
+    sys.modules.pop(_name, None)
+
 import synchelpers  # noqa: E402
 
 

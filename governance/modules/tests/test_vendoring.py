@@ -6,7 +6,23 @@ import json
 import shutil
 from pathlib import Path
 
-from conftest import codes, write_repo
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_modules_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+codes = _conftest.codes
+write_repo = _conftest.write_repo
 
 from governance.modules import hub, vendoring
 
@@ -68,7 +84,7 @@ def test_an_in_tree_distribution_package_is_refused(hub: Path, consumer: Path) -
 
 
 def test_a_scoped_node_package_is_refused(tmp_path: Path) -> None:
-    from conftest import write_hub
+    write_hub = _conftest.write_hub
 
     consumer = write_repo(tmp_path / "repo")
     package = consumer / "node_modules" / "@kushin77" / "scoped"
@@ -100,7 +116,7 @@ def test_a_reference_outside_the_hub_is_refused(hub: Path, consumer: Path) -> No
 
 
 def test_the_real_registry_references_stay_inside_the_hub(hub: Path, consumer: Path, tmp_path) -> None:
-    from conftest import write_targets
+    write_targets = _conftest.write_targets
     from governance.modules import registry
 
     targets = write_targets(tmp_path / "t.json", {"schema": "ao.module-targets/v1", "targets": [], "watch": []})
@@ -117,7 +133,7 @@ def test_the_register_scan_skips_hidden_and_vendor_trees(tmp_path: Path) -> None
             json.dumps({"schema": "cmr.module/v1", "id": "alpha"}), encoding="utf-8"
         )
     scratch = tmp_path / "hub"
-    from conftest import write_hub
+    write_hub = _conftest.write_hub
 
     write_hub(scratch)
     assert vendoring.scan(consumer, _catalog(scratch, consumer)) == []

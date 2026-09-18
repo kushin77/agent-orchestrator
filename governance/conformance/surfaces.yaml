@@ -150,10 +150,26 @@ waived_roots:
   - infra
 
 # The declared surfaces. `declared_class` is measured, never aspirational.
+#
+# Class ceilings (issue #883, ADR-0031). A row whose *shape* cannot honestly
+# reach the top rung — a static asset bundle, a single file — may carry
+# `class_ceiling: <rung>` plus a mandatory `ceiling_reason`. The ceiling is
+# REPORTED on every run (surface-class-ceiling), never silently waived; a
+# declared class above it is refused (surface-above-class-ceiling), and a
+# ceiling the evidence has already exceeded is refused as stale
+# (surface-class-ceiling-stale). Rows with a ceiling are the NON-product rows:
+# they are excluded from the product floor that module.json's `solution_class`
+# is held to. The three ceilings below are proposed for the OWNER to confirm.
 surfaces:
   - surface: shell
     path: portal/static
     declared_class: template
+    class_ceiling: pattern
+    ceiling_reason: >-
+      A static asset bundle (HTML/JS/CSS/tokens): a README.md and a suite under
+      the path are the most it can honestly carry. Controls, an audit trail, a
+      schema and a live-sync .py module are server-side artifacts that belong
+      to the `portal` row, not to its client assets. Owner to confirm.
     notes: >-
       The console *client* shell this repo hosts: the framed shell view, the
       console JS, the views and the design tokens it renders. Held at
@@ -163,40 +179,45 @@ surfaces:
       `shell/` and is out of this repo's scope.
   - surface: portal
     path: portal
-    declared_class: pattern
+    declared_class: elite
     notes: >-
       The admin/tenant control-plane console (server + static + catalog +
-      tests). Contract, tests, real controls, an audit chain and a live feed are
-      present; it declares no shared schema of its own (its controls are
-      validated by the guardrails control schema), and that missing owned schema
-      is what holds it at `pattern`.
+      tests). Contract, tests, real controls, an audit chain and a shared
+      schema (portal/schemas/fleet-board-row.schema.json) are present; the live
+      feed module portal/server/livestore.py is the live_sync evidence that
+      carries it past `pattern` to `elite`. Declared at the rung its evidence
+      measures, never above it.
   - surface: gateway
     path: gateway
-    declared_class: faang
+    declared_class: elite
     notes: >-
       Model gateways: contract, per-package suites, real controls (health
       policy, limits, budgets), an MCP audit trail + schema, and the
-      check-gateway-catalog-parity.sh gate. No live-sync module, so it stops
-      short of `elite`.
+      check-gateway-catalog-parity.sh gate. gateway/sync/live.py is the
+      live_sync module that carries it past `faang` to `elite`. Declared at the
+      rung its evidence measures, never above it.
   - surface: telemetry
     path: telemetry
-    declared_class: enterprise
+    declared_class: elite
     notes: >-
       Observability / FinOps: contract, four suites, real controls (budget
       policies + kill-switch), an audit trail and the ledger's
-      audit_event.schema.json. It has no dedicated scripts/check-*telemetry*
-      gate, which is what stops it at `enterprise`.
+      audit_event.schema.json. scripts/check-telemetry.sh is the dedicated gate
+      and telemetry/metering/feed.py is the live_sync module — together they
+      carry it past `enterprise` to `elite`. Declared at the rung its evidence
+      measures, never above it.
   - surface: registry
     path: registry
-    declared_class: faang
+    declared_class: elite
     notes: >-
       Agent registry: contract, six suites, owned schemas, an append-only event
       log + pack attestation (audit), the drift control (parity/parity.py) and
-      the check-registry-parity.sh gate. No live-sync module, so it stops short
-      of `elite`.
+      the check-registry-parity.sh gate. registry/sync/live.py is the
+      live_sync module that carries it past `faang` to `elite`. Declared at the
+      rung its evidence measures, never above it.
   - surface: module-registry
     path: governance/modules
-    declared_class: faang
+    declared_class: elite
     notes: >-
       The ecosystem module registry (issue #445, hardened to its declared class
       by #591): one honest view of every module, assembled by reference from the
@@ -204,14 +225,12 @@ surfaces:
       (module-registry.schema.json), the declared acceptance policy
       (controls.yaml + policy.py, read by registry.py) and an append-only audit
       trail of every refusal and judged state. Its dedicated gate is
-      scripts/check-module-registry.sh, which is what carries it past
-      `enterprise` to `faang`; it has no live/sync module (its live pin probe is
-      a CLI verb against a file, not a running sync surface), so `elite` — which
-      requires `live_sync` — is not claimed. Declared at the rung its evidence
-      measures, never above it.
+      scripts/check-module-registry.sh; governance/modules/sync/live.py is the
+      live_sync module that carries it past `faang` to `elite`. Declared at the
+      rung its evidence measures, never above it.
   - surface: module-brief
     path: integrations/paperclip/reporting
-    declared_class: faang
+    declared_class: elite
     notes: >-
       The paperclip reporting agent's module brief (issue #447, hardened to its
       declared class by #592): the per-module statement of what every repo must
@@ -220,10 +239,12 @@ surfaces:
       claim-resolution policy (claim-policy.json + policy.py, read by
       composer.py so no literal rule remains on a refusal path) and an
       append-only audit trail of claim resolution. Its dedicated gate is
-      scripts/check-module-brief.sh, which carries it past `enterprise` to
-      `faang`; no live-sync module, so not `elite`. Live under
+      scripts/check-module-brief.sh;
+      integrations/paperclip/reporting/sync/live.py is the live_sync module
+      that carries it past `faang` to `elite`. Live under
       integrations/paperclip/ deliberately — the canonical module (#448), never a
-      second top-level module.
+      second top-level module. Declared at the rung its evidence measures,
+      never above it.
   # Widened by issue #620 (EPIC #616; measured 2026-09-14 against this tree).
   # #590 widened the *roots*; the git ecosystem itself still had no row, so the
   # gate never looked at `.github/**`, at `.gitmessage`, or at the four
@@ -234,6 +255,13 @@ surfaces:
   - surface: github
     path: .github
     declared_class: template
+    class_ceiling: pattern
+    ceiling_reason: >-
+      Repository metadata (issue forms, PR template, dependabot.yml): a
+      README.md and a suite under the path are the most it can honestly carry.
+      Its real gates live in scripts/ and the machine `gate` evidence already
+      matches by name; controls, audit, schema and live-sync artifacts under
+      .github would be decorative (no-false-green). Owner to confirm.
     notes: >-
       The repository's GitHub surface: the issue forms
       (.github/ISSUE_TEMPLATE/), the PR template
@@ -247,6 +275,11 @@ surfaces:
   - surface: commit-contract
     path: .gitmessage
     declared_class: template
+    class_ceiling: template
+    ceiling_reason: >-
+      The path is a single file; every rung above `template` requires an
+      artifact *under* the path, which a file cannot hold. The contract is
+      enforced by scripts/check-pr-contract.sh instead. Owner to confirm.
     notes: >-
       The commit-message contract (issue #5, content lane #623, bootstrap lane
       #624) parsed by scripts/check-pr-contract.sh. The path is a single file, so
@@ -317,7 +350,7 @@ surfaces:
       `status --live` (`cli.py cmd_status`).
   - surface: hermes-integration
     path: integrations/hermes
-    declared_class: faang
+    declared_class: elite
     notes: >-
       The hermes peer-integration surface (issue #942): the thin, read-only
       projection of hermes's declared orchestration surface (the persona card,
@@ -328,6 +361,34 @@ surfaces:
       set: a contract (README.md), a test suite with a negative control, the
       mapped tiering policy (policy.py), the cross-source consistency audit
       (audit.py), the capability-registry schema (capabilities.schema.json) and
-      the dedicated gate scripts/check-hermes-integration.sh. No live-sync
-      module, so not `elite` — declared at the rung its evidence measures,
+      the dedicated gate scripts/check-hermes-integration.sh;
+      integrations/hermes/sync/live.py is the live_sync module that carries it
+      past `faang` to `elite`. Declared at the rung its evidence measures,
       never above it.
+  - surface: knowledge
+    path: governance/knowledge
+    declared_class: elite
+    notes: >-
+      The CMR knowledge base (governance/knowledge): contract (README.md), a
+      test suite, the declared controls module
+      (knowledge_controls.py), the audit trail (ledger.py), the shared schema
+      (live-sync-event.schema.json), the dedicated gate
+      scripts/check-cmr-knowledge.sh, and the live_sync module (live_sync.py)
+      that together carry it to `elite`. Declared at the rung its evidence
+      measures, never above it.
+  - surface: tagging
+    path: governance/tagging
+    declared_class: elite
+    notes: >-
+      The tag authority (issue #1175): contract (README.md), a suite (tests/),
+      the declared policy controls (controls.yaml + policy.py, read by cli.py's
+      authority findings and held to the taxonomy, the rules and the declared
+      limits), the append-only decision ledger (ledger.py, written to
+      .fleet/tagging/ledger.jsonl and validated against tagging.schema.json
+      BEFORE each write), the frozen record shapes (tagging.schema.json,
+      validated through governance/modules/schema.py so no third-party
+      validator is needed), the dedicated gate scripts/check-tagging.sh, and
+      the live_sync module live.py (the read-only projection of the board's
+      declared tags and the ledger, exposed through the existing
+      `cli.py board --live` verb) that carries it past `faang` to `elite`.
+      Declared at the rung its evidence measures, never above it.

@@ -77,7 +77,10 @@ INVARIANTS: Tuple[Invariant, ...] = (
             "names a commit, and a summary is not evidence. Close out BEFORE the lane is torn down "
             "(`governance/lifecycle/cli.py close --issue <n>`), or keep the verified commit reachable: "
             "the attestation is measured from one of the two, and the driver refuses to reclaim a lane "
-            "while this invariant is unsatisfied (#786)"
+            "while this invariant is unsatisfied (#786). For a SQUASH-merged pull request the lane may "
+            "instead be a tree cut from the default branch after the merge: it is admitted when it "
+            "contains the commit the squash landed as and that landing carries the same tree as the "
+            "verified head, and the record then names all three commits (#1098)"
         ),
     ),
     Invariant(

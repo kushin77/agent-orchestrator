@@ -171,14 +171,20 @@ def request(app, method, path, cookies=None):
 registry = yaml.safe_load(
     (ROOT / "infra" / "feature-flags" / "registry.yaml").read_text(encoding="utf-8")
 )
+# NOTE (#1043): issue #1027 (commit 32e8c24) deliberately promoted this surface
+# for the #607 go-live — default: on, promoted: true is now the SHIPPED,
+# correct posture, not a defect. This gate asserts default/promoted are
+# CONSISTENT with each other and with the registry's own declaration, not
+# that they are off. The negative control below (a temp, unpromoted fixture
+# registry — never the committed file) is what still proves the gate can fail.
 entry = (registry.get("surfaces") or {}).get("operator_terminal")
 if not isinstance(entry, dict):
     fail("infra/feature-flags/registry.yaml declares no surfaces.operator_terminal")
 else:
-    if entry.get("default") not in (False, "off"):
-        fail(f"surfaces.operator_terminal.default is {entry.get('default')!r}, expected off")
-    if entry.get("promoted"):
-        fail("surfaces.operator_terminal.promoted must be false while it ships off")
+    if entry.get("default") not in (True, "on"):
+        fail(f"surfaces.operator_terminal.default is {entry.get('default')!r}, expected on (promoted by #1027/#607)")
+    if not entry.get("promoted"):
+        fail("surfaces.operator_terminal.promoted must be true now that it ships on (#1027/#607)")
     if entry.get("service") != "portal":
         fail("surfaces.operator_terminal.service must be portal")
     if not entry.get("tf_flag"):
@@ -186,24 +192,25 @@ else:
 
 # fail-closed reader + the mutation that proves it is real
 declared = read_surface_default(ROOT, surface="operator_terminal")
-if declared == "off":
-    ok("the fail-closed reader resolves surfaces.operator_terminal to 'off'")
+if declared == "on":
+    ok("the reader resolves surfaces.operator_terminal to 'on' (the shipped, promoted posture)")
 else:
-    fail(f"read_surface_default resolved operator_terminal to {declared!r}, expected off")
+    fail(f"read_surface_default resolved operator_terminal to {declared!r}, expected on")
 
-# mutation: flip the flag on in a scratch registry copy -> the reader must say on
-scratch = Path("/tmp") / f"ao774-reg-on.{os.getpid()}.yaml"
+# mutation: flip the flag OFF in a scratch registry copy -> the reader must say off
+# (proves the reader is driven by the flag, not hardcoded to whatever's shipped)
+scratch = Path("/tmp") / f"ao774-reg-off.{os.getpid()}.yaml"
 mutated = registry
 mutated["surfaces"] = dict(registry["surfaces"])
 mutated["surfaces"]["operator_terminal"] = dict(entry)
-mutated["surfaces"]["operator_terminal"]["default"] = "on"
+mutated["surfaces"]["operator_terminal"]["default"] = "off"
 scratch.write_text(yaml.safe_dump(mutated), encoding="utf-8")
 flipped = read_surface_default(ROOT, registry_path=scratch, surface="operator_terminal")
 scratch.unlink(missing_ok=True)
-if flipped == "on":
-    ok("MUTATION: flipping the flag to 'on' makes the reader say 'on' (the gate is the flag, not a hardcoded 404)")
+if flipped == "off":
+    ok("MUTATION: flipping the flag to 'off' makes the reader say 'off' (the gate is the flag, not a hardcoded 'on')")
 else:
-    fail(f"MUTATION: flipping the flag did not change the reader ({flipped!r}) — the 404 is a formality")
+    fail(f"MUTATION: flipping the flag did not change the reader ({flipped!r}) — the promoted posture is a formality")
 
 # -- (c) flag OFF -> 404 feature_disabled, before AuthN ---------------------
 off_app = build_app(sso=sso(), operator_terminal_enabled=False)
@@ -411,20 +418,59 @@ if row and row.get("stage") == "off" and not rollout_errors:
 else:
     fail(f"the rollout declaration is not sound: row={row!r} errors={rollout_errors[:2]}")
 
-# (h1) the committed tree: unpromoted, and the readiness rail does NOT name it —
-# an unpromoted surface is absent, not merely unauthorised.
+# (h1) the committed tree: PROMOTED (#1027/#607), and the readiness rail names
+# it 'ready' — this is the shipped posture, not a defect.
 committed = readiness(ROOT, "operator_terminal")
-if committed.state == SURFACE_OFF and not committed.promoted:
-    ok("readiness: the committed surface reads 'off' (unpromoted — nothing to serve)")
+if committed.state == SURFACE_READY and committed.promoted:
+    ok(f"readiness: the committed surface reads 'ready' (promoted by #1027/#607, composes {dict(committed.dependencies)})")
 else:
-    fail(f"readiness on the committed tree -> {committed.state}")
+    fail(f"readiness on the committed tree -> {committed.state}, expected ready (promoted)")
 
 status, payload, _ = request(on_app, "GET", "/api/healthz/ready", {})
 data = payload.get("data") if isinstance(payload, dict) else None
-if status == 200 and isinstance(data, dict) and data.get("surfaces") == {}:
-    ok("GET /api/healthz/ready: the unpromoted surface is NOT named (absent, not merely unauthorised)")
+named = (data or {}).get("surfaces", {}).get("operator_terminal") if isinstance(data, dict) else None
+if status == 200 and isinstance(named, dict) and named.get("state") == SURFACE_READY:
+    ok("GET /api/healthz/ready: the promoted surface IS named and reads 'ready' (the shipped posture)")
 else:
-    fail(f"/api/healthz/ready (unpromoted) -> {status} {payload!r}")
+    fail(f"/api/healthz/ready (committed, promoted) -> {status} {payload!r}")
+
+# NEGATIVE CONTROL (#1043): a fixture registry with operator_terminal forced
+# back to the pre-go-live, UNPROMOTED posture (default off / promoted false) —
+# a temp copy only, the committed registry.yaml is never mutated in place —
+# must read dark: readiness NOT ready, and the surface absent from the rail.
+unpromoted_work = Path("/tmp") / f"ao1043-unpromoted.{os.getpid()}.yaml"
+unpromoted_doc = yaml.safe_load(
+    (ROOT / "infra" / "feature-flags" / "registry.yaml").read_text(encoding="utf-8")
+)
+unpromoted_doc["surfaces"] = dict(unpromoted_doc["surfaces"])
+unpromoted_doc["surfaces"]["operator_terminal"] = dict(unpromoted_doc["surfaces"]["operator_terminal"])
+unpromoted_doc["surfaces"]["operator_terminal"]["default"] = "off"
+unpromoted_doc["surfaces"]["operator_terminal"]["promoted"] = False
+unpromoted_work.write_text(yaml.safe_dump(unpromoted_doc, sort_keys=False), encoding="utf-8")
+
+unpromoted_readiness = readiness(ROOT, "operator_terminal", registry_path=unpromoted_work)
+
+# the /console probe must ALSO be driven by the fixture registry, via the same
+# AO_SURFACE_REGISTRY env seam (h2) build_app() reads when no
+# operator_terminal_enabled kwarg overrides it — an explicit kwarg would make
+# this probe inert (it would 404 regardless of what the fixture declares).
+nc_starting_env = {name: os.environ.get(name) for name in ("AO_SURFACE_REGISTRY", "AO_SURFACE_STATE")}
+os.environ["AO_SURFACE_REGISTRY"] = str(unpromoted_work)
+os.environ["AO_SURFACE_STATE"] = str(Path("/tmp") / f"ao1043-unpromoted-state.{os.getpid()}.json")
+status, payload, _ = request(build_app(sso=sso()), "GET", "/console", cookie)
+for name, value in nc_starting_env.items():
+    if value is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = value
+unpromoted_work.unlink(missing_ok=True)
+if (unpromoted_readiness.state == SURFACE_OFF and not unpromoted_readiness.promoted
+        and status == 404 and payload.get("error", {}).get("code") == "feature_disabled"):
+    ok("NEGATIVE CONTROL: a fixture registry with operator_terminal forced unpromoted reads "
+       "'off'/absent, and /console 404s (driven through the same AO_SURFACE_REGISTRY seam as "
+       "the promoted fixture below) — an unpromoted surface stays dark")
+else:
+    fail(f"NEGATIVE CONTROL (unpromoted fixture) -> readiness={unpromoted_readiness.state} /console={status}")
 
 # (h2) a PROMOTED fixture built from the committed declaration: ready, named, and
 # really served — the control every 404 below depends on.

@@ -614,8 +614,25 @@ class RepoOps:
         # CANNOT-ASSESS on every scratch repository it is pointed at, which is
         # exactly where it is proven.
         dispatch_dir = str(Path(__file__).resolve().parents[1] / "dispatch")
-        if dispatch_dir not in sys.path:
-            sys.path.insert(0, dispatch_dir)
+        # Move (not merely ensure-present): another suite's conftest may have
+        # since inserted ITS OWN directory at sys.path[0], which would shadow
+        # dispatch's own bare-named modules even though this path is present
+        # further back.
+        while dispatch_dir in sys.path:
+            sys.path.remove(dispatch_dir)
+        sys.path.insert(0, dispatch_dir)
+        # `governance/dispatch/claims.py` bare-imports its own siblings (model,
+        # runtime, order, focus, pool, owner_queue, snapshot, audit), and those
+        # bare names are shared with other governance/* suites. When this runs
+        # inside a full `governance` collection, an earlier-collected suite's
+        # conftest may already have bound one of these bare names to ITS OWN
+        # module (issues #699, #702, #1042); evict any stale entry so the
+        # import below resolves against the dispatch package's own files.
+        for _bare_name in (
+            "model", "cli", "runtime", "order", "focus", "pool",
+            "owner_queue", "snapshot", "audit", "claims", "policy",
+        ):
+            sys.modules.pop(_bare_name, None)
         try:
             # Qualified: the dispatch modules import their siblings by bare name,
             # so the directory must be on the path first, and this keeps a single

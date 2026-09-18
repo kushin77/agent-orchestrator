@@ -21,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-from rbac.model import (
+from ..model import (
     DEFAULT_ROLE_ADMIN_PERMISSION,
     ROLE_LEVEL_ORG,
     ROLE_LEVEL_TEAM,
