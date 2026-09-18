@@ -65,22 +65,61 @@ by a human in a console.
 ## The verify runner posts `ao/gate-of-record` (issue #1350)
 
 The now-required status check `ao/gate-of-record` (#1342) needs a producer on
-the PR head. `verify.yaml`'s `verify` step runs `make verify` (via
-`scripts/verify.sh verify`, the same command `make verify` runs) with `set -uo
-pipefail` (no `set -e`), captures its rc, and always calls
-`scripts/gate-status.sh post --sha "$COMMIT_SHA" --rc "$rc"` — then always
-exits with that same `$rc`, so the check-run stays truthful to the gate:
-posting can never turn a red gate green (or vice versa), and a missing secret
-can never fail the build. `$COMMIT_SHA` is the PR head on a pull_request build.
+the PR head. `verify.yaml`'s `verify` step runs the gate of record (via
+`scripts/verify.sh verify` — the same entrypoint `make verify` uses), captures
+its rc, publishes it with `scripts/gate-status.sh post --sha "$COMMIT_SHA"
+--rc "$rc"`, and then exits with that same `$rc`. Publishing can therefore
+never turn a red gate green, and the check-run stays truthful to the gate.
+`$COMMIT_SHA` is the PR head on a pull_request build, so the status lands on
+the commit branch protection actually evaluates.
 
-`scripts/gate-status.sh` already encodes the gate's tri-state (0 OK / 1 NOT-OK
-/ 2 CANNOT-ASSESS → success / failure / error; CANNOT-ASSESS is never posted
-as success). Cloud Build has no `gh` login, so the step supplies a token via
-`GH_TOKEN`, sourced from Secret Manager as `secretEnv`; `gate-status.sh` falls
-back from `gh` to a raw authenticated `curl` call when `gh` is absent. If the
-secret does not exist yet, `GH_TOKEN` is simply unset, the step logs
-`gate-status: token missing — status not posted`, and the build still exits
-with verify's own rc.
+`scripts/gate-status.sh` owns the tri-state mapping (0 OK / 1 NOT-OK /
+2 CANNOT-ASSESS → success / failure / error; CANNOT-ASSESS is never posted as
+success). Cloud Build has no `gh` login, so the token arrives as `GH_TOKEN`
+from Secret Manager as `secretEnv`, and the poster falls back from `gh` to a
+raw authenticated `curl` call when `gh` is absent.
+
+### A build that cannot publish the status is CANNOT-ASSESS, not a skip
+
+`availableSecrets` is resolved **before any step runs**, so the secret must
+exist before this trigger is enabled. A missing token does not degrade to
+"posted nothing and went green": the step refuses by name and exits `2`
+(CANNOT-ASSESS), which is the honest report of a run whose required check was
+never produced. The alternative — a green build with an unproduced required
+check — is strictly worse than no check at all, because it looks exactly like a
+red gate and blocks every merge.
+
+### Ordering: what has to exist before the check can be relied on
+
+1. **secret** — create `ao-gate-status-token` and grant the build SA read
+   access (commands below);
+2. **trigger** — promote the `verify` trigger out of `disabled: true`
+   (the existing flag-gate, unchanged by this change);
+3. **observation** — read the posted status back with
+   `bash scripts/gate-status.sh show --sha <sha>`.
+
+Until (1) and (2) are done, this repository's `ao/gate-of-record` check has no
+*automatic* producer, and the fleet merges under the documented operator
+override (`enforce_admins: false` in
+`governance/platform/branch-protection.yaml`) rather than by satisfying it.
+That gap is recorded in `docs/RELEASE-PLAN.md` §4/§5, not hidden here.
+
+### The same producer, run locally (no GH_TOKEN needed)
+
+The poster is the producer; the runner only supplies the rc. Locally (where
+`gh` is already authenticated) the identical, repeatable sequence is:
+
+```bash
+bash scripts/verify.sh verify                                    # the gate, in a lane worktree
+bash scripts/gate-status.sh post --attestation .verify/attestation.json
+bash scripts/gate-status.sh show --sha "$(git rev-parse HEAD)"   # read it BACK
+```
+
+`post --attestation` takes **both** the rc and the sha from the gate's own
+record (`.verify/attestation.json`), so no rc is ever typed by hand: an
+attestation for a different commit, recording something that is not an outcome
+(a PARKED run writes none), or older than `AO_ATTEST_MAX_AGE` (default 6h) is
+refused by name. `--self-test` proves those refusals offline, in dry-run.
 
 ### Owner step — create the token secret ONCE (not run by this task)
 
@@ -97,8 +136,10 @@ gcloud secrets add-iam-policy-binding ao-gate-status-token \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-Until this runs, the verify trigger (still `disabled: true` per the flag-gate
-above) posts nothing and the build is unaffected by the absence.
+Do (1) **before** enabling the trigger: with `availableSecrets` declared, a
+build started while the secret is absent fails before its steps run, naming the
+missing secret — a loud refusal, not a silent hole.
+
 
 ## Web surface (issue #258)
 

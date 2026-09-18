@@ -73,23 +73,32 @@ based on (§1) — to record that #1072 and #1073 landed in between.
 | Criterion | Evidence gate / command | Measured state today |
 |---|---|---|
 | Branch protection declared as code, applied, read-back gated | `verify.sh` gate `branch-protection` → `scripts/check-branch-protection.sh` | **Done** (#807) |
-| Required-check question decided in an ADR and implemented | `docs/decision-records/ADR-0028-gate-status-without-actions.md` (Accepted) | ADR **accepted**; poster (`scripts/gate-status.sh`) is now **wired into `governance/landing`** (#1072, landed at `66fa3d4`) — `governance/landing/ports.py` and `engine.py` call it at the PR boundary. **Not yet observed posting**: `gh api .../commits/66fa3d4.../status` reads `{"state":"pending","statuses":[]}` on 2026-09-17, so ADR-0028 step 2's precondition (a real status observed on a real `master` commit) has not fired yet |
+| Required-check question decided in an ADR and implemented | `docs/decision-records/ADR-0028-gate-status-without-actions.md` (Accepted) | ADR **accepted**; poster (`scripts/gate-status.sh`) is **wired into `governance/landing`** (#1072, landed at `66fa3d4`) — `governance/landing/ports.py` and `engine.py` call it at the PR boundary. **Now observed posting** (re-measured 2026-09-18): the poster published two real statuses onto ancestors of `master` — both `failure`, from the host-local straggler `governance/platform/branch-protection.yaml` records — and `post --attestation` publishes the gate's own rc and sha from a lane's attestation, so ADR-0028 step 2's precondition (a real status observed on a real commit) has fired |
 | GR-15 holds (no GitHub Actions) | `verify.sh` gate `no-actions` → `scripts/check-no-actions.sh` | **Done** (#812) |
 | Checked OpenAPI contract for the control-plane API | `verify.sh` gate `cpapi-spec-drift` → `scripts/check-cpapi-spec-drift.sh` | **Done** (#816) |
 | Cross-tenant isolation proven, in the gate | `engine/memory/tests/test_isolation.py`, `identity/chat/tests/test_isolation.py`, `identity/chat/tests/test_failclosed.py` | **Done** (GR-15/AO-GR-15 evidence; originally reported "unproven" — that row was **withdrawn** in issue #803's correction 1) |
 | `CODEOWNERS` + release version named | `.github/CODEOWNERS` | **Done** (#1073, landed at `66fa3d4` — a per-pillar ownership map, gated by `verify.sh` gate `codeowners` → `scripts/check-codeowners.sh`); this document is the release-version half |
-| Required status check actually required (`required_status_checks`) | `governance/platform/branch-protection.yaml` → `required_status_contexts: [ao/gate-of-record]` (declared, not yet in `protection`) | **Pending owner step** — ADR-0028 step 2. The poster is wired (#1072) but has not yet posted a real status on `master`, which is the precondition this step names before requiring the check |
+| Required status check actually required (`required_status_checks`) | `governance/platform/branch-protection.yaml` → `protection.required_status_checks.contexts: [ao/gate-of-record]` (read back live: the API returns the same context) | **Done** — this row previously read "Pending owner step"; that was stale. The declaration itself records the #724 precondition as discharged (two real statuses published by `scripts/gate-status.sh post`, both `failure`, both on ancestors of `master`, plus the owner's acceptance of the host-local straggler that produced them). What is *not* done is **automatic** production per head: only a `disabled: true` Cloud Build trigger and a lane invoking the poster can write the status, so every open PR reads `BLOCKED` until its own head carries one (#1350, #1354). |
 
 ## 5. Residual risks named
 
-- **Required status check not yet required.** `governance/platform/branch-protection.yaml`
-  declares `required_status_contexts: [ao/gate-of-record]` outside the
-  `protection` block on purpose (ADR-0028): requiring a context nothing
-  posts yet would deadlock every merge (the #724 defect class). The poster
-  is wired (#1072) but has not yet been observed posting a real status on
-  `master` — until it is, and step 2 lands, a merge to `master` can still
-  happen without a green gate being technically enforced by GitHub, only
-  by process discipline (AGENTS.md rule 3, autonomous-merge mandate rule 10).
+- **A required check needs a status on EVERY PR head, and the producer is not
+  yet automatic.** `governance/platform/branch-protection.yaml` records the #724
+  precondition as discharged (two real, honest `failure` statuses observed from
+  the code-native poster) and the requirement is applied — measured 2026-09-18:
+  `required_status_checks.contexts = [ao/gate-of-record]` live, every open PR
+  `BLOCKED`. But the requirement is evaluated per head, so a merge needs a
+  status on the commit under review, and the only producers are the `verify`
+  trigger (ships `disabled: true`) and a lane invoking
+  `scripts/gate-status.sh post` (#1350/#1354). Until the trigger is promoted,
+  merges pass on the operator override (`enforce_admins: false`) — which is
+  exactly how a required check degrades into a routinely-bypassed one.
+- **A fail-closed producer can wedge the queue.** With the context required, a
+  producer that stops publishing (expired token, disabled trigger) makes every
+  PR unmergeable rather than merely ungated. The escape is the declared policy
+  rather than anyone's memory: re-run `bash scripts/branch-protection.sh apply`
+  with `required_status_checks` removed, and record that decision in
+  `governance/platform/branch-protection.yaml` (ADR-0028, "Consequences").
 - **`CODEOWNERS` covers pillar ownership, not a required review.** `.github/CODEOWNERS`
   now exists and is gated (#1073), but `required_pull_request_reviews` is
   still `null` in `governance/platform/branch-protection.yaml` (deliberately,
@@ -107,11 +116,10 @@ based on (§1) — to record that #1072 and #1073 landed in between.
 Mechanics are `RELEASING.md`'s: an annotated `git tag -a v1.0.0` on `master`,
 pushed after `make verify` is green on the tagged commit. The v1.0.0-specific
 condition this plan adds: **the tag is cut only from a commit whose
-`ao/gate-of-record` commit status (ADR-0028) reads `success`**, once ADR-0028
-step 2 (making that context a required check) has landed. Until step 2 lands,
-`make verify` green plus this document's exit criteria (§4) all reading
-"Done" is the bar; after step 2 lands, GitHub itself refuses the merge
-otherwise, and the same bar becomes platform-enforced rather than
-process-enforced.
+`ao/gate-of-record` commit status (ADR-0028) reads `success`**. ADR-0028 step 2
+has landed and is applied (`required_status_checks` requires the context, §4),
+so GitHub itself refuses a merge that does not carry the status; the remaining
+process-half is named in §5 — until the `verify` trigger is promoted out of
+`disabled: true`, a lane produces that status by invoking the poster.
 
 See `RELEASING.md` for the full pre-release checklist and tag mechanics.

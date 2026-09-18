@@ -15,13 +15,17 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 # issue #1350: the now-required check `ao/gate-of-record` (#1342) needs a
-# producer. This step's `gate-status` stage posts the gate's own rc using
-# `scripts/gate-status.sh`, authenticated with a fine-grained PAT
-# (`statuses:write` only) held in Secret Manager -- Cloud Build has no `gh`
-# login, so the token comes in as GH_TOKEN (see scripts/gate-status.sh's
-# curl fallback). The secret is created ONCE by the owner (README.md); until
-# then GH_TOKEN is simply absent and the step logs and skips posting -- it
-# never fails the build BECAUSE the secret doesn't exist yet.
+# producer. This step posts the gate's own rc with `scripts/gate-status.sh`,
+# authenticated by a fine-grained PAT (`statuses:write` only) held in Secret
+# Manager -- Cloud Build has no `gh` login, so the token arrives as GH_TOKEN
+# (scripts/gate-status.sh falls back to a raw authenticated `curl`).
+#
+# ORDER IS PART OF THE CONTROL: `availableSecrets` is resolved BEFORE any step
+# runs, so the secret must exist before this trigger is enabled. That is the
+# honest failure mode -- a build that cannot produce the check fails loudly by
+# name instead of going green while branch protection blocks every merge on a
+# status nothing wrote (the #724 defect class). The step's own GH_TOKEN guard
+# below is the second line of that same refusal.
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/ao-gate-status-token/versions/latest
@@ -47,7 +51,7 @@ steps:
     args:
       - '-lc'
       - |
-        set -uo pipefail
+        set -euo pipefail
         python3 -m pip install --quiet --disable-pip-version-check -r infra/cloudbuild/requirements-verify.txt
         # gates that pin PATH=/usr/bin:/bin must still reach the interpreter the deps went into
         ln -sf /usr/local/bin/python3 /usr/bin/python3
@@ -60,22 +64,38 @@ steps:
         PATH=/usr/bin:/bin python3 -c 'import yaml' || { echo "PyYAML missing on /usr/bin/python3"; exit 1; }
         echo "toolchain OK"
 
-        # `make verify` is the gate of record. rc is captured (not `set -e`
-        # aborted) so this step can still post the gate's OWN outcome as the
-        # commit status below -- a step that dies on a red gate could never
-        # publish "red".
+        # `make verify` is the gate of record, run through the same entrypoint
+        # the Makefile uses. Its rc is CAPTURED (the `|| rc=$?` guard keeps
+        # `set -e` from ending the step here) because a step that dies on a red
+        # gate could never publish "red".
         rc=0
         bash scripts/verify.sh verify || rc=$?
 
-        # $COMMIT_SHA is the PR head for a pull_request-triggered build.
-        if [ -n "${GH_TOKEN:-}" ]; then
-          bash scripts/gate-status.sh post --sha "$COMMIT_SHA" --rc "$rc" \
-            || echo "gate-status: posting failed (see above) -- not failing the build for that"
-        else
-          echo "gate-status: token missing — status not posted"
+        # $COMMIT_SHA is the PR head on a pull_request-triggered build (Cloud
+        # Build's documented substitution), so this status lands on the commit
+        # branch protection evaluates.
+        if [ -z "${COMMIT_SHA:-}" ]; then
+          echo "gate-status: CANNOT-ASSESS — COMMIT_SHA is empty, so no commit status can be"
+          echo "  attached to the commit under review (not a pass, and not a verdict on the gate)"
+          exit 2
+        fi
+
+        # A required check nothing produces is worse than no check: every merge
+        # is blocked and the block looks like a red gate. So a build that cannot
+        # publish the status is CANNOT-ASSESS (2) BY NAME, never a silent skip
+        # and never a fabricated success.
+        if [ -z "${GH_TOKEN:-}" ]; then
+          echo "gate-status: CANNOT-ASSESS — no GH_TOKEN in the build environment, so the required"
+          echo "  check cannot be produced for $COMMIT_SHA. Create the ao-gate-status-token secret"
+          echo "  and grant the build SA access BEFORE enabling this trigger (see README.md)."
+          exit 2
+        fi
+        if ! bash scripts/gate-status.sh post --sha "$COMMIT_SHA" --rc "$rc"; then
+          echo "gate-status: CANNOT-ASSESS — the gate ran (rc $rc) but its status was not published"
+          echo "  for $COMMIT_SHA; the build is not reported as a gated run."
+          exit 2
         fi
 
         # The check-run must stay truthful to the gate: exit with verify's OWN
-        # rc, never the poster's -- a missing secret must never flip a red
-        # gate green, and a posting hiccup must never turn a green gate red.
+        # rc, never the poster's -- publishing must never flip a red gate green.
         exit "$rc"
