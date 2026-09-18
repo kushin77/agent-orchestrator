@@ -15,9 +15,10 @@ def test_project_is_ok_and_prints_canonical_json(schedule_tree: Path, capsys) ->
     document = json.loads(captured.out)
     assert document["view"] == "routines"
     assert document["source"] == "fleet/cron.py"
-    assert document["count"] == 3
+    assert document["count"] == 4
     assert sorted(routine["marker"] for routine in document["routines"]) == [
         "ao-fleet-prune",
+        "ao-fleet-reap",
         "ao-fleet-reconcile",
         "ao-fleet-watchdog",
     ]
