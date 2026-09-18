@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "note": "Named, leased exemptions for the real-tree worktree/branch audit (issue #1291). Each entry excuses ONE artifact \u2014 kind, name, and the tip the exemption was measured at \u2014 and only while the lease below holds. A new artifact is never absorbed (it is not listed), an artifact whose tip has moved is not absorbed (it is no longer the artifact named here), and an entry that no longer targets an unmatched artifact FAILS as a stale exemption until it is removed in a reviewed edit. Every entry here is the AGENTS.md rule 17 class: work that exists nowhere else, which the worker is forbidden to discard, so it must be reported rather than silently red \u2014 and reported rather than silently reaped. Resolve the artifact (land it, push it, or authorise its deletion on #1291) and the entry must go with it.",
-  "tracked_by": "#1291",
+  "note": "Named, leased exemptions for the real-tree worktree/branch audit (issues #1291, #1310). Each entry excuses ONE artifact \u2014 kind, name, and the tip the exemption was measured at \u2014 and only while the lease below holds. A new artifact is never absorbed (it is not listed), an artifact whose tip has moved is not absorbed (it is no longer the artifact named here), and an entry that no longer targets an unmatched artifact FAILS as a stale exemption until it is removed in a reviewed edit. Every entry here is the AGENTS.md rule 17 class: work that exists nowhere else, which the worker is forbidden to discard, so it must be reported rather than silently red \u2014 and reported rather than silently reaped. Resolve the artifact (land it, push it, or authorise its deletion on #1311) and the entry must go with it. #1291 created this document and closed with its residue unresolved, so the lease was moved to its successor #1311 rather than left recording a state that was no longer true.",
+  "tracked_by": "#1311",
   "tracking": {
     "state": "open",
-    "measured_at": "2026-09-18T15:41:29Z",
-    "measured_by": "governance/reconcile (issue #1291 lane)",
+    "measured_at": "2026-09-18T16:50:55Z",
+    "measured_by": "governance/reconcile (issue #1310 lane)",
     "max_age_hours": 24,
-    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1291 -> state=open"
+    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1311 -> state=open"
   },
   "quarantine": [
     {

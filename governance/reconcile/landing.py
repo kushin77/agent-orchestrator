@@ -24,11 +24,30 @@ branch, proven three ways, strongest first:
    (the same failure mode ``AGENTS.md`` rule 16 records for verification).
 3. **patch identity** — some commit **on the default branch** carries the same
    ``git patch-id --stable`` as the tip's combined diff. Candidate commits are
-   generated from the default branch's own subjects (``Closes #n`` / ``#n`` —
-   the fleet's landing convention), and the **proof is the patch, never the
-   name**: a branch whose work is not on the default branch has no matching
-   patch, whatever it is called. This is what separates a landed lane from an
-   abandoned one whose *issue number* merely appears in history.
+   generated from the default branch's own landing convention, and the **proof
+   is the patch, never the name**: a branch whose work is not on the default
+   branch has no matching patch, whatever it is called. This is what separates a
+   landed lane from an abandoned one whose *issue number* merely appears in
+   history.
+
+   The convention has **two halves, and they name different numbers**: a squash
+   landing carries the pull request in its *subject* (``… (#1165)``) and the
+   issue in its *body* (``Closes #1158``). A candidate generator that reads only
+   subjects therefore looks in an empty bucket whenever a lane's pull request
+   number differs from its issue number — which is the normal case here — and
+   reports work that has landed as work that exists nowhere. Measured (issue
+   #1310, 2026-09-18): one artifact of exactly that shape (``ao-1158`` /
+   ``issue-1158``) crossed the age grace while the gate ran and red the whole
+   fleet. So both halves are read, closers first.
+
+   This is the *declared* convention, and it is read as such — nothing wider. Of
+   the 23 artifacts the real-tree quarantine was still excusing at that head,
+   **5 are the same class of false finding for a further reason**: their issue is
+   named nowhere in the landing's subject *or* in a ``Closes #n`` line, only
+   somewhere else in its message (the ``Refs <owner>/<repo>#<n>`` half of rule
+   1). Recognising those needs a wider candidate rule, and doing so would
+   *remove* five exemptions, so it is reported to the owner rather than taken
+   here; this generator deliberately searches only the two declared halves.
 
 ## What it deliberately does NOT do
 
@@ -77,6 +96,15 @@ BRANCH = "branch"
 
 _ISSUE_BRANCH = re.compile(r"issue-(\d+)")
 _ISSUE_REFERENCE = re.compile(r"#(\d+)")
+
+#: The landing convention's *other* half: a squash landing names the issue it
+#: closes in its commit body, where a subject-only scan cannot see it.
+_ISSUE_CLOSED = re.compile(r"(?i)\bcloses\s+#(\d+)")
+
+#: One commit per RECORD, never one commit per line: a commit body carries
+#: embedded newlines, and a `Closes #n` on a later body line would otherwise be
+#: read as a field of its own and silently dropped.
+RECORD_SEPARATOR = "\x1e"
 
 #: How many candidate landing commits to patch-compare for one artifact.
 MAX_CANDIDATE_COMMITS = 40
@@ -221,24 +249,48 @@ class RepoLanding:
         return result is not None
 
     def _candidate_commits(self) -> dict[int, list[str]]:
-        """The default branch's own commits, keyed by every ``#n`` in the subject.
+        """The default branch's commits, keyed by the issue each one may land.
 
-        This is the fleet's landing convention read as a *candidate generator*:
-        a squash landing names its issue and its pull request in the subject. The
-        name never proves anything here — :func:`_patch_id` does.
+        The fleet's landing convention names **two different numbers**, so this
+        reads both halves: the issue a commit *closes* (``Closes #n``, in its
+        body) and every ``#n`` its *subject* mentions (which is the pull request,
+        for a squash landing). Closers are taken first so that a bucket cannot be
+        filled — up to :data:`MAX_CANDIDATE_COMMITS` — by incidental mentions
+        before the commit that actually landed the work is reached.
+
+        Widening the *search* is not widening the *proof*: a candidate is only
+        ever patch-compared, so the name still proves nothing here —
+        :func:`_patch_id` does.
+
+        The listing is split on a RECORD separator, not on lines: a body carries
+        embedded newlines, and ``Closes #n`` is frequently not on the body's
+        first line — a line-oriented parse reads that closer as if it were a
+        commit hash and silently drops the candidate.
         """
         if self._candidates is not None:
             return self._candidates
-        listing = self._run(["log", "--format=%H%x1f%s", self.ref])
-        by_issue: dict[int, list[str]] = {}
-        for line in (listing or "").splitlines():
-            sha, _, subject = line.partition("\x1f")
+        listing = self._run(["log", f"--format=%x1e%H%x1f%s%x1f%b", self.ref])
+        closed: dict[int, list[str]] = {}
+        mentioned: dict[int, list[str]] = {}
+        for record in (listing or "").split(RECORD_SEPARATOR):
+            sha, _, rest = record.partition("\x1f")
+            sha = sha.strip()
             if not sha:
                 continue
+            subject, _, body = rest.partition("\x1f")
+            for number in _ISSUE_CLOSED.findall(body):
+                closed.setdefault(int(number), []).append(sha)
             for number in _ISSUE_REFERENCE.findall(subject):
-                bucket = by_issue.setdefault(int(number), [])
-                if len(bucket) < MAX_CANDIDATE_COMMITS:
-                    bucket.append(sha)
+                mentioned.setdefault(int(number), []).append(sha)
+        by_issue: dict[int, list[str]] = {}
+        for source in (closed, mentioned):
+            for issue, shas in source.items():
+                bucket = by_issue.setdefault(issue, [])
+                for sha in shas:
+                    if len(bucket) >= MAX_CANDIDATE_COMMITS:
+                        break
+                    if sha not in bucket:
+                        bucket.append(sha)
         self._candidates = by_issue
         return by_issue
 
