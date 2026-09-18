@@ -71,6 +71,51 @@ AO_QUEUE_APPLY=1 bash scripts/pr-queue.sh
 AO_QUEUE_FIXTURE=/path/to/prs.json bash scripts/pr-queue.sh
 ```
 
+## Merged-tree evidence (issue #1254 step 6, child of #1254)
+
+Measured 2026-09-18: four times, two PRs each green ALONE were red TOGETHER
+— #1110+#1115 (`AO_FROZEN_CLOCK` vs the env-surface gate), #1309+#1287
+(`board.freshness` vs control-mapping), #1300 (box-local quarantine), #1246
+(RCA doc ids) — because merges were judged on PER-PR-HEAD build results, so
+the first build of the ACTUAL merged tree was the NEXT PR's, which
+inherited the red silently.
+
+Before `gh pr merge` (both `scripts/pr-queue.sh`'s apply loop and the
+single-PR `scripts/merge-pr.sh` entrypoint), the merge now requires evidence
+that a verify ran green on a tree equal to `origin/master`'s CURRENT tip
+(re-read immediately before merging) plus the PR's head. Evidence sources,
+any one suffices:
+
+- **(a) CI status.** The PR head's merge-base is the current master tip
+  (`git merge-base origin/master <head>` equals the tip — the base has not
+  moved since), and the gate-of-record's own commit status
+  (`scripts/gate-status.sh show --sha <head>`) reads success.
+- **(b) Local attestation, opt-in.** With `AO_QUEUE_VERIFY_MERGED=1`, the
+  queue materializes `origin/master`'s current tip in a detached scratch
+  worktree, merges the PR head into it, and runs `scripts/verify.sh verify`
+  there (honouring that script's own gate-lock, so it is never a second
+  concurrent gate run) — producing `.verify/attestation.json` for that exact
+  merged tree, not either side alone.
+
+Otherwise the merge is refused BY NAME, never silently skipped:
+
+| refusal                       | meaning                                                                 |
+|--------------------------------|--------------------------------------------------------------------------|
+| `merged-tree-unverified:<pr>`  | evidence is stale (the base moved) or absent (no CI status and (b) was not opted into); remedy: `update-branch` / re-run CI, or set `AO_QUEUE_VERIFY_MERGED=1` |
+| `merged-tree-red:<check>`      | the merged tree (master tip + this PR's head) itself reds on `<check>`  |
+
+A refusal stops that PR only; the run continues with the next candidate, and
+after every successful merge the tip has moved, so the next candidate is
+re-judged against the NEW tip — the same re-check discipline the existing
+gate-regression check already follows.
+
+`AO_QUEUE_VERIFY_MERGED=1` is opt-in (default: CI status only, or refuse)
+because it pays for a real `scripts/verify.sh verify` run per candidate that
+lacks fresh CI evidence; `AO_QUEUE_VERIFY_CMD` / `AO_QUEUE_VERIFY_ATTESTATION`
+are internal test seams `scripts/check-pr-queue-squash-guard.sh` uses to
+prove the red/green paths without paying for a real gate run on every test
+invocation, and are not meant for interactive use.
+
 ## The gate
 
 `scripts/check-pr-queue.sh` proves the planner offline against a fixture PR

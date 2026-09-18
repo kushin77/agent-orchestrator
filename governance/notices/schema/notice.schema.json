@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/governance/notices/schema/notice.schema.json",
+  "title": "Standing notice (notice/v1)",
+  "description": "A rule between runtimes, broadcast to every registered runtime. The machine that decides whether a record holds is governance/notices/notice_records.py (validate_notice); this schema documents the same rules for a reader and for any other tool. `requires_ack` is a SELECTOR, never a list of runtime ids: the effective requirement is computed from the registry (governance/notices/runtime_registry.py) on every read, so a runtime registered later is covered by every standing notice already issued. A literal id list is refused by name (hand-maintained-ack-list). Records live under the fleet's runtime state (.fleet/notices/<id>/notice.json) and are never committed; the shipped half is this schema, the module and the gate.",
+  "type": "object",
+  "required": ["schema", "id", "subject", "issued", "status", "requires_ack"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "notice/v1",
+      "description": "The record version. A record carrying any other value is refused by name."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]*$",
+      "description": "The stable notice id, and the name of the directory holding it. A notice is immutable: a correction is a new id that supersedes this one."
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One line naming the rule, so an ack names what it acknowledged."
+    },
+    "body": {
+      "type": "string",
+      "description": "The rule itself, in the words the runtimes must act on."
+    },
+    "issued": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "When the notice was issued, in UTC. A timestamp with no zone is refused: a rule whose age cannot be read cannot be re-checked."
+    },
+    "issued_by": {
+      "type": "string",
+      "description": "The seat that issued it (the director, by default)."
+    },
+    "status": {
+      "enum": ["standing", "withdrawn"],
+      "description": "standing = every registered runtime owes an ack; withdrawn = the rule is retired, so nothing is owed (the record stays, because a rule that was broadcast leaves a trace)."
+    },
+    "requires_ack": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "const": "registered-runtimes" },
+      "description": "The one accepted value is the selector 'registered-runtimes'. Any literal runtime id is refused by name (hand-maintained-ack-list)."
+    },
+    "refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Where the rule comes from (an issue, a PR, a decision record), so the notice is a pointer and not a second authority."
+    }
+  }
+}
