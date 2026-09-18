@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# merge-pr.sh — the ONE guarded PR-merge entrypoint (issue #1233, parent #1145).
+#
+# THE DEFECT THIS EXISTS FOR
+#   `gh pr merge --squash` composes the landed commit message out of the PR title
+#   and body (`squash_merge_commit_message: PR_BODY`, verified live by
+#   `scripts/repo-settings.sh verify`), so a body whose LAST paragraph is not the
+#   trailer block lands a commit carrying no `Refs <slug>#<n>`. Then
+#   `scripts/check-isolation-landed.sh` reddens on MASTER'S OWN TIP, which makes
+#   `make verify` red for every lane on the box. Measured: four recurrences
+#   (#960/#976/#996/#991), then eight in one day (#1145) — two of them (#1221,
+#   #1225) were lanes landing the unblock while re-creating the defect.
+#
+#   Every PROGRAMMATIC path already consulted the guard: `scripts/pr-queue.sh`
+#   and `governance/lifecycle`'s close-out both call
+#   `scripts/check-squash-message.sh`. The RAW `gh pr merge` that the spawn
+#   instruction told an agent to run consulted nothing. This script is the single
+#   entrypoint that closes that gap, and `governance/spawn/render.py` — the one
+#   copy of the instruction every spawned lane receives — now names it.
+#
+# WHAT IT GUARANTEES
+#   * `scripts/check-squash-message.sh --pr <n>` runs FIRST. That script renders
+#     the exact message `gh pr merge --squash` would compose and asks the ONE
+#     shared predicate (`governance/isolation/trailer.py`) about it.
+#   * A refusal (guard rc 1) exits 1 printing `squash-message-would-drop-trailer`.
+#     No verdict (guard rc 2, or an unrecognised rc) exits 2. `gh pr merge` is
+#     NEVER invoked in either case: a gate that could not reach a verdict is not
+#     permission.
+#   * DRY RUN BY DEFAULT, mirroring `scripts/pr-queue.sh` (AO_QUEUE_APPLY) and
+#     `scripts/land-lane.sh` (AO_LAND_APPLY): without AO_MERGE_APPLY=1 nothing is
+#     merged and the planned command is printed instead.
+#
+# WHAT IT DOES NOT DO (named rather than papered over)
+#   It cannot make a deliberate bypass impossible: a human or agent that calls
+#   `gh pr merge` directly still bypasses every local control. Only the required
+#   status check tracked by #1138 can close that boundary.
+#
+# Exit contract: 0 OK / 1 NOT-OK (refused; nothing merged) / 2 CANNOT-ASSESS
+# (nothing merged).
+#
+# Usage:
+#   bash scripts/merge-pr.sh --pr <number>                  # dry run
+#   AO_MERGE_APPLY=1 bash scripts/merge-pr.sh --pr <number>  # execute
+set -uo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root" || exit 2
+
+usage() {
+  cat <<'USAGE'
+Usage: bash scripts/merge-pr.sh --pr <number>
+       AO_MERGE_APPLY=1 bash scripts/merge-pr.sh --pr <number>
+Runs scripts/check-squash-message.sh first and refuses by name
+(squash-message-would-drop-trailer) before any merge is attempted.
+Dry run by default. Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+USAGE
+}
+
+pr_number=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --pr)
+      if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "merge-pr: CANNOT-ASSESS — --pr needs a PR number" >&2
+        exit 2
+      fi
+      pr_number="$2"
+      shift 2
+      ;;
+    --pr=*)
+      pr_number="${1#*=}"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'merge-pr: CANNOT-ASSESS — unknown argument: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$pr_number" ]; then
+  echo "merge-pr: CANNOT-ASSESS — a PR number is required (see --help)" >&2
+  exit 2
+fi
+
+case "$pr_number" in
+  *[!0-9]*)
+    printf 'merge-pr: CANNOT-ASSESS — not a PR number: %s\n' "$pr_number" >&2
+    exit 2
+    ;;
+esac
+
+# --- the guard, resolved next to this script so the two cannot drift apart ---
+guard="$(dirname "${BASH_SOURCE[0]}")/check-squash-message.sh"
+if [ ! -f "$guard" ]; then
+  echo "merge-pr: CANNOT-ASSESS — the squash-message guard is missing: $guard" >&2
+  exit 2
+fi
+
+echo "merge-pr: checking the rendered squash message for #$pr_number (scripts/check-squash-message.sh)"
+if bash "$guard" --pr "$pr_number"; then
+  guard_rc=0
+else
+  guard_rc=$?
+fi
+
+case "$guard_rc" in
+  0) ;;
+  1)
+    echo "merge-pr: REFUSED — squash-message-would-drop-trailer — #$pr_number's rendered squash message would fail check-isolation-landed after merge; gh pr merge was NOT invoked" >&2
+    exit 1
+    ;;
+  2)
+    echo "merge-pr: CANNOT-ASSESS — the squash-message guard reached no verdict for #$pr_number; gh pr merge was NOT invoked" >&2
+    exit 2
+    ;;
+  *)
+    printf 'merge-pr: CANNOT-ASSESS — the squash-message guard returned an unrecognised exit code %s for #%s; gh pr merge was NOT invoked\n' \
+      "$guard_rc" "$pr_number" >&2
+    exit 2
+    ;;
+esac
+
+if [ "${AO_MERGE_APPLY:-0}" != "1" ]; then
+  echo "merge-pr: DRY RUN — #$pr_number carries the ticket trailer; would run: gh pr merge $pr_number --squash --delete-branch (AO_MERGE_APPLY=1 to execute)"
+  exit 0
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "merge-pr: CANNOT-ASSESS — gh not found; apply mode needs it to merge" >&2
+  exit 2
+fi
+
+echo "merge-pr: merging #$pr_number (gh pr merge --squash --delete-branch); the message was verified above"
+# A non-zero exit here is a refusal to RE-CHECK, not proof that nothing landed:
+# `gh pr merge --delete-branch` can exit rc 1 after the merge actually succeeded
+# (measured 2026-09-15, #623 — the local branch-prune step collides with the
+# shared checkout that holds `master`). Read `gh pr view <n> --json
+# state,mergeCommit` before acting on it.
+if gh pr merge "$pr_number" --squash --delete-branch; then
+  echo "merge-pr: OK — #$pr_number merged"
+  exit 0
+fi
+echo "merge-pr: REFUSED — gh pr merge #$pr_number failed; re-check state before retrying" >&2
+exit 1

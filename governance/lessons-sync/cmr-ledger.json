@@ -186,7 +186,6 @@
     }
   ],
   "local_only": [
-
     {
       "id": "CA-0001",
       "reason": "no-hub-counterpart",
@@ -314,6 +313,12 @@
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     },
     {
+      "id": "CA-0023",
+      "reason": "no-hub-counterpart",
+      "record_ref": "074e3d481cfc16911da5c639d3e88e7002a0b180",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
       "id": "INC-0001",
       "reason": "no-hub-counterpart",
       "record_ref": "#153",
@@ -416,6 +421,12 @@
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     },
     {
+      "id": "INC-0018",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1115",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
       "id": "LESSON-0001",
       "reason": "no-hub-counterpart",
       "record_ref": "0ba7a2c",
@@ -455,6 +466,12 @@
       "id": "LESSON-0007",
       "reason": "no-hub-counterpart",
       "record_ref": "6e44c3c431987f007804bd2c772d38eec7ba0f3d",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0008",
+      "reason": "no-hub-counterpart",
+      "record_ref": "075a246b8eeec0ed3846ff34cbbd5af422dcbaef",
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     },
     {
@@ -557,6 +574,12 @@
       "id": "RCA-0017",
       "reason": "no-hub-counterpart",
       "record_ref": "#1052",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0018",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1082",
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     },
     {
