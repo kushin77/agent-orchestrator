@@ -288,6 +288,11 @@ variables:
     secret: false
     required_by: [local-run, ops]
     readers: [fleet/terminal.py]
+  - name: AO_LIFECYCLE_ROOT
+    purpose: the state root the lifecycle CLI reads and writes, unless this checkout's own is used.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [governance/lifecycle/cli.py]
   - name: AO_WATCHDOG_BOOTSTRAPPED
     purpose: the marker the watchdog sets so a respawned rung does not re-bootstrap.
     secret: false
