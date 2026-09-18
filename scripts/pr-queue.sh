@@ -46,6 +46,34 @@
 #   AO_QUEUE_FIXTURE=<json|path>  feed `gh pr list --json ...`-shaped input
 #                                 (a literal JSON array, or a path to a file
 #                                 holding one) for offline runs — no `gh` call
+#   AO_QUEUE_VERIFY_MERGED=1      let the queue itself run scripts/verify.sh in a
+#                                 detached scratch worktree of master+PR-head when
+#                                 no CI status evidence exists for the head (see
+#                                 merged-tree evidence, below)
+#
+# MERGED-TREE EVIDENCE (issue #1254 step 6, child of #1254). Measured
+# 2026-09-18: four times, two PRs each green ALONE were red TOGETHER —
+# #1110+#1115 (AO_FROZEN_CLOCK vs the env-surface gate), #1309+#1287
+# (board.freshness vs control-mapping), #1300 (box-local quarantine), #1246
+# (RCA doc ids) — because merges were judged on PER-PR-HEAD build results, so
+# the first build of the ACTUAL merged tree was the NEXT PR's, which
+# inherited the red silently. Before `gh pr merge`, the queue now requires
+# evidence that a verify ran green on a tree equal to origin/master's CURRENT
+# tip (re-read immediately before merging) plus this PR's head:
+#   (a) the PR head's merge-base IS the current master tip, and the gate of
+#       record's own commit status (scripts/gate-status.sh show --sha <head>)
+#       reads success; or
+#   (b) with AO_QUEUE_VERIFY_MERGED=1, a local `scripts/verify.sh verify` run
+#       in a detached scratch worktree merging master's tip with the PR head
+#       (honouring scripts/verify.sh's own gate-lock; a PARKED/CANNOT-ASSESS
+#       run is not evidence either way).
+# Otherwise the merge is refused BY NAME: `merged-tree-unverified:<pr>`
+# (evidence is stale or absent — the base moved, or no CI status and (b) was
+# not opted into) or `merged-tree-red:<check>` (the merged tree reds).
+# Refusing prints the remedy (update-branch / re-run) and the queue continues
+# with the NEXT candidate; after every successful merge the tip moved, so the
+# next candidate is re-judged against the NEW tip, exactly like the existing
+# gate-regression re-check below.
 #
 # Exit contract: 0 the plan/apply ran to completion with nothing refused,
 # 1 an apply-mode merge was refused, 2 CANNOT-ASSESS (no gh, no fixture, bad
@@ -60,6 +88,8 @@ cd "$root" || exit 2
 base="master"
 check_gate_regression_head=""
 check_gate_regression_base=""
+check_merged_tree_number=""
+check_merged_tree_head=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) base="${2:-master}"; shift 2 ;;
@@ -73,6 +103,22 @@ while [ $# -gt 0 ]; do
         exit 2
       fi
       check_gate_regression_head="$2"; shift 2 ;;
+    # Test seam / merge-pr.sh's own seam (issue #1254 step 6) for the
+    # merged-tree check: drives merged_tree_evidence_by_ref() directly, offline or
+    # from the single-PR merge-pr.sh entrypoint, against real refs — see
+    # that function's header for the negative-control invocation.
+    --check-merged-tree)
+      if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "pr-queue: CANNOT-ASSESS — --check-merged-tree needs a PR number" >&2
+        exit 2
+      fi
+      check_merged_tree_number="$2"; shift 2 ;;
+    --head)
+      if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "pr-queue: CANNOT-ASSESS — --head needs a head OID" >&2
+        exit 2
+      fi
+      check_merged_tree_head="$2"; shift 2 ;;
     --against-base)
       if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
         echo "pr-queue: CANNOT-ASSESS — --against-base needs a base ref/OID" >&2
@@ -82,8 +128,9 @@ while [ $# -gt 0 ]; do
     --help | -h)
       cat <<'USAGE'
 Usage: bash scripts/pr-queue.sh [--base BASE]
-       bash scripts/pr-queue.sh --check-gate-regression <head-oid>   (reads touched paths on stdin)
-Env: AO_QUEUE_APPLY, AO_QUEUE_INCLUDE_DRAFTS, AO_QUEUE_GATE_PATHS, AO_QUEUE_FIXTURE
+       bash scripts/pr-queue.sh --check-gate-regression <head-oid> [--against-base REF]   (reads touched paths on stdin)
+       bash scripts/pr-queue.sh --check-merged-tree <pr-number> --head <head-oid> --against-base <base-ref>
+Env: AO_QUEUE_APPLY, AO_QUEUE_INCLUDE_DRAFTS, AO_QUEUE_GATE_PATHS, AO_QUEUE_FIXTURE, AO_QUEUE_VERIFY_MERGED
 See docs/PR-QUEUE.md.
 USAGE
       exit 0
@@ -418,6 +465,127 @@ gate_regression_check() { # <head-oid> <base-ref-or-empty>
   return 0
 }
 
+# merged_tree_local_verify — evidence source (b): materialize origin/master's
+# CURRENT tip in a detached scratch worktree, merge the PR head into it, and
+# run scripts/verify.sh verify there (it applies its own gate-lock, so this
+# never runs concurrently with another verify on the box). A clean merge that
+# passes is evidence the MERGED tree is green, not just either side alone.
+merged_tree_local_verify() { # <pr-number> <head-oid> <tip>
+  local number="$1" head_oid="$2" tip="$3" wt logf verify_rc failed_names name
+  wt="$(mktemp -d "${TMPDIR:-/tmp}/pr-queue-merged-tree.XXXXXX" 2>/dev/null)" || {
+    echo "pr-queue: REFUSED — merged-tree-unverified:$number — could not allocate a scratch directory for the merge-tree verify" >&2
+    return 1
+  }
+  rmdir "$wt"
+  if ! git worktree add --detach --quiet "$wt" "$tip" >/dev/null 2>&1; then
+    echo "pr-queue: REFUSED — merged-tree-unverified:$number — could not materialize master tip $tip as a scratch worktree" >&2
+    return 1
+  fi
+  if ! ( cd "$wt" && git -c user.email=pr-queue@local -c user.name=pr-queue merge --no-commit --no-ff "$head_oid" ) >/dev/null 2>&1; then
+    ( cd "$wt" && git merge --abort ) >/dev/null 2>&1
+    git worktree remove --force "$wt" >/dev/null 2>&1; rm -rf "$wt" 2>/dev/null
+    echo "pr-queue: REFUSED — merged-tree-unverified:$number — master($tip)+#$number($head_oid) does not merge cleanly; cannot verify a tree that does not exist" >&2
+    return 1
+  fi
+  logf="$(mktemp "${TMPDIR:-/tmp}/pr-queue-merged-tree-log.XXXXXX" 2>/dev/null)"
+  # AO_QUEUE_VERIFY_CMD / AO_QUEUE_VERIFY_ATTESTATION are a test seam ONLY
+  # (default: the real gate) — check-pr-queue-squash-guard.sh's negative
+  # controls swap in a fast fake command + fixture attestation so the red
+  # and green merged-tree paths are provable offline without paying for a
+  # real `scripts/verify.sh verify` run per assertion.
+  ( cd "$wt" && bash -c "${AO_QUEUE_VERIFY_CMD:-"scripts/verify.sh verify"}" ) >"$logf" 2>&1
+  verify_rc=$?
+  failed_names=""
+  local attestation_rel="${AO_QUEUE_VERIFY_ATTESTATION:-.verify/attestation.json}"
+  local attestation_path="$attestation_rel"
+  case "$attestation_rel" in
+    /*) ;; # already absolute (a test seam pointing at a fixture) — use as-is
+    *) attestation_path="$wt/$attestation_rel" ;;
+  esac
+  if [ -f "$attestation_path" ]; then
+    failed_names="$(python3 -c "
+import json
+try:
+    data = json.load(open('$attestation_path'))
+except Exception:
+    raise SystemExit(0)
+print(' '.join(c.get('name', '') for c in data.get('checks', []) if c.get('verdict') == 'FAIL'))
+" 2>/dev/null)"
+  fi
+  git worktree remove --force "$wt" >/dev/null 2>&1
+  rm -rf "$wt" 2>/dev/null
+  case "$verify_rc" in
+    0)
+      echo "pr-queue: merged-tree evidence for #$number — local scratch verify PASSED on master($tip)+#$number($head_oid); log at $logf"
+      rm -f "$logf" 2>/dev/null
+      return 0
+      ;;
+    10 | 11 | 12)
+      echo "pr-queue: REFUSED — merged-tree-unverified:$number — the local merge-tree verify was PARKED/CANNOT-ASSESS (gate-lock rc $verify_rc); that is not evidence either way; log at $logf" >&2
+      return 1
+      ;;
+    *)
+      name="${failed_names%% *}"
+      [ -n "$name" ] || name="verify"
+      echo "pr-queue: REFUSED — merged-tree-red:$name — master($tip)+#$number($head_oid) is red on ${failed_names:-$name} (remedy: update-branch / re-run CI); log at $logf" >&2
+      return 1
+      ;;
+  esac
+}
+
+# merged_tree_evidence_by_ref — the gate itself, keyed off an ALREADY
+# RESOLVABLE base ref (a plain branch name is fetched from origin first; a
+# ref already in the form "origin/<branch>" — e.g. from merge-pr.sh, which
+# resolved baseRefName itself — is used as-is). No `gh pr merge` is reached
+# without this returning 0. Named refusals only (never a bare non-zero).
+merged_tree_evidence_by_ref() { # <pr-number> <head-oid> <base-ref>
+  local number="$1" head_oid="$2" base_ref="$3" tip mb
+  if [ -z "$head_oid" ]; then
+    echo "pr-queue: REFUSED — merged-tree-unverified:$number — no head OID to judge" >&2
+    return 1
+  fi
+  case "$base_ref" in
+    origin/*) git fetch --quiet origin "${base_ref#origin/}" >/dev/null 2>&1 || true ;;
+    *) git fetch --quiet origin "$base_ref" >/dev/null 2>&1 || true; base_ref="origin/$base_ref" ;;
+  esac
+  tip="$(git rev-parse "$base_ref" 2>/dev/null)"
+  if [ -z "$tip" ]; then
+    echo "pr-queue: REFUSED — merged-tree-unverified:$number — could not read the current tip of $base_ref" >&2
+    return 1
+  fi
+  git fetch --quiet origin "$head_oid" >/dev/null 2>&1 || true
+  mb="$(git merge-base "$tip" "$head_oid" 2>/dev/null)"
+  if [ "$mb" != "$tip" ]; then
+    echo "pr-queue: REFUSED — merged-tree-unverified:$number — #$number's merge-base is not the CURRENT master tip ($tip); evidence would be stale (remedy: update-branch / re-run, then re-plan)" >&2
+    return 1
+  fi
+  if command -v gh >/dev/null 2>&1 && [ -f "$(dirname "${BASH_SOURCE[0]}")/gate-status.sh" ]; then
+    if bash "$(dirname "${BASH_SOURCE[0]}")/gate-status.sh" show --sha "$head_oid" >/dev/null 2>&1; then
+      echo "pr-queue: merged-tree evidence for #$number — gate-of-record CI status success at $head_oid, merge-base == current tip $tip"
+      return 0
+    fi
+  fi
+  if [ "${AO_QUEUE_VERIFY_MERGED:-0}" = "1" ]; then
+    merged_tree_local_verify "$number" "$head_oid" "$tip"
+    return $?
+  fi
+  echo "pr-queue: REFUSED — merged-tree-unverified:$number — no green gate-of-record CI status found for $head_oid, and AO_QUEUE_VERIFY_MERGED is not set to run a local merge-tree verify (remedy: update-branch / re-run CI, or set AO_QUEUE_VERIFY_MERGED=1)" >&2
+  return 1
+}
+
+if [ -n "$check_merged_tree_number" ]; then
+  if [ -z "$check_merged_tree_head" ] || [ -z "$check_gate_regression_base" ]; then
+    echo "pr-queue: CANNOT-ASSESS — --check-merged-tree needs --head <oid> and --against-base <ref>" >&2
+    exit 2
+  fi
+  # --against-base here names the BASE REF (e.g. origin/master), not a bare
+  # branch name, so pass it through untouched to merge-base/rev-parse rather
+  # than merged_tree_evidence_by_ref's own "origin/<name>" fetch — the caller
+  # (merge-pr.sh) already resolved it.
+  merged_tree_evidence_by_ref "$check_merged_tree_number" "$check_merged_tree_head" "$check_gate_regression_base"
+  exit $?
+fi
+
 if [ -n "$check_gate_regression_head" ]; then
   gate_regression_check "$check_gate_regression_head" "$check_gate_regression_base"
   exit $?
@@ -476,6 +644,14 @@ for number in "${merge_order[@]}"; do
   head_and_files="$(pr_head_and_files_py "$recheck_json" "$number")"
   number_head_oid="$(printf '%s\n' "$head_and_files" | head -n1)"
   number_files="$(printf '%s\n' "$head_and_files" | tail -n +2)"
+  # Merged-tree evidence (issue #1254 step 6): required for EVERY PR, not
+  # just scripts/-touching ones — a merge-order defect (two green heads,
+  # red together) is not confined to gate files. Runs after the
+  # squash-message guard (a message-shape refusal should not spend a
+  # scratch worktree) and before the scripts/-scoped gate-regression check.
+  if ! merged_tree_evidence_by_ref "$number" "$number_head_oid" "$base"; then
+    exit 1
+  fi
   # gate_regression_check's own scoping (no scripts/* file touched -> return 0
   # immediately, no worktree) must be applied BEFORE the merge-base lookup
   # below, not just inside the function: a PR that touches nothing under
