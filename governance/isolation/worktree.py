@@ -480,14 +480,83 @@ def content_landed(main: Path | str, ref: str, base: str = "origin/master") -> b
     if not paths:
         return False
 
+    all_paths_equal = True
     for path in paths:
         theirs = git(main, "rev-parse", "--verify", "--quiet", f"{ref}:{path}")
         ours = git(main, "rev-parse", "--verify", "--quiet", f"{base}:{path}")
         theirs_sha = theirs.stdout.strip() if theirs.returncode == 0 else ""
         ours_sha = ours.stdout.strip() if ours.returncode == 0 else ""
         if theirs_sha != ours_sha:
+            all_paths_equal = False
+            break
+    if all_paths_equal:
+        return True
+
+    # Third method, tried only when the whole-file comparison above fails
+    # (issue #1265 comment 2): master routinely touches the SAME FILE again
+    # after landing a lane's hunk, so "the file's blob differs" is common even
+    # when every hunk the lane actually wrote is still there. Build the lane's
+    # own patch and test whether REVERSING it against a scratch index of
+    # ``base`` applies cleanly — that succeeds iff every hunk in the patch is
+    # present in ``base``'s content for that path, regardless of what else in
+    # the file changed since.
+    return _reverse_patch_landed(main, base_sha, ref, base)
+
+
+def _reverse_patch_landed(main: Path | str, base_sha: str, ref: str, base: str) -> bool:
+    """Is ``ref``'s own patch (vs ``base_sha``) reverse-appliable onto ``base``?
+
+    Builds ``git diff --no-renames base_sha ref`` (excluding machine-managed
+    paths), then checks it with ``git apply --cached --check -R`` against a
+    THROWAWAY index seeded from ``base`` via ``GIT_INDEX_FILE`` — never the
+    repository's real index, and nothing is written to the working tree. If
+    the reverse-apply succeeds, every hunk the patch would add is already
+    present in ``base``: landed. Any failure along the way (no git-dir, a
+    patch git cannot even build, a hunk missing or since reverted) is NOT
+    landed — this only ever widens what may be reclaimed.
+    """
+    import tempfile
+
+    exclude_pathspecs = [f":(exclude){path}" for path in MACHINE_MANAGED_PATHS]
+    exclude_pathspecs += [f":(exclude){prefix}*" for prefix in MACHINE_MANAGED_PREFIXES]
+    # -U0: zero context lines. A context line is a claim "this line, near my
+    # change, was unchanged" — and master routinely edits a NEARBY line in the
+    # same file without touching the lane's own hunk at all. Matching context
+    # would make this method fail on exactly the case it exists for; matching
+    # only the changed lines themselves is the whole point of "by content."
+    diff = git(main, "diff", "--no-renames", "-U0", base_sha, ref, "--", ".", *exclude_pathspecs)
+    if diff.returncode != 0 or not diff.stdout.strip():
+        return False
+    patch = diff.stdout
+
+    git_dir_result = git(main, "rev-parse", "--absolute-git-dir")
+    if git_dir_result.returncode != 0:
+        return False
+    git_dir = git_dir_result.stdout.strip()
+
+    with tempfile.TemporaryDirectory() as scratch:
+        index_path = str(Path(scratch) / "index")
+        env = {
+            **os.environ,
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_DIR": git_dir,
+            "GIT_INDEX_FILE": index_path,
+        }
+        read_tree = subprocess.run(
+            ["git", "read-tree", base], cwd=str(main), capture_output=True, text=True, env=env
+        )
+        if read_tree.returncode != 0:
             return False
-    return True
+        apply_check = subprocess.run(
+            ["git", "apply", "--cached", "--check", "-R", "--unidiff-zero"],
+            input=patch,
+            cwd=str(main),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        return apply_check.returncode == 0
 
 
 def record_reaped(

@@ -137,9 +137,16 @@ Exit contract, shared with the rest of the fleet's guards: `0` OK / `1` NOT-OK /
   a squash-merge, does not by itself mean the work is unlanded — the pruner
   also checks CONTENT equivalence (`governance/isolation/worktree.py`'s
   `content_landed`, the same test `--branches` already used for lane branches,
-  #1265) before keeping a worktree "just in case." `scripts/check-worktree-cap.sh`
+  #1265) before keeping a worktree "just in case" — including, as a third
+  fallback, reverse-applying the lane's own zero-context patch against a
+  scratch index of `origin/master`, which lands the common case where master
+  later edited the SAME file elsewhere and a whole-file blob comparison alone
+  would still say "unlanded." `scripts/check-worktree-cap.sh`
   is the box-wide companion gate: it reds `worktree-cap-exceeded:<n>/<cap>`
-  when live worktrees exceed open lane records plus a declared slack
+  when live worktrees exceed open lane records plus a declared slack (or a
+  dated, host-scoped `ratchet` in `worktree-cap.yaml` while the real pile is
+  still shrinking towards that slack — printed as a `worktree-cap-ratchet:<n>`
+  NOTE, and never honoured past its own `expires` date)
   (`governance/isolation/worktree-cap.yaml`), and `reaper-unscheduled` when
   nothing actually installs `prune-worktrees.sh` in the crontab a scheduler
   reads — a declaration is not an installation.

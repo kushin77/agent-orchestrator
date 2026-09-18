@@ -9,7 +9,10 @@
 # `open lane records + declared slack` (governance/isolation/worktree-cap.yaml,
 # default slack 10), and it also asks the reaper's own `--schedule` question so
 # an unscheduled reaper is a finding here too, not just inside prune-worktrees'
-# own report.
+# own report. worktree-cap.yaml may also declare a dated `ratchet` (measured on
+# a specific host, honoured only until it expires) that raises the cap while
+# the pile is still shrinking towards the declared `slack`; an active ratchet
+# is printed as a NOTE (`worktree-cap-ratchet:<n>`), never silently.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK (cap exceeded and/or reaper unscheduled,
 # named `worktree-cap-exceeded:<n>/<cap>` / `reaper-unscheduled`) /
@@ -34,18 +37,44 @@ done
 
 # --- the check itself, parameterized so --self-test can run it on a scratch
 #     repo without touching the real tree ------------------------------------
-declared_slack() { # declared_slack <repo> — the slack value in worktree-cap.yaml, default 10
-  local repo="$1" file="$repo/governance/isolation/worktree-cap.yaml" value
+cap_config() { # cap_config <repo> — prints "SLACK|RATCHET_MEASURED|RATCHET_EXPIRES"
+                # (the last two blank when no ratchet is declared, or malformed)
+  local repo="$1" file="$repo/governance/isolation/worktree-cap.yaml"
   if [ ! -f "$file" ]; then
-    printf '10'
+    printf '10||'
     return 0
   fi
-  value="$(grep -E '^[[:space:]]*slack:[[:space:]]*[0-9]+[[:space:]]*$' "$file" | head -n1 | grep -oE '[0-9]+')"
-  if [ -z "$value" ]; then
-    printf '10'
-  else
-    printf '%s' "$value"
-  fi
+  python3 - "$file" <<'PY'
+import sys
+try:
+    import yaml
+except ImportError:
+    print("10||")
+    raise SystemExit(0)
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        data = yaml.safe_load(handle) or {}
+except (OSError, yaml.YAMLError):
+    data = {}
+
+try:
+    slack = int(data.get("slack", 10))
+except (TypeError, ValueError):
+    slack = 10
+
+ratchet = data.get("ratchet") or {}
+measured = ratchet.get("measured", "")
+expires = ratchet.get("expires", "")
+try:
+    measured = int(measured) if measured != "" else ""
+except (TypeError, ValueError):
+    measured = ""
+if not isinstance(expires, str):
+    expires = str(expires) if expires not in (None, "") else ""
+
+print(f"{slack}|{measured}|{expires}")
+PY
 }
 
 fleet_dir_for() { # fleet_dir_for <repo> — .fleet/ lives beside the MAIN checkout's git dir,
@@ -106,8 +135,33 @@ check_cap() { # check_cap <repo> — prints findings, returns 0/1/2 per the cont
     return 2
   fi
 
-  slack="$(declared_slack "$repo")"
+  local cap_line slack ratchet_measured ratchet_expires
+  cap_line="$(cap_config "$repo")"
+  IFS='|' read -r slack ratchet_measured ratchet_expires <<< "$cap_line"
+  [ -z "$slack" ] && slack=10
   cap=$((lanes + slack))
+
+  # --- temporary ratchet (issue #1265 comment 3) -------------------------------
+  #
+  # `slack` is the TARGET, but the box was not there yet the day this gate
+  # shipped. `ratchet.measured` is what was left on the declaring host after
+  # ITS OWN reaper `--apply` (only provably-dead worktrees) — never renewed
+  # here, never re-measured by this script, and only honoured until
+  # `ratchet.expires`. After that date the declared `slack` is the only cap
+  # again, on purpose: an expired ratchet must not quietly re-excuse the same
+  # pile forever.
+  local ratchet_active=0 today
+  today="$(date -u +%Y-%m-%d)"
+  if [ -n "$ratchet_measured" ] && [ -n "$ratchet_expires" ] && [[ ! "$today" > "$ratchet_expires" ]]; then
+    local extra ratchet_cap
+    extra=$((ratchet_measured - lanes))
+    [ "$extra" -lt "$slack" ] && extra="$slack"
+    ratchet_cap=$((lanes + extra))
+    if [ "$ratchet_cap" -gt "$cap" ]; then
+      cap="$ratchet_cap"
+      ratchet_active=1
+    fi
+  fi
 
   wt_list="$(git -C "$repo" worktree list --porcelain | awk '/^worktree /{print $2}')"
   # The main checkout itself is not a lane worktree. `--show-toplevel` answers
@@ -131,6 +185,9 @@ check_cap() { # check_cap <repo> — prints findings, returns 0/1/2 per the cont
   done <<< "$wt_list"
 
   echo "check-worktree-cap: $wt_count worktree(s), $lanes open lane record(s), slack $slack, cap $cap"
+  if [ "$ratchet_active" -eq 1 ]; then
+    echo "check-worktree-cap: NOTE worktree-cap-ratchet:$ratchet_measured (measured on $ratchet_expires-bounded ratchet; target slack is $slack)"
+  fi
 
   local rc=0
   if [ "$wt_count" -gt "$cap" ]; then
@@ -226,6 +283,56 @@ self_test() {
     ok "reaper-unscheduled fires by name when nothing installs prune-worktrees.sh"
   else
     bad "reaper-unscheduled did not fire: $out3"
+  fi
+
+  # --- ratchet: live, honoured, NOTE ------------------------------------------
+  local live_ratchet="$work/live-ratchet"
+  git init -q "$live_ratchet"
+  git -C "$live_ratchet" config user.email t@example.com
+  git -C "$live_ratchet" config user.name t
+  git -C "$live_ratchet" commit -q --allow-empty -m seed
+  mkdir -p "$live_ratchet/.fleet/lanes" "$live_ratchet/governance/isolation"
+  printf '{"worktree": "%s"}\n' "$live_ratchet/.wt-a" > "$live_ratchet/.fleet/lanes/a.json"
+  cat > "$live_ratchet/governance/isolation/worktree-cap.yaml" <<'YAML'
+slack: 1
+ratchet:
+  measured: 4
+  host: self-test
+  expires: "2999-01-01"
+YAML
+  for i in 1 2 3 4; do
+    git -C "$live_ratchet" worktree add -q --detach "$live_ratchet/.wt-$i" master >/dev/null 2>&1 || true
+  done
+  out4="$(check_cap "$live_ratchet" 2>&1)"; rc4=$?
+  if [ "$rc4" -eq 0 ] && [[ "$out4" == *"worktree-cap-ratchet:4"* ]]; then
+    ok "a live (unexpired) ratchet raises the cap and prints worktree-cap-ratchet:<n> as a NOTE"
+  else
+    bad "a live ratchet did not hold, or did not print the NOTE by name (rc=$rc4): $out4"
+  fi
+
+  # --- ratchet: expired, real cap bites, reds ---------------------------------
+  local expired_ratchet="$work/expired-ratchet"
+  git init -q "$expired_ratchet"
+  git -C "$expired_ratchet" config user.email t@example.com
+  git -C "$expired_ratchet" config user.name t
+  git -C "$expired_ratchet" commit -q --allow-empty -m seed
+  mkdir -p "$expired_ratchet/.fleet/lanes" "$expired_ratchet/governance/isolation"
+  printf '{"worktree": "%s"}\n' "$expired_ratchet/.wt-a" > "$expired_ratchet/.fleet/lanes/a.json"
+  cat > "$expired_ratchet/governance/isolation/worktree-cap.yaml" <<'YAML'
+slack: 1
+ratchet:
+  measured: 4
+  host: self-test
+  expires: "2000-01-01"
+YAML
+  for i in 1 2 3 4; do
+    git -C "$expired_ratchet" worktree add -q --detach "$expired_ratchet/.wt-$i" master >/dev/null 2>&1 || true
+  done
+  out5="$(check_cap "$expired_ratchet" 2>&1)"; rc5=$?
+  if [ "$rc5" -eq 1 ] && [[ "$out5" == *"worktree-cap-exceeded:"* ]] && [[ "$out5" != *"worktree-cap-ratchet:"* ]]; then
+    ok "an expired ratchet is ignored — the declared slack is the only cap, and it reds"
+  else
+    bad "an expired ratchet still excused the pile (rc=$rc5): $out5"
   fi
 
   local result=0

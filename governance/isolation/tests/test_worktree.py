@@ -412,6 +412,83 @@ def test_content_landed_ignores_a_machine_managed_hunk(repo: Path):
     assert content_landed(repo, feature_sha) is True
 
 
+def test_content_landed_when_master_edited_the_same_file_elsewhere(repo: Path):
+    """A hunk fully present in master's file is landed, even if the blob differs
+    because master's own later edit touches a different part of the same file
+    (issue #1265 comment 2, the third reverse-patch method)."""
+    seed_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+    (repo / "multi.txt").write_text("line1\nline2\nline3\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "seed multi.txt")
+    common_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    git(repo, "checkout", "-q", "-b", "lane-branch")
+    (repo / "multi.txt").write_text("line1-lane\nline2\nline3\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "lane changes line1")
+    lane_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    git(repo, "checkout", "-q", "-b", "landed-master", common_sha)
+    (repo / "multi.txt").write_text("line1-lane\nline2\nline3-master\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "squash-land line1, then master edits line3")
+    git(repo, "update-ref", "refs/remotes/origin/master", "landed-master")
+    git(repo, "checkout", "-q", "master")
+
+    assert content_landed(repo, lane_sha) is True
+
+
+def test_content_landed_false_when_a_hunk_is_missing(repo: Path):
+    """One of two hunks never landed: the reverse patch cannot fully apply."""
+    (repo / "multi.txt").write_text("line1\nline2\nline3\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "seed multi.txt")
+    common_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    git(repo, "checkout", "-q", "-b", "lane-branch")
+    (repo / "multi.txt").write_text("line1-lane\nline2\nline3-lane\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "lane changes line1 and line3")
+    lane_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    # Master only picked up the line1 hunk, never line3.
+    git(repo, "checkout", "-q", "-b", "landed-master", common_sha)
+    (repo / "multi.txt").write_text("line1-lane\nline2\nline3\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "squash-land only line1")
+    git(repo, "update-ref", "refs/remotes/origin/master", "landed-master")
+    git(repo, "checkout", "-q", "master")
+
+    assert content_landed(repo, lane_sha) is False
+
+
+def test_content_landed_false_when_master_later_reverted_the_hunk(repo: Path):
+    """A hunk that landed and was since reverted on master is NOT landed."""
+    (repo / "multi.txt").write_text("line1\nline2\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "seed multi.txt")
+    common_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    git(repo, "checkout", "-q", "-b", "lane-branch")
+    (repo / "multi.txt").write_text("line1-lane\nline2\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "lane changes line1")
+    lane_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    git(repo, "checkout", "-q", "-b", "landed-master", common_sha)
+    (repo / "multi.txt").write_text("line1-lane\nline2\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "squash-land line1")
+    # Master later reverts the lane's own hunk.
+    (repo / "multi.txt").write_text("line1\nline2\n", encoding="utf-8")
+    git(repo, "add", "multi.txt")
+    git(repo, "commit", "-qm", "revert line1 on master")
+    git(repo, "update-ref", "refs/remotes/origin/master", "landed-master")
+    git(repo, "checkout", "-q", "master")
+
+    assert content_landed(repo, lane_sha) is False
+
+
 def test_record_reaped_appends_one_json_line(repo: Path):
     path = record_reaped(
         repo,
