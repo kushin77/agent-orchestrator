@@ -1,24 +1,20 @@
-# The PR-queue-clearing session (2026-09-16) — RCA-0015 / RCA-0016
+# RCA-0007 / RCA-0008 — the PR-queue-clearing session (2026-09-16)
 
 | Field | Value |
 |---|---|
 | Scope | one session that merged all 17 open PRs against `master` |
-| Lessons | two distinct classes, promoted into the ledger as `RCA-0015` and `RCA-0016` |
+| Lessons | two distinct classes, tracked as two RCA ids in this one document |
 | Severity | medium (wasted verify-gate throughput + duplicated feature work, no data loss) |
 | Owner | governance / gate-wiring lane |
 | Reviewed | 2026-09-16 |
 
-This is a lightweight, narrative companion to the canonical writeups. It is
-**not** the RCA artifact: the ledger's `artifact` field for each of these
-ids names the real writeup under `governance/lessons/rca/` — `RCA-0015`
-([`governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md`](../../governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md))
-and `RCA-0016`
-([`governance/lessons/rca/RCA-0016-shared-core-file-collision.md`](../../governance/lessons/rca/RCA-0016-shared-core-file-collision.md)).
-This document cites those ids; it does not mint them (issue #1052 — an
-earlier revision of this file minted `RCA-0007`/`RCA-0008` directly, which
-double-booked ids the ledger already held for a different incident).
+This is a lightweight, doc-only RCA. It is **not** entered into the
+`governance/lessons/ledger.jsonl` pipeline (see "Why not the lessons
+ledger" below) — treat it as the incident writeup, and open a
+`governance/lessons` record separately if this session's PRs get real
+issue numbers on the board.
 
-## The zero-byte gate-lock wedge (cited as RCA-0015)
+## RCA-0007 — the zero-byte gate-lock wedge
 
 ### Impact
 
@@ -105,7 +101,7 @@ copy is the loud, always-on notice.
 Auto-reap stays on the one path already proven safe: a worktree's own
 `release`.
 
-## The shared-core-file collision class (cited as RCA-0016)
+## RCA-0008 — the shared-core-file collision class
 
 ### Impact
 
@@ -154,17 +150,16 @@ staying lightweight.
 - `fleet/watchdog.py::watchdog_once` — the per-tick sweep + loud print.
 - `docs/EXECUTION-PLAN.md` §3 — the core-extension-point rule.
 
-## Promoted into the `governance/lessons` ledger (issue #1052)
+## Why not the `governance/lessons` ledger
 
 `governance/lessons/README.md` documents the repo's real RCA pipeline —
-`RCA-<n>` artifacts recorded against a real `INC-<n>` in `ledger.jsonl`, each
-`origin` resolved against the committed board snapshot, checked by
-`governance/lessons/cli.py check`. Both lessons in this document now have PR
-refs to anchor them (`#997`, `#1036`) and are recorded there as `INC-0015`
-/ `RCA-0015` and `INC-0016` / `RCA-0016`, with the full writeup living under
-`governance/lessons/rca/`. This document remains as a narrative companion —
-the session's own account of the 17-PR queue-clearing pass — and cites the
-ledger ids; the ledger is the single authority for what an `RCA-<n>` id
-means (issue #1052 — an earlier revision of this file minted `RCA-0007`
-/ `RCA-0008` directly, double-booking ids the ledger already held for a
-different incident, which is what closed that gap).
+`RCA-<n>` artifacts recorded against a real `INC-<n>` in
+`ledger.jsonl`, each `origin` resolved against the committed board
+snapshot, checked by `governance/lessons/cli.py check`. That pipeline
+requires a real incident/issue/PR reference resolvable on the board; this
+session's "17 PRs" and the specific collisions named above were given as
+narrative context rather than a set of board-resolvable refs, so recording
+them there would plant unverifiable references into an otherwise-verified
+ledger. This document captures the same analysis and the same corrective
+actions without that risk. If/when this incident gets real issue numbers,
+promote it into the ledger with `governance/lessons/cli.py record`.
