@@ -154,21 +154,22 @@ fi
 #    requiring a context nothing posts would deadlock every merge, which is
 #    exactly the #724 defect: an inert control with a gate that could not see it).
 live_rc=0
-if command -v gh >/dev/null 2>&1; then
-  if bash "$POSTER" show --sha "$(git rev-parse HEAD)" >/tmp/cgs-live.log 2>&1; then
-    echo "  OK  the LIVE read-back found $context_poster on this commit"
-  else
-    rc=$?
-    case "$rc" in
-      1) echo "  note  no $context_poster status on HEAD — expected until the poster runs in the runner" ;;
-      2) echo "  CANNOT-ASSESS  the status could NOT be read back (API unreachable) — not a pass"
-         live_rc=2 ;;
-      *) echo "  note  read-back returned $rc" ;;
-    esac
-  fi
-else
-  echo "  CANNOT-ASSESS  gh is unavailable, so no status could be read back — not a pass"
+if ! command -v gh >/dev/null 2>&1; then
+  echo "  CANNOT-ASSESS gh-unauthenticated: gh is not installed — install gh and run 'gh auth login'"
   live_rc=2
+elif ! gh auth status >/dev/null 2>&1; then
+  echo "  CANNOT-ASSESS gh-unauthenticated: gh is installed but not authenticated — run 'gh auth login'"
+  live_rc=2
+elif bash "$POSTER" show --sha "$(git rev-parse HEAD)" >/tmp/cgs-live.log 2>&1; then
+  echo "  OK  the LIVE read-back found $context_poster on this commit"
+else
+  rc=$?
+  case "$rc" in
+    1) echo "  note  no $context_poster status on HEAD — expected until the poster runs in the runner" ;;
+    2) echo "  CANNOT-ASSESS  the status could NOT be read back (API unreachable) — not a pass"
+       live_rc=2 ;;
+    *) echo "  note  read-back returned $rc" ;;
+  esac
 fi
 
 if [ "$fail" -ne 0 ]; then

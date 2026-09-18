@@ -79,6 +79,48 @@ def test_policies_typed():
     assert "no-secrets" in one.controls
 
 
+def test_policy_binding_parses_the_real_guardrail_store_view():
+    """The REAL ``GET /v1/policies`` payload parses (issue #1235).
+
+    The literal row below is what ``identity/cpapi`` actually serves. It is
+    written out here on purpose: ``_fakes.py`` serves a *different*, richer
+    shape (``policyId`` + a list of control ids), which is exactly why this
+    disagreement was invisible until the SDK had a real consumer.
+    """
+    row = {
+        "controls": 3,
+        "description": "reviewer posture guardrails",
+        "id": "reviewer-bundle",
+        "mode": "enforce",
+    }
+    parsed = PolicyBinding.from_dict(row)
+    assert parsed.policy_id == "reviewer-bundle", "`id` must map, never silently ''"
+    assert parsed.name == "reviewer posture guardrails"
+    assert parsed.description == "reviewer posture guardrails"
+    assert parsed.mode == "enforce"
+    assert parsed.controls == []
+    assert parsed.controls_count == 3, "the served value is a COUNT, not ids"
+    assert PolicyBinding.from_dict(parsed.to_dict()) == parsed
+
+
+def test_policy_binding_still_accepts_the_sdk_vocabulary():
+    """The widening is additive: the original shape keeps working unchanged."""
+    parsed = PolicyBinding.from_dict(
+        {"policyId": "worker-bundle", "controls": ["no-secrets", "verify-before-done"]}
+    )
+    assert parsed.policy_id == "worker-bundle"
+    assert parsed.controls == ["no-secrets", "verify-before-done"]
+    assert parsed.controls_count is None
+
+
+def test_policy_binding_fails_closed_on_a_malformed_controls_value():
+    """An unknown ``controls`` type still fails closed rather than guessing."""
+    with pytest.raises(TypeError):
+        PolicyBinding.from_dict({"policyId": "worker-bundle", "controls": True})
+    with pytest.raises(TypeError):
+        PolicyBinding.from_dict({"policyId": "worker-bundle", "controls": "no-secrets"})
+
+
 def test_policy_permission_denied_for_non_reader_role():
     transport = FakeControlPlane()
     client = _client(_token(role="analyst"), transport)

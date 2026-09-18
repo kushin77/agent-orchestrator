@@ -385,15 +385,123 @@ def trees_are_identical(worktree: Path, left: str, right: str) -> bool:
     The link that licenses measuring a lane which does not equal the verified commit.
     "What matters is that the tree which was verified is the tree that landed"
     (``governance/lifecycle/README.md``): a squash merge preserves the tree, so the
-    landing's tree and the verified head's tree are the *same object*. Without this
-    check ``commit_is_contained`` alone would admit a lane that contains a landing
-    built from **different** content — a measurement of work nobody verified.
+    landing's tree and the verified head's tree are the *same object*. Without a check
+    like this one, ``commit_is_contained`` alone would admit a lane that contains a
+    landing built from **different** content — a measurement of work nobody verified.
+
+    It is one of the ways :func:`landing_carries_change` answers — the exact case, where
+    nothing landed between the branch cut and the merge — and since #1298 it is no longer
+    the *only* one: a base that moved under the squash makes the whole trees differ
+    necessarily, so requiring equality was a control that could never fire.
 
     Only the measured ``same`` is a match, and an unreadable commit is not one, so this
     fails closed too — the tri-state is read through :func:`tree_relation` rather than
     re-derived here, so the two cannot drift apart.
     """
     return tree_relation(worktree, left, right) == "same"
+
+
+def _merge_base(worktree: Path, left: str, right: str) -> str:
+    """The commit ``left`` and ``right`` diverge from, or ``""`` when there is none.
+
+    ``git merge-base`` answers "no common ancestor" with exit 1 and an unresolvable
+    commit with 128; both are *no base*, and the caller then falls back to the question
+    that needs no ancestry at all. It never fails **open**: a base nobody could resolve
+    cannot license a lane.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "merge-base", left, right],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _change_paths(worktree: Path, base: str, commit: str) -> list[str] | None:
+    """The paths ``commit`` changed against ``base``, or ``None`` when unreadable.
+
+    ``None`` and ``[]`` are different facts — "I could not compare" against "there is no
+    change here" — and :func:`change_relation` reads them differently rather than
+    conflating them into one answer its caller would have to guess at.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "diff", "--name-only", base, commit],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def change_relation(worktree: Path, verified: str, landing: str) -> str:
+    """``"same"``, ``"different"`` or ``"unknown"``: does the landing carry the verified change?
+
+    The second half of the admissibility rule, restated so that it can *fire* (#1298).
+    "The tree which was verified is the tree that landed" is exactly true only when
+    nothing else landed on the default branch between the branch cut and the merge — and
+    a **squash merge composes its landing from the base AT MERGE TIME**, so a sibling
+    landing in that window puts content into the landing the branch tip never had.
+    Whole-tree equality is then *unsatisfiable* for the very case the arm exists for: a
+    control that cannot fire, the inverse of GR-12.
+
+    Measured on this repository's own history (issue #1298): branch tip ``17dc00a``
+    carries a change that landed as ``870eb26`` — the same ``git patch-id --stable``, the
+    same twelve paths, identical content at every one of them — while
+    ``git diff --quiet 17dc00a 870eb26`` is not clean and the tip is not an ancestor of
+    the landing. The arm that exists to admit a squash-merged item could not admit it.
+
+    What the arm is really asking is whether the landing carries **the verified work**, so
+    the question is asked that way. Three answers are ``"same"``, and each answers a shape
+    the others cannot:
+
+    * the verified commit is **in the landing's history** — the merge-commit form, where
+      the landing descends from the very commit that was gated;
+    * the landing carries the **tip's own change**: every path ``verified`` changed
+      against its merge base with the landing resolves to the *same blob* in the landing,
+      so everything the verified commit added, altered or removed is present and
+      unchanged. The landing's other content is the sibling landings that moved the base —
+      precisely what a squash merge necessarily carries, and what the arm must tolerate;
+    * the **whole trees are identical** — the original #1098 case, asked here only when
+      the path-by-path comparison had nothing to compare, because it needs no ancestry.
+
+    ``"unknown"`` is every question that could not be answered — an unreadable commit, no
+    common base, a change nothing could read. It is not ``"same"``: a difference nobody
+    measured may not admit a lane, and may not be reported as one either.
+    """
+    if not verified or not landing:
+        return "unknown"
+    if commit_is_contained(worktree, verified, landing):
+        return "same"
+    base = _merge_base(worktree, verified, landing)
+    paths = _change_paths(worktree, base, verified) if base else None
+    if paths:
+        result = subprocess.run(
+            ["git", "-C", str(worktree), "diff", "--quiet", verified, landing, "--", *paths],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return "same"
+        if result.returncode != 1:
+            return "unknown"
+        return "different"
+    # No common base, a change that could not be read, or a change that is empty. The
+    # whole-tree question is the one left, and it needs no ancestry at all: asked here it
+    # can only *add* an admission where the path comparison had nothing to compare.
+    return "same" if trees_are_identical(worktree, verified, landing) else "unknown"
+
+
+def landing_carries_change(worktree: Path, verified: str, landing: str) -> bool:
+    """Is the change ``verified`` brought present, unchanged, in ``landing``?
+
+    The boolean the admissibility arm reads, beside :func:`trees_are_identical` — which it
+    subsumes but no longer requires, because *requiring* it is what made the arm unfireable
+    for a squash merge whose base moved (#1298). Only a measured ``"same"`` is a match; the
+    tri-state is read through :func:`change_relation` rather than re-derived here, so the
+    two cannot drift apart.
+    """
+    return change_relation(worktree, verified, landing) == "same"
 
 
 def select_lane(records: list[dict] | None, commit: str = "") -> dict | None:
@@ -776,19 +884,19 @@ class GhOps:
             return (
                 f"{opening} and does not contain the landing {landing[:12]}, the commit the squash "
                 "landed as: a lane may stand for the verified commit only when it contains the "
-                "landing and that landing carries the same tree (#1098)"
+                "landing and that landing carries the verified work (#1098)"
             )
-        if trees_are_identical(worktree, commit, landing):
+        if change_relation(worktree, commit, landing) == "same":
             return (
                 f"{opening}: the lane contains the landing {landing[:12]} and that landing "
-                "carries the same tree as the verified commit, so these facts do not explain "
-                "the refusal — the admissibility rule refused a lane it should admit"
+                "carries the change the verified commit introduced, so these facts do not "
+                "explain the refusal — the admissibility rule refused a lane it should admit"
             )
         return (
-            f"{opening}: it DOES contain the landing {landing[:12]}, but the landing carries a "
-            f"different tree — {commit[:12]} names a tree that never landed, so it may not be "
-            "the subject of this item's evidence; the tree that landed is the one "
-            f"{landing[:12]} carries (#1149)"
+            f"{opening}: it DOES contain the landing {landing[:12]}, but the landing carries "
+            f"neither the verified tree nor the change {commit[:12]} introduced — {commit[:12]} "
+            "names a tree that never landed, so it may not be the subject of this item's "
+            f"evidence; the tree that landed is the one {landing[:12]} carries (#1149)"
         )
 
     def _admissible(self, worktree: Path, head: str, commit: str, landing: str) -> str:
@@ -801,11 +909,19 @@ class GhOps:
           commit is not an ancestor of anything on the default branch; the commit the
           merge *landed as* is, and a lane cut from the default branch contains it.
           Admitted only when **both** halves hold: the lane contains the landing
-          (``commit_is_contained``) **and** the landing carries the very tree that was
-          verified (``trees_are_identical``). The second half is what keeps this honest
-          — it is the doctrine read literally ("the tree which was verified is the tree
-          that landed"), and without it a lane containing a landing built from other
-          content would be measured as if it proved this item.
+          (``commit_is_contained``) **and** the landing carries the verified work
+          (:func:`landing_carries_change`). The second half is what keeps this honest —
+          without it a lane containing a landing built from other content would be
+          measured as if it proved this item.
+
+          It is asked as a **change**, not as whole-tree equality (#1298). Equality is
+          satisfiable only while nothing else lands on the default branch between the
+          branch cut and the merge, because a squash merge composes its landing from the
+          base *at merge time*; the moment a sibling lands, the arm cannot fire for the
+          very case it exists for — a control that cannot fire, the inverse of GR-12.
+          What is required is unchanged in substance: the lane must contain the landing,
+          and the landing must carry what was verified. Containing *a* landing is not the
+          claim; containing *the verified work* is.
 
         ``landing`` is non-empty only for a **merged** pull request, which is the whole
         reason the second arm is unreachable for an item still in flight: an unmerged
@@ -815,7 +931,7 @@ class GhOps:
             return "equals"  # no verified commit named: the legacy lane path, unchanged
         if head == commit:
             return "equals"
-        if landing and commit_is_contained(worktree, landing, head) and trees_are_identical(
+        if landing and commit_is_contained(worktree, landing, head) and landing_carries_change(
             worktree, commit, landing
         ):
             return "contains"
@@ -871,10 +987,13 @@ class GhOps:
         store can still be measured.
 
         A lane that is not *at* ``commit`` is admitted only when ``landing`` — the
-        commit a **squash merge** landed as — is contained by it and carries the same
-        tree (#1098). The record then names **all three**: ``commit`` (the verified
-        commit the evidence is against, whose meaning is unchanged), ``landing`` and
-        ``measured`` (the tree the gate actually ran in), with ``via: "contains"``.
+        commit a **squash merge** landed as — is contained by it and carries the verified
+        work (:func:`landing_carries_change`): the verified tree itself when nothing else
+        landed in between, or the change ``commit`` introduced once a sibling landing
+        moved the base under the squash (#1098, #1298). The record then names **all
+        three**: ``commit`` (the verified commit the evidence is against, whose meaning is
+        unchanged), ``landing`` and ``measured`` (the tree the gate actually ran in), with
+        ``via: "contains"``.
         ``commit`` deliberately keeps naming the *verified* commit rather than the
         measured tree: that is the convention the audit, the invariant's own text, the
         README table and every existing record use, and re-pointing it would have
@@ -937,9 +1056,19 @@ class GhOps:
                 f"branch head {subject[:12]} is red and the merge commit is the tree the change landed as"
             )
         if via == "contains":
+            # Which half admitted the lane is said out loud, because the two are not the
+            # same evidence: "the landing carries the verified tree" is the #1098 case, and
+            # "the landing carries the change the verified commit introduced" is the one a
+            # base that moved under the squash forces (#1298). A reader of the step should
+            # not have to re-derive which of them this record came from.
+            carried = (
+                "the landing carries the verified tree"
+                if self.tree_relation(commit, landing) == "same"
+                else "the landing carries the change the verified commit introduced"
+            )
             return (
                 f"verify green at {subject[:12]} (measured in the lane at {measured[:12]}, "
-                f"which contains the landing {landing[:12]})"
+                f"which contains the landing {landing[:12]}; {carried})"
                 + (
                     f"; the live head {drifted[:12]} advanced past the squash and its tree never "
                     "landed, so the evidence is against the tree that landed"
@@ -1212,7 +1341,14 @@ def cmd_audit(args: argparse.Namespace) -> int:
         print(f"lifecycle-hygiene: OK ({report['items']} item(s), 0 finding(s))")
         return EXIT_OK
     findings = audit(record, quarantine)
-    board_reports = board_report_findings(findings, _reporter(), apply=args.apply)
+    # #1266: subjects whose OWN issue is already closed, read from this same
+    # record — `board_report_findings` uses it to refuse filing a fresh
+    # VERIFY_EVIDENCE_MISSING board issue against work nobody can act on
+    # without reopening the issue first, and to resolve one already filed.
+    closed_subjects = frozenset(
+        f"#{item.get('issue')}" for item in record.get("items") or [] if str(item.get("state") or "").lower() == "closed"
+    )
+    board_reports = board_report_findings(findings, _reporter(), apply=args.apply, closed_subjects=closed_subjects)
     if not args.json:
         _print_board_reports(board_reports)
     print(f"lifecycle-hygiene: FAIL ({len(report['findings'])} finding(s))", file=sys.stderr)

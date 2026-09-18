@@ -88,17 +88,20 @@ def test_sdk_surfaces_the_real_authentication_refusal():
     assert caught.value.status in {401, 403}
 
 
-def test_drift_lock_policies_route_payload_is_incompatible_with_the_sdk_model():
-    """DRIFT LOCK — found by this e2e call (issue #1229). Read before changing.
+def test_policies_route_payload_parses_into_the_sdk_model():
+    """DRIFT LOCK, flipped — issue #1229/#1230 found this, #1235 fixes it.
 
     ``GET /v1/policies`` serves the guardrail policy store's view
     (``{"items": [{"id", "description", "mode", "controls": <int>}], "count":
-    N}``) while ``aosdk.model.PolicyBinding`` models a control-plane policy
-    *bundle* (``policyId``, ``bundle``, ``controls: [ids]``). The shipped SDK
-    therefore cannot parse the real route.
+    N}``). ``PolicyBinding.from_dict`` used to assume the ``controls`` field was
+    always a list of ids (a policy *bundle* shape) and raised ``TypeError`` on
+    the server's int count (register #1230's drift lock). #1235 corrects the
+    model instead: it now keeps the server's own fields (``description``,
+    ``mode``, ``controls_count``) rather than inventing a control-id list the
+    server never sent, so the real payload parses.
 
-    This test asserts the disagreement so it cannot be quietly forgotten:
-    whichever side is corrected, this test fails and must be updated with it.
+    This test asserts the fixed contract holds, using the same live route and
+    fixture the original lock used, so it cannot silently regress.
     """
     wired = build_real_control_plane(permissions=PERMS)
 
@@ -108,14 +111,29 @@ def test_drift_lock_policies_route_payload_is_incompatible_with_the_sdk_model():
     assert rows, "the real route must serve at least one policy row"
 
     row = rows[0]
-    # The server's shape: a count, under a key the SDK does not read.
+    # The server's shape: a count, under a key the SDK does not read as ids.
     assert isinstance(row["controls"], int)
     assert "policyId" not in row
 
-    # ...and the SDK's model cannot consume it. When the contract is reconciled
-    # this raises no longer, and this test must be updated (not deleted).
+    # ...and the SDK's model now consumes it faithfully, without inventing data.
+    binding = PolicyBinding.from_dict(row)
+    assert binding.controls == []
+    assert binding.controls_count == row["controls"]
+    assert binding.description == row.get("description")
+    assert binding.mode == row.get("mode")
+
+
+def test_drift_lock_still_bites_the_old_imagined_bundle_shape():
+    """Negative control: the pre-#1235 assumption still raises TypeError.
+
+    The lock isn't just deleted — a payload with the OLD imagined shape (a
+    non-list, non-int ``controls``, the wrong field type entirely) must still
+    fail loudly, so a regression back to "coerce whatever's there" is caught.
+    """
+    bad_row = {"id": "p1", "description": "d", "mode": "enforce", "controls": {"not": "a list or int"}}
+
     with pytest.raises(TypeError):
-        PolicyBinding.from_dict(row)
+        PolicyBinding.from_dict(bad_row)
 
 
 def test_the_call_is_in_process_and_uses_no_http_transport():

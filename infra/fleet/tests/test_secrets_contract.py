@@ -32,7 +32,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.p
 
 
 def test_declares_gh_gcloud_ssh() -> None:
-    assert set(secrets_contract.BY_NAME) == {"gh", "gcloud", "ssh"}
+    # issue #1329 adds a fourth mount (ar-reader-key) for promote_portal.py's
+    # Artifact Registry read auth — same declaration shape as the other three.
+    assert set(secrets_contract.BY_NAME) == {"gh", "gcloud", "ssh", "ar-reader-key"}
 
 
 def test_every_mount_is_read_only() -> None:

@@ -420,17 +420,42 @@ fi
 # unreachable (an installed one is not consulted: PATH has no other entry).
 minbin="$work/minbin"
 mkdir -p "$minbin"
-for tool in python3 cat dirname sed; do
+# python3 is deliberately NOT symlinked into $minbin: a venv's python3 is
+# often itself a symlink chain (e.g. a uv-managed venv's bin/python3 ->
+# "python" -> a base interpreter elsewhere), and CPython's pyvenv.cfg lookup
+# depends on the UNRESOLVED invocation directory. Re-symlinking the resolved
+# target into a fresh directory skips that directory and can lose the venv's
+# site-packages entirely (e.g. "cryptography" going missing) — a host-specific
+# breakage of this fixture that has nothing to do with gcloud detection, and
+# must never be reported as this gate's own FAIL (#1313). Instead, keep
+# python3 reachable from its own real directory and only strip the OTHER
+# tools down to a minimal, gcloud-free set.
+python3_dir=""
+python3_path="$(command -v python3 || true)"
+if [ -n "$python3_path" ]; then
+  python3_dir="$(cd "$(dirname "$python3_path")" && pwd)"
+fi
+for tool in cat dirname sed; do
   tool_path="$(command -v "$tool" || true)"
   if [ -n "$tool_path" ]; then
     ln -sf "$tool_path" "$minbin/$tool"
   fi
 done
 mirror_rc=0
-mirror_out="$(env PATH="$minbin" "$bash_bin" "$mirror" \
+mirror_out="$(env PATH="$minbin:$python3_dir" "$bash_bin" "$mirror" \
   --jwks-file "$work/jwks.json" --project stub-project --apply 2>&1)" || mirror_rc=$?
 if [ "$mirror_rc" -eq 2 ] && grep -qF "gcloud not found" <<<"$mirror_out"; then
   echo "  OK    with no gcloud the publish is CANNOT-ASSESS (rc 2), never a pass"
+elif [ "$mirror_rc" -eq 2 ]; then
+  # rc 2 but the message names something other than gcloud: $minbin carries
+  # only the tools $mirror is known to invoke (python3 cat dirname sed), so a
+  # host whose mirror script reaches for one more is CANNOT-ASSESS for THIS
+  # control, not a FAIL of the mirror's own gcloud detection — the assertion
+  # below is only that gcloud absence is refused BY NAME, not that this
+  # minimal PATH is sufficient on every host.
+  printf '%s\n' "$mirror_out" | sed 's/^/    /' >&2
+  echo "CANNOT-ASSESS gcloud-missing: the no-gcloud fixture refused for an unexpected reason, not proving gcloud detection either way" >&2
+  exit 2
 else
   printf '  FAIL  a publish with no gcloud did not report CANNOT-ASSESS (rc=%s)\n%s\n' "$mirror_rc" "$mirror_out" >&2
   mirror_ok=1

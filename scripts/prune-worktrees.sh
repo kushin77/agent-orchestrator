@@ -9,7 +9,11 @@
 #
 # A worktree is REMOVABLE only when all three hold:
 #   1. it is not the current worktree and not the repo's own checkout;
-#   2. no live process has it as its cwd;
+#   2. no live process has it as its cwd AND no live process holds an OPEN FILE
+#      under it (widened for issue #1159 — cwd alone cannot see a peer driving a
+#      worktree from the shared shell), AND no LIVE GATE holds it (issue #1345 —
+#      see below; the gate declares itself in a store, which is the only signal
+#      that survives the gap between two of a gate's short-lived checks);
 #   3. its HEAD commit is preserved outside it — reachable from origin/master or
 #      contained in a remote branch. Anything unreachable is reported, never
 #      deleted: unmerged work belongs to its lane.
@@ -53,9 +57,49 @@
 #     the LIVE crontab and never from a file in this repository: a declaration
 #     is not an installation, which is what #830 paid for.
 #
-# Exit-code contract: 0 OK / 1 NOT-OK (stale worktrees found in --check, or — for
-# --schedule — no installed crontab line invokes this tool) / 2 CANNOT-ASSESS
-# (the question could not be measured).
+# ONE MORE GUARANTEE WIDENED FOR ISSUE #1159:
+#   * LIVENESS IS cwd OR ANY OPEN FILE, never cwd alone. A peer driving a worktree
+#     from the SHARED shell keeps its cwd elsewhere and holds the tree open
+#     through file descriptors, so the old predicate classified LIVE trees as
+#     removable — measured on this box: 10 live `.claude/worktrees/agent-*` trees
+#     plus 4 scratch trees were reported "stale" while their working directories
+#     had been written 5-31 minutes earlier (#1159). The nightly `ao-fleet-reap`
+#     line runs this tool with --apply UNATTENDED, so that was a data-loss hazard
+#     rather than a report. A live path matches a worktree when it IS that
+#     worktree or lies UNDER it on a path boundary: an open file is always under
+#     the tree ("equal" alone would make the new source useless), while a bare
+#     prefix test would let /tmp/ao/a11 keep /tmp/ao/a115 — one lane's tree
+#     holding another lane's.
+#
+# ONE MORE GUARANTEE ADDED FOR ISSUE #1345:
+#   * A VENUE A LIVE GATE IS USING IS NEVER REMOVED, and a destroyed venue is
+#     never silent. The `/proc` predicate above is a measurement of the INSTANT,
+#     and a gate is not a long-lived reader: `make verify` runs a sequence of
+#     short-lived checks, so a scan landing between two of them sees a venue with
+#     no holder at all. That is how this tool came to delete the git admin
+#     directory of a venue a running gate was USING (measured 2026-09-18, #1345):
+#     five gate venues survived as directories whose `.git` file pointed at an
+#     admin dir that no longer existed, and the gate that had run inside one of
+#     them published 20 `rc 2 CANNOT-ASSESS` checks folded into `skipped` — a
+#     FALSE verdict that still read like a small, believable failure. (Reporting
+#     ONE named venue-invalid verdict instead of 20 skips is the COMPOSITE's half
+#     of that failure and belongs in scripts/verify.sh; it was owned by other open
+#     lanes, so it is tracked by #1351.)
+#     The gate already DECLARES that it is running: `scripts/gate-lock.sh`
+#     (fleet/gatelock.py) records, for every admitted gate, the HOLDER PID and the
+#     HOLDER WORKTREE in a store outside every workspace. That is a declaration,
+#     not an inference, so it is consulted BEFORE the /proc fallback, and a
+#     venue it names is KEEP by name. Liveness of a record is NOT its bytes —
+#     `release` truncates a permit's record and leaves the file — so a record is
+#     live only while its `flock` is HELD or a pid it records is still alive.
+#     A venue whose `.git` file already names a missing admin dir is reported
+#     `BROKEN` by name, and is a `--check` finding: the destruction must be
+#     visible, never 20 silent skips.
+#
+# Exit-code contract: 0 OK / 1 NOT-OK (stale worktrees found in --check, a
+# venue-invalid venue found in --check, or — for --schedule — no installed
+# crontab line invokes this tool) / 2 CANNOT-ASSESS (the question could not be
+# measured).
 #
 # Usage:
 #   bash scripts/prune-worktrees.sh                  # report what would be removed
@@ -73,9 +117,15 @@ set -uo pipefail
 # in: deriving it from $BASH_SOURCE made the tool ignore its cwd and act on the
 # operator's checkout instead (caught by this script's own tests, which were
 # passing for that reason).
+# Where THIS TOOL's own source lives — distinct from `$root` below, which is
+# the repository being SCANNED (its scratch-test doubles have no
+# `governance/isolation` package at all). content_landed()'s implementation is
+# always loaded from here, never from the target repo.
+self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -z "$root" ]; then
-  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  root="$self_root"
 fi
 cd "$root" || exit 2
 
@@ -101,11 +151,17 @@ done
 current="$root"
 
 scratch="$(mktemp)"
-live_cwds="$scratch.cwds"
+live_paths="$scratch.live"
+live_wts="$scratch.held"
+wt_paths="$scratch.wts"
 live_lanes="$scratch.lanes"
 declared="$scratch.declared"
 crontab_err="$scratch.crontab"
-trap 'rm -f "$scratch" "$live_cwds" "$live_lanes" "$declared" "$crontab_err"' EXIT
+gate_stores_file="$scratch.gatestores"
+gate_held="$scratch.gateheld"
+gate_err="$scratch.gateerr"
+venue_roots="$scratch.roots"
+trap 'rm -f "$scratch" "$live_paths" "$live_wts" "$wt_paths" "$live_lanes" "$declared" "$crontab_err" "$gate_stores_file" "$gate_held" "$gate_err" "$venue_roots"' EXIT
 
 # --- is this tool actually scheduled? (issue #830) ---------------------------
 #
@@ -170,10 +226,249 @@ if ! git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
   exit 2
 fi
 
-# cwd of every live process — a worktree in use must never be removed.
-for link in /proc/[0-9]*/cwd; do
-  readlink "$link" 2>/dev/null || true
-done > "$live_cwds"
+# --- liveness: is a live process holding this worktree? (issue #1159) --------
+#
+# A worktree is IN USE when a live process has it as its cwd OR holds ANY OPEN
+# FILE under it. cwd ALONE was the predicate until #1159, and it could not see a
+# peer driving a worktree from the SHARED shell: that peer's cwd is elsewhere and
+# it holds the tree open through file descriptors, so LIVE trees were classified
+# removable (10 `.claude/worktrees/agent-*` trees + 4 scratch trees measured on
+# this box) while --apply now runs unattended from cron. A guard that cannot see
+# the work is worse than no guard, because it authorises deletion.
+#
+# ONE `find` PER SOURCE, not a `readlink` per entry: this box carries ~630
+# processes and ~13k open descriptors (measured 2026-09-18), and a per-descriptor
+# `readlink` loop had NOT finished after a minute, where the two `find` calls
+# together take ~100 ms. `-printf '%l'` prints a link's TARGET without following
+# it, which is what both sources need.
+#
+# A NON-ZERO `find` IS EXPECTED HERE: some `/proc/<pid>/fd` directories belong to
+# another user and cannot be read (rc=1). That is a blind spot the cwd list had
+# too, and it is not a reason to refuse. What IS refused is being unable to search
+# AT ALL — if no live path can be seen, nothing is seen as in use, so nothing may
+# be removed (fail closed).
+#
+# MATCHING IS ANCHORED ON A PATH BOUNDARY: a live path matches when it IS the
+# worktree or begins with the worktree followed by "/".
+#
+# Both halves of the predicate are named in ONE place, so the check can flip each
+# of them and prove the flip matters (GR-12):
+#   LIVE_SOURCES — which process facts count as liveness.
+#   LIVE_MATCH   — "under" (the tree, or anything below it) or "exact" (the tree
+#                  path itself only).
+LIVE_SOURCES="cwd fd"
+LIVE_MATCH="under"
+
+live_paths_of() { # live_paths_of <source> — the live paths of that source, one per line
+  case "$1" in
+    cwd) find /proc/[0-9]*/cwd -maxdepth 0 -printf '%l\n' 2>/dev/null ;;
+    fd) find /proc/[0-9]*/fd -mindepth 1 -maxdepth 1 -printf '%l\n' 2>/dev/null ;;
+    *) return 3 ;;
+  esac
+}
+
+if [ ! -d /proc ]; then
+  echo "prune-worktrees: CANNOT-ASSESS — /proc is unavailable, so liveness cannot be measured; removing nothing" >&2
+  exit 2
+fi
+: > "$live_paths"
+while IFS= read -r source; do
+  [ -z "$source" ] && continue
+  source_paths="$(live_paths_of "$source")"
+  source_rc=$?
+  case "$source_rc" in
+    # 1 is find's "some directories could not be read" (another user's process);
+    # it is the normal outcome here and is not a reason to refuse.
+    0|1) : ;;
+    *)
+      echo "prune-worktrees: CANNOT-ASSESS — the '$source' liveness search failed (rc=$source_rc); nothing was seen, so nothing is removed" >&2
+      exit 2
+      ;;
+  esac
+  printf '%s\n' "$source_paths" >> "$live_paths"
+done < <(printf '%s\n' "$LIVE_SOURCES" | tr ' ' '\n')
+
+if ! grep -q '^/' "$live_paths"; then
+  echo "prune-worktrees: CANNOT-ASSESS — the liveness search found no usable live path; removing nothing" >&2
+  exit 2
+fi
+
+# Resolve ONCE, in a single pass: asking "is any of ~13k live paths under this
+# tree?" separately for every worktree would be ~10^6 comparisons in the shell.
+git -C "$root" worktree list --porcelain | awk '/^worktree /{ print $2 }' > "$wt_paths"
+awk -v list="$wt_paths" -v mode="$LIVE_MATCH" '
+  BEGIN { while ((getline line < list) > 0) if (line != "") tree[line] = 1 }
+  { for (t in tree) if ($0 == t || (mode != "exact" && index($0, t "/") == 1)) held[t] = 1 }
+  END { for (t in held) print t }
+' "$live_paths" > "$live_wts"
+
+live_path_count="$(wc -l < "$live_paths" | tr -d ' ')"
+wt_count="$(wc -l < "$wt_paths" | tr -d ' ')"
+live_wt_count="$(wc -l < "$live_wts" | tr -d ' ')"
+liveness_desc="cwd+open files ($LIVE_SOURCES), $LIVE_MATCH match"
+
+# --- liveness: is a LIVE GATE holding this worktree? (issue #1345) -----------
+#
+# PRIMARY, because it is DECLARED rather than inferred. The predicate above is a
+# measurement of the instant, and a gate is not a long-lived reader: `make verify`
+# runs a sequence of SHORT-LIVED checks, so a scan that lands between two of them
+# sees a venue with no holder at all. Measured consequences (#1345): five gate
+# venues survived as directories whose `.git` file pointed at an admin dir that no
+# longer existed, and a gate that had run inside one of them reported 20
+# `rc 2 CANNOT-ASSESS` checks folded into `skipped` — a FALSE verdict that still
+# read like a small honest failure, because `rc 2` is deliberately not a pass.
+#
+# `scripts/gate-lock.sh` (fleet/gatelock.py) already records, for every admitted
+# gate, the HOLDER PID and the HOLDER WORKTREE — in a store outside every
+# workspace precisely because a bound stored inside one is edited per worktree and
+# bounds nothing. This reads that store, so a gate announces itself instead of
+# having to be caught in the act.
+#
+# LIVENESS IS NOT BYTES. `release` TRUNCATES a permit's record and leaves the
+# file, so a record with bytes is evidence a gate WAS here, never that it is here
+# now; a bytes-only rule would pin every venue that ever ran a gate, for ever. A
+# record is live when the `flock` on its file is HELD — the holder holds it for
+# the whole gate, so a held flock IS a running gate — or when any pid it records
+# can still be signalled.
+#
+# BOTH VIEWS OF THE STORE ARE READ. A lane may export `AO_GATE_LOCK_ROOT` while
+# the scheduler that runs this tool does not, and the two processes then disagree
+# about where the store is; reading only one view would let this tool remove a
+# venue a live gate holds. Every candidate root is read, in the gate's own order
+# of preference, and a venue named by a live record in ANY of them is kept.
+#
+# FAIL CLOSED. A store that exists but cannot be read, or a non-empty record that
+# is not a readable gate record, is CANNOT-ASSESS: nothing was seen, so nothing is
+# removed. Widening what may be discarded is never the safe direction for a
+# failure.
+#
+# The signal is named in ONE place so a check can switch it off and prove the
+# switch matters (GR-12): GATE_SIGNAL — "permit" honours the store, anything else
+# ignores it, which is exactly the pre-#1345 predicate.
+GATE_SIGNAL="permit"
+GATE_STORE_SUBDIR="agent-orchestrator-gates"
+GATE_STORE_PERMIT_DIR="permits"
+GATE_STORE_WORKTREE_DIR="worktrees"
+
+{
+  [ -n "${AO_GATE_LOCK_ROOT:-}" ] && printf '%s\n' "${AO_GATE_LOCK_ROOT:-}"
+  printf '%s\n' "${XDG_RUNTIME_DIR:-/tmp}/$GATE_STORE_SUBDIR"
+} | awk 'NF && !seen[$0]++' > "$gate_stores_file"
+
+: > "$gate_held"
+: > "$gate_err"
+gate_held_count=0
+gate_signal_desc="OFF (GATE_SIGNAL=$GATE_SIGNAL) — the gate permit/lock store was not consulted"
+
+gate_held_reader() { # gate_held_reader <roots-file> — "<worktree>\t<what holds it>" per LIVE gate record
+  python3 - "$1" "$GATE_STORE_PERMIT_DIR" "$GATE_STORE_WORKTREE_DIR" <<'PY'
+import fcntl
+import json
+import os
+import sys
+from pathlib import Path
+
+PERMIT_DIR = sys.argv[2]
+WORKTREE_DIR = sys.argv[3]
+
+
+def pid_alive(pid):
+    """Can this pid still be signalled? A pid nobody can signal is not a gate."""
+    if not pid or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def flock_held(path):
+    """Is the file's flock held right now? The holder holds it for the whole gate."""
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except OSError:
+        return False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(fd)
+
+
+try:
+    raw_roots = Path(sys.argv[1]).read_text(encoding="utf-8")
+except OSError as exc:
+    sys.stderr.write(f"the store-root list cannot be read: {exc}\n")
+    sys.exit(3)
+
+roots = [line.strip() for line in raw_roots.splitlines() if line.strip()]
+for root in roots:
+    base = Path(root)
+    if not base.is_dir():
+        continue
+    for subdir, kind in ((PERMIT_DIR, "permit"), (WORKTREE_DIR, "lock")):
+        directory = base / subdir
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.lock")):
+            try:
+                raw = path.read_bytes()
+            except OSError as exc:
+                sys.stderr.write(f"{path} cannot be read: {exc}\n")
+                sys.exit(3)
+            if not raw:
+                continue
+            try:
+                record = json.loads(raw.decode("utf-8"))
+                worktree = str(record.get("worktree") or "")
+                pids = [
+                    int(value)
+                    for value in (record.get("pid"), record.get("owner_pid"))
+                    if value
+                ]
+            except (AttributeError, TypeError, ValueError, UnicodeDecodeError):
+                sys.stderr.write(
+                    f"{path} carries {len(raw)} bytes that are not a readable gate record\n"
+                )
+                sys.exit(3)
+            if not worktree:
+                sys.stderr.write(
+                    f"{path} names no worktree, so a live gate behind it cannot be honoured\n"
+                )
+                sys.exit(3)
+            if not flock_held(path) and not any(pid_alive(pid) for pid in pids):
+                continue
+            detail = (
+                f"{kind} {path.name} (holder pid {record.get('pid')}, "
+                f"gate pid {record.get('owner_pid')}, "
+                f"started {record.get('started_at', 'unknown')})"
+            )
+            # Both the recorded path and its realpath, so a worktree listed by git
+            # under a different spelling of the same directory still matches.
+            for form in {worktree, os.path.realpath(worktree)}:
+                print(f"{form}\t{detail}")
+PY
+}
+
+if [ "$GATE_SIGNAL" = "permit" ]; then
+  gate_held_reader "$gate_stores_file" > "$gate_held" 2>"$gate_err"
+  gate_rc=$?
+  if [ "$gate_rc" -ne 0 ]; then
+    echo "prune-worktrees: CANNOT-ASSESS — the gate permit/lock store could not be read ($(head -n 1 "$gate_err")); nothing was seen, so nothing is removed" >&2
+    exit 2
+  fi
+  gate_held_count="$(awk -F'\t' 'NF { print $1 }' "$gate_held" | LC_ALL=C sort -u | wc -l | tr -d ' ')"
+  gate_signal_desc="live gate permit/lock ($GATE_STORE_PERMIT_DIR + $GATE_STORE_WORKTREE_DIR)"
+fi
 
 # Worktrees an OPEN lane still claims (issue #516). A .fleet/lanes/ record is
 # deleted when the lane closes, so one that still exists means it never closed; a
@@ -264,6 +559,33 @@ on_a_remote_branch() { # on_a_remote_branch <sha> — preserved by a remote bran
 
 preserved() { # preserved <sha> — is this commit reachable outside the worktree?
   landed_in_master "$1" || on_a_remote_branch "$1"
+}
+
+# --- content equivalence (issue #1265) ---------------------------------------
+#
+# Measured 2026-09-18 (after #1285 landed): 49 of 88 remaining worktrees were
+# kept ONLY because "HEAD is not preserved on origin" — their remote branches
+# were deleted by a by-hand sweep after a squash-merge, so `preserved()` above
+# can NEVER pass for them even though every one is content-landed on master.
+# This delegates to the ONE implementation of that test
+# (`governance/isolation/worktree.py::content_landed`), which `--branches`
+# below also calls — so the worktree keep-rule and the branch keep-rule share
+# one implementation instead of two copies that can drift.
+landed_by_content() { # landed_by_content <ref> — is the ref's own change already on origin/master, by content?
+  PYTHONPATH="$self_root${PYTHONPATH:+:$PYTHONPATH}" python3 -m governance.isolation.worktree \
+    content-landed "$1" --root "$root" >/dev/null 2>&1
+}
+
+# Runtime state (gitignored): once a remote branch is gone, "preserved on
+# origin" can never be re-derived, so this is the only record a given SHA was
+# ever content-landed and reclaimed. Written BEFORE removal.
+record_reaped() { # record_reaped <branch> <head_sha> <worktree> <reason>
+  PYTHONPATH="$self_root${PYTHONPATH:+:$PYTHONPATH}" python3 - "$root" "$1" "$2" "$3" "$4" <<'PY'
+import sys
+from governance.isolation.worktree import record_reaped as _record
+
+_record(sys.argv[1], branch=sys.argv[2], head_sha=sys.argv[3], worktree=sys.argv[4], reason=sys.argv[5])
+PY
 }
 
 # --- item 3 (issue #830): declared runtime state is not a lane's work --------
@@ -361,30 +683,8 @@ foreign_dirt() { # foreign_dirt <worktree> — uncommitted paths that are NOT de
 # --- item 2 (issue #830): lane branches have no reaper ----------------------
 #
 # #830 measured 302 unmatched lane branches that no tool looks at. LANDED IS
-# DECIDED BY CONTENT, NEVER BY ANCESTRY: the landing path squash-merges, so a
-# fully-landed branch is never an ancestor of master and `merge-base --is-ancestor`
-# would call every landed lane "unmerged", keeping it for ever. The test here takes
-# the merge base, lists every path the branch changed since it, and requires
-# origin/master to hold EXACTLY the branch's content for that path. If master moved
-# on and differs anywhere — or nothing can be compared — the branch is KEPT.
-landed_by_content() { # landed_by_content <ref> — is the ref's own change already on origin/master?
-  local ref="$1" base path theirs ours changed=0
-  if git -C "$root" merge-base --is-ancestor "$ref" origin/master 2>/dev/null; then
-    return 0
-  fi
-  base="$(git -C "$root" merge-base "$ref" origin/master 2>/dev/null)" || return 1
-  [ -z "$base" ] && return 1
-  while IFS= read -r path; do
-    [ -z "$path" ] && continue
-    changed=$((changed + 1))
-    theirs="$(git -C "$root" rev-parse --verify --quiet "$ref:$path" 2>/dev/null || true)"
-    ours="$(git -C "$root" rev-parse --verify --quiet "origin/master:$path" 2>/dev/null || true)"
-    if [ "$theirs" != "$ours" ]; then
-      return 1
-    fi
-  done < <(git -C "$root" diff --name-only "$base" "$ref" 2>/dev/null)
-  [ "$changed" -gt 0 ]
-}
+# DECIDED BY CONTENT, NEVER BY ANCESTRY (see `landed_by_content` above, which
+# this reuses — one implementation, `governance/isolation/worktree.py`).
 
 # Snapshot BEFORE the sweep: a worktree this run removes must not release the
 # branch it was holding into the same run's reach.
@@ -407,8 +707,17 @@ while read -r path sha ref; do
   if [ "$dirty" != "0" ]; then
     printf '  NOTE   %s — %s uncommitted path(s), all declared runtime state; not the lane s work (#830)\n' "$path" "$dirty"
   fi
-  if grep -qxF -- "$path" "$live_cwds"; then
-    printf '  KEEP   %s — in use by a live process\n' "$path"
+  # A LIVE GATE first (issue #1345). This is the declared signal, and it is
+  # checked before the /proc fallback because the fallback is a race the gate's
+  # own structure loses between two of its short-lived checks.
+  gate_row="$(awk -F'\t' -v want="$path" 'NF && $1 == want { print $2; exit }' "$gate_held")"
+  if [ -n "$gate_row" ]; then
+    printf '  KEEP   %s — a LIVE GATE holds this venue (%s, #1345)\n' "$path" "$gate_row"
+    unsafe=$((unsafe + 1))
+    continue
+  fi
+  if grep -qxF -- "$path" "$live_wts"; then
+    printf '  KEEP   %s — in use by a live process (cwd or an open file under it, #1159)\n' "$path"
     unsafe=$((unsafe + 1))
     continue
   fi
@@ -417,32 +726,102 @@ while read -r path sha ref; do
     unsafe=$((unsafe + 1))
     continue
   fi
+  content_equiv=0
   if ! preserved "$sha"; then
-    printf '  KEEP   %s — HEAD %s is not preserved on origin (unmerged lane work)\n' "$path" "$sha"
-    unsafe=$((unsafe + 1))
-    continue
+    if landed_by_content "$sha"; then
+      # #1265: HEAD is not preserved by NAME on origin (its remote branch was
+      # deleted after a squash-merge), but its own change is fully present on
+      # origin/master BY CONTENT — reapable, and recorded before removal since
+      # this is the last point the fact is derivable at all. This applies to a
+      # detached HEAD exactly as it does to a named branch: `git diff`/
+      # `rev-parse <ref>:<path>` both work on a bare SHA, and a detached
+      # scratch tree is a large share of the pile (#1265 measured them too).
+      content_equiv=1
+    else
+      printf '  KEEP   %s — HEAD %s is not preserved on origin (unmerged lane work)\n' "$path" "$sha"
+      unsafe=$((unsafe + 1))
+      continue
+    fi
   fi
-  if [ "$strict" -eq 1 ] && ! landed_in_master "$sha" && [ "$ref" != "detached" ]; then
+  if [ "$strict" -eq 1 ] && [ "$content_equiv" -eq 0 ] && ! landed_in_master "$sha" && [ "$ref" != "detached" ]; then
     printf '  PARKED %s — %s holds work preserved only on a remote branch; kept (--strict)\n' "$path" "$ref"
     unsafe=$((unsafe + 1))
     continue
   fi
   stale=$((stale + 1))
+  if [ "$content_equiv" -eq 1 ]; then
+    reason="worktree-content-landed"
+    label="content-landed on origin/master; remote branch $ref is gone"
+  else
+    reason="worktree-preserved"
+    label="preserved on origin"
+  fi
   if [ "$apply" -eq 1 ]; then
+    [ "$content_equiv" -eq 1 ] && record_reaped "$ref" "$sha" "$path" "$reason"
     git -C "$root" worktree remove --force "$path" >/dev/null 2>&1 \
-      && printf '  REMOVED %s (HEAD %s preserved on origin)\n' "$path" "$sha" \
+      && printf '  REMOVED %s (HEAD %s %s)\n' "$path" "$sha" "$label" \
       || printf '  KEEP   %s — removal failed\n' "$path"
   else
-    printf '  STALE  %s — removable (HEAD %s preserved on origin)\n' "$path" "$sha"
+    printf '  STALE  %s — removable (HEAD %s %s)\n' "$path" "$sha" "$label"
   fi
 done < <(git -C "$root" worktree list --porcelain | awk '
   /^worktree /{ if (p != "") print p, h, (b == "" ? "detached" : b); p=$2; h=""; b=""; next }
   /^HEAD /{ h=$2 }
-  /^branch /{ b=$2 }
+  /^branch /{ b=$2; sub("^refs/heads/", "", b) }
   END{ if (p != "") print p, h, (b == "" ? "detached" : b) }
 ' | grep -v "^$current ")
 
 git -C "$root" worktree prune 2>/dev/null || true
+
+# --- venue-invalid: a destroyed venue is NAMED, never silent (#1345) ---------
+#
+# The other half of #1345 is detectability. A venue whose `.git` file names an
+# admin dir that is gone is no longer a git checkout, so EVERY git-dependent check
+# inside it returns `rc 2 CANNOT-ASSESS` — and the composite folds `rc 2` into
+# `skipped`, so a gate in such a venue publishes "20 of 203 checks failed, 20
+# skipped" instead of "this venue is invalid". Twenty independent skips are a
+# shape no reader can tell from twenty honest ones.
+#
+# This tool is where a venue's life cycle lives, so this is where the condition is
+# named. (The composite's own half — refusing to report a verdict at all when the
+# venue is not a repository — is tracked by #1351.) It is DERIVED, not assumed: the
+# `.git` file must actually name a missing admin dir AND `git rev-parse` must
+# actually fail inside the directory, so a venue whose linkage is merely unusual is
+# not reported.
+#
+# The roots scanned are the parents of the worktrees git still knows about (plus
+# this one), because a dangling venue is BY DEFINITION one git no longer lists —
+# enumerating from `git worktree list` alone can never see it, which is why the
+# condition was invisible until a gate reported it as 20 skips.
+#
+# Reported, never removed: a dangling directory is not a worktree, and removing
+# it is not this tool's job. It is a FINDING, so `--check` fails on it.
+broken=0
+{
+  git -C "$root" worktree list --porcelain | awk '/^worktree /{ print $2 }'
+  printf '%s\n' "$current"
+} | while IFS= read -r tree; do
+  [ -n "$tree" ] || continue
+  dirname -- "$tree"
+done | LC_ALL=C sort -u > "$venue_roots"
+
+while IFS= read -r venue_root; do
+  [ -d "$venue_root" ] || continue
+  for candidate in "$venue_root"/*; do
+    [ -d "$candidate" ] || continue
+    # Only a LINKED worktree carries a `.git` FILE; a repository has a directory.
+    [ -f "$candidate/.git" ] || continue
+    admin_dir="$(sed -n 's/^gitdir: //p' "$candidate/.git" 2>/dev/null | awk 'NR == 1')"
+    [ -n "$admin_dir" ] || continue
+    [ -e "$admin_dir" ] && continue
+    if git -C "$candidate" rev-parse HEAD >/dev/null 2>&1; then
+      continue
+    fi
+    printf '  BROKEN %s — venue-invalid: its .git names a missing admin dir %s, so no git command can run inside it; NOT a removal candidate (#1345)\n' \
+      "$candidate" "$admin_dir"
+    broken=$((broken + 1))
+  done
+done < "$venue_roots"
 
 branch_stale=0
 branch_kept=0
@@ -474,6 +853,8 @@ if [ "$branches" -eq 1 ]; then
     fi
     branch_stale=$((branch_stale + 1))
     if [ "$apply" -eq 1 ]; then
+      branch_sha="$(git -C "$root" rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || true)"
+      record_reaped "$branch" "$branch_sha" "" "branch-content-landed"
       git -C "$root" branch -D -- "$branch" >/dev/null 2>&1 \
         && printf '  REMOVED branch %s (its change is on origin/master by content)\n' "$branch" \
         || printf '  KEEP   branch %s — deletion failed\n' "$branch"
@@ -484,6 +865,19 @@ if [ "$branches" -eq 1 ]; then
 fi
 
 echo "prune-worktrees: $stale stale, $unsafe kept (dirty, in use, claimed, parked, or unpreserved)"
+# The predicate itself, on every run. #1159 was invisible without this: a tree
+# that is genuinely stale and a tree a peer holds open read identically in the
+# line above, which is exactly how 14 live trees came to be called removable.
+printf 'prune-worktrees: liveness: %s; %s live path(s) seen, %s of %s worktree(s) held\n' \
+  "$liveness_desc" "$live_path_count" "$live_wt_count" "$wt_count"
+# The declared signal, and its size, on every run — so "the reaper was looking at
+# the gate store" is a measurement rather than a claim (#1345). A venue named here
+# can never appear as STALE above; that pairing is what a reader can check.
+printf 'prune-worktrees: gate venues: %s; %s worktree(s) named by a live gate\n' \
+  "$gate_signal_desc" "$gate_held_count"
+if [ "$broken" -gt 0 ]; then
+  printf 'prune-worktrees: venue-invalid: %s dangling venue(s) named above; a gate run inside one reports false CANNOT-ASSESS verdicts folded into skipped (#1345)\n' "$broken"
+fi
 if [ "$branches" -eq 1 ]; then
   echo "prune-worktrees: $branch_stale landed branch(es) reapable, $branch_kept kept (not provably landed)"
 fi
@@ -493,6 +887,10 @@ fi
 printf 'prune-worktrees: schedule: %s — %s\n' "$schedule_state" "$schedule_detail"
 if [ "$check" -eq 1 ] && [ "$stale" -gt 0 ]; then
   echo "prune-worktrees: NOT-OK — $stale stale worktree(s); run with --apply" >&2
+  exit 1
+fi
+if [ "$check" -eq 1 ] && [ "$broken" -gt 0 ]; then
+  echo "prune-worktrees: NOT-OK — $broken venue-invalid venue(s): the git admin dir a gate venue points at is gone, so every check run inside it is a false CANNOT-ASSESS" >&2
   exit 1
 fi
 if [ "$check" -eq 1 ] && [ "$branches" -eq 1 ] && [ "$branch_stale" -gt 0 ]; then

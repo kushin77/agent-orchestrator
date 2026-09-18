@@ -71,6 +71,51 @@ AO_QUEUE_APPLY=1 bash scripts/pr-queue.sh
 AO_QUEUE_FIXTURE=/path/to/prs.json bash scripts/pr-queue.sh
 ```
 
+## Merged-tree evidence (issue #1254 step 6, child of #1254)
+
+Measured 2026-09-18: four times, two PRs each green ALONE were red TOGETHER
+— #1110+#1115 (`AO_FROZEN_CLOCK` vs the env-surface gate), #1309+#1287
+(`board.freshness` vs control-mapping), #1300 (box-local quarantine), #1246
+(RCA doc ids) — because merges were judged on PER-PR-HEAD build results, so
+the first build of the ACTUAL merged tree was the NEXT PR's, which
+inherited the red silently.
+
+Before `gh pr merge` (both `scripts/pr-queue.sh`'s apply loop and the
+single-PR `scripts/merge-pr.sh` entrypoint), the merge now requires evidence
+that a verify ran green on a tree equal to `origin/master`'s CURRENT tip
+(re-read immediately before merging) plus the PR's head. Evidence sources,
+any one suffices:
+
+- **(a) CI status.** The PR head's merge-base is the current master tip
+  (`git merge-base origin/master <head>` equals the tip — the base has not
+  moved since), and the gate-of-record's own commit status
+  (`scripts/gate-status.sh show --sha <head>`) reads success.
+- **(b) Local attestation, opt-in.** With `AO_QUEUE_VERIFY_MERGED=1`, the
+  queue materializes `origin/master`'s current tip in a detached scratch
+  worktree, merges the PR head into it, and runs `scripts/verify.sh verify`
+  there (honouring that script's own gate-lock, so it is never a second
+  concurrent gate run) — producing `.verify/attestation.json` for that exact
+  merged tree, not either side alone.
+
+Otherwise the merge is refused BY NAME, never silently skipped:
+
+| refusal                       | meaning                                                                 |
+|--------------------------------|--------------------------------------------------------------------------|
+| `merged-tree-unverified:<pr>`  | evidence is stale (the base moved) or absent (no CI status and (b) was not opted into); remedy: `update-branch` / re-run CI, or set `AO_QUEUE_VERIFY_MERGED=1` |
+| `merged-tree-red:<check>`      | the merged tree (master tip + this PR's head) itself reds on `<check>`  |
+
+A refusal stops that PR only; the run continues with the next candidate, and
+after every successful merge the tip has moved, so the next candidate is
+re-judged against the NEW tip — the same re-check discipline the existing
+gate-regression check already follows.
+
+`AO_QUEUE_VERIFY_MERGED=1` is opt-in (default: CI status only, or refuse)
+because it pays for a real `scripts/verify.sh verify` run per candidate that
+lacks fresh CI evidence; `AO_QUEUE_VERIFY_CMD` / `AO_QUEUE_VERIFY_ATTESTATION`
+are internal test seams `scripts/check-pr-queue-squash-guard.sh` uses to
+prove the red/green paths without paying for a real gate run on every test
+invocation, and are not meant for interactive use.
+
 ## The gate
 
 `scripts/check-pr-queue.sh` proves the planner offline against a fixture PR
@@ -80,3 +125,45 @@ both reported and never enter the merge order, and a mutant (the gate-path
 glob list emptied) is proven to diverge — the same PR that was gate-changing
 becomes ready. It is registered in `scripts/verify.sh` as the `pr-queue`
 check and never sets `AO_QUEUE_APPLY=1`.
+
+## The PR contract (issue #1254 step 5 / #1328)
+
+Every PR body carries a `## Classification` block (`.github/PULL_REQUEST_TEMPLATE.md`,
+placed directly under `## Closes`): `class`, `posture`, `lifecycle`, `pillar`,
+`pattern`, `lane`, one `key: value` per line, closed vocabularies. It is a
+projection of the same tag authority `governance/tagging/cli.py` already
+enforces on issues (`class` from `governance/conformance/policy.yaml`'s ladder,
+`posture`/`lifecycle`/`pillar` from `governance/tagging/taxonomy.yaml`,
+`pattern` resolved against `docs/PYTHON-PATTERNS.md` / `docs/SHELL-PATTERNS.md`
+/ `AGENTS.md` golden rules / `docs/decision-records/` ADRs) — never a second
+copy of any of those vocabularies.
+
+`bash scripts/check-pr-contract.sh --pr <N>` reads the block and refuses, by
+name: `pr-classification-missing`, `pr-class-unknown`, `pr-posture-unknown`,
+`pr-lifecycle-unknown`, `pr-pillar-unknown`, `pr-posture-contradiction`
+(`no-human-needed` + `human-gated` together), `pr-pattern-unresolvable`,
+`pr-lane-mismatch` (`lane: issue-<n>` disagreeing with the head branch), and
+`pr-class-below-surface` (the declared `class` sits below the rung
+`governance/conformance/surfaces.yaml` declares for a surface root the PR's
+diff touches — via `governance/conformance/surfaces.py`'s own loader). A PR
+with no `--pr` context, and neither `$_PR_NUMBER` nor `$PR_NUMBER` set, cannot
+be assessed and exits 2 naming `pr-context-missing`.
+
+**Warn-only today.** These classification findings print but do not flip the
+exit code: `AO_PR_CONTRACT_ENFORCE=1` is what turns them into a hard refusal
+(rc 1). The existing trailer/`Closes`/`AI-assistance`/`Gate-changing`/
+pre-existing-red checks are unaffected and keep enforcing unconditionally.
+Enforcement flips in a later PR, once every open PR carries the block —
+flipping it early would red every PR opened before this one merged.
+
+`python3 governance/tagging/cli.py pr-labels --pr N` derives the
+`class:`/`posture:`/`lifecycle:`/`pillar:` labels the block implies; `--apply`
+sets them on the PR via `gh`. A hand-applied label that disagrees with the
+body is reported as `pr-label-drift`, never silently trusted.
+
+Self-test both gates directly:
+
+```bash
+bash scripts/check-pr-contract.sh --selftest
+python3 -m pytest governance/tagging/tests -k pr_labels
+```

@@ -99,6 +99,22 @@ SECRET_MOUNTS: tuple[SecretMount, ...] = (
         target="/root/.ssh",
         why="`git push` over ssh (inventory.yaml packages: openssh-client) — the fleet's push identity.",
     ),
+    SecretMount(
+        name="ar-reader-key",
+        host_env="AO_FLEET_AR_READER_KEY_FILE",
+        default_host_path="${HOME}/.config/ao/ar-reader-key.json",
+        target="/root/.config/ao/ar-reader-key.json",
+        why=(
+            "issue #1329: read access to Artifact Registry for "
+            "infra/fleet/promote_portal.py — a mounted service-account JSON key, "
+            "never a value in the environment. The rung's OTHER accepted auth "
+            "shape, AO_FLEET_AR_ACCESS_TOKEN_CMD (a command whose stdout is a "
+            "bearer token), is declared in env_contract.py instead: it names a "
+            "COMMAND, not a path to mount, so it does not belong to this file's "
+            "mount contract. Absent both, the rung refuses `ar-auth-missing` "
+            "(CANNOT-ASSESS) and escalates once; it never creates a key (GR-6)."
+        ),
+    ),
 )
 
 BY_NAME: dict[str, SecretMount] = {mount.name: mount for mount in SECRET_MOUNTS}

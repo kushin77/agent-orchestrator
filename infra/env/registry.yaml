@@ -237,6 +237,31 @@ variables:
     secret: false
     required_by: [local-run, ops]
     readers: [infra/fleet/parity.py]
+  # -- portal promotion (issue #1329, parent #1295) ---------------------------
+  - name: AO_FLEET_AR_READER_KEY_FILE
+    purpose: >-
+      a mounted Artifact Registry service-account JSON key PATH, for
+      promote_portal.py's read access to the portal image repository. Optional
+      — the rung accepts this OR AO_FLEET_AR_ACCESS_TOKEN_CMD; declared, never
+      a secret VALUE (GR-6): infra/fleet/secrets_contract.py owns the mount.
+    secret: true
+    required_by: [deploy, ops]
+    readers: [infra/fleet/promote_portal.py, infra/fleet/env_contract.py]
+  - name: AO_FLEET_AR_ACCESS_TOKEN_CMD
+    purpose: >-
+      the alternative auth shape for promote_portal.py — a COMMAND (never a
+      value) whose stdout is a bearer token for Artifact Registry.
+    secret: true
+    required_by: [deploy, ops]
+    readers: [infra/fleet/promote_portal.py, infra/fleet/env_contract.py]
+  - name: AO_FLEET_PORTAL_HEALTHZ_URL
+    purpose: >-
+      the URL promote_portal.py polls after recreating the portal container,
+      before deciding healthy (record + post ao/deploy) vs rollback+escalate.
+    secret: false
+    required_by: [deploy, ops]
+    readers: [infra/fleet/promote_portal.py]
+
   - name: KEYDB_HOST
     purpose: >-
       the host of the keydb instance the fleet's keydb lease backend connects to,
@@ -375,6 +400,17 @@ variables:
     secret: false
     required_by: [ops]
     readers: [governance/tagging/ledger.py]
+
+  # -- the PR-labels verb (issue #1254 step 5c / #1328) ---------------------
+  - name: AO_GH_BIN
+    purpose: >-
+      the `gh` binary `pr-labels --apply` shells out to; overridable so a test
+      can inject a fake `gh` (SP-4: nothing in this repository defines a
+      function named after a binary) rather than reaching the network.
+      Unset, it resolves to the real `gh` on PATH.
+    secret: false
+    required_by: [tooling]
+    readers: [governance/tagging/cli.py]
 
   # -- telemetry -----------------------------------------------------------
   - name: AO_FROZEN_CLOCK
