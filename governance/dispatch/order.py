@@ -29,6 +29,16 @@ refusal stays a separate question — :func:`claimable_frontier` is the
 focus-aware one, and it is what a report advertising "do this next" must use —
 and :func:`frontier_agreement` / :func:`unclaimable_frontier` exist so a gate can
 PROVOKE the disagreement rather than assert the happy path.
+
+**An `epic-closed` refusal names the remedy, not only the cause (issue #1259).**
+The refusal is right — the epic that would own the work is gone — but it is
+PERMANENT for the issue until the board is re-pointed, and the `Verify:` command
+of #1259 runs `claim`, which used to answer with a bare cause. `eligible` (and the
+claim-time arbitration, which calls the same helper) now append
+:func:`closed_parent_remedy`, and the report `status`/`dangling` prints derives from
+the same :data:`REMEDY_REPARENT` phrase, so the dead-end is actionable at the point
+a lane actually hits it rather than only in a report it may never read. The refusal
+itself is NOT relaxed.
 """
 
 from __future__ import annotations
@@ -92,13 +102,18 @@ def _refusal_before_grants(
 
     # An issue whose declared epic is closed has no owner to work under: the unit
     # cannot prove issue -> epic -> lane, so it is refused like any unowned unit.
+    # The detail names the closed parent AND the remedy that clears it (issue
+    # #1259): a refusal that is only a cause is a dead end, and this one is
+    # PERMANENT until the board is re-pointed, so a lane that hits it must be told
+    # what to do, not just what is wrong.
     epic = snapshot.get(issue.parent) if issue.parent is not None else None
     if epic is not None and epic.closed:
         return Eligibility(
             issue.number,
             False,
             REASON_EPIC_CLOSED,
-            f"#{issue.number} declares Parent #{epic.number}, which is closed",
+            f"#{issue.number} declares Parent #{epic.number}, which is closed — "
+            f"{closed_parent_remedy(epic)}",
         )
 
     open_blockers = snapshot.blockers_open(issue)
@@ -477,12 +492,49 @@ def wave_plan(candidates: Sequence[Issue]) -> WavePlan:
 # by `claim`/`eligible` and named by nothing: invisible AND permanently
 # unclaimable. These helpers name them, with the remedy, so the dead-end is
 # visible and reachable rather than silent. The refusal itself is NOT relaxed.
+#
+# Issue #1259 added the half #1179 left out: the *report* once existed but the
+# *refusal* a lane actually hits at `claim`/`dispatch` still named only the cause,
+# so a lane that ran the `Verify:` command was told the work was unclaimable and
+# never what to do — the dead-end was visible to a reader of `status` and not to
+# the agent that hit it. The remedy is now ONE phrase (`REMEDY_REPARENT`) that
+# both the report and the refusal are built from, so the two consumers cannot
+# drift into telling a reader two different things.
+
+#: The ONE action that clears an `epic-closed` dead-end (issue #1259). Both the
+#: *report* (`status`/`dangling`, via ``REMEDIATION_REPARENT`` below) and the
+#: *refusal* a lane hits (`order.eligible`, and the claim-time arbitration in
+#: ``claims._arbitrate_unaudited``, via :func:`closed_parent_remedy`) derive from
+#: this single phrase — one source, so the two surfaces agree by construction.
+REMEDY_REPARENT = (
+    "re-point the issue's `Parent:` at the open epic that now owns the work "
+    "(or close the issue if the work is gone)"
+)
 
 REMEDIATION_REPARENT = (
-    "remediate: re-point the issue's `Parent:` at the open epic that now owns the work "
-    "(or close the issue if the work is gone) — an issue whose declared parent is closed "
+    f"remediate: {REMEDY_REPARENT} — an issue whose declared parent is closed "
     "is refused `epic-closed` and can never be claimed"
 )
+
+
+def closed_parent_remedy(parent: Issue) -> str:
+    """The remedy an ``epic-closed`` refusal names, with the closed parent (#1259).
+
+    A refusal whose detail is only the cause (``#'s epic is closed``) is a dead
+    end: the lane that hit it is told the work cannot be claimed and never what to
+    do about it. This names BOTH halves a refused lane needs — the closed parent,
+    by number and title, so the reader does not have to look it up, and the one
+    action that clears the refusal.
+
+    It is called by ``order.eligible`` (and therefore ``order.frontier``, which
+    applies the same predicate) AND by the claim-time arbitration
+    (``claims._arbitrate_unaudited``). One function, not two copies: the pre-flight
+    and the mutation point must not disagree about the reason *or* the remedy.
+    """
+    title = parent.title.strip() or "untitled"
+    return (
+        f"remedy: {REMEDY_REPARENT} — its declared parent #{parent.number} ({title}) is closed"
+    )
 
 
 def dangling_on_closed_parent(snapshot: Snapshot) -> list[tuple[Issue, Issue]]:

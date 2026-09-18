@@ -156,6 +156,10 @@ def record_real_tree_verdict(root: Path | str, verdict, *, at: float | None = No
             "stale_entries": len(verdict.stale_entries),
             "young": len(verdict.young),
             "vanished": len(getattr(verdict, "vanished", ()) or ()),
+            # Named, leased exemptions (#1291): without these the ledger would
+            # show a green verdict with no trace of what was excused.
+            "quarantined": len(getattr(verdict, "quarantined", ()) or ()),
+            "stale_quarantine": len(getattr(verdict, "stale_quarantine", ()) or ()),
         },
     )
 

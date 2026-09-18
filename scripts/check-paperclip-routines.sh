@@ -20,6 +20,20 @@
 #     owner-less routine, an inexpressible trigger, and a routine whose lane
 #     disagrees with the PMO graph. If any control is accepted, this gate
 #     reports FAIL — a check that cannot fail is a formality;
+#   * every control mutation is ANCHORED AND PROVEN: it names something that
+#     provably exists and asserts the anchor matched EXACTLY ONCE, so an anchor
+#     that later drifts fails loudly instead of provoking nothing silently. The
+#     controls mutate `config/fleet-jobs.json` — since issue #241/#962
+#     `fleet/cron.py` RENDERS the schedule from that manifest, so the manifest is
+#     the only place a marker can enter the schedule; a mutation of the
+#     renderer's text cannot provoke drift. Before the negative controls run, the
+#     gate also proves an UNMUTATED scratch tree projects BYTE-IDENTICALLY to the
+#     real root, which is the premise underneath every control: the fixture they
+#     act on IS the real schedule. Until #1176 that premise was unproven and
+#     false — the `drop-prune` mutation's anchor had drifted out of
+#     `fleet/cron.py`, so the control "changed nothing" and the gate retreated to
+#     CANNOT-ASSESS rather than reaching a verdict (GR-12: a control whose anchor
+#     silently moved is a control that cannot fail);
 #   * the PMO agreement must actually RUN on the real root (the committed graph
 #     is read), never silently degrade to `pmo-unavailable`;
 #   * the projection keeps NO STORE of its own: deriving and verifying every
@@ -41,7 +55,8 @@ fi
 
 adapter="integrations/paperclip/adapters/routines"
 for required in "$adapter/cli.py" fleet/cron.py fleet/runtime.py \
-  docs/contracts/paperclip/ticket.schema.json .board/snapshot.json; do
+  config/fleet-jobs.json docs/contracts/paperclip/ticket.schema.json \
+  .board/snapshot.json; do
   if [ ! -e "$required" ]; then
     echo "check-paperclip-routines: CANNOT-ASSESS — $required is missing" >&2
     exit 2
@@ -64,44 +79,109 @@ json_ok() {
 }
 
 # make_tree <dir> <mutation> — a minimal schedule tree: the real `fleet/cron.py`
-# (+ `runtime`) with one deliberate mutation applied. The mutation is asserted to
-# have changed the text, so a renamed source string fails loudly instead of
-# producing a control that "provokes" nothing.
+# (+ `runtime`) with the real `config/fleet-jobs.json`, one deliberate mutation
+# applied to the LATTER. `fleet/cron.py` renders the schedule from the manifest,
+# so the manifest is mutated — and each mutation is anchored and asserted below,
+# so a renamed job or a moved schedule fails loudly instead of producing a
+# control that "provokes" nothing. The exit code is passed through UNCHANGED
+# (3 = the anchor moved, anything else = an input that could not be read), which
+# is how `build_tree` tells the two apart — a `|| return 1` here would collapse
+# them and turn a moved anchor back into a silent CANNOT-ASSESS.
 make_tree() {
-  python3 - "$root" "$1" "$2" <<'PY' || return 1
+  python3 - "$root" "$1" "$2" <<'PY'
+import json
 import shutil
 import sys
 from pathlib import Path
 
 root, dest, mutation = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+
+
+def moved(detail):
+    """The anchor a mutation names is gone — exit 3, which the caller turns into
+    a FAILURE of this gate (never CANNOT-ASSESS: a control that cannot fail must
+    not hide in the composite's `skipped` bucket, GR-12 / issue #1176)."""
+    print("the mutation anchor moved: %s" % detail, file=sys.stderr)
+    raise SystemExit(3)
+
+
+def one_job(manifest, name):
+    """The single job named `name` — or a loud failure, never a silent no-op."""
+    matching = [job for job in manifest["jobs"] if job.get("name") == name]
+    if len(matching) != 1:
+        moved("expected exactly one job named %r in config/fleet-jobs.json, found %d"
+              % (name, len(matching)))
+    return matching[0]
+
+
 fleet = dest / "fleet"
 fleet.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(root / "fleet" / "runtime.py", fleet / "runtime.py")
-original = (root / "fleet" / "cron.py").read_text(encoding="utf-8")
-text = original
+shutil.copyfile(root / "fleet" / "cron.py", fleet / "cron.py")
+(dest / "config").mkdir(parents=True, exist_ok=True)
+manifest_path = root / "config" / "fleet-jobs.json"
+original_text = manifest_path.read_text(encoding="utf-8")
+manifest = json.loads(original_text)
+
+text = original_text
 if mutation == "none":
     pass
 elif mutation == "drop-prune":
-    text = text.replace("        prune_line(),\n", "")
+    manifest["jobs"].remove(one_job(manifest, "prune"))
+    text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
 elif mutation == "monthly":
-    text = text.replace('PRUNE_SCHEDULE = "23 4 * * *"', 'PRUNE_SCHEDULE = "0 0 1 * *"')
-elif mutation == "add-extra":
-    text = text.replace(
-        "MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER)",
-        'MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, "ao-fleet-extra")',
-    )
-    text = text.replace(
-        "        reconcile_line(interval),\n    ]",
-        "        reconcile_line(interval),\n"
-        '        "*/5 * * * * cd /tmp && /usr/bin/python3 fleet/extra.py run '
-        '>> /tmp/extra.log 2>&1 # ao-fleet-extra",\n    ]',
-    )
+    job = one_job(manifest, "prune")
+    if job.get("schedule") != "23 4 * * *":
+        moved("the prune job's schedule is %r, not '23 4 * * *'" % (job.get("schedule"),))
+    job["schedule"] = "0 0 1 * *"
+    text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+elif mutation == "enable-gated":
+    job = one_job(manifest, "scan-pr-failures")
+    if job.get("enabled") is not False:
+        moved("the scan-pr-failures job is not ship-gated OFF (enabled=%r)"
+              % (job.get("enabled"),))
+    job["enabled"] = True
+    text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
 else:
-    raise SystemExit("unknown mutation: %s" % mutation)
-if mutation != "none" and text == original:
-    raise SystemExit("mutation %r changed nothing — the source string moved" % mutation)
-(fleet / "cron.py").write_text(text, encoding="utf-8")
+    moved("unknown mutation: %s" % mutation)
+if mutation != "none" and text == original_text:
+    moved("mutation %r changed nothing" % mutation)
+(dest / "config" / "fleet-jobs.json").write_text(text, encoding="utf-8")
 PY
+}
+
+# build_tree <dir> <mutation> <label> — build a mutated schedule tree, and hold
+# the two failure modes apart:
+#
+#   * the mutation's ANCHOR is gone (exit 3) — the control can no longer fail, so
+#     this gate FAILS and says which control lost its provocation. It must NOT be
+#     CANNOT-ASSESS: `scripts/verify.sh` maps rc 2 to SKIP, so a moved anchor
+#     would hide in the `skipped` bucket exactly as the whole defect did before
+#     #1176 (GR-12);
+#   * the tree's input is missing (anything else) — CANNOT-ASSESS, an absent
+#     input is never a pass (nor a FAIL: nothing was assessed).
+build_tree() {  # build_tree <dir> <mutation> <label>
+  local dir="$1" mutation="$2" label="$3" rc=0 err="$scratch/tree.err"
+  make_tree "$dir" "$mutation" 2>"$err" || rc=$?
+  case "$rc" in
+    0)
+      return 0
+      ;;
+    3)
+      printf '  FAIL  control %-30s cannot be exercised: its mutation no longer changes the schedule\n' "$label" >&2
+      sed 's/^/        /' "$err" >&2
+      unproven=$((unproven + 1))
+      # The control is still DECLARED (the count below tracks the declared set,
+      # not the exercised one), so only the missing provocation is reported.
+      controls=$((controls + 1))
+      return 1
+      ;;
+    *)
+      printf 'check-paperclip-routines: CANNOT-ASSESS — could not build the %s tree\n' "$label" >&2
+      sed 's/^/        /' "$err" >&2
+      exit 2
+      ;;
+  esac
 }
 
 unproven=0
@@ -201,32 +281,56 @@ else
   unproven=$((unproven + 1))
 fi
 
+# --- the fixture the controls mutate IS the real schedule --------------------
+# Every control below mutates a scratch copy of the tree. This proves the copy
+# STARTS from exactly the schedule the real root projects, so the premise the
+# whole negative-control section rests on is measured rather than assumed: if the
+# schedule ever moves to a source the scratch tree does not carry, the controls
+# would silently stop acting on the real thing, and that is the failure #1176
+# measured (`drop-prune`'s anchor had drifted out of `fleet/cron.py`).
+echo "== the controls act on the real schedule =="
+controls=$((controls + 1))
+if make_tree "$scratch/plain" none; then
+  rc=0
+  routines --root "$scratch/plain" --pmo-root "$root" project \
+    > "$scratch/plain-project.json" 2>/dev/null || rc=$?
+  if [ "$rc" -eq 0 ] && cmp -s "$scratch/real-project.json" "$scratch/plain-project.json"; then
+    echo "  OK    control an unmutated scratch tree projects byte-identically to the real root"
+  else
+    echo "  FAIL  an unmutated scratch tree does NOT project like the real root (rc=$rc):" >&2
+    diff <(sed 's/^/        /' "$scratch/real-project.json") \
+      <(sed 's/^/        /' "$scratch/plain-project.json") >&2 || true
+    unproven=$((unproven + 1))
+  fi
+else
+  echo "check-paperclip-routines: CANNOT-ASSESS — could not build the plain tree" >&2
+  exit 2
+fi
+
 # --- negative controls -------------------------------------------------------
 echo "== negative controls =="
 
 # --- 1. an entry DELETED from the schedule ----------------------------------
-make_tree "$scratch/dropped" drop-prune || {
-  echo "check-paperclip-routines: CANNOT-ASSESS — could not build the dropped-entry tree" >&2
-  exit 2
-}
-check_refused "entry deleted from schedule" "ao-fleet-prune" \
-  routines --root "$scratch/dropped" --pmo-root "$root" project
+if build_tree "$scratch/dropped" drop-prune "entry deleted from schedule"; then
+  check_refused "entry deleted from schedule" "ao-fleet-prune" \
+    routines --root "$scratch/dropped" --pmo-root "$root" project
+fi
 
 # --- 2. a schedule entry ADDED with no routine change (drift) ---------------
-make_tree "$scratch/drifted" add-extra || {
-  echo "check-paperclip-routines: CANNOT-ASSESS — could not build the drifted tree" >&2
-  exit 2
-}
-check_refused "schedule drifted (entry added)" "ao-fleet-extra" \
-  routines --root "$scratch/drifted" --pmo-root "$root" project
+# The manifest's ship-gated job is flipped ON (GR-5's flag-gated-OFF rule): the
+# marker is already declared ours in `fleet/cron.py`, so the reader sees the new
+# line, and no routine claims it — drift of exactly the shape the real
+# `ao-fleet-reap` finding had, provoked through the authority the code renders.
+if build_tree "$scratch/drifted" enable-gated "schedule drifted"; then
+  check_refused "schedule drifted (entry added)" "ao-fleet-scan-pr-failures" \
+    routines --root "$scratch/drifted" --pmo-root "$root" project
+fi
 
 # --- 3. an inexpressible trigger --------------------------------------------
-make_tree "$scratch/monthly" monthly || {
-  echo "check-paperclip-routines: CANNOT-ASSESS — could not build the monthly tree" >&2
-  exit 2
-}
-check_refused "schedule with no trigger shape" "ao-fleet-prune" \
-  routines --root "$scratch/monthly" --pmo-root "$root" project
+if build_tree "$scratch/monthly" monthly "schedule with no trigger shape"; then
+  check_refused "schedule with no trigger shape" "ao-fleet-prune" \
+    routines --root "$scratch/monthly" --pmo-root "$root" project
+fi
 
 # --- 4. a routine with no owner ---------------------------------------------
 routines registry > "$scratch/registry.json" 2>/dev/null || true
@@ -331,7 +435,7 @@ else
   unproven=$((unproven + 1))
 fi
 
-expected_controls=10
+expected_controls=11
 if [ "$controls" -ne "$expected_controls" ]; then
   echo "check-paperclip-routines: FAIL — expected $expected_controls controls, ran $controls" >&2
   unproven=$((unproven + 1))

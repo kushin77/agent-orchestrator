@@ -190,6 +190,34 @@ def test_the_epic_closed_refusal_is_not_relaxed(tmp_path, capsys):
     assert verdict["reason"] == "epic-closed"
 
 
+def test_the_epic_closed_refusal_names_the_remedy_at_the_entry_point(tmp_path, capsys):
+    """Issue #1259: the verb a lane runs must name the remedy, not only the cause.
+
+    `status`/`dangling` named the dead-end, but the verb #1259's `Verify:` runs —
+    `claim` — named only the cause, so the one reader who hit the dead end was the
+    one never told what to do. Both surfaces derive from `order.REMEDY_REPARENT`.
+    """
+    snap_path = _write(tmp_path, _dangling_board())
+    rc = cli.main(["claim", "--issue", "11", "--agent", "me", "--lane", "governance",
+                   "--stale-minutes", "100000000",
+                   *_paths(tmp_path, snap_path)])
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "claim REFUSED: epic-closed" in captured.err
+    assert "#10" in captured.err, "the closed parent must be named"
+    assert order.REMEDY_REPARENT in captured.err, "the remedy must be named"
+
+
+def test_the_report_and_the_refusal_name_the_same_remedy(tmp_path, capsys):
+    """One source, two consumers (#1259): the dangling report and the refusal agree."""
+    snap_path = _write(tmp_path, _dangling_board())
+    rc = cli.main(["dangling", "--stale-minutes", "100000000",
+                   *_paths(tmp_path, snap_path)])
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert order.REMEDY_REPARENT in captured.err
+
+
 # --- defect 3: the frontier never advertises work `claim` refuses (issue #1168)
 
 

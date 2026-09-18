@@ -25,11 +25,19 @@ is ever a silent success.
 
 ## What is projected
 
-| Source (`fleet/cron.py`) | Routine | Trigger | Owner |
+| Source (`fleet/cron.py` renders it) | Routine | Trigger | Owner |
 |---|---|---|---|
 | `line(interval)` — `# ao-fleet-watchdog` | `fleet-watchdog` | interval, every 2 min | `fleet/watchdog` |
 | `prune_line()` — `# ao-fleet-prune` | `fleet-prune` | daily at 04:23 | `fleet/prune` |
 | `reconcile_line(interval)` — `# ao-fleet-reconcile` | `fleet-reconcile` | interval, every 2 min | `governance/reconcile` |
+| `reap_line()` — `# ao-fleet-reap` | `fleet-reap` | daily at 03:47 | `scripts/prune-worktrees` |
+
+Since issue #241/#962 `fleet/cron.py` **renders** those lines from
+`config/fleet-jobs.json`, so the manifest — not the module's text — is where a
+marker enters the schedule and every enabled rung must have a routine here.
+`ao-fleet-reap` went without one from #830 (which added the rung) until #1176,
+and the projection reported it as `schedule-unprojected` drift rather than
+silently projecting three of the four scheduled rungs.
 
 The **trigger** and the **params** (`argv`, `log`, `cwd`) come from the parsed
 cron line. The **owner**, the **lane** and the **anchor** ticket come from the
@@ -87,12 +95,25 @@ and after deriving and verifying every routine — the tree is unchanged.
 
 `scripts/check-paperclip-routines.sh` does not merely assert these properties, it
 **provokes** them (GR-12): an entry deleted from a scratch copy of the schedule,
-an entry added with no routine change, an inexpressible trigger, an owner-less
-routine, a lane that disagrees with the graph, an owner that disagrees with the
-graph, a non-deterministic render, and a written store. Each control must be
-refused **by name**; if any is accepted the gate reports FAIL. The mutation proof
-(`mutate → gate must go red naming the offender → restore → byte-identical`)
-confirms each control is load-bearing rather than decorative.
+an entry added with no routine change (the manifest's ship-gated job flipped ON),
+an inexpressible trigger, an owner-less routine, a lane that disagrees with the
+graph, an owner that disagrees with the graph, a non-deterministic render, and a
+written store. Each control must be refused **by name**; if any is accepted the
+gate reports FAIL. The mutation proof (`mutate → gate must go red naming the
+offender → restore → byte-identical`) confirms each control is load-bearing
+rather than decorative.
+
+Two properties keep the controls honest about *what* they mutate, and both were
+added by #1176 after the opposite was measured:
+
+* every mutation is **anchored and asserted to match exactly once**, so an anchor
+  that later drifts fails loudly instead of silently provoking nothing — the
+  `drop-prune` control's anchor had drifted out of `fleet/cron.py` when #962 moved
+  the schedule into the manifest, leaving a control that could not fail;
+* the controls mutate the **manifest**, which is where the schedule now lives, and
+  the gate first proves an unmutated scratch tree projects **byte-identically to
+  the real root** — the premise that the fixture they act on IS the real schedule,
+  measured rather than assumed.
 
 ## Boundary
 

@@ -37,10 +37,22 @@
 # covers what a scratch repository cannot fake — the git mechanics and the
 # decision that decides whether work survives.
 #
-# No network is used or required (the bare "remote" is a local directory).
+# The last section (§6) points the audit at the REAL repository, and it is the
+# one that reds a whole fleet when it is wrong, so it is proven in both
+# directions (#1291): the *work* on the default branch is proven landed
+# (`landing.py` — ancestry, tree containment, or patch identity against the
+# default branch's own commits, never the branch's name), the residue is
+# quarantined by NAME with a tip-pinned, leased exemption document, and §6e
+# provokes the three ways an exemption could be abused (an entry matching
+# nothing, an artifact whose tip moved, a lease that is closed or expired).
+#
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/check-reconcile.sh
+#        bash scripts/check-reconcile.sh --real-tree-only DIR BASELINE [QUARANTINE]
+#          runs ONLY the §6 real-tree step against DIR (the same code path, so a
+#          driver outside the repo can provoke it with its own scratch tree) and
+#          exits 0/1/2. The no-argument form is the gate.
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -64,6 +76,78 @@ for required in "$cli" "$terminal" "$suites" "governance/reconcile/README.md"; d
     exit 1
   fi
 done
+
+# --- the real-tree step, as ONE definition (#1291) --------------------------
+#
+# §6 runs it against this repository; the `--real-tree-only` seam below runs the
+# same body against another tree, which is what lets an out-of-band driver point
+# the step at its own fixture repository, its own baseline and its own quarantine
+# document (and assert the exit code AND the refusal string this script produces).
+# One definition, so the gate and its provocation can never drift apart.
+run_real_tree_step() {
+  # $1 = the tree to audit, $2 = baseline, $3 = quarantine document ("" = none),
+  # $4 = where the CODE lives (defaults to this repo; the audited tree may be a
+  #      fixture with no `governance/` package of its own)
+  local audited="$1" baseline="$2" quarantine="$3" code_root="${4:-$root}"
+  python3 - "$audited" "$baseline" "$quarantine" "$code_root" <<'PYREALTREE'
+import sys
+
+audited, baseline_path, quarantine_path, code_root = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+# The audited root is DATA (read through git and its `.fleet/` state); the code
+# under test is this checkout's. Importing the fixture's own package would prove
+# the fixture, not the gate.
+sys.path.insert(0, audited)
+sys.path.insert(0, code_root)
+from governance.reconcile.real_tree_baseline import check_real_tree
+
+verdict = check_real_tree(
+    audited, baseline_path, quarantine_path=(quarantine_path or None)
+)
+print(verdict.describe())
+if not verdict.assessable:
+    print("check-reconcile: CANNOT-ASSESS on the real tree", file=sys.stderr)
+    raise SystemExit(2)
+if not verdict.ok:
+    print(
+        f"check-reconcile: FAIL — real tree drifted from {baseline_path} "
+        f"({len(verdict.new_violations)} new-and-old, {len(verdict.stale_entries)} stale, not fatal; "
+        f"{len(verdict.stale_quarantine)} stale quarantine exemption(s))",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+if verdict.stale_entries:
+    print(
+        f"check-reconcile: {len(verdict.stale_entries)} stale baseline entr(y/ies) — "
+        f"cleaned up on disk; safe to `status --disk --prune-stale`",
+        file=sys.stderr,
+    )
+PYREALTREE
+}
+
+# --- out-of-band seam: drive §6's step against another tree -----------------
+#
+# Usage: bash scripts/check-reconcile.sh --real-tree-only DIR BASELINE [QUARANTINE]
+#
+# The no-argument invocation is the gate (`scripts/discover-checks.sh` passes no
+# arguments, so this branch is never the gate path). This mode exists because a
+# check that can only be provoked from inside itself is hard to believe: a driver
+# outside the repository builds its own scratch tree, baseline and quarantine,
+# runs THIS script, and asserts the exit code and the refusal text.
+if [ "${1:-}" = "--real-tree-only" ]; then
+  real_tree_only_root="${2:-}"
+  real_tree_only_baseline="${3:-}"
+  real_tree_only_quarantine="${4:-}"
+  if [ -z "$real_tree_only_root" ] || [ ! -d "$real_tree_only_root" ]; then
+    echo "check-reconcile: CANNOT-ASSESS — --real-tree-only needs a directory (got '${real_tree_only_root}')" >&2
+    exit 2
+  fi
+  if [ ! -f "$real_tree_only_baseline" ]; then
+    echo "check-reconcile: CANNOT-ASSESS — baseline not found: ${real_tree_only_baseline}" >&2
+    exit 2
+  fi
+  run_real_tree_step "$real_tree_only_root" "$real_tree_only_baseline" "$real_tree_only_quarantine"
+  exit $?
+fi
 
 fail=0
 
@@ -375,10 +459,36 @@ git(repo, "fetch", "-q", "origin")
 
 ops = RepoOps(repo)
 
+
+def unique_work(where, name, message):
+    """Commit a file that is on NO other branch, in `where` (repo or worktree).
+
+    Load-bearing for the proofs below (#1291): since the audit also reads the
+    landing proof, an artifact that sits at a commit already on `origin/master`
+    can be explained by that alone — which would make the "removing the beat /
+    the claim / the journal makes it refused" assertions pass for the wrong
+    reason. An artifact holding unlanded work is explained ONLY by its record.
+    """
+    (where / name).write_text(f"{name}: unlanded\n", encoding="utf-8")
+    git(where, "add", name)
+    git(where, "commit", "-q", "-m", message)
+
+
+def branch_holding_unique_work(name, path):
+    """A branch with one unlanded commit and no worktree left behind."""
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", name,
+                    str(path), "origin/master"], check=True)
+    unique_work(path, f"{name}.txt", f"{name}: unlanded work")
+    subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(path)],
+                   check=True)
+    return path
+
+
 # --- an artifact each record DOES explain, one per source -------------------
 beaten = work / "audit-lane-beaten"
 subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "issue-905",
                 str(beaten), "origin/master"], check=True)
+unique_work(beaten, "beat-work.txt", "issue-905: unlanded work")
 stamp("audit-beaten", issue=905, agent="gate-agent", root=repo, worktree=str(beaten),
       branch="issue-905", at=datetime.now(timezone.utc).timestamp())
 
@@ -388,13 +498,13 @@ stamp("audit-beaten", issue=905, agent="gate-agent", root=repo, worktree=str(bea
                 "lane": "gate", "reason": "next-in-milestone"}) + "\n",
     encoding="utf-8",
 )
-git(repo, "branch", "issue-901")
+branch_holding_unique_work("issue-901", work / "audit-claim-staging")
 
 (repo / ".fleet" / "lifecycle").mkdir(parents=True, exist_ok=True)
 (repo / ".fleet" / "lifecycle" / "902.json").write_text(
     json.dumps({"closing_evidence": True}) + "\n", encoding="utf-8"
 )
-git(repo, "branch", "issue-902")
+branch_holding_unique_work("issue-902", work / "audit-journal-staging")
 
 # --- the provoked negatives: an artifact NO record explains -----------------
 orphan = work / "audit-lane-orphan"
@@ -403,7 +513,7 @@ subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "orphan-b
 (orphan / "unmerged.txt").write_text("unmerged work\n", encoding="utf-8")
 git(orphan, "add", "unmerged.txt")
 git(orphan, "commit", "-q", "-m", "unmerged")
-git(repo, "branch", "issue-903")
+branch_holding_unique_work("issue-903", work / "audit-orphan-staging")
 
 report = audit(repo, ops=ops)
 refused = names(report)
@@ -523,48 +633,51 @@ fi
 # DESIRED outcome) is reported and counted but does NOT fail the gate, because
 # disk artifacts are meant to disappear (a landed commit never does). Only a
 # NEW unbaselined artifact older than the age-grace window fails, named.
+#
+# Two further sources sit under this step (#1291):
+#
+#   * the landing proof — `governance/reconcile/landing.py` explains an artifact
+#     whose *work* is on the default branch (ancestry, tree containment or patch
+#     identity). Measured at `99f6b37`: 25 of 35 findings were false without it,
+#     and each red a composite gate that serializes the whole fleet;
+#   * `real-tree-quarantine.json` — named, tip-pinned, leased exemptions for the
+#     residue: the AGENTS.md rule 17 class, work that exists nowhere else, which
+#     the worker is forbidden to discard and the gate must therefore report
+#     rather than red on. It cannot absorb anything new (an unlisted artifact
+#     fails immediately; so does one whose tip has moved), and an entry that
+#     excuses nothing FAILS as a stale exemption.
+#
+# A baseline this step cannot read is CANNOT-ASSESS (exit 2), never drift and
+# never a pass: "the state could not be read" and "the state is wrong" are
+# different answers, and this script declares all three in its contract above.
 real_tree_baseline="governance/reconcile/real-tree-baseline.json"
+real_tree_quarantine="governance/reconcile/real-tree-quarantine.json"
 if [ ! -f "$real_tree_baseline" ]; then
-  echo "check-reconcile: FAIL — $real_tree_baseline is missing (#740)" >&2
-  exit 1
+  echo "check-reconcile: CANNOT-ASSESS — $real_tree_baseline is missing (#740): the real tree cannot be assessed" >&2
+  exit 2
 fi
 real_tree_baseline_sha_before="$(sha256sum "$real_tree_baseline" | awk '{print $1}')"
+real_tree_quarantine_sha_before="$(sha256sum "$real_tree_quarantine" 2>/dev/null | awk '{print $1}' || echo absent)"
 
-python3 - "$root" "$real_tree_baseline" <<'PYREALTREE'
-import sys
-sys.path.insert(0, sys.argv[1])
-from governance.reconcile.real_tree_baseline import check_real_tree
-
-root, baseline_path = sys.argv[1], sys.argv[2]
-verdict = check_real_tree(root, baseline_path)
-print(verdict.describe())
-if not verdict.assessable:
-    print("check-reconcile: CANNOT-ASSESS on the real tree", file=sys.stderr)
-    raise SystemExit(2)
-if not verdict.ok:
-    print(
-        f"check-reconcile: FAIL — real tree drifted from {baseline_path} "
-        f"({len(verdict.new_violations)} new-and-old, {len(verdict.stale_entries)} stale, not fatal)",
-        file=sys.stderr,
-    )
-    raise SystemExit(1)
-if verdict.stale_entries:
-    print(
-        f"check-reconcile: {len(verdict.stale_entries)} stale baseline entr(y/ies) — "
-        f"cleaned up on disk; safe to `status --disk --prune-stale`",
-        file=sys.stderr,
-    )
-PYREALTREE
+run_real_tree_step "$root" "$real_tree_baseline" "$real_tree_quarantine"
 real_tree_rc=$?
+if [ "$real_tree_rc" -eq 2 ]; then
+  echo "check-reconcile: CANNOT-ASSESS — the real tree could not be assessed; that is never a pass" >&2
+  exit 2
+fi
 if [ "$real_tree_rc" -ne 0 ]; then
   fail=$((fail + 1))
 fi
 real_tree_baseline_sha_after="$(sha256sum "$real_tree_baseline" | awk '{print $1}')"
+real_tree_quarantine_sha_after="$(sha256sum "$real_tree_quarantine" 2>/dev/null | awk '{print $1}' || echo absent)"
 if [ "$real_tree_baseline_sha_before" != "$real_tree_baseline_sha_after" ]; then
   echo "  FAIL  the read-only real-tree check modified $real_tree_baseline" >&2
   fail=$((fail + 1))
+elif [ "$real_tree_quarantine_sha_before" != "$real_tree_quarantine_sha_after" ]; then
+  echo "  FAIL  the read-only real-tree check modified $real_tree_quarantine" >&2
+  fail=$((fail + 1))
 else
-  echo "  OK    the real-tree check is read-only: $real_tree_baseline is unchanged"
+  echo "  OK    the real-tree check is read-only: $real_tree_baseline and $real_tree_quarantine are unchanged"
 fi
 
 # --- 6b. the OLD-unbaselined-artifact provocation must be able to fail ------
@@ -596,15 +709,23 @@ if git -C "$root" worktree add -q -b "$provoke_branch" "$provoke_worktree" HEAD 
     git -C "$provoke_worktree" commit -q --allow-empty -m "backdated provocation, never real work" >/dev/null 2>&1
   touch -d "@$thirty_days_ago_epoch" "$provoke_worktree" 2>/dev/null || touch -t "$(date -r "$thirty_days_ago_epoch" +%Y%m%d%H%M.%S)" "$provoke_worktree"
 
-  if python3 - "$root" "$real_tree_baseline" "$provoke_branch" "$provoke_worktree" <<'PYPROVOKECHECK'
+  if python3 - "$root" "$real_tree_baseline" "$real_tree_quarantine" "$provoke_branch" "$provoke_worktree" <<'PYPROVOKECHECK'
 import sys
-sys.path.insert(0, sys.argv[1])
+
+code_root = sys.argv[1]
+sys.path.insert(0, code_root)
 from governance.reconcile.real_tree_baseline import check_real_tree
 
-root, baseline_path, branch, worktree = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-verdict = check_real_tree(root, baseline_path)
+root, baseline_path, quarantine_path = sys.argv[1], sys.argv[2], sys.argv[3]
+branch, worktree = sys.argv[4], sys.argv[5]
+# The SAME configuration §6 runs (baseline AND the named quarantine): a planted
+# artifact must fail *with* the exemptions in place, which is what proves the
+# quarantine cannot absorb something it does not name (#1291).
+verdict = check_real_tree(root, baseline_path, quarantine_path=quarantine_path)
 new_names = {e.name for e in verdict.new_violations}
 young_names = {e.name for e in verdict.young}
+quarantined_names = {e.name for e in verdict.quarantined}
+stale_names = {e.name for e in verdict.stale_quarantine}
 ok = (
     verdict.assessable
     and not verdict.ok
@@ -612,15 +733,19 @@ ok = (
     and worktree in new_names
     and branch not in young_names
     and worktree not in young_names
+    and branch not in quarantined_names
+    and worktree not in quarantined_names
+    and not stale_names
 )
 if not ok:
     print(
         f"  FAIL  old-unbaselined provocation did not fire (new={sorted(new_names)}, "
-        f"young={sorted(young_names)})",
+        f"young={sorted(young_names)}, quarantined={len(quarantined_names)}, "
+        f"stale_quarantine={sorted(stale_names)})",
         file=sys.stderr,
     )
     raise SystemExit(1)
-print("  OK    old-unbaselined provocation fires: a backdated, unbaselined worktree AND branch are refused by name (neither is 'young')")
+print("  OK    old-unbaselined provocation fires: a backdated, unbaselined worktree AND branch are refused by name (neither is 'young'), and neither is absorbed by the named quarantine")
 PYPROVOKECHECK
   then
     :
@@ -633,6 +758,223 @@ else
 fi
 
 cleanup_provocation
+
+# --- 6e. the named quarantine's teeth (#1291) -------------------------------
+# Exemptions are the only thing in this step that can turn a finding into a pass,
+# so each way they could be abused is provoked rather than asserted. Every half
+# runs through the SAME `check_real_tree` the gate runs, with fixture quarantine
+# documents, against a SCRATCH repository with its own planted, backdated
+# artifact — not the real tree. Two reasons: the rules under test are properties
+# of the *document* (the real tree's own configuration is proven by §6 and §6b
+# above), and a fixture root is deterministic — the real tree moves while the
+# gate runs, which is exactly what the fixtures must not depend on.
+#
+#   (iii) an entry naming a real, present, unmatched artifact at its exact tip IS
+#         honoured — and that artifact is then neither a violation nor 'young';
+#   (i)   an entry naming an artifact that is not there FAILS as a stale
+#         exemption, by name;
+#   (i-b) an entry whose artifact is present but whose recorded tip has moved is
+#         NOT absorbed: it is a violation AND a stale exemption, both named;
+#   (ii)  a lease that is closed, or whose measurement is older than its own
+#         declared age bound, honours nothing and fails by name (without a lease,
+#         "honoured while the tracking issue is open" would be decorative, GR-29);
+#   (iv)  an unreadable document is CANNOT-ASSESS, never a pass.
+q_root="$work/quarantine-case"
+q_repo="$q_root/repo"
+q_docs="$q_root/docs"
+q_branch="issue-check-reconcile-quarantine-$$"
+q_worktree="$q_root/lane-wt"
+q_ready=0
+if mkdir -p "$q_repo" "$q_docs" 2>/dev/null \
+  && git -C "$q_repo" init -q -b master >/dev/null 2>&1 \
+  && git -C "$q_repo" config user.name "Gate Human" \
+  && git -C "$q_repo" config user.email "gate-human@example.com" \
+  && printf 'seed\n' > "$q_repo/seed.txt" \
+  && git -C "$q_repo" add seed.txt \
+  && git -C "$q_repo" commit -q -m seed \
+  && git -C "$q_repo" worktree add -q -b "$q_branch" "$q_worktree" HEAD 2>/dev/null; then
+  q_backdate_epoch=$(( $(date +%s) - 30 * 24 * 3600 ))
+  q_backdate_git="$(date -u -d "@$q_backdate_epoch" +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -r "$q_backdate_epoch" +%Y-%m-%dT%H:%M:%S)"
+  GIT_AUTHOR_DATE="$q_backdate_git" GIT_COMMITTER_DATE="$q_backdate_git" \
+    git -C "$q_worktree" commit -q --allow-empty -m "quarantine fixture, never real work" >/dev/null 2>&1
+  touch -d "@$q_backdate_epoch" "$q_worktree" 2>/dev/null || true
+  q_ready=1
+fi
+
+if [ "$q_ready" -eq 1 ]; then
+  if python3 - "$root" "$q_repo" "$q_docs" "$q_branch" "$q_worktree" <<'PYQUARANTINE'
+"""Live proof: the named quarantine excuses exactly what it names (#1291)."""
+import json
+import subprocess
+import sys
+import time
+
+code_root, repo, docs = sys.argv[1], sys.argv[2], sys.argv[3]
+branch, worktree = sys.argv[4], sys.argv[5]
+sys.path.insert(0, code_root)
+from governance.reconcile.real_tree_baseline import check_real_tree
+
+problems = []
+
+
+def check(label, condition, detail=""):
+    if condition:
+        print(f"  OK    {label}")
+    else:
+        problems.append(label)
+        print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr)
+
+
+def git(*args):
+    result = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+def git_in(path, *args):
+    result = subprocess.run(["git", "-C", path, *args], capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+now = time.time()
+tip = git("rev-parse", "refs/heads/" + branch)
+# Read the HEAD *in the worktree*: the primary checkout's HEAD is a different
+# commit, and an exemption pinned to the wrong one lapses immediately (which is
+# how this line was caught).
+head = git_in(worktree, "rev-parse", "HEAD")
+if not tip or not head:
+    print("  FAIL  the quarantine fixture has no tip to pin", file=sys.stderr)
+    raise SystemExit(1)
+iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+baseline = f"{docs}/empty-baseline.json"
+with open(baseline, "w", encoding="utf-8") as handle:
+    json.dump({"note": "fixture: nothing pretends to be pre-existing", "entries": []}, handle)
+
+
+def document(name, *, state="open", measured_at=None, max_age_hours=1, entries=None, raw=None):
+    path = f"{docs}/{name}.json"
+    if raw is not None:
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(raw)
+        return path
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "version": 1,
+                "note": "fixture written by check-reconcile.sh §6e",
+                "tracked_by": "#1291",
+                "tracking": {
+                    "state": state,
+                    "measured_at": measured_at or iso,
+                    "measured_by": "check-reconcile.sh §6e",
+                    "max_age_hours": max_age_hours,
+                },
+                "quarantine": entries or [],
+            },
+            handle,
+        )
+    return path
+
+
+present = [
+    {"kind": "branch", "name": branch, "tip": tip, "reason": "fixture: a planted, backdated branch"},
+    {"kind": "worktree", "name": worktree, "tip": head, "reason": "fixture: its lane worktree"},
+]
+
+
+def verdict(document_path):
+    return check_real_tree(repo, baseline, quarantine_path=document_path)
+
+
+# The precondition every half below rests on: without a document, this artifact
+# is a violation (so "honoured" means something, and the refusals are not vacuous).
+plain = verdict(f"{docs}/never-written.json")
+check(
+    "with no quarantine at all, the planted artifact IS a violation (the precondition)",
+    not plain.ok and branch in {e.name for e in plain.new_violations} and plain.quarantined == (),
+    f"violations={sorted(e.name for e in plain.new_violations)}",
+)
+
+# (iii) an entry naming a real, present, unmatched artifact at its exact tip IS honoured
+honoured = verdict(document("honoured", entries=present))
+quarantined = {e.name for e in honoured.quarantined}
+fixture_violations = {e.name for e in honoured.new_violations} & {branch, worktree}
+check(
+    "an entry naming the artifact at the tip it records IS honoured, and the verdict is OK",
+    honoured.assessable and honoured.ok and branch in quarantined and worktree in quarantined
+    and not fixture_violations and not honoured.stale_quarantine,
+    f"quarantined={sorted(quarantined)} violations={sorted(fixture_violations)} "
+    f"stale={sorted(e.name for e in honoured.stale_quarantine)}",
+)
+check(
+    "and the excused artifact is not 'young' either (it is excused, not deferred)",
+    branch not in {e.name for e in honoured.young},
+)
+check(
+    "and it is still REPORTED by name on every pass",
+    branch in honoured.describe() and worktree in honoured.describe(),
+)
+
+# (i) an entry that matches nothing FAILS as a stale exemption, by the name it carries
+absent = f"{branch}-absent-{int(now)}"
+stale_doc = verdict(document(
+    "stale",
+    entries=[{"kind": "branch", "name": absent, "tip": tip, "reason": "fixture: nothing is there"}],
+))
+stale = {e.name for e in stale_doc.stale_quarantine}
+check(
+    "an entry that matches nothing FAILS as a stale exemption, named",
+    stale_doc.assessable and not stale_doc.ok and absent in stale,
+    f"stale={sorted(stale)} ok={stale_doc.ok}",
+)
+
+# (i-b) an entry whose artifact is present but whose tip has MOVED is not absorbed
+moved = verdict(document(
+    "moved",
+    entries=[{"kind": "worktree", "name": worktree, "tip": "0" * 40, "reason": "fixture: not this artifact's tip"}],
+))
+check(
+    "an artifact whose tip has moved is NOT absorbed by its own entry",
+    not moved.ok and worktree in {e.name for e in moved.new_violations}
+    and worktree in {e.name for e in moved.stale_quarantine},
+    f"violations={sorted(e.name for e in moved.new_violations)}",
+)
+
+# (ii) a lease that is not open, or has expired, is not honoured
+for label, kwargs in (
+    ("closed tracking issue", {"state": "closed"}),
+    ("expired measurement", {"measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 30 * 3600))}),
+):
+    lapsed = verdict(document("lease", entries=present, **kwargs))
+    check(
+        f"a lease with a {label} is NOT honoured: nothing is excused and the lease fails by name",
+        not lapsed.ok and lapsed.quarantined == ()
+        and branch in {e.name for e in lapsed.new_violations}
+        and "#1291" in {e.name for e in lapsed.stale_quarantine},
+        f"stale={sorted(e.name for e in lapsed.stale_quarantine)} "
+        f"violations={sorted(e.name for e in lapsed.new_violations)}",
+    )
+
+# (iv) a document that cannot be read is CANNOT-ASSESS, never a pass
+broken = verdict(document("broken", raw="{not json"))
+check(
+    "an unreadable quarantine document is CANNOT-ASSESS, never a pass",
+    not broken.assessable and not broken.ok,
+    f"assessable={broken.assessable}",
+)
+
+if problems:
+    print(f"  ({len(problems)} quarantine proof(s) failed)", file=sys.stderr)
+    raise SystemExit(1)
+PYQUARANTINE
+  then
+    :
+  else
+    fail=$((fail + 1))
+  fi
+else
+  echo "  FAIL  could not create the §6e quarantine fixture (#1291)" >&2
+  fail=$((fail + 1))
+fi
 
 if [ "$fail" -gt 0 ]; then
   echo "check-reconcile: FAIL ($fail violation(s))" >&2

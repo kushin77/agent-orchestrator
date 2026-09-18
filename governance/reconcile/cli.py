@@ -238,7 +238,9 @@ def _cmd_status_prune_stale(args: argparse.Namespace) -> int:
     from governance.reconcile.real_tree_baseline import check_real_tree, prune_stale
 
     baseline_path = args.real_tree_baseline
-    verdict = check_real_tree(args.root, baseline_path)
+    verdict = check_real_tree(
+        args.root, baseline_path, quarantine_path=args.real_tree_quarantine
+    )
     print(verdict.describe())
     if not verdict.assessable:
         print("reconcile-status: CANNOT-ASSESS — the real tree could not be audited", file=sys.stderr)
@@ -403,6 +405,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--real-tree-baseline",
         default=str(ROOT / "governance" / "reconcile" / "real-tree-baseline.json"),
         help="the reviewed baseline the real-tree audit is checked against (#740)",
+    )
+    status_cmd.add_argument(
+        "--real-tree-quarantine",
+        default=str(ROOT / "governance" / "reconcile" / "real-tree-quarantine.json"),
+        help=(
+            "the reviewed, named exemptions for artifacts the worker may not discard "
+            "(#1291) — honoured only while their tracking issue is open and the "
+            "declared measurement is within its lease"
+        ),
     )
     status_cmd.add_argument(
         "--prune-stale",

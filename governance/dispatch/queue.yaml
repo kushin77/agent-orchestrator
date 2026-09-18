@@ -40,13 +40,13 @@ waves:
     # closed at seed time and omitted). `queue --fix` (#1113) has since
     # pruned #714, #712, #900, #715, #713, #902 as closed on GitHub, leaving
     # only the still-open #830.
-    issues: [830]
+    issues: []
 
   - name: wave-1-epic-878-lanes
     # EPIC #878 lanes L1-L11, forced order by dependency shape (owner queue
     # comment, section B, items 9-19). `queue --fix` (#1113) has since
     # pruned #882, #883, #885, #887, #888, #889 as closed on GitHub.
-    issues: [880, 881, 884, 886, 890]
+    issues: []
 
   - name: wave-2-epic-706-residual-and-golive
     # Seeded from #706 residual + go-live #607 (owner queue comment,

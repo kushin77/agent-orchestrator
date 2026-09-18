@@ -51,7 +51,9 @@
         "new_violations": {"type": "integer"},
         "stale_entries": {"type": "integer"},
         "young": {"type": "integer"},
-        "vanished": {"type": "integer"}
+        "vanished": {"type": "integer"},
+        "quarantined": {"type": "integer"},
+        "stale_quarantine": {"type": "integer"}
       },
       "additionalProperties": false
     },
