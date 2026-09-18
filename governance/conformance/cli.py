@@ -18,6 +18,7 @@ Subcommands::
     change-set   check the current diff against the mandates
     filing-check the filing path derives declaring labels, and refuses when it cannot
     file         the supported hand-run filing path (derives the labels for you)
+    labels       show the recorded label inventory, or re-record it (--refresh)
     policy       print the declared policy
     report       write .verify/conformance-report.json without failing
 
@@ -28,6 +29,7 @@ Examples::
     python3 governance/conformance/cli.py change-set --base origin/master
     python3 governance/conformance/cli.py filing-check
     python3 governance/conformance/cli.py file --title "..." --body "..." --dry-run
+    python3 governance/conformance/cli.py labels --refresh
 """
 
 from __future__ import annotations
@@ -45,16 +47,25 @@ if _PKG_DIR not in sys.path:
     sys.path.insert(0, _PKG_DIR)
 
 from checker import (  # noqa: E402
+    CODE_FILING_LABEL_UNRESOLVED,
+    LABELS_RELPATH,
+    LABELS_REFRESH_VERB,
     POLICY_RELPATH,
     REPORT_RELPATH,
     SNAPSHOT_RELPATH,
     SUITES_RELPATH,
+    LabelsUnavailable,
     PolicyUnavailable,
+    audit_filing_labels,
     check_board,
     check_change_set,
+    default_filing_labels,
+    load_label_inventory,
     load_policy,
     load_snapshot,
     missing_suite_registration,
+    record_label_inventory,
+    unresolvable_labels,
     write_report,
 )
 from filing import (  # noqa: E402
@@ -216,6 +227,60 @@ def cmd_policy(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_labels(args: argparse.Namespace) -> int:
+    """The recorded label vocabulary, and the defaults it resolves (issue #1160).
+
+    Two modes, one artifact. Without ``--refresh`` this is offline and read-only:
+    it answers "do the labels the filing defaults derive actually exist on this
+    repository?" against the committed inventory. With ``--refresh`` it re-records
+    that inventory from the live label set — the one path that touches the network,
+    and the verb every refusal names.
+    """
+    inventory_path = args.root / LABELS_RELPATH
+
+    if args.refresh:
+        recorded, detail = record_label_inventory(inventory_path, repo=args.repo)
+        if not recorded:
+            print("conformance: CANNOT-ASSESS — %s" % detail, file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        print("labels: RECORDED — %s" % detail)
+        print("  inventory: %s" % inventory_path)
+
+    try:
+        inventory = load_label_inventory(inventory_path)
+    except LabelsUnavailable as exc:
+        print("conformance: CANNOT-ASSESS — %s" % exc, file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    print("labels: %d recorded in %s" % (len(inventory), inventory_path))
+
+    try:
+        policy = load_policy(args.root / POLICY_RELPATH)
+    except PolicyUnavailable as exc:
+        print("conformance: CANNOT-ASSESS — %s" % exc, file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    derived = default_filing_labels(policy)
+    missing = unresolvable_labels(derived, inventory)
+    print("  filing defaults derive: %s" % ", ".join(derived))
+    if missing:
+        for finding in audit_filing_labels(
+            policy,
+            inventory,
+            policy_path=POLICY_RELPATH,
+            inventory_path=LABELS_RELPATH,
+        ):
+            print("  %-7s %-28s %s" % ("ERROR", finding.code, finding.message))
+        print(
+            "labels: FAIL — %d derived label(s) are not recorded on this repository"
+            % len(missing),
+            file=sys.stderr,
+        )
+        return EXIT_NOT_OK
+    print("labels: OK — every label the filing defaults derive is recorded")
+    return EXIT_OK
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     """Write the report and never fail — for board reporting."""
     namespace = argparse.Namespace(**vars(args))
@@ -292,6 +357,16 @@ def cmd_filing_check(args: argparse.Namespace) -> int:
     """
     policy = _policy_or_cannot_assess(args.root)
     if policy is None:
+        return EXIT_CANNOT_ASSESS
+
+    # The recorded label vocabulary (issue #1160) is REQUIRED: the resolvability
+    # expectation below is graded against it, and absence must fail closed rather
+    # than resolve every label by default. A missing, unparseable or empty
+    # inventory is therefore CANNOT-ASSESS for the whole self-control, never a pass.
+    try:
+        inventory = load_label_inventory(args.root / LABELS_RELPATH)
+    except LabelsUnavailable as exc:
+        print("conformance: CANNOT-ASSESS — %s" % exc, file=sys.stderr)
         return EXIT_CANNOT_ASSESS
 
     results: list = []
@@ -571,6 +646,87 @@ def cmd_filing_check(args: argparse.Namespace) -> int:
             "missing=%s" % ", ".join(exc.missing),
         )
 
+    # 15. RESOLVABILITY (issue #1160): deriving a label is not the same as the
+    #     repository HAVING it. `gh issue create` refuses a label that does not
+    #     exist, so a `filing.defaults` entry naming one breaks the DEFAULT filing
+    #     path in production while a derivation-only control stays green — measured:
+    #     the policy derived `area:governance`, which this repository has never had,
+    #     so every filing that left `area` to the default was refused by GitHub.
+    derived: tuple = ()
+    try:
+        derived = default_filing_labels(policy)
+        unresolved = unresolvable_labels(derived, inventory)
+        expect(
+            "every label the filing defaults derive exists on the repository",
+            not unresolved,
+            "derived=%s | unresolved=%s"
+            % (", ".join(derived), ", ".join(unresolved) or "(none)"),
+        )
+    except FilingRefused as exc:
+        expect(
+            "every label the filing defaults derive exists on the repository",
+            False,
+            exc.loud_message,
+        )
+
+    #     The refusal must be REACHABLE, and it must name the file, the label and
+    #     the one refresh verb: a default naming a label the inventory does not
+    #     record is refused by name, so the operator does not have to work out
+    #     which artifact to re-record. The probe's premise is asserted rather than
+    #     assumed — if the label it plants is ever recorded, this expectation FAILS
+    #     instead of passing vacuously.
+    probe_label = "area:conformance-label-probe"
+    if probe_label in inventory:
+        expect(
+            "refuses a filing default naming a label the repository does not have",
+            False,
+            "%s IS recorded, so this probe cannot demonstrate the refusal"
+            % probe_label,
+        )
+    else:
+        planted = replace(
+            policy,
+            filing_defaults=dict(policy.filing_defaults, area="conformance-label-probe"),
+        )
+        planted_findings = audit_filing_labels(
+            planted,
+            inventory,
+            policy_path=POLICY_RELPATH,
+            inventory_path=LABELS_RELPATH,
+        )
+        planted_text = "; ".join(
+            "%s REMEDY: %s" % (finding.message, finding.remediation)
+            for finding in planted_findings
+        )
+        expect(
+            "refuses a filing default naming a label the repository does not have",
+            len(planted_findings) == 1
+            and planted_findings[0].code == CODE_FILING_LABEL_UNRESOLVED
+            and probe_label in planted_text
+            and str(POLICY_RELPATH) in planted_text
+            and LABELS_REFRESH_VERB in planted_text,
+            planted_text or "no finding for `%s`" % probe_label,
+        )
+
+    #     ABSENCE FAILS CLOSED: the loader must refuse an inventory it cannot read
+    #     (missing, unparseable, or empty) rather than return an empty vocabulary
+    #     against which every label resolves. Without this half, deleting
+    #     `labels.json` would turn the control off silently.
+    absent = args.root / LABELS_RELPATH.with_name("labels.absent-probe.json")
+    try:
+        load_label_inventory(absent)
+        expect(
+            "refuses an unreadable label inventory (absence fails closed)",
+            False,
+            "it returned a vocabulary for a file that does not exist",
+        )
+    except LabelsUnavailable as exc:
+        expect(
+            "refuses an unreadable label inventory (absence fails closed)",
+            LABELS_REFRESH_VERB in str(exc),
+            str(exc),
+        )
+
     unmet = [index for index, ok in enumerate(results, start=1) if not ok]
     if unmet:
         print(
@@ -607,6 +763,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_policy = sub.add_parser("policy", help="print the declared policy")
     p_policy.set_defaults(func=cmd_policy)
+
+    p_labels = sub.add_parser(
+        "labels",
+        help="show the recorded label inventory, or re-record it (--refresh)",
+    )
+    p_labels.add_argument(
+        "--refresh",
+        action="store_true",
+        help="re-record the inventory from the live label set (needs network)",
+    )
+    p_labels.add_argument(
+        "--repo",
+        default=DEFAULT_REPO,
+        help="the repository whose labels the inventory records",
+    )
+    p_labels.set_defaults(func=cmd_labels)
 
     p_filing_check = sub.add_parser(
         "filing-check",

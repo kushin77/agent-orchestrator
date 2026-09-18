@@ -1,39 +1,41 @@
 #!/usr/bin/env bash
-# check-merge-guard.sh — prove the lane merge path is GUARDED, offline and
-# without merging anything (issue #1145, parent #878).
+# check-merge-guard.sh — the raw merge path must be guarded, and the instruction
+# every spawned lane receives must name the guarded entrypoint (issue #1233,
+# parent #1145).
 #
 # THE DEFECT THIS EXISTS FOR
-#   A trailer-less squash merge reds `check-isolation-landed` on master's own tip
-#   and therefore reds `make verify` for EVERY lane. The guard that renders the
-#   composed squash message (`scripts/check-squash-message.sh`) was consulted by
-#   `scripts/pr-queue.sh`, `governance/lifecycle`'s close-out and
-#   `governance/landing` -- but the agent-facing INSTRUCTION told every spawned
-#   lane to run `gh pr merge <n> --squash --delete-branch` directly, and that raw
-#   path consulted nothing. The leaks measured on 2026-09-17 (#1150, #1171,
-#   #1185, #1188, #1191) were all direct owner merges: the shape that instruction
-#   produces. `scripts/merge-pr.sh` is the guarded entrypoint; this gate proves
-#   the refusal is real AND that the producer instructs it.
+#   `gh pr merge --squash` composes the landed commit message from the PR body
+#   (`squash_merge_commit_message: PR_BODY`), so a body whose last paragraph is
+#   not the trailer block lands a commit carrying no `Refs <slug>#<n>`. Then
+#   `scripts/check-isolation-landed.sh` reddens on MASTER'S OWN TIP, which makes
+#   `make verify` red for every lane on the box. Eight recurrences in one day
+#   (#1145). `scripts/merge-pr.sh` now guards the raw path; this file proves that
+#   guard offline with nothing merged, and proves the instruction that spawns
+#   every lane hands out the guarded entrypoint instead of the raw command.
 #
-# WHAT IS PROVOKED (no network, no real gh, nothing merged)
-#   1. REFUSAL    -- the guard says NOT-OK => `merge-pr.sh --apply` exits 1,
-#                    names `squash-message-would-drop-trailer`, and `gh pr merge`
-#                    is NEVER invoked. A refusal that still merges is not a
-#                    refusal.
-#   2. PROCEED    -- the guard says OK => exit 0 and `gh pr merge <n> --squash`
-#                    IS invoked, exactly once. A control whose pass and fail
-#                    paths collapse into one exit code is a formality (GR-12).
-#   3. CANNOT-ASSESS -- the guard reaches no verdict (rc 2) => `merge-pr.sh`
-#                    exits 2 and `gh pr merge` is never invoked. An unreadable
-#                    guard is an unknown verdict, never a merge.
-#   4. THE PRODUCER -- the instruction surfaces that hand a lane its merge
-#                    command must name the guarded entrypoint and must NOT carry
-#                    a raw merge instruction. Provoked with a plant: the same
-#                    predicate, run over a fixture holding a raw instruction,
-#                    must REFUSE it by name -- so the rule cannot pass by
-#                    matching nothing.
-#   5. NO INPUT     -- a missing guard is CANNOT-ASSESS (exit 2), never OK.
+# HOW — everything below runs OFFLINE. A scratch PATH puts a RECORDING fake `gh`
+# in front of the real one, and the REAL `scripts/check-squash-message.sh` is
+# driven through it, so the refusal observed here is the real predicate's
+# refusal and not a stub's:
+#   1. NOT-OK: `gh pr view` answers with a body whose last paragraph is not the
+#      trailer block. merge-pr.sh must exit 1, print the refusal name
+#      `squash-message-would-drop-trailer`, report the predicate's own finding
+#      `commit-missing-ticket-trailer`, and the recording `gh` must show that
+#      `gh pr merge` was NEVER invoked. Run in apply mode, so that last claim is
+#      load-bearing rather than trivially true.
+#   2. OK: a trailer-bearing body. Dry run by default (exit 0, nothing merged),
+#      then AO_MERGE_APPLY=1 must exit 0 and record `gh pr merge` EXACTLY once.
+#   3. NO VERDICT: `gh pr view` fails, so the guard reports CANNOT-ASSESS.
+#      merge-pr.sh must exit 2 and NEVER merge (also asserted in apply mode).
+#   4. The instruction surfaces: the source of the ONE render module AND the
+#      prompt it actually renders must both hand out `scripts/merge-pr.sh`, and
+#      no line of either may mention `gh pr merge` without naming it. A PLANTED
+#      raw instruction (the verbatim pre-fix prose that spawned the eight
+#      offenders) must be refused BY NAME, and a surface with the guarded
+#      entrypoint removed must be refused by the OTHER name — so the rule can
+#      neither pass by matching nothing nor fire on everything.
 #
-# Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+# Exit contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/check-merge-guard.sh
 set -uo pipefail
@@ -41,204 +43,348 @@ set -uo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
 
-ENTRY="scripts/merge-pr.sh"
-GUARD="scripts/check-squash-message.sh"
-#: The files whose PROSE hands a lane a merge command. Deliberately literal: a
-#: glob would make the surface set grow silently, which is the defect this
-#: section exists to catch.
-SURFACES="governance/spawn/render.py fleet/terminal.py"
-
 FAILED=0
 fail() { printf '  FAIL  %s\n' "$*" >&2; FAILED=$((FAILED + 1)); }
 ok() { printf '  ok    %s\n' "$*"; }
 
+# Has <file> <needle> — a containment test that cannot kill its own producer
+# (no pipe into a quiet grep; see scripts/check-verdict-contains.sh).
+has() { grep -qF -- "$2" "$1"; }
+
 TMPD=""
 cleanup() { [ -n "$TMPD" ] && rm -rf "$TMPD" || true; }
 trap cleanup EXIT
-TMPD="$(mktemp -d /tmp/ao1145-merge-guard.XXXXXX)" || {
+
+entry="scripts/merge-pr.sh"
+guard="scripts/check-squash-message.sh"
+# The ONE render module: the copy of the instruction prose every spawned lane
+# receives (its own docstring makes that claim, and part 4 below measures it
+# against the other spawn path).
+render_module="governance/spawn/render.py"
+
+[ -f "$entry" ] || { echo "check-merge-guard: CANNOT-ASSESS — $entry is missing" >&2; exit 2; }
+[ -f "$guard" ] || { echo "check-merge-guard: CANNOT-ASSESS — $guard is missing" >&2; exit 2; }
+[ -f "$render_module" ] || { echo "check-merge-guard: CANNOT-ASSESS — $render_module is missing" >&2; exit 2; }
+command -v python3 >/dev/null 2>&1 || {
+  echo "check-merge-guard: CANNOT-ASSESS — python3 is not on PATH" >&2
+  exit 2
+}
+
+TMPD="$(mktemp -d "/tmp/ao1233-merge-guard.$(printf 'X%.0s' 1 2 3 4 5 6)" 2>/dev/null)" || {
   echo "check-merge-guard: CANNOT-ASSESS — no scratch directory" >&2
   exit 2
 }
 
-echo "== check-merge-guard: the lane merge path is guarded =="
+# --- the recording fake `gh` -------------------------------------------------
+fakebin="$TMPD/bin"
+mkdir -p "$fakebin"
 
-# --- 0. structural ----------------------------------------------------------
-for f in "$ENTRY" "$GUARD" $SURFACES; do
-  if [ ! -f "$f" ]; then
-    echo "check-merge-guard: CANNOT-ASSESS — $f is missing" >&2
-    exit 2
+cat > "$fakebin/gh" <<'GH'
+#!/usr/bin/env bash
+# A RECORDING fake gh for check-merge-guard.sh. Never touches the network:
+#   pr view  -> the JSON at $AO_TEST_GH_VIEW_JSON, or a failure when
+#               $AO_TEST_GH_VIEW_MODE is `fail`
+#   pr merge -> appends the PR number to $AO_TEST_GH_MERGE_CALLS, exits 0
+set -u
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "view" ]; then
+  if [ "${AO_TEST_GH_VIEW_MODE:-ok}" = "fail" ]; then
+    echo "fake gh: could not resolve to a Repository (offline)" >&2
+    exit 1
   fi
-done
-ok "the entrypoint, the guard and every instruction surface exist"
-
-# --- fixtures: a scratch copy of the entrypoint + a stub guard + a fake gh ---
-fixture() { # fixture <guard-rc> <label> -> prints scratch entry path
-  local guard_rc="$1" label="$2"
-  local dir="$TMPD/$label"
-  mkdir -p "$dir/scripts" "$TMPD/bin"
-  cp "$root/$ENTRY" "$dir/scripts/merge-pr.sh"
-  {
-    printf '#!/usr/bin/env bash\n'
-    printf 'echo "check-squash-message: stub verdict %s" >&2\n' "$label"
-    printf 'exit %s\n' "$guard_rc"
-  } > "$dir/scripts/check-squash-message.sh"
-  chmod +x "$dir/scripts/check-squash-message.sh"
-  # A fake gh that records the invocation; it must NEVER be reached on a refusal.
-  {
-    printf '#!/usr/bin/env bash\n'
-    printf 'printf "%%s\\n" "$*" >> "$FAKE_GH_CALLS"\n'
-    printf 'exit 0\n'
-  } > "$TMPD/bin/gh"
-  chmod +x "$TMPD/bin/gh"
-  printf '%s' "$dir/scripts/merge-pr.sh"
-}
-
-run_entry() { # run_entry <entry> <calls-file> [args...]
-  local entry="$1" calls="$2"; shift 2
-  : > "$calls"
-  FAKE_GH_CALLS="$calls" PATH="$TMPD/bin:$PATH" AO_MERGE_APPLY=0 \
-    bash "$entry" "$@" > "$TMPD/out.txt" 2>&1
-  echo $?
-}
-
-# --- 1. REFUSAL: the guard says NOT-OK -> refuse, and never call gh ---------
-entry="$(fixture 1 notok)"
-rc="$(run_entry "$entry" "$TMPD/calls-notok.txt" --pr 10 --apply)"
-if [ "$rc" -eq 1 ]; then
-  ok "REFUSAL: merge-pr.sh exits 1 when the guard reports NOT-OK"
-else
-  fail "REFUSAL: merge-pr.sh exit=$rc, expected 1"
+  cat "$AO_TEST_GH_VIEW_JSON"
+  exit 0
 fi
-if grep -q 'squash-message-would-drop-trailer' "$TMPD/out.txt"; then
-  ok "REFUSAL: the refusal is named squash-message-would-drop-trailer"
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "merge" ]; then
+  printf '%s\n' "${3:-}" >> "$AO_TEST_GH_MERGE_CALLS"
+  exit 0
+fi
+echo "fake gh: unexpected invocation: $*" >&2
+exit 1
+GH
+chmod +x "$fakebin/gh"
+
+# --- the two PR bodies the fake `gh pr view` answers with -------------------
+view_bad="$TMPD/view-bad.json"
+view_good="$TMPD/view-good.json"
+python3 - "$view_bad" "$view_good" <<'PY'
+import json
+import sys
+
+bad, good = sys.argv[1], sys.argv[2]
+with open(bad, "w", encoding="utf-8") as handle:
+    json.dump(
+        {
+            "title": "fix(thing): do the thing",
+            "body": "What changed.\n\nSome detail with no trailer paragraph at all.\n",
+        },
+        handle,
+    )
+with open(good, "w", encoding="utf-8") as handle:
+    json.dump(
+        {
+            "title": "fix(thing): do the thing",
+            "body": "What changed.\n\nSome detail.\n\nRefs kushin77/agent-orchestrator#1233\n",
+        },
+        handle,
+    )
+PY
+fixtures_rc=$?
+if [ "$fixtures_rc" -ne 0 ]; then
+  echo "check-merge-guard: CANNOT-ASSESS — could not write the scratch fixtures (rc=$fixtures_rc)" >&2
+  exit 2
+fi
+
+# --- drive the REAL entrypoint (which drives the REAL guard) -----------------
+# <label> <view-mode> <json-file> <apply 0|1> -> prints the entrypoint's exit
+# code; its output lands in $TMPD/out-<label>.txt, the recorded merge calls in
+# $TMPD/calls-<label>.txt.
+run_merge() {
+  local label="$1" mode="$2" json="$3" apply="$4"
+  local calls out rc
+  calls="$TMPD/calls-$label.txt"
+  out="$TMPD/out-$label.txt"
+  : > "$calls"
+  AO_TEST_GH_MERGE_CALLS="$calls" AO_TEST_GH_VIEW_MODE="$mode" AO_TEST_GH_VIEW_JSON="$json" \
+    AO_MERGE_APPLY="$apply" PATH="$fakebin:$PATH" \
+    bash "$root/$entry" --pr 1233 > "$out" 2>&1
+  rc=$?
+  printf '%s' "$rc"
+}
+
+echo "== check-merge-guard: the merge entrypoint is gated on the squash-message guard =="
+
+# --- 1. NOT-OK: refused by name, and never merged ---------------------------
+rc="$(run_merge notok ok "$view_bad" 1)"
+if [ "$rc" = "1" ]; then
+  ok "NOT-OK verdict: merge-pr.sh exits 1 (refused)"
 else
-  fail "REFUSAL: the refusal is not named squash-message-would-drop-trailer"
+  fail "NOT-OK verdict: merge-pr.sh exit=$rc, expected 1"
+fi
+if has "$TMPD/out-notok.txt" "squash-message-would-drop-trailer"; then
+  ok "NOT-OK verdict: the refusal is named squash-message-would-drop-trailer"
+else
+  fail "NOT-OK verdict: the refusal is not named squash-message-would-drop-trailer"
+fi
+if has "$TMPD/out-notok.txt" "commit-missing-ticket-trailer"; then
+  ok "NOT-OK verdict: the REAL shared predicate fired (commit-missing-ticket-trailer), not a stub"
+else
+  fail "NOT-OK verdict: the shared predicate's own finding was not reported"
 fi
 if [ -s "$TMPD/calls-notok.txt" ]; then
-  fail "REFUSAL: gh was invoked although the guard refused: $(tr '\n' ' ' < "$TMPD/calls-notok.txt")"
+  fail "NOT-OK verdict: gh pr merge was recorded although the guard refused"
 else
-  ok "REFUSAL: gh pr merge was never invoked"
+  ok "NOT-OK verdict: gh pr merge was never invoked"
 fi
 
-# --- 2. PROCEED: the guard says OK -> merge, exactly once -------------------
-entry="$(fixture 0 ok)"
-rc="$(run_entry "$entry" "$TMPD/calls-ok.txt" --pr 10 --apply)"
-if [ "$rc" -eq 0 ]; then
-  ok "PROCEED: merge-pr.sh exits 0 when the guard reports OK"
+# --- 2. OK: dry run by default, then merged exactly once --------------------
+rc="$(run_merge ok-dryrun ok "$view_good" 0)"
+if [ "$rc" = "0" ]; then
+  ok "OK verdict (dry run by default): merge-pr.sh exits 0"
 else
-  fail "PROCEED: merge-pr.sh exit=$rc, expected 0"
+  fail "OK verdict (dry run by default): merge-pr.sh exit=$rc, expected 0"
 fi
-if grep -q '^pr merge 10 --squash$' "$TMPD/calls-ok.txt"; then
-  ok "PROCEED: gh pr merge 10 --squash was invoked"
+if has "$TMPD/out-ok-dryrun.txt" "DRY RUN"; then
+  ok "OK verdict (dry run by default): the plan is printed instead of merging"
 else
-  fail "PROCEED: gh pr merge was not invoked with the expected argv: $(tr '\n' ' ' < "$TMPD/calls-ok.txt")"
+  fail "OK verdict (dry run by default): no DRY RUN plan was printed"
 fi
-if [ "$(wc -l < "$TMPD/calls-ok.txt")" -eq 1 ]; then
-  ok "PROCEED: gh was invoked exactly once"
+if [ -s "$TMPD/calls-ok-dryrun.txt" ]; then
+  fail "OK verdict (dry run by default): gh pr merge was recorded in dry-run mode"
 else
-  fail "PROCEED: gh was invoked $(wc -l < "$TMPD/calls-ok.txt") times, expected 1"
-fi
-
-# --- 3. CANNOT-ASSESS: no verdict -> refuse, never merge --------------------
-entry="$(fixture 2 cannot)"
-rc="$(run_entry "$entry" "$TMPD/calls-cannot.txt" --pr 10 --apply)"
-if [ "$rc" -eq 2 ]; then
-  ok "CANNOT-ASSESS: merge-pr.sh exits 2 when the guard reaches no verdict"
-else
-  fail "CANNOT-ASSESS: merge-pr.sh exit=$rc, expected 2"
-fi
-if [ -s "$TMPD/calls-cannot.txt" ]; then
-  fail "CANNOT-ASSESS: gh was invoked although the guard had no verdict"
-else
-  ok "CANNOT-ASSESS: gh pr merge was never invoked"
+  ok "OK verdict (dry run by default): gh pr merge was never invoked"
 fi
 
-# --- 3b. bad input is CANNOT-ASSESS, never OK -------------------------------
-rc="$(run_entry "$entry" "$TMPD/calls-bad.txt" --pr not-a-number --apply)"
-if [ "$rc" -eq 2 ]; then
-  ok "BAD INPUT: a non-numeric --pr is CANNOT-ASSESS (rc 2)"
+rc="$(run_merge ok-apply ok "$view_good" 1)"
+if [ "$rc" = "0" ]; then
+  ok "OK verdict (apply): merge-pr.sh exits 0"
 else
-  fail "BAD INPUT: a non-numeric --pr gave rc=$rc, expected 2"
+  fail "OK verdict (apply): merge-pr.sh exit=$rc, expected 0"
+fi
+merge_count="$(wc -l < "$TMPD/calls-ok-apply.txt")"
+merge_count="${merge_count// /}"
+if [ "$merge_count" = "1" ]; then
+  ok "OK verdict (apply): gh pr merge was invoked exactly once"
+else
+  fail "OK verdict (apply): gh pr merge was invoked $merge_count time(s), expected exactly 1"
+fi
+if [ "$(head -n1 "$TMPD/calls-ok-apply.txt")" = "1233" ]; then
+  ok "OK verdict (apply): the recorded merge is for PR 1233"
+else
+  fail "OK verdict (apply): the recorded merge names the wrong PR"
 fi
 
-# --- 3c. missing --pr is CANNOT-ASSESS -------------------------------------
-rc="$(run_entry "$entry" "$TMPD/calls-nopr.txt" --apply)"
-if [ "$rc" -eq 2 ]; then
-  ok "BAD INPUT: a missing --pr is CANNOT-ASSESS (rc 2)"
+# --- 3. NO VERDICT: CANNOT-ASSESS, and never merged -------------------------
+rc="$(run_merge noverdict fail "$view_good" 1)"
+if [ "$rc" = "2" ]; then
+  ok "no verdict: merge-pr.sh exits 2 (CANNOT-ASSESS)"
 else
-  fail "BAD INPUT: a missing --pr gave rc=$rc, expected 2"
+  fail "no verdict: merge-pr.sh exit=$rc, expected 2"
+fi
+if has "$TMPD/out-noverdict.txt" "CANNOT-ASSESS"; then
+  ok "no verdict: the refusal is named CANNOT-ASSESS"
+else
+  fail "no verdict: the refusal is not named CANNOT-ASSESS"
+fi
+if [ -s "$TMPD/calls-noverdict.txt" ]; then
+  fail "no verdict: gh pr merge was recorded although the guard reached no verdict"
+else
+  ok "no verdict: gh pr merge was never invoked"
 fi
 
-# --- 4. THE PRODUCER: the instruction surfaces hand out the guarded entry ----
-# A raw merge instruction is a command line that invokes the GitHub CLI's merge
-# subcommand. Written as a regex so this very file does not contain the literal.
-raw_merge_res='gh[[:space:]]+pr[[:space:]]+merge'
+# --- 4. the instruction surfaces --------------------------------------------
+echo "== check-merge-guard: the spawn instruction hands out the guarded entrypoint =="
 
-scan_surfaces() { # scan_surfaces <file...> -> 0 clean / 1 refused (named)
-  local f hits=0
-  for f in "$@"; do
-    [ -f "$f" ] || continue
-    hits="$(grep -nE "$raw_merge_res" "$f" 2>/dev/null || true)"
-    if [ -n "$hits" ]; then
-      printf '  FAIL  raw-merge-instruction:%s\n' "$f" >&2
-      printf '%s\n' "$hits" | sed 's/^/        /' >&2
-      return 1
-    fi
-  done
-  return 0
+# The rule, in ONE place, applied to ONE surface: a surface must name the
+# guarded entrypoint, and no LINE of it may mention the raw command without
+# naming that entrypoint. Line granularity rather than whole-file granularity on
+# purpose: the pre-fix prose named `gh pr merge` and named no entrypoint at all,
+# and the cheap whole-file version of this rule would have passed that prose the
+# moment any other line of the file happened to mention merge-pr.sh.
+cat > "$TMPD/scan.py" <<'PY'
+import sys
+
+GUARD = "scripts/merge-pr.sh"
+RAW = "gh pr merge"
+RAW_FINDING = "instruction-teaches-raw-merge"
+MISSING_FINDING = "instruction-missing-guarded-entrypoint"
+
+
+def findings(text):
+    """The finding names a single surface earns, in report order."""
+    out = []
+    if GUARD not in text:
+        out.append(MISSING_FINDING)
+    for line in text.splitlines():
+        if RAW in line and GUARD not in line:
+            out.append(RAW_FINDING)
+    return out
+
+
+bad = 0
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError as exc:
+        sys.stderr.write("check-merge-guard: CANNOT-ASSESS — cannot read %s: %s\n" % (path, exc))
+        raise SystemExit(2)
+    for finding in findings(text):
+        print("%s %s" % (finding, path))
+        bad = 1
+raise SystemExit(bad)
+PY
+
+# <label> <file>... -> prints the scanner's exit code; findings land in
+# $TMPD/scan-<label>.txt. The scanner takes file paths, so the REAL surfaces and
+# the planted ones are read by the very same code path.
+run_scan() {
+  local label="$1"
+  shift
+  local out rc
+  out="$TMPD/scan-$label.txt"
+  python3 "$TMPD/scan.py" "$@" > "$out" 2>"$TMPD/scan-$label.err"
+  rc=$?
+  printf '%s' "$rc"
 }
 
-if scan_surfaces $SURFACES; then
-  ok "PRODUCER: no instruction surface hands a lane a raw merge command"
-else
-  fail "PRODUCER: an instruction surface still hands a lane a raw merge command"
+# The fleet shape, not a minimal one: session identity, lane and trailer all
+# present, so the rendered prompt carries the same prose a real spawn receives.
+python3 - "$TMPD/rendered-prompt.txt" <<'PY'
+import sys
+
+sys.path.insert(0, ".")
+from governance.spawn import render  # noqa: E402
+
+document = {
+    "issue": 1233,
+    "session": {"agent": "check-merge-guard"},
+    "lane": "standards",
+    "trailer": "Refs kushin77/agent-orchestrator#1233",
+}
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    handle.write(render.prompt(document))
+PY
+render_rc=$?
+if [ "$render_rc" -ne 0 ]; then
+  echo "check-merge-guard: CANNOT-ASSESS — could not render the spawn prompt (rc=$render_rc)" >&2
+  exit 2
 fi
 
-# The guarded entrypoint must actually be NAMED where the instruction lives, or
-# a lane is told to run something that does not exist and improvises.
-if grep -q 'merge-pr\.sh' governance/spawn/render.py; then
-  ok "PRODUCER: governance/spawn/render.py names the guarded entrypoint"
+surface_source="$root/$render_module"
+surface_prompt="$TMPD/rendered-prompt.txt"
+
+# The plants. The first is the VERBATIM pre-fix instruction (the producer that
+# spawned the eight offenders), so the negative control is the measured defect
+# rather than a shape invented for the test.
+plant_raw="$TMPD/plant-raw-instruction.txt"
+cat > "$plant_raw" <<'PLANT'
+4. After `make verify` is green and the PR is open, squash-merge it with `gh pr merge <number> --squash --delete-branch`, then close the issue. NEVER leave a completed PR unmerged or the issue open.
+PLANT
+
+plant_noguard="$TMPD/plant-no-guard.txt"
+cat > "$plant_noguard" <<'PLANT'
+4. After `make verify` is green and the PR is open, merge the PR and close the issue.
+PLANT
+
+plant_guarded="$TMPD/plant-guarded-instruction.txt"
+cat > "$plant_guarded" <<'PLANT'
+4. Land the PR through `bash scripts/merge-pr.sh --pr <number>`; running `gh pr merge <number> --squash` instead of that entrypoint is FORBIDDEN.
+PLANT
+
+# 4a. the real surfaces: both must hand out the guarded entrypoint
+rc="$(run_scan real "$surface_source" "$surface_prompt")"
+if [ "$rc" = "0" ] && [ ! -s "$TMPD/scan-real.txt" ]; then
+  ok "instruction surfaces: the render module's source and the prompt it renders both name $entry"
 else
-  fail "PRODUCER: governance/spawn/render.py does not name scripts/merge-pr.sh"
+  fail "instruction surfaces: refused (rc=$rc):"
+  sed 's/^/        /' "$TMPD/scan-real.txt" >&2
 fi
 
-# NEGATIVE CONTROL: the same predicate must REFUSE a planted raw instruction --
-# asserted only on the clean case, the rule would pass a predicate matching
-# nothing. The FAIL printed inside this provocation is EXPECTED (it is the
-# refusal being proved), which is why it is framed as one.
-echo "== provocation: a planted raw merge instruction must be refused (may FAIL) =="
-plant="$TMPD/planted-instruction.txt"
-printf 'squash-merge it with `gh pr merge <number> --squash --delete-branch`\n' > "$plant"
-if scan_surfaces "$plant" 2> "$TMPD/plant.out"; then
-  fail "NEGATIVE CONTROL: a planted raw merge instruction was NOT refused"
+# 4b. the planted raw instruction must be refused BY NAME
+rc="$(run_scan plantraw "$plant_raw")"
+if [ "$rc" = "1" ] && has "$TMPD/scan-plantraw.txt" "instruction-teaches-raw-merge"; then
+  ok "instruction surfaces: the verbatim pre-fix instruction is refused by name (instruction-teaches-raw-merge)"
 else
-  if grep -q 'raw-merge-instruction' "$TMPD/plant.out"; then
-    ok "NEGATIVE CONTROL: a planted raw merge instruction is refused by name"
-  else
-    fail "NEGATIVE CONTROL: the planted instruction was refused but not by name"
-  fi
-fi
-# ... and a clean file must still pass, so the rule cannot match everything.
-clean="$TMPD/clean-instruction.txt"
-printf 'merge it with `bash scripts/merge-pr.sh --pr <number> --apply`\n' > "$clean"
-if scan_surfaces "$clean" 2> "$TMPD/clean.out"; then
-  ok "NEGATIVE CONTROL: a guarded instruction is accepted (the rule is not blanket)"
-else
-  fail "NEGATIVE CONTROL: a guarded instruction was wrongly refused"
+  fail "instruction surfaces: the planted raw instruction was NOT refused by name (rc=$rc)"
 fi
 
-# --- 5. no input: a missing guard is CANNOT-ASSESS, never OK ----------------
-rm -f "$TMPD/ok/scripts/check-squash-message.sh"
-rc="$(run_entry "$TMPD/ok/scripts/merge-pr.sh" "$TMPD/calls-noguard.txt" --pr 10 --apply)"
-if [ "$rc" -eq 2 ]; then
-  ok "NO INPUT: a missing guard is CANNOT-ASSESS (rc 2), never a merge"
+# 4c. attribution: a surface with the entrypoint removed is refused by the OTHER
+# name, which is what proves 4b came from the raw-command rule and not from this
+# one (an assertion that only checked "a finding fired" would conflate them).
+rc="$(run_scan plantnoguard "$plant_noguard")"
+if [ "$rc" = "1" ] && has "$TMPD/scan-plantnoguard.txt" "instruction-missing-guarded-entrypoint"; then
+  ok "instruction surfaces: a surface naming no guarded entrypoint is refused by name (instruction-missing-guarded-entrypoint)"
 else
-  fail "NO INPUT: a missing guard gave rc=$rc, expected 2"
+  fail "instruction surfaces: a surface naming no guarded entrypoint was NOT refused by name (rc=$rc)"
+fi
+if has "$TMPD/scan-plantnoguard.txt" "instruction-teaches-raw-merge"; then
+  fail "instruction surfaces: the no-entrypoint plant also tripped the raw-command rule, so 4b's attribution is not established"
+else
+  ok "instruction surfaces: the no-entrypoint plant trips ONLY the missing-entrypoint rule"
+fi
+
+# 4d. vacuity, the other direction: an instruction that names the entrypoint and
+# the raw command on the same line must be ACCEPTED, or the rule refuses
+# everything and proves nothing.
+rc="$(run_scan plantguarded "$plant_guarded")"
+if [ "$rc" = "0" ] && [ ! -s "$TMPD/scan-plantguarded.txt" ]; then
+  ok "instruction surfaces: a guarded instruction that names the entrypoint is accepted (the rule does not match everything)"
+else
+  fail "instruction surfaces: a guarded instruction was refused (rc=$rc):"
+  sed 's/^/        /' "$TMPD/scan-plantguarded.txt" >&2
+fi
+
+# 4e. the ONE-copy claim: the other spawn path must carry no second copy of the
+# prose, or the surface this check measured is not the surface agents receive.
+if has "$root/fleet/terminal.py" "gh pr merge"; then
+  fail "one copy: fleet/terminal.py carries a second copy of the merge instruction"
+else
+  ok "one copy: fleet/terminal.py carries no second copy of the merge instruction"
 fi
 
 echo ""
 if [ "$FAILED" -eq 0 ]; then
-  echo "check-merge-guard: OK — the merge path refuses a trailer-less squash by name, never merges on a refusal or on no verdict, and the instruction surfaces hand out the guarded entrypoint"
+  echo "check-merge-guard: OK — guarded refusals (NOT-OK and no-verdict) never merged, OK merged exactly once, and the instruction surfaces hand out $entry"
   exit 0
 fi
 echo "check-merge-guard: NOT-OK — $FAILED finding(s)" >&2

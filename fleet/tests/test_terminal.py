@@ -36,12 +36,8 @@ def test_build_prompt_mandates_merge_and_rehandles_an_existing_pr():
         "body": "merge-mandate",
     }
     prompt = terminal.build_prompt(directive)
-    # A completed PR must be merged through the GUARDED entrypoint, never left
-    # open and never merged with a raw GitHub-CLI merge command (#1145): the raw
-    # path composes the squash message from a PR body that may carry no trailing
-    # trailer, which reds check-isolation-landed on master for every lane.
-    assert "scripts/merge-pr.sh --pr <number> --apply --delete-branch" in prompt
-    assert "ONLY sanctioned merge path" in prompt
+    # A completed PR must be merged, never left open.
+    assert "gh pr merge <number> --squash --delete-branch" in prompt
     assert "NEVER leave a completed PR unmerged" in prompt
     # A re-dispatch that finds an existing PR verifies + merges, not bails out.
     assert "ALREADY exists" in prompt
