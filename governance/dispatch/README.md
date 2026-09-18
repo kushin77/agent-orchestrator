@@ -146,7 +146,7 @@ sidestepped by calling the mutation directly. Each refusal names what it read:
 | Refusal | Refused when | Evidence named |
 |---|---|---|
 | `issue-closed` | the issue is closed in the board | the snapshot (source, generation, digest) and the issue's `state` / `closed_at` |
-| `epic-closed` | the issue declares a `Parent:` edge to a closed epic | the same, for both the issue and the epic |
+| `epic-closed` | the issue declares a `Parent:` edge to a closed epic | the same, for both the issue and the epic, **plus the closed parent by name and the remedy that clears the refusal** (#1259) |
 | `already-claimed` | a live claim holds the unit (another agent, or another lane) | the holder's agent **and lane**, since when, plus the ledger and lock path |
 | `unowned` | the dispatch and the directive both name no lane | the empty lane and the directive that would have declared one |
 | `provenance-mismatch` | the directive declares an epic or lane the board does not corroborate | the directive file, the declared `task.epic` / `task.lane`, and the board's own edge |
@@ -241,6 +241,25 @@ dangling-epic: #12 declares Parent #7, which is closed (the ownering epic)
 
 The refusal is deliberately **not** relaxed: the fix is visibility plus a
 reachable re-parenting path, not a silent re-allow.
+
+**The refusal itself names the remedy (issue #1259).** #1179 named the dead-end in
+the *report* (`status`/`dangling`) but the *refusal* a lane actually hits —
+`claim`/`dispatch`/`eligible` — still answered with a bare cause, so the agent that
+hit the dead end was the one reader never told what to do, and the state is
+**permanent** until the board is re-pointed. Both surfaces now derive from ONE
+phrase (`order.REMEDY_REPARENT`): the report via `order.REMEDIATION_REPARENT` and
+the refusal via `order.closed_parent_remedy(parent)`, which `order.eligible` (and
+`order.frontier`, which applies the same predicate) and the claim-time arbitration
+(`claims._arbitrate_unaudited`) both call. The refusal still stands; it is simply no
+longer a dead end:
+
+```
+$ python3 governance/dispatch/cli.py claim --issue 11 --agent me --lane governance
+claim REFUSED: epic-closed — #11's epic is closed — evidence: <in-memory snapshot>
+  (source …) issue #11 state=OPEN parent=#10 …; epic issue #10 state=CLOSED …
+  — remedy: re-point the issue's `Parent:` at the open epic that now owns the work
+  (or close the issue if the work is gone) — its declared parent #10 (the closed epic) is closed
+```
 
 Finally, `status` advertises the **claimable** frontier (issue #1168). The
 milestone frontier (`order.frontier`) applies every *issue-property* refusal

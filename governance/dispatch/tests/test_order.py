@@ -274,6 +274,41 @@ def test_a_non_active_epic_child_is_out_of_order_without_a_focus(tmp_path):
     assert verdict.reason == REASON_EPIC_CLOSED
 
 
+def test_an_epic_closed_refusal_names_the_parent_and_the_remedy():
+    """Issue #1259: the refusal names the parent AND the way out, not only the cause.
+
+    The state is PERMANENT until someone re-points the board, so a refusal that
+    stops at `epic-closed` is a dead end the reader cannot act on.
+    """
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            10: Issue(10, "the closed epic", state="closed", labels=("type:epic",)),
+            11: Issue(11, "child of a closed epic", milestone="M1", parent=10),
+        },
+    )
+    verdict = order.eligible(board, 11)
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_EPIC_CLOSED
+    assert "#10" in verdict.detail, "the closed parent must be named by number"
+    assert "the closed epic" in verdict.detail, "the closed parent must be named by title"
+    assert order.REMEDY_REPARENT in verdict.detail, "the ONE shared remedy phrase must be named"
+
+
+def test_the_report_and_the_refusal_name_the_same_remedy():
+    """One source, two consumers (#1259): the report's remedy and the refusal's agree."""
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={10: Issue(10, "the closed epic", state="closed", labels=("type:epic",))},
+    )
+    remedy = order.closed_parent_remedy(board.get(10))
+    assert order.REMEDY_REPARENT in remedy
+    assert order.REMEDY_REPARENT in order.REMEDIATION_REPARENT
+    assert "#10" in remedy and "the closed epic" in remedy
+
+
 def test_an_unrelated_open_board_item_is_still_refused(focused, snapshot):
     """Regression: epic focus adds an edge, it does not open the board."""
     verdict = order.eligible(snapshot, 603, focus_path=focused(600))
