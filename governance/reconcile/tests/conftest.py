@@ -133,12 +133,15 @@ class FakeAuditOps:
         branches: tuple[str, ...] = (),
         claims: dict[int, str] | None = None,
         landed: set[int] | None = None,
+        proofs: dict[str, str] | None = None,
         fail: tuple[str, ...] = (),
     ) -> None:
         self.worktrees = list(worktrees)
         self.branches = list(branches)
         self.claims = dict(claims or {})
         self.landed = set(landed or {})
+        #: name -> landing proof; an artifact with no entry is not proven (#1291).
+        self.proofs = dict(proofs or {})
         self.fail = set(fail)
         self.calls: list[str] = []
 
@@ -162,6 +165,11 @@ class FakeAuditOps:
     def landed_issues(self):
         self._record("landed_issues")
         return set(self.landed)
+
+    def landing_proof(self, kind: str, name: str, branch: str = "") -> str:
+        """The default-branch proof (#1291) — read-only, and never invented."""
+        self._record("landing_proof")
+        return self.proofs.get(name, "")
 
 
 @pytest.fixture
