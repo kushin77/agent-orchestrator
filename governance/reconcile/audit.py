@@ -21,7 +21,13 @@ orphaned because it *is* the repository) and every local ``issue-*`` branch is a
   (``governance.dispatch.claims``);
 * the **landing history** — ``.fleet/lifecycle/<issue>.json``, the journal the
   lifecycle close-out writes once an item's work has landed
-  (``governance.lifecycle.cli.JOURNAL_DIR``).
+  (``governance.lifecycle.cli.JOURNAL_DIR``);
+* the **landing proof** — the *work* is on the default branch, proven from the
+  default branch's own commits by ``landing.py`` (issue #1291). This is a
+  separate source on purpose: the journal above is **gitignored runtime state**,
+  so a lane that landed on a box that never wrote one was reported as an orphan
+  — measured at ``99f6b37``: 25 of 35 findings were false for exactly this
+  reason, and each one red a composite gate that serializes the whole fleet.
 
 An artifact no record explains is **reported by name**.
 
@@ -213,6 +219,18 @@ class AuditOps(Protocol):
     def active_claims(self) -> dict[int, str]: ...
 
     def landed_issues(self) -> set[int]: ...
+
+    def landing_proof(self, kind: str, name: str, branch: str) -> str:
+        """Evidence that this artifact's *work* is on the default branch (#1291).
+
+        ``""`` when it is not proven (the artifact stays a finding); else a
+        string naming how it was proven — ``landed:ancestor:<sha>``,
+        ``landed:tree-contained:<sha>`` or ``landed:patch-identity:<sha>``.
+
+        Optional on a double: an ops implementation written before this existed
+        simply explains fewer artifacts (its audit reports *more* findings,
+        never fewer), which is the fail-closed direction for an excuse.
+        """
 
 
 def _issue_of(branch: str) -> int | None:
@@ -422,6 +440,33 @@ def audit(
             _explain(artifact, by_worktree=by_worktree, by_branch=by_branch,
                      by_issue=by_issue, claims=claims, landed=landed)
         )
+
+    # The landing proof (#1291) runs last and only for what nothing else
+    # explains: it is the most expensive source (a handful of git reads per
+    # artifact) and the only one that is *never* needed when a beat, a claim or
+    # the journal already accounts for the artifact.
+    prover = getattr(ops, "landing_proof", None)
+    if prover is not None:
+        failures: list[str] = []
+        for index, explanation in enumerate(report.explanations):
+            if explanation.matched or explanation.exempt:
+                continue
+            artifact = explanation.artifact
+            try:
+                proof = prover(artifact.kind, artifact.name, artifact.branch)
+            except Exception as exc:  # noqa: BLE001 - an unreadable source is data
+                failures.append(f"landing proof: {type(exc).__name__}: {exc}"[:200])
+                continue
+            if proof:
+                report.explanations[index] = Explanation(
+                    artifact, MATCHED, (proof,), f"explained by {proof}"
+                )
+        if failures:
+            # "I could not look" is not "nothing is there" — the same rule every
+            # other source here follows. A prover that cannot run must not silently
+            # leave artifacts looking unexplained *or* explained.
+            report.reason = "; ".join(failures)
+            report.unreadable = tuple(failures)
     return report
 
 

@@ -220,7 +220,13 @@ def test_an_absent_sessions_directory_is_not_an_unreadable_one(root: Path):
 def test_the_audit_only_reads_through_its_port(root: Path):
     ops = FakeAuditOps(worktrees=(primary(), lane()), branches=("issue-9",))
     audit(root, ops=ops, at=AT)
-    assert set(ops.calls) <= {"list_worktrees", "list_local_branches", "active_claims", "landed_issues"}
+    assert set(ops.calls) <= {
+        "list_worktrees",
+        "list_local_branches",
+        "active_claims",
+        "landed_issues",
+        "landing_proof",
+    }
 
 
 def test_the_port_has_no_removal_method_at_all():
@@ -230,10 +236,70 @@ def test_the_port_has_no_removal_method_at_all():
         for name in dir(AuditOps)
         if not name.startswith("_") and callable(getattr(AuditOps, name, None))
     }
-    assert surface == {"list_worktrees", "list_local_branches", "active_claims", "landed_issues"}
+    assert surface == {
+        "list_worktrees",
+        "list_local_branches",
+        "active_claims",
+        "landed_issues",
+        "landing_proof",
+    }
     for forbidden in ("remove_worktree", "delete_branch", "release_claim", "forget_lane", "clear_session"):
         assert not hasattr(AuditOps, forbidden)
         assert not hasattr(FakeAuditOps(), forbidden)
+
+
+# --- the landing proof (#1291): the work, not the name -----------------------
+
+
+def test_a_proven_landing_explains_an_otherwise_unmatched_artifact(root: Path):
+    """The journal was the only landing source; the default branch now answers too."""
+    ops = FakeAuditOps(
+        worktrees=(primary(),), branches=("issue-42",), proofs={"issue-42": "landed:patch-identity:abc123"}
+    )
+    report = audit(root, ops=ops, at=AT)
+    assert "issue-42" in names(report, MATCHED)
+    explanation = next(e for e in report.explanations if e.artifact.name == "issue-42")
+    assert explanation.evidence == ("landed:patch-identity:abc123",)
+
+
+def test_no_proof_leaves_the_artifact_a_finding(root: Path):
+    """The proof is an excuse: failing to prove one can only add findings."""
+    ops = FakeAuditOps(worktrees=(primary(),), branches=("issue-43",))
+    report = audit(root, ops=ops, at=AT)
+    assert "issue-43" in names(report, UNMATCHED)
+    assert report.exit_code == 1
+
+
+def test_a_prover_that_cannot_run_is_cannot_assess_not_a_finding(root: Path):
+    """'I could not look' is never 'nothing is there' — the rule every source obeys."""
+    ops = FakeAuditOps(
+        worktrees=(primary(),), branches=("issue-44",), fail=("landing_proof",)
+    )
+    report = audit(root, ops=ops, at=AT)
+    assert not report.assessable
+    assert "landing_proof" in report.reason
+    assert report.exit_code == 2
+
+
+def test_an_ops_double_without_the_prover_still_audits(root: Path):
+    """Optional on a double by design: its audit reports more, never fewer."""
+
+    class Older:
+        def list_worktrees(self):
+            return [primary()]
+
+        def list_local_branches(self):
+            return ["issue-45"]
+
+        def active_claims(self):
+            return {}
+
+        def landed_issues(self):
+            return set()
+
+    report = audit(root, ops=Older(), at=AT)
+    assert "issue-45" in names(report, UNMATCHED)
+    assert report.assessable
 
 
 def test_an_unmatched_artifact_is_still_there_after_the_audit(root: Path, tmp_path: Path):

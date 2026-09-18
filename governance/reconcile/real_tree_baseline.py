@@ -103,6 +103,53 @@ baseline can only *grow* by an explicit reviewed edit (same as before); it can
 :func:`prune_stale` (``status --disk --prune-stale``), which only ever removes
 entries the audit no longer reports unmatched — it can never fabricate a drop
 of a still-live artifact.
+
+## Named quarantine, for work the worker is forbidden to discard (#1291)
+
+A baseline entry says "this artifact was already unmatched when the baseline was
+measured". It cannot honestly say the next thing the gate needs to say, because
+the two are different kinds of fact:
+
+* the baseline's ``young`` grace window **defers** the red by 24 hours rather
+  than preventing it (measured at ``99f6b37``: 27 → 30 → 31 violations in seven
+  minutes with no commit in between — every new one an artifact crossing the
+  grace window while the fleet worked);
+* and the residual are artifacts `AGENTS.md` **rule 17** forbids the worker to
+  discard: an orphan whose work exists nowhere else keeps its worktree, its
+  branch and its claim, and *is reported on every pass until someone resolves
+  it*. A red `make verify` on this box is not a report — it is a fleet-wide
+  serialization point (16 open pull requests at the time of measurement).
+
+:file:`real-tree-quarantine.json` is how those two facts are reconciled
+honestly, in the idiom this repository already uses for legacy drift
+(``governance/lifecycle/baseline.json``, rule 16):
+
+* **every exemption is named.** One entry per artifact — ``kind``, ``name``, the
+  ``tip`` the exemption was *measured against*, and a ``reason`` a human wrote.
+  There is no pattern, no prefix and no wildcard: an artifact is excused only by
+  an entry naming it and the exact commit it was recorded at.
+* **a new artifact is never absorbed.** A new branch or worktree is by
+  definition not in the document, so it fails immediately. A branch whose tip has
+  *moved* is a different artifact and fails immediately too — the recorded tip is
+  what makes that detectable, and the lapsed entry is named as it fails.
+* **an entry that excuses nothing FAILS.** If the artifact is gone, or is no
+  longer unmatched, the exemption has outlived its need: the verdict names it in
+  ``stale_quarantine`` and exits **1** until the entry is removed in a reviewed
+  edit. The document can therefore only shrink, never rot in place.
+* **it is a lease, not a permanent allow.** The document declares the issue
+  tracking it and when that issue's state was last *measured*. An entry is
+  honoured only while that measurement says the tracking issue is ``open`` and is
+  younger than the declared ``max_age_hours``. A missing, malformed, expired or
+  not-open declaration is **never** read as "still excused": no entry is honoured
+  and the lease itself is reported as a violation. This is the same fail-closed
+  direction ``governance/lifecycle`` takes (its quarantine is honoured only while
+  its tracking issue is open, and *unknown* counts as stale) — a gate cannot read
+  the board offline, so the age bound is what keeps the declaration falsifiable
+  rather than decorative.
+
+Quarantined artifacts are still **reported on every pass**, by name, in the
+verdict: rule 17's "reported until someone resolves it" is satisfied by the
+report, and the tracking issue carries the resolution.
 """
 
 from __future__ import annotations
@@ -112,6 +159,7 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from governance.policy import lease
@@ -120,6 +168,11 @@ from governance.reconcile.audit import AuditReport, audit as run_audit
 
 #: kind/name pairs the baseline can carry entries for.
 _KEY = tuple[str, str]
+
+#: The reviewed, named exemptions (issue #1291). A tracked file on purpose:
+#: an exemption is a reviewed edit in a commit a human reads, never gitignored
+#: runtime state.
+QUARANTINE_RELPATH = Path("governance") / "reconcile" / "real-tree-quarantine.json"
 
 #: Read from the single declared policy (governance/policy/lease.py), never
 #: restated as a bare literal here (the policy scan would refuse that).
@@ -133,6 +186,15 @@ class BaselineUnavailable(Exception):
     """The baseline file itself could not be read or is malformed."""
 
 
+class QuarantineUnavailable(Exception):
+    """The quarantine document could not be read or is malformed.
+
+    Distinct from *absent*: no document means no exemptions (which can only add
+    findings), while an unreadable one means the gate cannot say what is excused
+    — CANNOT-ASSESS, never a pass.
+    """
+
+
 @dataclass(frozen=True)
 class BaselineEntry:
     kind: str
@@ -144,6 +206,66 @@ class BaselineEntry:
         return (self.kind, self.name)
 
 
+@dataclass(frozen=True)
+class QuarantineEntry:
+    """One named exemption: this artifact, at this tip, for this reason (#1291).
+
+    ``tip`` is load-bearing, not documentation. It is the commit the exemption
+    was *measured against*, so a branch or worktree that has moved on is a
+    different artifact: it fails immediately, and the lapsed entry is named as it
+    fails. Without it, a name would excuse whatever later appeared under it.
+    """
+
+    kind: str
+    name: str
+    reason: str
+    tip: str
+
+    @property
+    def key(self) -> _KEY:
+        return (self.kind, self.name)
+
+
+@dataclass(frozen=True)
+class QuarantineLease:
+    """The term of the exemptions: an open tracking issue, measured recently.
+
+    ``max_age_hours`` is declared in the document rather than as a constant here
+    because it is a property of *that review*, not a fleet-wide timing (the fleet
+    timings live in ``governance/policy/lease.py``; the policy scan owns that
+    surface and would refuse a restatement here).
+    """
+
+    tracked_by: str
+    state: str
+    measured_at: float
+    measured_by: str
+    max_age_hours: float
+
+    def refusal(self, *, at: float) -> str:
+        """``""`` when the lease holds; else the reason no entry may be honoured."""
+        if self.state != "open":
+            return (
+                f"the tracking issue {self.tracked_by} is "
+                f"{self.state or 'unstated'}, not open"
+            )
+        age_hours = (at - self.measured_at) / 3600.0
+        if age_hours > self.max_age_hours:
+            return (
+                f"the tracking measurement is {age_hours:.1f}h old "
+                f"(> {self.max_age_hours:g}h lease); re-measure {self.tracked_by} "
+                "and record it, or retire the exemptions"
+            )
+        return ""
+
+    def describe(self, *, at: float) -> str:
+        age_hours = (at - self.measured_at) / 3600.0
+        return (
+            f"quarantine: honoured — {self.tracked_by} {self.state}, measured "
+            f"{age_hours:.1f}h ago (lease {self.max_age_hours:g}h, by {self.measured_by})"
+        )
+
+
 @dataclass
 class RealTreeVerdict:
     """The result of checking the real tree's audit against its baseline."""
@@ -153,6 +275,9 @@ class RealTreeVerdict:
     stale_entries: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     young: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     vanished: tuple[BaselineEntry, ...] = field(default_factory=tuple)
+    quarantined: tuple[QuarantineEntry, ...] = field(default_factory=tuple)
+    stale_quarantine: tuple[BaselineEntry, ...] = field(default_factory=tuple)
+    quarantine_note: str = ""
     baseline_count: int = 0
     unmatched_count: int = 0
     grace_hours: float = 0.0
@@ -164,7 +289,11 @@ class RealTreeVerdict:
         # over-claims, not debris the disk still has to explain. Disk artifacts
         # are meant to disappear (unlike a landed commit, which never does) —
         # see the module docstring's "Stale is not fatal".
-        return self.assessable and not self.new_violations
+        #
+        # A stale *quarantine* entry is the opposite: losing that artifact would
+        # mean the worker discarded work that exists nowhere else, so the excuse
+        # outliving its need — or its lease lapsing — is exactly what must bite.
+        return self.assessable and not self.new_violations and not self.stale_quarantine
 
     def describe(self) -> str:
         if not self.assessable:
@@ -172,14 +301,23 @@ class RealTreeVerdict:
         lines = [
             f"real-tree-baseline: {self.unmatched_count} unmatched artifact(s) on disk, "
             f"{self.baseline_count} baselined, {len(self.young)} young (< {self.grace_hours:g}h, not failed), "
-            f"{len(self.stale_entries)} stale (not failed), {len(self.vanished)} vanished (not failed)"
+            f"{len(self.stale_entries)} stale (not failed), {len(self.vanished)} vanished (not failed), "
+            f"{len(self.quarantined)} quarantined by name (reported, not failed)"
         ]
+        if self.quarantine_note:
+            lines.append(f"  {self.quarantine_note}")
         for entry in self.vanished:
             lines.append(f"  VANISHED {entry.kind} {entry.name} — {entry.reason}")
+        for entry in self.stale_quarantine:
+            lines.append(f"  STALE-QUARANTINE {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.young:
             lines.append(f"  YOUNG    {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.new_violations:
             lines.append(f"  NEW      {entry.kind} {entry.name} — not in the baseline (add it, reviewed, or fix it)")
+        for entry in self.quarantined:
+            lines.append(
+                f"  QUARANTINED {entry.kind} {entry.name} @{entry.tip[:12]} — {entry.reason}"
+            )
         for entry in self.stale_entries:
             lines.append(f"  STALE    {entry.kind} {entry.name} — baselined but no longer unmatched (remove it, e.g. --prune-stale)")
         if self.ok:
@@ -219,6 +357,90 @@ def _branch_resolves(root: Path | str, branch: str) -> bool:
         text=True,
     )
     return result.returncode == 0
+
+
+def branch_tip(root: Path | str, branch: str) -> str:
+    """The commit a branch points at right now, or ``""`` when it does not resolve."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def worktree_head(path: str) -> str:
+    """The commit a worktree's HEAD is at right now, or ``""`` when it is gone."""
+    if not Path(path).exists():
+        return ""
+    result = subprocess.run(
+        ["git", "-C", path, "rev-parse", "HEAD"], capture_output=True, text=True
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def artifact_tip(root: Path | str, kind: str, name: str) -> str:
+    """The tip an exemption for this artifact would have to have been measured at."""
+    if kind == "branch":
+        return branch_tip(root, name)
+    if kind == "worktree":
+        return worktree_head(name)
+    return ""
+
+
+def load_quarantine(path: Path | str) -> tuple[QuarantineLease, list[QuarantineEntry]]:
+    """Read the reviewed, named exemptions and the lease that bounds them (#1291).
+
+    Raises :class:`QuarantineUnavailable` for anything it cannot read *strictly*:
+    a malformed document must not be read as "nothing is excused" (that would be
+    a silent red) nor as "everything is excused" (a silent green) — it is
+    CANNOT-ASSESS, same discipline as :func:`load_baseline`.
+    """
+    path = Path(path)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise QuarantineUnavailable(f"{path}: {type(exc).__name__}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise QuarantineUnavailable(f"{path}: malformed quarantine — expected an object")
+    tracked = payload.get("tracked_by")
+    tracking = payload.get("tracking")
+    if not isinstance(tracked, str) or not tracked:
+        raise QuarantineUnavailable(f"{path}: malformed quarantine — 'tracked_by' is required")
+    if not isinstance(tracking, dict):
+        raise QuarantineUnavailable(f"{path}: malformed quarantine — 'tracking' is required")
+    try:
+        measured_at = datetime.strptime(
+            str(tracking["measured_at"]), "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc).timestamp()
+        quarantine_lease = QuarantineLease(
+            tracked_by=tracked,
+            state=str(tracking["state"]).lower(),
+            measured_at=measured_at,
+            measured_by=str(tracking["measured_by"]),
+            max_age_hours=float(tracking["max_age_hours"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise QuarantineUnavailable(f"{path}: malformed 'tracking' block: {exc}") from exc
+
+    rows = payload.get("quarantine")
+    if not isinstance(rows, list):
+        raise QuarantineUnavailable(f"{path}: malformed quarantine — 'quarantine' must be a list")
+    entries: list[QuarantineEntry] = []
+    for row in rows:
+        try:
+            entry = QuarantineEntry(
+                kind=row["kind"], name=row["name"], reason=row["reason"], tip=row["tip"]
+            )
+        except (KeyError, TypeError) as exc:
+            raise QuarantineUnavailable(f"{path}: malformed entry {row!r}: {exc}") from exc
+        if not entry.tip:
+            # The tip is what stops a name excusing whatever appears under it.
+            raise QuarantineUnavailable(
+                f"{path}: entry {entry.kind} {entry.name} has no 'tip' to pin it to"
+            )
+        entries.append(entry)
+    return quarantine_lease, entries
 
 
 def artifact_vanished(root: Path | str, kind: str, name: str) -> bool:
@@ -274,6 +496,7 @@ def check_real_tree(
     root: Path | str,
     baseline_path: Path | str,
     *,
+    quarantine_path: Path | str | None = None,
     ops=None,
     grace_hours: float | None = None,
     at: float | None = None,
@@ -283,6 +506,12 @@ def check_real_tree(
     Raises nothing on a bad baseline or an unreadable disk: both come back as a
     non-assessable verdict, same tri-state discipline as the rest of this
     package (CANNOT-ASSESS is never spelled as a clean pass).
+
+    ``quarantine_path`` is the reviewed, named-exemption document (#1291). When
+    it is given and present, its entries excuse an artifact *only* while the
+    lease it declares holds (an open tracking issue, measured recently); without
+    it no artifact is excused — the fail-closed direction, since an exemption is
+    the only thing here that can turn a finding into a pass.
 
     ``grace_hours`` defaults to the declared policy
     (``governance/policy/lease.REAL_TREE_GRACE_HOURS``); a caller may override
@@ -307,11 +536,71 @@ def check_real_tree(
     baseline_by_key = {entry.key: entry for entry in baseline}
     unmatched_keys = {(item.artifact.kind, item.artifact.name) for item in report.unmatched}
 
+    # --- the named, leased quarantine (#1291) -------------------------------
+    quarantine_entries: list[QuarantineEntry] = []
+    stale_quarantine: list[BaselineEntry] = []
+    quarantine_note = ""
+    honoured: dict[_KEY, QuarantineEntry] = {}
+    document = Path(quarantine_path) if quarantine_path is not None else None
+    if document is not None and document.exists():
+        try:
+            quarantine_lease, quarantine_entries = load_quarantine(document)
+        except QuarantineUnavailable as exc:
+            return RealTreeVerdict(assessable=False, reason=str(exc))
+        refusal = quarantine_lease.refusal(at=now)
+        if refusal:
+            # No entry is honoured, and the lease itself is the named violation:
+            # an exemption nobody can show is still current is not an exemption.
+            quarantine_note = f"quarantine: NOT HONOURED — {refusal}"
+            stale_quarantine.append(
+                BaselineEntry(kind="lease", name=quarantine_lease.tracked_by, reason=refusal)
+            )
+        else:
+            quarantine_note = quarantine_lease.describe(at=now)
+            for entry in quarantine_entries:
+                if entry.key not in unmatched_keys:
+                    stale_quarantine.append(
+                        BaselineEntry(
+                            kind=entry.kind,
+                            name=entry.name,
+                            reason=(
+                                "quarantined but no longer an unmatched artifact. Confirm which "
+                                "happened before removing this entry: the work reached the default "
+                                "branch (a resolution — remove it), or the artifact was reclaimed "
+                                "(then the exemption is the last record that work existing nowhere "
+                                "else was discarded, which is the owner's call, not a cleanup). "
+                                f"Tracked by {quarantine_lease.tracked_by}."
+                            ),
+                        )
+                    )
+                    continue
+                current = artifact_tip(root, entry.kind, entry.name)
+                if current != entry.tip:
+                    # A moved branch/worktree is a different artifact: it must fail
+                    # immediately rather than be absorbed by the name it reuses.
+                    stale_quarantine.append(
+                        BaselineEntry(
+                            kind=entry.kind,
+                            name=entry.name,
+                            reason=(
+                                f"quarantined at {entry.tip[:12]} but now at "
+                                f"{current[:12] or '(gone)'} — a different artifact; "
+                                "re-measure it and re-record the exemption"
+                            ),
+                        )
+                    )
+                    continue
+                honoured[entry.key] = entry
+
     unbaselined = sorted(unmatched_keys - set(baseline_by_key))
     young: list[BaselineEntry] = []
     new_violations: list[BaselineEntry] = []
     vanished: list[BaselineEntry] = []
+    quarantined: list[QuarantineEntry] = []
     for kind, name in unbaselined:
+        if (kind, name) in honoured:
+            quarantined.append(honoured[(kind, name)])
+            continue
         if artifact_vanished(root, kind, name):
             vanished.append(
                 BaselineEntry(
@@ -349,6 +638,9 @@ def check_real_tree(
         stale_entries=stale_entries,
         young=tuple(young),
         vanished=tuple(vanished),
+        quarantined=tuple(quarantined),
+        stale_quarantine=tuple(stale_quarantine),
+        quarantine_note=quarantine_note,
         baseline_count=len(baseline),
         unmatched_count=len(unmatched_keys),
         grace_hours=resolved_grace_hours,

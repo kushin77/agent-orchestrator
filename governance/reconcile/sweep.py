@@ -577,6 +577,9 @@ class RepoOps:
 
     def __init__(self, root: Path | str) -> None:
         self.root = Path(root)
+        #: Lazily built, because most `RepoOps` uses never need a landing proof
+        #: (and building one resolves the default-branch ref against this repo).
+        self._landing = None
 
     def _run(self, args: list[str], cwd: Path | None = None) -> str:
         result = subprocess.run(args, cwd=str(cwd or self.root), capture_output=True, text=True)
@@ -751,6 +754,28 @@ class RepoOps:
                 raise AuditUnavailable(f"{path.name} is unreadable ({type(exc).__name__})") from exc
             landed.add(int(path.stem))
         return landed
+
+    def landing_proof(self, kind: str, name: str, branch: str = "") -> str:
+        """Is this artifact's *work* on the default branch? (#1291)
+
+        The journal above only exists where the close-out ran; this answers the
+        same question from the default branch's **tracked** history, which every
+        checkout has. Read-only, and never a wildcard — see
+        ``governance/reconcile/landing.py`` for the three proofs and why a branch
+        whose tip is not an ancestor stays unexplained.
+        """
+        # Import here, like `forget_lane` above: the proof is a property of the
+        # reconciled repository, and this worker is the thing that holds one.
+        from governance.reconcile.landing import LandingUnavailable, RepoLanding  # noqa: PLC0415
+
+        if self._landing is None:
+            try:
+                self._landing = RepoLanding(self.root)
+            except LandingUnavailable:
+                # Re-raise as this module's own unreadable-source error so the
+                # audit's single `_read` discipline sees one exception type.
+                raise AuditUnavailable(f"{self.root}: git could not be read for the landing proof") from None
+        return self._landing.proof(kind, name, branch)
 
 
 def describe(report: SweepReport) -> str:
