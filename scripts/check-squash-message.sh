@@ -86,7 +86,7 @@ render_message() { # <title> <number> <body>
 # predicate itself could not be run — never reported as clean.
 classify_message() { # <message>
   local msg="$1" tmp
-  tmp="$(mktemp -d 2>/dev/null)" || {
+  tmp="$(mktemp -d "/tmp/ao877-squash.$(printf 'X%.0s' 1 2 3 4 5 6)" 2>/dev/null)" || {
     echo "PREDICATE-UNAVAILABLE:mktemp failed"
     return 0
   }

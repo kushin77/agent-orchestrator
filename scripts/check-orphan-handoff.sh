@@ -170,7 +170,7 @@ fi
 # --- the vacuity control: the same assertions must FAIL on a loop that does not
 # hand over. Without this the check above cannot be shown to be able to fail.
 printf '\n== vacuity control: remove the handoff and require a failure ==\n'
-tmp="$(mktemp -d)" || { echo "check-orphan-handoff: CANNOT-ASSESS -- mktemp failed" >&2; exit 2; }
+tmp="$(mktemp -d "/tmp/ao877-orphan-handoff.$(printf 'X%.0s' 1 2 3 4 5 6)")" || { echo "check-orphan-handoff: CANNOT-ASSESS -- mktemp failed" >&2; exit 2; }
 trap 'rm -rf "$tmp"' EXIT
 
 mkdir -p "$tmp/mut/fleet/tests" "$tmp/mut/governance/reconcile"

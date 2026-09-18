@@ -443,8 +443,7 @@ fi
 # finding it must produce: "the map was refused" is not sufficient evidence, because a
 # refusal for the wrong reason does not show that the assertion under test works.
 printf '\n== vacuity control: a control nobody runs must be refused ==\n'
-tmp="$(mktemp -d)" || { echo "check-control-coverage: CANNOT-ASSESS — mktemp failed" >&2; exit 2; }
-trap 'rm -rf "$tmp"' EXIT
+  tmp="$(mktemp -d "/tmp/ao877-control-coverage.$(printf 'X%.0s' 1 2 3 4 5 6)")" || { echo "check-control-coverage: CANNOT-ASSESS — mktemp failed" >&2; exit 2; }
 
 mutate() { # mutate <src> <dst> <rule> <new-controls-value>
   python3 - "$1" "$2" "$3" "$4" <<'PY'

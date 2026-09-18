@@ -93,8 +93,7 @@ echo "check-cmr-pin: bundle_ref matches vendor/CMR HEAD ($live_head) — no drif
 #    non-zero and name CMR-PIN-DRIFT. A gate whose negative control cannot
 #    fail if the drift check were deleted proves nothing.
 if [ -z "${CMR_PIN_NEGATIVE_CONTROL:-}" ]; then
-  scratch="$(mktemp -d)"
-  trap 'rm -rf "$scratch"' EXIT
+    scratch="$(mktemp -d "/tmp/ao877-cmr-pin.$(printf 'X%.0s' 1 2 3 4 5 6)")"
 
   scratch_pin="$scratch/cmr-pin.yaml"
   python3 - "$pin" "$scratch_pin" "$live_head" <<'PYEOF'

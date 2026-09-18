@@ -302,7 +302,7 @@ bad() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
 
 printf 'verdict-contains: a verdict test must not kill its own producer (#852)\n'
 
-tmp="$(mktemp -d)" || { echo "check-verdict-contains: CANNOT-ASSESS -- mktemp failed" >&2; exit 2; }
+tmp="$(mktemp -d "/tmp/ao877-verdict.$(printf 'X%.0s' 1 2 3 4 5 6)")" || { echo "check-verdict-contains: CANNOT-ASSESS -- mktemp failed" >&2; exit 2; }
 trap 'rm -rf "$tmp"' EXIT
 
 printf '\n== 1. the mechanism ==\n'

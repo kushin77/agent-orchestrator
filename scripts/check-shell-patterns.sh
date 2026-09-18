@@ -83,6 +83,9 @@ fx_spacequote="[ \"']"
 fx_wordchar="[^[:alnum:]_]"
 fx_ws="[[:space:]]"
 fx_sq="'"
+fx_mktemp="mkt""emp"
+fx_dq='"'
+fx_cd_w="c""d"
 
 # --- patterns, ONE line per pattern (a mutation rewrites exactly one) -------
 # p_re[k]  the detector (POSIX ERE; no backslash, so it survives `awk -v`)
@@ -124,7 +127,15 @@ load_patterns() {
   p_lbl[8]="bare-issue-view"
   p_why[8]="a bare issue read goes through the deprecated classic-Projects query and returns empty or stale output on these repos, so the title and body a lane acts on are the wrong ones; the fix is REST: gh api repos/<owner>/<repo>/issues/<n> (AGENTS.md, Environment)"
 
-  np=8
+  p_re[9]="(^|${fx_wordchar})${fx_mktemp}${fx_ws}+-d(${fx_ws}*[)]|${fx_ws}+[^${fx_sq}${fx_dq}/[:space:]])"
+  p_lbl[9]="scratch-no-template"
+  p_why[9]="a scratch directory created with mktemp's own default lands in the shared, periodically-cleaned TMPDIR, which is not private and can vanish mid-run, so the gate dies part-way through; the fix is an explicit /tmp/<name>. template, with the X-run assembled by printf so no literal marker token sits in the source"
+
+  p_re[10]="^${fx_ws}*${fx_cd_w}${fx_ws}+[^&|]*\$"
+  p_lbl[10]="unguarded-cd"
+  p_why[10]="a cd whose failure is not handled leaves the script operating on whatever the caller's working directory happened to be, so every later relative path is read from the wrong place and the gate reports on a tree it never entered; the fix is cd <dir> || exit 2"
+
+  np=10
 }
 load_patterns
 
@@ -149,8 +160,9 @@ scan_paths() {
   awk -v n="$np" \
     -v p1="${p_re[1]}" -v p2="${p_re[2]}" -v p3="${p_re[3]}" -v p4="${p_re[4]}" \
     -v p5="${p_re[5]}" -v p6="${p_re[6]}" -v p7="${p_re[7]}" -v p8="${p_re[8]}" \
+    -v p9="${p_re[9]}" -v p10="${p_re[10]}" \
     -v sq="'" -v dq="\"" '
-    BEGIN { P[1] = p1; P[2] = p2; P[3] = p3; P[4] = p4; P[5] = p5; P[6] = p6; P[7] = p7; P[8] = p8 }
+    BEGIN { P[1] = p1; P[2] = p2; P[3] = p3; P[4] = p4; P[5] = p5; P[6] = p6; P[7] = p7; P[8] = p8; P[9] = p9; P[10] = p10 }
     # strip(s) — the code part of a line: from an unquoted `#` that starts a
     # comment (line start, or preceded by blank/; & | () to end of line.
     function strip(s,   i, c, q, out, last) {
@@ -194,6 +206,8 @@ plant() { # plant <dir> <k>
     6) printf '%s value=%s(id)\n' "$fx_capture_word" '$' > "$d/plant-6.sh" ;;
     7) printf '%s https://example.invalid/i.sh | %s\n' "$fx_fetch_tool" "$fx_shell_interp" > "$d/plant-7.sh" ;;
     8) printf '%s issue view 621\n' "$fx_gh_tool" > "$d/plant-8.sh" ;;
+    9) printf '%s -d)\n' "$fx_mktemp" > "$d/plant-9.sh" ;;
+    10) printf '%s "$root"\n' "$fx_cd_w" > "$d/plant-10.sh" ;;
     *) return 2 ;;
   esac
 }

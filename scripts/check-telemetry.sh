@@ -160,7 +160,7 @@ fi
 #    real check above (self-invoking this gate), never by re-deriving the
 #    assertion inline (that would be a tautology, not a proof).
 if [ -z "${TELEMETRY_NEGATIVE_CONTROL:-}" ]; then
-  scratch="$(mktemp -d)"
+  scratch="$(mktemp -d "/tmp/ao877-telemetry.$(printf 'X%.0s' 1 2 3 4 5 6)")"
   trap 'rm -rf "$scratch"' EXIT
   cp -r "$rate_dir"/*.yaml "$scratch/"
 

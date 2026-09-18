@@ -56,7 +56,7 @@ tf_validate() {
   fi
 
   local td
-  td="$(mktemp -d)"
+  td="$(mktemp -d "/tmp/ao877-tf.$(printf 'X%.0s' 1 2 3 4 5 6)")"
   local rc=0
 
   # terraform writes the dependency lock file next to the configuration even
