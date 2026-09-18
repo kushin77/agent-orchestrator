@@ -1212,7 +1212,14 @@ def cmd_audit(args: argparse.Namespace) -> int:
         print(f"lifecycle-hygiene: OK ({report['items']} item(s), 0 finding(s))")
         return EXIT_OK
     findings = audit(record, quarantine)
-    board_reports = board_report_findings(findings, _reporter(), apply=args.apply)
+    # #1266: subjects whose OWN issue is already closed, read from this same
+    # record — `board_report_findings` uses it to refuse filing a fresh
+    # VERIFY_EVIDENCE_MISSING board issue against work nobody can act on
+    # without reopening the issue first, and to resolve one already filed.
+    closed_subjects = frozenset(
+        f"#{item.get('issue')}" for item in record.get("items") or [] if str(item.get("state") or "").lower() == "closed"
+    )
+    board_reports = board_report_findings(findings, _reporter(), apply=args.apply, closed_subjects=closed_subjects)
     if not args.json:
         _print_board_reports(board_reports)
     print(f"lifecycle-hygiene: FAIL ({len(report['findings'])} finding(s))", file=sys.stderr)

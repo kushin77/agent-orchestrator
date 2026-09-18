@@ -48,6 +48,19 @@ DEFAULT_LABELS: tuple[str, ...] = (
     "class:enterprise",
 )
 
+#: What one report call did when a finding turned out to be obsolete-by-close
+#: rather than filed or deduped (issue #1266).
+OBSOLETE_BY_CLOSE = "obsolete-by-close"
+
+#: Invariant codes that only warrant a live board issue while the item's own
+#: GitHub issue is still OPEN (issue #1266). `VERIFY_EVIDENCE_MISSING` is the
+#: one measured case: 27 squash merges landed on 2026-09-18 and closed 0
+#: issues, and the auto-filer went on to raise fresh `VERIFY_EVIDENCE_MISSING`
+#: board issues (#992, #1247, #1251) against items whose GitHub issue was
+#: ALREADY closed by hand — an evidence gap on a closed item is history, not
+#: something anyone can act on without reopening the issue first.
+OPEN_ONLY_CODES: frozenset[str] = frozenset({"VERIFY_EVIDENCE_MISSING"})
+
 
 class IssueFiler(Protocol):
     """The board-write effects. Injected, so reporting is testable offline."""
@@ -162,6 +175,7 @@ def board_report_findings(
     reporter: BoardReporter,
     *,
     apply: bool = False,
+    closed_subjects: frozenset[str] = frozenset(),
 ) -> list[BoardReport]:
     """File one board finding per lifecycle violation (deduped by fingerprint).
 
@@ -169,14 +183,39 @@ def board_report_findings(
     ``detail`` and ``remediation``; the fingerprint is ``code:subject``, so the
     same broken invariant on the same item is one issue no matter how many
     passes observe it.
+
+    ``closed_subjects`` names every subject (``"#<n>"``) whose OWN GitHub issue
+    is closed, as read from the SAME lifecycle record the findings came from —
+    this function never re-derives GitHub state itself (issue #1266). A
+    finding whose code is in :data:`OPEN_ONLY_CODES` and whose subject is in
+    ``closed_subjects`` is REFUSED as a new board issue, by name: it is never
+    handed to ``reporter.report`` (so ``filer.create`` is never called for it),
+    whatever ``apply`` is. Any board issue already filed for that same
+    ``code:subject`` from an earlier, still-open pass is resolved instead, so
+    it does not rot on the board beside a finding nobody can act on without
+    reopening the issue first.
     """
     reports: list[BoardReport] = []
     for finding in findings:
         code = str(finding.code)
         subject = str(finding.subject)
+        key = finding_key(f"lifecycle:{code}", subject)
+
+        if code in OPEN_ONLY_CODES and subject in closed_subjects:
+            reporter.resolve(
+                key,
+                comment=(
+                    f"obsolete-by-close: {subject} is closed, so this {code} finding is no "
+                    f"longer a live board item.\n\n- detail: {finding.detail}\n"
+                ),
+                apply=apply,
+            )
+            reports.append(BoardReport(key, OBSOLETE_BY_CLOSE))
+            continue
+
         reports.append(
             reporter.report(
-                finding_key(f"lifecycle:{code}", subject),
+                key,
                 title=f"[lifecycle] {code} — {subject}",
                 body=_finding_body(finding),
                 labels=DEFAULT_LABELS,
