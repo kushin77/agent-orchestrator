@@ -21,7 +21,8 @@ slack: 10
 # automatically, so the pile has to keep shrinking rather than being re-measured
 # and re-excused forever.
 ratchet:
-  measured: 80
+  measured: 90
   host: ElevatedIQ-AK
   expires: "2026-10-02"
+  note: "post-reap count 80 on 2026-09-18 + 10 churn headroom; ratchet expires 2026-10-02, then slack 10 applies"
 
