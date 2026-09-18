@@ -14,6 +14,19 @@
 options:
   logging: CLOUD_LOGGING_ONLY
 
+# issue #1350: the now-required check `ao/gate-of-record` (#1342) needs a
+# producer. This step's `gate-status` stage posts the gate's own rc using
+# `scripts/gate-status.sh`, authenticated with a fine-grained PAT
+# (`statuses:write` only) held in Secret Manager -- Cloud Build has no `gh`
+# login, so the token comes in as GH_TOKEN (see scripts/gate-status.sh's
+# curl fallback). The secret is created ONCE by the owner (README.md); until
+# then GH_TOKEN is simply absent and the step logs and skips posting -- it
+# never fails the build BECAUSE the secret doesn't exist yet.
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/ao-gate-status-token/versions/latest
+      env: GH_TOKEN
+
 steps:
   # Toolchain attestation + the gate itself, in one step: Cloud Build steps
   # each run in a fresh container and do not share installed packages, so
@@ -30,10 +43,11 @@ steps:
   - id: verify
     name: 'python:3.14'
     entrypoint: 'bash'
+    secretEnv: ['GH_TOKEN']
     args:
       - '-lc'
       - |
-        set -euo pipefail
+        set -uo pipefail
         python3 -m pip install --quiet --disable-pip-version-check -r infra/cloudbuild/requirements-verify.txt
         # gates that pin PATH=/usr/bin:/bin must still reach the interpreter the deps went into
         ln -sf /usr/local/bin/python3 /usr/bin/python3
@@ -45,4 +59,23 @@ steps:
         python3 -c 'import yaml' || { echo "PyYAML missing"; exit 1; }
         PATH=/usr/bin:/bin python3 -c 'import yaml' || { echo "PyYAML missing on /usr/bin/python3"; exit 1; }
         echo "toolchain OK"
-        make verify
+
+        # `make verify` is the gate of record. rc is captured (not `set -e`
+        # aborted) so this step can still post the gate's OWN outcome as the
+        # commit status below -- a step that dies on a red gate could never
+        # publish "red".
+        rc=0
+        bash scripts/verify.sh verify || rc=$?
+
+        # $COMMIT_SHA is the PR head for a pull_request-triggered build.
+        if [ -n "${GH_TOKEN:-}" ]; then
+          bash scripts/gate-status.sh post --sha "$COMMIT_SHA" --rc "$rc" \
+            || echo "gate-status: posting failed (see above) -- not failing the build for that"
+        else
+          echo "gate-status: token missing — status not posted"
+        fi
+
+        # The check-run must stay truthful to the gate: exit with verify's OWN
+        # rc, never the poster's -- a missing secret must never flip a red
+        # gate green, and a posting hiccup must never turn a green gate red.
+        exit "$rc"

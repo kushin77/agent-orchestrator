@@ -62,6 +62,44 @@ containers. When a real GCP project exists (a later deploy concern), the
 only way infrastructure changes reach GCP — executed by the deployer SA, never
 by a human in a console.
 
+## The verify runner posts `ao/gate-of-record` (issue #1350)
+
+The now-required status check `ao/gate-of-record` (#1342) needs a producer on
+the PR head. `verify.yaml`'s `verify` step runs `make verify` (via
+`scripts/verify.sh verify`, the same command `make verify` runs) with `set -uo
+pipefail` (no `set -e`), captures its rc, and always calls
+`scripts/gate-status.sh post --sha "$COMMIT_SHA" --rc "$rc"` — then always
+exits with that same `$rc`, so the check-run stays truthful to the gate:
+posting can never turn a red gate green (or vice versa), and a missing secret
+can never fail the build. `$COMMIT_SHA` is the PR head on a pull_request build.
+
+`scripts/gate-status.sh` already encodes the gate's tri-state (0 OK / 1 NOT-OK
+/ 2 CANNOT-ASSESS → success / failure / error; CANNOT-ASSESS is never posted
+as success). Cloud Build has no `gh` login, so the step supplies a token via
+`GH_TOKEN`, sourced from Secret Manager as `secretEnv`; `gate-status.sh` falls
+back from `gh` to a raw authenticated `curl` call when `gh` is absent. If the
+secret does not exist yet, `GH_TOKEN` is simply unset, the step logs
+`gate-status: token missing — status not posted`, and the build still exits
+with verify's own rc.
+
+### Owner step — create the token secret ONCE (not run by this task)
+
+A fine-grained GitHub PAT scoped to `statuses:write` on this repo only:
+
+```bash
+# 1. Create the secret from the PAT (read from stdin, never as a CLI arg/file):
+echo -n "<the fine-grained PAT>" | gcloud secrets create ao-gate-status-token \
+  --data-file=- --replication-policy=automatic
+
+# 2. Grant the Cloud Build service account read access to it:
+gcloud secrets add-iam-policy-binding ao-gate-status-token \
+  --member="serviceAccount:1056038104733-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+Until this runs, the verify trigger (still `disabled: true` per the flag-gate
+above) posts nothing and the build is unaffected by the absence.
+
 ## Web surface (issue #258)
 
 The public web UI served at ai.purebliss.app (`infra/terraform/modules/web-surface`, flag `enable_web`, OFF by default) rides the **same** `apply.yaml`
