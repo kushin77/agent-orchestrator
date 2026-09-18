@@ -71,18 +71,26 @@ INVARIANTS: Tuple[Invariant, ...] = (
     ),
     Invariant(
         code="VERIFY_EVIDENCE_MISSING",
-        requires="a green verification attestation naming the commit whose tree is the tree that landed - the pull request's head commit, or the commit the squash landed as when the branch advanced after it (#1149)",
+        requires=(
+            "a green verification attestation naming the commit whose tree is the tree that landed - "
+            "the pull request's head commit, or the commit the squash landed as when the branch "
+            "advanced after it (#1149) - and, when the attestation records the tree it measured, a "
+            "tree that is that commit's own tree or the merged tree the squash composed (#1003)"
+        ),
         remediation=(
             "run `make verify` on the branch head before merging and record its attestation; evidence "
             "names a commit, and a summary is not evidence. Close out BEFORE the lane is torn down "
-            "(`governance/lifecycle/cli.py close --issue <n>`), or keep the verified commit reachable: "
-            "the attestation is measured from one of the two, and the driver refuses to reclaim a lane "
-            "while this invariant is unsatisfied (#786). For a SQUASH-merged pull request the lane may "
-            "instead be a tree cut from the default branch after the merge: it is admitted when it "
-            "contains the commit the squash landed as and that landing carries the same tree as the "
-            "verified head, and the record then names all three commits (#1098). Where the branch "
-            "advanced *after* the squash, the live head's tree never landed and the evidence names the "
-            "commit the squash landed as instead, recording the drifted head it moved past (#1149)"
+            "(`governance/lifecycle/cli.py close --issue <n>`), or keep the verified commit - or the "
+            "merge commit - reachable: the attestation is measured from one of these, and the driver "
+            "refuses to reclaim a lane while this invariant is unsatisfied (#786, #1003). For a "
+            "SQUASH-merged pull request the lane may instead be a tree cut from the default branch "
+            "after the merge: it is admitted when it contains the commit the squash landed as and that "
+            "landing carries the same tree as the verified head, and the record then names all three "
+            "commits (#1098). Where the branch advanced *after* the squash, the live head's tree never "
+            "landed and the evidence names the commit the squash landed as instead, recording the "
+            "drifted head it moved past (#1149). And when the frozen head's own tree is red, the merge "
+            "commit itself is measured in a throwaway detached tree - the tree the change actually "
+            "landed as - and the record says so (#1003)"
         ),
     ),
     Invariant(
@@ -198,6 +206,119 @@ def invariants_for(item: dict) -> Iterable[Invariant]:
     return (INVARIANTS_BY_CODE["FILING_LABELS_MISSING"],)
 
 
+def verified_head(item: dict) -> str:
+    """The commit the item's evidence is held against: its pull request's head.
+
+    The *subject* of the verification invariant, and deliberately not the merge commit:
+    a squash merge composes a new commit, so demanding the merge commit would fail every
+    correctly-merged item (``audit._closure_findings``).
+    """
+    return str((item.get("pr") or {}).get("head_commit") or "")
+
+
+def measurement_venues(item: dict) -> Tuple[str, ...]:
+    """Every tree the item's attestation may record as the one it measured.
+
+    Two, and no more, and both bounded by the item's own record:
+
+    1. the **verified head commit** — the tree the lane is gated at, which is what the
+       invariant has always named and what every record written before #1003 names;
+    2. the **merge commit** — for an item whose pull request is already merged, the tree
+       that actually landed. It is the only honest venue when the frozen branch head is
+       permanently red because it predates a commit the squash was composed on (#1003):
+       no other commit in the object store holds the landed tree.
+
+    A commit the record does not carry is omitted rather than counted as an empty
+    string, so an absent merge commit cannot legitimise an empty answer.
+    """
+    pr = item.get("pr") or {}
+    return tuple(commit for commit in (verified_head(item), str(pr.get("merge_commit") or "")) if commit)
+
+
+def evidence_problem(item: dict) -> str:
+    """Why the item's attestation does not count, or ``""`` when it does.
+
+    **One** reader for the whole rule, so the audit's finding and the close-out's
+    decision to run (or skip) step 2 cannot drift into two answers — the drift that
+    would let a step be skipped on evidence the audit refuses, or re-run on the
+    verification it already holds.
+
+    Three ways to fail. The attestation must be green; it must name the verified head
+    commit; and — new with #1003 — when it records *which tree it measured*, that tree
+    must be one the item's own record legitimises (:func:`measurement_venues`). A
+    record that does not say which tree it measured is read exactly as before, so every
+    attestation this repo has already written keeps its meaning; a record that says it
+    was measured somewhere the item's record does not carry is refused where it used to
+    be believed. The clause is a **strengthening**, never a relaxation: the invariant's
+    subject is still the verified head commit.
+
+    A record whose ``via`` is ``"contains"`` (#1098) is exempt from the venue check:
+    its ``measured`` names a lane HEAD cut from the default branch after a squash
+    merge, a commit this offline record cannot itself re-derive — that lane was
+    already made to prove it contains the landing *and* carries the verified tree,
+    by :meth:`GhOps._admissible`, before the record was ever written. Re-deriving
+    that proof here would need the git history this module deliberately never reads
+    (audit is offline, #170); trusting the venue check instead would refuse the very
+    record #1098 exists to admit.
+
+    A record naming the **landing** rather than the head is admitted too, when it also
+    discloses the drift (#1149): the branch advanced after the squash, so the live head's
+    tree never landed and cannot be the subject, but the commit the squash landed as does
+    hold it — and the record names that commit and the drifted head it moved past, never
+    silently substituting one for the other (:func:`names_the_landed_tree`).
+    """
+    head = verified_head(item)
+    verify = item.get("verify") or {}
+    pr = item.get("pr") or {}
+    if not verify.get("ok"):
+        return "no green verification attestation is recorded"
+    if not head:
+        return "the item records no verified head commit to hold the evidence against"
+    recorded = str(verify.get("commit") or "")
+    if recorded != head and not names_the_landed_tree(pr, verify):
+        return (
+            f"the attestation names {recorded[:12] or 'none'}, not the verified head commit "
+            f"{head[:12]} and not the commit its tree landed as"
+        )
+    measured = str(verify.get("measured") or "")
+    if measured and str(verify.get("via") or "") != "contains" and measured not in measurement_venues(item):
+        landed = str(pr.get("merge_commit") or "")
+        return (
+            f"the attestation was measured at {measured[:12]}, which is neither the verified head "
+            f"commit {head[:12]} nor the merged tree {landed[:12] or 'none'}"
+        )
+    return ""
+
+
+def names_the_landed_tree(pr: dict, verify: dict) -> bool:
+    """Does the attestation name a commit whose tree is the tree that **landed**?
+
+    Two shapes, and no more (#1149):
+
+    * the **ordinary** one — it names the pull request's head commit, whose tree is the
+      tree the squash landed (``verify.commit == pr.head_commit``). That is the
+      convention every pre-existing record and the ``clean_item`` fixture use, and the
+      reason this invariant must not demand the merge commit: a squash merge creates a
+      new commit, so demanding equality there would fail every correctly-merged item.
+    * the **drifted** one — the branch received commits after the squash, so the live
+      head's tree never landed. The evidence then names the commit the squash landed as
+      *as its subject* and records the live head it drifted from. Requiring the drift to
+      be recorded is what keeps this honest: a record that merely names the merge commit,
+      with no measured drift explaining the substitution, stays a finding.
+    """
+    commit = str(verify.get("commit") or "")
+    landing = str(verify.get("landing") or "")
+    drifted = str(verify.get("drifted_head") or "")
+    head = str(pr.get("head_commit") or "")
+    merge = str(pr.get("merge_commit") or "")
+    return bool(commit) and commit != head and commit == landing == merge and drifted == head
+
+
+def evidence_green(item: dict) -> bool:
+    """Whether the item holds a green attestation the audit accepts."""
+    return not evidence_problem(item)
+
+
 def stage_of(item: dict) -> str:
     """Which lifecycle stage an item's own facts show it reached.
 
@@ -216,12 +337,8 @@ def stage_of(item: dict) -> str:
         return "filed"
 
     pr = item.get("pr") or {}
-    verify = item.get("verify") or {}
     if pr.get("state") != "merged":
-        evidence_names_head = bool(verify.get("ok")) and str(verify.get("commit") or "") == str(
-            pr.get("head_commit") or ""
-        )
-        return "verified" if evidence_names_head else "opened"
+        return "verified" if evidence_green(item) else "opened"
     if item.get("state") != "closed" or not item.get("branch_deleted", False):
         return "merged"
     if (item.get("claim") or {}).get("live") or (item.get("lane") or {}).get("present"):
