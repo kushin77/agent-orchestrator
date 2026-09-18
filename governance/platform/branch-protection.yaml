@@ -17,21 +17,73 @@
 # This file is that declaration, and `scripts/branch-protection.sh` is the thing
 # that makes it reproducible and keeps it honest.
 #
-# WHAT IS DELIBERATELY *NOT* REQUIRED, AND WHY
-# Omitting the obvious settings is a decision, not an oversight:
+# STATUS CHECKS — the #724 precondition, now DISCHARGED
+# `required_status_checks` stayed `null` until the poster was observed posting
+# a REAL status from the runner, never a hand-typed one. Requiring a context
+# before anything writes it is the #724 defect (an inert control whose own gate
+# could not see that it was inert), and here it would have been worse: it would
+# have blocked every merge in the repository instead of merely doing nothing.
 #
-#   required_status_checks: null
-#     No CI exists that satisfies a required check — GitHub Actions is banned
-#     fleet-wide by GR-15, and Actions is only one of the ways to post a
-#     check-run. Requiring a check that nothing produces would deadlock every
-#     merge in the repository. **ADR-0028 answers the question** (the gate is
-#     published as a commit status by the code-native runner, no Actions), and
-#     the context it will require is declared under `required_status_contexts`
-#     below. It is deliberately NOT in `protection` yet: the poster must be
-#     observed posting a real status first. Requiring a context before anything
-#     writes it is the #724 defect — an inert control whose own gate could not
-#     see that it was inert — and here it would be worse, because it would block
-#     every merge instead of merely doing nothing.
+# That precondition is now met. `scripts/gate-status.sh post` published the
+# gate's outcome for two commits in turn, both ancestors of `master`, both via
+# ADR-0028's code-native poster (no Actions):
+#
+#   0dbb0e6819979e329b615292adaa74ceecded5ee -> ao/gate-of-record: failure
+#     (`make verify`: 1 of 203 checks failed — `check-futureproof-e2e`, because
+#     the `shell-patterns` and `lessons` gates read BLIND/CANNOT-ASSESS against
+#     the disposable `git worktree add --detach` scratch checkout used to run
+#     that verify. That checkout was later found to have been silently pruned
+#     mid-run by this host's own worktree tooling, which is consistent with a
+#     measurement artifact rather than a real defect.)
+#
+#   83ff32dbcf40fe42c4ccbdcb3a41e5b4a48944f6 -> ao/gate-of-record: failure
+#     (`make verify` re-run on a CLEAN, non-scratch worktree: `check-lessons.sh`
+#     and `check-futureproof-e2e.sh` both now pass outright — 37/37 and 10/10
+#     respectively — confirming the first failure was that measurement
+#     artifact, not a defect. This run failed differently: 1 of 204 checks,
+#     `check-reconcile`'s `old-unbaselined provocation did not fire` self-test,
+#     whose outcome depends on the live population of worktrees on the host
+#     `make verify` runs on. Re-running `check-reconcile.sh` alone minutes
+#     later, on the identical tree, still failed but named a DIFFERENT set of
+#     "young" worktrees — proving the condition is driven by concurrent,
+#     unrelated lanes creating/removing worktrees on a shared host, not by
+#     anything committed to `master`.)
+#
+# The repo owner (kushin77) reviewed both runs and explicitly accepted
+# `check-reconcile`'s host-worktree-churn provocation as a known straggler —
+# the same category as PR #1153's unrelated known-red item — rather than
+# blocking this control on a full `make verify` this host cannot currently
+# produce. `scripts/gate-status.sh` has no field for recording that acceptance
+# on the posted commit status itself (the rc -> state mapping is intentionally
+# rigid and un-annotatable, by design — ADR-0028/`gate-status-map.py`); this
+# paragraph is that record instead.
+#
+# THIS DECLARATION is written with `required_status_checks` filled in because
+# the precondition (a real status, correctly observed, twice) is met, the
+# shape is provable end to end, and the one remaining red item is an accepted,
+# host-local straggler rather than a code defect. `required_status_checks`
+# applies to each PR's OWN head SHA once protection is applied (not
+# retroactively to whatever is posted on `master`'s tip at apply time), so
+# accepting today's straggler here does not exempt any future PR from posting
+# its own green `ao/gate-of-record` before it can merge.
+#
+#   strict: false
+#     No CI produces a required check on every push, so `strict: true` would
+#     force every PR to rebase onto master's latest tip AND get a freshly
+#     posted status each time master moves — with a human/agent poster instead
+#     of Actions, that wedges the repo within a day. `strict: false` requires
+#     the context to be green on the PR's own head SHA, which is the control
+#     this epic exists to add, without inventing a rebase treadmill nothing here
+#     can keep up with.
+#
+#   contexts: [ao/gate-of-record]
+#     The one context ADR-0028 defines, and the one name `required_status_contexts`
+#     below also names — `scripts/check-gate-status.sh` asserts those two
+#     declarations never drift into two different strings. `branch-protection-
+#     compare.py` normalizes this field to just {strict, contexts} before
+#     comparing, since GitHub's live response also carries server-generated
+#     fields (`url`, `contexts_url`, `checks`) that are not this repo's to
+#     declare and must not manufacture false drift.
 #
 #   required_pull_request_reviews: null
 #     Requiring a human review would break the autonomous-merge doctrine
@@ -59,22 +111,26 @@ protection:
   # remove the only override point the operating model names.
   enforce_admins: false
   required_signatures: false
-  required_status_checks: null
+  required_status_checks:
+    strict: false
+    contexts:
+      - ao/gate-of-record
   required_pull_request_reviews: null
   restrictions: null
   required_conversation_resolution: false
   lock_branch: false
   block_creations: false
 
-# ADR-0028 — the status context the gate of record publishes, and which branch
-# protection will require ONCE `scripts/gate-status.sh` has been observed posting
-# a real status from the runner.
+# ADR-0028 — the status context the gate of record publishes, and which
+# `protection.required_status_checks` above now requires.
 #
-# This key is OUTSIDE `protection` on purpose, so `scripts/branch-protection.sh
-# apply` does NOT require it: the declaration is the intent, the application is a
-# separate deliberate step. `scripts/check-gate-status.sh` asserts that this
-# context and the one the poster writes are the same STRING — two names for one
-# control is how a required check becomes permanently unsatisfiable (protection
-# would wait for a context nothing ever writes).
+# This key stays OUTSIDE `protection` on purpose: `protection` is what
+# `scripts/branch-protection.sh apply` PUTs to GitHub, and this key is instead
+# the single name `scripts/check-gate-status.sh` cross-checks against the
+# poster's own declared context. Keeping the two declarations SEPARATE, rather
+# than reading one out of the other, is what lets that check catch the two
+# ever drifting into different strings — two names for one control is how a
+# required check becomes permanently unsatisfiable (protection would wait for
+# a context nothing ever writes).
 required_status_contexts:
   - ao/gate-of-record

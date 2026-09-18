@@ -105,15 +105,35 @@ done
 work="$(python3 -c 'import tempfile; print(tempfile.mkdtemp(prefix="cbp-"))')" || exit 2
 trap 'rm -rf "$work"' EXIT
 
-# 2a. A live state that MATCHES the declaration must pass.
-python3 - "$work/match.json" <<'PY'
+# The fixture builder mirrors GitHub's wire shape: boolean policy fields arrive
+# as {"enabled": bool}; required_status_checks is its OWN nested shape (strict +
+# contexts, plus server-generated fields the comparator ignores), never wrapped
+# in "enabled" — wrapping it there would compare against a key the comparator
+# never reads and hide real drift on that field.
+build_live() {
+python3 - "$1" "$2" <<'PY'
 import json, sys
 want = json.load(open('/tmp/cbp-declared.json'))['want']
+overrides = json.loads(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else {}
 live = {}
 for key, value in want.items():
-    live[key] = None if value is None else {"enabled": value}
+    if key == "required_status_checks":
+        live[key] = None if value is None else {
+            "url": "https://api.example/required_status_checks",
+            "strict": value.get("strict", False),
+            "contexts": list(value.get("contexts", [])),
+            "contexts_url": "https://api.example/contexts",
+            "checks": [{"context": c, "app_id": None} for c in value.get("contexts", [])],
+        }
+    else:
+        live[key] = None if value is None else {"enabled": value}
+live.update(overrides)
 json.dump(live, open(sys.argv[1], "w"))
 PY
+}
+
+# 2a. A live state that MATCHES the declaration must pass.
+build_live "$work/match.json" "{}"
 python3 "$COMPARE" /tmp/cbp-declared.json "$work/match.json" >"$work/match.log" 2>&1
 rc=$?
 if [ $rc -ne 0 ]; then
@@ -124,17 +144,7 @@ fi
 
 # 2b. A live state whose protection has been REMOVED must be caught, by name.
 #     This is the real-world failure: someone turns protection off.
-python3 - "$work/drift.json" <<'PY'
-import json, sys
-want = json.load(open('/tmp/cbp-declared.json'))['want']
-live = {}
-for key, value in want.items():
-    live[key] = None if value is None else {"enabled": value}
-# the provocation: force-pushes allowed again, linear history off.
-live["allow_force_pushes"] = {"enabled": True}
-live["required_linear_history"] = {"enabled": False}
-json.dump(live, open(sys.argv[1], "w"))
-PY
+build_live "$work/drift.json" '{"allow_force_pushes": {"enabled": true}, "required_linear_history": {"enabled": false}}'
 python3 "$COMPARE" /tmp/cbp-declared.json "$work/drift.json" >"$work/drift.log" 2>&1
 rc=$?
 if [ $rc -ne 1 ]; then
@@ -148,6 +158,33 @@ elif ! grep -q "allow_force_pushes" "$work/drift.log"; then
 else
   echo "  OK  the comparator CATCHES removed protection and names the field:"
   grep "DRIFT" "$work/drift.log" | sed 's/^/      /'
+fi
+
+# 2b2. If the declaration REQUIRES a status-check context, a live state that
+#      has silently dropped that context (protection object still present,
+#      but the gate it names is gone) must be caught by name too. This is the
+#      #724 shape one layer down: a required-checks field that can drift
+#      without the comparator ever noticing is an inert control.
+declared_rsc="$(python3 -c "
+import json
+want = json.load(open('/tmp/cbp-declared.json'))['want']
+print('yes' if want.get('required_status_checks') else 'no')
+")"
+if [ "$declared_rsc" = "yes" ]; then
+  build_live "$work/rsc-drift.json" '{"required_status_checks": {"strict": false, "contexts": []}}'
+  python3 "$COMPARE" /tmp/cbp-declared.json "$work/rsc-drift.json" >"$work/rsc-drift.log" 2>&1
+  rc=$?
+  if [ $rc -ne 1 ]; then
+    echo "check-branch-protection: FAIL — a DROPPED required status context was NOT caught (rc=$rc, expected 1)" >&2
+    sed 's/^/    /' "$work/rsc-drift.log" >&2
+    fail=1
+  elif ! grep -q "required_status_checks" "$work/rsc-drift.log"; then
+    echo "check-branch-protection: FAIL — the dropped context drift was not named by field" >&2
+    fail=1
+  else
+    echo "  OK  a required status context silently dropped is caught and named:"
+    grep "DRIFT" "$work/rsc-drift.log" | sed 's/^/      /'
+  fi
 fi
 
 # 2c. A wholly UNPROTECTED branch must be caught -- the exact state measured.
