@@ -376,6 +376,17 @@ variables:
     required_by: [ops]
     readers: [governance/tagging/ledger.py]
 
+  # -- the PR-labels verb (issue #1254 step 5c / #1328) ---------------------
+  - name: AO_GH_BIN
+    purpose: >-
+      the `gh` binary `pr-labels --apply` shells out to; overridable so a test
+      can inject a fake `gh` (SP-4: nothing in this repository defines a
+      function named after a binary) rather than reaching the network.
+      Unset, it resolves to the real `gh` on PATH.
+    secret: false
+    required_by: [tooling]
+    readers: [governance/tagging/cli.py]
+
   # -- telemetry -----------------------------------------------------------
   - name: AO_FROZEN_CLOCK
     purpose: >-

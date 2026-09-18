@@ -160,15 +160,24 @@ usage() {
   printf 'usage: %s --body-file <path> [--range <git-range>] | --pr <number> | --landed [--range <git-range>] | --selftest\n' "$0" >&2
 }
 
+PR_NUMBER="${_PR_NUMBER:-${PR_NUMBER:-}}"
+# The `## Classification` block (issue #1254 step 5 / #1328). Vocabularies are
+# read live from the sources the tagging gate already owns; the scratch path
+# below exists only so `--selftest` can provoke `pr-class-below-surface`
+# against a fixture ladder without touching the real one.
+surfaces_yaml_override=""
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --body-file) body_file="${2:-}"; shift 2 ;;
     --range)     range="${2:-}"; RANGE_SET=1; shift 2 ;;
     --repo)      repo="${2:-}"; shift 2 ;;
     --selftest)  SELFTEST=1; shift ;;
+    --self-test) SELFTEST=1; shift ;;
     --landed)    LANDED=1; shift ;;
     --pr)        PR_NUMBER="${2:-}"; shift 2 ;;
     --enforcement-gate) gate="${2:-}"; shift 2 ;;
+    --surfaces-yaml) surfaces_yaml_override="${2:-}"; shift 2 ;;
     -h|--help)   usage; exit 0 ;;
     *) printf 'check-pr-contract: unknown argument %s\n' "$1" >&2; usage; exit 2 ;;
   esac
@@ -186,6 +195,7 @@ fi
 # --- the checks -------------------------------------------------------------
 # Each check appends one named finding to the `findings` array.
 declare -a findings=()
+declare -a class_findings=()
 
 # Is the ticket reference in this message's TRAILING TRAILER BLOCK? Prints the
 # named finding, or nothing when the rule holds. The message and subject arrive
@@ -439,6 +449,238 @@ PY
   fi
 }
 
+# --- Classification block (issue #1254 step 5 / #1328) ---------------------
+# WARN-ONLY by default (issue #1328): findings are printed but do not flip the
+# exit code unless AO_PR_CONTRACT_ENFORCE=1. The flip is a later PR, once every
+# open PR carries the block. Every vocabulary is read live from the source the
+# tagging gate already owns -- never a second copy of the ladder (ADR-0010 /
+# ADR-0031): `governance/conformance/policy.yaml` for `class`,
+# `governance/tagging/taxonomy.yaml` for `posture`/`lifecycle`/`pillar`,
+# `docs/PYTHON-PATTERNS.md` / `docs/SHELL-PATTERNS.md` / `AGENTS.md` / decision
+# records for `pattern`.
+check_classification() { # <body-file> <diff-range> [<head-branch>] [<surfaces-yaml>]
+  local body="$1" diff_range="$2" head_branch="${3:-}" surfaces_yaml="${4:-}"
+  local out line
+  out="$(
+    AO_ROOT="$root" AO_REPO="$repo" AO_BODY="$body" AO_DIFF_RANGE="$diff_range" \
+    AO_HEAD_BRANCH="$head_branch" \
+    AO_SURFACES_YAML="${surfaces_yaml:-$root/governance/conformance/surfaces.yaml}" \
+    python3 - <<'PY'
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(os.environ["AO_ROOT"])
+repo = Path(os.environ["AO_REPO"])
+body_path = os.environ["AO_BODY"]
+diff_range = os.environ.get("AO_DIFF_RANGE", "")
+head_branch = os.environ.get("AO_HEAD_BRANCH", "") or ""
+surfaces_yaml = Path(os.environ["AO_SURFACES_YAML"])
+
+
+def emit(code, detail=""):
+    print("%s:%s" % (code, detail) if detail else code)
+
+
+try:
+    text = Path(body_path).read_text(encoding="utf-8")
+except OSError as exc:
+    emit("pr-context-missing", "body unreadable: %s" % exc)
+    sys.exit(0)
+
+no_comments = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+match = re.search(
+    r"(?im)^##+[ \t]*Classification[ \t]*$(.*?)(?=^##+[ \t]|\Z)",
+    no_comments,
+    flags=re.S | re.M,
+)
+if not match or not match.group(1).strip():
+    emit("pr-classification-missing")
+    sys.exit(0)
+
+fields = {}
+for raw_line in match.group(1).splitlines():
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#"):
+        continue
+    kv = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$", stripped)
+    if not kv:
+        continue
+    key = kv.group(1).lower()
+    value = re.split(r"\s+#", kv.group(2).strip(), maxsplit=1)[0].strip()
+    fields[key] = value
+
+
+def filled(value):
+    return bool(value) and "<" not in value
+
+
+try:
+    import yaml
+except ImportError as exc:
+    emit("pr-context-missing", "PyYAML unavailable: %s" % exc)
+    sys.exit(0)
+
+
+def load_yaml(path):
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except OSError:
+        return {}
+
+
+policy = load_yaml(root / "governance/conformance/policy.yaml")
+ladder = list(policy.get("ladder") or [])
+
+sys.path.insert(0, str(root / "governance/tagging"))
+try:
+    import model as M  # noqa: E402
+
+    taxonomy = M.load_taxonomy(root / "governance/tagging/taxonomy.yaml")
+    posture_vocab = list(taxonomy.dimensions["posture"].values)
+    posture_exclusive = list(taxonomy.dimensions["posture"].mutually_exclusive or [])
+    lifecycle_vocab = list(taxonomy.dimensions["lifecycle"].values)
+    pillar_vocab = list(taxonomy.dimensions["pillar"].values)
+except Exception as exc:  # the authority itself is unreadable -- CANNOT-ASSESS
+    emit("pr-context-missing", "tagging authority unreadable: %s" % exc)
+    sys.exit(0)
+
+findings = []
+
+cls = fields.get("class", "")
+if not filled(cls) or cls not in ladder:
+    findings.append(("pr-class-unknown", cls or "(missing)"))
+
+posture_raw = fields.get("posture", "")
+if not filled(posture_raw):
+    findings.append(("pr-posture-unknown", "(missing)"))
+else:
+    postures = [p.strip() for p in posture_raw.split(",") if p.strip()]
+    bad = [p for p in postures if p not in posture_vocab]
+    if bad or not postures:
+        findings.append(("pr-posture-unknown", ",".join(bad) or posture_raw))
+    for pair in posture_exclusive:
+        if all(v in postures for v in pair):
+            findings.append(("pr-posture-contradiction", "+".join(pair)))
+
+lifecycle = fields.get("lifecycle", "")
+if not filled(lifecycle) or lifecycle not in lifecycle_vocab:
+    findings.append(("pr-lifecycle-unknown", lifecycle or "(missing)"))
+
+pillar = fields.get("pillar", "")
+if not filled(pillar) or pillar not in pillar_vocab:
+    findings.append(("pr-pillar-unknown", pillar or "(missing)"))
+
+pattern = fields.get("pattern", "")
+
+
+def pattern_resolvable(value):
+    if value == "none":
+        return True
+    fam = re.match(r"^(PP|SP|GR)-([0-9]+)$", value)
+    if fam:
+        family, num = fam.groups()
+        doc = {
+            "PP": root / "docs/PYTHON-PATTERNS.md",
+            "SP": root / "docs/SHELL-PATTERNS.md",
+            "GR": root / "AGENTS.md",
+        }[family]
+        try:
+            doc_text = doc.read_text(encoding="utf-8")
+        except OSError:
+            return False
+        return bool(re.search(r"(?m)^#+.*\b%s-%s\b" % (family, num), doc_text))
+    adr = re.match(r"^ADR-([0-9]{4})$", value)
+    if adr:
+        decisions = root / "docs/decision-records"
+        try:
+            return any(
+                p.name.startswith("ADR-%s-" % adr.group(1)) or p.name == "ADR-%s.md" % adr.group(1)
+                for p in decisions.glob("ADR-*.md")
+            )
+        except OSError:
+            return False
+    return False
+
+
+if not filled(pattern) or not pattern_resolvable(pattern):
+    findings.append(("pr-pattern-unresolvable", pattern or "(missing)"))
+
+lane = fields.get("lane", "")
+lane_ok = False
+if filled(lane):
+    if lane == "direct":
+        lane_ok = not re.match(r"^issue-[0-9]+", head_branch)
+    else:
+        lm = re.match(r"^issue-([0-9]+)$", lane)
+        if lm:
+            lane_ok = bool(head_branch) and (
+                head_branch == lane or head_branch.startswith(lane + "-")
+            )
+if not lane_ok:
+    findings.append(
+        ("pr-lane-mismatch", "lane=%s head=%s" % (lane or "(missing)", head_branch or "(unknown)"))
+    )
+
+if filled(cls) and cls in ladder and diff_range:
+    spolicy = None
+    try:
+        sys.path.insert(0, str(root / "governance/conformance"))
+        import surfaces as SF  # noqa: E402
+
+        spolicy = SF.load_surface_policy(surfaces_yaml)
+    except Exception:
+        spolicy = None
+    if spolicy is not None:
+        try:
+            proc = subprocess.run(
+                ["git", "-C", str(repo), "diff", "--name-only", diff_range],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            touched = proc.stdout.splitlines()
+        except OSError:
+            touched = []
+        cls_rank = spolicy.rank(cls)
+        worst_surface = None
+        worst_rank = -1
+        for f in touched:
+            if not f:
+                continue
+            best_spec = None
+            best_len = -1
+            for spec in spolicy.surfaces:
+                sp = spec.path.rstrip("/")
+                if f == sp or f.startswith(sp + "/"):
+                    if len(sp) > best_len:
+                        best_len = len(sp)
+                        best_spec = spec
+            if best_spec is not None:
+                r = spolicy.rank(best_spec.declared_class)
+                if r > worst_rank:
+                    worst_rank = r
+                    worst_surface = best_spec.surface
+        if worst_surface is not None and 0 <= cls_rank < worst_rank:
+            findings.append(
+                (
+                    "pr-class-below-surface",
+                    "%s requires >= %s" % (worst_surface, spolicy.ladder[worst_rank]),
+                )
+            )
+
+for code, detail in findings:
+    emit(code, detail)
+PY
+  )"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    class_findings+=("$line")
+  done <<<"$out"
+}
+
 report() { # [label]
   local label="${1:-check-pr-contract}"
   local f
@@ -448,16 +690,33 @@ report() { # [label]
   printf '%s: FAIL (%s finding(s))\n' "$label" "${#findings[@]}" >&2
 }
 
-run_checks() { # <body-file> <range>
+run_checks() { # <body-file> <range> [<head-branch>] [<surfaces-yaml>]
   findings=()
+  class_findings=()
   check_body "$1"
   check_gate_changing "$1" "$2"
   check_commits "$2"
-  if [ "${#findings[@]}" -gt 0 ]; then
+  local dr
+  dr="$(diff_range_for "$2" 2>/dev/null || true)"
+  check_classification "$1" "$dr" "${3:-}" "${4:-}"
+
+  local enforce="${AO_PR_CONTRACT_ENFORCE:-0}" cf level
+  if [ "${#class_findings[@]}" -gt 0 ]; then
+    [ "$enforce" = "1" ] && level="FAIL" || level="WARN"
+    for cf in "${class_findings[@]}"; do
+      printf '  %s  classification:%s\n' "$level" "$cf" >&2
+    done
+  fi
+
+  if [ "${#findings[@]}" -gt 0 ] || { [ "$enforce" = "1" ] && [ "${#class_findings[@]}" -gt 0 ]; }; then
     report "check-pr-contract"
     return 1
   fi
-  echo "check-pr-contract: OK — trailer block, AI-assistance, Closes and the pre-existing-red claim are all evidenced"
+  if [ "${#class_findings[@]}" -gt 0 ]; then
+    echo "check-pr-contract: OK — trailer block, AI-assistance, Closes and the pre-existing-red claim are all evidenced (classification: ${#class_findings[@]} warn-only finding(s); set AO_PR_CONTRACT_ENFORCE=1 to enforce)"
+    return 0
+  fi
+  echo "check-pr-contract: OK — trailer block, AI-assistance, Closes, the pre-existing-red claim and the Classification block are all evidenced"
   return 0
 }
 
@@ -509,7 +768,7 @@ landed_audit() { # <range> <gate>
 
 # --- PR-time hook: the body and the range come from GitHub -------------------
 pr_check() { # <number>
-  local number="$1" tmpdir bodyfile base_name head_oid rang rc base_rev resolved
+  local number="$1" tmpdir bodyfile base_name head_oid head_name rang rc base_rev resolved
   if ! command -v gh >/dev/null 2>&1; then
     echo "check-pr-contract: CANNOT-ASSESS — gh not found (the PR-time check reads the PR body via gh)" >&2
     return 2
@@ -534,6 +793,7 @@ pr_check() { # <number>
   # (#1147; the two-dot/two-tree difference is spelled out in the header).
   base_name="$( ( cd "$repo" && gh pr view "$number" --json baseRefName --jq '.baseRefName' ) 2>/dev/null )"
   head_oid="$( ( cd "$repo" && gh pr view "$number" --json headRefOid --jq '.headRefOid' ) 2>/dev/null )"
+  head_name="$( ( cd "$repo" && gh pr view "$number" --json headRefName --jq '.headRefName' ) 2>/dev/null )"
   if [ -z "$base_name" ] || [ -z "$head_oid" ]; then
     rm -rf "$tmpdir"
     echo "check-pr-contract: CANNOT-ASSESS — cannot resolve the base/head of PR #$number" >&2
@@ -554,7 +814,7 @@ pr_check() { # <number>
     echo "check-pr-contract: CANNOT-ASSESS — no non-merge commits between PR #$number's base ($base_name) and its head ($head_oid) (is the PR head fetched into this clone?)" >&2
     return 2
   fi
-  run_checks "$bodyfile" "$rang"
+  run_checks "$bodyfile" "$rang" "$head_name" "$surfaces_yaml_override"
   rc=$?
   rm -rf "$tmpdir"
   return "$rc"
@@ -1141,6 +1401,185 @@ MD
     ok=1
   fi
 
+  # --- the Classification block (issue #1254 step 5 / #1328) -----------------
+  # WARN-ONLY by default: every plant below must be provoked BY NAME with
+  # AO_PR_CONTRACT_ENFORCE=1 (rc 1) and must NOT flip a plain run's rc (warn
+  # only, rc 0) — proving the warn-only default is real, not decorative.
+  class_good_body() {
+    cat <<MD
+## Closes
+
+Closes #1328
+
+## Classification
+
+class: pattern
+posture: overall
+lifecycle: build
+pillar: governance
+pattern: none
+lane: issue-1328
+
+## Merge order
+
+Gate-changing: no
+
+## Evidence
+
+\`\`\`
+\$ make verify
+verify: PASS (30 of 30 checks)
+\`\`\`
+
+## AI-assistance
+
+AI-assistance: Copilot (Relentless, flash/LOW)
+
+## Pre-existing red
+
+None
+MD
+  }
+  class_good="$work/class-good.md"
+  class_good_body >"$class_good"
+
+  expect_class() { # <label> <body-file> <head-branch> <want-code> <surfaces-yaml>
+    local label="$1" body="$2" head="$3" want="$4" syaml="${5:-}" out rc
+    out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$body" "$base..$a_sha" "$head" "$syaml" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && [[ "$out" == *"classification:$want"* ]]; then
+      printf '  OK    %s\n' "$label"
+    else
+      printf '  FAIL  %s (rc=%s)\n%s\n' "$label" "$rc" "$out" >&2
+      ok=1
+    fi
+    # …and the SAME plant, warn-only (no AO_PR_CONTRACT_ENFORCE), must not flip rc.
+    out="$(run_checks "$body" "$base..$a_sha" "$head" "$syaml" 2>&1)"
+    rc=$?
+    if [ "$rc" -eq 0 ] && [[ "$out" == *"classification:$want"* ]]; then
+      printf '  OK    %s — warn-only by default (rc stays 0)\n' "$label"
+    else
+      printf '  FAIL  %s did not stay warn-only (rc=%s)\n%s\n' "$label" "$rc" "$out" >&2
+      ok=1
+    fi
+  }
+
+  # a compliant body on its declared lane passes clean, ENFORCED, with no
+  # classification finding at all.
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$class_good" "$base..$a_sha" "issue-1328" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" == *"check-pr-contract: OK"* ]] && [[ "$out" != *"classification:"* ]]; then
+    printf '  OK    a compliant Classification block passes enforced, with no findings\n'
+  else
+    printf '  FAIL  a compliant Classification block was refused\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # no block at all.
+  expect_class "a missing Classification block is refused by name" "$good_body" "issue-1328" "pr-classification-missing"
+
+  # class outside the ladder.
+  bad_class="$work/class-bad-class.md"
+  class_good_body | sed 's/^class: pattern$/class: not-a-rung/' >"$bad_class"
+  expect_class "an unknown class is refused by name" "$bad_class" "issue-1328" "pr-class-unknown"
+
+  # posture outside the vocabulary.
+  bad_posture="$work/class-bad-posture.md"
+  class_good_body | sed 's/^posture: overall$/posture: made-up/' >"$bad_posture"
+  expect_class "an unknown posture is refused by name" "$bad_posture" "issue-1328" "pr-posture-unknown"
+
+  # lifecycle outside the vocabulary.
+  bad_lifecycle="$work/class-bad-lifecycle.md"
+  class_good_body | sed 's/^lifecycle: build$/lifecycle: made-up/' >"$bad_lifecycle"
+  expect_class "an unknown lifecycle is refused by name" "$bad_lifecycle" "issue-1328" "pr-lifecycle-unknown"
+
+  # pillar outside the vocabulary.
+  bad_pillar="$work/class-bad-pillar.md"
+  class_good_body | sed 's/^pillar: governance$/pillar: made-up/' >"$bad_pillar"
+  expect_class "an unknown pillar is refused by name" "$bad_pillar" "issue-1328" "pr-pillar-unknown"
+
+  # posture contradiction: both mutually-exclusive autonomy claims declared.
+  contra_posture="$work/class-posture-contradiction.md"
+  class_good_body | sed 's/^posture: overall$/posture: no-human-needed, human-gated/' >"$contra_posture"
+  expect_class "a posture contradiction is refused by name" "$contra_posture" "issue-1328" "pr-posture-contradiction"
+
+  # pattern id that resolves to nothing in the named doc.
+  bad_pattern="$work/class-bad-pattern.md"
+  class_good_body | sed 's/^pattern: none$/pattern: SP-99999/' >"$bad_pattern"
+  expect_class "an unresolvable pattern id is refused by name" "$bad_pattern" "issue-1328" "pr-pattern-unresolvable"
+
+  # a REAL pattern id resolves cleanly (non-vacuity for the resolver).
+  real_pattern="$work/class-real-pattern.md"
+  class_good_body | sed 's/^pattern: none$/pattern: SP-1/' >"$real_pattern"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$real_pattern" "$base..$a_sha" "issue-1328" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" != *"pr-pattern-unresolvable"* ]]; then
+    printf '  OK    a real pattern id (SP-1) resolves and is accepted\n'
+  else
+    printf '  FAIL  a real pattern id was refused\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # lane declares an issue branch that does not match the actual head.
+  expect_class "a lane/head mismatch is refused by name" "$class_good" "issue-9999" "pr-lane-mismatch"
+
+  # lane: direct on a branch that IS an issue lane is also a mismatch.
+  direct_on_lane="$work/class-direct-on-lane.md"
+  class_good_body | sed 's/^lane: issue-1328$/lane: direct/' >"$direct_on_lane"
+  expect_class "lane: direct on an issue-lane head is refused by name" "$direct_on_lane" "issue-1328" "pr-lane-mismatch"
+
+  # lane: direct on a non-lane head is accepted.
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$direct_on_lane" "$base..$a_sha" "main" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" != *"pr-lane-mismatch"* ]]; then
+    printf '  OK    lane: direct on a non-lane head is accepted\n'
+  else
+    printf '  FAIL  lane: direct on a non-lane head was refused\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # class-below-surface: a SCRATCH surfaces.yaml declares one root `elite`;
+  # the lane touches it while declaring `pattern` — below the surface's rung.
+  scratch_surfaces="$work/surfaces.scratch.yaml"
+  cat >"$scratch_surfaces" <<'YAML'
+ladder: [template, pattern, elite]
+evidence:
+  tests:
+    kind: machine
+    description: a test suite exists
+requirements:
+  template: []
+  pattern: [tests]
+  elite: [tests]
+surfaces:
+  - surface: scratch-elite-surface
+    path: elitepath
+    declared_class: elite
+YAML
+  mkdir -p "$scratch/elitepath"
+  printf 'x\n' >"$scratch/elitepath/thing.txt"
+  git -C "$scratch" add elitepath/thing.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "touch a surface the scratch policy declares elite" \
+    -m "Refs kushin77/agent-orchestrator#1328" >/dev/null 2>&1
+  below_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$class_good" "${below_sha}^..$below_sha" "issue-1328" "$scratch_surfaces" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"classification:pr-class-below-surface"* ]]; then
+    printf '  OK    a class below the touched surface'"'"'s rung is refused by name\n'
+  else
+    printf '  FAIL  a below-surface class went undetected\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # non-vacuity: the same touch declaring `elite` (at or above the surface's
+  # rung) is accepted.
+  at_surface="$work/class-at-surface.md"
+  class_good_body | sed 's/^class: pattern$/class: elite/' >"$at_surface"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$at_surface" "${below_sha}^..$below_sha" "issue-1328" "$scratch_surfaces" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" != *"pr-class-below-surface"* ]]; then
+    printf '  OK    a class at the surface'"'"'s own rung is accepted\n'
+  else
+    printf '  FAIL  a correctly-classed touch was refused\n%s\n' "$out" >&2
+    ok=1
+  fi
+
   rm -rf "$work"
   if [ "$ok" -ne 0 ]; then
     echo "check-pr-contract: SELFTEST FAIL — the gate cannot detect every violation it defines" >&2
@@ -1170,7 +1609,7 @@ if [ -n "${PR_NUMBER:-}" ]; then
 fi
 
 if [ -z "$body_file" ]; then
-  echo "check-pr-contract: CANNOT-ASSESS — no PR body file (--body-file or AO_PR_BODY_FILE); a missing body is not a pass" >&2
+  echo "check-pr-contract: CANNOT-ASSESS — pr-context-missing: no --pr, no \$_PR_NUMBER/\$PR_NUMBER, and no PR body file (--body-file or AO_PR_BODY_FILE); a missing body is not a pass" >&2
   exit 2
 fi
 if [ ! -f "$body_file" ]; then
@@ -1182,5 +1621,5 @@ if [ -z "$(git -C "$repo" rev-list --no-merges "$range" 2>/dev/null)" ]; then
   exit 2
 fi
 
-run_checks "$body_file" "$range"
+run_checks "$body_file" "$range" "$(git -C "$repo" rev-parse --abbrev-ref HEAD 2>/dev/null)" "$surfaces_yaml_override"
 exit $?

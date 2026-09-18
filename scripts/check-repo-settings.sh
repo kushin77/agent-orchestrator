@@ -48,6 +48,16 @@ fail=0
 
 command -v python3 >/dev/null 2>&1 || { echo "check-repo-settings: CANNOT-ASSESS — python3 not found" >&2; exit 2; }
 
+# Precondition: an authenticated `gh` is what the LIVE section (part 3) needs
+# to read settings back. Hoisted ABOVE the offline PROVOKED section (part 2)
+# on purpose — see scripts/check-branch-protection.sh for the mirrored rule
+# and the measured defect (#1313): on a host where `gh` is installed but
+# unauthenticated, the PROVOKED section ran anyway and reported FAIL for a
+# comparator this run was never able to reach.
+# shellcheck source=scripts/lib/preconditions.sh
+source "$root/scripts/lib/preconditions.sh"
+require_gh_auth gh-unauthenticated
+
 # 1. STRUCTURAL -- the declaration is present and actually declares settings.
 [ -f "$POLICY" ] || { echo "check-repo-settings: FAIL — the declared policy is missing: $POLICY" >&2; exit 1; }
 [ -f "$COMPARE" ] || { echo "check-repo-settings: FAIL — the comparator is missing: $COMPARE" >&2; exit 1; }
@@ -154,7 +164,10 @@ esac
 
 # Order matters: a real, provoked failure outranks an unobserved live state,
 # so a gate that found a genuine defect still reports NOT-OK (1) rather than
-# the softer 2.
+# the softer 2 — but only once the precondition at the top of this file has
+# already confirmed the provocations ran for real. When `gh` is unauthenticated
+# this gate never reaches here at all (rc 2, by name, above); it does not fall
+# through to this ordering.
 if [ "$fail" -ne 0 ]; then
   echo "check-repo-settings: NOT-OK — the declaration or its enforcement is defective"
   exit 1

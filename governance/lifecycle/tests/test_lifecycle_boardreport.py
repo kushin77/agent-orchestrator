@@ -122,6 +122,67 @@ def test_a_parked_verification_files_nothing_on_the_board(tmp_path):
     assert result.board_reports == []
 
 
+def test_verify_evidence_missing_is_filed_for_an_open_issue(tmp_path):
+    """#1266: an OPEN issue's missing-evidence finding is a live board item."""
+    finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#1300", detail="no attestation")
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    result = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset())
+    assert result and result[0].action == "filed"
+    assert filer.created and "VERIFY_EVIDENCE_MISSING" in filer.created[0]["title"]
+
+
+def test_verify_evidence_missing_is_not_filed_for_a_closed_issue(tmp_path):
+    """#1266: 27 squash merges landed 2026-09-18 and closed 0 issues — the
+    auto-filer went on to raise VERIFY_EVIDENCE_MISSING against items already
+    closed by hand (#992/#1247/#1251). A subject in ``closed_subjects`` must
+    never reach ``filer.create`` for this code."""
+    finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#992", detail="no attestation")
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    result = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#992"}))
+    assert result and result[0].action == "obsolete-by-close"
+    assert filer.created == [], "a closed issue's evidence gap must not become a new board issue"
+
+
+def test_a_closed_issues_stale_board_entry_is_resolved_not_left_to_rot(tmp_path):
+    """A VERIFY_EVIDENCE_MISSING board issue filed while the item was open must
+    be resolved once the item closes, not left open beside an unfileable finding."""
+    finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#992", detail="no attestation")
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    board_report_findings([finding], rep, apply=True, closed_subjects=frozenset())
+    assert filer.created  # filed while the item was still open
+
+    # The item's issue closes; the next pass re-observes the same finding.
+    second = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#992"}))
+    assert second[0].action == "obsolete-by-close"
+    # No SECOND issue was created for it.
+    assert len(filer.created) == 1
+
+
+def test_a_forced_file_for_a_closed_issue_is_refused_by_name(tmp_path):
+    """Negative control: even asking to file straight into a closed subject's
+    board issue must be refused by name, never create one (#1266)."""
+    finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#1251", detail="no attestation")
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    result = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#1251"}))
+    assert result[0].action == "obsolete-by-close", "must be refused by name, not silently deduped or filed"
+    assert filer.created == []
+
+
+def test_other_codes_are_unaffected_by_closed_subjects(tmp_path):
+    """Only the codes in OPEN_ONLY_CODES are gated on issue state; anything
+    else still files normally even against a closed subject."""
+    finding = Finding(code="BRANCH_NOT_DELETED", subject="#992", detail="branch still exists")
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    result = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#992"}))
+    assert result[0].action == "filed"
+    assert filer.created
+
+
 def test_a_park_does_not_excuse_a_finding_that_is_really_broken(tmp_path):
     """A capacity condition must not silence a defect that was actually measured."""
     item = clean_item(verify={}, branch_deleted=False)

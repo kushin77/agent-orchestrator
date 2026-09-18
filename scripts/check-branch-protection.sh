@@ -46,6 +46,18 @@ fail=0
 
 command -v python3 >/dev/null 2>&1 || { echo "check-branch-protection: CANNOT-ASSESS — python3 not found" >&2; exit 2; }
 
+# Precondition: an authenticated `gh` is what the LIVE section (part 3) needs
+# to read protection back. This is hoisted ABOVE the offline PROVOKED section
+# (part 2) on purpose: a gate whose precondition is absent is CANNOT-ASSESS
+# for the WHOLE gate, including its provocations — a provocation is judged
+# only when the live half could run. Measured (#1313): on a host where `gh`
+# is installed but unauthenticated, the PROVOKED section still ran and its
+# rc-2-from-elsewhere was compared against the expected rc 1, reporting FAIL
+# for a comparator this run was never able to reach.
+# shellcheck source=scripts/lib/preconditions.sh
+source "$root/scripts/lib/preconditions.sh"
+require_gh_auth gh-unauthenticated
+
 # 1. STRUCTURAL -- the declaration is present and actually declares protection.
 [ -f "$POLICY" ] || { echo "check-branch-protection: FAIL — the declared policy is missing: $POLICY" >&2; exit 1; }
 [ -f "$COMPARE" ] || { echo "check-branch-protection: FAIL — the comparator is missing: $COMPARE" >&2; exit 1; }
@@ -175,7 +187,10 @@ esac
 
 # Order matters: a real, provoked failure outranks an unobserved live state, so a
 # gate that found a genuine defect still reports NOT-OK (1) rather than the
-# softer 2.
+# softer 2 — but only once the precondition at the top of this file has
+# already confirmed the provocations ran for real. When `gh` is unauthenticated
+# this gate never reaches here at all (rc 2, by name, above); it does not fall
+# through to this ordering.
 if [ "$fail" -ne 0 ]; then
   echo "check-branch-protection: NOT-OK — the declaration or its enforcement is defective"
   exit 1

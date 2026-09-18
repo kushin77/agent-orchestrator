@@ -92,6 +92,23 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
+# Precondition: this gate's LIVE section runs `docker compose ... up/logs/stop
+# /down` against a real container. Measured (#1313, host 192.168.168.42):
+# docker 29 with no `docker compose` v2 plugin turned every one of those
+# invocations into "Run 'docker --help' for more information", surfacing as
+# 11 FAILs rather than one named CANNOT-ASSESS. `docker compose version` is
+# probed rather than `command -v docker-compose` (the v1 standalone binary):
+# a `docker` that runs but whose compose SUBCOMMAND is absent is exactly the
+# measured state, and a docker-less PATH alone would not reproduce it. This
+# is hoisted above every section (including the offline structural/provoked
+# checks in 1-6 below) because a precondition absent for the live half makes
+# the WHOLE gate CANNOT-ASSESS, not only the invocations that would have
+# failed.
+if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+  echo "CANNOT-ASSESS compose-plugin-missing: install the docker compose v2 plugin (docker compose version must succeed)" >&2
+  exit 2
+fi
+
 IMAGE_DIR="infra/fleet"
 COMPOSE="infra/fleet/docker-compose.agent-cron.yml"
 INVENTORY="infra/fleet/inventory.yaml"

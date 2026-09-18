@@ -27,6 +27,41 @@ BEFORE OPENING
 
 Closes #<n>
 
+## Classification
+
+<!--
+Issue #1254 step 5 / #1328: the PR's own tag record, judged by
+`scripts/check-pr-contract.sh` (WARN-ONLY today; AO_PR_CONTRACT_ENFORCE=1
+flips it to a hard refusal in a later PR, once every open PR carries this
+block). Machine-shaped `key: value` lines, one per line — every vocabulary is
+read live from the authority that already owns it, never copied here:
+
+    class:      the CMR ladder rung (governance/conformance/policy.yaml
+                `ladder`) — the rung this PR must meet, never lower than the
+                rung governance/conformance/surfaces.yaml declares for any
+                surface root this PR's diff touches (ADR-0010/0031).
+    posture:    governance/tagging/taxonomy.yaml `posture` values, comma-list
+                if more than one applies. `no-human-needed` and `human-gated`
+                are mutually exclusive.
+    lifecycle:  governance/tagging/taxonomy.yaml `lifecycle` values.
+    pillar:     the `pillar:*` label family (governance/tagging/taxonomy.yaml
+                `pillar` values).
+    pattern:    the pattern/rule this PR applies or extends — a `PP-nn` id
+                (docs/PYTHON-PATTERNS.md), `SP-nn` (docs/SHELL-PATTERNS.md), a
+                `GR-nn` golden rule (AGENTS.md), an `ADR-nnnn` decision record
+                (docs/decision-records/), or `none`.
+    lane:       `issue-<n>` (this PR's isolation lane branch) or `direct` for
+                an owner merge with no lane branch — must agree with the head
+                branch actually pushed.
+-->
+
+class: <template|class|pattern|enterprise|faang|elite>
+posture: <overall|saas|iac|no-human-needed|human-gated>
+lifecycle: <plan|build|verify|release>
+pillar: <registry-profiling|model-gateway|state-machine|guardrails-security|observability-finops|identity-rbac|control-plane|governance|autonomous-ops>
+pattern: <PP-nn|SP-nn|GR-nn|ADR-nnnn|none>
+lane: <issue-<n>|direct>
+
 ## What changed
 
 <The substance: what this changes and why, in a paragraph or two. Not a diff.>
