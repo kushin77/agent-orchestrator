@@ -40,6 +40,8 @@ ROUTINE_WATCHDOG = "fleet-watchdog"
 ROUTINE_PRUNE = "fleet-prune"
 #: The registry id of the orphan-reconciliation sweep.
 ROUTINE_RECONCILE = "fleet-reconcile"
+#: The registry id of the daily worktree-reap rung.
+ROUTINE_REAP = "fleet-reap"
 
 
 class RoutineRefused(Exception):
@@ -175,9 +177,19 @@ class RoutineSpec:
 
 #: The routine registry — the accountable owner of each schedule the code
 #: declares. ``anchor`` is the issue the schedule's own source cites as its
-#: reason to exist (``fleet/cron.py`` names #280 for the pruner and #304 for the
-#: sweep; #237 is the cron-owned watchdog), so the routine view and the PMO view
-#: describe the same ticket rather than two answers.
+#: reason to exist (``fleet/cron.py`` names #280 for the pruner, #304 for the
+#: sweep and #830 for the reaper; #237 is the cron-owned watchdog), so the routine
+#: view and the PMO view describe the same ticket rather than two answers.
+#:
+#: Every ENABLED rung the schedule carries must appear here. The registry was
+#: written for the three rungs issue #418 shipped and was never extended when
+#: #830 added the fourth (the daily worktree reaper) to the manifest, so the
+#: projection reported ``schedule-unprojected: ao-fleet-reap`` — a real drift, and
+#: the reason `scripts/check-paperclip-routines.sh` had no verdict to give
+#: (issue #1176). The rung is live: `config/fleet-jobs.json` enables it,
+#: `infra/fleet/inventory.yaml` declares it, `infra/fleet/dev_run.py` carries a
+#: dry-run form for it, its cron line shells out to `scripts/prune-worktrees.sh`
+#: and its log is gitignored.
 ROUTINES: tuple[RoutineSpec, ...] = (
     RoutineSpec(
         id=ROUTINE_WATCHDOG,
@@ -199,6 +211,19 @@ ROUTINES: tuple[RoutineSpec, ...] = (
         owner="governance/reconcile",
         lane="fleet-ops",
         anchor="kushin77/agent-orchestrator#304",
+    ),
+    # The reaper's owner is the tool that does the work — `scripts/prune-worktrees.sh`
+    # — exactly as `fleet/prune` names the job `fleet/prune.py` runs and
+    # `governance/reconcile` names the sweep's package. The rung declares no work
+    # of its own: `fleet/cron.py`'s reap comment says it "shells out to" that tool
+    # and "adds no second copy of its reclaim policy, only the schedule", so the
+    # owner is the tool, not a fleet module that does not exist.
+    RoutineSpec(
+        id=ROUTINE_REAP,
+        marker="ao-fleet-reap",
+        owner="scripts/prune-worktrees",
+        lane="fleet-ops",
+        anchor="kushin77/agent-orchestrator#830",
     ),
 )
 

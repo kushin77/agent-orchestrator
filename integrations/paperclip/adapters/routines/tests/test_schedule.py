@@ -12,9 +12,9 @@ from integrations.paperclip.adapters.routines.schedule import (
     ROOT_TOKEN,
     read_schedule,
 )
-from integrations.paperclip.adapters.routines.tests.conftest import build_schedule_tree
+from integrations.paperclip.adapters.routines.tests.conftest import build_schedule_tree, job
 
-MARKERS = ("ao-fleet-watchdog", "ao-fleet-prune", "ao-fleet-reconcile")
+MARKERS = ("ao-fleet-watchdog", "ao-fleet-prune", "ao-fleet-reconcile", "ao-fleet-reap")
 
 
 def test_reads_exactly_one_entry_per_marker(schedule_tree: Path) -> None:
@@ -47,26 +47,38 @@ def test_absolute_paths_are_normalised_so_revision_decides_bytes(tmp_path: Path)
 
 
 def test_an_inexpressible_trigger_is_refused_by_name(tmp_path: Path) -> None:
-    tree = build_schedule_tree(
-        tmp_path,
-        mutate=lambda text: text.replace('PRUNE_SCHEDULE = "23 4 * * *"', 'PRUNE_SCHEDULE = "0 0 1 * *"'),
-    )
+    def monthly(manifest: dict) -> None:
+        # A day-of-month restriction cannot be expressed as a fleet Trigger. The
+        # mutation goes through the manifest because that is where the schedule
+        # lives: `fleet/cron.py` renders it from there (issue #241/#962).
+        job(manifest, "prune")["schedule"] = "0 0 1 * *"
+
+    tree = build_schedule_tree(tmp_path, mutate=monthly)
     schedule = read_schedule(tree)
     assert [finding.code for finding in schedule.refusals] == ["inexpressible-trigger"]
     assert schedule.refusals[0].subject == "ao-fleet-prune"
-    assert [entry.marker for entry in schedule.entries] == ["ao-fleet-watchdog", "ao-fleet-reconcile"]
+    assert [entry.marker for entry in schedule.entries] == [
+        "ao-fleet-watchdog",
+        "ao-fleet-reconcile",
+        "ao-fleet-reap",
+    ]
 
 
-def test_an_unmarked_line_is_refused(tmp_path: Path) -> None:
-    tree = build_schedule_tree(
-        tmp_path,
-        mutate=lambda text: text.replace("# {PRUNE_MARKER}", "# ao-fleet-watchdog"),
-    )
+def test_a_retagged_entry_is_read_as_the_marker_it_carries(tmp_path: Path) -> None:
+    def retag(manifest: dict) -> None:
+        job(manifest, "prune")["marker"] = "ao-fleet-watchdog"
+
+    tree = build_schedule_tree(tmp_path, mutate=retag)
     # Retagging prune to the watchdog marker makes the watchdog marker appear
     # twice and the prune marker disappear; the reader reports both facts.
     schedule = read_schedule(tree)
     markers = sorted(entry.marker for entry in schedule.entries)
-    assert markers == ["ao-fleet-reconcile", "ao-fleet-watchdog", "ao-fleet-watchdog"]
+    assert markers == [
+        "ao-fleet-reap",
+        "ao-fleet-reconcile",
+        "ao-fleet-watchdog",
+        "ao-fleet-watchdog",
+    ]
 
 
 def test_parse_trigger_refusals_are_named() -> None:
