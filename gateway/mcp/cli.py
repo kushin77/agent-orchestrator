@@ -163,6 +163,24 @@ def _code(resp: dict) -> int:
     return resp["error"]["code"]
 
 
+def _tamper_signature(token: str) -> str:
+    """Return ``token`` with its signature provably altered.
+
+    The signature's FIRST base64url character is changed, never its last. A
+    32-byte HMAC encodes to 43 base64url characters, so the final character
+    carries only 4 significant bits (2 are padding) and replacing it therefore
+    often decodes to the **same** signature bytes -- the credential is not
+    tampered and this control's denial is never exercised. MEASURED: 263 of 4000
+    minted tokens (6.6 %) were still ACCEPTED after ``token[:-1] + ("A"|"B")``,
+    i.e. ~1 run in 15. The first character carries 6 significant bits, so
+    changing it always changes the decoded signature (measured: 0 of 4000).
+    """
+    head, sep, sig = token.rpartition(".")
+    if not sep or not sig:
+        raise ValueError(f"not a header.payload.signature token: {token!r}")
+    return f"{head}{sep}{'B' if sig[0] != 'B' else 'C'}{sig[1:]}"
+
+
 def _demo() -> int:
     demo = Demo()
     print("gateway/mcp demo - tenant-scoped MCP tool gateway (issue #20)")
@@ -251,7 +269,7 @@ def _demo() -> int:
     )
     authn_denied = gateway.call_tool("kb.summary", {}, session_token=expired)
     demo.check("expired session denied", _code(authn_denied) == AUTHN_FAILED)
-    tampered = acme_op[:-1] + ("A" if acme_op[-1] != "A" else "B")
+    tampered = _tamper_signature(acme_op)
     demo.check(
         "tampered session denied",
         _code(gateway.call_tool("kb.summary", {}, session_token=tampered)) == AUTHN_FAILED,

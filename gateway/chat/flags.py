@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 try:  # pragma: no cover - the repo declares PyYAML
     import yaml  # type: ignore

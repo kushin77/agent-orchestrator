@@ -13,12 +13,11 @@ the runner seam (``engine/loop``, issue #23 — see ``loop_seam.py``).
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence
 
 from .fanout import FanOutDispatcher, validate_plan
 from .model import (
     AggregationReport,
-    AgentResult,
     EscalationContext,  # noqa: F401  (re-exported for callers)
     FanOutItem,
     FanOutPlan,
@@ -28,7 +27,6 @@ from .model import (
     Lane,
     LaneRole,
     Mission,
-    ResultStatus,
     Subtask,
     validate_lanes,
 )

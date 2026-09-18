@@ -30,7 +30,7 @@ try:  # pragma: no cover - exercised when cryptography is importable
         RSAPrivateKey,
         RSAPublicKey,
     )
-    from cryptography.x509 import (
+    from cryptography.x509 import (  # noqa: F401  (re-exported: identity/sso/saml.py imports load_der_x509_certificate from here)
         Certificate,
         load_der_x509_certificate,
         load_pem_x509_certificate,

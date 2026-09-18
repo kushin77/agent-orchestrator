@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
 SCHEMA_VERSION = 1

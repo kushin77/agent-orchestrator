@@ -25,7 +25,7 @@ no file outside ``integrations/erp/webhooks/**``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 #: The envelope version every conversion event carries.
 SCHEMA_VERSION = 1

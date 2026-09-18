@@ -362,9 +362,7 @@ class SsoService:
                 "console SSO requires relay_hmac_key + console_signing_key"
             )
         now_i = int(now if now is not None else time.time())
-        state = verify_relay_state(
-            state_token, self.relay_hmac_key, now=now_i
-        )
+        verify_relay_state(state_token, self.relay_hmac_key, now=now_i)
         role, allowed = allowlist_decision(
             identity_email,
             root_admin_emails=self.root_admin_emails,

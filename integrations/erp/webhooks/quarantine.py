@@ -14,8 +14,8 @@ real deployment swaps it for a durable dead-letter queue behind the same
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
 
 
 @dataclass(frozen=True)

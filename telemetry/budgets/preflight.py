@@ -30,9 +30,6 @@ from telemetry.budgets.killswitch import KillSwitchController
 from telemetry.budgets.model import (
     DECISION_ALLOW,
     EnforcerDecision,
-    KIND_BUDGET,
-    KIND_KILL_SWITCH,
-    KIND_QUOTA,
 )
 from telemetry.budgets.quota import QuotaEnforcer
 

@@ -173,7 +173,6 @@ class TaskBoardSurface:
                 "no ticket runtime is wired for this board "
                 "(engine/core/tickets is not reachable)",
             )
-        resolved = tenant or self.tenant or getattr(self._runtime, "tenant", "")
         if tenant and tenant != getattr(self._runtime, "tenant", tenant):
             # The runtime is bound to one tenant; a request for another tenant's
             # board is refused rather than served the wrong tenant's tickets.

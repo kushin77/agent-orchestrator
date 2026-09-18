@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Tuple
 
 from integrations.erp.auth.model import Refused
 

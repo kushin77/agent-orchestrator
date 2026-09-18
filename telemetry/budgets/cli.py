@@ -42,7 +42,6 @@ from telemetry.budgets.exporter import BudgetStateExporter
 from telemetry.budgets.killswitch import (
     JsonKillSwitchStore,
     KillSwitchController,
-    KillSwitchState,
     load_killswitch_state,
 )
 from telemetry.budgets.ledger import MeteringReporterLedger, StaticLedger

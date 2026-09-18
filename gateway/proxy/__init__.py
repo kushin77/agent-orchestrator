@@ -138,4 +138,19 @@ __all__ = [
     "load_routing_config",
     "outcome_status",
     "parse_task_request",
+    # The submodule re-exports and the gateway stage vocabulary are DELIBERATE
+    # (issue #1203): the docstring above names ``model``/``contract`` as the
+    # public surface, so they are declared here rather than left as imports the
+    # linter must read as dead code.
+    "contract",
+    "model",
+    "schema",
+    "sinks",
+    "STAGE_AGENT_RESOLVED",
+    "STAGE_ATTEMPT",
+    "STAGE_COMPLETED",
+    "STAGE_GUARD",
+    "STAGE_RECEIVED",
+    "STAGE_ROUTE_SELECTED",
+    "STAGE_TASK_RESOLVED",
 ]

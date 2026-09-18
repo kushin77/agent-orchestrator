@@ -200,7 +200,6 @@ def _cmd_claims(args) -> int:
 
 def _cmd_audit(args) -> int:
     """Report the append-only trail of composed brief runs (issue #592)."""
-    from integrations.paperclip.reporting import audit
 
     trail = _trail(args)
     records = trail.records()

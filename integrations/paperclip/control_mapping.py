@@ -59,7 +59,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .client import API_PREFIX, MUTATING_METHODS, Transport
 

@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Iterable, Optional
 
 from . import pmo as pmo_mod
 from .model import Finding, Projection, Routine, RoutineSpec, ROUTINES

@@ -51,3 +51,19 @@ from telemetry.budgets import (  # noqa: F401
     preflight,
     quota,
 )
+
+# The re-export above is DELIBERATE (issue #1203): `telemetry.budgets.<module>`
+# is the documented public surface of this package, so it is declared here
+# rather than left as an import the linter reads as dead code.
+__all__ = [
+    "alerts",
+    "audit",
+    "budget",
+    "chargeback",
+    "exporter",
+    "killswitch",
+    "ledger",
+    "model",
+    "preflight",
+    "quota",
+]

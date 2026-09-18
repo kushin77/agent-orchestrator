@@ -84,6 +84,15 @@ results_tsv="$verify_dir/.results.tsv"
 checks=(
   'shell-syntax|bash scripts/check-shell-syntax.sh'
   'python-syntax|bash scripts/check-python-syntax.sh'
+  # python-lint (issue #1203, parent #1201): the gate of record COMPILED the
+  # Python but never LINTED it, so an unused import, a discarded local or an
+  # undefined annotation name was invisible to `make verify` -- the deep review
+  # of 2026-09-17 measured 81 such pyflakes findings in the three biggest pillars
+  # alone. `scripts/discover-checks.sh` would append a `scripts/check-*.sh` on
+  # its own, but this entry is explicit on purpose: this array is the gate of
+  # record, and naming the check here is what makes it run for every lane rather
+  # than by the luck of the discovery layer.
+  'python-lint|bash scripts/check-python-lint.sh'
   'yaml-lint|python3 scripts/check-yaml.py'
   'json-lint|bash scripts/check-json.sh'
   'docs-lint|bash scripts/check-docs.sh'
@@ -659,6 +668,40 @@ checks=(
   'pytest-module-registry-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/modules/sync/tests'
   'pytest-hermes-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/hermes/sync/tests'
   'pytest-governance-controls|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/controls/tests'
+  # Issue #1203 (parent #1201, the deep-review register): the 18 suites the
+  # review found `swept-only`. Each is revealed BY NAME in
+  # scripts/pytest-suites.txt but named by NO gate, and
+  # `scripts/check-gate-coverage.sh` defines "only ever run because the manifest
+  # sweep reaches it" as NOT covered -- so `make verify` ran not one test in
+  # registry/, gateway/ or engine/, the three biggest pillars. Naming each suite
+  # here is what retires its `swept-only` row in
+  # scripts/gate-coverage-baseline.txt: that baseline is checked in BOTH
+  # directions, so leaving the rows in place would now fail as STALE by name.
+  # All 18 are offline and deterministic (measured green before this lane landed),
+  # so they RUN for real rather than being recorded as CANNOT-ASSESS.
+  'pytest-gateway-finops|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/finops/tests'
+  'pytest-gateway-health|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/health/tests'
+  'pytest-gateway-providers|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/providers/tests'
+  'pytest-gateway-catalog|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/catalog/tests'
+  'pytest-gateway-limits|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/limits/tests'
+  'pytest-gateway-mcp|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/mcp/tests'
+  'pytest-gateway-proxy|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/proxy/tests'
+  # `registry/profiles` is deliberately NOT listed here. It was red on this
+  # lane's original base and is now named by its OWN gate,
+  # `scripts/check-profiles.sh` (issue #1292, landed as #1320) -- so it reads
+  # wired in scripts/check-gate-coverage.sh without a row in this array, the
+  # same way `identity/chat` does. Naming it here as well would run the suite
+  # twice for no extra coverage.
+  'pytest-registry-prompts|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/prompts/tests'
+  'pytest-registry-personas|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/personas/tests'
+  'pytest-registry-events|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/events/tests'
+  'pytest-registry-service|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/service/tests'
+  'pytest-registry-packs|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/packs/tests'
+  'pytest-engine-loop|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/loop/tests'
+  'pytest-engine-multiagent|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/multiagent/tests'
+  'pytest-engine-memory|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/memory/tests'
+  'pytest-engine-queue|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/queue/tests'
+  'pytest-engine-core|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q engine/core/tests'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------

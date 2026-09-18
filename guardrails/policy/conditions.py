@@ -50,7 +50,7 @@ from __future__ import annotations
 import fnmatch
 import numbers
 import re
-from typing import Any, List, Mapping, Optional, Sequence
+from typing import Any, List, Mapping, Sequence
 
 from policy.errors import ConditionError
 

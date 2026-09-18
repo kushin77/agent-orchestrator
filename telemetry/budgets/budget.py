@@ -48,8 +48,6 @@ from telemetry.budgets.model import (
     MODES,
     OUTCOME_BUDGET_EXCEEDED,
     WINDOWS,
-    this_month_utc,
-    today_utc,
 )
 
 DEFAULT_POLICY_CONFIG = Path(__file__).resolve().parent / "config" / "policies.yaml"

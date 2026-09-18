@@ -11,16 +11,14 @@ acceptance #1 and #5).
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import Any, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Iterable, List, Mapping, Optional
 
 import yaml
 
 from policy.conditions import validate_condition
 from policy.decision import DecisionLevel
 from policy.errors import (
-    DuplicatePolicyError,
     PolicyLoadError,
     PolicyValidationError,
 )
