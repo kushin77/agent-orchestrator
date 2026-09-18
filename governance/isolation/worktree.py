@@ -572,10 +572,24 @@ def record_reaped(
     Called BEFORE removal (#1265): once a worktree's remote branch is gone,
     ``HEAD is not preserved on origin`` can never be re-derived, so this is the
     only record that a given SHA was ever content-landed and reclaimed.
+
+    ``.fleet/`` is gitignored runtime state that lives beside the MAIN
+    checkout's git dir, never inside a linked worktree (mirrored from
+    ``prune-worktrees.sh``'s own lookup) — ``main`` here is often the worktree
+    the reaper happens to be RUN FROM, and writing there silently split the
+    ledger per-worktree instead of keeping the one record an operator reads.
     """
     import time
 
-    path = Path(main) / REAPED_BRANCHES_LOG
+    common = git(main, "rev-parse", "--git-common-dir")
+    root = Path(main)
+    if common.returncode == 0:
+        common_dir = Path(common.stdout.strip())
+        if not common_dir.is_absolute():
+            common_dir = Path(main).resolve() / common_dir
+        root = common_dir.resolve().parent
+
+    path = root / REAPED_BRANCHES_LOG
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {
         "branch": branch,

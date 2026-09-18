@@ -509,3 +509,24 @@ def test_record_reaped_appends_one_json_line(repo: Path):
 
     record_reaped(repo, branch="issue-5", head_sha="cafe", worktree="x", reason="worktree-content-landed")
     assert len(path.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_record_reaped_writes_to_the_main_checkout_not_a_linked_worktree(
+    lane, repo: Path, tmp_path: Path
+):
+    """The reaper is often RUN FROM a linked worktree — the ledger must still
+    land beside the MAIN checkout's git dir, never split per-worktree (a bug
+    caught after `prune-worktrees.sh --apply` on the real box wrote no
+    .fleet/reaped-branches.jsonl under the main checkout at all)."""
+    path = record_reaped(
+        lane.worktree,
+        branch="issue-9",
+        head_sha="feedface",
+        worktree=str(lane.worktree),
+        reason="worktree-content-landed",
+    )
+
+    assert path == repo / REAPED_BRANCHES_LOG
+    assert not (lane.worktree / REAPED_BRANCHES_LOG).exists()
+    record = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert record["branch"] == "issue-9"
