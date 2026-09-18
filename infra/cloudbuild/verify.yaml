@@ -100,7 +100,14 @@ steps:
         # No token: skip posting BY NAME and hand back the GATE's own rc. A
         # build that cannot publish the check is not a verdict on the code under
         # review, so the absent secret must not become the step's outcome.
-        if [ -z "$GH_TOKEN" ]; then
+        #
+        # `${GH_TOKEN:-}` and NOT `$GH_TOKEN`: Cloud Build validates every
+        # `$NAME` template in this file at SUBMISSION time, and a bare `$GH_TOKEN`
+        # is refused outright -- "key in the template \"GH_TOKEN\" is not a valid
+        # built-in substitution" -- killing the build before it starts. Only
+        # `PROJECT_ID` / `COMMIT_SHA` (and their peers) are built-in; the braced
+        # form is not read as a template at all.
+        if [ -z "${GH_TOKEN:-}" ]; then
           echo "gate-status: SKIPPED -- no ao-gate-status-token secret; the gate verdict is NOT posted (see issue #1350)"
           echo "  create the secret and grant the build SA read access to give this build a producer (see README.md)."
           exit "$rc"
