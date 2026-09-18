@@ -38,11 +38,12 @@
       "name": "reap",
       "marker": "ao-fleet-reap",
       "schedule": "47 3 * * *",
-      "command": "bash scripts/prune-worktrees.sh --apply",
+      "command": "bash scripts/prune-worktrees.sh --branches --apply",
       "user": "",
       "log": "reap.log",
       "singleton": false,
-      "enabled": true
+      "enabled": true,
+      "why": "issue #1360: the rung must pass --branches. The reaper's branch half (landed lane branches, by content — #1118) runs ONLY with that flag, so a rung without it reaps worktrees and lets landed branches pile up until each one ages past check-reconcile's 24h grace and reds the gate of record for every lane. --apply is the half that acts at all: without it the rung reports and reclaims nothing. Both flags are held by name in scripts/check-reap-branches.sh."
     },
     {
       "name": "snapshot-refresh",
