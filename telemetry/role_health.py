@@ -73,6 +73,7 @@ from gateway.finops.budget import (  # noqa: F401  (consumed vocabulary)
     RoleBudgetError,
 )
 from telemetry.budgets.model import month_bucket, this_month_utc
+from telemetry.clock import now_epoch, now_utc_iso
 from telemetry.metering.report import GROUP_AGENT, WINDOW_MONTH
 
 # --------------------------------------------------------------------------- #
@@ -665,9 +666,8 @@ class Heartbeat:
 
 
 def _now_epoch() -> float:
-    import time
-
-    return time.time()
+    """The one clock seam (``telemetry/clock.py``, issue #1025)."""
+    return now_epoch()
 
 
 @dataclass(frozen=True)
@@ -1102,10 +1102,9 @@ class RoleChargebackReport:
     def write_json(self, path: Any, **kwargs: Any) -> Path:
         out = Path(path)
         out.parent.mkdir(parents=True, exist_ok=True)
-        from datetime import datetime, timezone
 
         payload = {
-            "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "generatedAt": now_utc_iso(),
             "scope": SCOPE_ROLE,
             "rows": [r.to_dict() for r in self.report(**kwargs)],
             "totals": self.totals(),
@@ -1290,6 +1289,5 @@ class RoleBudgetBurnExporter:
 
 
 def _now_iso() -> str:
-    from datetime import datetime, timezone
-
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """The one clock seam (``telemetry/clock.py``, issue #1025)."""
+    return now_utc_iso()

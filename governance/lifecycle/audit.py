@@ -29,6 +29,7 @@ from governance.lifecycle.model import (
     INVARIANTS_BY_CODE,
     ITEM_INVARIANTS,
     Invariant,
+    evidence_problem,
     invariant,
     invariants_for,
     owes_closure,
@@ -149,32 +150,28 @@ def _closure_findings(item: dict) -> list[Finding]:
     problems: list[Finding] = []
 
     pr = item.get("pr") or {}
-    verify = item.get("verify") or {}
-    # Evidence must name the *verified head* commit. It cannot name the merge
-    # commit: a squash merge creates a new commit, so demanding equality there
-    # would fail every correctly-merged item. What matters is that the tree which
-    # was verified is the tree that landed.
-    verified_commit = str(pr.get("head_commit") or "")
+    # Evidence must name the *verified head* commit, or — when the branch advanced
+    # after the squash — the commit the squash landed as (#1149). It cannot name the
+    # merge commit as a bare substitute: a squash merge creates a new commit, so
+    # demanding equality there would fail every correctly-merged item. What matters is
+    # that the tree which was verified is the tree that landed.
+    #
+    # The rule itself lives in one place (``model.evidence_problem``), because the
+    # close-out decides whether to run step 2 on the same question (#1003). Since
+    # #1003 the attestation may *also* record which tree it measured — the verified
+    # head's own tree, or the merged tree the squash composed — and that clause
+    # strengthens the rule rather than relaxing it: a record that does not say is read
+    # exactly as before, and one that names a tree the item's record does not hold is
+    # refused where it used to be believed.
 
     if str(pr.get("state") or "").lower() != "merged":
         problems.append(
             Finding("PR_NOT_MERGED", subject, f"pull request state is {pr.get('state') or 'unknown'}, not merged")
         )
-    elif not verify.get("ok"):
-        problems.append(Finding("VERIFY_EVIDENCE_MISSING", subject, "no green verification attestation is recorded"))
-    elif not verified_commit:
-        problems.append(
-            Finding("VERIFY_EVIDENCE_MISSING", subject, "the item records no verified head commit to hold the evidence against")
-        )
-    elif str(verify.get("commit") or "") != verified_commit:
-        recorded = str(verify.get("commit") or "none")
-        problems.append(
-            Finding(
-                "VERIFY_EVIDENCE_MISSING",
-                subject,
-                f"the attestation names {recorded[:12]}, not the verified head commit {verified_commit[:12]}",
-            )
-        )
+    else:
+        problem = evidence_problem(item)
+        if problem:
+            problems.append(Finding("VERIFY_EVIDENCE_MISSING", subject, problem))
 
     if not item.get("branch_deleted", False):
         problems.append(

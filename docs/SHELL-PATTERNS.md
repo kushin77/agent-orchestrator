@@ -57,6 +57,8 @@ had.
 | `SP-6` | declaring and capturing in one statement (`local x=$(cmd)`) | the declaration's own status masks the command's: a failed command looks successful, and the branch that reports it never runs | the two-step form, used throughout: `local out` then `out="$(…)"` |
 | `SP-7` | a fetch piped straight into a shell (`curl … \| bash`) | it executes whatever the network answers with: no review, no pin, no digest, last-write-wins | 0 sites — infra is declared and flag-gated (GR-5), never installed from a pipe |
 | `SP-8` | a bare `gh issue view <n>` in command position | it goes through the deprecated classic-Projects query and returns empty/stale output on these repos, so the title and body a lane acts on are the wrong ones | 0 sites; the repo's own environment notes already require REST ([`AGENTS.md`](../AGENTS.md)) |
+| `SP-9` | a scratch directory created with `mktemp`'s own default — no template | it lands in the shared, periodically-cleaned `$TMPDIR`, which is not private: the directory can vanish mid-run and the gate dies part-way through, after the real work | 0 sites; 15 use an explicit `/tmp/<name>.` template, with the X-run assembled by `printf` so no literal marker token sits in the source ([`check-fleet-drift.sh`](../scripts/check-fleet-drift.sh)) |
+| `SP-10` | a `cd` whose failure is not handled | the script operates on whatever the caller's working directory happened to be, so every later relative path is read from the wrong place, and the gate reports on a tree it never entered | `cd "$root" \|\| exit 2` ([`ao-ssh-access.sh`](../infra/cloudflare/ao-ssh-access.sh)) |
 
 **Enforced by**, for every row: the gate's own provocation. Each pattern has a
 planted violation (`plant-<id>.sh`), and the gate refuses each plant **by name** —
@@ -231,6 +233,65 @@ gh issue view 621 --json title,body
 gh api repos/kushin77/agent-orchestrator/issues/621 --jq '.title, .body'
 ```
 
+### SP-9 — a scratch directory carries an explicit template
+
+**What it is.** A scratch directory created with `mktemp -d` and **no template**
+argument, so `mktemp` applies its own default under `$TMPDIR`.
+
+**The failure it prevents.** On this box `$TMPDIR` is a shared, periodically-cleaned
+cache — not private, and not durable. A scratch directory made that way can be
+removed by another process mid-run, so the gate dies part-way through a check and
+reports a failure of *its own workspace* as though it were a finding about the
+repository. [`SCRATCH-SPACE-DISCIPLINE.md`](SCRATCH-SPACE-DISCIPLINE.md) is the
+canonical statement, and the explicit `/tmp/<name>.` template is already the
+majority idiom here.
+
+**One wrinkle worth knowing:** the obvious template — a literal `XXXXXX` — cannot
+be written directly in a file this repository ships, because the docs gate reads
+an `X`-run as an unfinished marker. So the good shape **assembles** the run:
+
+```bash
+# BAD — mktemp's own default: $TMPDIR, shared and periodically cleaned
+work="$(mktemp -d)" || exit 2
+tmp="$(mktemp -d 2>/dev/null)"          # a redirection is not a template
+
+# GOOD — explicit /tmp path, X-run assembled so no marker token is in the source
+work="$(mktemp -d "/tmp/ao877-chrono.$(printf 'X%.0s' 1 2 3 4 5 6)")" || exit 2
+```
+
+**Measured when this row was enforced (2026-09-18):** the doctrine had declared
+**5** sites. The detector found **15** — the declared list was stale by three
+times, and two of the extra sites (`check-terraform-iac.sh`'s ephemeral
+`TF_DATA_DIR`s and `check-squash-message.sh`'s classifier scratch) were not in any
+list at all. That is the argument for enforcing rather than recording: a recorded
+list does not shrink on its own, and it cannot notice a site added after it was
+written.
+
+### SP-10 — a `cd` is guarded, or it is not a `cd`
+
+**What it is.** A `cd` in command position whose failure is not handled — no
+`&&`, no `||`.
+
+**The failure it prevents.** The script keeps running from wherever the caller's
+working directory happened to be, so every later relative path is read from the
+wrong place. The gate then reports findings about a tree it never entered — the
+most expensive kind of false result, because it looks like evidence.
+
+```bash
+# BAD — the failure is ignored and the cwd is whatever it was
+cd "$root"
+
+# GOOD — the failure is refused
+cd "$root" || exit 2
+
+# GOOD — as part of a compound command (already handled)
+cd "$scratch" && "$BIN" validate
+(cd "$dir" && pwd -P)
+```
+
+**Measured when this row was enforced (2026-09-18):** **1** site, as declared —
+`infra/cloudflare/ao-ssh-access.sh:68`.
+
 ## How the gate proves itself (GR-12)
 
 A gate that cannot fail is a formality, so the provocation runs **on every
@@ -315,13 +376,17 @@ check-shell-patterns: NOT-OK — 3 occurrence(s) refused above (docs/SHELL-PATTE
 Enforcing any of these today would red `master` on land, and a gate that is red on
 master is either disabled or ignored — strictly worse than no gate. So they are
 measured here, graded honestly, and retired by **[#877](https://github.com/kushin77/agent-orchestrator/issues/877)**
-(the two with sites) rather than grandfathered. When #877 lands, these rows move
-into the enforced table above.
+rather than grandfathered.
 
-| id | the shape | measured (2026-09-16) | why it is declared, not enforced |
+`SP-9` and `SP-10` **left this table on 2026-09-18**: their sites were repaired
+(15 scratch templates and 1 guarded `cd`) and both detectors were promoted into
+[`scripts/check-shell-patterns.sh`](../scripts/check-shell-patterns.sh), so they
+are now in the enforced table above. The declaration was stale — it named 5 of the
+15 scratch sites — which is the reason the row is retired by *enforcing* it rather
+than by re-recording a count.
+
+| id | the shape | measured (2026-09-18) | why it is declared, not enforced |
 |----|-----------|-----------------------|----------------------------------|
-| `SP-9` | a scratch directory created with no template — it lands in the shared, periodically-cleaned `$TMPDIR`, which is not private, and can vanish mid-run | **5 sites**: `check-chronological-dispatch.sh:106`, `check-fleet-runbook.sh:130`, `check-orphan-handoff.sh:173`, `check-terraform.sh:59`, `check-verdict-contains.sh:214` | the good shape is already the majority habit (**10** sites use `mktemp -d /tmp/<name>.XXXXXX`, and [`SCRATCH-SPACE-DISCIPLINE.md`](SCRATCH-SPACE-DISCIPLINE.md) is the canonical statement), so this is a six-line retrofit — [#877](https://github.com/kushin77/agent-orchestrator/issues/877) |
-| `SP-10` | a `cd` whose failure is not handled | **1 site**: `infra/cloudflare/ao-ssh-access.sh:68` | same retrofit — [#877](https://github.com/kushin77/agent-orchestrator/issues/877) |
 | CMR §3 | `gh` reached through a pinned `GH=` indirection | **0** files use a `GH=` indirection; **11** shell files call `gh` | adopting the rule means editing 11 files' call sites in one lane, and nothing owns that lane today; the *enforceable* half (SP-4) already refuses the shadowing mechanism |
 | CMR §4 | a gh state compared against a lowercase literal | **0** sites with the narrow detector | a bracket test on a variable cannot be told from a legitimate comparison without knowing where the value came from; the hub anchors its detector to a harness probe, and that probe is a lane of its own |
 | CMR §5 | mode flags resolved last-wins in a hand-rolled argument loop | **18** loops iterate `"$@"`; **10** sites already parse with `while [ $# -gt 0 ]; case` ([`check-fleet-template.sh`](../scripts/check-fleet-template.sh)) | the bad shape is structural (a loop *body* that assigns a mode variable), not a line shape; a line-level rule cannot express it without false refusals on legitimate per-file loops |

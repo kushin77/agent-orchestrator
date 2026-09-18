@@ -5,10 +5,12 @@
 # docs/*.md is indexed in docs/README.md (issue #629, EPIC #616). Every
 # branch exits nonzero on failure — no-false-green (fleet doctrine).
 #
-# Legacy extraction artifacts (MIGRATION_NOTES.md, VALIDATION.md,
-# .github/workflows/*) are preserved as-is and excluded from the whitespace
-# scan; they are not product docs. .github/workflows IS yaml-parsed by the
-# yaml-lint check.
+# Legacy extraction artifacts (MIGRATION_NOTES.md, VALIDATION.md) are preserved
+# as-is and excluded from the whitespace scan; they are not product docs, and
+# the `.github/**` tree is excluded with them. This repository carries NO
+# `.github/workflows/` directory — GitHub Actions is disabled fleet-wide
+# (GR-15) — so there is no workflow file here for a CI parser to read
+# (measured 2026-09-17).
 #
 # THE MARKER RULE, AND THE TRAP IT SPRANG (issue #804)
 # The marker branch used to end in a word boundary with NO leading one, so it
@@ -240,42 +242,13 @@ idx_excluded_dirs=(
   docs/rca/
 )
 
-# Quarantine baseline: tracked docs/*.md not yet indexed in docs/README.md,
-# as measured when this gate was introduced (issue #629). 31 files, held
-# open under issue #629. Remove an entry once the doc is indexed — leaving a
-# stale entry in place is itself a FAIL (see docs_index_stale below).
+# Quarantine baseline: tracked docs/*.md not yet indexed in docs/README.md.
+# Introduced by issue #629 and EMPTIED of exemptions by issue #1206: the 31
+# docs it held are now folded into docs/README.md, so no doc is exempt and
+# every tracked docs/*.md must be reachable from the index. The array is kept
+# (and still checked in BOTH directions, below) so that any future exemption
+# has to be declared here rather than left silently out of the index.
 idx_quarantine=(
-  docs/AGENT-IDENTITY.md
-  docs/BOARD-ATTACK-PLAN.md
-  docs/CHAT-MOUNT.md
-  docs/CODEIDX-CAPABILITY-REGISTER.md
-  docs/CONTROL-COVERAGE.md
-  docs/CROSS-REPO-LESSONS-SYNC.md
-  docs/DIAGRAMS-CAPABILITY-REGISTER.md
-  docs/EDGE-CUTOVER.md
-  docs/FLEET-CAPABILITY-DRIFT.md
-  docs/FLEET-DASHBOARD-GAP-ANALYSIS.md
-  docs/FLEET-STATE.md
-  docs/GLOSSARY.md
-  docs/GOLDEN-RULES.md
-  docs/LEASE-POLICY.md
-  docs/LIVE-DATA-BRIDGE.md
-  docs/MECHANICAL-EXECUTION-LAYER.md
-  docs/MODULE-BRIEF.md
-  docs/MODULE-REGISTRY.md
-  docs/OBSERVABILITY.md
-  docs/OPERATOR-ACCESS.md
-  docs/PORTAL-OFFLINE-DEV.md
-  docs/QA-GATE.md
-  docs/SCRATCH-SPACE-DISCIPLINE.md
-  docs/SESSION-FLEET-SYNC.md
-  docs/SHARED-SERVICES-FALLBACK.md
-  docs/SHELL-PATTERNS.md
-  docs/SURFACE-CLASS.md
-  docs/erp-finops/compliance-audit.md
-  docs/erp-finops/current-state.md
-  docs/erp-finops/saas-metrics-current-state.md
-  docs/erp-finops/token-baseline.md
 )
 
 # Every link target in docs/README.md, normalized to a repo-root-relative
@@ -394,11 +367,17 @@ docs_index_self_test() {
   # The real baseline, unmutated, must be clean — proves the two mutants
   # above are what moved the verdict, not a rule that always fires.
   docs_index_stale idx_quarantine
-  if [ "$idx_stale" -eq 0 ]; then
-    echo '  OK  the real, unmutated baseline is clean — the mutants above are load-bearing'
-  else
+  if [ "$idx_stale" -ne 0 ]; then
     printf 'check-docs: FAIL — the real baseline is not clean (%s stale entries)\n' "$idx_stale" >&2
     rc=1
+  elif [ "${#idx_quarantine[@]}" -eq 0 ]; then
+    # An EMPTY baseline is the intended state as of issue #1206 — no doc is
+    # exempt. Reported rather than passed over in silence: the stale rule is
+    # still load-bearing (proved by the two mutants above), but on the real
+    # baseline it has nothing to inspect, and saying so is the honest verdict.
+    echo '  NOTE  the real baseline is EMPTY — no doc is exempt; the stale rule is proved by the mutants above'
+  else
+    echo '  OK  the real, unmutated baseline is clean — the mutants above are load-bearing'
   fi
 
   if [ "$rc" -eq 0 ]; then

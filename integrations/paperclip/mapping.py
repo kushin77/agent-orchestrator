@@ -7,15 +7,16 @@ stores — ``registry/profiles/seeds/*.yaml``, ``registry/personas/cards/*.yaml`
 and emits records that validate against the three frozen seam schemas in
 ``docs/contracts/paperclip/``. Same input, byte-identical output.
 
-Two stdlib-only tools live here because the adapter may not take a third-party
-dependency:
-
-* a small **YAML subset loader** (``load_yaml``) covering mappings, sequences,
-  scalars, quoted strings and block scalars — enough for the fleet's own YAML;
-* a small **JSON-Schema subset validator** (``validate``) covering the keywords
-  the three seam schemas use — ``type``, ``required``, ``properties``,
-  ``additionalProperties``, ``enum``, ``items``, ``minLength``, ``minimum``,
-  ``maximum``, ``pattern`` and ``format: date-time``.
+The two stdlib-only tools the adapter may not take a third-party dependency for
+— a **YAML subset loader** (``load_yaml``: mappings, sequences, scalars, quoted
+strings, block scalars and flow collections) and a **JSON-Schema subset
+validator** (``validate``: ``type``, ``required``, ``properties``,
+``additionalProperties``, ``enum``, ``items``, ``minLength``, ``minimum``,
+``maximum``, ``pattern`` and ``format: date-time``) — live in the seam this
+adapter shares with ``integrations/hermes/`` (``integrations/_seam/``, issue
+#1208) and are re-exported here. The validator is the **superset** of the two
+copies that used to exist, so every keyword this adapter enforced is still
+enforced, by both adapters.
 
 The gate drives both: a required field or a closed-vocabulary value that drifts
 is refused, by name, and the negative control proves the refusal.
@@ -24,10 +25,11 @@ is refused, by name, and the negative control proves the refusal.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from .._seam.schema import validate  # noqa: F401 - re-exported at this adapter's seam
+from .._seam.yaml_subset import load_yaml, load_yaml_file  # noqa: F401
 from .model import Activity, Budget, Cost, Issue, Persona, Profile
 
 #: The three frozen seam contracts and their schemas.
@@ -48,271 +50,14 @@ PLATFORM_ROOT = "platform/purebliss"
 
 
 # ==========================================================================
-# YAML subset loader (stdlib only)
+# The shared seam: the YAML subset loader and the schema-subset validator
 # ==========================================================================
-
-
-def _strip_comment(text: str) -> str:
-    out: List[str] = []
-    quote = ""
-    for ch in text:
-        if quote:
-            out.append(ch)
-            if ch == quote:
-                quote = ""
-        elif ch in ("'", '"'):
-            quote = ch
-            out.append(ch)
-        elif ch == "#":
-            break
-        else:
-            out.append(ch)
-    return "".join(out)
-
-
-def _tokenize(text: str) -> List[Tuple[int, str]]:
-    """Flatten YAML into ``(indent, content)`` items, dropping comments/blanks.
-
-    A block-scalar header (``key: |`` / ``key: >``) is kept as an empty scalar
-    and its body is skipped, so free text inside a description can never be
-    mis-read as structure.
-    """
-    lines = text.split("\n")
-    tokens: List[Tuple[int, str]] = []
-    i = 0
-    while i < len(lines):
-        raw = lines[i]
-        stripped = raw.lstrip(" ")
-        if not stripped.strip() or stripped.startswith("#"):
-            i += 1
-            continue
-        indent = len(raw) - len(stripped)
-        content = _strip_comment(stripped).rstrip()
-        if content.endswith((": |", ": |-", ": >", ": >-")):
-            key = content.split(":", 1)[0].strip()
-            tokens.append((indent, f'{key}: ""'))
-            i += 1
-            while i < len(lines):
-                nxt = lines[i]
-                nstripped = nxt.lstrip(" ")
-                if not nstripped.strip():
-                    i += 1
-                    continue
-                if (len(nxt) - len(nstripped)) <= indent:
-                    break
-                i += 1
-            continue
-        tokens.append((indent, content))
-        i += 1
-    return tokens
-
-
-def _split_kv(content: str) -> Optional[Tuple[str, str]]:
-    if content.startswith(("'", '"')):
-        return None
-    for idx, ch in enumerate(content):
-        if ch != ":":
-            continue
-        if idx + 1 < len(content) and content[idx + 1] != " ":
-            return None
-        key = content[:idx].strip()
-        if not key or " " in key:
-            return None
-        return key, content[idx + 1:].strip()
-    return None
-
-
-def _scalar(text: str) -> Any:
-    text = text.strip()
-    if text == "" or text in ("null", "~"):
-        return None
-    if text in ("true", "True"):
-        return True
-    if text in ("false", "False"):
-        return False
-    if text.startswith("[") and text.endswith("]"):
-        inner = text[1:-1].strip()
-        if not inner:
-            return []
-        return [_scalar(part) for part in inner.split(",")]
-    if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
-        return text[1:-1]
-    try:
-        return int(text)
-    except ValueError:
-        pass
-    try:
-        return float(text)
-    except ValueError:
-        pass
-    return text
-
-
-def _parse_map(tokens: List[Tuple[int, str]], idx: int, indent: int) -> Tuple[Dict[str, Any], int]:
-    mapping: Dict[str, Any] = {}
-    while idx < len(tokens):
-        ind, content = tokens[idx]
-        if ind < indent:
-            break
-        if ind > indent:
-            raise ValueError(f"unexpected indent {ind} (want {indent}): {content!r}")
-        if content.startswith("- "):
-            break
-        kv = _split_kv(content)
-        if kv is None:
-            raise ValueError(f"not a mapping entry: {content!r}")
-        key, value = kv
-        idx += 1
-        if value == "":
-            if idx < len(tokens) and tokens[idx][0] > indent:
-                nested, idx = _parse_block(tokens, idx, tokens[idx][0])
-                mapping[key] = nested
-            else:
-                mapping[key] = None
-        else:
-            mapping[key] = _scalar(value)
-    return mapping, idx
-
-
-def _parse_seq(tokens: List[Tuple[int, str]], idx: int, indent: int) -> Tuple[List[Any], int]:
-    seq: List[Any] = []
-    while idx < len(tokens):
-        ind, content = tokens[idx]
-        if ind < indent:
-            break
-        if ind > indent:
-            raise ValueError(f"unexpected indent {ind} (want {indent}): {content!r}")
-        if not content.startswith("- "):
-            break
-        rest = content[2:].strip()
-        idx += 1
-        if rest == "":
-            if idx < len(tokens) and tokens[idx][0] > indent:
-                nested, idx = _parse_block(tokens, idx, tokens[idx][0])
-                seq.append(nested)
-            else:
-                seq.append(None)
-            continue
-        kv = _split_kv(rest)
-        if kv is None:
-            seq.append(_scalar(rest))
-            continue
-        sub_indent = indent + 2
-        entry: Dict[str, Any] = {}
-        key, value = kv
-        if value == "" and idx < len(tokens) and tokens[idx][0] > sub_indent:
-            nested, idx = _parse_block(tokens, idx, tokens[idx][0])
-            entry[key] = nested
-        else:
-            entry[key] = _scalar(value) if value != "" else None
-        while idx < len(tokens):
-            ind2, content2 = tokens[idx]
-            if ind2 < sub_indent or content2.startswith("- "):
-                break
-            if ind2 > sub_indent:
-                raise ValueError(f"unexpected indent {ind2} in mapping: {content2!r}")
-            kv2 = _split_kv(content2)
-            if kv2 is None:
-                break
-            key2, value2 = kv2
-            idx += 1
-            if value2 == "" and idx < len(tokens) and tokens[idx][0] > sub_indent:
-                nested2, idx = _parse_block(tokens, idx, tokens[idx][0])
-                entry[key2] = nested2
-            else:
-                entry[key2] = _scalar(value2) if value2 != "" else None
-        seq.append(entry)
-    return seq, idx
-
-
-def _parse_block(tokens: List[Tuple[int, str]], idx: int, indent: int) -> Tuple[Any, int]:
-    if tokens[idx][1].startswith("- "):
-        return _parse_seq(tokens, idx, indent)
-    return _parse_map(tokens, idx, indent)
-
-
-def load_yaml(text: str) -> Any:
-    """Load the YAML subset the fleet's own files use."""
-    tokens = _tokenize(text)
-    if not tokens:
-        return None
-    return _parse_block(tokens, 0, tokens[0][0])[0]
-
-
-def load_yaml_file(path: Path) -> Any:
-    return load_yaml(path.read_text(encoding="utf-8"))
-
-
-# ==========================================================================
-# JSON-Schema subset validator (stdlib only)
-# ==========================================================================
-
-_DATE_TIME = re.compile(
-    r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$"
-)
-
-
-def _type_ok(value: Any, expected: str) -> bool:
-    if expected == "object":
-        return isinstance(value, dict)
-    if expected == "array":
-        return isinstance(value, list)
-    if expected == "string":
-        return isinstance(value, str)
-    if expected == "boolean":
-        return isinstance(value, bool)
-    if expected == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if expected == "number":
-        return isinstance(value, (int, float)) and not isinstance(value, bool)
-    if expected == "null":
-        return value is None
-    return True
-
-
-def _validate(inst: Any, schema: Dict[str, Any], path: str, findings: List[str]) -> None:
-    expected = schema.get("type")
-    if expected is not None and not _type_ok(inst, expected):
-        findings.append(f"{path}: expected {expected}, got {type(inst).__name__}")
-        return
-    if "enum" in schema and inst not in schema["enum"]:
-        findings.append(f"{path}: value {inst!r} is outside the closed vocabulary {schema['enum']}")
-    if isinstance(inst, str):
-        if "minLength" in schema and len(inst) < schema["minLength"]:
-            findings.append(f"{path}: length {len(inst)} is below minLength {schema['minLength']}")
-        if "pattern" in schema and not re.search(schema["pattern"], inst):
-            findings.append(f"{path}: {inst!r} does not match pattern {schema['pattern']}")
-        if schema.get("format") == "date-time" and not _DATE_TIME.match(inst):
-            findings.append(f"{path}: {inst!r} is not an ISO-8601 date-time")
-    if isinstance(inst, (int, float)) and not isinstance(inst, bool):
-        if "minimum" in schema and inst < schema["minimum"]:
-            findings.append(f"{path}: {inst} is below minimum {schema['minimum']}")
-        if "maximum" in schema and inst > schema["maximum"]:
-            findings.append(f"{path}: {inst} is above maximum {schema['maximum']}")
-    if isinstance(inst, dict):
-        for key in schema.get("required", []):
-            if key not in inst:
-                findings.append(f"{path}: required field '{key}' is missing")
-        properties = schema.get("properties", {})
-        if schema.get("additionalProperties") is False:
-            for key in inst:
-                if key not in properties:
-                    findings.append(f"{path}: unexpected field '{key}' (additionalProperties: false)")
-        for key, sub in properties.items():
-            if key in inst:
-                _validate(inst[key], sub, f"{path}.{key}", findings)
-    if isinstance(inst, list):
-        items = schema.get("items")
-        if isinstance(items, dict):
-            for i, element in enumerate(inst):
-                _validate(element, items, f"{path}[{i}]", findings)
-
-
-def validate(instance: Any, schema: Dict[str, Any], path: str = "$") -> List[str]:
-    """Validate ``instance`` against a schema built from the supported subset."""
-    findings: List[str] = []
-    _validate(instance, schema, path, findings)
-    return findings
+# Both tools used to be defined here. They were also defined, body for body, in
+# ``integrations/hermes/mapping.py`` — and the copies had already drifted (this
+# adapter enforced ``format: date-time``/``minimum``/``maximum`` and the other
+# did not). They live in ``integrations/_seam/`` now (issue #1208) and are
+# re-exported under their original names, so every existing caller keeps
+# importing them from ``integrations.paperclip.mapping``.
 
 
 def load_schema(root: Path, kind: str) -> Dict[str, Any]:

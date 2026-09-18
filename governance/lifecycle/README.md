@@ -41,7 +41,7 @@ and the gate can require that each one has been provoked.
 | Invariant | Broken means |
 |---|---|
 | `PR_NOT_MERGED` | A verified change that never landed. |
-| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name the pull request's **head commit** — a squash merge creates a *new* commit, so demanding that evidence name the merge commit would fail every correctly-merged item. What matters is that the tree which was verified is the tree that landed. A lane may therefore stand for that head only when it **is** the verified commit, or — for a *merged* pull request — contains the commit the squash landed as **and** that landing carries the same tree (§3.6, #1098). |
+| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name a commit whose tree is **the tree that landed** — for an ordinary item the pull request's head commit, and for a branch that advanced after the squash the commit the squash landed as, with the drifted head recorded beside it (§3.7, #1149). Demanding that evidence name the merge commit would fail every correctly-merged item, because a squash merge creates a *new* commit. A lane may therefore stand for that subject only when it **is** it, or — for a *merged* pull request — contains the commit the squash landed as **and** that landing carries the same tree (§3.6, #1098). When the attestation *also* records the tree it measured (`.verify.measured`), that tree must be one the item's own record carries: the head commit's own tree, or the merged tree the squash composed (§3.6, #1003). A record that does not say which tree it measured is read as before. |
 | `BRANCH_NOT_DELETED` | The branch outlived its issue. |
 | `CLAIM_STILL_HELD` | A closed issue still claims a lane, blocking re-dispatch. |
 | `DIRECTIVE_NOT_CONSUMED` | A pending directive re-executes the order the moment the claim frees. |
@@ -344,9 +344,134 @@ is the measurement; the verified commit is the subject; the record says which is
 All of it is provoked in
 [`check-lifecycle-verify-order.sh`](../../scripts/check-lifecycle-verify-order.sh) against
 a **real** squash merge: a lane that contains the landing is **admitted** and journalled;
-a lane containing no landing of the item's, and a lane containing a landing built from
-other content, are both **refused by name**; and removing either the containment arm or
-the tree check reproduces the wrong answer, so neither half is decoration.
+a lane containing no landing of the item's is **refused by name**; and removing either the
+containment arm or the tree check reproduces the wrong answer, so neither half is
+decoration.
+
+### 3.7 Which commit the evidence is *against* — the tree that landed (#1149)
+
+§3.6 fixed *whether* a lane may stand for the verified commit. It left *which commit the
+evidence names* read straight off the live pull request:
+
+```python
+verified_commit = str(pr.get("head_commit") or "")
+```
+
+For a branch that received commits **after** the squash, that commit is a tree that **never
+landed and never gated**. Measured on #977/#978 through PR #984:
+
+| fact | value |
+|---|---|
+| `pulls/984.head.sha` (live) | `e3f63457cac0…` |
+| `pulls/984.merge_commit_sha` | `fed4e7d433e4…` |
+| `git diff --quiet <head> <merge>` | **rc 1** — 54 files, 4731 insertions(+), 31 deletions(-) |
+| `git merge-base --is-ancestor <head> <merge>` | **rc 1** |
+
+§3.6's rule then refuses the item for the *right* reason (`contains the landing ? True,
+landing tree == verified tree ? False`) and the item is **structurally unclosable**: the
+invariant is keyed to a tree nobody verified and which never landed, and there is no other
+subject to offer. The candidate remedy "resolve to the last PR commit that is an ancestor of
+the default branch" is dead on this very case — a squash merge leaves **no** commit of the
+branch an ancestor of the default branch.
+
+So the subject is resolved by measurement, once per item, in `closeout.evidence_subject`:
+
+| live `head_commit` vs `merge_commit` | subject |
+|---|---|
+| trees **same** — the ordinary correctly-merged item | the head commit, unchanged; its tree *is* the landed one, so every existing record and the `clean_item` fixture keep their meaning |
+| trees **different** — the branch advanced after the squash | the **landing**, the commit that carries the tree that landed |
+| trees **unreadable** | the head commit, unchanged — nothing new is *claimed* about a tree nobody read, and the admissibility rule still refuses any lane that would need it |
+
+The comparison is a **tri-state** (`tree_relation`): "the trees differ" and "the trees cannot
+be read" are different facts, and reporting the second as the first would announce a drift
+nobody measured. The drift is **disclosed, not hidden** — the attestation carries
+`drifted_head`, and the step says the evidence is against the tree that landed:
+
+```json
+{"verify": {"ok": true, "commit": "<the landing - the tree that landed>",
+            "landing": "<the same commit>", "measured": "<the lane's tree>",
+            "drifted_head": "<the live head whose tree never landed>",
+            "via": "contains", "source": "lane"}}
+```
+
+Nothing is accepted on weaker grounds than before: `_admissible`'s two arms and its tree half
+are exactly #1098's. Only the refusal is sharper, because the two causes have different
+remedies — a lane of the wrong tree is re-cut, a subject naming a tree that never landed is
+re-pointed:
+
+```
+lane head <master> is not the verified commit <pr head>: it DOES contain the landing
+<merge>, but the landing carries a different tree — <pr head> names a tree that never
+landed, so it may not be the subject of this item's evidence; the tree that landed is the
+one <merge> carries (#1149)
+```
+
+`audit` is widened in the same direction and no further: evidence satisfies the invariant when
+it names the head commit, **or** names the landing as its subject **and** records the live head
+it drifted from. A record that merely names the merge commit stays a finding — a substitution
+nobody measured is still a mismatch.
+
+`check-lifecycle-verify-order.sh` provokes all of it: a real squash merge whose branch
+advanced afterwards is closed out **green** on the landed tree, with the journal naming the
+landing and the drifted head; the port still **refuses** that drifted subject, in its own
+words; and disabling the resolution reproduces the wedge, so the remedy is load-bearing rather
+than decoration.
+
+### 3.8 A frozen branch head that can never be made green (#1003)
+
+#786 made *a lane that is gone* recoverable. It left its sibling unsolved: the lane is
+still there, and the tree at its head is **permanently red** for a reason the tree that
+landed does not contain. Measured on #955, where the close-out refused identically for
+**seven attempts over ~2 hours**:
+
+| | |
+|---|---|
+| lane head `4ed3fc0`, branch `issue-955` | committed **16:18:30**, without the declaration |
+| `72dca6c` (issue #959) lands on master | **16:16:48** — before the head was committed |
+| squash `494ff91` (PR #964) | composed **16:19:38**, with `72dca6c` as its **parent** |
+| `e2e` at the frozen head | **3 failed** — the declaration is absent (`grep -c` → 0) |
+| `e2e` at the merged commit | **11 passed** — the landed tree holds it |
+
+A commit is immutable, so *re-running cannot converge*: the invariant was being measured
+at a tree that could never be green. The question the invariant actually asks — **did the
+change that landed reach a green gate?** — is answered for an already-merged item at the
+**merge commit**, and only there: for a squash merge no other commit in the object store
+holds the landed tree.
+
+So `record-verification` now has three venues, tried in this order:
+
+| # | Venue | When | Recorded as |
+|---|---|---|---|
+| 1 | the gate re-run **in the lane** | whenever the lane is there — the tree and the run are the same object, which nothing else can be | `source: lane` |
+| 2 | the **verified head commit**, in a throwaway detached tree | the lane is gone (#786) | `source: reclaimed-lane` |
+| 3 | the **merge commit**, in a throwaway detached tree | the head was measured **red**, the pull request is **merged**, and the landed tree is a **different commit** | `source: merged-tree`, plus `measured: <the merge commit>` |
+
+The attestation still **names the verified head** — the invariant's subject is unchanged,
+and naming the merge commit as the subject would let one stand for a tree nobody verified.
+The venue is recorded *beside* it, so the record says what was actually measured:
+
+```json
+{"verify": {"ok": true, "commit": "4ed3fc0…", "source": "merged-tree", "measured": "494ff91…"}}
+```
+
+Five things bound it, and each one is provoked by a test in
+[`tests/test_frozen_head.py`](tests/test_frozen_head.py):
+
+- the head is measured **first**, so the strongest evidence is still preferred and a green
+  head is never replaced by a re-measurement;
+- the merge commit is the item's **own** pull request's, so it contains the change under
+  test — a defect the lane carries is red there too, and the fix cannot launder a red lane;
+- it is tried only when the landed tree is a **different commit**, so no tree is gated
+  twice and the common case (head and merge are one tree) costs nothing;
+- a **park is not a red**: a capacity condition is answered by the bounded retry, never by
+  measuring somewhere else, so CANNOT-ASSESS is still CANNOT-ASSESS (#840);
+- when the landed tree is red too, the refusal **names both trees** and the invariant
+  stands. No journal is written for a red tree, ever.
+
+The clause on `measured` is a **strengthening**, not a relaxation: an attestation that
+records a venue the item's own record does not carry is refused where it used to be
+believed, and every record written before #1003 — which says nothing about a venue — is
+read exactly as it always was.
 
 ## 4. Auditing, and why it is offline
 

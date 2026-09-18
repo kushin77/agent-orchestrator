@@ -33,6 +33,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -227,6 +228,30 @@ def commit_is_contained(worktree: Path, ancestor: str, descendant: str) -> bool:
     return result.returncode == 0
 
 
+def tree_relation(worktree: Path, left: str, right: str) -> str:
+    """``"same"``, ``"different"`` or ``"unknown"`` — how two commits' trees compare.
+
+    Three answers rather than two, because *"the trees differ"* and *"the trees cannot
+    be read"* are different facts and only one of them licenses a conclusion (#1149).
+    ``git diff --quiet`` exits 128 for an object this repository does not hold; a caller
+    that read that as *different* would report a drift nobody measured, and one that read
+    it as *same* would admit a tree nobody compared. Both are fail-open, and this module
+    exists to close exactly that gap.
+    """
+    if not left or not right:
+        return "unknown"
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "diff", "--quiet", left, right],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return "same"
+    if result.returncode == 1:
+        return "different"
+    return "unknown"
+
+
 def trees_are_identical(worktree: Path, left: str, right: str) -> bool:
     """Do two commits carry the **same tree** — is this the tree that landed?
 
@@ -237,17 +262,11 @@ def trees_are_identical(worktree: Path, left: str, right: str) -> bool:
     check ``commit_is_contained`` alone would admit a lane that contains a landing
     built from **different** content — a measurement of work nobody verified.
 
-    ``git diff --quiet`` exits 0 for identical trees, 1 for differing ones and 128 when
-    a commit is unknown; only 0 is a match, so this fails closed too.
+    Only the measured ``same`` is a match, and an unreadable commit is not one, so this
+    fails closed too — the tri-state is read through :func:`tree_relation` rather than
+    re-derived here, so the two cannot drift apart.
     """
-    if not left or not right:
-        return False
-    result = subprocess.run(
-        ["git", "-C", str(worktree), "diff", "--quiet", left, right],
-        capture_output=True,
-        text=True,
-    )
-    return result.returncode == 0
+    return tree_relation(worktree, left, right) == "same"
 
 
 def select_lane(records: list[dict] | None, commit: str = "") -> dict | None:
@@ -447,6 +466,27 @@ def read_baseline(path: str) -> dict:
     return _read_json(Path(path)) or {"quarantine": []}
 
 
+class RedGate(RuntimeError):
+    """The gate ran at a tree and a check failed: a *measured* red (#1003).
+
+    A ``RuntimeError``, so every reader of a failed step keeps seeing a failure and
+    every refusal this port has always raised stays a refusal. It is a distinct class
+    so that one caller can ask a question the message cannot answer: *this tree* is red
+    is a different statement from *this tree could not be measured*, and only the first
+    is recoverable — by measuring the tree that landed — for an item whose pull request
+    is already merged.
+
+    ``verdict_line`` is the gate's own *sentence* — its verdict line, not its whole
+    transcript — kept beside the message because ``closeout`` truncates a step's detail at
+    300 characters: a *composed* refusal that has to name two red trees must fit inside
+    that cap, and the sentence saying which run failed is the part worth spending it on.
+    """
+
+    def __init__(self, detail: str, verdict_line: str = "") -> None:
+        super().__init__(detail)
+        self.verdict_line = verdict_line
+
+
 class GhOps:
     """The real effects close-out needs, through ``gh`` and the repo's own CLIs."""
 
@@ -455,7 +495,9 @@ class GhOps:
         #: The lifecycle record the close-out was collected from. The directive's
         #: terminal move is gated on whether the order's change has landed, and
         #: that fact comes from the board read that already happened — not from a
-        #: second, possibly different, read of the world (#821).
+        #: second, possibly different, read of the world (#821). It is also where the
+        #: item's pull request number comes from, so the merged tree can be found
+        #: (#1003).
         self.record = record
 
     def _run(self, args: list[str], cwd: Path | None = None) -> str:
@@ -520,9 +562,81 @@ class GhOps:
             return
         if run.cannot_assess:
             raise gate.CannotAssess(run.verdict, run.detail(), run.remediation())
-        raise RuntimeError(
+        raise RedGate(
             f"{run.detail()} — the gate ran against {described} and reported a failure, "
-            "so the item has no green verification"
+            "so the item has no green verification",
+            # The *short* sentence, not ``detail()``: a composed refusal has to fit the
+            # 300-character step detail, and the retry bookkeeping is not what an operator
+            # needs to read twice.
+            run.final.headline() or f"verify: {run.verdict.upper()} (rc {run.exit_code})",
+        )
+
+    def tree_relation(self, left: str, right: str) -> str:
+        """How two commits' trees compare — read in the repository this port measures.
+
+        The driver asks this to decide *which* commit a merged item's evidence is against
+        (#1149). It is a question about a repository, so it is asked of the port rather
+        than of a bare ``git`` call inside the driver — the driver owns the decision, the
+        port owns knowing where to look.
+        """
+        return tree_relation(self.root, left, right)
+
+    def commit_is_superset(self, larger: str, smaller: str) -> bool:
+        """Does ``larger``'s tree carry every path ``smaller``'s does, unchanged?
+
+        Read as a content diff, not an ancestry check: a squash merge disconnects the
+        branch head from the landing either way, so ``merge-base --is-ancestor`` can
+        never answer this. ``git diff --diff-filter=DM`` between the two, restricted to
+        deletions and modifications, is empty exactly when nothing ``smaller`` carries
+        was removed or changed on the way to ``larger`` — additions are the only
+        difference a genuinely-advanced branch can produce. An unreadable pair answers
+        ``False``: nothing is claimed about a comparison nobody could measure.
+        """
+        if not larger or not smaller:
+            return False
+        result = subprocess.run(
+            ["git", "-C", str(self.root), "diff", "--no-renames", "--diff-filter=DM", "--name-only", smaller, larger],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False
+        return result.stdout.strip() == ""
+
+    def _refusal_reason(self, worktree: Path, head: str, commit: str, landing: str) -> str:
+        """Why this lane may not stand for ``commit`` — one line, naming the true reason.
+
+        #1098's refusal said "and does not contain it" for two different causes, so the
+        #977/#978 shape — a lane that **does** contain the landing, whose landing carries
+        a different tree than the commit the evidence names — was diagnosed as the one
+        thing it was not. The causes have different remedies: a lane of the wrong tree is
+        re-cut, while a subject naming a tree that never landed is re-pointed. Naming them
+        apart is the whole point of a refusal whose operator has to act on it (#1149).
+        """
+        opening = f"lane head {head[:12]} is not the verified commit {commit[:12]}"
+        if not landing:
+            return (
+                f"{opening}: no landing is recorded for it, so a lane cut from the default "
+                "branch cannot stand for it — the equality arm is the only arm for an "
+                "unmerged (or landless) pull request"
+            )
+        if not commit_is_contained(worktree, landing, head):
+            return (
+                f"{opening} and does not contain the landing {landing[:12]}, the commit the squash "
+                "landed as: a lane may stand for the verified commit only when it contains the "
+                "landing and that landing carries the same tree (#1098)"
+            )
+        if trees_are_identical(worktree, commit, landing):
+            return (
+                f"{opening}: the lane contains the landing {landing[:12]} and that landing "
+                "carries the same tree as the verified commit, so these facts do not explain "
+                "the refusal — the admissibility rule refused a lane it should admit"
+            )
+        return (
+            f"{opening}: it DOES contain the landing {landing[:12]}, but the landing carries a "
+            f"different tree — {commit[:12]} names a tree that never landed, so it may not be "
+            "the subject of this item's evidence; the tree that landed is the one "
+            f"{landing[:12]} carries (#1149)"
         )
 
     def _admissible(self, worktree: Path, head: str, commit: str, landing: str) -> str:
@@ -555,8 +669,40 @@ class GhOps:
             return "contains"
         return ""
 
-    def record_verification(self, issue: int, commit: str, landing: str = "") -> str:
-        """Record a green attestation for ``commit``, from the lane or from the commit.
+    def _in_detached_tree(self, commit: str, measure: Callable[[Path], None]) -> None:
+        """Run ``measure`` in a throwaway detached worktree at ``commit``, then remove it.
+
+        Extracted from :meth:`_remeasure` (#1003) because there are now two commits
+        worth measuring this way — the verified head commit once the lane is gone (#786),
+        and the merge commit once the head's tree is red (#1003) — and a second copy of
+        the scratch/cleanup dance is a second place for a leaked worktree. The tree is
+        destroyed either way, including when ``measure`` raises, so a measurement can
+        never itself become a lane.
+        """
+        root_dir = scratch_root()
+        root_dir.mkdir(parents=True, exist_ok=True)
+        scratch = Path(tempfile.mkdtemp(prefix="ao-lifecycle-verify-", dir=str(root_dir)))
+        try:
+            self._run(["git", "-C", str(self.root), "worktree", "add", "--detach", str(scratch), commit])
+            measure(scratch)
+        finally:
+            # Always give the tree back: a leaked worktree is another lane's
+            # isolation problem, and this one is scratch by construction.
+            cleanup = subprocess.run(
+                ["git", "-C", str(self.root), "worktree", "remove", "--force", str(scratch)],
+                capture_output=True,
+                text=True,
+            )
+            if cleanup.returncode != 0:
+                subprocess.run(
+                    ["git", "-C", str(self.root), "worktree", "prune"], capture_output=True, text=True
+                )
+
+    def record_verification(self, issue: int, commit: str, landing: str = "", drifted: str = "") -> str:
+        """Record a green attestation for ``commit``, from the lane, from the commit,
+        from a drifted head's landing (#1149), or — when the frozen head is red and
+        the item is merged — from the merged tree (#786, #1098, #1149, #1003).
+
 
         The lane is the first source: the gate is re-run in it, and the attestation it
         writes is journalled. That is the strongest evidence available, because the
@@ -583,12 +729,85 @@ class GhOps:
         silently invalidated each of them. The lane is the measurement; the verified
         commit is the subject; the record says which is which.
 
+        ``drifted`` is the pull request's **live** head where a commit landed *after* the
+        squash carried it. ``governance/lifecycle/closeout.py`` measured that its tree is
+        not the landed one, so it cannot be the subject and the landing is (#1149). It is
+        recorded as ``drifted_head`` rather than dropped: the whole defect was that the
+        drifted head was used *silently*, as though it were the verified work. It changes
+        nothing about what is accepted — the lane is still admitted by the two arms only,
+        with the tree half intact.
+
+        When that frozen head's tree is **red** and the pull request is already merged,
+        the tree that *landed* is measured instead, and the record says so (#1003).
+        Measured on #955: seven close-out attempts over two hours, every one
+        ``REMAINS VERIFY_EVIDENCE_MISSING``, for work whose merged tree was green. A
+        commit is immutable, so re-running the head can never converge — but the merge
+        commit is a different commit, and for an already-merged item it is the tree the
+        change actually landed as. See :meth:`_measure_landed_tree` for why that cannot
+        launder a red lane.
+
         A run that did not happen writes **no journal**. ``.fleet/lifecycle``'s
         presence is another module's landing record — ``governance/reconcile``
         reads a journal file as "this issue's work landed" — so writing one for a
         parked run would let capacity be read as a landing, the substitution
         golden rule 17 forbids. The attempts are recorded where close-out prints
         them instead; nothing carries them as evidence.
+        """
+        try:
+            measured, source, via = self._measure_verified_head(issue, commit, landing)
+        except RedGate as red:
+            measured, source, via = self._measure_landed_tree(issue, commit, red), "merged-tree", ""
+        # The attestation names the **verified head** — the subject the audit holds it
+        # against — and, only when it is a different commit, the tree the gate actually
+        # ran in. For the lane and the reclaimed-commit venues the two are the same, so
+        # those records are exactly the ones #786 has always written. The squash-landing
+        # arm (#1098) is the one exception: it always names ``landing`` and ``measured``
+        # alongside ``via``, because the tree that proved this item is not ``commit``'s own.
+        subject = str(commit or measured)
+        verify = {"ok": True, "commit": subject, "source": source}
+        if via == "contains":
+            verify.update({"landing": landing, "measured": measured, "via": via})
+            if drifted and drifted != commit:
+                # The live head whose tree never landed (#1149). Disclosed precisely so
+                # the substitution that caused this defect can never be silent again.
+                verify["drifted_head"] = drifted
+        elif measured != subject:
+            verify["measured"] = measured
+        if source == "reclaimed-lane" and drifted and drifted != commit and commit == landing:
+            # A subject that is the landing rather than the branch tip (#1149): the
+            # re-measurement is still a real gate run at the commit the evidence names,
+            # and the drift is still disclosed rather than dropped.
+            verify.update({"landing": landing, "drifted_head": drifted})
+        write_journal(issue, {"verify": verify}, self.root)
+        if source == "merged-tree":
+            return (
+                f"verify green at {measured[:12]} — measured in the tree that landed, because the frozen "
+                f"branch head {subject[:12]} is red and the merge commit is the tree the change landed as"
+            )
+        if via == "contains":
+            return (
+                f"verify green at {subject[:12]} (measured in the lane at {measured[:12]}, "
+                f"which contains the landing {landing[:12]})"
+                + (
+                    f"; the live head {drifted[:12]} advanced past the squash and its tree never "
+                    "landed, so the evidence is against the tree that landed"
+                    if verify.get("drifted_head")
+                    else ""
+                )
+            )
+        if source == "reclaimed-lane":
+            return f"verify green at {measured[:12]} (re-measured at the verified commit; the lane is gone)"
+        return f"verify green at {measured[:12]}"
+
+    def _measure_verified_head(self, issue: int, commit: str, landing: str = "") -> tuple[str, str, str]:
+        """Gate the verified head commit — in the lane, or at the commit (#786, #1098).
+
+        Returns ``(the commit whose tree was gated, where the run was taken, "contains"
+        when the lane stood in for ``commit`` via the squash-landing arm else "")``.
+        Raises ``gate.CannotAssess`` when nothing was measured (a park, an unusable
+        permit store, a signal) and :class:`RedGate` when the gate measured a failing
+        tree — two outcomes the caller must be able to tell apart, because only the
+        second is answered by measuring another tree (#1003).
         """
         records = _lane_records(self.root).get(issue) or []
         lane = select_lane(records, commit)
@@ -597,23 +816,9 @@ class GhOps:
             head = self._run(["git", "-C", str(worktree), "rev-parse", "HEAD"])
             via = self._admissible(worktree, head, commit, landing)
             if not via:
-                raise RuntimeError(
-                    f"lane head {head[:12]} is not the verified commit {commit[:12]} and does not "
-                    f"contain it: a lane must be at the verified commit, or be a tree cut after the "
-                    f"landing {landing[:12] or '(none recorded)'} that contains it and carries the "
-                    "same tree as the verified commit (#1098)"
-                )
+                raise RuntimeError(self._refusal_reason(worktree, head, commit, landing))
             self._gate_in(worktree, head[:12])
-            record: dict = {"ok": True, "commit": commit or head, "source": "lane"}
-            if via == "contains":
-                record.update({"landing": landing, "measured": head, "via": via})
-            write_journal(issue, {"verify": record}, self.root)
-            if via == "contains":
-                return (
-                    f"verify green at {record['commit'][:12]} (measured in the lane at {head[:12]}, "
-                    f"which contains the landing {landing[:12]})"
-                )
-            return f"verify green at {head[:12]}"
+            return head, "lane", via
         if any(record["worktree_exists"] for record in records):
             # A live lane exists yet the resolution did not return it (#834). The gate
             # must run IN the lane — that is the strongest evidence there is, and the
@@ -628,13 +833,89 @@ class GhOps:
         # record at all. The invariant names the COMMIT (#786), so a commit that is
         # still in the object store is re-measured rather than mourned — and when
         # there is none, ``_remeasure`` refuses by name, naming the ordering.
-        measured = self._remeasure(issue, commit, dead=lane)
-        write_journal(
-            issue,
-            {"verify": {"ok": True, "commit": measured, "source": "reclaimed-lane"}},
-            self.root,
-        )
-        return f"verify green at {measured[:12]} (re-measured at the verified commit; the lane is gone)"
+        return self._remeasure(issue, commit, dead=lane), "reclaimed-lane", ""
+
+    def _measure_landed_tree(self, issue: int, commit: str, red: RedGate) -> str:
+        """Measure the tree that actually landed, when the frozen head's is red (#1003).
+
+        A commit is immutable, so a red branch head stays red however many times it is
+        re-run — measured on #955, where seven attempts over ~2 hours refused identically
+        while the *merged* tree was green. The head ``4ed3fc0`` was committed at
+        16:18:30 and did not contain ``72dca6c``, which had landed at 16:16:48; the squash
+        ``494ff91`` was composed at 16:19:38 **with ``72dca6c`` as its parent**, so the
+        tree that landed held a declaration the frozen branch head never had. The
+        question the invariant really asks — *did the change that landed reach a green
+        gate?* — is answerable at the **merge commit**, and only there: for a squash
+        merge no other commit in the object store holds the landed tree.
+
+        What bounds it, so this can never launder a red lane:
+
+        * the head is always measured **first**, and its tree is the strongest evidence
+          whenever it is green — this runs only after it is measured red;
+        * the merge commit is the item's **own** pull request's, read from the item's
+          record or live from GitHub, so it contains the change under test: a change that
+          is genuinely broken is red there too;
+        * it is only tried when the landed tree is a **different commit** from the one
+          already measured — so no tree is gated twice, and the common case, where the
+          head and the merge commit are the same tree, costs nothing;
+        * a park is not a red: ``CannotAssess`` is never answered by measuring
+          elsewhere;
+        * and when the landed tree is red as well, the original red is raised, naming
+          both trees. The invariant stands.
+        """
+        landed = self._merged_commit(issue)
+        if not commit or not landed or landed == commit:
+            raise red
+        try:
+            self._in_detached_tree(landed, lambda scratch: self._gate_in(scratch, landed[:12]))
+        except gate.CannotAssess:
+            raise
+        except RedGate as also_red:
+            # Composed from each run's own sentence rather than their whole messages: this
+            # becomes a step's detail, which closeout truncates at 300 characters, and the
+            # fact an operator needs is *which* two trees are red — not the retry bookkeeping
+            # twice over.
+            raise RuntimeError(
+                f"{red.verdict_line or red} — the gate ran against {commit[:12]} and reported a failure, "
+                f"so the item has no green verification — and the tree that landed ({landed[:12]}) is red too "
+                f"({also_red.verdict_line or 'the gate failed'})"
+            ) from None
+        return landed
+
+    def _item(self, issue: int) -> dict:
+        """The item this close-out was collected for, out of the record it was given."""
+        for entry in (self.record or {}).get("items") or []:
+            if int(entry.get("issue") or 0) == issue:
+                return entry
+        return {}
+
+    def _merged_commit(self, issue: int) -> str:
+        """The merge commit of the item's pull request, or ``""`` when it is not merged.
+
+        The record is read first, because it costs nothing: an item collected *after* its
+        merge already carries the commit. A live read is the fallback, and it is needed
+        because close-out collects the item **before** it merges anything — step 1 merges,
+        step 2 records — so the record this run holds still says the pull request is open,
+        and the live read is the only one that can answer "is it merged *now*".
+
+        An unreadable answer is ``""``, never a guess: a red head then stands, unchanged,
+        which is the honest outcome.
+        """
+        pr = (self._item(issue) or {}).get("pr") or {}
+        recorded = str(pr.get("merge_commit") or "")
+        if recorded and str(pr.get("state") or "").lower() == "merged":
+            return recorded
+        number = int(pr.get("number") or 0)
+        if not number:
+            return ""
+        try:
+            view = self._run(["gh", "pr", "view", str(number), "--json", "state,mergeCommit"])
+            payload = json.loads(view)
+        except (RuntimeError, json.JSONDecodeError):
+            return ""
+        if str(payload.get("state") or "").upper() != "MERGED":
+            return ""
+        return str((payload.get("mergeCommit") or {}).get("oid") or "")
 
     def _remeasure(self, issue: int, commit: str, dead: dict | None = None) -> str:
         """Re-measure a verified commit whose lane worktree no longer exists.
@@ -686,24 +967,7 @@ class GhOps:
                 f"the attestation (looked in {self.root})"
             )
         resolved = probe.stdout.strip()
-        root_dir = scratch_root()
-        root_dir.mkdir(parents=True, exist_ok=True)
-        scratch = Path(tempfile.mkdtemp(prefix="ao-lifecycle-verify-", dir=str(root_dir)))
-        try:
-            self._run(["git", "-C", str(self.root), "worktree", "add", "--detach", str(scratch), resolved])
-            self._gate_in(scratch, resolved[:12])
-        finally:
-            # Always give the tree back: a leaked worktree is another lane's
-            # isolation problem, and this one is scratch by construction.
-            cleanup = subprocess.run(
-                ["git", "-C", str(self.root), "worktree", "remove", "--force", str(scratch)],
-                capture_output=True,
-                text=True,
-            )
-            if cleanup.returncode != 0:
-                subprocess.run(
-                    ["git", "-C", str(self.root), "worktree", "prune"], capture_output=True, text=True
-                )
+        self._in_detached_tree(resolved, lambda scratch: self._gate_in(scratch, resolved[:12]))
         return resolved
 
     def delete_branch(self, branch: str) -> str:

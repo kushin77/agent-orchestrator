@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, datetime
 from typing import Any, Iterable, Optional
 
+from telemetry.clock import now_utc_iso
 from telemetry.observability.breach import Alert
 from telemetry.observability.model import (
     SERVED_OUTCOMES,
@@ -34,7 +34,8 @@ VERDICT_COLOR = {
 
 
 def _now_iso() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """The one clock seam (``telemetry/clock.py``, issue #1025)."""
+    return now_utc_iso()
 
 
 def _outcome_mix(spans: Iterable[SpanRecord]) -> dict[str, int]:

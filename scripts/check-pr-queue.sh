@@ -229,7 +229,8 @@ if grep -qE '^ *90 +unclear-pre-existing-red' "$out"; then
 else
   fail "PR #90 (no section) was not flagged: $(grep -E '^ *90 ' "$out")"
 fi
-if grep -q '^MERGE_ORDER:.*\b80\b' "$out" || grep -q '^MERGE_ORDER:.*\b90\b' "$out"; then
+merge_order_line="$(grep '^MERGE_ORDER:' "$out" || true)"
+if [[ "$merge_order_line" =~ (^|[^0-9])80([^0-9]|$) ]] || [[ "$merge_order_line" =~ (^|[^0-9])90([^0-9]|$) ]]; then
   fail "a PR with an unclear/missing Pre-existing-red section entered the merge order"
 else
   ok "neither PR #80 nor #90 enters the merge order"

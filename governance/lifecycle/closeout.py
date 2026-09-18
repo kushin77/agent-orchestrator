@@ -4,7 +4,10 @@
 is derived from the incident that motivated the module rather than from taste:
 
 1. **merge** first, because the verification evidence must name the merged commit;
-2. **record verification** for that commit, so "green" is evidence and not a claim;
+2. **record verification** for that commit, so "green" is evidence and not a claim —
+   measured in the lane at its verified head, or (when that frozen tree is red only
+   because it predates a commit its own squash was composed on) at the merge commit,
+   which the record then names as the tree it measured (#1003);
 3. **delete the source branch**, which the local merge command measurably fails to
    do while the main checkout holds ``master``;
 4. **consume the authorisation directive** *before* releasing the claim — on #263
@@ -47,7 +50,7 @@ from typing import Callable, Protocol
 
 from governance.lifecycle.audit import Finding, audit_item
 from governance.lifecycle.gate import UNASSESSED_VERDICTS, CannotAssess
-from governance.lifecycle.model import owes_closure
+from governance.lifecycle.model import evidence_green, owes_closure, verified_head
 from governance.lifecycle.report import (
     BoardReport,
     BoardReporter,
@@ -78,7 +81,7 @@ class CloseOutOps(Protocol):
     def merge_pull_request(self, number: int) -> str:
         """Squash-merge the pull request; return the merge commit."""
 
-    def record_verification(self, issue: int, commit: str, landing: str = "") -> str:
+    def record_verification(self, issue: int, commit: str, landing: str = "", drifted: str = "") -> str:
         """Record a green verification attestation naming ``commit``.
 
         ``landing`` is the commit the pull request was **squash-merged as**, and is
@@ -88,10 +91,34 @@ class CloseOutOps(Protocol):
         ``landing`` carries the same tree as ``commit`` (#1098). An unmerged item has no
         landing, and therefore still requires the lane to be *at* ``commit``.
 
+        ``drifted`` is the pull request's live head where the branch advanced *after* the
+        squash carried it, so that head's tree never landed and ``commit`` is the landing
+        instead (#1149). It is journalled as provenance and never widens what is admitted.
+
         Raises ``governance.lifecycle.gate.CannotAssess`` — and *not* a generic
         error — when the gate produced no verification result at all (it was parked,
         its permit store was unusable, or it was killed by a signal), so the executor
         can report that outcome as unassessed instead of as a failure (#840).
+        """
+
+    def tree_relation(self, left: str, right: str) -> str:
+        """Compare two commits' trees: ``"same"``, ``"different"`` or ``"unknown"``.
+
+        Asked by :func:`evidence_subject` to decide *which* commit a merged item's evidence
+        is against (#1149). The driver owns the decision; the port owns reading the
+        repository the decision is made about — so the driver never shells out itself.
+        """
+
+    def commit_is_superset(self, larger: str, smaller: str) -> bool:
+        """Does ``larger``'s tree carry every path ``smaller``'s does, unchanged?
+
+        Asked by :func:`evidence_subject` before it trusts a tree difference as the
+        branch-advanced drift (#1149): that shape is specifically the live head adding
+        content on top of what the squash carried, never touching it — so the squash's
+        tree is fully, unchanged, still sitting inside the live head's. A difference
+        that removes or changes any of ``smaller``'s content (#1003: the frozen head
+        predates a commit its own squash was composed on, so the squash carries content
+        — the sibling declaration — the head never had) is not this shape at all.
         """
 
     def delete_branch(self, branch: str) -> str:
@@ -239,6 +266,56 @@ def _run(result: CloseOutResult, action: str, op: Callable[[], str], needed: boo
     return True
 
 
+def evidence_subject(item: dict, ops: CloseOutOps) -> tuple[str, str, str]:
+    """``(subject, landing, drifted)`` — the commit a merged item's evidence must name.
+
+    The subject is the commit whose tree is the tree that **landed**, because that is what
+    "the tree which was verified is the tree that landed" means once the branch moves on.
+    For an ordinary merged item the pull request's head commit *is* that commit and nothing
+    changes: its tree and the landing's are the same object, so the convention every
+    existing record and the ``clean_item`` fixture use keeps its meaning exactly.
+
+    A branch that received commits **after** the squash is the case this exists for
+    (#1149, measured on #977/#978 through PR #984). GitHub's ``head_commit`` for such a
+    pull request is a tree that **never landed and never gated** — measured 54 files and
+    4731 insertions away from the commit the squash landed as — so it cannot be the subject
+    of evidence for work that landed. The landing carries the landed tree by construction
+    and is the canonical commit that does, so it becomes the subject while the live head is
+    returned as ``drifted`` and **disclosed** in the attestation, never silently dropped.
+
+    Fail-closed direction: an **unreadable** comparison leaves the subject where it was.
+    Nothing is then *claimed* that was not measured — the subject is the pull request's
+    head, exactly as before this rule — and the admissibility rule still refuses any lane
+    that would need the tree nobody could read. Treating an unreadable pair as a measured
+    drift would report a mismatch nobody measured; treating it as equal would admit a tree
+    nobody compared.
+
+    A tree difference is substituted only when ``head``'s tree is a **superset** of
+    ``landing``'s — the branch genuinely continued *past* the squash, adding content
+    without touching what was squashed, so everything the landing carries is still
+    sitting in the live head unchanged. A different tree that is **not** in that
+    direction (#1003: the frozen head predates a commit its own squash was composed on,
+    so the landing carries content — the sibling declaration — the head never had, and
+    a squash disconnects the two commits' ancestry either way) is not this shape at
+    all: it is a lane whose head may still be gated directly, and whose fallback
+    (measuring the merge commit only once that gate measures red) is
+    `record-verification`'s own, not this function's to pre-empt. Pre-empting it here
+    would skip the lane's own run entirely and misname a red-and-fixed-on-arrival lane
+    as "drifted" for a head that never carried the landing's content in the first place.
+    """
+    pr = item.get("pr") or {}
+    head = str(pr.get("head_commit") or "")
+    merged = str(pr.get("state") or "").lower() == "merged"
+    landing = str(pr.get("merge_commit") or "") if merged else ""
+    if not landing or not head or head == landing:
+        # Not merged, no landing recorded, or the live head *is* the landing: the ordinary
+        # shape, and the one where no repository need be read at all.
+        return head, landing, ""
+    if ops.tree_relation(head, landing) == "different" and ops.commit_is_superset(head, landing):
+        return landing, landing, head
+    return head, landing, ""
+
+
 def closeout(
     item: dict,
     ops: CloseOutOps,
@@ -269,27 +346,27 @@ def closeout(
         return _finish(result, reporter, apply)
 
     pr = item.get("pr") or {}
-    verify = item.get("verify") or {}
     claim = item.get("claim") or {}
     directive = item.get("directive") or {}
-    verified_commit = str(pr.get("head_commit") or "")
-    # The commit a squash merge landed as. Given to the port only for a genuinely
-    # merged pull request: it is the licence to measure a lane that is not *at* the
-    # verified head, and it is what makes the squash half of this invariant (#1098)
-    # satisfiable without weakening the unmerged half.
-    landing = str(pr.get("merge_commit") or "") if pr.get("state") == "merged" else ""
+    verified_commit, landing, drifted = evidence_subject(item, ops)
 
     # 1. merge (the verified head is what lands).
     _run(result, "merge-pull-request", lambda: ops.merge_pull_request(int(pr.get("number") or 0)),
          pr.get("state") != "merged")
 
-    # 2. verification evidence for the verified head commit.
-    verification_recorded = bool(verify.get("ok")) and str(verify.get("commit") or "") == verified_commit
+    # 2. verification evidence for the verified head commit. The question "is it
+    #    already recorded" is the audit's own rule (``model.evidence_green``), not a
+    #    second copy of it: a record that names the *merged* tree as the tree it
+    #    measured is a recorded verification too (#1003), and reading it as absent
+    #    would re-gate a green item on every pass. ``model.evidence_green`` is offline
+    #    and reads the same subject convention ``evidence_subject`` resolves here — the
+    #    verified head, or (#1149) the landing when the branch drifted past the squash
+    #    — so the two can never disagree about what is already on record.
     _run(
         result,
         "record-verification",
-        lambda: ops.record_verification(issue, verified_commit, landing),
-        not verification_recorded,
+        lambda: ops.record_verification(issue, verified_commit, landing, drifted),
+        not evidence_green(item),
     )
 
     # 3. the source branch, which a local squash-merge reliably leaves behind.
@@ -332,7 +409,7 @@ def closeout(
     #    unconditionally, so step 2's failure destroyed the only tree step 2's retry
     #    could have measured from — which is what made the invariant permanently
     #    unsatisfiable, and the retry the eight-step design assumes unreachable.
-    _reclaim_lane(result, item, ops)
+    _reclaim_lane(result, item, ops, verified_commit)
 
     # Never success by assertion: re-collect the item through the operations
     # port and re-derive from its *fresh* facts. The pre-close item is stale once
@@ -342,29 +419,32 @@ def closeout(
     result.remaining = audit_item(fresh)
     verification = next((step for step in result.steps if step.action == "record-verification"), None)
     if verification is not None and verification.outcome in UNASSESSED_VERDICTS:
-        _retire_unmeasured_verification(result, fresh, verification)
+        _retire_unmeasured_verification(result, fresh, verification, evidence_subject(fresh, ops)[0])
     _retire_withheld_reclaim(result)
     return _finish(result, reporter, apply)
 
 
-def _verification_owed(item: dict, result: CloseOutResult) -> str:
+def _verification_owed(item: dict, result: CloseOutResult, subject: str) -> str:
     """Why the item must keep its lane, or ``""`` when the lane may go.
 
     The question is deliberately not "did a step fail": a failure five steps above
     holds nothing the lane is the only source of. It is precisely whether the
     attestation ``record-verification`` owes is **on record for the verified head**,
     because while it is not, this worktree is the only tree it can be measured from.
+    ``subject`` is the commit the record must name — resolved the same way the step
+    resolved it (#1149), so the two can never disagree about what is owed.
 
     Step 2's own outcome is read first: a ``performed`` verification is the record
     itself, and only then does the item's pre-close state decide (a step that was
-    skipped as already satisfied is a record that was already there).
+    skipped as already satisfied is a record that was already there). The state half is
+    the audit's rule itself (``model.evidence_green``) — including the #1003 clause that
+    lets an attestation name the *merged* tree as the tree it measured, which is still a
+    recorded verification of the verified head.
     """
     step = next((entry for entry in result.steps if entry.action == "record-verification"), None)
     if step is not None and step.outcome == PERFORMED:
         return ""
-    verify = item.get("verify") or {}
-    head = str((item.get("pr") or {}).get("head_commit") or "")
-    if verify.get("ok") and str(verify.get("commit") or "") == head:
+    if evidence_green(item):
         return ""
     outcome = step.outcome if step is not None else "not attempted"
     detail = (step.detail if step is not None else "")[:160]
@@ -375,7 +455,7 @@ def _verification_owed(item: dict, result: CloseOutResult) -> str:
     )
 
 
-def _reclaim_lane(result: CloseOutResult, item: dict, ops: CloseOutOps) -> None:
+def _reclaim_lane(result: CloseOutResult, item: dict, ops: CloseOutOps, subject: str) -> None:
     """Reclaim the lane — unless doing so would destroy evidence the item still owes.
 
     ``record-verification`` measures the lane worktree; step 8 removes it. The order
@@ -394,7 +474,7 @@ def _reclaim_lane(result: CloseOutResult, item: dict, ops: CloseOutOps) -> None:
     if not lane.get("present"):
         result.steps.append(Step("reclaim-lane", SKIPPED, "already satisfied"))
         return
-    owed = _verification_owed(item, result)
+    owed = _verification_owed(item, result, subject)
     if owed:
         result.steps.append(Step("reclaim-lane", REFUSED, owed))
         result.withheld.append(f"reclaim-lane: {owed}")
@@ -422,7 +502,7 @@ def _retire_withheld_reclaim(result: CloseOutResult) -> None:
     result.remaining = [finding for finding in result.remaining if finding.code != "LANE_NOT_RECLAIMED"]
 
 
-def _retire_unmeasured_verification(result: CloseOutResult, fresh: dict, step: Step) -> None:
+def _retire_unmeasured_verification(result: CloseOutResult, fresh: dict, step: Step, subject: str) -> None:
     """A verification the gate never measured is *unassessed*, not missing (#840).
 
     ``audit`` is offline by design and reads only the item, so it cannot know that
@@ -438,8 +518,7 @@ def _retire_unmeasured_verification(result: CloseOutResult, fresh: dict, step: S
     is broken for a reason no gate run could fix.
     """
     verify = fresh.get("verify") or {}
-    head = str((fresh.get("pr") or {}).get("head_commit") or "")
-    if verify.get("ok") or not head:
+    if verify.get("ok") or not subject:
         return
     retired = [finding for finding in result.remaining if finding.code == VERIFY_INVARIANT]
     if not retired:

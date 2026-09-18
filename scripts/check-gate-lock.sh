@@ -128,6 +128,7 @@ sibling lane's lock state.
 """
 import atexit
 import hashlib
+import json
 import os
 import shutil
 import signal
@@ -177,9 +178,9 @@ def note(label, detail):
     print(f"  note  {label}: {' '.join(detail.split())}", flush=True)
 
 
-def env(**overrides):
+def env(root=None, **overrides):
     merged = dict(os.environ)
-    merged["AO_GATE_LOCK_ROOT"] = str(store)
+    merged["AO_GATE_LOCK_ROOT"] = str(root if root is not None else store)
     merged["PYTHONDONTWRITEBYTECODE"] = "1"
     for key, value in overrides.items():
         if value is None:
@@ -189,7 +190,7 @@ def env(**overrides):
     return merged
 
 
-def gate(*args, cap=None, owner=None, timeout=60):
+def gate(*args, cap=None, owner=None, timeout=60, root=None):
     overrides = {}
     if cap is not None:
         overrides["AO_GATE_MAX_CONCURRENT"] = cap
@@ -197,7 +198,11 @@ def gate(*args, cap=None, owner=None, timeout=60):
     if owner is not None:
         command += ["--owner-pid", str(owner)]
     return subprocess.run(
-        command, capture_output=True, text=True, env=env(**overrides), timeout=timeout
+        command,
+        capture_output=True,
+        text=True,
+        env=env(root=root, **overrides),
+        timeout=timeout,
     )
 
 
@@ -641,8 +646,9 @@ needle = "    try:\n        return lease.fcntl_flock_nb(fd, strict=True)\n"
 mutated = original.replace(needle, "    return True\n" + needle, 1)
 check(
     "the mutation applied to the module under test",
-    mutated != original and needle in original,
-    "the mutation target was not found — this control would be vacuous",
+    mutated != original and original.count(needle) == 1,
+    "the mutation target was not found, or was ambiguous — this control would "
+    "be vacuous",
 )
 mutant_path.write_text(mutated, encoding="utf-8")
 shutil.rmtree(mutant_dir / "__pycache__", ignore_errors=True)
@@ -773,6 +779,13 @@ scratch = work / "scratch-wt"
 (scratch / "scripts").mkdir(parents=True, exist_ok=True)
 (scratch / "fleet").mkdir(parents=True, exist_ok=True)
 
+# `fleet/lease.py` travels WITH `fleet/gatelock.py`: `scripts/gate-lock.sh`
+# `exec`s `python3 "$root/fleet/gatelock.py"`, so `fleet/` itself is on that
+# process's `sys.path` and gatelock's sibling import must resolve from inside
+# the scratch tree. Copying the module without its sibling made gate A die in
+# the gate's OWN admission step — a traceback where a PARKED/ADMITTED line
+# belongs — on every tree, whichever form the import takes (measured
+# 2026-09-17, issues #1071 / #1034).
 orchestrator_files = (
     "scripts/verify.sh",
     "scripts/gate-lock.sh",
@@ -993,6 +1006,261 @@ check(
     "verify: PASS" in a_text or "verify: FAIL" in a_text,
     a_text[-300:],
 )
+# --- 14. prune: only a provably-dead leftover is reaped (#1170) ------------
+# `doctor` can NAME a leftover but never remove one, so they accumulated: the
+# box's real store carried 160 zero-byte owner-less leftovers and `doctor` sat
+# permanently at rc 13 — a red that is always red carries no information. The
+# only verb that could remove a leftover was a worktree's own `release`, because
+# a box-wide sweep reaping a lock it does not own is the "delete every file" risk
+# class #948 forbids. `prune` is the provably-safe middle: a named leftover goes
+# only when its recorded owner_pid is gone AND its recorded worktree path is
+# absent (never either alone); a 0-byte owner-less file, which carries no record,
+# goes only while holding its own flock. Everything else is refused BY NAME.
+#
+# These proofs are driven for REAL against fixture stores (never the box's real
+# one), and the fixtures are asserted to differ, so no half can pass vacuously.
+
+
+def prune_fixture_store(name):
+    base = work / ("prune-" + name)
+    (base / "worktrees").mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def write_record(store_dir, name, *, owner_pid, worktree):
+    path = store_dir / "worktrees" / name
+    record = {
+        "pid": owner_pid,
+        "kind": "worktree",
+        "worktree": worktree,
+        "owner_pid": owner_pid,
+        "started_ts": 1.0,
+    }
+    path.write_text(json.dumps(record), encoding="utf-8")
+    return path
+
+
+def line_for(text, filename):
+    for line in text.splitlines():
+        if filename in line:
+            return line.strip()
+    return ""
+
+
+# A dead pid we can prove dead: spawn a child and reap it.
+dead_proc = subprocess.Popen(["sleep", "30"])
+dead_pid = dead_proc.pid
+dead_proc.kill()
+dead_proc.wait()
+check("the dead-pid fixture is really dead", not gatelock.pid_alive(dead_pid), str(dead_pid))
+
+absent_worktree = work / "prune-absent-worktree"  # deliberately never created
+
+# The mutant fixtures, and the assertion that they really differ: (a), (b) and
+# (c) differ in exactly one dimension each, so a rule that keys on only one of
+# them cannot pass all three.
+lock_a = write_record(
+    prune_fixture_store("a"), "leftover-a.lock", owner_pid=os.getpid(),
+    worktree=str(absent_worktree),
+)
+lock_b = write_record(
+    prune_fixture_store("b"), "leftover-b.lock", owner_pid=dead_pid,
+    worktree=str(work),
+)
+lock_c = write_record(
+    prune_fixture_store("c"), "leftover-c.lock", owner_pid=dead_pid,
+    worktree=str(absent_worktree),
+)
+fixture_shapes = {
+    "(a) live pid / absent worktree": (gatelock.pid_alive(os.getpid()), absent_worktree.exists()),
+    "(b) dead pid / existing worktree": (gatelock.pid_alive(dead_pid), Path(str(work)).exists()),
+    "(c) dead pid / absent worktree": (gatelock.pid_alive(dead_pid), absent_worktree.exists()),
+}
+check(
+    "the three leftover fixtures really differ (no rule can pass all three vacuously)",
+    fixture_shapes["(a) live pid / absent worktree"] == (True, False)
+    and fixture_shapes["(b) dead pid / existing worktree"] == (False, True)
+    and fixture_shapes["(c) dead pid / absent worktree"] == (False, False),
+    repr(fixture_shapes),
+)
+
+# (a) a leftover whose recorded owner_pid is ALIVE -> REFUSED by name.
+run_a = gate("prune", "--apply", root=prune_fixture_store("a"))
+check(
+    "(a) a leftover whose owner pid is alive is REFUSED and NOT removed",
+    run_a.returncode == gatelock.EXIT_ADMIT
+    and "REFUSED" in line_for(run_a.stdout, "leftover-a.lock")
+    and f"owner pid {os.getpid()} is alive" in line_for(run_a.stdout, "leftover-a.lock")
+    and lock_a.exists(),
+    f"rc={run_a.returncode} {line_for(run_a.stdout, 'leftover-a.lock')}",
+)
+note("(a) refusal", line_for(run_a.stdout, "leftover-a.lock"))
+
+# (b) a leftover whose recorded worktree path STILL EXISTS -> REFUSED by name.
+run_b = gate("prune", "--apply", root=prune_fixture_store("b"))
+check(
+    "(b) a leftover whose worktree still exists is REFUSED and NOT removed",
+    run_b.returncode == gatelock.EXIT_ADMIT
+    and "REFUSED" in line_for(run_b.stdout, "leftover-b.lock")
+    and f"worktree {work} still exists" in line_for(run_b.stdout, "leftover-b.lock")
+    and lock_b.exists(),
+    f"rc={run_b.returncode} {line_for(run_b.stdout, 'leftover-b.lock')}",
+)
+note("(b) refusal", line_for(run_b.stdout, "leftover-b.lock"))
+
+# (c) a leftover with a DEAD pid AND an ABSENT worktree -> REMOVED.
+run_c = gate("prune", "--apply", root=prune_fixture_store("c"))
+check(
+    "(c) a leftover with a dead pid and an absent worktree is REMOVED",
+    run_c.returncode == gatelock.EXIT_ADMIT
+    and "REMOVED" in line_for(run_c.stdout, "leftover-c.lock")
+    and not lock_c.exists(),
+    f"rc={run_c.returncode} {line_for(run_c.stdout, 'leftover-c.lock')}",
+)
+note("(c) removal", line_for(run_c.stdout, "leftover-c.lock"))
+
+# (g) dry-run is the default: the same (c) shape is only REPORTED, never removed.
+store_g = prune_fixture_store("g")
+lock_g = write_record(store_g, "leftover-g.lock", owner_pid=dead_pid,
+                      worktree=str(absent_worktree))
+run_g = gate("prune", root=store_g)
+check(
+    "(g) prune is DRY-RUN by default: it reports WOULD-REMOVE and removes nothing",
+    run_g.returncode == gatelock.EXIT_HEALTH_ATTENTION
+    and "WOULD-REMOVE" in line_for(run_g.stdout, "leftover-g.lock")
+    and "REMOVED" not in line_for(run_g.stdout, "leftover-g.lock")
+    and lock_g.exists(),
+    f"rc={run_g.returncode} {line_for(run_g.stdout, 'leftover-g.lock')}",
+)
+note("(g) dry-run", line_for(run_g.stdout, "leftover-g.lock"))
+run_g_apply = gate("prune", "--apply", root=store_g)
+check(
+    "(g) the same store with --apply does remove it",
+    run_g_apply.returncode == gatelock.EXIT_ADMIT
+    and "REMOVED" in line_for(run_g_apply.stdout, "leftover-g.lock")
+    and not lock_g.exists(),
+    f"rc={run_g_apply.returncode} {line_for(run_g_apply.stdout, 'leftover-g.lock')}",
+)
+
+# (f) a record prune cannot classify (no owner_pid) -> REFUSED, and rc 13: this
+# is the one refusal that is a real health signal, not a provably-alive lock.
+store_f = prune_fixture_store("f")
+lock_f = store_f / "worktrees" / "leftover-f.lock"
+lock_f.write_text(json.dumps({"pid": dead_pid, "kind": "worktree", "worktree": ""}),
+                  encoding="utf-8")
+run_f = gate("prune", "--apply", root=store_f)
+check(
+    "(f) a record that names no owner_pid is REFUSED and flags HEALTH-ATTENTION",
+    run_f.returncode == gatelock.EXIT_HEALTH_ATTENTION
+    and "REFUSED" in line_for(run_f.stdout, "leftover-f.lock")
+    and "names no owner_pid" in line_for(run_f.stdout, "leftover-f.lock")
+    and lock_f.exists(),
+    f"rc={run_f.returncode} {line_for(run_f.stdout, 'leftover-f.lock')}",
+)
+note("(f) refusal", line_for(run_f.stdout, "leftover-f.lock"))
+
+# (d) a 0-byte owner-less file that IS flock-held by a live process -> REFUSED.
+store_d = prune_fixture_store("d")
+lock_d_prune = store_d / "worktrees" / "leftover-d.lock"
+lock_d_prune.write_bytes(b"")
+holder_d = subprocess.Popen(
+    [sys.executable, "-c",
+     "import fcntl,os,sys,time;fd=os.open(sys.argv[1],os.O_RDWR);"
+     "fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB);print('held',flush=True);time.sleep(120)",
+     str(lock_d_prune)],
+    stdout=subprocess.PIPE, text=True,
+)
+try:
+    holder_d.stdout.readline()
+    run_d = gate("prune", "--apply", root=store_d)
+    check(
+        "(d) a 0-byte owner-less file held by a live process is REFUSED, not unlinked",
+        run_d.returncode == gatelock.EXIT_ADMIT
+        and "REFUSED" in line_for(run_d.stdout, "leftover-d.lock")
+        and "HELD right now" in line_for(run_d.stdout, "leftover-d.lock")
+        and lock_d_prune.exists(),
+        f"rc={run_d.returncode} {line_for(run_d.stdout, 'leftover-d.lock')}",
+    )
+    note("(d) refusal", line_for(run_d.stdout, "leftover-d.lock"))
+    check("(d) the live holder was left running", holder_d.poll() is None)
+finally:
+    holder_d.kill()
+    holder_d.wait(timeout=20)
+
+# (e) a 0-byte owner-less file that is NOT held -> REMOVED (the flock is the proof).
+store_e = prune_fixture_store("e")
+lock_e_prune = store_e / "worktrees" / "leftover-e.lock"
+lock_e_prune.write_bytes(b"")
+run_e = gate("prune", "--apply", root=store_e)
+check(
+    "(e) a 0-byte owner-less file that is NOT held is REMOVED",
+    run_e.returncode == gatelock.EXIT_ADMIT
+    and "REMOVED" in line_for(run_e.stdout, "leftover-e.lock")
+    and not lock_e_prune.exists(),
+    f"rc={run_e.returncode} {line_for(run_e.stdout, 'leftover-e.lock')}",
+)
+note("(e) removal", line_for(run_e.stdout, "leftover-e.lock"))
+
+# A live gate's lock survives the whole run, and prune never touches permits/.
+store_live = prune_fixture_store("live")
+live_lane = lane("ao-1170-prune-live")
+live_admit = gate("acquire", "--worktree", str(live_lane), root=store_live, owner=os.getpid())
+live_lock = gatelock.worktree_lock_path(live_lane, store_live)
+live_owner = gatelock.read_owner(live_lock)
+check(
+    "the live-gate fixture acquired a real lock before the prune runs",
+    live_admit.returncode == 0 and live_lock.exists() and gatelock.probe(live_lock).held,
+    f"rc={live_admit.returncode} {live_admit.stderr.strip() or live_admit.stdout.strip()}",
+)
+permit_pool = store_live / "permits"
+permit_pool.mkdir(parents=True, exist_ok=True)
+permit_sentinel = permit_pool / "slot-00.lock"
+permit_sentinel.write_text(
+    json.dumps({"pid": dead_pid, "kind": "permit", "worktree": str(absent_worktree),
+                "owner_pid": dead_pid}),
+    encoding="utf-8",
+)
+# Plant fresh leftovers of every reapable shape so the sweep has work to do.
+write_record(store_live, "leftover-live-c.lock", owner_pid=dead_pid,
+             worktree=str(absent_worktree))
+(store_live / "worktrees" / "leftover-live-e.lock").write_bytes(b"")
+run_live = gate("prune", "--apply", root=store_live)
+check(
+    "the live gate's lock file is untouched by prune (still HELD, by pid)",
+    live_lock.exists() and gatelock.probe(live_lock).held and live_owner is not None
+    and "REFUSED" in line_for(run_live.stdout, live_lock.name),
+    line_for(run_live.stdout, live_lock.name) or gatelock.state_text(gatelock.probe(live_lock)),
+)
+note("live gate kept", line_for(run_live.stdout, live_lock.name))
+check(
+    "prune never touches permits/: the pool file is byte-identical after --apply",
+    permit_sentinel.exists() and json.loads(permit_sentinel.read_text(encoding="utf-8"))["kind"] == "permit",
+    "prune touched a permit slot",
+)
+check(
+    "the live-gate neighbours were still reaped, so the run did real work",
+    not (store_live / "worktrees" / "leftover-live-c.lock").exists()
+    and not (store_live / "worktrees" / "leftover-live-e.lock").exists(),
+    "the sweep removed nothing, so this control would be vacuous",
+)
+released_live = gate("release", "--worktree", str(live_lane), root=store_live)
+check("the live gate still releases cleanly after the prune",
+      released_live.returncode == 0 and not live_lock.exists(),
+      f"rc={released_live.returncode} {released_live.stdout.strip()}")
+
+# A clean store must report OK — never SKIP, never rc 13.
+store_clean = prune_fixture_store("clean")
+run_clean = gate("prune", "--apply", root=store_clean)
+check(
+    "a clean store reports OK (not SKIP) and exits 0",
+    run_clean.returncode == gatelock.EXIT_ADMIT
+    and "OK" in run_clean.stdout
+    and "SKIP" not in run_clean.stdout
+    and "considered=0" in run_clean.stdout,
+    f"rc={run_clean.returncode} {run_clean.stdout.strip()}",
+)
+note("clean store", run_clean.stdout.strip().splitlines()[-1])
+
 if problems:
     print(f"  ({len(problems)} live proof(s) failed)", file=sys.stderr)
     raise SystemExit(1)
@@ -1008,5 +1276,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-gate-lock: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-gate-lock: OK — the prelude is applied to scripts/verify.sh before .verify/ is reset, a second verify.sh in one worktree is refused by name having run zero checks and written no attestation, the box cap parks the rest, and both signal and crash release the permit"
+echo "check-gate-lock: OK — the prelude is applied to scripts/verify.sh before .verify/ is reset, a second verify.sh in one worktree is refused by name having run zero checks and written no attestation, the box cap parks the rest, both signal and crash release the permit, and prune (#1170) reaps only a leftover whose owner pid is gone AND whose worktree is absent (a 0-byte owner-less file only while holding its flock), refusing every other shape by name"
 exit 0

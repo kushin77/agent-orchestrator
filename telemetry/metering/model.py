@@ -33,6 +33,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Mapping, Optional
 
+from telemetry.clock import now_utc_iso  # noqa: F401  (re-exported: the seam)
+
 SCHEMA_VERSION = 1
 RECORD_KIND = "usage"
 
@@ -73,9 +75,10 @@ NON_BILLABLE_OUTCOMES = frozenset(
 CACHE_HIT_OUTCOME = "cache_hit"
 
 
-def now_utc_iso() -> str:
-    """UTC timestamp in the repo-wide RFC 3339 ``Z`` shape."""
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+# ``now_utc_iso`` is the one clock seam (``telemetry/clock.py``, issue #1025),
+# re-exported at the top of this module rather than defined here.  This module
+# used to carry its own copy, and a copy nobody can pin is how a green expires
+# with the calendar (``docs/PYTHON-PATTERNS.md`` PP-1).
 
 
 def parse_ts(value: Any) -> str:

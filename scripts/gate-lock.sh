@@ -22,13 +22,24 @@
 # alert, never auto-reap — and is meant to run from cron/the watchdog:
 #   bash "$root/scripts/gate-lock.sh" doctor
 #
+# `prune` (issue #1170) is the provably-safe reaper the leftovers needed. It is
+# DRY-RUN by default and removes a file only when it can prove the lock is dead:
+# a named leftover goes only when its recorded owner pid is gone AND its recorded
+# worktree path is absent (never either alone, never a filename glob); a 0-byte
+# owner-less file — which carries no record — goes only while holding its own
+# flock. A held lock, a live owner pid, and an existing worktree path are refused
+# BY NAME, never touched. `--apply` performs the unlinks; without it, prune only
+# reports what it would do:
+#   bash "$root/scripts/gate-lock.sh" prune            # dry-run
+#   bash "$root/scripts/gate-lock.sh" prune --apply    # reap the provably dead
+#
 # The permit store lives outside every workspace, and every knob is overridable
 # so a test or a sibling gate never has to touch the box's real store:
 #   AO_GATE_LOCK_ROOT      default ${XDG_RUNTIME_DIR:-/tmp}/agent-orchestrator-gates
 #   AO_GATE_MAX_CONCURRENT default 4
 #   AO_GATE_LOCK_TTL       default 900 seconds
 #
-# Usage: bash scripts/gate-lock.sh acquire|release|status [options]
+# Usage: bash scripts/gate-lock.sh acquire|release|status|doctor|prune [options]
 set -uo pipefail
 
 # A gate must not leave bytecode caches in the tree it is judging.

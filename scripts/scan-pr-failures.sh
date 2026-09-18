@@ -24,6 +24,13 @@
 #   bash scripts/scan-pr-failures.sh            # report only
 #   bash scripts/scan-pr-failures.sh --apply    # file issues
 #
+# SCHEDULED (issue #1207). This script is the `scan-pr-failures` job in
+# `config/fleet-jobs.json` (marker `ao-fleet-scan-pr-failures`), which
+# `fleet/cron.py` renders and reconciles — the schedule it never had. It is
+# declared `enabled: false` because `--apply` writes to the board (GR-5), so a
+# principal enables it by flipping that flag; the installed crontab is never
+# hand-edited.
+#
 # Exit codes: 0 OK (including "found nothing", which is the normal case) /
 #             1 NOT-OK / 2 CANNOT-ASSESS (gh absent or the API refused).
 set -u

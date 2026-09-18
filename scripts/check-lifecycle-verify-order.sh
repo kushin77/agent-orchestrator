@@ -41,13 +41,20 @@
 #                                                         the tree the gate ran in
 #        b. a lane of the default branch from BEFORE the landing (it carries none of
 #           this item's work)                 -> REFUSED BY NAME
-#        c. a lane containing a landing built from OTHER content
-#                                                      -> REFUSED: containing a landing is
-#                                                         not containing the verified work
-#   9. MUTANT — the containment arm removed           -> 8a goes red (load-bearing)
-#  10. MUTANT — the tree check removed                -> 8c goes red (load-bearing)
+#   9. DRIFTED BRANCH (#1149) — the pull request's branch received commits AFTER the squash,
+#      so GitHub's live head is a tree that never landed:
+#        a. the item is closed out on the tree that LANDED -> the record is PRODUCED, its
+#                                                              subject the landing, with the
+#                                                              drifted head disclosed
+#        b. the port is handed that drifted subject direct -> REFUSED IN ITS OWN WORDS: it
+#                                                              DOES contain the landing, and
+#                                                              the landing carries a
+#                                                              different tree
+#  10. MUTANT — the containment arm removed           -> 8a goes red (load-bearing)
+#  11. MUTANT — the tree check removed                -> 9b goes red (load-bearing)
+#  12. MUTANT — the subject resolution removed        -> 9a goes red (load-bearing)
 #
-# Cases 2, 3, 5, 8b, 8c and the four mutants are negative controls: without them the gate
+# Cases 2, 3, 5, 8b, 9b and the five mutants are negative controls: without them the gate
 # would pass for a `record_verification` that simply returned success, which is the failure
 # mode GR-12 names.
 #

@@ -133,17 +133,26 @@ fetch_prs() {
 
 # classify.py — the ONE classifier, used by the plan, the self-test and the
 # apply-mode re-check, so what is proven offline is the code path that runs.
+#
+# The PR JSON arrives on STDIN, never in argv (issue #1056). At the fleet's
+# current queue size a `gh pr list --json` payload is larger than Linux's
+# per-argument limit (MAX_ARG_STRLEN, ~128KB), so passing it as an argv entry
+# died with `python3: Argument list too long` (rc 126) — the tool worked only
+# while the queue was small. Only the small scalars stay in argv; the program
+# rides in `-c` so stdin is free for the payload.
 classify_py() {
-  python3 - "$@" <<'PY'
+  # usage: <pr-json on stdin> classify_py <gate-globs> <include-drafts> [only-number]
+  python3 -c "$(cat <<'PY'
 import fnmatch
 import json
 import re
 import sys
 
-gate_globs_raw, include_drafts_raw, prs_json = sys.argv[1], sys.argv[2], sys.argv[3]
-only_number = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] else None
+gate_globs_raw, include_drafts_raw = sys.argv[1], sys.argv[2]
+only_number = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else None
 gate_globs = [g for g in gate_globs_raw.split() if g.strip()]
 include_drafts = include_drafts_raw == "1"
+prs_json = sys.stdin.read()
 
 try:
     prs = json.loads(prs_json)
@@ -246,6 +255,7 @@ for number, cls, reason in rows:
 merge_order = [str(r[0]) for r in rows if r[1] in ("ready", "gate-changing")]
 print("MERGE_ORDER:" + (" " + " ".join(merge_order) if merge_order else ""))
 PY
+)" "$@"
 }
 
 # pr_head_and_files_py — the head OID and changed-file list for one PR
@@ -418,7 +428,7 @@ include_drafts="${AO_QUEUE_INCLUDE_DRAFTS:-0}"
 
 prs_json="$(fetch_prs)" || exit $?
 
-plan_output="$(classify_py "$gate_globs_text" "$include_drafts" "$prs_json")"
+plan_output="$(printf '%s' "$prs_json" | classify_py "$gate_globs_text" "$include_drafts")"
 plan_rc=$?
 if [ "$plan_rc" -ne 0 ]; then
   printf '%s\n' "$plan_output" >&2
@@ -448,7 +458,9 @@ for number in "${merge_order[@]}"; do
   # Re-read mergeability immediately before acting on it: master moves, and
   # another session may have merged this PR (or made it conflict) already.
   recheck_json="$(fetch_prs)" || exit $?
-  current_class="$(classify_py "$gate_globs_text" "$include_drafts" "$recheck_json" "$number")"
+  # Same stdin route as the plan above, so the offline proof and the live
+  # re-check exercise one code path.
+  current_class="$(printf '%s' "$recheck_json" | classify_py "$gate_globs_text" "$include_drafts" "$number")"
   if [ "$current_class" != "ready" ] && [ "$current_class" != "gate-changing" ]; then
     if [ -z "$current_class" ]; then
       echo "pr-queue: SKIP #$number — no longer open (merged or closed elsewhere mid-run)"
@@ -464,20 +476,35 @@ for number in "${merge_order[@]}"; do
   head_and_files="$(pr_head_and_files_py "$recheck_json" "$number")"
   number_head_oid="$(printf '%s\n' "$head_and_files" | head -n1)"
   number_files="$(printf '%s\n' "$head_and_files" | tail -n +2)"
-  # The MERGE BASE, not master's current tip: the tip moves as the queue
-  # works through the plan, and a two-dot-shaped comparison against the
-  # tip is exactly the range-computation defect issue #1145 also names
-  # (in check-pr-contract.sh, out of this lane's scope — see the PR body).
-  git fetch --quiet origin "$base" >/dev/null 2>&1 || true
-  git fetch --quiet origin "$number_head_oid" >/dev/null 2>&1 || true
-  number_merge_base="$(git merge-base "origin/$base" "$number_head_oid" 2>/dev/null)"
-  if [ -z "$number_merge_base" ]; then
-    echo "pr-queue: REFUSED — gate-regression CANNOT-ASSESS — could not compute the merge base of #$number's head ($number_head_oid) with origin/$base; stopping (no loop swallowing a refusal)" >&2
-    exit 1
-  fi
-  if ! printf '%s\n' "$number_files" | gate_regression_check "$number_head_oid" "$number_merge_base"; then
-    echo "pr-queue: REFUSED — gate-regression — #$number's diff would red a check-*.sh gate that passes on master today; stopping (no loop swallowing a refusal)" >&2
-    exit 1
+  # gate_regression_check's own scoping (no scripts/* file touched -> return 0
+  # immediately, no worktree) must be applied BEFORE the merge-base lookup
+  # below, not just inside the function: a PR that touches nothing under
+  # scripts/ has no reason to need `origin/$base` fetched or a merge-base
+  # computed at all, and a queue offline/fixture context (no real PR head to
+  # fetch) must not be refused over a check this PR was never going to need
+  # (measured: broke check-pr-queue-squash-guard.sh's non-scripts/ fixture).
+  number_any_scripts=0
+  while IFS= read -r ao_f; do
+    case "$ao_f" in
+      scripts/*) number_any_scripts=1 ;;
+    esac
+  done <<<"$number_files"
+  if [ "$number_any_scripts" -eq 1 ]; then
+    # The MERGE BASE, not master's current tip: the tip moves as the queue
+    # works through the plan, and a two-dot-shaped comparison against the
+    # tip is exactly the range-computation defect issue #1145 also names
+    # (in check-pr-contract.sh, out of this lane's scope — see the PR body).
+    git fetch --quiet origin "$base" >/dev/null 2>&1 || true
+    git fetch --quiet origin "$number_head_oid" >/dev/null 2>&1 || true
+    number_merge_base="$(git merge-base "origin/$base" "$number_head_oid" 2>/dev/null)"
+    if [ -z "$number_merge_base" ]; then
+      echo "pr-queue: REFUSED — gate-regression CANNOT-ASSESS — could not compute the merge base of #$number's head ($number_head_oid) with origin/$base; stopping (no loop swallowing a refusal)" >&2
+      exit 1
+    fi
+    if ! printf '%s\n' "$number_files" | gate_regression_check "$number_head_oid" "$number_merge_base"; then
+      echo "pr-queue: REFUSED — gate-regression — #$number's diff would red a check-*.sh gate that passes on master today; stopping (no loop swallowing a refusal)" >&2
+      exit 1
+    fi
   fi
   echo "pr-queue: merging #$number (gh pr merge --squash)"
   if ! gh pr merge "$number" --squash; then

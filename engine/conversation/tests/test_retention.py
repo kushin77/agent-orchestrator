@@ -113,8 +113,6 @@ def test_forget_erases_both_halves(store, memory_store):
 def test_export_before_erasure_is_a_complete_snapshot(store):
     convo = store.create_conversation(tenant_id=T1, agent_id=AGENT_A, title="keep me")
     store.append_message(convo.conversation_id, tenant_id=T1, agent_id=AGENT_A,
-                         role="helper", content="x") if False else None
-    store.append_message(convo.conversation_id, tenant_id=T1, agent_id=AGENT_A,
                          role="user", content="q1")
     store.append_message(convo.conversation_id, tenant_id=T1, agent_id=AGENT_A,
                          role="assistant", content="a1")

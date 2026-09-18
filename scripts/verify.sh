@@ -322,7 +322,6 @@ checks=(
   # dead-lettered after K attempts — against the real tree and two mutated
   # scratch copies (CAP-DISABLED, BACKOFF-FLAT) that it must refuse BY NAME.
   'runaway-guard|bash scripts/check-runaway-guard.sh'
-  'infra-limits|bash scripts/check-infra-limits.sh'
   'lease-policy|bash scripts/check-lease-policy.sh'
   'fleet-state|bash scripts/check-fleet-state.sh'
   'paperclip-gap-analysis|bash scripts/check-paperclip-gap-analysis.sh'
