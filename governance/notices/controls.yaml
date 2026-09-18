@@ -1,0 +1,135 @@
+# governance/notices/controls.yaml -- the notice rule's declared vocabulary.
+#
+# Issue #1269, EPIC #1268. This file is the DECLARATION; the code is the machine.
+# The repository's own pattern for that split is governance/vocabulary/fleet.yaml:
+# the vocabulary is declared here, mirrored as constants in
+# governance/notices/notice_records.py (and the ledger's kinds in ledger.py), and
+# `python3 governance/notices/cli.py controls` FAILS when the two stop agreeing --
+# so a lane cannot mint a second vocabulary by editing one side (`controls'mirror
+# drift`), and a refusal cannot be declared without a provocation in the gate that
+# carries its name (`refusal-not-provoked`).
+#
+# Why the declaration is load-bearing rather than documentation: a rule only prose
+# carries is advice (GR-29 / AO-GR-4). Each `refusals` entry below is checked
+# against the gate that provokes it, so adding a refusal here without arming it
+# fails, and arming a refusal the gate does not name fails too.
+
+schema: notice-controls/v1
+
+# The ONLY accepted value of a notice's `requires_ack`. It is a selector, not a
+# list: the effective requirement is computed from the registry on every read
+# (governance/notices/runtime_registry.py), which is what makes a runtime
+# registered AFTER a notice was issued owe an ack without the notice being edited.
+selector: registered-runtimes
+
+# The closed status set. `withdrawn` retires a rule and owes nothing; the record
+# stays, because a rule that was broadcast leaves a trace.
+statuses:
+  - standing
+  - withdrawn
+
+# The audit trail: one hash-chained line per WRITE. `evaluate` is read-only and
+# appends nothing, so a gate run leaves no trace of its own.
+ledger:
+  path: notices/ledger.jsonl
+  events:
+    - publish
+    - ack
+
+# The bounds this rule holds itself to. Each is enforced somewhere named, never
+# stated and left to drift.
+limits:
+  - id: no-hand-maintained-ack-list
+    rule: >
+      `requires_ack` accepts only the selector above. A literal list of runtime ids
+      is refused by name, because a list typed once is how a notice stops covering
+      the runtime somebody registers next -- the failure this lane closes at one
+      remove.
+    enforced_by: governance/notices/notice_records.py
+  - id: no-silent-empty-registry
+    rule: >
+      An unreadable registry is CANNOT-ASSESS and an empty one is a refusal. A
+      requirement of nobody must never read as everything satisfied; that is the one
+      failure a rule about acknowledgement cannot have.
+    enforced_by: governance/notices/runtime_registry.py
+  - id: no-unregistered-ack
+    rule: >
+      An ack is the record of a REGISTERED runtime. An ack from an identity the
+      registry does not carry is refused by name, because it proves nothing.
+    enforced_by: governance/notices/notice_records.py
+  - id: no-retractable-broadcast
+    rule: >
+      Every publish and every ack is chained in the ledger with the digest of the
+      record it wrote, so a record edited after the fact no longer matches the
+      digest the ledger recorded, and a ledger edited after the fact no longer
+      chains.
+    enforced_by: governance/notices/ledger.py
+
+# Every refusal this rule reports, each with the gate that provokes it. The gate
+# is read mechanically: the id must appear on a NON-COMMENT line of the script
+# named here, so a refusal cannot be declared while nothing can make it fire.
+refusals:
+  - id: notice-unacked
+    rule: a registered runtime has not acked a standing notice
+    names_in_the_finding: the notice id and the runtime id
+    provoked_by: scripts/check-notice-acks.sh
+  - id: notice-not-fanned-out
+    rule: no copy of the notice was ever addressed to a registered runtime
+    names_in_the_finding: the notice id and the runtime id
+    provoked_by: scripts/check-notice-acks.sh
+  - id: ack-from-unregistered-runtime
+    rule: an ack whose runtime the registry does not carry proves nothing
+    names_in_the_finding: the notice id and the runtime id
+    provoked_by: scripts/check-notice-acks.sh
+  - id: ack-without-evidence
+    rule: an ack carrying no evidence of receipt is refused
+    names_in_the_finding: the notice id and the runtime id
+    provoked_by: scripts/check-notice-acks.sh
+  - id: ack-runtime-mismatch
+    rule: the ack filename and the record's runtime must agree
+    names_in_the_finding: the notice id and the runtime the record claims
+    provoked_by: governance/notices/tests/test_notices.py
+  - id: hand-maintained-ack-list
+    rule: requires_ack must be the registry selector, never a list of ids
+    names_in_the_finding: the notice id
+    provoked_by: scripts/check-notice-acks.sh
+  - id: empty-runtime-registry
+    rule: nothing registered is a refusal, never a pass invented by matching nothing
+    names_in_the_finding: the empty subject and the reason
+    provoked_by: scripts/check-notice-acks.sh
+  - id: transport-surface-missing
+    rule: a registered runtime's declared transport must exist in the tree
+    names_in_the_finding: the runtime id and the transport path
+    provoked_by: governance/notices/tests/test_notices.py
+  - id: malformed-record
+    rule: a notice or ack record the record schema refuses is named, never skipped
+    names_in_the_finding: the record path
+    provoked_by: governance/notices/tests/test_notices.py
+  - id: ledger-digest-mismatch
+    rule: a record edited after the ledger recorded its digest is named
+    names_in_the_finding: the notice id and the record path
+    provoked_by: scripts/check-notice-acks.sh
+  - id: ledger-chain-broken
+    rule: a ledger whose entries no longer chain is named
+    names_in_the_finding: the entry's sequence number
+    provoked_by: scripts/check-notice-acks.sh
+  - id: ledger-malformed
+    rule: a ledger line that does not parse, or an event outside the declared set, is named
+    names_in_the_finding: the ledger path and the line number
+    provoked_by: scripts/check-notice-acks.sh
+  - id: controls-mirror-drift
+    rule: the declared selector, statuses, ledger path or event kinds must equal the code's constants
+    names_in_the_finding: the drifted field, with the declared and mirrored values
+    provoked_by: scripts/check-notice-acks.sh
+  - id: refusal-unknown
+    rule: a refusal this declaration carries while the code never reports it is named
+    names_in_the_finding: the declared refusal id
+    provoked_by: scripts/check-notice-acks.sh
+  - id: refusal-undeclared
+    rule: a refusal the code can report while this declaration omits it is named
+    names_in_the_finding: the undeclared refusal id
+    provoked_by: scripts/check-notice-acks.sh
+  - id: refusal-not-provoked
+    rule: a declared refusal whose provoked_by never names it outside a comment cannot fire
+    names_in_the_finding: the refusal id and the script that was supposed to arm it
+    provoked_by: scripts/check-notice-acks.sh
