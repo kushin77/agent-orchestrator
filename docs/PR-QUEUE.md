@@ -80,3 +80,45 @@ both reported and never enter the merge order, and a mutant (the gate-path
 glob list emptied) is proven to diverge — the same PR that was gate-changing
 becomes ready. It is registered in `scripts/verify.sh` as the `pr-queue`
 check and never sets `AO_QUEUE_APPLY=1`.
+
+## The PR contract (issue #1254 step 5 / #1328)
+
+Every PR body carries a `## Classification` block (`.github/PULL_REQUEST_TEMPLATE.md`,
+placed directly under `## Closes`): `class`, `posture`, `lifecycle`, `pillar`,
+`pattern`, `lane`, one `key: value` per line, closed vocabularies. It is a
+projection of the same tag authority `governance/tagging/cli.py` already
+enforces on issues (`class` from `governance/conformance/policy.yaml`'s ladder,
+`posture`/`lifecycle`/`pillar` from `governance/tagging/taxonomy.yaml`,
+`pattern` resolved against `docs/PYTHON-PATTERNS.md` / `docs/SHELL-PATTERNS.md`
+/ `AGENTS.md` golden rules / `docs/decision-records/` ADRs) — never a second
+copy of any of those vocabularies.
+
+`bash scripts/check-pr-contract.sh --pr <N>` reads the block and refuses, by
+name: `pr-classification-missing`, `pr-class-unknown`, `pr-posture-unknown`,
+`pr-lifecycle-unknown`, `pr-pillar-unknown`, `pr-posture-contradiction`
+(`no-human-needed` + `human-gated` together), `pr-pattern-unresolvable`,
+`pr-lane-mismatch` (`lane: issue-<n>` disagreeing with the head branch), and
+`pr-class-below-surface` (the declared `class` sits below the rung
+`governance/conformance/surfaces.yaml` declares for a surface root the PR's
+diff touches — via `governance/conformance/surfaces.py`'s own loader). A PR
+with no `--pr` context, and neither `$_PR_NUMBER` nor `$PR_NUMBER` set, cannot
+be assessed and exits 2 naming `pr-context-missing`.
+
+**Warn-only today.** These classification findings print but do not flip the
+exit code: `AO_PR_CONTRACT_ENFORCE=1` is what turns them into a hard refusal
+(rc 1). The existing trailer/`Closes`/`AI-assistance`/`Gate-changing`/
+pre-existing-red checks are unaffected and keep enforcing unconditionally.
+Enforcement flips in a later PR, once every open PR carries the block —
+flipping it early would red every PR opened before this one merged.
+
+`python3 governance/tagging/cli.py pr-labels --pr N` derives the
+`class:`/`posture:`/`lifecycle:`/`pillar:` labels the block implies; `--apply`
+sets them on the PR via `gh`. A hand-applied label that disagrees with the
+body is reported as `pr-label-drift`, never silently trusted.
+
+Self-test both gates directly:
+
+```bash
+bash scripts/check-pr-contract.sh --selftest
+python3 -m pytest governance/tagging/tests -k pr_labels
+```
