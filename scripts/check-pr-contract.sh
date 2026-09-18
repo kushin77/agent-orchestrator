@@ -61,6 +61,30 @@
 #     time only, never by `--landed` (a squash-merge commit carries no PR body
 #     to re-judge, so the enforcement-gate grandfathering does not need to say
 #     anything about it — there is nothing in landed history for it to check).
+#     The diff this declaration is judged against is the lane's OWN diff: the
+#     range is resolved against its merge base before `git diff` sees it, so a
+#     base branch that moved on after the lane forked cannot vote (#1147).
+#
+# WHY THE RANGE IS RESOLVED AGAINST THE MERGE BASE (issue #1147)
+#   `git rev-list A..B` and `git diff A..B` are two different things wearing the
+#   same syntax: the first is the COMMIT SET `reachable(B) − reachable(A)`, the
+#   second is a TWO-TREE diff of `tree(A)` against `tree(B)`. They agree only
+#   while A is an ancestor of B — which is exactly what stops being true the
+#   moment the base branch moves on after a lane forks. The PR-time range was
+#   `origin/<base>..<head-oid>`, so as soon as master advanced, the
+#   `Gate-changing:` cross-check (the one check here that diffs) saw every file
+#   MASTER had changed since the fork alongside the lane's own, and refused a
+#   correct `Gate-changing: no` with `pr-body-gate-changing-mismatch-no` for
+#   master's commits. Measured on PR #1125 (head `84e0bba`, base `c9040b9`):
+#   `--landed --range HEAD^..HEAD` was OK and only that cross-check misfired —
+#   and it misfires for EVERY lane cut from an older master.
+#   The set this gate means is the PR's own range, which git spells
+#   `merge-base(A, B)..B`. The derivation resolves that once, in `--pr` (and in
+#   `diff_range_for` for any range handed to the diffing check, so a
+#   caller-supplied `--range`/`AO_PR_RANGE` cannot reintroduce the defect).
+#   The commit-set half is deliberately left alone: `rev-list --no-merges
+#   A..B` already yields the lane's own commits, so the trailer check never
+#   misfired — only the diffing consumer did.
 #
 # WHY NOT `git interpret-trailers --parse` ALONE: git only recognises the COLON
 # form (`Refs: owner/repo#n`), while this repo's convention — and the exemplary
@@ -74,7 +98,9 @@
 #
 # ENFORCEMENT SURFACES (issue #311 — the follow-up that gives this gate teeth)
 #   * PR time — `bash scripts/check-pr-contract.sh --pr <number>` reads the PR
-#     body and the PR's base..head range through `gh` and runs every check above.
+#     body through `gh` and the PR's own range — the merge base of its base and
+#     its head, through to the head (`#1147`; see the merge-base note above) —
+#     and runs every check above.
 #     `scripts/merge-gate.sh run` wires it in: when `AO_PR_NUMBER` (or
 #     `AO_PR_BODY_FILE` + `AO_PR_RANGE`) is set, the merge gate runs the check
 #     as its `pr-contract` signal; when neither is set (an ordinary working
@@ -265,6 +291,32 @@ print("commit-missing-ticket-trailer")
 PY
 }
 
+# `git diff A..B` is a TWO-TREE diff, not "the commits in the range": unlike
+# `git rev-list A..B` (`reachable(B) − reachable(A)`) it compares `tree(A)` with
+# `tree(B)`, and the two agree only while A is an ancestor of B. A base branch
+# that moved on after the lane forked breaks exactly that, so the diffing check
+# must never be handed a raw two-dot range. Full rationale (and the measurement)
+# in the header, "WHY THE RANGE IS RESOLVED AGAINST THE MERGE BASE".
+merge_base_range() { # <base-rev> <head-rev> — "<merge-base>..<head>", or rc 1
+  local mb
+  mb="$(git -C "$repo" merge-base "$1" "$2" 2>/dev/null)"
+  [ -n "$mb" ] || return 1
+  printf '%s..%s' "$mb" "$2"
+}
+
+diff_range_for() { # <range> — the same range resolved against its merge base
+  local r="$1" a b mb
+  case "$r" in
+    *...*) printf '%s' "$r"; return 0 ;;  # `git diff A...B` IS the merge-base diff
+    *..*)  a="${r%%..*}"; b="${r#*..}" ;;
+    *)     printf '%s' "$r"; return 0 ;;  # not a range — nothing to resolve
+  esac
+  [ -n "$a" ] && [ -n "$b" ] || return 1
+  mb="$(git -C "$repo" merge-base "$a" "$b" 2>/dev/null)"
+  [ -n "$mb" ] || return 1
+  printf '%s..%s' "$mb" "$b"
+}
+
 check_commits() { # <range>
   local rang="$1" sha message subject finding shas
   shas="$(git -C "$repo" rev-list --no-merges "$rang" 2>/dev/null)"
@@ -323,7 +375,7 @@ PY
 # `scripts/lib/gate-paths.txt`, and a real audit should not let a PR that
 # deletes the path file also delete the cross-check.
 check_gate_changing() { # <body-file> <range>
-  local body="$1" rang="$2" line declared touched matched paths_file
+  local body="$1" rang="$2" line declared touched matched paths_file diff_range
   line="$(grep -E '^Gate-changing:' "$body" | head -n1)"
   declared=""
   if [ -n "$line" ]; then
@@ -342,7 +394,18 @@ check_gate_changing() { # <body-file> <range>
     return
   fi
 
-  touched="$(git -C "$repo" diff --name-only "$rang" 2>/dev/null)"
+  # The declaration is judged against the LANE'S OWN diff, so the range is
+  # resolved against its merge base first: handed a raw `base..head` whose base
+  # has moved, `git diff` would put the base's own commits in the lane's diff and
+  # refuse a correct `no` (#1147). When the range cannot be resolved against a
+  # merge base the declaration cannot be assessed, and an unassessable
+  # declaration is refused by name rather than quietly compared against a
+  # two-tree diff.
+  if ! diff_range="$(diff_range_for "$rang")"; then
+    findings+=("pr-body-gate-changing-unassessable:$rang")
+    return
+  fi
+  touched="$(git -C "$repo" diff --name-only "$diff_range" 2>/dev/null)"
   paths_file="$root/scripts/lib/gate-paths.txt"
   matched="0"
   if [ -n "$touched" ]; then
@@ -446,7 +509,7 @@ landed_audit() { # <range> <gate>
 
 # --- PR-time hook: the body and the range come from GitHub -------------------
 pr_check() { # <number>
-  local number="$1" tmpdir bodyfile base_name head_oid rang rc
+  local number="$1" tmpdir bodyfile base_name head_oid rang rc base_rev resolved
   if ! command -v gh >/dev/null 2>&1; then
     echo "check-pr-contract: CANNOT-ASSESS — gh not found (the PR-time check reads the PR body via gh)" >&2
     return 2
@@ -463,8 +526,12 @@ pr_check() { # <number>
     return 2
   fi
   # `gh pr view` exposes the base NAME and the head OID (there is no baseRefOid
-  # field), so the range is `origin/<base>..<head-oid>`, falling back to the
-  # local base branch when the remote-tracking ref is not present in the clone.
+  # field), so the base rev is `origin/<base>`, falling back to the local base
+  # branch when the remote-tracking ref is not present in the clone. The range is
+  # then the PR'S OWN range — `merge-base(base, head)..head`, never the raw
+  # `base..head` — because the diffing `Gate-changing:` cross-check would
+  # otherwise judge the lane by every commit the base gained after the fork
+  # (#1147; the two-dot/two-tree difference is spelled out in the header).
   base_name="$( ( cd "$repo" && gh pr view "$number" --json baseRefName --jq '.baseRefName' ) 2>/dev/null )"
   head_oid="$( ( cd "$repo" && gh pr view "$number" --json headRefOid --jq '.headRefOid' ) 2>/dev/null )"
   if [ -z "$base_name" ] || [ -z "$head_oid" ]; then
@@ -472,13 +539,19 @@ pr_check() { # <number>
     echo "check-pr-contract: CANNOT-ASSESS — cannot resolve the base/head of PR #$number" >&2
     return 2
   fi
-  rang="origin/$base_name..$head_oid"
-  if [ -z "$(git -C "$repo" rev-list --no-merges "$rang" 2>/dev/null)" ]; then
-    rang="$base_name..$head_oid"
-  fi
-  if [ -z "$(git -C "$repo" rev-list --no-merges "$rang" 2>/dev/null)" ]; then
+  rang=""
+  for base_rev in "origin/$base_name" "$base_name"; do
+    git -C "$repo" rev-parse --verify --quiet "$base_rev^{commit}" >/dev/null 2>&1 || continue
+    resolved="$(merge_base_range "$base_rev" "$head_oid" 2>/dev/null)" || continue
+    [ -n "$resolved" ] || continue
+    if [ -n "$(git -C "$repo" rev-list --no-merges "$resolved" 2>/dev/null)" ]; then
+      rang="$resolved"
+      break
+    fi
+  done
+  if [ -z "$rang" ]; then
     rm -rf "$tmpdir"
-    echo "check-pr-contract: CANNOT-ASSESS — no non-merge commits in $rang (is the PR head fetched into this clone?)" >&2
+    echo "check-pr-contract: CANNOT-ASSESS — no non-merge commits between PR #$number's base ($base_name) and its head ($head_oid) (is the PR head fetched into this clone?)" >&2
     return 2
   fi
   run_checks "$bodyfile" "$rang"
@@ -967,6 +1040,105 @@ MD
       printf '  FAIL  the mutant still refused plant (a); the check is not load-bearing\n%s\n' "$mutant_out" >&2
       ok=1
     fi
+  fi
+
+  # --- #1147: a base that MOVED must not be judged as if it were the lane ------
+  # The scratch repository above never moves a base, and THAT is why this defect
+  # survived: while `base` is an ancestor of the lane, `git diff base..lane` and
+  # `git diff $(git merge-base base lane)..lane` are the same diff, so no case
+  # here could tell them apart. These cases move the base and then judge the range
+  # exactly as `--pr` derives it. (Measured on the real repo: PR #1125, head
+  # `84e0bba`, base `c9040b9` — refused `pr-body-gate-changing-mismatch-no` for
+  # master's own commits while every other check of the same PR said OK.)
+  moved_lane="lane-moved-1147"
+  moved_base_branch="base-moved-1147"
+  git -C "$scratch" branch "$moved_base_branch" "$base" >/dev/null 2>&1
+  git -C "$scratch" checkout -q -b "$moved_lane" "$base" >/dev/null 2>&1
+  printf 'lane-1147\n' >"$scratch/lane-only-1147.txt"
+  git -C "$scratch" add lane-only-1147.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "the lane own non-gate change" \
+    -m "Refs kushin77/agent-orchestrator#1147" >/dev/null 2>&1
+  moved_lane_sha="$(git -C "$scratch" rev-parse HEAD)"
+  # …and the BASE moves on, touching a gate path the lane never touched.
+  git -C "$scratch" checkout -q "$moved_base_branch" >/dev/null 2>&1
+  mkdir -p "$scratch/scripts"
+  printf 'base-1147\n' >"$scratch/scripts/check-base-moved-1147.sh"
+  git -C "$scratch" add scripts/check-base-moved-1147.sh >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "the base own gate-path change" \
+    -m "Refs kushin77/agent-orchestrator#1147" >/dev/null 2>&1
+  moved_base_sha="$(git -C "$scratch" rev-parse HEAD)"
+  moved_range="$moved_base_sha..$moved_lane_sha"
+
+  # 12. the lane own diff touches NO gate path while the base moved with one: the
+  #     declared `no` is CORRECT, so it must pass. Two-dot, this was refused.
+  #     The assertion is the bash-native containment test, never
+  #     `… | grep -q` — a quiet grep exits on its first match and SIGPIPEs the
+  #     producer, which `set -o pipefail` turns into a status for the whole
+  #     pipeline, so that idiom fails OPEN on a large report
+  #     (`scripts/check-verdict-contains.sh`, whose record is shrink-only).
+  out="$(run_checks "$gate_no_body" "$moved_range" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" == *"check-pr-contract: OK"* ]]; then
+    printf '  OK    a moved base does not vote — the lane diff decides Gate-changing\n'
+  else
+    printf '  FAIL  a moved base was judged as the lane diff\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 12b. non-vacuity for case 12: the same body and the same range under a mutant
+  #      that reinstates the raw two-dot diff must be REFUSED, so case 12 measures
+  #      the merge-base resolution rather than agreeing with whatever the gate now
+  #      happens to do. The mutant lives INSIDE the scratch repo (and gets a copy
+  #      of the real gate-paths list) because the script derives both its own repo
+  #      root and that list from `BASH_SOURCE` — a mutant left next to the real
+  #      script would resolve a paths file that is not there and measure nothing.
+  moved_mutant="$scratch/scripts/check-pr-contract.two-dot.sh"
+  mkdir -p "$scratch/scripts/lib"
+  cp "$root/scripts/lib/gate-paths.txt" "$scratch/scripts/lib/gate-paths.txt"
+  sed -e 's|diff_range="$(diff_range_for "$rang")"|diff_range="$rang"|' "$0" >"$moved_mutant"
+  if cmp -s "$0" "$moved_mutant"; then
+    echo "check-pr-contract: SELFTEST FAIL — the two-dot mutant is byte-identical to this script; the mutation proved nothing" >&2
+    ok=1
+  else
+    mutant_out="$(bash "$moved_mutant" --repo "$scratch" --body-file "$gate_no_body" --range "$moved_range" 2>&1)"
+    mutant_rc=$?
+    if [ "$mutant_rc" -ne 0 ] && [[ "$mutant_out" == *"pr-body-gate-changing-mismatch-no"* ]]; then
+      printf '  OK    the two-dot mutant refuses it; case 12 measures the merge-base fix\n'
+    else
+      printf '  FAIL  the two-dot mutant did not refuse the moved-base case (rc=%s)\n%s\n' "$mutant_rc" "$mutant_out" >&2
+      ok=1
+    fi
+  fi
+
+  # 13. non-permissiveness: with the base moved, a lane that REALLY touches a gate
+  #     path and declares `no` is still refused by name — the fix must not blind
+  #     the check it repairs.
+  git -C "$scratch" checkout -q "$moved_lane" >/dev/null 2>&1
+  mkdir -p "$scratch/scripts"
+  printf 'lane-gate-1147\n' >"$scratch/scripts/check-lane-moved-1147.sh"
+  git -C "$scratch" add scripts/check-lane-moved-1147.sh >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -q \
+    -m "the lane own gate-path change" \
+    -m "Refs kushin77/agent-orchestrator#1147" >/dev/null 2>&1
+  lane_touch_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(run_checks "$gate_no_body" "$moved_base_sha..$lane_touch_sha" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-no"* ]]; then
+    printf '  OK    a lane that really touches a gate path is still refused (declared no)\n'
+  else
+    printf '  FAIL  the merge-base range blinded the Gate-changing check\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 14. …and the resolved range is the lane own commits, not an empty diff: a
+  #     wrong `yes` is still refused. (A diff resolved down to nothing would
+  #     accept both declarations, which is the other way to make case 12 pass.)
+  out="$(run_checks "$gate_yes_body" "$moved_range" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"pr-body-gate-changing-mismatch-yes"* ]]; then
+    printf '  OK    a wrong yes is still refused against the lane diff\n'
+  else
+    printf '  FAIL  a wrong yes was accepted after the merge-base resolution\n%s\n' "$out" >&2
+    ok=1
   fi
 
   rm -rf "$work"

@@ -457,7 +457,6 @@ def cmd_filing_check(args: argparse.Namespace) -> int:
     #     refused BY NAME, so a typo (`priorty=`) cannot land an issue missing
     #     `priority:` while its filer believes it declared one.
     unknown = FilingRequest(title="t", body="b", declaring={"priorty": "P1"})
-    unknown_refusal = None
     try:
         plan_filing(unknown, policy)
         expect(
@@ -466,7 +465,6 @@ def cmd_filing_check(args: argparse.Namespace) -> int:
             "it planned a filing anyway, silently dropping `priorty:`",
         )
     except FilingRefused as exc:
-        unknown_refusal = exc
         expect(
             "refuses a declared label the policy does not recognise",
             exc.missing == ("priorty",) and "priorty" in exc.reason,

@@ -7,14 +7,14 @@ and ``gateway/catalog/modules/hermes/module.json`` — and emits one canonical
 document that validates against the inline contract (``CONTRACT``). Same input,
 byte-identical output (the gate asserts sha256 equality across two builds).
 
-Two stdlib-only tools live here because the adapter may not take a third-party
-dependency (the same constraint ``integrations/paperclip/`` carries):
-
-* a small **YAML subset loader** (``load_yaml``) covering mappings, sequences,
-  scalars, quoted strings and block scalars — enough for the fleet's own YAML;
-* a small **JSON-Schema subset validator** (``validate``) covering the keywords
-  the inline contract uses — ``type``, ``required``, ``properties``,
-  ``additionalProperties``, ``enum`` and ``items``.
+The two stdlib-only tools the adapter may not take a third-party dependency for
+(the same constraint ``integrations/paperclip/`` carries) — a **YAML subset
+loader** (``load_yaml``) and a **JSON-Schema subset validator** (``validate``) —
+live in the seam the two adapters share (``integrations/_seam/``, issue #1208)
+and are re-exported here. The validator is the **superset** of the two copies
+that used to exist, which is to say paperclip's stricter rules:
+``format: date-time``, ``minimum`` and ``maximum`` are enforced here now, where
+this adapter's own copy had drifted below them.
 
 The binding is stated once, here, so the projection, the CLI and the gate
 cannot drift apart: this adapter binds the **hermes-agents routing service**
@@ -26,10 +26,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
+from .._seam.schema import validate  # noqa: F401 - re-exported at this adapter's seam
+from .._seam.yaml_subset import load_yaml, load_yaml_file  # noqa: F401
 from . import audit as audit_mod
 from . import policy as policy_mod
 
@@ -54,315 +55,13 @@ MODEL_TIERS = ("LOW", "MED", "HIGH", "MAX")
 
 
 # ==========================================================================
-# YAML subset loader (stdlib only)
+# The shared seam: the YAML subset loader and the schema-subset validator
 # ==========================================================================
-
-
-def _strip_comment(text: str) -> str:
-    out: List[str] = []
-    quote = ""
-    for ch in text:
-        if quote:
-            out.append(ch)
-            if ch == quote:
-                quote = ""
-        elif ch in ("'", '"'):
-            quote = ch
-            out.append(ch)
-        elif ch == "#":
-            break
-        else:
-            out.append(ch)
-    return "".join(out)
-
-
-def _tokenize(text: str) -> List[Tuple[int, str]]:
-    """Flatten YAML into ``(indent, content)`` items, dropping comments/blanks.
-
-    A block-scalar header (``key: |`` / ``key: >``) is kept as an empty scalar
-    and its body is skipped, so free text inside a description can never be
-    mis-read as structure.
-    """
-    lines = text.split("\n")
-    tokens: List[Tuple[int, str]] = []
-    i = 0
-    while i < len(lines):
-        raw = lines[i]
-        stripped = raw.lstrip(" ")
-        if not stripped.strip() or stripped.startswith("#"):
-            i += 1
-            continue
-        indent = len(raw) - len(stripped)
-        content = _strip_comment(stripped).rstrip()
-        if content.endswith((": |", ": |-", ": >", ": >-")):
-            key = content.split(":", 1)[0].strip()
-            tokens.append((indent, '%s: ""' % key))
-            i += 1
-            while i < len(lines):
-                nxt = lines[i]
-                nstripped = nxt.lstrip(" ")
-                if not nstripped.strip():
-                    i += 1
-                    continue
-                if (len(nxt) - len(nstripped)) <= indent:
-                    break
-                i += 1
-            continue
-        tokens.append((indent, content))
-        i += 1
-    return tokens
-
-
-def _split_kv(content: str) -> Optional[Tuple[str, str]]:
-    if content.startswith(("'", '"')):
-        return None
-    for idx, ch in enumerate(content):
-        if ch != ":":
-            continue
-        if idx + 1 < len(content) and content[idx + 1] != " ":
-            return None
-        key = content[:idx].strip()
-        if not key or " " in key:
-            return None
-        return key, content[idx + 1:].strip()
-    return None
-
-
-def _split_flow(inner: str) -> List[str]:
-    """Split a flow body on top-level commas, quote- and depth-aware."""
-    parts: List[str] = []
-    depth = 0
-    quote = ""
-    cur: List[str] = []
-    for ch in inner:
-        if quote:
-            cur.append(ch)
-            if ch == quote:
-                quote = ""
-        elif ch in ("'", '"'):
-            quote = ch
-            cur.append(ch)
-        elif ch in "[{":
-            depth += 1
-            cur.append(ch)
-        elif ch in "]}":
-            depth -= 1
-            cur.append(ch)
-        elif ch == "," and depth == 0:
-            parts.append("".join(cur))
-            cur = []
-        else:
-            cur.append(ch)
-    if cur:
-        parts.append("".join(cur))
-    return parts
-
-
-def _parse_flow(text: str) -> Any:
-    """Parse one flow mapping / sequence (``{ k: v }``, ``[ a, b ]``).
-
-    ``gateway/finops/tiers.yaml`` writes its ``taskClasses`` values as inline
-    flow mappings (``code-author: { capability: code-author, defaultTier: L0,
-    maxTier: L1 }``), which the block parser above does not cover; this reads
-    them as real mappings so the tier projection can be deterministic.
-    """
-    inner = text[1:-1].strip()
-    if text.startswith("{"):
-        if not inner:
-            return {}
-        out: Dict[str, Any] = {}
-        for part in _split_flow(inner):
-            part = part.strip()
-            if not part:
-                continue
-            if ":" in part:
-                key, value = part.split(":", 1)
-                out[key.strip()] = _scalar(value.strip())
-            else:
-                out[part] = None
-        return out
-    if not inner:
-        return []
-    return [_scalar(part.strip()) for part in _split_flow(inner) if part.strip()]
-
-
-def _scalar(text: str) -> Any:
-    text = text.strip()
-    if text == "" or text in ("null", "~"):
-        return None
-    if text in ("true", "True"):
-        return True
-    if text in ("false", "False"):
-        return False
-    if len(text) >= 2 and text[0] in "{[" and text[-1] in "}]":
-        return _parse_flow(text)
-    if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
-        return text[1:-1]
-    try:
-        return int(text)
-    except ValueError:
-        pass
-    try:
-        return float(text)
-    except ValueError:
-        pass
-    return text
-
-
-def _parse_map(tokens: List[Tuple[int, str]], idx: int, indent: int) -> Tuple[Dict[str, Any], int]:
-    mapping: Dict[str, Any] = {}
-    while idx < len(tokens):
-        ind, content = tokens[idx]
-        if ind < indent:
-            break
-        if ind > indent:
-            raise ValueError("unexpected indent %d (want %d): %r" % (ind, indent, content))
-        if content.startswith("- "):
-            break
-        kv = _split_kv(content)
-        if kv is None:
-            raise ValueError("not a mapping entry: %r" % content)
-        key, value = kv
-        idx += 1
-        if value == "":
-            if idx < len(tokens) and tokens[idx][0] > indent:
-                nested, idx = _parse_block(tokens, idx, tokens[idx][0])
-                mapping[key] = nested
-            else:
-                mapping[key] = None
-        else:
-            mapping[key] = _scalar(value)
-    return mapping, idx
-
-
-def _parse_seq(tokens: List[Tuple[int, str]], idx: int, indent: int) -> Tuple[List[Any], int]:
-    seq: List[Any] = []
-    while idx < len(tokens):
-        ind, content = tokens[idx]
-        if ind < indent:
-            break
-        if ind > indent:
-            raise ValueError("unexpected indent %d (want %d): %r" % (ind, indent, content))
-        if not content.startswith("- "):
-            break
-        rest = content[2:].strip()
-        idx += 1
-        if rest == "":
-            if idx < len(tokens) and tokens[idx][0] > indent:
-                nested, idx = _parse_block(tokens, idx, tokens[idx][0])
-                seq.append(nested)
-            else:
-                seq.append(None)
-            continue
-        kv = _split_kv(rest)
-        if kv is None:
-            seq.append(_scalar(rest))
-            continue
-        sub_indent = indent + 2
-        entry: Dict[str, Any] = {}
-        key, value = kv
-        if value == "" and idx < len(tokens) and tokens[idx][0] > sub_indent:
-            nested, idx = _parse_block(tokens, idx, tokens[idx][0])
-            entry[key] = nested
-        else:
-            entry[key] = _scalar(value) if value != "" else None
-        while idx < len(tokens):
-            ind2, content2 = tokens[idx]
-            if ind2 < sub_indent or content2.startswith("- "):
-                break
-            if ind2 > sub_indent:
-                raise ValueError("unexpected indent %d in mapping: %r" % (ind2, content2))
-            kv2 = _split_kv(content2)
-            if kv2 is None:
-                break
-            key2, value2 = kv2
-            idx += 1
-            if value2 == "" and idx < len(tokens) and tokens[idx][0] > sub_indent:
-                nested2, idx = _parse_block(tokens, idx, tokens[idx][0])
-                entry[key2] = nested2
-            else:
-                entry[key2] = _scalar(value2) if value2 != "" else None
-        seq.append(entry)
-    return seq, idx
-
-
-def _parse_block(tokens: List[Tuple[int, str]], idx: int, indent: int) -> Tuple[Any, int]:
-    if tokens[idx][1].startswith("- "):
-        return _parse_seq(tokens, idx, indent)
-    return _parse_map(tokens, idx, indent)
-
-
-def load_yaml(text: str) -> Any:
-    """Load the YAML subset the fleet's own files use."""
-    tokens = _tokenize(text)
-    if not tokens:
-        return None
-    return _parse_block(tokens, 0, tokens[0][0])[0]
-
-
-def load_yaml_file(path: Path) -> Any:
-    return load_yaml(path.read_text(encoding="utf-8"))
-
-
-# ==========================================================================
-# JSON-Schema subset validator (stdlib only)
-# ==========================================================================
-
-
-def _type_ok(value: Any, expected: str) -> bool:
-    if expected == "object":
-        return isinstance(value, dict)
-    if expected == "array":
-        return isinstance(value, list)
-    if expected == "string":
-        return isinstance(value, str)
-    if expected == "boolean":
-        return isinstance(value, bool)
-    if expected == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if expected == "number":
-        return isinstance(value, (int, float)) and not isinstance(value, bool)
-    if expected == "null":
-        return value is None
-    return True
-
-
-def _validate(inst: Any, schema: Dict[str, Any], path: str, findings: List[str]) -> None:
-    expected = schema.get("type")
-    if expected is not None and not _type_ok(inst, expected):
-        findings.append("%s: expected %s, got %s" % (path, expected, type(inst).__name__))
-        return
-    if "enum" in schema and inst not in schema["enum"]:
-        findings.append("%s: value %r is outside the closed vocabulary %s" % (path, inst, schema["enum"]))
-    if isinstance(inst, str):
-        if "minLength" in schema and len(inst) < schema["minLength"]:
-            findings.append("%s: length %d is below minLength %d" % (path, len(inst), schema["minLength"]))
-        if "pattern" in schema and not re.search(schema["pattern"], inst):
-            findings.append("%s: %r does not match pattern %s" % (path, inst, schema["pattern"]))
-    if isinstance(inst, dict):
-        for key in schema.get("required", []):
-            if key not in inst:
-                findings.append("%s: required field '%s' is missing" % (path, key))
-        properties = schema.get("properties", {})
-        if schema.get("additionalProperties") is False:
-            for key in inst:
-                if key not in properties:
-                    findings.append("%s: unexpected field '%s' (additionalProperties: false)" % (path, key))
-        for key, sub in properties.items():
-            if key in inst:
-                _validate(inst[key], sub, "%s.%s" % (path, key), findings)
-    if isinstance(inst, list):
-        items = schema.get("items")
-        if isinstance(items, dict):
-            for i, element in enumerate(inst):
-                _validate(element, items, "%s[%d]" % (path, i), findings)
-
-
-def validate(instance: Any, schema: Dict[str, Any], path: str = "$") -> List[str]:
-    """Validate ``instance`` against a schema built from the supported subset."""
-    findings: List[str] = []
-    _validate(instance, schema, path, findings)
-    return findings
+# Both tools used to be defined here, and identically in
+# ``integrations/paperclip/mapping.py`` — the copy this adapter was written from.
+# They live in ``integrations/_seam/`` now (issue #1208) and are re-exported
+# under their original names, so every existing caller keeps importing them from
+# ``integrations.hermes.mapping``.
 
 
 # ==========================================================================

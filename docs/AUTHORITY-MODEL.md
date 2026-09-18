@@ -1,7 +1,7 @@
 # Authority model — repo separation, admin rights and end-to-end closure
 
 **Issue #150** (EPIC-00 #144) · pillar: governance · product spine:
-`docs/GOLDEN-RULES.md` (AO-GR-1..20) · fleet doctrine: [`../AGENTS.md`](../AGENTS.md)
+`docs/GOLDEN-RULES.md` (AO-GR-1..28) · fleet doctrine: [`../AGENTS.md`](../AGENTS.md)
 
 Each governed repo has **its own fleet** — its own engineering team — that
 controls, locks and implements that repo's issues to full closure under

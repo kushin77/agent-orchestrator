@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from policy import DecisionLevel, PolicyEngine, build_bundle
+from policy import ControlRegistry, DecisionLevel, PolicyEngine, build_bundle
 
 
 @pytest.fixture()

@@ -57,6 +57,24 @@ What it provokes:
 * ``MUTANT-DROPS-BOARD-LINK-*`` — a mutant per refusal, so each is proven able
   to disappear.
 
+Issue #1028 added a second rule to the same gate and provokes it here for the
+same reason: an open ``corrective-action`` whose tracked issue the committed
+board snapshot reports **CLOSED** states a closure condition it has already met,
+so it is an error rather than the benign “still in flight” deviation — and while
+nothing observed the landing, a stale record was indistinguishable from work in
+progress (eight of this ledger's actions were in exactly that state).
+
+* ``CA-REMEDIATION-LANDED-IS-REFUSED`` — exactly one error, named, subject
+  ``CA-0001``, quoting the issue and the board's own verdict, and **not** also
+  emitted as the mild deviation.
+* ``CA-REMEDIATION-OPEN-IS-A-DEVIATION`` — the accepted half: while that issue
+  is open the action is a deviation, so the rule did not become “any open
+  action”.
+* ``CA-REMEDIATION-ABSENT-IS-NOT-EVIDENCE`` — an issue the point-in-time
+  snapshot does not carry is evidence of nothing, so its absence must not fire.
+* ``MUTANT-DROPS-CA-REMEDIATION-REFUSAL`` — the derived control: a scratch copy
+  whose ``_check_actions`` call drops the snapshot must stop refusing.
+
 Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 
 No network. Writes only inside one scratch directory, which it removes.
@@ -287,6 +305,43 @@ def _records(origin_ref: str) -> List[Dict[str, Any]]:
             "evidence": [{"kind": "commit", "ref": EVIDENCE_SHA}],
         },
     ]
+
+
+#: The issue that tracks the probe's corrective action (issue #1028). Its state
+#: on the probe board is what the rule under test reads, and it is deliberately a
+#: SECOND issue: the action's remediation ref must resolve to a live board row,
+#: which is exactly the situation the real ledger was in while eight of its
+#: actions still read ``open`` after the issue tracking them had landed.
+REMEDIATION_ISSUE = 950
+
+
+def _open_action_records() -> List[Dict[str, Any]]:
+    """The probe ledger: complete and closed, with its ONE action still open.
+
+    ``_records()`` returns a ledger every other rule passes, so the only finding
+    a probe can observe is the one it planted.
+    """
+    records = _records("#%d" % TRACED_ISSUE)
+    records[2].update(
+        {
+            "status": "open",
+            "evidence": [],
+            "remediation_issue": "#%d" % REMEDIATION_ISSUE,
+        }
+    )
+    return records
+
+
+def _probe_board(remediation_state: Optional[str]) -> Dict[int, Dict[str, Any]]:
+    """The probe board: the traced issue, plus the remediation issue in a state.
+
+    ``remediation_state=None`` leaves the remediation issue OFF the board, which
+    is the absent case the rule must not fire on.
+    """
+    snapshot = _snapshot(_issue(900, labels=["area:board"]))
+    if remediation_state is not None:
+        snapshot[REMEDIATION_ISSUE] = _issue(REMEDIATION_ISSUE, state=remediation_state)
+    return snapshot
 
 
 def _board_findings(report) -> List[Any]:
@@ -826,6 +881,70 @@ def probe_board_link_dangling_origin_is_refused(case: Case) -> Tuple[bool, str]:
     )
 
 
+#: The wiring the corrective-action rule depends on: the board snapshot reaches
+#: ``_check_actions``. A mutation that removes it must stop the refusal, or the
+#: probe above proves nothing.
+MUTANT_ANCHOR_CA_REMEDIATION = (
+    "        _check_actions(actions, rcas, root=root, probe=probe, snapshot=snapshot)\n"
+)
+MUTANT_REPLACEMENT_CA_REMEDIATION = (
+    "        _check_actions(actions, rcas, root=root, probe=probe)  # mutated out\n"
+)
+
+
+def probe_ca_remediation_landed_is_refused(case: Case) -> Tuple[bool, str]:
+    """An open action whose tracked issue the board reports CLOSED is an error.
+
+    This is the #1028 gap in the RCA surface: the record states its own closure
+    condition ("close it when #<n> lands") and nothing could observe that the
+    condition had been met, so a stale record was indistinguishable from work in
+    flight.
+    """
+    code = case.c.CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED
+    report = case.report(_open_action_records(), _probe_board("CLOSED"))
+    found = [f for f in report.findings if f.code == code]
+    also_open = [
+        f for f in report.findings if f.code == case.c.CODE_CORRECTIVE_ACTION_OPEN
+    ]
+    held = (
+        len(found) == 1
+        and found[0].subject == "CA-0001"
+        and _error_codes(report) == [code]
+        and ("#%d" % REMEDIATION_ISSUE) in found[0].message
+        and "CLOSED" in found[0].message
+        and not also_open
+    )
+    return held, (
+        "code=%s subject=%s errors=%s (the benign deviation is not also emitted)" % (
+            code,
+            found[0].subject if found else "(none)",
+            _error_codes(report),
+        )
+    )
+
+
+def probe_ca_remediation_open_is_a_deviation(case: Case) -> Tuple[bool, str]:
+    """The accepted half: while the tracked issue is open, in flight is a deviation.
+
+    Without this half the rule would be "any open action", which refuses work
+    that is genuinely in progress.
+    """
+    landed = case.c.CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED
+    open_code = case.c.CODE_CORRECTIVE_ACTION_OPEN
+    report = case.report(_open_action_records(), _probe_board("OPEN"))
+    found = [f for f in report.findings if f.code == open_code]
+    held = (
+        len(found) == 1
+        and not [f for f in report.findings if f.code == landed]
+        and not _errors(report)
+    )
+    return held, "code=%s count=%d errors=%s" % (
+        open_code,
+        len(found),
+        _error_codes(report),
+    )
+
+
 def probe_board_link_unlabelled_is_refused(case: Case) -> Tuple[bool, str]:
     """The ledger names #901 as an incident's origin; the board must show it."""
     snapshot = _snapshot(_issue(900, labels=["area:board"]))
@@ -842,6 +961,41 @@ def probe_board_link_unlabelled_is_refused(case: Case) -> Tuple[bool, str]:
     return held, "code=%s subject=%s errors=%s" % (
         CODE_BOARD_LINK_UNLABELLED,
         found[0].subject if found else "(none)",
+        _error_codes(report),
+    )
+
+
+def probe_ca_remediation_absent_is_not_evidence(case: Case) -> Tuple[bool, str]:
+    """An issue the snapshot does not carry is not evidence that it landed.
+
+    The snapshot is point-in-time, so its silence about an issue means nothing:
+    firing there would make the verdict a function of how old a committed
+    artifact is — "every action recorded since the last refresh is stale" —
+    which is the very class of defect this rule exists to catch.
+
+    The remediation issue is ALSO genuinely absent from the board, so it is a
+    dangling reference under the ledger -> board linkage rule (issue #1178) —
+    a real, separate defect (the reference does not resolve at all), not
+    evidence that it landed. The two rules are not in tension: this probe's
+    own contract is only that ``corrective-action-remediation-landed`` stays
+    silent and the action is still reported as the benign in-flight deviation.
+    """
+    landed = case.c.CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED
+    board = _probe_board(None)
+    report = case.report(_open_action_records(), board)
+    absent = [f for f in report.findings if f.code == landed]
+    non_dangling_errors = [
+        f for f in _errors(report) if f.code != CODE_BOARD_LINK_DANGLING
+    ]
+    held = (
+        not absent
+        and not non_dangling_errors
+        and REMEDIATION_ISSUE not in board
+        and case.c.CODE_CORRECTIVE_ACTION_OPEN
+        in [f.code for f in report.findings]
+    )
+    return held, "the issue is off the snapshot; landed finding(s)=%d errors=%s" % (
+        len(absent),
         _error_codes(report),
     )
 
@@ -1045,6 +1199,18 @@ def probe_mutant_drops_board_link_unlabelled(case: Case) -> Tuple[bool, str]:
         probe_name="BOARD-LINK-UNLABELLED-IS-REFUSED",
         expect_code=CODE_BOARD_LINK_UNLABELLED,
         filename="linkage.py",
+    )
+
+
+def probe_mutant_drops_ca_remediation_refusal(case: Case) -> Tuple[bool, str]:
+    """The corrective-action-remediation-landed refusal must be able to fail."""
+    return _run_generic_mutant(
+        case,
+        tag="ca-remediation",
+        anchor=MUTANT_ANCHOR_CA_REMEDIATION,
+        replacement=MUTANT_REPLACEMENT_CA_REMEDIATION,
+        probe_name="CA-REMEDIATION-LANDED-IS-REFUSED",
+        expect_code=case.c.CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED,
     )
 
 
@@ -1320,6 +1486,12 @@ PROBES: Dict[str, Probe] = {
     "MUTANT-DROPS-BOARD-LINK-MISSING": probe_mutant_drops_board_link_missing,
     "MUTANT-DROPS-BOARD-LINK-DANGLING": probe_mutant_drops_board_link_dangling,
     "MUTANT-DROPS-BOARD-LINK-UNLABELLED": probe_mutant_drops_board_link_unlabelled,
+    # issue #1028 — an open corrective action whose remediation issue has
+    # landed on the committed board snapshot is refused as a contradiction.
+    "CA-REMEDIATION-LANDED-IS-REFUSED": probe_ca_remediation_landed_is_refused,
+    "CA-REMEDIATION-OPEN-IS-A-DEVIATION": probe_ca_remediation_open_is_a_deviation,
+    "CA-REMEDIATION-ABSENT-IS-NOT-EVIDENCE": probe_ca_remediation_absent_is_not_evidence,
+    "MUTANT-DROPS-CA-REMEDIATION-REFUSAL": probe_mutant_drops_ca_remediation_refusal,
 }
 
 
@@ -1397,10 +1569,12 @@ def run(repo: Path, module_dir: Path, out=sys.stdout) -> int:
     print(
         "negative-control: OK — an area label cannot manufacture an incident, a "
         "record-labelled issue with no ledger record is still refused, no "
-        "exemption can be declared, the refusal is proven able to fail, and the "
-        "ledger -> board linkage (a silent orphan, a dangling reference, an "
-        "incident-origin issue with no record label) is refused on the real "
-        "ledger and board with one real fact changed"
+        "exemption can be declared, the ledger -> board linkage (a silent orphan, "
+        "a dangling reference, an incident-origin issue with no record label) is "
+        "refused on the real ledger and board with one real fact changed, an "
+        "action left open past the landing of the issue that tracks it is "
+        "refused rather than reported as in flight, and each refusal is proven "
+        "able to fail"
     )
     return EXIT_OK
 

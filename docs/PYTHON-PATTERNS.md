@@ -44,10 +44,11 @@ measurement that says where enforcement belongs.
 
 | id | the shape | the failure it prevents | measured on `master` (2026-09-16) |
 |----|-----------|-------------------------|-----------------------------------|
-| `PP-1` | **a fixture that pins a *seed* but not the *evaluation*** — the fixture writes its data under one time bucket while the subject under test resolves the bucket it *judges in* somewhere else, most often from the live clock | the green expires with the calendar: it is correct on the day the fixture was written and wrong every day after, with no commit in between | **2 modules** — `telemetry/chat/tests/test_budget_guard.py`, `telemetry/chat/tests/test_negative_controls.py`: `2 failed, 45 passed` on `master` `ffe3f9d`, reproduced today (lane **#506**, PR **#1026**, repairs them) |
+| `PP-1` | **a fixture that pins a *seed* but not the *evaluation*** — the fixture writes its data under one time bucket while the subject under test resolves the bucket it *judges in* somewhere else, most often from the live clock | the green expires with the calendar: it is correct on the day the fixture was written and wrong every day after, with no commit in between | **2 modules, repaired** — `telemetry/chat/tests/test_budget_guard.py`, `telemetry/chat/tests/test_negative_controls.py`: `2 failed, 45 passed` at #506's closing squash `eae061d` and on `master` `ffe3f9d` while the bomb was live; **`56 passed` at `master` `4155448`** after the repair landed (lane **#506**, PR **#1026** = `58d5392`) |
 
 **Enforcer**, for that row: not a static scan — a behavioural, mutation-proved
-control. See [what enforces this today](#what-enforces-this-today).
+control, measured below and wired into the gate of record. See
+[what enforces this today](#what-enforces-this-today).
 
 ### `PP-1` — a fixture that pins a seed but not the evaluation
 
@@ -56,8 +57,8 @@ is *seeded* by a fixture under one instant, and the code under test *judges* a
 turn in a bucket it resolved by itself. The two agree only by coincidence — and
 the coincidence is the calendar.
 
-**The failure it prevents.** Measured, in this repository, and reproduced today
-against `origin/master`:
+**The failure it prevents.** Measured in this repository while the bomb was live,
+by the lane that reported it (`origin/master` `ffe3f9d`):
 
 ```
 $ cd /home/akushnir/ao-worktrees/ao-1028-3ec9daca      # at origin/master ffe3f9d
@@ -66,6 +67,39 @@ FAILED telemetry/chat/tests/test_budget_guard.py::test_a_quota_exhausted_tenant_
 FAILED telemetry/chat/tests/test_negative_controls.py::test_each_refusal_path_refuses_and_still_meters[quota]
 2 failed, 45 passed in 0.75s
 ```
+
+**The same command, after the repair landed** (`master` `4155448`, 2026-09-17) —
+so the row above is a claim two commands can falsify, not a memory:
+
+```
+$ python3 -m pytest telemetry/chat -q -p no:cacheprovider
+........................................................                 [100%]
+56 passed in 0.94s
+```
+
+**And the enforcement the row cites**, run at that same tree:
+
+```
+$ bash scripts/check-chat-finops.sh
+== the turn's own bucket (the #506 date bomb) ==
+  OK    a past-dated turn is refused in its own bucket (C1) and served there against another day's rail (C3)
+== mutation controls (a control that cannot fail is a formality) ==
+  OK    the date mutant's guard no longer derives the turn's own bucket
+  OK    a guard that judges against the live clock: the past-dated turn was ALLOWED past an exhausted rail, as the control requires
+          a turn dated 2026-09-14T09:00:00Z was ALLOWED against a rail exhausted in its own bucket 2026-09-14: the evaluation bucket is not the turn's own (#506), so a refusal rail can never bite on a past-dated turn
+check-chat-finops: OK — per-turn attribution, budget caps, the turn's own bucket and cache accounting hold
+$ echo $?
+0
+```
+
+**Is that control on the gate of record?** Yes — and that too is checkable rather
+than asserted. `scripts/check-chat-finops.sh` is one of the 146 scripts
+`scripts/discover-checks.sh` finds, and it is wired by path in
+[`scripts/verify.sh`](../scripts/verify.sh) (`'chat-finops|bash
+scripts/check-chat-finops.sh'`). That second half matters as much as the first:
+the #506 lesson was *also* that no gate of record ran `telemetry/chat`, so a
+control that exists but is invoked by nothing would have repeated the defect one
+level up.
 
 The mechanism is not "a test with a date in it". It is this asymmetry:
 
@@ -185,11 +219,27 @@ fix or to soften the rule until it matched nothing.
 real, the instance is real, and the enforcement exists — it is simply not here,
 because it is not a property of this file's subject matter.
 
+**The same rule, one layer up (#1028).** A record whose truth is a function of a
+later event is the same shape as a green that expires with the calendar. The
+lesson's own ledger carried it: eight `corrective-action` records still read
+`open` after the issue each one named as *the thing to close it when* had landed,
+and nothing could fail — the deviation said "close the action when #170 lands"
+forever, whatever the board said, so a stale record and work in flight looked
+identical. `governance/lessons/` now refuses that contradiction by name
+(`corrective-action-remediation-landed`, an **error**, keyed on the committed
+board snapshot so the verdict is a function of the tree and never of the date).
+The verdict is a pure function of two committed artifacts, which is the property
+the date bomb lacks — and an issue the snapshot does not carry fires nothing,
+because the silence of a point-in-time artifact is evidence of nothing at all.
+
 ## What enforces this today
 
 The defect is a property of the **subject**, so the control is behavioural and
-belongs with the subject's own gate. Lane #506 (PR **#1026**) puts it on the gate
-of record in [`scripts/check-chat-finops.sh`](../scripts/check-chat-finops.sh):
+belongs with the subject's own gate. Lane #506 (PR **#1026**, landed as
+`58d5392` on 2026-09-17) puts it on the gate of record in
+[`scripts/check-chat-finops.sh`](../scripts/check-chat-finops.sh) — wired by path
+in [`scripts/verify.sh`](../scripts/verify.sh) (`'chat-finops|bash
+scripts/check-chat-finops.sh'`), so it is *invoked*, not merely delivered:
 
 * **control `turn-date-scope`** — a rail exhausted *only* on a **literal past
   day**, and two turns dated by literal: the turn dated the exhausted day must be

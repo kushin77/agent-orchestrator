@@ -19,8 +19,24 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
+
+# The one clock seam (``telemetry/clock.py``, issue #1025).
+#
+# This package is reachable under TWO import roots, and both are live: the
+# canonical one (repo root on ``sys.path`` — ``python3 -m telemetry.ledger.cli``,
+# ``telemetry/audit/read_model.py``'s sibling imports) and the flat one
+# (``telemetry/`` on ``sys.path`` — ``telemetry/ledger/tests``,
+# ``scripts/check-audit-read-model.sh``, which all do ``from ledger import ...``).
+# Measured: under the flat root ``import telemetry.clock`` fails, so the seam is
+# reached by its second name there.  Both names are the same file, and the seam
+# keeps its override in the environment rather than in a module global, so the
+# two module objects agree on what time it is.
+
+try:  # canonical root: imported as ``telemetry.ledger.schema``
+    from ..clock import now_utc_iso as _now_utc_iso
+except ImportError:  # flat root: imported as top-level ``ledger.schema``
+    from clock import now_utc_iso as _now_utc_iso
 
 from .errors import LedgerValidationError
 
@@ -69,8 +85,13 @@ OPTIONAL_FIELDS = (
 
 
 def now_utc() -> str:
-    """RFC 3339 UTC timestamp, e.g. ``2026-09-08T12:00:00Z``."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """RFC 3339 UTC timestamp, e.g. ``2026-09-08T12:00:00Z``.
+
+    Delegated to the one clock seam (``telemetry/clock.py``, issue #1025) so the
+    ledger's record timestamps can be pinned by a test or a gate like every
+    other timestamp on the money path.
+    """
+    return _now_utc_iso()
 
 
 def canonical_bytes(record: Dict[str, Any]) -> bytes:

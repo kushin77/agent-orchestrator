@@ -486,7 +486,6 @@ def validate(registry: Registry, derived: Optional[Derived] = None) -> list[Find
     """Every finding this registry has, each named. Empty list == OK."""
     derived = derived if derived is not None else derive()
     findings: list[Finding] = []
-    document = registry.document
 
     findings.extend(_check_schema_block(registry, derived))
     findings.extend(_check_functions(registry, derived))

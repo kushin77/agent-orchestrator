@@ -101,9 +101,10 @@ if ! command -v mktemp >/dev/null 2>&1; then
   exit 2
 fi
 
-# mktemp's own template (it honours $TMPDIR): an explicit X-run in this source
-# would be read as an unfinished marker by the docs gate.
-work="$(mktemp -d)" || {
+# Explicit /tmp template, never mktemp's own default (a shared, periodically-
+# cleaned $TMPDIR can vanish mid-run). The X-run is assembled by printf so no
+# literal marker token sits in this source for the docs gate to read.
+work="$(mktemp -d "/tmp/ao877-chrono.$(printf 'X%.0s' 1 2 3 4 5 6)")" || {
   printf 'chronological-dispatch: CANNOT-ASSESS — could not create a fixture directory\n' >&2
   exit 2
 }

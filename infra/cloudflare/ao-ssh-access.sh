@@ -65,7 +65,9 @@ SURFACE="remote_ssh_access"
 REGISTRY_RELATIVE="infra/feature-flags/registry.yaml"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$root"
+# A cd whose failure is not handled leaves the script operating on whatever the
+# caller's cwd happened to be. Refuse the failure instead of ignoring it.
+cd "$root" || exit 2
 
 DRY_RUN=true
 PROVISION=false

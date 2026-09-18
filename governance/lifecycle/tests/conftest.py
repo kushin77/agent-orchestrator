@@ -147,10 +147,14 @@ class FakeOps:
         item: dict,
         fail: tuple[str, ...] = (),
         cannot_assess: dict[str, gate.CannotAssess] | None = None,
+        tree_relations: dict[tuple[str, str], str] | None = None,
+        supersets: dict[tuple[str, str], bool] | None = None,
     ) -> None:
         self.item = item
         self.fail = set(fail)
         self.cannot_assess = dict(cannot_assess or {})
+        self.tree_relations = dict(tree_relations or {})
+        self.supersets = dict(supersets or {})
         self.calls: list[str] = []
 
     def _record(self, action: str) -> None:
@@ -165,10 +169,38 @@ class FakeOps:
         self.item["pr"]["state"] = "merged"
         return MERGE_COMMIT
 
-    def record_verification(self, issue: int, commit: str, landing: str = "") -> str:
+    def record_verification(self, issue: int, commit: str, landing: str = "", drifted: str = "") -> str:
         self._record("record-verification")
-        self.item["verify"] = {"ok": True, "commit": commit}
+        record: dict = {"ok": True, "commit": commit}
+        if landing and commit == landing and drifted and drifted != commit:
+            # The drifted shape (#1149): the subject is the landing and the live head it
+            # moved past is journalled beside it. Mirrored here because the audit reads
+            # the record, so a fixture that wrote a different shape would test nothing.
+            record.update({"landing": landing, "drifted_head": drifted})
+        self.item["verify"] = record
         return f"verify green at {commit[:12]}"
+
+    def tree_relation(self, left: str, right: str) -> str:
+        """How two commits' trees compare — ``unknown`` unless a test says otherwise.
+
+        The default is deliberately the answer that changes nothing: ``unknown`` leaves
+        the subject resolution (#1149) at its pre-existing behaviour — the pull request's
+        head commit — so every test written before that rule keeps the meaning it was
+        written with, and a test that wants the drifted shape has to *state* that the
+        trees differ rather than inherit it.
+        """
+        return self.tree_relations.get((left, right), "unknown")
+
+    def commit_is_superset(self, larger: str, smaller: str) -> bool:
+        """Does ``larger`` carry everything ``smaller`` does — ``True`` unless a test says otherwise.
+
+        The default matches every test written before this method existed: the fixtures'
+        #1149 shape is always "the branch advanced past the squash, adding content", so the
+        head is always a superset of the landing there, and leaving this ``True`` by default
+        keeps their meaning exactly. A test for the #1003 shape (the landing carries content
+        the head never had) states that explicitly via ``supersets``.
+        """
+        return self.supersets.get((larger, smaller), True)
 
     def delete_branch(self, branch: str) -> str:
         self._record("delete-branch")
