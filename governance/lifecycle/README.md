@@ -41,7 +41,7 @@ and the gate can require that each one has been provoked.
 | Invariant | Broken means |
 |---|---|
 | `PR_NOT_MERGED` | A verified change that never landed. |
-| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name a commit whose tree is **the tree that landed** — for an ordinary item the pull request's head commit, and for a branch that advanced after the squash the commit the squash landed as, with the drifted head recorded beside it (§3.7, #1149). Demanding that evidence name the merge commit would fail every correctly-merged item, because a squash merge creates a *new* commit. A lane may therefore stand for that subject only when it **is** it, or — for a *merged* pull request — contains the commit the squash landed as **and** that landing carries the same tree (§3.6, #1098). When the attestation *also* records the tree it measured (`.verify.measured`), that tree must be one the item's own record carries: the head commit's own tree, or the merged tree the squash composed (§3.6, #1003). A record that does not say which tree it measured is read as before. |
+| `VERIFY_EVIDENCE_MISSING` | "Green" is a claim. Evidence must name a commit whose tree is **the tree that landed** — for an ordinary item the pull request's head commit, and for a branch that advanced after the squash the commit the squash landed as, with the drifted head recorded beside it (§3.7, #1149). Demanding that evidence name the merge commit would fail every correctly-merged item, because a squash merge creates a *new* commit. A lane may therefore stand for that subject only when it **is** it, or — for a *merged* pull request — contains the commit the squash landed as **and** that landing carries the verified work (§3.6, #1098/#1298). When the attestation *also* records the tree it measured (`.verify.measured`), that tree must be one the item's own record carries: the head commit's own tree, or the merged tree the squash composed (§3.6, #1003). A record that does not say which tree it measured is read as before. |
 | `BRANCH_NOT_DELETED` | The branch outlived its issue. |
 | `CLAIM_STILL_HELD` | A closed issue still claims a lane, blocking re-dispatch. |
 | `DIRECTIVE_NOT_CONSUMED` | A pending directive re-executes the order the moment the claim frees. |
@@ -322,11 +322,36 @@ of its halves:
 | A lane may stand for the verified commit when | |
 |---|---|
 | it **is** the verified commit | unchanged — the equality arm, and the only arm for an item that has not merged |
-| it **contains the landing**, *and* the landing carries the **verified tree** | the squash arm. `landing` is the commit the merge landed as, offered only when the pull request is genuinely merged |
+| it **contains the landing**, *and* the landing carries the **verified work** | the squash arm. `landing` is the commit the merge landed as, offered only when the pull request is genuinely merged |
 
-The tree half is what keeps the doctrine intact — "the tree which was verified is the
+The second half is what keeps the doctrine intact — "the tree which was verified is the
 tree that landed" — so a lane containing a landing built from *other* content is refused
-rather than measured as if it proved this item. The record then names **all three**
+rather than measured as if it proved this item. It is asked as a **change**, not as
+whole-tree equality (#1298). A squash merge composes its landing from the base **at merge
+time**, so the moment anything else lands on the default branch between the branch cut and
+the merge the landing carries content the branch tip never had and the whole trees differ
+*by construction*: equality was satisfiable only while nothing else landed, so the arm that
+exists for a squash-merged item could not fire for one whose base moved — a control that
+cannot fire, the inverse of GR-12.
+
+The second half therefore holds when any one of three measured facts does, each of which
+answers a shape the others cannot:
+
+| The landing carries the verified work when | |
+|---|---|
+| the verified commit is **in the landing's history** | the merge-commit form: the landing descends from the very commit that was gated |
+| the landing carries the **change the verified commit introduced** | every path the tip changed against its merge base with the landing resolves to the **same blob** there — an addition, a modification and a deletion all carried, with the landing's other content being the sibling landings that moved the base |
+| the **whole trees are identical** | the original #1098 case, asked when no path-by-path comparison was possible, because it needs no ancestry at all |
+
+Containment of the landing is still required, and a landing that carries neither is still
+refused: containing *a* landing is not the claim, containing *the verified work* is. An
+unreadable commit, no common base, or a change nothing could read is `unknown` — never a
+pass.
+
+Measured on this repository's own history: branch tip `17dc00a` carries a change that
+landed as `870eb26` — the same `git patch-id --stable`, the same twelve paths, identical
+content at every one of them — while `git diff --quiet 17dc00a 870eb26` is not clean and
+the tip is not an ancestor of the landing. The record then names **all three**
 commits, because each answers a different question:
 
 ```json
@@ -347,6 +372,14 @@ a **real** squash merge: a lane that contains the landing is **admitted** and jo
 a lane containing no landing of the item's is **refused by name**; and removing either the
 containment arm or the tree check reproduces the wrong answer, so neither half is
 decoration.
+
+The base-moved shape is provoked the same way — a real repository, a real squash merge, a
+real lane — in [`tests/test_squash_base_moved.py`](tests/test_squash_base_moved.py): the
+base-moved item is **admitted** by the shipping port and journalled, each of the three
+clauses is shown by measurement to be the *sole* clause that could have answered its shape,
+and every refusal the arms exist for (an unmerged pull request, a lane that does not
+contain the landing, a landing that carries neither the verified tree nor the verified
+change) is asserted on the ACTUAL line the port printed.
 
 ### 3.7 Which commit the evidence is *against* — the tree that landed (#1149)
 

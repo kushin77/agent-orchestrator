@@ -9,7 +9,9 @@ rules — it must never remove a worktree whose work is not preserved elsewhere.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -359,3 +361,144 @@ def test_item2_a_branch_checked_out_in_a_worktree_is_never_reaped(tmp_path):
 
     assert git(repo, "rev-parse", "--verify", "--quiet", "issue-44-lane").returncode == 0
     assert "issue-44-lane" not in result.stdout, "a checked-out branch is not even a candidate"
+
+
+# --- issue #1159: liveness is cwd OR an open file under the tree -------------
+#
+# The predicate the reaper landed with was `/proc/*/cwd` ALONE, so a peer driving
+# a worktree from the SHARED shell — cwd elsewhere, the tree held open through file
+# descriptors — was invisible, and its LIVE tree was classified removable (10 live
+# `.claude/worktrees/agent-*` trees plus 4 scratch trees, measured on the real
+# tree). `--apply` now runs unattended from cron, so that was a data-loss hazard.
+
+
+def hold_open(path: Path, seconds: int = 60) -> subprocess.Popen:
+    """A process whose cwd is ELSEWHERE, holding one open file descriptor on `path`."""
+    return subprocess.Popen(["bash", "-c", f'exec 9<"{path}" || exit 1; sleep {seconds}'])
+
+
+def hold_cwd(directory: Path, seconds: int = 60) -> subprocess.Popen:
+    """A process standing INSIDE `directory` (a subdirectory of the tree)."""
+    return subprocess.Popen(["bash", "-c", f'cd "{directory}" || exit 1; sleep {seconds}'])
+
+
+def open_paths(pid: int) -> str:
+    """Every path a pid holds open, read straight from /proc — measured, not assumed."""
+    result = subprocess.run(
+        ["find", f"/proc/{pid}/fd", "-mindepth", "1", "-maxdepth", "1", "-printf", "%l\n"],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
+
+
+def cwd_of(pid: int) -> Path | None:
+    try:
+        return Path(os.readlink(f"/proc/{pid}/cwd"))
+    except OSError:
+        return None
+
+
+def wait_for(predicate, timeout: float = 10.0) -> bool:
+    """Bounded poll. A forked child applies its redirection (and its `cd`) after
+    the fork returns, so the fixture's evidence must be OBSERVED — asserting on the
+    next line makes the arm a race, and an arm that fails at random teaches nothing."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def add_tracked_dir(repo: Path, name: str) -> None:
+    """A TRACKED directory, so a worktree containing it is still clean."""
+    (repo / name).mkdir(parents=True, exist_ok=True)
+    (repo / name / "keep.txt").write_text("seed\n", encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", f"seed {name}")
+    git(repo, "push", "-qu", "origin", "master")
+    git(repo, "fetch", "-q", "origin")
+
+
+def test_a_worktree_held_open_from_elsewhere_is_kept(tmp_path):
+    """The tree's ONLY liveness evidence is an open file descriptor.
+
+    A peer driving a worktree from the SHARED shell never appears in
+    /proc/<pid>/cwd, which is exactly how 14 live trees came to be reported
+    removable. Here the holder's cwd is asserted to be OUTSIDE the tree and the
+    descriptor to be on a file INSIDE it, so a KEEP can only be explained by the
+    widened predicate — not merely by cwd still being checked.
+    """
+    repo = make_repo(tmp_path)
+    lane = tmp_path / "lane"
+    git(repo, "worktree", "add", "-q", "--detach", str(lane), "origin/master")
+    holder = hold_open(lane / "README.md")
+    try:
+        assert wait_for(lambda: str(lane / "README.md") in open_paths(holder.pid)), (
+            f"the fixture must be armed: pid {holder.pid} holds nothing under the tree; "
+            f"got {open_paths(holder.pid)!r}"
+        )
+        cwd = cwd_of(holder.pid)
+        assert cwd is not None and cwd != lane and lane not in cwd.parents, (
+            f"the premise: the holder's cwd ({cwd}) must not be under the tree"
+        )
+
+        result = run_script(repo, "--apply")
+
+        assert lane.exists(), "a tree a live process holds OPEN must never be removed"
+        assert "in use by a live process" in result.stdout
+    finally:
+        holder.kill()
+        holder.wait()
+
+
+def test_a_worktree_a_process_stands_in_a_subdirectory_of_is_kept(tmp_path):
+    """A cwd UNDER the tree counts, not just one equal to the tree path.
+
+    The descriptor source always yields paths strictly under the tree, so the
+    predicate has to be anchored that way; this pins the same rule for cwd.
+    """
+    repo = make_repo(tmp_path)
+    add_tracked_dir(repo, "sub")
+    lane = tmp_path / "lane"
+    git(repo, "worktree", "add", "-q", "--detach", str(lane), "origin/master")
+    holder = hold_cwd(lane / "sub")
+    try:
+        assert wait_for(lambda: cwd_of(holder.pid) == lane / "sub"), (
+            f"the premise: the holder must stand in a subdirectory (got {cwd_of(holder.pid)})"
+        )
+
+        result = run_script(repo, "--apply")
+
+        assert lane.exists(), "a live process under the tree keeps it, not only one at its root"
+        assert "in use by a live process" in result.stdout
+    finally:
+        holder.kill()
+        holder.wait()
+
+
+def test_a_held_tree_does_not_keep_its_name_prefix_neighbour(tmp_path):
+    """The match is anchored on a path boundary, so an unheld neighbour is still
+    reaped — the widening must not become a reason to keep everything."""
+    repo = make_repo(tmp_path)
+    held = tmp_path / "lane-anchor"
+    unheld = tmp_path / "lane-anchor-neighbour"
+    git(repo, "worktree", "add", "-q", "--detach", str(held), "origin/master")
+    git(repo, "worktree", "add", "-q", "--detach", str(unheld), "origin/master")
+    holder = hold_open(held / "README.md")
+    try:
+        assert wait_for(lambda: str(held / "README.md") in open_paths(holder.pid)), (
+            "the fixture must be armed: nothing holds that tree"
+        )
+
+        run_script(repo, "--apply")
+
+        assert held.exists(), "the held tree is kept"
+        assert not unheld.exists(), (
+            "a genuinely stale, preserved, unclaimed tree must still be reaped: "
+            "a bare prefix match would wrongly keep this one"
+        )
+    finally:
+        holder.kill()
+        holder.wait()

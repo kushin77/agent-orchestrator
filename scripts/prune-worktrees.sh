@@ -9,7 +9,9 @@
 #
 # A worktree is REMOVABLE only when all three hold:
 #   1. it is not the current worktree and not the repo's own checkout;
-#   2. no live process has it as its cwd;
+#   2. no live process has it as its cwd AND no live process holds an OPEN FILE
+#      under it (widened for issue #1159 — cwd alone cannot see a peer driving a
+#      worktree from the shared shell);
 #   3. its HEAD commit is preserved outside it — reachable from origin/master or
 #      contained in a remote branch. Anything unreachable is reported, never
 #      deleted: unmerged work belongs to its lane.
@@ -52,6 +54,20 @@
 #     an exit code a scheduler or a gate can consume. The standing is read from
 #     the LIVE crontab and never from a file in this repository: a declaration
 #     is not an installation, which is what #830 paid for.
+#
+# ONE MORE GUARANTEE WIDENED FOR ISSUE #1159:
+#   * LIVENESS IS cwd OR ANY OPEN FILE, never cwd alone. A peer driving a worktree
+#     from the SHARED shell keeps its cwd elsewhere and holds the tree open
+#     through file descriptors, so the old predicate classified LIVE trees as
+#     removable — measured on this box: 10 live `.claude/worktrees/agent-*` trees
+#     plus 4 scratch trees were reported "stale" while their working directories
+#     had been written 5-31 minutes earlier (#1159). The nightly `ao-fleet-reap`
+#     line runs this tool with --apply UNATTENDED, so that was a data-loss hazard
+#     rather than a report. A live path matches a worktree when it IS that
+#     worktree or lies UNDER it on a path boundary: an open file is always under
+#     the tree ("equal" alone would make the new source useless), while a bare
+#     prefix test would let /tmp/ao/a11 keep /tmp/ao/a115 — one lane's tree
+#     holding another lane's.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK (stale worktrees found in --check, or — for
 # --schedule — no installed crontab line invokes this tool) / 2 CANNOT-ASSESS
@@ -107,11 +123,13 @@ done
 current="$root"
 
 scratch="$(mktemp)"
-live_cwds="$scratch.cwds"
+live_paths="$scratch.live"
+live_wts="$scratch.held"
+wt_paths="$scratch.wts"
 live_lanes="$scratch.lanes"
 declared="$scratch.declared"
 crontab_err="$scratch.crontab"
-trap 'rm -f "$scratch" "$live_cwds" "$live_lanes" "$declared" "$crontab_err"' EXIT
+trap 'rm -f "$scratch" "$live_paths" "$live_wts" "$wt_paths" "$live_lanes" "$declared" "$crontab_err"' EXIT
 
 # --- is this tool actually scheduled? (issue #830) ---------------------------
 #
@@ -176,10 +194,86 @@ if ! git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
   exit 2
 fi
 
-# cwd of every live process — a worktree in use must never be removed.
-for link in /proc/[0-9]*/cwd; do
-  readlink "$link" 2>/dev/null || true
-done > "$live_cwds"
+# --- liveness: is a live process holding this worktree? (issue #1159) --------
+#
+# A worktree is IN USE when a live process has it as its cwd OR holds ANY OPEN
+# FILE under it. cwd ALONE was the predicate until #1159, and it could not see a
+# peer driving a worktree from the SHARED shell: that peer's cwd is elsewhere and
+# it holds the tree open through file descriptors, so LIVE trees were classified
+# removable (10 `.claude/worktrees/agent-*` trees + 4 scratch trees measured on
+# this box) while --apply now runs unattended from cron. A guard that cannot see
+# the work is worse than no guard, because it authorises deletion.
+#
+# ONE `find` PER SOURCE, not a `readlink` per entry: this box carries ~630
+# processes and ~13k open descriptors (measured 2026-09-18), and a per-descriptor
+# `readlink` loop had NOT finished after a minute, where the two `find` calls
+# together take ~100 ms. `-printf '%l'` prints a link's TARGET without following
+# it, which is what both sources need.
+#
+# A NON-ZERO `find` IS EXPECTED HERE: some `/proc/<pid>/fd` directories belong to
+# another user and cannot be read (rc=1). That is a blind spot the cwd list had
+# too, and it is not a reason to refuse. What IS refused is being unable to search
+# AT ALL — if no live path can be seen, nothing is seen as in use, so nothing may
+# be removed (fail closed).
+#
+# MATCHING IS ANCHORED ON A PATH BOUNDARY: a live path matches when it IS the
+# worktree or begins with the worktree followed by "/".
+#
+# Both halves of the predicate are named in ONE place, so the check can flip each
+# of them and prove the flip matters (GR-12):
+#   LIVE_SOURCES — which process facts count as liveness.
+#   LIVE_MATCH   — "under" (the tree, or anything below it) or "exact" (the tree
+#                  path itself only).
+LIVE_SOURCES="cwd fd"
+LIVE_MATCH="under"
+
+live_paths_of() { # live_paths_of <source> — the live paths of that source, one per line
+  case "$1" in
+    cwd) find /proc/[0-9]*/cwd -maxdepth 0 -printf '%l\n' 2>/dev/null ;;
+    fd) find /proc/[0-9]*/fd -mindepth 1 -maxdepth 1 -printf '%l\n' 2>/dev/null ;;
+    *) return 3 ;;
+  esac
+}
+
+if [ ! -d /proc ]; then
+  echo "prune-worktrees: CANNOT-ASSESS — /proc is unavailable, so liveness cannot be measured; removing nothing" >&2
+  exit 2
+fi
+: > "$live_paths"
+while IFS= read -r source; do
+  [ -z "$source" ] && continue
+  source_paths="$(live_paths_of "$source")"
+  source_rc=$?
+  case "$source_rc" in
+    # 1 is find's "some directories could not be read" (another user's process);
+    # it is the normal outcome here and is not a reason to refuse.
+    0|1) : ;;
+    *)
+      echo "prune-worktrees: CANNOT-ASSESS — the '$source' liveness search failed (rc=$source_rc); nothing was seen, so nothing is removed" >&2
+      exit 2
+      ;;
+  esac
+  printf '%s\n' "$source_paths" >> "$live_paths"
+done < <(printf '%s\n' "$LIVE_SOURCES" | tr ' ' '\n')
+
+if ! grep -q '^/' "$live_paths"; then
+  echo "prune-worktrees: CANNOT-ASSESS — the liveness search found no usable live path; removing nothing" >&2
+  exit 2
+fi
+
+# Resolve ONCE, in a single pass: asking "is any of ~13k live paths under this
+# tree?" separately for every worktree would be ~10^6 comparisons in the shell.
+git -C "$root" worktree list --porcelain | awk '/^worktree /{ print $2 }' > "$wt_paths"
+awk -v list="$wt_paths" -v mode="$LIVE_MATCH" '
+  BEGIN { while ((getline line < list) > 0) if (line != "") tree[line] = 1 }
+  { for (t in tree) if ($0 == t || (mode != "exact" && index($0, t "/") == 1)) held[t] = 1 }
+  END { for (t in held) print t }
+' "$live_paths" > "$live_wts"
+
+live_path_count="$(wc -l < "$live_paths" | tr -d ' ')"
+wt_count="$(wc -l < "$wt_paths" | tr -d ' ')"
+live_wt_count="$(wc -l < "$live_wts" | tr -d ' ')"
+liveness_desc="cwd+open files ($LIVE_SOURCES), $LIVE_MATCH match"
 
 # Worktrees an OPEN lane still claims (issue #516). A .fleet/lanes/ record is
 # deleted when the lane closes, so one that still exists means it never closed; a
@@ -418,8 +512,8 @@ while read -r path sha ref; do
   if [ "$dirty" != "0" ]; then
     printf '  NOTE   %s — %s uncommitted path(s), all declared runtime state; not the lane s work (#830)\n' "$path" "$dirty"
   fi
-  if grep -qxF -- "$path" "$live_cwds"; then
-    printf '  KEEP   %s — in use by a live process\n' "$path"
+  if grep -qxF -- "$path" "$live_wts"; then
+    printf '  KEEP   %s — in use by a live process (cwd or an open file under it, #1159)\n' "$path"
     unsafe=$((unsafe + 1))
     continue
   fi
@@ -517,6 +611,11 @@ if [ "$branches" -eq 1 ]; then
 fi
 
 echo "prune-worktrees: $stale stale, $unsafe kept (dirty, in use, claimed, parked, or unpreserved)"
+# The predicate itself, on every run. #1159 was invisible without this: a tree
+# that is genuinely stale and a tree a peer holds open read identically in the
+# line above, which is exactly how 14 live trees came to be called removable.
+printf 'prune-worktrees: liveness: %s; %s live path(s) seen, %s of %s worktree(s) held\n' \
+  "$liveness_desc" "$live_path_count" "$live_wt_count" "$wt_count"
 if [ "$branches" -eq 1 ]; then
   echo "prune-worktrees: $branch_stale landed branch(es) reapable, $branch_kept kept (not provably landed)"
 fi
