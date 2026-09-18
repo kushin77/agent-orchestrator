@@ -90,6 +90,18 @@ REAP_SCHEDULE = "47 3 * * *"
 # not change installed behaviour until a principal flips `enabled: true`.
 SNAPSHOT_REFRESH_MARKER = "ao-fleet-snapshot-refresh"
 
+# The sixth job the manifest declares, and the second ship-gated OFF (issue
+# #1207): the PR-failure scanner is the code-native replacement for the retired
+# `ci-failure-scanner.yml` workflow (#812, GR-15), and it FILES a board issue for
+# every open PR whose checks concluded FAILURE. Filing is a write, so it ships
+# `--apply` behind `enabled: false` and changes nothing until a principal flips
+# it on (GR-5). It was previously reachable from nothing — not named `check-*`,
+# so `scripts/discover-checks.sh` never wired it; absent from the Makefile, the
+# manifest and cron — and declaring it here is what gives it a schedule:
+# `install` renders every enabled job, and `reconcile`/`uninstall` recognise a
+# stale line for this marker whether or not the job is enabled (below).
+SCAN_PR_FAILURES_MARKER = "ao-fleet-scan-pr-failures"
+
 #: The enabled jobs' markers — the lines `install` writes and the image's
 #: inventory (`infra/fleet/inventory.yaml`) re-measures. A disabled job's marker
 #: is deliberately NOT here: it is declared in the manifest and recognised by the
@@ -99,7 +111,7 @@ MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, REAP_MARKER)
 #: Every marker this module has ever owned, enabled or not. `_is_ours` matches
 #: against these so `uninstall`/`reconcile` remove a line whose job is now
 #: disabled or dropped, not just one whose schedule drifted.
-DECLARED_MARKERS = MARKERS + (SNAPSHOT_REFRESH_MARKER,)
+DECLARED_MARKERS = MARKERS + (SNAPSHOT_REFRESH_MARKER, SCAN_PR_FAILURES_MARKER)
 
 INTERPRETER = "/usr/bin/python3"
 FLOCK = "/usr/bin/flock"

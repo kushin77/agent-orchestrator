@@ -54,6 +54,16 @@
       "log": "snapshot-refresh.log",
       "singleton": true,
       "enabled": false
+    },
+    {
+      "name": "scan-pr-failures",
+      "marker": "ao-fleet-scan-pr-failures",
+      "schedule": "*/15 * * * *",
+      "command": "bash scripts/scan-pr-failures.sh --apply",
+      "user": "",
+      "log": "scan-pr-failures.log",
+      "singleton": true,
+      "enabled": false
     }
   ]
 }
