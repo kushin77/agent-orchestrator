@@ -617,6 +617,13 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
         "unknown numbers, cycles). Upstream serves no dispatch queue; the write "
         "that moves an issue through ours is the claim path (board.claim).",
     ),
+    "board.freshness": (
+        UNMAPPED, None,
+        "Checks whether `.board/snapshot.json` is stale against the schedule's job "
+        "set, the read the `snapshot-stale` refusal is named for. Upstream serves "
+        "no route into that file; the remedy is our own board.trigger/board.snapshot "
+        "pair, not an upstream call.",
+    ),
     "recover.status": (
         UNMAPPED, None,
         "The orphan/suspect state of our sessions. Upstream serves no orphan view "
