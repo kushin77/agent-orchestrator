@@ -208,7 +208,7 @@ PY
     4) echo "SELFTEST FAIL: mutant-A site not found (rollback branch text changed)"; fail=1 ;;
     0)
       out="$(analyze_dynamic "$dir")"
-      if printf '%s\n' "$out" | grep -q "^P3: failed-healthz scenario did not roll back"; then
+      if [[ "$out" == *"P3: failed-healthz scenario did not roll back"* ]]; then
         echo "SELFTEST OK: dropping rollback is refused by name"
       else
         echo "SELFTEST FAIL: dropping rollback was NOT caught (got: ${out:-<none>})"
@@ -235,7 +235,7 @@ PY
     4) echo "SELFTEST FAIL: mutant-B site not found (ancestry-check text changed)"; fail=1 ;;
     0)
       out="$(analyze_dynamic "$dir")"
-      if printf '%s\n' "$out" | grep -q "^P3: tag-not-on-master scenario did not refuse by name"; then
+      if [[ "$out" == *"P3: tag-not-on-master scenario did not refuse by name"* ]]; then
         echo "SELFTEST OK: dropping the ancestry check is refused by name"
       else
         echo "SELFTEST FAIL: dropping the ancestry check was NOT caught (got: ${out:-<none>})"
