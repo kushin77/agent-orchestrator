@@ -39,13 +39,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import json
 import os
 import re
 
 from packs import attestation
-from packs.pack_events import PackEventLog
-from packs.registry import PackRegistry, PackRegistryError
+from packs.registry import PackRegistryError
 
 SLUG_RE = re.compile(r"[^A-Za-z0-9._-]+")
 HEX_RE = re.compile(r"^[0-9a-f]{64}$")

@@ -30,9 +30,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from .errors import ApiError, invalid_body, not_found
+from .errors import ApiError, not_found
 
 _PATH_PARAM_RE = re.compile(r"\{([A-Za-z][A-Za-z0-9_]*)\}")
 

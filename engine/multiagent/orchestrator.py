@@ -15,7 +15,7 @@ whole composition deterministic and offline-testable.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Mapping, Optional, Sequence
+from typing import Callable, Mapping, Optional, Sequence
 
 from .consensus import ConsensusConfig, ConsensusRequest, run_consensus
 from .model import (
@@ -23,7 +23,6 @@ from .model import (
     EscalationContext,
     FanOutPlan,
     HierarchyConfig,
-    HierarchyReport,
     Lane,
     LaneRole,
     Mission,

@@ -15,7 +15,7 @@ boundary.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from .catalog import ClosedCatalog, load_catalog
 from .errors import AgentAlreadyRegisteredError, RegistryServiceError

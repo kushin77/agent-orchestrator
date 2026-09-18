@@ -63,7 +63,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 import yaml
 
@@ -72,7 +72,7 @@ from gateway.finops.budget import (  # noqa: F401  (consumed vocabulary)
     parse_role_policy,
     RoleBudgetError,
 )
-from telemetry.budgets.model import month_bucket, this_month_utc
+from telemetry.budgets.model import this_month_utc
 from telemetry.clock import now_epoch, now_utc_iso
 from telemetry.metering.report import GROUP_AGENT, WINDOW_MONTH
 

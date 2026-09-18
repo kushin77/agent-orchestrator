@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 from telemetry.budgets.audit import BudgetAuditStore
-from telemetry.budgets.budget import BudgetEnforcer, BudgetLimit, TenantBudgetPolicy
+from telemetry.budgets.budget import BudgetEnforcer, BudgetLimit
 from telemetry.budgets.killswitch import KillSwitchController
 from telemetry.budgets.ledger import SpendLedger
 from telemetry.budgets.model import now_utc_iso

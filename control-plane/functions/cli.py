@@ -62,10 +62,10 @@ def cmd_validate(args: argparse.Namespace) -> int:
     print(f"  OK    schema {reg.REGISTRY_SCHEMA} at {registry.path}")
     print(f"  OK    {len(registry)} functions declared, {panels} panel(s) rendered by the cockpit")
     print(f"  OK    every one of the {len(derived.routes)} exposed control verbs is declared")
-    print(f"  OK    every endpoint resolves in RC-3's declared route set")
-    print(f"  OK    every stream is a declared surface; every named flag exists")
-    print(f"  OK    effect classes, capabilities and audit actions are RC-2's own")
-    print(f"  OK    roles are additive filtering only (no role appears in a scope block)")
+    print("  OK    every endpoint resolves in RC-3's declared route set")
+    print("  OK    every stream is a declared surface; every named flag exists")
+    print("  OK    effect classes, capabilities and audit actions are RC-2's own")
+    print("  OK    roles are additive filtering only (no role appears in a scope block)")
     print("control-functions: OK — every cockpit function is declared exactly once")
     return OK
 

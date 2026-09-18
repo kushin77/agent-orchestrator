@@ -16,8 +16,8 @@ last heartbeat — never from what a session says about itself:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Mapping, Optional, Tuple
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional
 
 
 @dataclass(frozen=True)

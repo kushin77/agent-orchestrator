@@ -37,7 +37,6 @@ if __package__ in (None, ""):  # executed as a script, not imported as a package
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 from integrations.erp.crm import audit, documents, flows, provenance, schema, sla, timesheet  # noqa: E402
-from integrations.erp.crm.definitions import DefinitionSet  # noqa: E402
 from integrations.erp.crm.definitions import load as load_definitions  # noqa: E402
 from integrations.erp.crm.model import (  # noqa: E402
     KIND_LEAD,
@@ -386,7 +385,7 @@ def run(sink: Optional[TextIO] = None) -> int:
     try:
         base = flows.golden_path(TENANT)
     except Exception as exc:  # the driver's own inability to start is NOT-OK, not a pass
-        print(f"negative-control: FAIL — the golden path could not be built", file=out)
+        print("negative-control: FAIL — the golden path could not be built", file=out)
         print(f"  FAIL  {type(exc).__name__}: {exc}", file=out)
         return 1
     checks = provocations(base)

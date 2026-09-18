@@ -23,7 +23,7 @@ import secrets
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 if __package__ in (None, ""):  # executed as a script, not imported as a package
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))

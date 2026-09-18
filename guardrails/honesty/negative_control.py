@@ -38,7 +38,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import yaml
 
-from .tristate import TriState, from_exit_code, parse, to_exit_code
+from .tristate import TriState, from_exit_code, parse
 
 
 @dataclass

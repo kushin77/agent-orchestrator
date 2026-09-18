@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -140,8 +141,6 @@ def unresolved_document(tree: Path) -> Path:
 
 def run_cli(tree: Path, *args: str) -> "subprocess.CompletedProcess":
     """The scratch tree's own CLI, in a fresh interpreter (the lane's tree is never touched)."""
-    import subprocess
-
     return subprocess.run(
         [
             sys.executable,

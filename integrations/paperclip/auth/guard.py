@@ -23,7 +23,7 @@ credential it refused (GR-6).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 from . import board as _board
 from . import jwt as _jwt

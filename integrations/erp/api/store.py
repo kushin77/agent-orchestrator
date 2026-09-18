@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
-from integrations.erp.core.errors import invalid_body, unknown_document_kind
+from integrations.erp.core.errors import invalid_body
 
 from . import errors as err
 

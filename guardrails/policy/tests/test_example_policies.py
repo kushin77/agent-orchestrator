@@ -142,7 +142,6 @@ def _workbook_registry(*, on: bool) -> "ControlRegistry":
     by its own workbook policy and the assertions below cannot be satisfied by
     an unrelated gate.
     """
-    from policy.controls import ControlRegistry
 
     platform_ids = (
         "model-call-budget",

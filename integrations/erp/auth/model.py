@@ -32,7 +32,7 @@ consulted and no declaration can influence it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple
 
 #: The envelope version every declaration in this module carries.
 SCHEMA_VERSION = 1

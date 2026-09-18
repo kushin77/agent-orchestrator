@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Callable, List, Tuple
+from typing import List, Tuple
 
 if __package__ in (None, ""):  # executed as a script, not imported as a package
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))

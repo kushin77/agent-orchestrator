@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable, Optional
 
 from policy.bundle import PolicyBundle, assemble
 from policy.controls import ControlRegistry

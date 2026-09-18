@@ -29,7 +29,6 @@ endpoints never care which transport carried the parameters.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import errors as err

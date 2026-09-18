@@ -91,7 +91,6 @@ def _cycle_up_to_order(defs: DefinitionSet) -> Tuple[Workspace, Scenario]:
 def _cycle_with_delivery(defs: DefinitionSet) -> Tuple[Workspace, Scenario]:
     """A workspace through the delivery: an order submitted and its delivery live."""
     space, scenario = _cycle_up_to_order(defs)
-    chain = defs.chain
     at = spine.TIMELINE["delivered"]
     space = spine.submit(space, scenario.ids[1], at=at)
     space = spine.deliver(

@@ -48,7 +48,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-from portal.server.fleet import read_surface_default, surface_enabled
+from portal.server.fleet import surface_enabled
 from portal.server.livestore import DEFAULT_USAGE_STORE, TelemetrySnapshot
 from telemetry.budgets.alerts import SpendAlertEvaluator
 from telemetry.budgets.budget import (

@@ -41,7 +41,7 @@ from .repair import plan_repairs, repair_execute  # noqa: E402
 from .report import render_json, render_text  # noqa: E402
 from .scanner import scan_paths  # noqa: E402
 from .selfcheck import repo_root, self_check, self_check_exit  # noqa: E402
-from .triage import TriageAction, partition, triage_finding  # noqa: E402
+from .triage import TriageAction, partition  # noqa: E402
 from .tristate import EXIT_CANNOT_ASSESS, EXIT_NOT_OK, EXIT_OK  # noqa: E402
 
 _PARSER = None

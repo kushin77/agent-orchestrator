@@ -37,16 +37,13 @@ from . import provenance, rates, schema as schemas
 from .budget import load_policies
 from .harness import build_workspace, policies_from, stamp
 from .ledger import open_sink
-from .meter import ErpMeter
 from .model import (
     REFUSALS,
     MeteredEvent,
-    OP_CREATE,
-    OP_TRANSITION,
     Refused,
 )
 from .rollup import ErpRollup
-from .usage import UsageSink, assert_event_shape_dict
+from .usage import assert_event_shape_dict
 from telemetry.metering.report import UsageReporter
 
 TENANT = "acme"

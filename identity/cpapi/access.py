@@ -51,7 +51,7 @@ from .errors import (
     scope_denied,
     unauthorized,
 )
-from .ports import Authorizer, DecisionView, SessionVerifier, VerifiedPrincipal
+from .ports import Authorizer, DecisionView, SessionVerifier
 
 
 @dataclass(frozen=True)

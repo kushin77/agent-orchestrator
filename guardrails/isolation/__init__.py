@@ -25,7 +25,6 @@ and depends only on the Python standard library.
 from __future__ import annotations
 
 from .model import Finding, FindingCategory, IndexVerdict, Severity
-from .tristate import TriState as _TriState
 
 __all__ = [
     "Finding",

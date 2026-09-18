@@ -28,7 +28,6 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from typing import List, Optional
@@ -41,7 +40,7 @@ from .negative_control import (
     run_controls,
     write_report,
 )
-from .tristate import aggregate, from_exit_code, parse, serialize, to_exit_code
+from .tristate import aggregate, from_exit_code, parse, to_exit_code
 
 
 def _cmd_status(args: argparse.Namespace) -> int:

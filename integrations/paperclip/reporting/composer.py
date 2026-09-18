@@ -53,14 +53,12 @@ from governance.modules.model import (
     REGISTERED_MANDATORY,
     STATES,
     TARGET_PENDING,
-    CannotAssess,
     Refusal,
     sorted_refusals,
 )
 
 from integrations.paperclip.reporting import audit, brief_schema, capability, policy as claim_policy
 from integrations.paperclip.reporting.model import (
-    ARTIFACT,
     REGISTRY_DOCUMENT,
     REGISTRY_PREFIX,
     SCHEMA,
@@ -555,8 +553,7 @@ def compose(
     book.blank()
     if module_findings:
         for finding in module_findings:
-            line = book.add("- `{}`".format(finding.render()))
-            del line
+            book.add("- `{}`".format(finding.render()))
     else:
         book.claim(
             "none — every claim above resolves to a registry row or a cited hub path.",

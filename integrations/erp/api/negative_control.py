@@ -470,7 +470,7 @@ def _with_unreadable_contract(base: World) -> Mapping[str, Any]:
     auth_contract.rbac = _UnreadableContract().rbac  # type: ignore[assignment]
     try:
         return base.surface.handle(
-            "GET", f"/v1/erp/documents/party", principal=base.principal()
+            "GET", "/v1/erp/documents/party", principal=base.principal()
         )
     finally:
         auth_contract.rbac = original  # type: ignore[assignment]

@@ -33,8 +33,7 @@ from typing import Any, Dict, List, Optional
 
 from .errors import RepairAbortError
 from .integrity import (DEFAULT_FALLBACK_TENANT, DEFAULT_QUARANTINE_TENANT,
-                        RULE_DENORMALIZED, RULE_DUPLICATE,
-                        RULE_FALLBACK_PILEUP, RULE_ORPHANED,
+                        RULE_ORPHANED,
                         scan_dataset)
 
 

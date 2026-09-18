@@ -45,7 +45,6 @@ if __package__ in (None, ""):  # executed as a script, not imported as a package
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from integrations.erp.api import (  # noqa: E402
-    errors as errors_module,
     fixtures,
     health as health_module,
     negative_control,
@@ -272,8 +271,8 @@ def _check_wiring(rig: _Rig, sink: TextIO) -> List[str]:
         )
     if not problems:
         print(
-            f"  OK    the route table agrees with the model, every route has a handler, and the "
-            f"authorization layer is reached from exactly one place",
+            "  OK    the route table agrees with the model, every route has a handler, and the "
+            "authorization layer is reached from exactly one place",
             file=sink,
         )
     return problems
