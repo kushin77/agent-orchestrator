@@ -161,12 +161,6 @@
     },
     {
       "kind": "worktree",
-      "name": "/home/akushnir/ao-worktrees/ao-1158",
-      "tip": "bce58866c000acf18eddb7506d142148770258d1",
-      "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD bce58866c000 is on no default branch the audit's proofs can find, and it holds 0 uncommitted path(s); its tip is contained in no remote-tracking ref. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
-    },
-    {
-      "kind": "worktree",
       "name": "/tmp/ao968-pristine",
       "tip": "96ae0fba19c36764e1f0251070d7c77bb17b4a5d",
       "reason": "AGENTS.md rule 17 (keep-and-report): its HEAD 96ae0fba19c3 is already on the default branch, but the worktree holds 1 uncommitted path(s), which are on no branch at all; its tip IS contained in a remote-tracking ref, so the work is preserved elsewhere. Measured 2026-09-18T17:50:33Z by the #1321 lane; discarding it is the worker's decision to have authorised, not a cleanup. Resolution is the owner's call on #1311: land it, push it, or authorise its deletion — and this entry then goes with it."
