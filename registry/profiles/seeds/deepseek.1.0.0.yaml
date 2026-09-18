@@ -16,7 +16,7 @@ toolAllowlist:
   - file_write
   - shell_exec
   - web_fetch
-  - sql_query
+  - sql_query  # role-only: analytics worker SQL access, not applicable to the orchestrator
   - search_memory
   - store_memory
 constraintSet:
@@ -27,8 +27,8 @@ constraintSet:
 capabilitySet:
   - code-author
   - research
-  - data-analysis
-  - memory-ops
+  - data-analysis  # role-only: analytics worker, not applicable to the orchestrator
+  - memory-ops  # role-only: analytics worker memory operations, not applicable to the orchestrator
 defaultModelTier: MED
 memoryScope:
   - user

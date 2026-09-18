@@ -12,8 +12,8 @@ version: 1.0.0
 owner: platform/purebliss
 systemPromptRef: claude/primary@v1
 toolAllowlist:
-  - gh_issue
-  - gh_pr
+  - gh_issue  # role-only: orchestrator issue authoring, not applicable to the analytics worker
+  - gh_pr  # role-only: orchestrator PR authoring, not applicable to the analytics worker
   - file_read
   - file_write
   - shell_exec
@@ -30,9 +30,9 @@ constraintSet:
   - no-unverified-merge
   - no-debug-leftovers
 capabilitySet:
-  - orchestrate
+  - orchestrate  # role-only: orchestrator lane decomposition, not applicable to the analytics worker
   - code-author
-  - code-review
+  - code-review  # role-only: orchestrator review duty, not applicable to the analytics worker
   - research
 defaultModelTier: MED
 memoryScope:

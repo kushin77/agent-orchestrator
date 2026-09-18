@@ -157,6 +157,85 @@ else
   fail "the real and mutant plans are byte-identical — the mutation had no effect"
 fi
 
+# --- 8. mergeable/mergeStateStatus "UNKNOWN" (string) is unknown, not ready -
+# Issue #1145 defect 1: `gh pr list --json mergeable` can report the JSON
+# STRING "UNKNOWN" (GitHub still computing it), not just null; only null was
+# ever treated as unknown, so a PR in this state was misclassified ready.
+fixture_unknown="$TMPD/fixture-unknown.json"
+cat > "$fixture_unknown" <<'JSON'
+[
+  {"number":60,"title":"still computing","isDraft":false,"mergeable":"UNKNOWN","mergeStateStatus":"UNKNOWN","files":[{"path":"README.md"}],"body":"## Pre-existing red\n\nNone\n"}
+]
+JSON
+out="$TMPD/out-unknown.txt"
+env -u AO_QUEUE_APPLY AO_QUEUE_FIXTURE="$fixture_unknown" bash "$target" > "$out" 2>&1
+if grep -qE '^ *60 +unknown' "$out"; then
+  ok "mergeable/mergeStateStatus = string \"UNKNOWN\" is classified 'unknown', not 'ready'"
+else
+  fail "PR #60 (mergeable=\"UNKNOWN\") was not classified 'unknown': $(grep -E '^ *60 ' "$out")"
+fi
+if grep -q '^MERGE_ORDER:.*\b60\b' "$out"; then
+  fail "PR #60 (mergeable=\"UNKNOWN\") entered the merge order"
+else
+  ok "PR #60 (mergeable=\"UNKNOWN\") never enters the merge order"
+fi
+
+# --- 9. gate-paths.txt comments are stripped, not treated as globs ----------
+# Issue #1145 defect 2: a `#`-prefixed comment line in scripts/lib/gate-paths.txt
+# was read as a literal glob. The real file's own header IS such a comment
+# (it names scripts/pr-queue.sh in prose), so a PR touching ONLY
+# scripts/pr-queue.sh — a real file, not a gate path — must still classify
+# 'ready' against the real file, proving the header text isn't glob-matched.
+if grep -qE '^[[:space:]]*#' "$root/scripts/lib/gate-paths.txt"; then
+  fixture_comment="$TMPD/fixture-comment.json"
+  cat > "$fixture_comment" <<'JSON'
+[
+  {"number":70,"title":"touches pr-queue.sh only","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","files":[{"path":"scripts/pr-queue.sh"}],"body":"## Pre-existing red\n\nNone\n"}
+]
+JSON
+  out="$TMPD/out-comment.txt"
+  env -u AO_QUEUE_APPLY AO_QUEUE_FIXTURE="$fixture_comment" bash "$target" > "$out" 2>&1
+  if grep -qE '^ *70 +ready' "$out"; then
+    ok "a PR touching only scripts/pr-queue.sh is 'ready' against the real gate-paths.txt (its header comments are not read as globs)"
+  else
+    fail "PR #70 was misclassified against the real gate-paths.txt: $(grep -E '^ *70 ' "$out")"
+  fi
+else
+  fail "scripts/lib/gate-paths.txt has no '#' comment line to provoke this case against"
+fi
+
+# --- 10. a Pre-existing-red heading that doesn't match exactly is unclear ---
+# Issue #1145 defect 3: the queue used to prefix-match "## pre-existing red",
+# so "## Pre-existing red / environment notes" (#1127's real shape) was
+# treated as a clean "None" section instead of flagged. Reconciled against
+# check-pr-contract.sh's exact-heading predicate, and "no section found" is
+# refused (class 'unclear-pre-existing-red'), not silently treated as none.
+fixture_fuzzy="$TMPD/fixture-fuzzy-heading.json"
+cat > "$fixture_fuzzy" <<'JSON'
+[
+  {"number":80,"title":"fuzzy heading","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","files":[{"path":"README.md"}],"body":"## Pre-existing red / environment notes\n\nNone\n"},
+  {"number":90,"title":"no section at all","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","files":[{"path":"README.md"}],"body":"Just a description, no pre-existing-red section.\n"}
+]
+JSON
+out="$TMPD/out-fuzzy.txt"
+env -u AO_QUEUE_APPLY AO_QUEUE_FIXTURE="$fixture_fuzzy" bash "$target" > "$out" 2>&1
+if grep -qE '^ *80 +unclear-pre-existing-red' "$out"; then
+  ok "a heading that isn't the exact '## Pre-existing red' text (#1127's shape) is flagged 'unclear-pre-existing-red', not read as a clean None"
+else
+  fail "PR #80 (fuzzy heading) was not flagged: $(grep -E '^ *80 ' "$out")"
+fi
+if grep -qE '^ *90 +unclear-pre-existing-red' "$out"; then
+  ok "a body with no Pre-existing-red section at all is flagged 'unclear-pre-existing-red', not defaulted to ready"
+else
+  fail "PR #90 (no section) was not flagged: $(grep -E '^ *90 ' "$out")"
+fi
+merge_order_line="$(grep '^MERGE_ORDER:' "$out" || true)"
+if [[ "$merge_order_line" =~ (^|[^0-9])80([^0-9]|$) ]] || [[ "$merge_order_line" =~ (^|[^0-9])90([^0-9]|$) ]]; then
+  fail "a PR with an unclear/missing Pre-existing-red section entered the merge order"
+else
+  ok "neither PR #80 nor #90 enters the merge order"
+fi
+
 # --- 7. nothing here ever applies -------------------------------------------
 if [ -z "${AO_QUEUE_APPLY:-}" ]; then
   ok "this self-test never sets AO_QUEUE_APPLY — every run above was a dry-run plan"

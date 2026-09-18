@@ -23,21 +23,35 @@ from checker import (
     load_snapshot,
     parse_ledger_text,
     relpath,
+    write_report,
 )
-from conftest import (
-    AREA_LABEL,
-    ARTIFACT,
-    INCIDENT_LABEL,
-    REPO_ROOT,
-    StubProbe,
-    action,
-    board,
-    board_issue,
-    incident,
-    lesson,
-    rca,
-    suggestion,
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_lessons_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
 )
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+AREA_LABEL = _conftest.AREA_LABEL
+ARTIFACT = _conftest.ARTIFACT
+INCIDENT_LABEL = _conftest.INCIDENT_LABEL
+REPO_ROOT = _conftest.REPO_ROOT
+StubProbe = _conftest.StubProbe
+action = _conftest.action
+board = _conftest.board
+board_issue = _conftest.board_issue
+incident = _conftest.incident
+lesson = _conftest.lesson
+rca = _conftest.rca
+suggestion = _conftest.suggestion
 from model import (
     CODE_BOARD_INCIDENT_PENDING,
     CODE_BOARD_INCIDENT_WITHOUT_RCA,
@@ -422,24 +436,29 @@ def test_an_area_labelled_issue_is_not_an_incident_record(report_factory):
     """The #766 regression: #141/#494/#495/#497 hold the AREA label, not a record.
 
     All four are work items with no incident to record, so none of them may be
-    a finding — and none may need a hand-written exemption to say so.
+    a finding — and none may need a hand-written exemption to say so. #100 is
+    the issue the ledger *names* as INC-0001's origin, so it carries the record
+    label; the AREA-labelled four must not be selected by it (issue #1178).
     """
     snapshot = board(
-        board_issue(100, state="OPEN", labels=["area:board"]),
+        board_issue(100, state="OPEN", labels=[INCIDENT_LABEL]),
         {**board_issue(141, state="CLOSED"), "labels": [AREA_LABEL, "area:lessons"]},
         {**board_issue(494, state="CLOSED"), "labels": [AREA_LABEL]},
         {**board_issue(495, state="CLOSED"), "labels": [AREA_LABEL]},
         {**board_issue(497, state="CLOSED"), "labels": [AREA_LABEL]},
     )
     report = report_factory(clean_ledger(), snapshot=snapshot)
-    assert report.counts["board_incidents_scanned"] == 0
+    assert report.counts["board_incidents_scanned"] == 1
     assert [f for f in report.findings if f.code.startswith("board-incident")] == []
+    subjects = {f.subject for f in report.findings}
+    for ref in ("#141", "#494", "#495", "#497"):
+        assert ref not in subjects
     assert errors(report.findings) == []
 
 
 def test_an_open_record_labelled_issue_is_a_deviation(report_factory, clean_records):
     snapshot = board(
-        board_issue(100, state="OPEN", labels=["area:board"]),
+        board_issue(100, state="OPEN", labels=[INCIDENT_LABEL]),
         board_issue(900, state="OPEN"),
     )
     report = report_factory(clean_records, snapshot=snapshot)
@@ -651,8 +670,6 @@ def test_git_probe_reports_unavailable_outside_a_work_tree(tmp_path):
 
 
 def test_report_is_written_as_json(report_factory, tmp_path, clean_records):
-    from checker import write_report
-
     report = report_factory(clean_records)
     path = write_report(report, tmp_path / "out" / "lessons-report.json")
     assert path.is_file()

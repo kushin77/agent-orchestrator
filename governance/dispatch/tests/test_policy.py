@@ -6,15 +6,24 @@ import claims
 import policy
 import pytest
 import snapshot as snapshot_mod
+import model as _model  # noqa: E402
 from model import Issue, Snapshot
+
+# A lazy ``_model`` inside a test body is not safe here: by the
+# time the test runs, a later-collected governance/* suite's conftest may have
+# already evicted and re-imported the bare "model" name for itself (issues
+# #699, #702, #1042), so a lookup done at test-execution time can silently
+# resolve to a DIFFERENT package's module. Binding ``_model`` at collection
+# time (immediately after this suite's own conftest has run its eviction)
+# pins the reference to THIS package's module for the rest of the file.
 
 
 def test_load_default_controls_matches_model_vocabulary():
     controls = policy.load()
     assert controls.schema == policy.SCHEMA
-    assert set(controls.allowed_claim_reasons) == set(__import__("model").ALLOWED_CLAIM_REASONS)
-    assert set(controls.terminal_claim_reasons) == set(__import__("model").TERMINAL_CLAIM_REASONS)
-    assert set(controls.arbitration_refusals) == set(__import__("model").ARBITRATION_REFUSALS)
+    assert set(controls.allowed_claim_reasons) == set(_model.ALLOWED_CLAIM_REASONS)
+    assert set(controls.terminal_claim_reasons) == set(_model.TERMINAL_CLAIM_REASONS)
+    assert set(controls.arbitration_refusals) == set(_model.ARBITRATION_REFUSALS)
 
 
 def test_claim_ttl_matches_lease_single_source():
@@ -31,9 +40,9 @@ def _write_controls(tmp_path, **overrides):
         "schema": policy.SCHEMA,
         "stale_minutes": 15,
         "claim_ttl_hours": 24,
-        "allowed_claim_reasons": list(__import__("model").ALLOWED_CLAIM_REASONS),
-        "terminal_claim_reasons": list(__import__("model").TERMINAL_CLAIM_REASONS),
-        "arbitration_refusals": list(__import__("model").ARBITRATION_REFUSALS),
+        "allowed_claim_reasons": list(_model.ALLOWED_CLAIM_REASONS),
+        "terminal_claim_reasons": list(_model.TERMINAL_CLAIM_REASONS),
+        "arbitration_refusals": list(_model.ARBITRATION_REFUSALS),
     }
     base.update(overrides)
     path = tmp_path / "controls.yaml"
@@ -43,7 +52,7 @@ def _write_controls(tmp_path, **overrides):
 
 def test_mutation_dropped_reason_is_refused(tmp_path):
     """Mutation test: a controls.yaml that drops a real reason is CANNOT-ASSESS, not a pass."""
-    reasons = list(__import__("model").ALLOWED_CLAIM_REASONS)[:-1]
+    reasons = list(_model.ALLOWED_CLAIM_REASONS)[:-1]
     path = _write_controls(tmp_path, allowed_claim_reasons=reasons)
     with pytest.raises(policy.PolicyUnavailable, match="allowed_claim_reasons"):
         policy.load(path)
@@ -80,9 +89,9 @@ def test_stale_minutes_is_read_and_changes_real_behaviour(tmp_path):
                 "schema": policy.SCHEMA,
                 "stale_minutes": 5,
                 "claim_ttl_hours": 24,
-                "allowed_claim_reasons": list(__import__("model").ALLOWED_CLAIM_REASONS),
-                "terminal_claim_reasons": list(__import__("model").TERMINAL_CLAIM_REASONS),
-                "arbitration_refusals": list(__import__("model").ARBITRATION_REFUSALS),
+                "allowed_claim_reasons": list(_model.ALLOWED_CLAIM_REASONS),
+                "terminal_claim_reasons": list(_model.TERMINAL_CLAIM_REASONS),
+                "arbitration_refusals": list(_model.ARBITRATION_REFUSALS),
             }
         ),
         encoding="utf-8",

@@ -8,11 +8,21 @@ Two additions to the per-surface check (ADR-0031):
   evidence has already exceeded is refused as stale.
 * ``module.json`` ``solution_class`` — the module declares its own class, and it
   may never exceed the floor: the lowest measured class over the *product*
-  surfaces (every row without a ceiling). A mutant declaring ``elite`` is
-  refused by name.
+  surfaces (every row without a ceiling). A synthetic-policy mutant declaring
+  above the floor is refused by name (``test_cli_refuses_a_mutant_manifest``,
+  ``test_cli_module_flag_overrides_the_manifest_path``).
 
 Both checks stay silent when their input is absent (no ceiling key, no
 manifest), so the existing suite's exact finding-code assertions still hold.
+
+EPIC #878 flip note: the real tree's product floor is now `elite` — the
+ladder's top rung — so the above-floor negative control can no longer be run
+against the real tree (there is no rung left to mutate into). That real-tree
+variant was replaced by
+``test_real_tree_floor_is_elite_so_no_rung_can_mutate_above_it``, which
+asserts the floor really is the top rung and that the real manifest declares
+exactly it; the negative-control *mechanism* itself stays proven by the two
+synthetic-policy tests named above.
 """
 
 from __future__ import annotations
@@ -379,12 +389,21 @@ def test_real_policy_ceilings_are_the_three_non_product_rows():
             assert row["ceiling_reason"].strip(), row["surface"]
 
 
-def test_real_tree_mutant_manifest_declaring_elite_is_refused_by_name(tmp_path):
+def test_real_tree_floor_is_elite_so_no_rung_can_mutate_above_it(tmp_path):
+    # EPIC #878 flip: every product surface now measures `elite`, so the real
+    # product floor is the ladder's top rung. There is no rung left above
+    # `elite` to mutate the manifest into, so the above-floor negative control
+    # this test used to run against the real tree is no longer expressible
+    # here (it stays covered generically by the synthetic-policy negative
+    # controls: test_cli_refuses_a_mutant_manifest and
+    # test_cli_module_flag_overrides_the_manifest_path). What we can still
+    # assert against the real tree is that the floor really is the top rung,
+    # and the real manifest declares exactly the floor, never above it.
     policy = load_surface_policy(REAL_POLICY)
     rows, _ = evaluate_surfaces(policy, ROOT)
+    floor, _holders = product_floor(policy, rows)
+    assert floor == policy.ladder[-1] == "elite"
     manifest = json.loads(REAL_MODULE.read_text(encoding="utf-8"))
-    manifest[MODULE_CLASS_KEY] = "elite"
-    mutant = tmp_path / "module.json"
-    mutant.write_text(json.dumps(manifest), encoding="utf-8")
-    findings = evaluate_module_class(policy, rows, mutant)
-    assert codes(findings) == {CODE_MODULE_ABOVE_FLOOR}
+    assert manifest[MODULE_CLASS_KEY] == floor
+    findings = evaluate_module_class(policy, rows, REAL_MODULE)
+    assert findings == [], [f.message for f in findings]

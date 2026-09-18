@@ -530,7 +530,7 @@ already had, each read by name rather than existing decoratively:
   refusal-code vocabulary this surface's `Violation`s may carry
   ([`violation.KNOWN_CODES`](violation.py)) in both directions: a declared
   code the surface never emits, or an emitted code nobody declared, is
-  `PolicyUnavailable` at load time. [`tests/test_controls.py`](tests/test_controls.py)
+  `PolicyUnavailable` at load time. [`tests/test_isolation_controls.py`](tests/test_isolation_controls.py)
   mutates a temporary copy of `controls.yaml` and proves `identity.mint()` and
   `speculative.DEFAULT_BASE` actually follow it; `scripts/check-session-isolation.sh`
   §3e provokes the same mutation against the real declaration (sha256-restored

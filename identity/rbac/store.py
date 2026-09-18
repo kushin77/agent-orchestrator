@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from rbac.model import (
+from .model import (
     DEFAULT_ROLE_ADMIN_PERMISSION,
     ROLE_LEVEL_TEAM,
     Agent,

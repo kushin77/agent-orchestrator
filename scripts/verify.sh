@@ -114,6 +114,17 @@ checks=(
   # CANNOT-ASSESS (exit 2), never a pass -- found by mutation, not by review: the
   # first version printed "not a pass" and then exited 0.
   'branch-protection|bash scripts/check-branch-protection.sh'
+  # repo-settings (issue #1138, parent #803): the platform-level enforcement
+  # of the squash-merge message policy. Measured: the live repo setting was
+  # `squash_merge_commit_message=COMMIT_MESSAGES`, concatenating every
+  # per-commit message onto the squash commit instead of using the PR body --
+  # burying the ticket trailer mid-body and redding check-isolation-landed on
+  # every wave (#1119 #1044 #1121 #1126 #1103, four more baselined in #1130).
+  # This check compares the LIVE settings against the DECLARED policy and is
+  # PROVOKED offline (a matching fixture must pass; a reverted message policy
+  # must be caught and named), mirroring branch-protection's own gate. An
+  # unobservable live state is CANNOT-ASSESS (exit 2), never a pass.
+  'repo-settings|bash scripts/check-repo-settings.sh'
   # gate-status (epic #803 P0-2, ADR-0028): GitHub's required status checks are
   # the only mechanism that makes a merge impossible without green evidence, and
   # producing one normally needs the GitHub Actions that GR-15 bans. ADR-0028
@@ -320,6 +331,12 @@ checks=(
   # every seed must validate as a projected identity; the check mutates its own
   # input, so it cannot pass vacuously.
   'agent-identity-parity|bash scripts/check-agent-identity-parity.sh'
+  # provider-parity (issue #1194): flag UNEXPLAINED Claude/DeepSeek capability
+  # drift without forcing literal parity (roles differ by design); every
+  # asymmetric flag-gated module.json feature and capabilitySet/toolAllowlist
+  # entry must carry an inline rationale marker, and the check mutates a
+  # scratch copy with an unmarked item, so it cannot pass vacuously.
+  'provider-parity|bash scripts/check-provider-parity.sh'
   # rbac-head-binding (issue #952): tenant/RBAC binding for the head-of-org
   # personas (hermes, paperclip) — identity/rbac/presets/head-agents.yaml +
   # identity/rbac/head_bindings.py; GR-28 default-off is asserted live and the
@@ -629,6 +646,20 @@ checks=(
   # comparator function with four fixtures (valid / missing-pillar /
   # stale-path / malformed-owner), each required to fail BY NAME.
   'codeowners|bash scripts/check-codeowners.sh'
+  # EPIC #878 flip (issue #883/#878): five suites this lane declared in
+  # scripts/pytest-suites.txt as part of raising every product surface's
+  # `declared_class` to `elite` (the live_sync evidence). A suite declared in
+  # the manifest but named by no gate is refused by check-gate-coverage, which
+  # never grandfathers a newly declared one -- so each gets the `pytest-*`
+  # wiring precedent (`pytest-fleet`, `pytest-conversation`, `pytest-control`)
+  # rather than being named only from inside an unrelated per-surface check.
+  # Offline and deterministic (no network, no vendor seed), so each RUNS for
+  # real in a fresh worktree.
+  'pytest-gateway-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q gateway/sync/tests'
+  'pytest-registry-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/sync/tests'
+  'pytest-module-registry-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/modules/sync/tests'
+  'pytest-hermes-sync|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/hermes/sync/tests'
+  'pytest-governance-controls|env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/controls/tests'
 )
 
 # --- check auto-discovery (#698) ---------------------------------------------
@@ -823,7 +854,7 @@ PY
 # here so a malformed attestation is itself a gate defect, not a silent hole. A
 # schema violation here is not allowed to hide behind an otherwise-green run:
 # it forces the whole gate to FAIL (no-false-green doctrine, GR-12).
-attestation_schema="$root/.verify/attestation.schema.json"
+attestation_schema="$root/governance/isolation/attestation.schema.json"
 if [ -f "$attestation_schema" ] && command -v python3 >/dev/null 2>&1; then
   if ! python3 "$root/scripts/lib/validate-attestation.py" \
       "$verify_dir/attestation.json" "$attestation_schema" >>"$log" 2>&1; then

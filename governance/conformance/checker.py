@@ -117,6 +117,7 @@ def load_policy(path: Path) -> Policy:
         str(name): str(value)
         for name, value in (filing.get("defaults") or {}).items()
     }
+    filing_tags = tuple(str(name) for name in (filing.get("tags") or ()))
 
     return Policy(
         ladder=ladder,
@@ -126,6 +127,7 @@ def load_policy(path: Path) -> Policy:
         infra_paths=infra_paths,
         filing_default_class=filing_default_class,
         filing_defaults=filing_defaults,
+        filing_tags=filing_tags,
     )
 
 
