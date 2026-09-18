@@ -291,8 +291,6 @@ class ControlPlane:
         from engine.core import (
             Engine,
             FileJsonlEventStore,
-            GatewayRequest,
-            GatewayResult,
             NamespaceRegistry,
             WorkflowSpec,
         )

@@ -30,7 +30,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 # The HS256 JWT codec is the identity lane's canonical one
 # (``identity/sso/jose.py``). This module delegates to it instead of

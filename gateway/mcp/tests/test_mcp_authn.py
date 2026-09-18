@@ -25,6 +25,24 @@ def _error_code(resp: dict) -> int:
     return resp["error"]["code"]
 
 
+def _tampered(token: str) -> str:
+    """Return ``token`` with its signature provably altered.
+
+    The signature's FIRST base64url character is changed, never its last. A
+    32-byte HMAC encodes to 43 base64url characters, so the final character
+    carries only 4 significant bits (2 are padding) and replacing it therefore
+    often decodes to the **same** signature bytes: the credential is not
+    tampered at all and the denial under test is never exercised. MEASURED on
+    this box: 263 of 4000 minted tokens (6.6 %) were still ACCEPTED after
+    ``token[:-1] + ("A"|"B")`` -- i.e. ~1 run in 15 reddened the wired gate with
+    a false failure. The first character carries 6 significant bits, so changing
+    it always changes the decoded signature (measured: 0 of 4000 no-ops).
+    """
+    head, sep, sig = token.rpartition(".")
+    assert sep and sig, f"not a header.payload.signature token: {token!r}"
+    return f"{head}{sep}{'B' if sig[0] != 'B' else 'C'}{sig[1:]}"
+
+
 def test_initialize_and_ping_need_no_session(make_gateway):
     gateway = make_gateway()
     init = gateway.handle_message(
@@ -78,8 +96,7 @@ def test_whoami_resolves_tenant_per_request(make_gateway, mint):
 def test_invalid_signature_denied(make_gateway, mint, two_tenant_kb):
     gateway = make_gateway(kb_registry=two_tenant_kb)
     token = mint("acme", "agent-a", allowed_tools=("kb.summary",))
-    tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
-    resp = gateway.call_tool("kb.summary", {}, session_token=tampered)
+    resp = gateway.call_tool("kb.summary", {}, session_token=_tampered(token))
     assert _error_code(resp) == AUTHN_FAILED
 
 

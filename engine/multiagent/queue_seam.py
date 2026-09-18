@@ -16,7 +16,7 @@ Imported as ``engine.multiagent.queue_seam`` with the repo root on
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from engine.queue.model import Priority, TaskSpec, coerce_priority
 from engine.queue.queue import JobQueue

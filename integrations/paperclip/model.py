@@ -15,7 +15,7 @@ nor the gate pull a third-party dependency in.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 from .._seam.wire import Response  # noqa: F401 - re-exported at this adapter's seam

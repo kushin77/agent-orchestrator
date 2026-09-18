@@ -60,8 +60,8 @@ Exit-code-free by design: this is a library. The caller holds the queue
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Mapping
 
 #: The environment variable a principal sets to pin the profile explicitly, when
 #: the runner's own executable name does not identify it (a wrapper, say). Naming

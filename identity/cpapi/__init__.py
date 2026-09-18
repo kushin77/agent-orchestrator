@@ -86,4 +86,10 @@ __all__ = [
     "authorize_request",
     "build_test_app",
     "verify_token",
+    # Submodule re-exports (issue #1203): ``cpapi.model`` and ``cpapi.errors``
+    # are part of the surface the docstring above names, so they are declared
+    # here rather than left as imports the linter must read as dead code.
+    "errors",
+    "model",
+    "outbox",
 ]

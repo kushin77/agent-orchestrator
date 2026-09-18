@@ -30,7 +30,7 @@ run reconstructs the whole ticket with no hidden in-memory state.
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, Dict, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, Mapping, Optional
 
 from core.errors import StepFailure
 from core.handlers import Handler, StepContext

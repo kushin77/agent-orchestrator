@@ -30,7 +30,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .._seam.schema import validate  # noqa: F401 - re-exported at this adapter's seam
 from .._seam.yaml_subset import load_yaml, load_yaml_file  # noqa: F401
-from .model import Activity, Budget, Cost, Issue, Persona, Profile
+from .model import Activity, Cost, Issue, Persona, Profile
 
 #: The three frozen seam contracts and their schemas.
 SCHEMA_KINDS: Tuple[str, ...] = ("heartbeat", "ticket", "budget")

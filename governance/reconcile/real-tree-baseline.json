@@ -671,6 +671,11 @@
     },
     {
       "kind": "branch",
+      "name": "issue-1158",
+      "reason": "measured 2026-09-18 by the ao-lhf-1158 lane at origin/master 5ec9b29 and baselined, NOT quarantined: its work IS on the default branch, so reaping it loses no work and it is not the AGENTS.md rule-17 keep-and-report class the quarantine exists for. Proof: `git diff origin/master...bce5886 | git patch-id --stable` = 7de27445f6d2, identical to 4c9db94 (subject names PR #1165, body says Closes #1158, ancestor of origin/master, same tree 12065dc4). The audit's own three proofs still grant nothing: ancestry no; tree containment no (the tip's three changed paths -- .board/snapshot.json, docs/BOARD-METADATA-AUDIT.md, docs/README.md -- have drifted on master since 4c9db94); patch identity no, because landing.py's candidate generator keys on the issue number in the commit SUBJECT and this landing names PR #1165 there (#1310; fix open as PR #1312; owner #1311). The tip is contained in no remote-tracking ref, so the commit itself exists only on this box: reaping the branch is the reaper's call (#1265/#1159) and the owner's on #1311, never a lane's. Its twin worktree ao-worktrees/ao-1158 @bce5886 still carries a quarantine exemption whose reason over-claims for this same tip; #1311 owns restating or removing it."
+    },
+    {
+      "kind": "branch",
       "name": "issue-12-agent-org-rbac",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },

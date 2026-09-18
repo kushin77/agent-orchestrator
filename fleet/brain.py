@@ -207,8 +207,8 @@ def master_health_refusal(order: dict) -> str | None:
     head = current_master_head()
     if head is None:
         return (
-            f"master-health CANNOT-ASSESS — origin/master's head could not be resolved "
-            f"(no fetch, no verify was run); dispatch refuses rather than assume master is green"
+            "master-health CANNOT-ASSESS — origin/master's head could not be resolved "
+            "(no fetch, no verify was run); dispatch refuses rather than assume master is green"
         )
     if not landing_evidence.same_commit(attestation.commit, head):
         return (

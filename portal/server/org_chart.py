@@ -45,7 +45,7 @@ portal's own ``portal/config/feature-flags.yaml`` and read here through
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, List, Mapping, Optional
 
 from portal.server.config_flags import ORG_CHART_SURFACE, surface_enabled
 

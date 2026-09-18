@@ -41,7 +41,6 @@ if _guardrails_root not in sys.path:
 
 from policy import __version__  # noqa: E402
 from policy.controls import ControlRegistry  # noqa: E402
-from policy.decision import DecisionLevel  # noqa: E402
 from policy.startup import (  # noqa: E402
     default_bundle_dir,
     default_controls_file,

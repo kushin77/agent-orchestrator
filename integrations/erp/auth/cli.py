@@ -124,7 +124,7 @@ def command_check(args: argparse.Namespace, sink: TextIO, err: TextIO) -> int:
     try:
         role_map = roles.load_default()
         policy_set = policies_module.load_default(kinds=role_map.kinds)
-        record = provenance.load_default()
+        provenance.load_default()
     except Refused as refusal:
         return _fail(err, "declarations", refusal)
     print(

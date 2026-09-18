@@ -21,6 +21,7 @@ may be handed to :class:`LoopAgentRunner` (or straight into
 
 from __future__ import annotations
 
+import importlib
 import sys
 from typing import Any, Optional
 
@@ -161,7 +162,7 @@ def loop_runner_if_present() -> Optional[LoopAgentRunner]:
     runner type is never picked up.
     """
     try:
-        import engine.loop  # type: ignore  # not on master yet (issue #23)
+        importlib.import_module("engine.loop")
     except Exception:  # noqa: BLE001 - absent module is the expected state
         return None
     module = sys.modules.get("engine.loop")

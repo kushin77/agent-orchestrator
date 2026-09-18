@@ -44,7 +44,6 @@ from telemetry.budgets.model import (
     RESOURCE_REQUESTS,
     RESOURCE_STORAGE,
     RESOURCE_TOKENS,
-    day_bucket,
 )
 
 DEFAULT_QUOTA_CONFIG = Path(__file__).resolve().parent / "config" / "quotas.yaml"

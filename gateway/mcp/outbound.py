@@ -51,12 +51,12 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Protocol, Tuple
 
 from .audit import GENESIS_HASH, _chain_verify, _hash_record, now_utc
-from .authz import AuthzDecision, PermissionGuard
+from .authz import PermissionGuard
 from .model import SessionIdentity
 
 # --------------------------------------------------------------------------- #

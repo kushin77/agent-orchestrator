@@ -16,7 +16,7 @@ seam so the whole protocol is testable with a scripted runner.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, Optional, Sequence
 
 from .model import (
     AgentResult,
@@ -27,7 +27,6 @@ from .model import (
     ConsensusResult,
     Lane,
     LaneRole,
-    ResultStatus,
     TaskKind,
     ThresholdRule,
     Vote,

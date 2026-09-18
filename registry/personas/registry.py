@@ -373,7 +373,6 @@ def validate_org_chart(
                 "platform persona"
             )
 
-        card = cards.get((tenant, target)) or cards.get((_PLATFORM_TENANT, target))
         bound = cards.get((tenant, nid)) or cards.get((_PLATFORM_TENANT, nid))
         if bound is None:
             raise InvalidOrgChartError(

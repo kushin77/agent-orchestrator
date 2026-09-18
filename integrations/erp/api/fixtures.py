@@ -35,7 +35,7 @@ from integrations.erp.auth import contract as auth_contract
 from integrations.erp.auth import platform_fixture as fx
 from integrations.erp.auth import policies as policies_module
 from integrations.erp.auth import roles as roles_module
-from integrations.erp.auth.model import ACTIONS, SCHEMA_VERSION
+from integrations.erp.auth.model import SCHEMA_VERSION
 from integrations.erp.core import validators as core_validators
 
 from .store import DocumentStore

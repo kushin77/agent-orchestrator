@@ -104,7 +104,7 @@ def check(stream: TextIO = sys.stdout) -> int:
         for problem in harvest:
             fail(problem)
     else:
-        ok(f"the harvest record accounts for every shipped schema (GR-10)")
+        ok("the harvest record accounts for every shipped schema (GR-10)")
 
     print("== 3. the posting rules ==", file=stream)
     for rule in catalog.postings:

@@ -401,7 +401,7 @@ def _demo() -> int:
     registry = PersonaRegistry()
     cards = registry.discover()
     print(f"persona library: {len(cards)} persona(s) discovered")
-    print(f"materializing AgentProfiles for every persona ...")
+    print("materializing AgentProfiles for every persona ...")
     profiles = {}
     for (tenant, persona) in sorted(cards):
         profile = materialize_profile(cards[(tenant, persona)])

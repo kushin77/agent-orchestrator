@@ -28,7 +28,6 @@ import os
 
 from .model import canonical_version, rule_ids
 from .render import LEDGER_MARKER, LEDGER_SCHEMA, MIRROR_TARGETS
-from .versioning import DistributionError
 
 # Which harness consumes which mirror (the runtime -> file map, stated once).
 HARNESS_MAP = {

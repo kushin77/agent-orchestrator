@@ -59,34 +59,29 @@
 # 6, UNWIRED 69, baselined 69.
 # The gate-invocation universe, the match-by-path rule and the rejected
 # alternatives are stated in scripts/check-gate-coverage.sh.
+# It shrank again with the gate-coverage lane (#1203, parent #1201): 18 suite
+# rows were retired BY NAMING the suite as a pytest target a gate actually runs.
+# Seventeen of them (`gateway/{finops,health,providers,catalog,limits,mcp,proxy}`,
+# `registry/{prompts,personas,events,service,packs}` and
+# `engine/{loop,multiagent,memory,queue,core}`) are named in scripts/verify.sh's
+# checks=() array, which is what `make verify` runs. The eighteenth,
+# `registry/profiles`, was red on the base and is named instead by its own gate
+# `scripts/check-profiles.sh` (issue #1292, landed as #1320) -- the same reason
+# `identity/chat` is absent above. That is the whole point of the
+# both-directions rule: naming a suite made its row STALE, so the gate failed by
+# name until the row was removed -- the list cannot grow an excuse and cannot
+# keep a dead one.
 suite	guardrails/dlp	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	guardrails/policy	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	guardrails/controls	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	guardrails/honesty	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	guardrails/isolation	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	guardrails/sandbox	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/finops	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/health	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/providers	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/catalog	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/limits	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/mcp	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/proxy	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	registry/prompts	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	registry/personas	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	registry/events	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	registry/service	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	registry/packs	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/onboarding	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/cpapi	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/edges	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/entitlements	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	identity/sso	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	engine/loop	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	engine/multiagent	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	engine/memory	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	engine/queue	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	engine/core	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	telemetry/ledger	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	telemetry/audit	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	telemetry/observability	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
