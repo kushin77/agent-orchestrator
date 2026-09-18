@@ -1,0 +1,374 @@
+# The declared environment-variable surface (issue #944).
+#
+# Every environment variable this repository's code reads is named here, once,
+# with what it is for, whether it carries a secret, what supplies it, and who
+# reads it. `infra/env/surface.py` measures this declaration against the tree and
+# `scripts/check-env-surface.sh` is the gate: a variable a deploy or a local run
+# would have to supply cannot be introduced without being declared here, and a
+# declaration that names a variable nothing reads is a finding too.
+#
+# This is the environment counterpart of `infra/feature-flags/registry.yaml`,
+# which `scripts/check-feature-flags.py` holds to `infra/terraform/variables.tf`.
+# The difference is the direction of the drift: a flag registry drifts against
+# Terraform, an env registry drifts against the code that reads it.
+#
+# WHY THIS EXISTS (the defect it removes)
+#   The go-live work added two new env seams (`AO_SURFACE_REGISTRY`,
+#   `AO_EDGE_HOST`) and relied on three pre-existing ones
+#   (`PORTAL_AUTH_GATE_JWKS` / `PORTAL_AUTH_GATE_JWKS_FILE`,
+#   `ROOT_ADMIN_EMAILS`) while there was nowhere a new variable was declared,
+#   reviewed, or checked for parity. A reader could not enumerate from any single
+#   place what a deployment needs, and nothing failed when a variable was
+#   introduced with no record.
+#
+# THE SCANNER IS NOT A GREP
+#   The console reads its environment through module-level constants
+#   (`os.environ.get(JWKS_ENV)`, where `JWKS_ENV = "PORTAL_AUTH_GATE_JWKS"`), so a
+#   textual `os.environ["..."]` scan finds NOTHING in `portal/` while the console
+#   reads four variables. `surface.py` resolves module-level string constants in
+#   the same file, and a read it cannot follow is reported as
+#   `indirect-read-not-recorded` rather than silently dropped.
+
+schema: cmr.env-surface/registry-v1
+
+# What the gate measures. A root that is not listed here is not scanned, and that
+# is exactly the omission this registry exists to end — so the exclusions are
+# declared with their reasons rather than left implicit.
+scan:
+  roots:
+    - control-plane
+    - e2e
+    - engine
+    - fleet
+    - gateway
+    - governance
+    - guardrails
+    - identity
+    - infra
+    - integrations
+    - portal
+    - registry
+    - telemetry
+  exclude:
+    - path: scripts
+      reason: >-
+        the gate/tooling layer: these are the checks that MEASURE a declaration,
+        and the env seams that configure a check (`CHECK_DENYLIST`, `AO_PR_RANGE`,
+        `STUB_*`) are inputs to a run of the harness, not variables a deploy of
+        the product supplies. `scripts/check-env-surface.sh` is exempt from its own
+        scan for the same reason the compiler is not written in its own output.
+    - path: vendor
+      reason: the pinned CMR submodule, never edited (repository DON'Ts).
+
+# Reads the scanner deliberately cannot follow, named with the site, HOW MANY such
+# sites it has, and why. A generic `os.environ.get(name)` resolves to whatever the
+# caller passed, so pretending it is closed would be a false green; recording the
+# count keeps the unmeasurable part of the surface visible and makes a NEW one a
+# finding (it raises the count) and a removed one stale (it lowers it).
+indirect_reads:
+  - path: fleet/health.py
+    sites: 1
+    reason: >-
+      the health probe resolves its variable from a caller-supplied name, so the
+      names it may consult are not statically known.
+  - path: fleet/runaway.py
+    sites: 1
+    reason: the runaway guard resolves its tunables from caller-supplied names.
+  - path: fleet/watchdog.py
+    sites: 2
+    reason: the watchdog resolves its rung tunables from caller-supplied names.
+  - path: control-plane/sdk/python/aosdk/auth.py
+    sites: 1
+    reason: >-
+      the SDK resolves a credential from the variable NAME its caller chose, which
+      is the point of a configurable credential seam.
+  - path: integrations/paperclip/auth/cli.py
+    sites: 2
+    reason: the paperclip auth CLI resolves its seam from a caller-supplied name.
+  - path: gateway/health/fallback.py
+    sites: 1
+    reason: >-
+      a provider fallback resolves its endpoint override from the environment
+      variable its configuration named.
+  - path: gateway/providers/vault.py
+    sites: 1
+    reason: the vault provider accepts a caller-supplied master-key variable name.
+  - path: e2e/go_live_delivery.py
+    sites: 1
+    reason: >-
+      the go-live delivery harness indexes the environment with a computed name
+      when it reproduces a deploy locally.
+  - path: governance/landing/attribution.py
+    sites: 1
+    reason: >-
+      the landing attribution step reads a computed variable name when it compares
+      the baseline against the landed tree.
+
+# The declared surface. `secret: true` means the variable carries secret material
+# and must NEVER appear as a literal value in the tree (GR-6); `surface.py`
+# refuses one by name. `required_by` is the closed vocabulary of what has to
+# supply it, and `readers` are the repository-relative files that consult it —
+# measured, and re-measured by the gate on every run.
+variables:
+  # -- the portal console: the auth gate (#730) -------------------------------
+  - name: PORTAL_AUTH_GATE_JWKS
+    purpose: >-
+      an inline auth-gate JWKS document the console verifies sessions against;
+      the mirror publishes it, so a literal in the tree is refused.
+    secret: true
+    required_by: [deploy]
+    readers: [portal/server/sso.py]
+  - name: PORTAL_AUTH_GATE_JWKS_FILE
+    purpose: >-
+      the mount path of the mirrored auth-gate JWKS the console reads at boot;
+      it carries a PATH, never a value.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/sso.py]
+  - name: ROOT_ADMIN_EMAILS
+    purpose: >-
+      the comma-separated allowlist of addresses that hold the root operator
+      role; a placeholder is fine in docs, a real literal is refused.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/sso.py]
+  - name: AO_SURFACE_REGISTRY
+    purpose: >-
+      the fleet projection the cockpit reads (the surface registry document);
+      absent, the console falls back to the repo-relative default.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/fleet.py, e2e/go_live_delivery.py]
+  - name: AO_SURFACE_STATE
+    purpose: the live surface-state document the console serves, overriding the repo-local default.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/surface_state.py, e2e/go_live_delivery.py]
+  - name: AO_PORTAL_CHAT_STORE
+    purpose: the transcript store directory the console's chat surface reads.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/chat.py]
+  - name: AO_PORTAL_CHAT_GATEWAY
+    purpose: the model-gateway base URL the console's chat surface calls.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/chat.py]
+  - name: AO_CONTROL_SLOG
+    purpose: the signed control-audit log the console appends control-plane events to.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/control_audit.py]
+  - name: AO_LEDGER_DIR
+    purpose: the control-audit ledger directory the console reads and appends to.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/control_audit.py]
+  - name: AO_FLEET_DIR
+    purpose: >-
+      the fleet state directory (sessions, claims, gates) shared by the runtime,
+      the state projection, the parity probe and the console's audit view.
+    secret: false
+    required_by: [deploy, local-run, ops]
+    readers:
+      - fleet/runtime.py
+      - fleet/state.py
+      - infra/fleet/parity.py
+      - portal/server/control_audit.py
+
+  # -- edge cutover (#1043 lane's surface; declared here, read by the probe) ---
+  - name: AO_EDGE_HOST
+    purpose: >-
+      the public edge hostname the edge-cutover probe resolves before promoting
+      the live edge; declared here because it is a variable a deploy supplies.
+    secret: false
+    required_by: [deploy]
+    readers: [scripts/check-edge-cutover.sh, docs/EDGE-CUTOVER.md]
+
+  # -- tenant identity / onboarding -------------------------------------------
+  - name: AO_ONBOARDING_STORE
+    purpose: the onboarding store the tenant-onboarding CLI reads and writes.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [identity/onboarding/cli.py]
+
+  # -- the guardrails: DLP audit ----------------------------------------------
+  - name: AO_DLP_HMAC_KEY
+    purpose: >-
+      the HMAC key that makes the DLP audit trail tamper-evident; secret
+      material, so a literal in the tree is refused (GR-6).
+    secret: true
+    required_by: [deploy, local-run]
+    readers: [guardrails/dlp/hmac_audit.py]
+
+  # -- the execution engine ----------------------------------------------------
+  - name: AO_QUEUE_STORE
+    purpose: the durable queue store the engine's queue CLI dispatches from.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [engine/queue/cli.py]
+
+  # -- the fleet runtime: leases, gates, worktrees -----------------------------
+  - name: AO_FLEET_SESSION
+    purpose: the session record the fleet runtime reads to bind a run to its lane.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/runtime.py]
+  - name: AO_FLEET_ENVELOPE_SCHEMA
+    purpose: the schema the fleet channel validates a dispatch envelope against.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/channel.py]
+  - name: AO_FLEET_LOCK_BACKEND
+    purpose: which lease backend the fleet takes locks in (file, or keydb).
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/lease.py]
+  - name: AO_FLEET_BOARD_DIR
+    purpose: the board directory the fleet parity probe compares the projection against.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [infra/fleet/parity.py]
+  - name: KEYDB_HOST
+    purpose: >-
+      the host of the keydb instance the fleet's keydb lease backend connects to,
+      used instead of the local file backend when that backend is selected.
+    secret: false
+    required_by: [deploy, ops]
+    readers: [fleet/lease.py]
+  - name: KEYDB_PORT
+    purpose: >-
+      the TCP port of that keydb instance; the lease backend defaults it, but a
+      non-default deployment must be able to declare it.
+    secret: false
+    required_by: [deploy, ops]
+    readers: [fleet/lease.py]
+  - name: KEYDB_PASSWORD
+    purpose: >-
+      the password the fleet presents to the keydb lease backend; secret
+      material, refused as a literal anywhere in the tree (GR-6).
+    secret: true
+    required_by: [deploy, ops]
+    readers: [fleet/lease.py]
+  - name: AO_GATE_LOCK_ROOT
+    purpose: the directory the one-gate-per-worktree permit store lives in.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/gatelock.py]
+  - name: AO_GATE_LOCK_TTL
+    purpose: how long a gate permit may be held before it is considered abandoned.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/gatelock.py]
+  - name: AO_GATE_MAX_CONCURRENT
+    purpose: the box-wide cap on concurrently admitted composite gates.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/gatelock.py]
+  - name: AO_GATE_TMP_PATH
+    purpose: the scratch root the capacity gate measures free space on.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/capacity.py]
+  - name: AO_WORKTREE_ROOT
+    purpose: where a lane's own git worktree is provisioned.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/terminal.py, governance/isolation/worktree.py]
+  - name: AO_ORPHAN_HANDOFF_TIMEOUT
+    purpose: how long an orphaned session's work is held before handoff is attempted.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/terminal.py]
+  - name: AO_WATCHDOG_BOOTSTRAPPED
+    purpose: the marker the watchdog sets so a respawned rung does not re-bootstrap.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/watchdog.py]
+  - name: AO_AGENT_ID
+    purpose: the agent identity the fleet control surface attributes an action to.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/control.py]
+  - name: FLEET_RUNNER
+    purpose: the runner binary a loop must resolve before it takes work (AO-GR-26).
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/terminal.py]
+  - name: FLEET_SISTER_POOL
+    purpose: the sibling runner pool a loop may borrow capacity from.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [fleet/terminal.py]
+
+  # -- autonomous ops: landing, lifecycle --------------------------------------
+  - name: AO_LAND_APPLY
+    purpose: whether the landing driver applies or only reports (flag-gated OFF by default).
+    secret: false
+    required_by: [ops]
+    readers: [governance/landing/cli.py]
+  - name: AO_AGENT
+    purpose: the agent the landing CLI records on the commit it authors.
+    secret: false
+    required_by: [ops]
+    readers: [governance/landing/cli.py]
+  - name: AO_AI_ASSISTANCE
+    purpose: the AI-assistance declaration the landing CLI writes into the trailer.
+    secret: false
+    required_by: [ops]
+    readers: [governance/landing/cli.py]
+  - name: AO_LAND_BASELINE_RECORD
+    purpose: the record of the pre-land baseline the attribution step compares against.
+    secret: false
+    required_by: [ops]
+    readers: [governance/landing/attribution.py]
+  - name: AO_LAND_BASELINE_TIMEOUT
+    purpose: how long the baseline measurement may take before it is abandoned.
+    secret: false
+    required_by: [ops]
+    readers: [governance/landing/attribution.py]
+  - name: AO_LIFECYCLE_CONTROLS
+    purpose: the closure-invariant policy the lifecycle engine enforces.
+    secret: false
+    required_by: [ops]
+    readers: [governance/lifecycle/policy.py]
+  - name: AO_LIFECYCLE_SCHEMA
+    purpose: the schema the lifecycle ledger's records validate against.
+    secret: false
+    required_by: [ops]
+    readers: [governance/lifecycle/ledger.py]
+  - name: AO_LIFECYCLE_SCRATCH
+    purpose: the scratch root the lifecycle close-out measures a lane in.
+    secret: false
+    required_by: [ops]
+    readers: [governance/lifecycle/cli.py]
+
+  # -- the control plane -------------------------------------------------------
+  - name: AO_CONTROL_PLANE
+    purpose: the control-plane base URL the aoctl CLI and cockpit call.
+    secret: false
+    required_by: [local-run, ops]
+    readers: [control-plane/cli/aoctl/cli.py, control-plane/cockpit/cockpit/cli.py]
+  - name: AO_CONTROL_SESSION
+    purpose: the control-plane session token the aoctl CLI and cockpit authenticate with.
+    secret: true
+    required_by: [local-run, ops]
+    readers: [control-plane/cli/aoctl/cli.py, control-plane/cockpit/cockpit/cli.py]
+  - name: AO_TAGGING_LEDGER
+    purpose: >-
+      overrides the tag authority's append-only ledger path (default
+      `.fleet/tagging/ledger.jsonl`), so a gate can drive a round trip in a
+      scratch directory and leave the tree clean.
+    secret: false
+    required_by: [ops]
+    readers: [governance/tagging/ledger.py]
+
+# Read by the tree, deliberately NOT part of the surface a deploy or a local run
+# supplies. Each carries the reason it is exempt; `surface.py` refuses an
+# exemption with no reason, and one whose variable nothing reads any more.
+exempt:
+  - name: XDG_RUNTIME_DIR
+    reason: >-
+      inherited from the process environment: it is where the permit store lives,
+      so it is a property of the session a run happens in, not something a deploy
+      of the product supplies.
