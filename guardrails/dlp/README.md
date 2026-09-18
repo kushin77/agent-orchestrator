@@ -142,8 +142,8 @@ output filter.
 Default-deny, per-tenant allowlist of `(provider, host, optional path_prefix)`.
 Host matching is exact, or subdomain when the allowlist entry starts with `.`;
 suffix-squatting names (`api.openai.com.evil.example`) never match. An unlisted
-tenant/provider/host/path is denied. `KNOWN_ENDPOINTS` is authoring convenience
-only — the guard never consults it.
+tenant/provider/host/path is denied. There is no built-in default endpoint
+table — allowlisting is explicit and the guard never consults one.
 
 ## HMAC per-call ([`hmac_audit.py`](hmac_audit.py))
 

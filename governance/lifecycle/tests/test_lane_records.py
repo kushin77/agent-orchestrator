@@ -36,6 +36,7 @@ from governance.lifecycle.cli import (
     lane_view,
     read_journal,
     select_lane,
+    tree_relation,
     trees_are_identical,
 )
 
@@ -277,7 +278,7 @@ def test_a_lane_that_does_not_contain_the_landing_is_refused(
 
     message = str(raised.value)
     assert "is not the verified commit" in message
-    assert "does not contain it" in message
+    assert "does not contain the landing" in message
     assert landing[:12] in message, "the refusal must name the landing that could not license the lane"
     assert read_journal(ISSUE, repo) == {}, "no attestation may be written for a tree that carries none of the work"
 
@@ -285,7 +286,14 @@ def test_a_lane_that_does_not_contain_the_landing_is_refused(
 def test_a_lane_containing_a_landing_with_another_tree_is_refused(
     repo: Path, tmp_path: Path, mounts: Path, monkeypatch
 ):
-    """Containing *a* landing is not the claim; containing *the verified tree* is."""
+    """Containing *a* landing is not the claim; containing *the verified tree* is.
+
+    This is the #977/#978 shape seen from the port (#1149): the lane **does** contain the
+    landing, and the true reason for the refusal is that the landing carries a different
+    tree than the commit the evidence names. #1098's message said "and does not contain
+    it" for this too, diagnosing the lane as the one thing it was not — so the assertion
+    below is on the *distinct* clause, not on a substring the wrong cause would satisfy.
+    """
     _stub_make(tmp_path, monkeypatch)
     verified, landing = _squash_landing(repo, extra_commit=True)
     _lane(repo, tmp_path, mounts, "difftree")
@@ -293,7 +301,10 @@ def test_a_lane_containing_a_landing_with_another_tree_is_refused(
     with pytest.raises(RuntimeError) as raised:
         GhOps(root=repo).record_verification(ISSUE, verified, landing)
 
-    assert "does not contain it" in str(raised.value)
+    message = str(raised.value)
+    assert "it DOES contain the landing" in message, message
+    assert "names a tree that never landed" in message, message
+    assert "does not contain" not in message, "the distinct cause may not be reported as the other one"
     assert read_journal(ISSUE, repo) == {}, "a landing built from other content may not stand in"
 
 
@@ -308,13 +319,14 @@ def test_an_unmerged_item_still_requires_the_lane_to_be_at_the_verified_commit(
     with pytest.raises(RuntimeError) as raised:
         GhOps(root=repo).record_verification(ISSUE, verified)
 
-    assert "does not contain it" in str(raised.value)
+    assert "no landing is recorded for it" in str(raised.value)
     assert read_journal(ISSUE, repo) == {}
 
 
 def test_the_ancestry_and_tree_questions_fail_closed(repo: Path):
     """Both halves answer "no" for a commit the repository cannot resolve — never a pass."""
     head = _git(repo, "rev-parse", "HEAD")
+    drifted, landing = _squash_landing(repo, extra_commit=True)
 
     assert commit_is_contained(repo, head, head) is True
     assert trees_are_identical(repo, head, head) is True
@@ -322,6 +334,12 @@ def test_the_ancestry_and_tree_questions_fail_closed(repo: Path):
     assert trees_are_identical(repo, "c" * 40, head) is False
     assert commit_is_contained(repo, "", head) is False
     assert trees_are_identical(repo, head, "") is False
+    # The tri-state (#1149): "different" and "cannot be read" are different facts, and
+    # only a *measured* difference may move a merged item's evidence onto the landing.
+    assert tree_relation(repo, head, head) == "same"
+    assert tree_relation(repo, drifted, landing) == "different"
+    assert tree_relation(repo, "c" * 40, head) == "unknown"
+    assert tree_relation(repo, head, "") == "unknown"
 
 
 def test_an_item_with_no_lane_has_no_lane_view(repo: Path):

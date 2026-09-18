@@ -43,8 +43,10 @@ go run cmd/main.go
 
 ## CI/CD Checklist
 
-- [ ] Update `.github/workflows/ci.yml` with actual test commands
-- [ ] Configure GitHub Actions secrets if needed
+- [ ] Add the test commands to the `make verify` target — this repo has no
+      `.github/workflows/` directory (GitHub Actions is disabled fleet-wide, GR-15)
+- [ ] Configure whatever secrets the `make verify` / apply route needs (there is
+      no GitHub Actions secret store here)
 - [ ] Test locally before pushing
 - [ ] Update Dockerfile with production settings
 - [ ] Update requirements.txt or go.mod with final dependencies

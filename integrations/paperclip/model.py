@@ -18,26 +18,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
+from .._seam.wire import Response  # noqa: F401 - re-exported at this adapter's seam
+from .._seam.wire import WireBoundary
+
 # --------------------------------------------------------------------------
 # Transport primitives
 # --------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Response:
-    """One upstream HTTP response, parsed at the transport seam.
-
-    ``body`` is the decoded JSON body when the response is JSON, else the raw
-    text. ``status`` is the HTTP status code, always present.
-    """
-
-    status: int
-    body: Any = None
-    headers: Dict[str, str] = field(default_factory=dict)
-
-    @property
-    def ok(self) -> bool:
-        return 200 <= self.status < 300
+# ``Response`` and the rendering of ``error_for_status`` are the shared seam's
+# (``integrations/_seam/wire.py``, issue #1208): both were byte-identical in this
+# adapter and in ``integrations/hermes/``, so they live there now and are
+# re-exported here — ``from integrations.paperclip.model import Response`` keeps
+# working. What stays local is this adapter's own vocabulary: the error classes
+# below and the boundary that binds them to the seam's rendering.
 
 
 class PaperclipError(Exception):
@@ -106,14 +98,20 @@ ERROR_BY_STATUS: Dict[int, type] = {
     503: ServiceUnavailableError,
 }
 
+#: This adapter's wire vocabulary, bound to its own typed errors: the shared
+#: seam renders the message and constructs the error (``_seam/wire.py``).
+BOUNDARY = WireBoundary(
+    label="paperclip", error_by_status=ERROR_BY_STATUS, base_error=PaperclipError
+)
+
 
 def error_for_status(status: int, path: str, detail: str = "") -> PaperclipError:
-    """Build the typed error a given upstream status maps to."""
-    cls = ERROR_BY_STATUS.get(status, PaperclipError)
-    message = f"paperclip {path}: HTTP {status}"
-    if detail:
-        message = f"{message} — {detail}"
-    return cls(message, status=status, path=path)
+    """Build the typed error a given upstream status maps to.
+
+    The status→class table and the ``paperclip`` label are this adapter's; the
+    message shape and the constructor call are the shared seam's.
+    """
+    return BOUNDARY.error_for_status(status, path, detail)
 
 
 # --------------------------------------------------------------------------

@@ -15,25 +15,21 @@ nor the gate pull a third-party dependency in.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Dict
 
+from .._seam.wire import Response  # noqa: F401 - re-exported at this adapter's seam
+from .._seam.wire import WireBoundary
 
-@dataclass(frozen=True)
-class Response:
-    """One upstream HTTP response, parsed at the transport seam.
-
-    ``body`` is the decoded JSON body when the response is JSON, else the raw
-    text. ``status`` is the HTTP status code, always present.
-    """
-
-    status: int
-    body: Any = None
-    headers: Dict[str, str] = field(default_factory=dict)
-
-    @property
-    def ok(self) -> bool:
-        return 200 <= self.status < 300
+# --------------------------------------------------------------------------
+# Transport primitives
+# --------------------------------------------------------------------------
+# ``Response`` and the rendering of ``error_for_status`` are the shared seam's
+# (``integrations/_seam/wire.py``, issue #1208): both were byte-identical in this
+# adapter and in ``integrations/paperclip/``, so they live there now and are
+# re-exported here — ``from integrations.hermes.model import Response`` keeps
+# working. What stays local is this adapter's own vocabulary: the error classes
+# below and the boundary that binds them to the seam's rendering.
 
 
 class HermesError(Exception):
@@ -59,14 +55,18 @@ ERROR_BY_STATUS: Dict[int, type] = {
     503: UnavailableError,
 }
 
+#: This adapter's wire vocabulary, bound to its own typed errors: the shared
+#: seam renders the message and constructs the error (``_seam/wire.py``).
+BOUNDARY = WireBoundary(label="hermes", error_by_status=ERROR_BY_STATUS, base_error=HermesError)
+
 
 def error_for_status(status: int, path: str, detail: str = "") -> HermesError:
-    """Build the typed error a given upstream status maps to."""
-    cls = ERROR_BY_STATUS.get(status, HermesError)
-    message = "hermes %s: HTTP %s" % (path, status)
-    if detail:
-        message = "%s — %s" % (message, detail)
-    return cls(message, status=status, path=path)
+    """Build the typed error a given upstream status maps to.
+
+    The status→class table and the ``hermes`` label are this adapter's; the
+    message shape and the constructor call are the shared seam's.
+    """
+    return BOUNDARY.error_for_status(status, path, detail)
 
 
 @dataclass(frozen=True)

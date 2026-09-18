@@ -14,9 +14,11 @@ embedded router, and it does **not** bind the gateway namesake
 ``gateway/providers/hermes.py`` — that is an Ollama-compatible inference
 endpoint for the Hermes-3 LLM, explicitly excluded here by name.
 
-The package is stdlib-only: the mapping reads its YAML sources with a small
-in-repo subset loader and the offline transport replays canned responses, so the
-gate and the tests never need a third-party dependency or the network.
+The package is stdlib-only: the mapping reads its YAML sources with the small
+in-repo subset loader it shares with ``integrations/paperclip/``
+(``integrations/_seam/``, issue #1208) and the offline transport replays canned
+responses, so the gate and the tests never need a third-party dependency or the
+network.
 """
 
 __all__ = ["audit", "client", "mapping", "model", "policy"]

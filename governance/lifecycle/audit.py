@@ -143,6 +143,30 @@ def _declared_children(item: dict) -> tuple[list[dict], list[dict]]:
     return declared, unmatched
 
 
+def names_the_landed_tree(pr: dict, verify: dict) -> bool:
+    """Does the attestation name a commit whose tree is the tree that **landed**?
+
+    Two shapes, and no more (#1149):
+
+    * the **ordinary** one — it names the pull request's head commit, whose tree is the
+      tree the squash landed (``verify.commit == pr.head_commit``). That is the
+      convention every pre-existing record and the ``clean_item`` fixture use, and the
+      reason this invariant must not demand the merge commit: a squash merge creates a
+      new commit, so demanding equality there would fail every correctly-merged item.
+    * the **drifted** one — the branch received commits after the squash, so the live
+      head's tree never landed. The evidence then names the commit the squash landed as
+      *as its subject* and records the live head it drifted from. Requiring the drift to
+      be recorded is what keeps this honest: a record that merely names the merge commit,
+      with no measured drift explaining the substitution, stays a finding.
+    """
+    commit = str(verify.get("commit") or "")
+    landing = str(verify.get("landing") or "")
+    drifted = str(verify.get("drifted_head") or "")
+    head = str(pr.get("head_commit") or "")
+    merge = str(pr.get("merge_commit") or "")
+    return bool(commit) and commit != head and commit == landing == merge and drifted == head
+
+
 def _closure_findings(item: dict) -> list[Finding]:
     """A closed item owes every closure invariant, derived from its artifacts."""
     subject = f"#{item.get('issue')}"
@@ -150,10 +174,12 @@ def _closure_findings(item: dict) -> list[Finding]:
 
     pr = item.get("pr") or {}
     verify = item.get("verify") or {}
-    # Evidence must name the *verified head* commit. It cannot name the merge
-    # commit: a squash merge creates a new commit, so demanding equality there
-    # would fail every correctly-merged item. What matters is that the tree which
-    # was verified is the tree that landed.
+    # Evidence must name a commit whose tree is the tree that **landed**. It cannot be
+    # made to name the merge commit: a squash merge creates a new commit, so demanding
+    # equality there would fail every correctly-merged item. `verified_commit` is the
+    # pull request's head commit — the ordinary subject — and `names_the_landed_tree`
+    # admits the one other shape a merged item can legitimately have: a branch that
+    # advanced after the squash, whose evidence names the landing and the drift (#1149).
     verified_commit = str(pr.get("head_commit") or "")
 
     if str(pr.get("state") or "").lower() != "merged":
@@ -166,13 +192,14 @@ def _closure_findings(item: dict) -> list[Finding]:
         problems.append(
             Finding("VERIFY_EVIDENCE_MISSING", subject, "the item records no verified head commit to hold the evidence against")
         )
-    elif str(verify.get("commit") or "") != verified_commit:
+    elif str(verify.get("commit") or "") != verified_commit and not names_the_landed_tree(pr, verify):
         recorded = str(verify.get("commit") or "none")
         problems.append(
             Finding(
                 "VERIFY_EVIDENCE_MISSING",
                 subject,
-                f"the attestation names {recorded[:12]}, not the verified head commit {verified_commit[:12]}",
+                f"the attestation names {recorded[:12]}, not the verified head commit "
+                f"{verified_commit[:12]} and not the commit its tree landed as",
             )
         )
 
