@@ -430,3 +430,120 @@ def guard_lane_name(name: str) -> str:
     if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", name):
         raise ProvisionRefused(f"{REFUSAL_UNSAFE_NAME}: unsafe lane name {name!r}")
     return name
+
+
+#: Runtime state (gitignored): every content-equivalence reap is recorded here
+#: before the worktree/branch is removed, so an operator can reconstruct what
+#: happened to a HEAD that is no longer preserved by name on origin.
+REAPED_BRANCHES_LOG = ".fleet/reaped-branches.jsonl"
+
+
+def content_landed(main: Path | str, ref: str, base: str = "origin/master") -> bool:
+    """Is ``ref``'s own change already fully present in ``base``, BY CONTENT?
+
+    Issue #1265: a worktree whose HEAD is not reachable from ``base`` and not on
+    any preserved remote branch is not necessarily unlanded work — this repo
+    squash-merges, so a fully-landed commit is never an ancestor of ``base`` and
+    its remote branch is routinely deleted after merge (measured 2026-09-18: 49
+    of 88 remaining worktrees were kept for exactly that reason, "HEAD is not
+    preserved on origin", although every one of them was content-landed).
+
+    This is the SAME test ``prune-worktrees.sh --branches`` already applies to
+    lane branches (issue #830) — lifted here, in one place, so the worktree
+    keep-rule and the branch keep-rule share one implementation instead of two
+    copies that can drift: take the merge-base of ``ref`` and ``base``, list
+    every path ``ref`` changed since it, and require ``base`` to hold EXACTLY
+    that content for each path. If ``base`` moved on and differs anywhere — or
+    nothing can be compared (unknown ref, no common history, no changed paths) —
+    the ref is NOT landed, and the caller must keep it. Failing closed is the
+    only safe direction here: this function only ever widens what may be
+    reclaimed, never what may be discarded.
+    """
+    if git(main, "merge-base", "--is-ancestor", ref, base).returncode == 0:
+        return True
+
+    merge_base = git(main, "merge-base", ref, base)
+    if merge_base.returncode != 0:
+        return False
+    base_sha = merge_base.stdout.strip()
+    if not base_sha:
+        return False
+
+    changed = git(main, "diff", "--name-only", base_sha, ref)
+    if changed.returncode != 0:
+        return False
+    # A path a MACHINE rewrites (`.board/focus.json`, anything under `.fleet/`)
+    # is not the lane's own change (#834) — comparing it here would compare
+    # regenerated scratch state a later fleet run has since rewritten, and keep
+    # a fully-landed worktree FOR EVER over a file it never authored as work.
+    paths = [line for line in changed.stdout.splitlines() if line and not _is_machine_managed(line)]
+    if not paths:
+        return False
+
+    for path in paths:
+        theirs = git(main, "rev-parse", "--verify", "--quiet", f"{ref}:{path}")
+        ours = git(main, "rev-parse", "--verify", "--quiet", f"{base}:{path}")
+        theirs_sha = theirs.stdout.strip() if theirs.returncode == 0 else ""
+        ours_sha = ours.stdout.strip() if ours.returncode == 0 else ""
+        if theirs_sha != ours_sha:
+            return False
+    return True
+
+
+def record_reaped(
+    main: Path | str,
+    *,
+    branch: str,
+    head_sha: str,
+    worktree: str,
+    reason: str,
+) -> Path:
+    """Append one reap record to :data:`REAPED_BRANCHES_LOG`, runtime state.
+
+    Called BEFORE removal (#1265): once a worktree's remote branch is gone,
+    ``HEAD is not preserved on origin`` can never be re-derived, so this is the
+    only record that a given SHA was ever content-landed and reclaimed.
+    """
+    import time
+
+    path = Path(main) / REAPED_BRANCHES_LOG
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "branch": branch,
+        "head_sha": head_sha,
+        "worktree": worktree,
+        "reason": reason,
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+    return path
+
+
+def _cli(argv: list[str] | None = None) -> int:
+    """A minimal standalone CLI: ``content-landed`` only.
+
+    This module is not the repo's shared isolation CLI (``cli.py``, which this
+    issue's file list does not touch) — it is a small, direct entry point so
+    ``scripts/prune-worktrees.sh`` can call the ONE content-equivalence
+    implementation from bash without duplicating it (issue #1265).
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="worktree.py")
+    sub = parser.add_subparsers(dest="command", required=True)
+    landed = sub.add_parser("content-landed", help="exit 0 iff REF is content-landed on BASE")
+    landed.add_argument("ref")
+    landed.add_argument("--base", default="origin/master")
+    landed.add_argument("--root", default=".")
+    args = parser.parse_args(argv)
+
+    if args.command == "content-landed":
+        return 0 if content_landed(args.root, args.ref, args.base) else 1
+    return 2
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(_cli(sys.argv[1:]))

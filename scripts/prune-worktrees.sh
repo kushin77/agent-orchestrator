@@ -73,9 +73,15 @@ set -uo pipefail
 # in: deriving it from $BASH_SOURCE made the tool ignore its cwd and act on the
 # operator's checkout instead (caught by this script's own tests, which were
 # passing for that reason).
+# Where THIS TOOL's own source lives — distinct from `$root` below, which is
+# the repository being SCANNED (its scratch-test doubles have no
+# `governance/isolation` package at all). content_landed()'s implementation is
+# always loaded from here, never from the target repo.
+self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -z "$root" ]; then
-  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  root="$self_root"
 fi
 cd "$root" || exit 2
 
@@ -266,6 +272,33 @@ preserved() { # preserved <sha> — is this commit reachable outside the worktre
   landed_in_master "$1" || on_a_remote_branch "$1"
 }
 
+# --- content equivalence (issue #1265) ---------------------------------------
+#
+# Measured 2026-09-18 (after #1285 landed): 49 of 88 remaining worktrees were
+# kept ONLY because "HEAD is not preserved on origin" — their remote branches
+# were deleted by a by-hand sweep after a squash-merge, so `preserved()` above
+# can NEVER pass for them even though every one is content-landed on master.
+# This delegates to the ONE implementation of that test
+# (`governance/isolation/worktree.py::content_landed`), which `--branches`
+# below also calls — so the worktree keep-rule and the branch keep-rule share
+# one implementation instead of two copies that can drift.
+landed_by_content() { # landed_by_content <ref> — is the ref's own change already on origin/master, by content?
+  PYTHONPATH="$self_root${PYTHONPATH:+:$PYTHONPATH}" python3 -m governance.isolation.worktree \
+    content-landed "$1" --root "$root" >/dev/null 2>&1
+}
+
+# Runtime state (gitignored): once a remote branch is gone, "preserved on
+# origin" can never be re-derived, so this is the only record a given SHA was
+# ever content-landed and reclaimed. Written BEFORE removal.
+record_reaped() { # record_reaped <branch> <head_sha> <worktree> <reason>
+  PYTHONPATH="$self_root${PYTHONPATH:+:$PYTHONPATH}" python3 - "$root" "$1" "$2" "$3" "$4" <<'PY'
+import sys
+from governance.isolation.worktree import record_reaped as _record
+
+_record(sys.argv[1], branch=sys.argv[2], head_sha=sys.argv[3], worktree=sys.argv[4], reason=sys.argv[5])
+PY
+}
+
 # --- item 3 (issue #830): declared runtime state is not a lane's work --------
 #
 # The dirty test above counts GENERATED runtime state as uncommitted lane work, so
@@ -361,30 +394,8 @@ foreign_dirt() { # foreign_dirt <worktree> — uncommitted paths that are NOT de
 # --- item 2 (issue #830): lane branches have no reaper ----------------------
 #
 # #830 measured 302 unmatched lane branches that no tool looks at. LANDED IS
-# DECIDED BY CONTENT, NEVER BY ANCESTRY: the landing path squash-merges, so a
-# fully-landed branch is never an ancestor of master and `merge-base --is-ancestor`
-# would call every landed lane "unmerged", keeping it for ever. The test here takes
-# the merge base, lists every path the branch changed since it, and requires
-# origin/master to hold EXACTLY the branch's content for that path. If master moved
-# on and differs anywhere — or nothing can be compared — the branch is KEPT.
-landed_by_content() { # landed_by_content <ref> — is the ref's own change already on origin/master?
-  local ref="$1" base path theirs ours changed=0
-  if git -C "$root" merge-base --is-ancestor "$ref" origin/master 2>/dev/null; then
-    return 0
-  fi
-  base="$(git -C "$root" merge-base "$ref" origin/master 2>/dev/null)" || return 1
-  [ -z "$base" ] && return 1
-  while IFS= read -r path; do
-    [ -z "$path" ] && continue
-    changed=$((changed + 1))
-    theirs="$(git -C "$root" rev-parse --verify --quiet "$ref:$path" 2>/dev/null || true)"
-    ours="$(git -C "$root" rev-parse --verify --quiet "origin/master:$path" 2>/dev/null || true)"
-    if [ "$theirs" != "$ours" ]; then
-      return 1
-    fi
-  done < <(git -C "$root" diff --name-only "$base" "$ref" 2>/dev/null)
-  [ "$changed" -gt 0 ]
-}
+# DECIDED BY CONTENT, NEVER BY ANCESTRY (see `landed_by_content` above, which
+# this reuses — one implementation, `governance/isolation/worktree.py`).
 
 # Snapshot BEFORE the sweep: a worktree this run removes must not release the
 # branch it was holding into the same run's reach.
@@ -417,28 +428,48 @@ while read -r path sha ref; do
     unsafe=$((unsafe + 1))
     continue
   fi
+  content_equiv=0
   if ! preserved "$sha"; then
-    printf '  KEEP   %s — HEAD %s is not preserved on origin (unmerged lane work)\n' "$path" "$sha"
-    unsafe=$((unsafe + 1))
-    continue
+    if landed_by_content "$sha"; then
+      # #1265: HEAD is not preserved by NAME on origin (its remote branch was
+      # deleted after a squash-merge), but its own change is fully present on
+      # origin/master BY CONTENT — reapable, and recorded before removal since
+      # this is the last point the fact is derivable at all. This applies to a
+      # detached HEAD exactly as it does to a named branch: `git diff`/
+      # `rev-parse <ref>:<path>` both work on a bare SHA, and a detached
+      # scratch tree is a large share of the pile (#1265 measured them too).
+      content_equiv=1
+    else
+      printf '  KEEP   %s — HEAD %s is not preserved on origin (unmerged lane work)\n' "$path" "$sha"
+      unsafe=$((unsafe + 1))
+      continue
+    fi
   fi
-  if [ "$strict" -eq 1 ] && ! landed_in_master "$sha" && [ "$ref" != "detached" ]; then
+  if [ "$strict" -eq 1 ] && [ "$content_equiv" -eq 0 ] && ! landed_in_master "$sha" && [ "$ref" != "detached" ]; then
     printf '  PARKED %s — %s holds work preserved only on a remote branch; kept (--strict)\n' "$path" "$ref"
     unsafe=$((unsafe + 1))
     continue
   fi
   stale=$((stale + 1))
+  if [ "$content_equiv" -eq 1 ]; then
+    reason="worktree-content-landed"
+    label="content-landed on origin/master; remote branch $ref is gone"
+  else
+    reason="worktree-preserved"
+    label="preserved on origin"
+  fi
   if [ "$apply" -eq 1 ]; then
+    [ "$content_equiv" -eq 1 ] && record_reaped "$ref" "$sha" "$path" "$reason"
     git -C "$root" worktree remove --force "$path" >/dev/null 2>&1 \
-      && printf '  REMOVED %s (HEAD %s preserved on origin)\n' "$path" "$sha" \
+      && printf '  REMOVED %s (HEAD %s %s)\n' "$path" "$sha" "$label" \
       || printf '  KEEP   %s — removal failed\n' "$path"
   else
-    printf '  STALE  %s — removable (HEAD %s preserved on origin)\n' "$path" "$sha"
+    printf '  STALE  %s — removable (HEAD %s %s)\n' "$path" "$sha" "$label"
   fi
 done < <(git -C "$root" worktree list --porcelain | awk '
   /^worktree /{ if (p != "") print p, h, (b == "" ? "detached" : b); p=$2; h=""; b=""; next }
   /^HEAD /{ h=$2 }
-  /^branch /{ b=$2 }
+  /^branch /{ b=$2; sub("^refs/heads/", "", b) }
   END{ if (p != "") print p, h, (b == "" ? "detached" : b) }
 ' | grep -v "^$current ")
 
@@ -474,6 +505,8 @@ if [ "$branches" -eq 1 ]; then
     fi
     branch_stale=$((branch_stale + 1))
     if [ "$apply" -eq 1 ]; then
+      branch_sha="$(git -C "$root" rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || true)"
+      record_reaped "$branch" "$branch_sha" "" "branch-content-landed"
       git -C "$root" branch -D -- "$branch" >/dev/null 2>&1 \
         && printf '  REMOVED branch %s (its change is on origin/master by content)\n' "$branch" \
         || printf '  KEEP   branch %s — deletion failed\n' "$branch"

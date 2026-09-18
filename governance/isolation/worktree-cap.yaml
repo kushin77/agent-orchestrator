@@ -1,0 +1,10 @@
+# worktree-cap.yaml — declared slack for scripts/check-worktree-cap.sh (#1265).
+#
+# The cap is `open lane records (.fleet/lanes/*.json) + slack`, never a bare
+# worktree count: lanes come and go, and a fixed number would either false-red
+# on a busy day or hide a real pile on a quiet one. `slack` is the number of
+# worktrees allowed ABOVE the lanes actually in flight — for a lane mid-close,
+# a scratch worktree a human is using by hand, or a lane whose record has not
+# been written yet. Declared here, in one place, so raising it is a reviewed
+# change rather than a comment in a script nobody reads.
+slack: 10

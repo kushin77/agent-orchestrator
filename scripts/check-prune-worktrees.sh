@@ -252,6 +252,62 @@ else
   bad "a checked-out branch was deleted"
 fi
 
+echo "== prune-worktrees: worktree content equivalence (#1265) =="
+
+# A worktree whose HEAD is squash-landed on origin/master by content, but whose
+# remote branch was deleted by a by-hand sweep (so "preserved on origin" can
+# never pass), must still be reapable — and recorded before removal.
+squash_landed_wt="$work/squash-wt"
+make_repo "$squash_landed_wt"
+sq_lane="$work/lane-squash-landed"
+git_ "$squash_landed_wt" worktree add -q -b issue-1265-lane "$sq_lane" master
+printf 'squash content\n' >"$sq_lane/squash.txt"
+git_ "$sq_lane" add -A
+git_ "$sq_lane" commit -qm "issue-1265 work"
+sq_sha="$(git_ "$sq_lane" rev-parse HEAD)"
+git_ "$squash_landed_wt" checkout -q master
+printf 'squash content\n' >"$squash_landed_wt/squash.txt"
+git_ "$squash_landed_wt" add -A
+git_ "$squash_landed_wt" commit -qm "issue-1265-lane landed (squashed)"
+git_ "$squash_landed_wt" push -qu origin master
+git_ "$squash_landed_wt" push -q origin --delete issue-1265-lane 2>/dev/null || true
+git_ "$squash_landed_wt" branch -D -r origin/issue-1265-lane 2>/dev/null || true
+git_ "$squash_landed_wt" fetch -q origin
+
+reap "$squash_landed_wt" --apply >"$work/out.squash_wt.txt" 2>&1
+if [ -d "$sq_lane" ]; then
+  bad "a worktree content-landed on origin/master (remote branch gone) was kept"
+else
+  ok "a worktree content-landed on origin/master is reaped although its remote branch is gone"
+fi
+if [ -f "$squash_landed_wt/.fleet/reaped-branches.jsonl" ] \
+  && grep -qF "\"$sq_sha\"" "$squash_landed_wt/.fleet/reaped-branches.jsonl" \
+  && grep -qF '"reason": "worktree-content-landed"' "$squash_landed_wt/.fleet/reaped-branches.jsonl"; then
+  ok "the reap is recorded to .fleet/reaped-branches.jsonl before removal"
+else
+  bad "the content-landed reap was not recorded to .fleet/reaped-branches.jsonl"
+fi
+
+# Negative control: an unlanded hunk keeps the worktree by name.
+unlanded_wt="$work/unlanded-wt"
+make_repo "$unlanded_wt"
+ul_lane="$work/lane-unlanded"
+git_ "$unlanded_wt" worktree add -q -b issue-1266-lane "$ul_lane" master
+printf 'nobody else has this either\n' >"$ul_lane/unlanded.txt"
+git_ "$ul_lane" add -A
+git_ "$ul_lane" commit -qm "issue-1266 unlanded work"
+git_ "$unlanded_wt" push -qu origin issue-1266-lane 2>/dev/null || true
+git_ "$unlanded_wt" push -q origin --delete issue-1266-lane 2>/dev/null || true
+git_ "$unlanded_wt" branch -D -r origin/issue-1266-lane 2>/dev/null || true
+git_ "$unlanded_wt" fetch -q origin
+
+out="$(reap "$unlanded_wt" --apply)"
+if [ -d "$ul_lane" ] && [[ "$out" == *"is not preserved on origin"* ]]; then
+  ok "a worktree with an unlanded hunk is kept by name, not reaped"
+else
+  bad "a worktree with real unlanded work was reaped, or not named as kept"
+fi
+
 echo "== prune-worktrees: the check is wired, not a formality =="
 # `set +u` around the sourcing: the lister reads an optional `CHECK_DENYLIST`. The
 # match is a `case` and not `grep -q` because `grep -q` exits on its first match,

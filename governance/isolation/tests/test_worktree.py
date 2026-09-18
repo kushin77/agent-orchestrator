@@ -17,8 +17,10 @@ from governance.isolation.identity import mint
 from governance.isolation.worktree import (
     MACHINE_MANAGED_PATHS,
     MACHINE_MANAGED_PREFIXES,
+    REAPED_BRANCHES_LOG,
     ProvisionRefused,
     close,
+    content_landed,
     enable_worktree_config,
     filesystem_type,
     foreign_uncommitted,
@@ -29,6 +31,7 @@ from governance.isolation.worktree import (
     provision,
     read_record,
     read_stamped_identity,
+    record_reaped,
     shared_identity,
     uncommitted_paths,
     write_record,
@@ -316,3 +319,116 @@ def test_a_disk_backed_root_is_not_refused(repo: Path, tmp_path: Path):
 
     assert result.created is True
     assert identity.worktree.exists()
+
+
+# --- content_landed (issue #1265) --------------------------------------------
+#
+# "HEAD is not preserved on origin" (unreachable from origin/master, and its
+# remote branch is gone after a squash-merge) is not the same fact as "this
+# work never landed" — measured 2026-09-18: 49 of 88 remaining worktrees were
+# kept for exactly this reason although every one of them was content-landed.
+
+
+def test_content_landed_when_the_squash_landed_the_same_content(repo: Path):
+    """A commit whose diff origin/master already holds, path for path, is landed."""
+    commit(repo, "feature.txt", "add feature")
+    feature_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+    # Simulate the squash-merge landing the SAME content on origin/master, from
+    # a different commit — so ancestry can never prove it, only content can.
+    git(repo, "checkout", "-q", "-b", "landed-master")
+    git(repo, "cherry-pick", feature_sha)
+    git(repo, "update-ref", "refs/remotes/origin/master", "landed-master")
+    git(repo, "checkout", "-q", "master")
+
+    assert content_landed(repo, feature_sha) is True
+
+
+def test_content_landed_is_false_for_an_unlanded_hunk(repo: Path):
+    """A change origin/master does not hold anywhere is kept, never reaped."""
+    seed_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+    commit(repo, "unlanded.txt", "add unlanded work")
+    unlanded_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+    # origin/master here is the seed commit only — it never saw unlanded.txt.
+    git(repo, "update-ref", "refs/remotes/origin/master", seed_sha)
+
+    assert content_landed(repo, unlanded_sha) is False
+
+
+def test_content_landed_true_when_ref_is_a_plain_ancestor(repo: Path):
+    """The ancestry fast path: no squash involved, still landed."""
+    git(repo, "update-ref", "refs/remotes/origin/master", "master")
+    sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    assert content_landed(repo, sha) is True
+
+
+def test_content_landed_false_when_bases_share_no_history(repo: Path, tmp_path: Path):
+    """No common history to compare: fail closed, never reap."""
+    other = tmp_path / "unrelated"
+    subprocess_git_init_unrelated(other)
+    git(repo, "fetch", str(other), "+refs/heads/master:refs/remotes/origin/master")
+    sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    assert content_landed(repo, sha) is False
+
+
+def subprocess_git_init_unrelated(path: Path) -> None:
+    import subprocess
+
+    path.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "master", str(path)], check=True, capture_output=True, text=True)
+    git(path, "config", "user.name", "Other")
+    git(path, "config", "user.email", "other@example.com")
+    (path / "other.txt").write_text("other\n", encoding="utf-8")
+    git(path, "add", "other.txt")
+    git(path, "commit", "-q", "-m", "unrelated seed")
+
+
+def test_content_landed_ignores_a_machine_managed_hunk(repo: Path):
+    """A dirty `.board/focus.json` diff must never pin a landed commit forever (#834)."""
+    seed_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+    commit(repo, "feature.txt", "add feature")
+    (repo / ".board").mkdir()
+    (repo / ".board" / "focus.json").write_text('{"active_epic": 707}\n', encoding="utf-8")
+    git(repo, "add", ".board/focus.json")
+    git(repo, "commit", "-qm", "lane's own snapshot of board state")
+    feature_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    # origin/master, branched from the SAME seed (so the merge-base is the seed
+    # and the diff actually covers feature.txt), holds feature.txt identically
+    # but a DIFFERENT focus.json — exactly what a fleet run rewriting that file
+    # after the squash looks like.
+    git(repo, "checkout", "-q", "-b", "landed-master", seed_sha)
+    (repo / "feature.txt").write_text("feature.txt\n", encoding="utf-8")
+    git(repo, "add", "feature.txt")
+    git(repo, "commit", "-qm", "feature landed (squashed)")
+    (repo / ".board").mkdir(exist_ok=True)
+    (repo / ".board" / "focus.json").write_text('{"active_epic": 999}\n', encoding="utf-8")
+    git(repo, "add", ".board/focus.json")
+    git(repo, "commit", "-qm", "board refresher rewrote focus.json")
+    git(repo, "update-ref", "refs/remotes/origin/master", "landed-master")
+    git(repo, "checkout", "-q", "master")
+
+    assert content_landed(repo, feature_sha) is True
+
+
+def test_record_reaped_appends_one_json_line(repo: Path):
+    path = record_reaped(
+        repo,
+        branch="issue-1234",
+        head_sha="deadbeef",
+        worktree=str(repo / "worktrees" / "issue-1234"),
+        reason="worktree-content-landed",
+    )
+
+    assert path == repo / REAPED_BRANCHES_LOG
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["branch"] == "issue-1234"
+    assert record["head_sha"] == "deadbeef"
+    assert record["reason"] == "worktree-content-landed"
+    assert "ts" in record
+
+    record_reaped(repo, branch="issue-5", head_sha="cafe", worktree="x", reason="worktree-content-landed")
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 2
