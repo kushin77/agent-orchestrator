@@ -1,0 +1,6 @@
+# Python deps the `make verify` gates import (mirrors the versions on the dev box).
+PyYAML>=6.0
+pytest>=8.0
+jsonschema>=4.20
+cryptography>=42
+python-hcl2>=4.3
