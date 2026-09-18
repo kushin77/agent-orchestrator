@@ -1,29 +1,48 @@
 # Build config for the control-plane verify trigger (code-native CI status).
 #
 # Runs the repo gate of record (`make verify`) when a pull_request trigger
-# fires. The runner image must provide bash, make, python3 + PyYAML, and
-# terraform (the same toolchain `make verify` requires locally). This file is
-# declarative scaffolding — the trigger that executes it ships disabled until a
-# reviewed go-live (see README.md and the feature-flag registry).
+# fires. The runner image must provide bash, make, and python3 + PyYAML (the
+# same toolchain `make verify` requires locally); terraform/shellcheck/
+# gitleaks/pre-commit are SKIP-if-absent per scripts/check-terraform.sh and
+# friends, so the runner need not provide them. This file is declarative
+# scaffolding — the trigger that executes it ships disabled until a reviewed
+# go-live (see README.md and the feature-flag registry).
+
+# The verify trigger runs as an explicit service account, and Cloud Build
+# refuses such builds unless logging is CLOUD_LOGGING_ONLY, NONE, or a logs
+# bucket is declared (see apply.yaml for the same constraint).
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
-  # Attestation of the toolchain so a misconfigured runner fails loudly rather
-  # than skipping the gate (no-false-green).
-  - id: toolchain
-    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+  # Toolchain attestation + the gate itself, in one step: Cloud Build steps
+  # each run in a fresh container and do not share installed packages, so
+  # installing PyYAML/pytest in a separate "toolchain" step would not persist
+  # into a later "verify" step. `gcr.io/google.com/cloudsdktool/cloud-sdk` has
+  # no `make`, so this runs on `python:3.14` (Debian full image; has make and
+  # git) instead, matching the dev box's Python: knowledge-index's
+  # `Path.glob("x/**")` only started matching files (not just directories)
+  # in 3.13+, so 3.12 silently starved it of sources. History is deepened
+  # (the default Cloud Build checkout is shallow) because lessons-sync and
+  # capability-drift walk commit ancestry and need cited ancestor commits to
+  # resolve; a git identity is configured because check-reconcile's
+  # old-unbaselined provocation makes a real backdated commit.
+  - id: verify
+    name: 'python:3.14'
     entrypoint: 'bash'
     args:
       - '-lc'
       - |
+        set -euo pipefail
+        python3 -m pip install --quiet --disable-pip-version-check -r infra/cloudbuild/requirements-verify.txt
+        # gates that pin PATH=/usr/bin:/bin must still reach the interpreter the deps went into
+        ln -sf /usr/local/bin/python3 /usr/bin/python3
+        git config --global --add safe.directory /workspace
+        git fetch --unshallow --quiet origin 2>/dev/null || git fetch --deepen=100000 --quiet origin || true
+        git config --global user.email ci@cloudbuild.local
+        git config --global user.name "cloudbuild-verify"
         command -v make >/dev/null || { echo "make missing"; exit 1; }
-        command -v python3 >/dev/null || { echo "python3 missing"; exit 1; }
         python3 -c 'import yaml' || { echo "PyYAML missing"; exit 1; }
+        PATH=/usr/bin:/bin python3 -c 'import yaml' || { echo "PyYAML missing on /usr/bin/python3"; exit 1; }
         echo "toolchain OK"
-
-  # The gate itself. Fails the build when any check fails.
-  - id: verify
-    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
-    entrypoint: 'bash'
-    args:
-      - '-lc'
-      - 'make verify'
+        make verify
