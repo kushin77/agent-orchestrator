@@ -473,6 +473,70 @@ records a venue the item's own record does not carry is refused where it used to
 believed, and every record written before #1003 — which says nothing about a venue — is
 read exactly as it always was.
 
+### 3.9 A red verification names the check it disagreed with (#1247)
+
+A refusal that says *something is wrong* and not *what* cannot be acted on, and until
+#1247 the driver could not say what. `scripts/verify.sh`'s own banner names how many
+checks failed and which ones were **skipped** — code 2, the tri-state's CANNOT-ASSESS —
+and never which ones failed:
+
+```
+verify: FAIL (2 of 142 checks failed, 4 skipped: module-registry, module-brief, diagrams-declaration, codeidx-surface)
+```
+
+Measured on #627 and #629, whose close-outs refused with exactly that and nothing else
+(`.fleet/lifecycle/ledger.jsonl`, 2026-09-18T09:07–09:37), and whose two board findings
+(#1247, #1251) therefore carried `1 of 142 checks failed` and `2 of 142 checks failed`
+as their whole account of the defect. Finding out *which* check meant running the entire
+composite gate again, so the finding stayed unresolved for a reason that was entirely
+about the report and not about the code.
+
+The names are already written, by the gate, on every failed run: `.verify/attestation.json`
+carries one entry per check — `{"name": …, "rc": …}` — and `scripts/verify.sh` writes it
+**even on failure**, deliberately ("so a red run still carries evidence"). Step 2 now reads
+it, through the same single reader the park/FAIL/signal table goes through, and:
+
+| | |
+|---|---|
+| what is named | every check whose `rc` is neither `0` (PASS) nor `2` (SKIP) — the gate's own tri-state, quoted from its producer rather than re-derived from prose |
+| where it is named | the refusal's **first** clause, and `RedGate.failing` beside `RedGate.verdict_line` for a composed refusal that has to name two red trees |
+| why first | `closeout` clamps a step's detail at 300 characters, and the gate's banner already spends most of that on counts and skips — a name that arrives after the bookkeeping is still unactionable |
+| when nothing is named | when the attestation is not demonstrably **this run's**: its `git_sha` must be the measured tree's `HEAD`, and it must have been written at or after the attempt started. A lane keeps an older run's record in the same worktree, and a run that died before writing one must not be described by the previous run's red |
+
+The count is still reported when no name can be read — the driver says what it measured
+and never invents a name, which is the substitution this module exists to prevent.
+
+### 3.10 The state root, and why the fixed code needs a seam (#1247)
+
+`ROOT` is this file's own checkout, so a checkout's copy operates on its own state. The
+driver has two requirements that a lane worktree cannot satisfy at once:
+
+- it must run the **fixed** code — the remedy from §3.8 is on `master`; and
+- it must run against the **fleet's** state — the journals, the lane records and the
+  decision ledger the fleet loops write in the shared checkout, without which an item is
+  not even in the audit's scope (`audit.in_scope`).
+
+The shared checkout is not a stable code baseline: it holds whichever branch a lane last
+left it on. Measured on this box while diagnosing #1247, it sat on
+`issue-708-wire-runaway-guard`, **3.7 hours behind `origin/master`**, so its copy of
+`cli.py` still refuses a red frozen head outright — the §3.8 remedy could not be
+exercised from it at all.
+
+`AO_LIFECYCLE_ROOT=<repo>` therefore points a lane's copy — the one carrying the fix —
+at the state that matters, instead of the fleet having to choose which of the two to lose:
+
+```
+AO_LIFECYCLE_ROOT=/home/akushnir/agent-orchestrator \
+  python3 <lane>/governance/lifecycle/cli.py close --issue 627
+```
+
+An override that is not a repository is **refused by name**, not used: it decides where
+`.fleet/lifecycle` is written, and that file's *presence* is what `governance/reconcile`
+reads as a landing record, so an unvalidated override would scatter landing records
+outside the fleet's state — the substitution golden rule 17 forbids, arriving by typo. An
+unset or empty override is this checkout, unchanged. Both halves are pinned by
+[`tests/test_lifecycle_root.py`](tests/test_lifecycle_root.py).
+
 ## 4. Auditing, and why it is offline
 
 `cli.py collect` reaches GitHub; `cli.py audit` never does. The rules are asserted

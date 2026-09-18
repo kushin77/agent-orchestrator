@@ -42,9 +42,13 @@
 # directions (#1291): the *work* on the default branch is proven landed
 # (`landing.py` — ancestry, tree containment, or patch identity against the
 # default branch's own commits, never the branch's name), the residue is
-# quarantined by NAME with a tip-pinned, leased exemption document, and §6e
-# provokes the three ways an exemption could be abused (an entry matching
-# nothing, an artifact whose tip moved, a lease that is closed or expired).
+# quarantined by NAME with a tip-pinned, leased exemption document that declares
+# the repository instance it was measured in (#1321), and §6e provokes every way
+# an exemption could be abused: an entry matching nothing, an artifact whose tip
+# moved, a lease that is closed or expired, a document measured in another
+# repository instance (inert, never excusing and never fatal), a document with
+# entries and no venue at all (CANNOT-ASSESS), and an unreadable document
+# (CANNOT-ASSESS).
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
@@ -647,6 +651,20 @@ fi
 #     fails immediately; so does one whose tip has moved), and an entry that
 #     excuses nothing FAILS as a stale exemption.
 #
+#   * and the document declares its VENUE (#1321) — the repository instance its
+#     exemptions were measured in. An exemption names a disk artifact of one
+#     checkout (a local branch, a worktree path), and the document is tracked, so
+#     it is read on checkouts where that artifact was never there; read
+#     venue-blind, every entry there "matches nothing" and fails as stale. #1317
+#     measured exactly that on a pristine clone and emptied the document — which
+#     un-quarantined all of it on the one box that has the artifacts. So: at the
+#     venue it declares, every rule above applies unchanged; anywhere else the
+#     whole document is INERT — each entry reported by name, honouring nothing
+#     (an artifact that IS unmatched there stays a finding) and not fatal (a
+#     stale exemption is a claim about the declared venue's disk, which this
+#     checkout cannot observe). A document holding entries with no venue is
+#     CANNOT-ASSESS, never a pass.
+#
 # A baseline this step cannot read is CANNOT-ASSESS (exit 2), never drift and
 # never a pass: "the state could not be read" and "the state is wrong" are
 # different answers, and this script declares all three in its contract above.
@@ -778,7 +796,16 @@ cleanup_provocation
 #   (ii)  a lease that is closed, or whose measurement is older than its own
 #         declared age bound, honours nothing and fails by name (without a lease,
 #         "honoured while the tracking issue is open" would be decorative, GR-29);
-#   (iv)  an unreadable document is CANNOT-ASSESS, never a pass.
+#   (iv)  an unreadable document is CANNOT-ASSESS, never a pass;
+#   (v)   a document measured in ANOTHER repository instance is INERT here (#1321):
+#         every entry is reported by name, honours nothing (the artifact stays a
+#         finding — this document does not speak for this checkout) and is NOT
+#         fatal (a stale exemption is a claim about the OTHER venue's disk, which
+#         this checkout cannot observe). That is the case #1317 measured on a
+#         pristine clone and emptied the document over; failing on it reds CI on
+#         a box-local document, and honouring it would let a foreign venue excuse
+#         work here. Without (v) the other five halves are satisfiable by a
+#         document that simply has no venue — which is CANNOT-ASSESS, not a pass.
 q_root="$work/quarantine-case"
 q_repo="$q_root/repo"
 q_docs="$q_root/docs"
@@ -812,7 +839,7 @@ import time
 code_root, repo, docs = sys.argv[1], sys.argv[2], sys.argv[3]
 branch, worktree = sys.argv[4], sys.argv[5]
 sys.path.insert(0, code_root)
-from governance.reconcile.real_tree_baseline import check_real_tree
+from governance.reconcile.real_tree_baseline import check_real_tree, repository_venue
 
 problems = []
 
@@ -850,7 +877,14 @@ with open(baseline, "w", encoding="utf-8") as handle:
     json.dump({"note": "fixture: nothing pretends to be pre-existing", "entries": []}, handle)
 
 
-def document(name, *, state="open", measured_at=None, max_age_hours=1, entries=None, raw=None):
+def document(name, *, state="open", measured_at=None, max_age_hours=1, entries=None, raw=None, venue=None):
+    """A fixture document, declaring the FIXTURE repo's venue by default (#1321).
+
+    An exemption names a disk artifact of one repository instance, so the
+    fixture must say which instance it was measured in — otherwise every half
+    below is inert (CANNOT-ASSESS without a venue at all) instead of honoured or
+    refused, and the proofs would pass vacuously.
+    """
     path = f"{docs}/{name}.json"
     if raw is not None:
         with open(path, "w", encoding="utf-8") as handle:
@@ -867,6 +901,10 @@ def document(name, *, state="open", measured_at=None, max_age_hours=1, entries=N
                     "measured_at": measured_at or iso,
                     "measured_by": "check-reconcile.sh §6e",
                     "max_age_hours": max_age_hours,
+                },
+                "venue": {
+                    "git_common_dir": venue if venue is not None else repository_venue(repo),
+                    "measured_on": "check-reconcile.sh §6e",
                 },
                 "quarantine": entries or [],
             },
@@ -960,6 +998,58 @@ check(
     "an unreadable quarantine document is CANNOT-ASSESS, never a pass",
     not broken.assessable and not broken.ok,
     f"assessable={broken.assessable}",
+)
+
+# (v) a document measured in ANOTHER repository instance is INERT here (#1321):
+#     reported by name, honouring nothing, and NOT fatal. This is the case #1317
+#     measured on a pristine clone (`0 new-and-old, 538 stale; 23 stale
+#     quarantine exemption(s)`) and emptied the document over. The SAME entry,
+#     artifact and tip are honoured at their own venue — that is half (iii)
+#     above — so what (v) proves is that the VENUE decides, not the entry.
+elsewhere = verdict(document("elsewhere", entries=present, venue="/somewhere/else/.git"))
+inert = {e.name for e in elsewhere.inapplicable_quarantine}
+check(
+    "an entry measured in another repository instance is INERT here: reported by name, "
+    "honouring nothing, not fatal",
+    elsewhere.assessable
+    and not elsewhere.ok  # fail-closed: the artifact it names is still a finding here
+    and branch in {e.name for e in elsewhere.new_violations}
+    and branch in inert
+    and worktree in inert
+    and elsewhere.quarantined == ()
+    and not elsewhere.stale_quarantine
+    and "NOT IN FORCE" in elsewhere.describe()
+    and branch in elsewhere.describe(),
+    f"quarantined={sorted(e.name for e in elsewhere.quarantined)} "
+    f"inapplicable={sorted(inert)} stale={sorted(e.name for e in elsewhere.stale_quarantine)} "
+    f"violations={sorted(e.name for e in elsewhere.new_violations)}",
+)
+
+# ...and without a venue it cannot be interpreted at all: an exemption names a
+# disk artifact of one repository instance, so a document that does not say which
+# one has no way to tell "the artifact is gone" from "the artifact was never
+# here". Both shapes of that (a missing block, an empty identity) are refusals.
+no_venue_block = verdict(document("no-venue-block", raw=json.dumps({
+    "version": 1,
+    "tracked_by": "#1291",
+    "tracking": {
+        "state": "open",
+        "measured_at": iso,
+        "measured_by": "check-reconcile.sh §6e",
+        "max_age_hours": 1,
+    },
+    "quarantine": present,
+})))
+check(
+    "entries with no 'venue' block at all are CANNOT-ASSESS, never a pass",
+    not no_venue_block.assessable and not no_venue_block.ok and "venue" in no_venue_block.reason,
+    f"assessable={no_venue_block.assessable} reason={no_venue_block.reason[:120]}",
+)
+empty_venue = verdict(document("empty-venue", entries=present, venue=""))
+check(
+    "entries with an empty venue identity are CANNOT-ASSESS, never a pass",
+    not empty_venue.assessable and not empty_venue.ok and "venue" in empty_venue.reason,
+    f"assessable={empty_venue.assessable} reason={empty_venue.reason[:120]}",
 )
 
 if problems:
