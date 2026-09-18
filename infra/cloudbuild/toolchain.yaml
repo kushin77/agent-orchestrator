@@ -1,0 +1,58 @@
+# infra/cloudbuild/toolchain.yaml -- the DECLARED verify-runner toolchain
+# contract (#1264, parent #1254).
+#
+# `make verify` claims to run "the same everywhere". Measured 2026-09-18 (#1245),
+# it did not -- and every difference was found one build at a time, because none
+# of them was DECLARED. The gate asserted the product and never asserted its own
+# instrument:
+#
+#   * the runner had Python 3.12. `Path.glob("x/**")` only matches the FILES
+#     below a directory from 3.13 on, so the knowledge index was silently starved
+#     of its sources and still reported green;
+#   * the runner had no git identity. check-reconcile's backdated provocation
+#     makes a real commit; with no identity it made none, so the provocation
+#     reported success while provoking nothing;
+#   * the checkout was shallow. lessons-sync and capability-drift walk commit
+#     ancestry; the ancestors they cite were simply not in the checkout;
+#   * `PATH=/usr/bin:/bin` reached an interpreter without PyYAML -- the deps had
+#     been installed into a different interpreter.
+#
+# This file is that contract, stated. scripts/check-toolchain-parity.sh asserts
+# every line of it at the top of `make verify` (locally, and in
+# infra/cloudbuild/verify.yaml before the gate itself runs), refusing BY NAME:
+#
+#   toolchain:python-minor       the interpreter `python3` resolves to is outside `python.range`
+#   toolchain:git-identity       `git config user.name` / `user.email` does not resolve
+#   toolchain:shallow            the checkout is shallow (the history the gate walks is absent)
+#   toolchain:interpreter-split  the declared interpreters disagree on major.minor, or one
+#                                of them cannot import a declared module
+#
+# This is a declaration, not a build config: there are no `steps:` here. An
+# importable trigger is a separate file (infra/cloudbuild/verify-trigger.yaml,
+# which points at verify.yaml). scripts/check-cloudbuild.sh parses every *.yaml
+# in this directory, and this file is additionally read by the gate itself with a
+# dependency-free reader -- a checker that needs the toolchain it is checking
+# cannot diagnose that toolchain's absence.
+
+# The interpreter the gate runs under. `Path.glob("x/**")` gained file matching
+# in 3.13; on 3.12 it starved the knowledge index, silently (#1245).
+python:
+  range: ">=3.14,<3.15"
+
+# The modules the gate's checks import. Mirrors
+# infra/cloudbuild/requirements-verify.txt, which the runner installs.
+modules: [yaml, pytest, jsonschema, cryptography, hcl2]
+
+# A gate that makes a commit needs a DECLARED identity: check-reconcile's
+# backdated provocation otherwise makes no commit and reports success (#1245).
+# `shallow: false` because lessons-sync and capability-drift resolve ancestors.
+git:
+  identity: required
+  shallow: false
+
+# Every interpreter a PATH-pinned check can reach must be the SAME interpreter.
+# The Cloud Build python:3.14 image holds the installed deps on
+# /usr/local/bin/python3 while /usr/bin/python3 is the distro's own interpreter,
+# so verify.yaml symlinks them together before the gate runs -- and the gate
+# asserts the result rather than trusting the symlink.
+interpreters: [/usr/bin/python3, /usr/local/bin/python3]

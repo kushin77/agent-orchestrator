@@ -4,9 +4,13 @@
 # fires. The runner image must provide bash, make, and python3 + PyYAML (the
 # same toolchain `make verify` requires locally); terraform/shellcheck/
 # gitleaks/pre-commit are SKIP-if-absent per scripts/check-terraform.sh and
-# friends, so the runner need not provide them. This file is declarative
-# scaffolding — the trigger that executes it ships disabled until a reviewed
-# go-live (see README.md and the feature-flag registry).
+# friends, so the runner need not provide them. What "the same toolchain" means
+# is not prose: it is DECLARED in infra/cloudbuild/toolchain.yaml (Python minor,
+# required modules, git identity, non-shallow history, interpreter agreement) and
+# ASSERTED against this runner by scripts/check-toolchain-parity.sh before the
+# gate runs (#1264). This file is declarative scaffolding — the trigger that
+# executes it ships disabled until a reviewed go-live (see README.md and the
+# feature-flag registry).
 
 # The verify trigger runs as an explicit service account, and Cloud Build
 # refuses such builds unless logging is CLOUD_LOGGING_ONLY, NONE, or a logs
@@ -20,13 +24,20 @@ steps:
   # installing PyYAML/pytest in a separate "toolchain" step would not persist
   # into a later "verify" step. `gcr.io/google.com/cloudsdktool/cloud-sdk` has
   # no `make`, so this runs on `python:3.14` (Debian full image; has make and
-  # git) instead, matching the dev box's Python: knowledge-index's
-  # `Path.glob("x/**")` only started matching files (not just directories)
-  # in 3.13+, so 3.12 silently starved it of sources. History is deepened
-  # (the default Cloud Build checkout is shallow) because lessons-sync and
-  # capability-drift walk commit ancestry and need cited ancestor commits to
-  # resolve; a git identity is configured because check-reconcile's
-  # old-unbaselined provocation makes a real backdated commit.
+  # git) instead. That image tag is not a coincidence: the Python minor, the git
+  # identity, a non-shallow checkout and the interpreter agreement are a
+  # DECLARED contract in infra/cloudbuild/toolchain.yaml, and the remedies below
+  # exist only to make this runner conform to it. The assertions themselves live
+  # in scripts/check-toolchain-parity.sh (#1264) and refuse BY NAME --
+  # toolchain:python-minor, toolchain:git-identity, toolchain:shallow,
+  # toolchain:interpreter-split -- replacing the three ad-hoc one-liners that
+  # used to stand here and covered only one of the four (a PyYAML-less
+  # interpreter). Two of the four were previously measured on this runner and
+  # missed: `Path.glob("x/**")` only matches files from 3.13 on, so a 3.12
+  # runner silently starved the knowledge index; and the default Cloud Build
+  # checkout is shallow, so lessons-sync and capability-drift could not resolve
+  # the ancestors they cite. A git identity is configured because check-reconcile
+  # makes a real backdated commit.
   - id: verify
     name: 'python:3.14'
     entrypoint: 'bash'
@@ -41,8 +52,8 @@ steps:
         git fetch --unshallow --quiet origin 2>/dev/null || git fetch --deepen=100000 --quiet origin || true
         git config --global user.email ci@cloudbuild.local
         git config --global user.name "cloudbuild-verify"
+        # `make` is a precondition of THIS file (it calls `make verify`), not of
+        # the declared toolchain, so it stays here rather than in the gate.
         command -v make >/dev/null || { echo "make missing"; exit 1; }
-        python3 -c 'import yaml' || { echo "PyYAML missing"; exit 1; }
-        PATH=/usr/bin:/bin python3 -c 'import yaml' || { echo "PyYAML missing on /usr/bin/python3"; exit 1; }
-        echo "toolchain OK"
+        bash scripts/check-toolchain-parity.sh
         make verify

@@ -82,6 +82,24 @@ results_tsv="$verify_dir/.results.tsv"
 
 # name|command — every command is an honest gate (real exit code, can fail).
 checks=(
+  # toolchain-parity (issue #1264, parent #1254): the runner's OWN toolchain is a
+  # declared contract (infra/cloudbuild/toolchain.yaml) and it is asserted BEFORE
+  # every other check, because every check below depends on the instrument. It is
+  # registered explicitly here, for the same reason python-lint is: this array is
+  # the gate of record, and naming a check here is what makes it run for every
+  # lane rather than by the luck of the discovery layer (which would append it
+  # LAST -- the wrong place for a precondition). Measured 2026-09-18 (#1245), four
+  # differences between the dev box and the Cloud Build runner were each found one
+  # build at a time: Python 3.12 (`Path.glob("x/**")` matches files only from 3.13
+  # on, so the knowledge index was silently starved of sources), no git identity
+  # (check-reconcile's backdated provocation made no commit and reported success),
+  # a shallow clone (lessons-sync and capability-drift could not resolve the
+  # ancestors they cite) and a `PATH=/usr/bin:/bin` that reached a PyYAML-less
+  # interpreter. The check refuses BY NAME -- toolchain:python-minor,
+  # toolchain:git-identity, toolchain:shallow, toolchain:interpreter-split -- so a
+  # wrong runner is named once, at the top, instead of surfacing as a cascade of
+  # unrelated reds twenty minutes later.
+  'toolchain-parity|bash scripts/check-toolchain-parity.sh'
   'shell-syntax|bash scripts/check-shell-syntax.sh'
   'python-syntax|bash scripts/check-python-syntax.sh'
   # python-lint (issue #1203, parent #1201): the gate of record COMPILED the
