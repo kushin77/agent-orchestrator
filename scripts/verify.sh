@@ -25,6 +25,15 @@
 # standing gap. The ratchet's own record rides in the attestation as
 # `skip_ratchet`.
 #
+# A DESTROYED VENUE IS ONE FINDING, NOT TWENTY SKIPS (issue #1351). rc 2 still
+# means CANNOT-ASSESS and the ratchet still accounts for every skip -- but a
+# venue whose git linkage has been destroyed (the #1345 shape: its `.git` names
+# an admin dir that no longer exists) is decided ONCE, before the check loop.
+# Such a run publishes exactly ONE `venue-invalid` finding and refuses the
+# verdict; the checks are NOT run, so nothing is counted as a skip and twenty
+# per-check rc-2 results can no longer be folded into `skipped` and read as a
+# small, believable failure.
+#
 # The check set includes the declared `fleet` pytest suite (`pytest-fleet`) and
 # the declared capstone `e2e` suite (`e2e`).
 # The gate of record must exercise the tests it claims to cover: a red fleet
@@ -792,6 +801,162 @@ if [ -s "$duplicates_tsv" ]; then
   done < "$duplicates_tsv"
   echo "verify: duplicate check name(s) registered -- the check list is wedged" >&2
   overall=1
+fi
+
+# --- venue precondition (issue #1351) ----------------------------------------
+# ONE CONDITION, NOT TWENTY FINDINGS. Measured 2026-09-18 while closing #1345
+# (gate transcript /tmp/ao-hp/gates/M2/run.log): a lane venue whose git admin
+# directory had been reclaimed survived as a directory whose `.git` FILE named
+# an admin dir that no longer existed, and the composite published
+# `verify: FAIL (5 of 203 checks failed, 20 skipped: fleet-runbook, reconcile,
+# ...)` -- twenty checks each saying "not a repository" in their own words,
+# counted in the skip bucket, reading like a small, believable failure instead
+# of "this venue is not a checkout, so nothing in it was assessed". A venue
+# being invalid is ONE condition, and the verdict says so ONCE, by name.
+#
+# Decided here, before the check loop, on the shape that was actually measured:
+#   * `.git` is a FILE (the linked-worktree shape) whose `gitdir:` target does
+#     not exist -- the destruction #1345 measured, and the shape of every one of
+#     the 48 dangling venues the reaper named on this box; or
+#   * `.git` declares a linkage in some other broken form (a dangling symlink,
+#     no `gitdir:` at all) or `git rev-parse HEAD` still fails inside it.
+# The question is asked of the VENUE, so the two `GIT_*` variables that would
+# redirect it elsewhere are dropped for that one command.
+#
+# A tree that never claimed a git linkage is NOT this condition: an exported tree
+# (`git archive HEAD | tar -x`) and the shim `scripts/check-skip-ratchet.sh`
+# mounts the real orchestrator into are gitless BY CONSTRUCTION, and their
+# per-check tri-state (`git_sha: unknown`) is exactly what it was before this
+# probe existed. This fires on a venue that DECLARES a linkage it cannot honour.
+#
+# THE FINDING REPLACES THE CHECK LOOP. The checks are not run, `check_count` is
+# 0, nothing is counted as a skip, and no per-check rc-2 results exist to be
+# mistaken for independent findings; the attestation carries `venue_invalid`
+# instead, so the ONE condition is machine-readable rather than prose.
+#
+# rc 2 CANNOT-ASSESS, deliberately: an unusable venue cannot produce a verdict,
+# and 2 is this gate's own code for exactly that -- never a pass, and never a
+# failure of a check that did not run. rc 1 would claim the checks had run and
+# failed; the parked codes 10/11/12 sit outside the tri-state and mean "not
+# admitted", which this run IS (it holds a permit). Callers that require green
+# (make, the merge gate, the landing driver) already refuse anything that is not
+# a PASS, so this can never be read as green.
+venue_declares_linkage=0
+if [ -e "$root/.git" ] || [ -L "$root/.git" ]; then
+  venue_declares_linkage=1
+fi
+venue_detail=""
+venue_gitdir=""
+if [ "$venue_declares_linkage" -eq 1 ]; then
+  if [ -L "$root/.git" ] && [ ! -e "$root/.git" ]; then
+    venue_detail="its .git is a symlink to a missing target"
+  elif [ ! -d "$root/.git" ]; then
+    venue_gitdir="$(sed -n 's/^gitdir:[[:space:]]*//p' "$root/.git" | head -1)"
+    case "$venue_gitdir" in
+      "") venue_detail="its .git names no gitdir at all" ;;
+      /*) ;;
+      *) venue_gitdir="$root/$venue_gitdir" ;;
+    esac
+    if [ -z "$venue_detail" ] && [ ! -d "$venue_gitdir" ]; then
+      venue_detail="its .git names a missing admin dir $venue_gitdir"
+    fi
+  fi
+  venue_sha="$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$root" rev-parse HEAD 2>/dev/null || true)"
+  if [ -z "$venue_detail" ] && [ -z "$venue_sha" ]; then
+    venue_detail="git rev-parse HEAD fails inside it"
+  fi
+fi
+if [ -n "$venue_detail" ]; then
+  venue_total="${#checks[@]}"
+  venue_attestation="$verify_dir/attestation.json"
+  printf 'verify: CANNOT-ASSESS \u2014 venue-invalid: %s is not usable as a git checkout (%s); %s of %s checks were not run\n' \
+    "$root" "$venue_detail" "$venue_total" "$venue_total" | tee -a "$log" >&2
+  export VENUE_ROOT="$root"
+  export VENUE_DETAIL="$venue_detail"
+  export VENUE_GITDIR="$venue_gitdir"
+  export VENUE_TOTAL="$venue_total"
+  export VENUE_ATTESTATION="$venue_attestation"
+  export VENUE_MODE="$mode"
+  export VENUE_OUT="${venue_attestation#$root/}"
+  export VENUE_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  export VENUE_HOST="$(hostname 2>/dev/null || echo unknown)"
+  export VENUE_VERIFIED_BY="${AO_AGENT_ID:-$(id -un 2>/dev/null || echo unknown)}"
+  export VENUE_SESSION="${AO_SESSION_ID:-}"
+  export VENUE_SHA="$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$root" rev-parse HEAD 2>/dev/null || echo unknown)"
+  export VENUE_BRANCH="$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$root" branch --show-current 2>/dev/null || echo unknown)"
+  export VENUE_RUN_ID="${VENUE_TS}-$$"
+  venue_write_rc=0
+  python3 - <<'PY' || venue_write_rc=$?
+import json
+import os
+import sys
+
+# The ONE finding (issue #1351). `checks` is empty ON PURPOSE: no check ran, and
+# this record says so instead of inventing one. That is the single place it
+# departs from governance/isolation/attestation.schema.json, whose `checks` has
+# minItems 1 and whose `overall_verdict` tri-state has no member meaning "no
+# verdict can be produced": the schema describes a run that assessed something,
+# and this run assessed nothing. `result`/`exit_code` carry the refusal, and
+# `overall_verdict` is the tri-state's own rc-2 member (WARN = CANNOT-ASSESS),
+# never OK.
+record = {
+    "run_id": os.environ["VENUE_RUN_ID"],
+    "gate": "verify",
+    "mode": os.environ["VENUE_MODE"],
+    "result": "CANNOT-ASSESS",
+    "overall_verdict": "WARN",
+    "exit_code": 2,
+    "timestamp": os.environ["VENUE_TS"],
+    "host": os.environ["VENUE_HOST"],
+    "git_sha": os.environ["VENUE_SHA"],
+    "branch": os.environ["VENUE_BRANCH"],
+    "verified_by": os.environ["VENUE_VERIFIED_BY"],
+    "verification_session": os.environ["VENUE_SESSION"],
+    "check_count": 0,
+    "skipped": 0,
+    "skipped_checks": [],
+    "duplicates": {},
+    "venue_invalid": {
+        "root": os.environ["VENUE_ROOT"],
+        "detail": os.environ["VENUE_DETAIL"],
+        "gitdir": os.environ["VENUE_GITDIR"],
+        "finding": "venue-invalid",
+        "checks_total": int(os.environ["VENUE_TOTAL"]),
+        "checks_not_run": int(os.environ["VENUE_TOTAL"]),
+    },
+    "checks": [],
+}
+path = os.environ["VENUE_ATTESTATION"]
+with open(path, "w", encoding="utf-8") as fh:
+    json.dump(record, fh, indent=2)
+    fh.write("\n")
+# The write rule (docs/INFRA-LIMITS.md): a write is not a write until it is read
+# back non-empty. A silently truncated record is the one failure this artifact
+# cannot survive -- it is the only evidence of the refusal.
+try:
+    with open(path, encoding="utf-8") as fh:
+        read_back = json.load(fh)
+except (OSError, json.JSONDecodeError) as exc:
+    print("venue-record-unreadable: %s" % exc, file=sys.stderr)
+    raise SystemExit(1)
+if read_back.get("venue_invalid", {}).get("root") != record["venue_invalid"]["root"]:
+    print("venue-record-does-not-name-the-venue", file=sys.stderr)
+    raise SystemExit(1)
+if read_back.get("check_count") != 0 or read_back.get("checks"):
+    print("venue-record-counts-checks-that-did-not-run", file=sys.stderr)
+    raise SystemExit(1)
+print("venue-record: %s" % os.environ["VENUE_OUT"])
+PY
+  if [ "$venue_write_rc" -ne 0 ]; then
+    printf 'verify: CANNOT-ASSESS \u2014 venue-invalid: %s (%s); the run could not write its own record to %s -- the refusal is this line, not an artifact (#1351)\n' \
+      "$root" "$venue_detail" "$VENUE_OUT" >&2
+  else
+    printf 'attestation: %s (venue_invalid; no per-check verdicts exist for it to carry)\n' "$VENUE_OUT" >&2
+  fi
+  if [ "$mode" = "gate" ]; then
+    echo "GATE: CANNOT-ASSESS" >&2
+  fi
+  exit 2
 fi
 
 check_out_dir="$verify_dir/.check-out"
