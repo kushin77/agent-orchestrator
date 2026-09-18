@@ -150,6 +150,48 @@ honestly, in the idiom this repository already uses for legacy drift
 Quarantined artifacts are still **reported on every pass**, by name, in the
 verdict: rule 17's "reported until someone resolves it" is satisfied by the
 report, and the tracking issue carries the resolution.
+
+## An exemption has a venue (#1317 → #1321)
+
+An exemption's artifact is a **disk artifact of one repository instance** — a
+local branch of this checkout, a worktree path on this machine. That is a fact
+about a *venue*. The document is tracked, so it is read on checkouts where the
+artifact was never there; read venue-blind, every entry there is "no longer an
+unmatched artifact" and FAILS as a stale exemption. That is exactly what #1317
+measured on a pristine clone (`0 new-and-old, 538 stale; 23 stale quarantine
+exemption(s)`) and why it emptied the document — which un-quarantined all 23 on
+the one box that has them, and red the fleet again. #1317's reading of the other
+checkout was right, and its remedy was wrong: the two checkouts need *different
+answers*, not one of them deleted.
+
+So the document **declares the venue its exemptions were measured in**
+(`venue.git_common_dir` — see :func:`repository_venue`) and the check takes one
+of two branches:
+
+* **the same venue** — every rule above applies unchanged, teeth included: an
+  entry that excuses nothing (the artifact gone, or no longer unmatched) still
+  fails by name, and a lapsed lease still honours nothing;
+* **a different venue** — the whole document is **inert** here. Each entry is
+  reported (:attr:`RealTreeVerdict.inapplicable_quarantine`, `NOT-APPLICABLE`),
+  honours **nothing** — the fail-closed direction: an artifact that *is*
+  unmatched here stays a finding, because this document does not speak for this
+  checkout — and is not fatal, because a *stale* exemption is a claim about the
+  declared venue's disk, which this checkout cannot observe at all. The lease is
+  venue-scoped with it: a document that is not in force here cannot lapse here.
+
+This cannot be used to buy a green. Naming a venue that is not yours honours
+nothing, so the artifacts the entries were hiding here come back as findings;
+declaring no venue at all (while holding entries) is CANNOT-ASSESS; and an
+artifact the document does not name is a finding on every venue, because nothing
+about a venue can absorb it. A venue this check cannot read is CANNOT-ASSESS
+too, never "some other venue" — an unreadable identity must not silently stop
+exemptions from being evaluated.
+
+A document that declares **no exemptions at all** is inert everywhere (there is
+nothing to honour), and so is its lease: a lease bounding no entry cannot turn
+anything green, and failing on it would be the formality GR-12 refuses. Deleting
+the entries to reach that state does not buy a green either — the artifacts they
+named then fail by NAME as unbaselined-and-old.
 """
 
 from __future__ import annotations
@@ -227,6 +269,27 @@ class QuarantineEntry:
 
 
 @dataclass(frozen=True)
+class QuarantineVenue:
+    """The repository instance an exemption's artifacts belong to (#1321).
+
+    ``git_common_dir`` is load-bearing, not documentation: it is the one value
+    every worktree of an instance shares — a lane worktree, the shared checkout,
+    an operator's gate worktree — and that no other clone, and no pristine
+    checkout of the same repository, has. It is what makes "this artifact is
+    gone" (a resolution, in force at its venue) distinguishable from "this
+    artifact was never here" (inert, at any other venue).
+    """
+
+    git_common_dir: str
+    measured_on: str = ""
+
+    def describe(self) -> str:
+        if self.measured_on:
+            return f"{self.git_common_dir} ({self.measured_on})"
+        return self.git_common_dir
+
+
+@dataclass(frozen=True)
 class QuarantineLease:
     """The term of the exemptions: an open tracking issue, measured recently.
 
@@ -277,6 +340,14 @@ class RealTreeVerdict:
     vanished: tuple[BaselineEntry, ...] = field(default_factory=tuple)
     quarantined: tuple[QuarantineEntry, ...] = field(default_factory=tuple)
     stale_quarantine: tuple[BaselineEntry, ...] = field(default_factory=tuple)
+    #: Entries of a document that is not in force in this venue (#1321): reported
+    #: by name, honouring nothing, and NOT fatal — see "An exemption has a venue".
+    inapplicable_quarantine: tuple[QuarantineEntry, ...] = field(default_factory=tuple)
+    #: The repository instance this verdict was measured in, and the one the
+    #: exemptions declare. Equal (or undeclared, with no entries) is "in force".
+    venue: str = ""
+    quarantine_venue: str = ""
+    quarantine_applicable: bool = True
     quarantine_note: str = ""
     baseline_count: int = 0
     unmatched_count: int = 0
@@ -306,6 +377,12 @@ class RealTreeVerdict:
         ]
         if self.quarantine_note:
             lines.append(f"  {self.quarantine_note}")
+        for entry in self.inapplicable_quarantine:
+            lines.append(
+                f"  NOT-APPLICABLE {entry.kind} {entry.name} @{entry.tip[:12]} — the exemption "
+                f"was measured in {self.quarantine_venue or '(an unstated venue)'}; it is not in "
+                "force here (reported, honouring nothing, not fatal)"
+            )
         for entry in self.vanished:
             lines.append(f"  VANISHED {entry.kind} {entry.name} — {entry.reason}")
         for entry in self.stale_quarantine:
@@ -388,13 +465,53 @@ def artifact_tip(root: Path | str, kind: str, name: str) -> str:
     return ""
 
 
-def load_quarantine(path: Path | str) -> tuple[QuarantineLease, list[QuarantineEntry]]:
-    """Read the reviewed, named exemptions and the lease that bounds them (#1291).
+def repository_venue(root: Path | str) -> str:
+    """The repository instance ``root`` belongs to, as an absolute path (#1321).
+
+    Read from git rather than guessed: ``--git-common-dir`` is the one value
+    every worktree of one instance shares (a lane worktree, the shared checkout,
+    an operator's gate worktree all answer the same) and that a pristine clone
+    of the same repository cannot have. That is what makes the document's
+    ``venue`` falsifiable offline, with no network and no board access.
+
+    ``""`` when git cannot answer. That is deliberately *not* treated as "some
+    other venue": a venue this check cannot read is CANNOT-ASSESS, because
+    reading it as "elsewhere" would silently stop evaluating exemptions.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return os.path.realpath(result.stdout.strip())
+    # `--path-format` needs git >= 2.31: the plain form is relative to `root`.
+    fallback = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+    )
+    if fallback.returncode != 0 or not fallback.stdout.strip():
+        return ""
+    return os.path.realpath(Path(str(root)) / fallback.stdout.strip())
+
+
+def load_quarantine(
+    path: Path | str,
+) -> tuple[QuarantineLease, list[QuarantineEntry], QuarantineVenue]:
+    """Read the reviewed, named exemptions, their lease and their venue (#1291, #1321).
 
     Raises :class:`QuarantineUnavailable` for anything it cannot read *strictly*:
     a malformed document must not be read as "nothing is excused" (that would be
     a silent red) nor as "everything is excused" (a silent green) — it is
     CANNOT-ASSESS, same discipline as :func:`load_baseline`.
+
+    A document that holds entries but does not declare the venue they were
+    measured in is *also* unreadable in the sense that matters: an exemption
+    names a disk artifact of one repository instance, and without the venue
+    there is no way to tell "the artifact is gone" (a resolution) from "the
+    artifact was never here" (nothing to assess) — which is the whole reason
+    #1317 emptied this document (#1321). CANNOT-ASSESS, never a pass.
     """
     path = Path(path)
     try:
@@ -440,7 +557,28 @@ def load_quarantine(path: Path | str) -> tuple[QuarantineLease, list[QuarantineE
                 f"{path}: entry {entry.kind} {entry.name} has no 'tip' to pin it to"
             )
         entries.append(entry)
-    return quarantine_lease, entries
+
+    venue_payload = payload.get("venue")
+    if venue_payload is None:
+        if entries:
+            raise QuarantineUnavailable(
+                f"{path}: {len(entries)} exemption(s) and no 'venue' — an exemption names a disk "
+                "artifact of one repository instance, so a document that does not declare which "
+                "one cannot be interpreted (re-measure it and record the venue, #1321)"
+            )
+        return quarantine_lease, entries, QuarantineVenue(git_common_dir="")
+    if not isinstance(venue_payload, dict) or not str(venue_payload.get("git_common_dir") or ""):
+        raise QuarantineUnavailable(
+            f"{path}: malformed 'venue' — 'git_common_dir' is required (see repository_venue)"
+        )
+    return (
+        quarantine_lease,
+        entries,
+        QuarantineVenue(
+            git_common_dir=str(venue_payload["git_common_dir"]),
+            measured_on=str(venue_payload.get("measured_on", "")),
+        ),
+    )
 
 
 def artifact_vanished(root: Path | str, kind: str, name: str) -> bool:
@@ -536,61 +674,109 @@ def check_real_tree(
     baseline_by_key = {entry.key: entry for entry in baseline}
     unmatched_keys = {(item.artifact.kind, item.artifact.name) for item in report.unmatched}
 
-    # --- the named, leased quarantine (#1291) -------------------------------
+    # --- the named, leased quarantine (#1291), scoped to its venue (#1321) ---
     quarantine_entries: list[QuarantineEntry] = []
     stale_quarantine: list[BaselineEntry] = []
+    inapplicable_quarantine: list[QuarantineEntry] = []
     quarantine_note = ""
     honoured: dict[_KEY, QuarantineEntry] = {}
+    venue = ""
+    declared_venue = ""
+    quarantine_applicable = True
     document = Path(quarantine_path) if quarantine_path is not None else None
     if document is not None and document.exists():
         try:
-            quarantine_lease, quarantine_entries = load_quarantine(document)
+            quarantine_lease, quarantine_entries, quarantine_venue = load_quarantine(document)
         except QuarantineUnavailable as exc:
             return RealTreeVerdict(assessable=False, reason=str(exc))
-        refusal = quarantine_lease.refusal(at=now)
-        if refusal:
-            # No entry is honoured, and the lease itself is the named violation:
-            # an exemption nobody can show is still current is not an exemption.
-            quarantine_note = f"quarantine: NOT HONOURED — {refusal}"
-            stale_quarantine.append(
-                BaselineEntry(kind="lease", name=quarantine_lease.tracked_by, reason=refusal)
+        declared_venue = quarantine_venue.git_common_dir
+        if not quarantine_entries:
+            # Nothing is excused and nothing can be: a lease bounding no entry
+            # has no power to turn a finding into a pass, so it is reported and
+            # evaluated by nothing (GR-12: a check that cannot fail is a
+            # formality). Deleting entries cannot buy a green either — the
+            # artifacts they named then fail by NAME as unbaselined-and-old.
+            quarantine_note = (
+                "quarantine: empty — the document declares no exemptions "
+                f"(tracked by {quarantine_lease.tracked_by}); nothing is excused"
             )
         else:
-            quarantine_note = quarantine_lease.describe(at=now)
-            for entry in quarantine_entries:
-                if entry.key not in unmatched_keys:
+            venue = repository_venue(root)
+            if not venue:
+                return RealTreeVerdict(
+                    assessable=False,
+                    reason=(
+                        "this repository instance's identity could not be read "
+                        "(`git rev-parse --git-common-dir`), so no exemption's venue can be "
+                        f"assessed; {document} declares {declared_venue or '(no venue)'}"
+                    ),
+                )
+            quarantine_applicable = os.path.realpath(declared_venue) == venue
+            if not quarantine_applicable:
+                # The document is not in force here (#1321): every entry is
+                # reported and honours nothing (fail-closed — an artifact that
+                # IS unmatched here stays a finding), and none of it is fatal,
+                # because a stale exemption is a claim about the declared
+                # venue's disk, which this checkout cannot observe at all. The
+                # lease is venue-scoped with it: a document that is not in force
+                # here cannot lapse here.
+                inapplicable_quarantine = list(quarantine_entries)
+                quarantine_note = (
+                    f"quarantine: NOT IN FORCE — the {len(quarantine_entries)} exemption(s) were "
+                    f"measured in {quarantine_venue.describe()}; this gate is running in {venue} "
+                    "— each is reported by name and honours nothing here, and its staleness "
+                    "cannot be observed from here (not fatal)"
+                )
+            else:
+                refusal = quarantine_lease.refusal(at=now)
+                if refusal:
+                    # No entry is honoured, and the lease itself is the named
+                    # violation: an exemption nobody can show is still current
+                    # is not an exemption.
+                    quarantine_note = f"quarantine: NOT HONOURED — {refusal}"
                     stale_quarantine.append(
                         BaselineEntry(
-                            kind=entry.kind,
-                            name=entry.name,
-                            reason=(
-                                "quarantined but no longer an unmatched artifact. Confirm which "
-                                "happened before removing this entry: the work reached the default "
-                                "branch (a resolution — remove it), or the artifact was reclaimed "
-                                "(then the exemption is the last record that work existing nowhere "
-                                "else was discarded, which is the owner's call, not a cleanup). "
-                                f"Tracked by {quarantine_lease.tracked_by}."
-                            ),
+                            kind="lease", name=quarantine_lease.tracked_by, reason=refusal
                         )
                     )
-                    continue
-                current = artifact_tip(root, entry.kind, entry.name)
-                if current != entry.tip:
-                    # A moved branch/worktree is a different artifact: it must fail
-                    # immediately rather than be absorbed by the name it reuses.
-                    stale_quarantine.append(
-                        BaselineEntry(
-                            kind=entry.kind,
-                            name=entry.name,
-                            reason=(
-                                f"quarantined at {entry.tip[:12]} but now at "
-                                f"{current[:12] or '(gone)'} — a different artifact; "
-                                "re-measure it and re-record the exemption"
-                            ),
-                        )
-                    )
-                    continue
-                honoured[entry.key] = entry
+                else:
+                    quarantine_note = quarantine_lease.describe(at=now)
+                    for entry in quarantine_entries:
+                        if entry.key not in unmatched_keys:
+                            stale_quarantine.append(
+                                BaselineEntry(
+                                    kind=entry.kind,
+                                    name=entry.name,
+                                    reason=(
+                                        "quarantined but no longer an unmatched artifact at its "
+                                        "declared venue. Confirm which happened before removing this "
+                                        "entry: the work reached the default branch (a resolution — "
+                                        "remove it), or the artifact was reclaimed (then the "
+                                        "exemption is the last record that work existing nowhere "
+                                        "else was discarded, which is the owner's call, not a "
+                                        f"cleanup). Tracked by {quarantine_lease.tracked_by}."
+                                    ),
+                                )
+                            )
+                            continue
+                        current = artifact_tip(root, entry.kind, entry.name)
+                        if current != entry.tip:
+                            # A moved branch/worktree is a different artifact: it must
+                            # fail immediately rather than be absorbed by the name it
+                            # reuses.
+                            stale_quarantine.append(
+                                BaselineEntry(
+                                    kind=entry.kind,
+                                    name=entry.name,
+                                    reason=(
+                                        f"quarantined at {entry.tip[:12]} but now at "
+                                        f"{current[:12] or '(gone)'} — a different artifact; "
+                                        "re-measure it and re-record the exemption"
+                                    ),
+                                )
+                            )
+                            continue
+                        honoured[entry.key] = entry
 
     unbaselined = sorted(unmatched_keys - set(baseline_by_key))
     young: list[BaselineEntry] = []
@@ -640,6 +826,10 @@ def check_real_tree(
         vanished=tuple(vanished),
         quarantined=tuple(quarantined),
         stale_quarantine=tuple(stale_quarantine),
+        inapplicable_quarantine=tuple(inapplicable_quarantine),
+        venue=venue,
+        quarantine_venue=declared_venue,
+        quarantine_applicable=quarantine_applicable,
         quarantine_note=quarantine_note,
         baseline_count=len(baseline),
         unmatched_count=len(unmatched_keys),

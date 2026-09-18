@@ -53,7 +53,9 @@
         "young": {"type": "integer"},
         "vanished": {"type": "integer"},
         "quarantined": {"type": "integer"},
-        "stale_quarantine": {"type": "integer"}
+        "stale_quarantine": {"type": "integer"},
+        "inapplicable_quarantine": {"type": "integer"},
+        "venue": {"type": "string"}
       },
       "additionalProperties": false
     },
