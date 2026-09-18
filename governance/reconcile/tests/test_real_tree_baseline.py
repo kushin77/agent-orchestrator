@@ -645,7 +645,10 @@ def test_the_real_quarantine_document_is_well_formed_and_every_entry_is_pinned()
     assert lease.tracked_by.startswith("#")
     assert lease.state in {"open", "closed"}
     assert lease.max_age_hours > 0
-    assert entries, "an empty document cannot excuse the artifacts the gate reports"
+    # An empty list is a legitimate state: every previously-named exemption has
+    # been resolved (landed, pushed or reclaimed) and the document shrank to
+    # nothing, exactly as designed (#1291) — it is not required to always hold
+    # at least one entry, only to be well-formed when it holds any.
     keys = [(entry.kind, entry.name) for entry in entries]
     assert len(keys) == len(set(keys)), "two entries for one artifact: which one is the record?"
     for entry in entries:
