@@ -101,12 +101,14 @@ steps:
         # build that cannot publish the check is not a verdict on the code under
         # review, so the absent secret must not become the step's outcome.
         #
-        # `${GH_TOKEN:-}` and NOT `$GH_TOKEN`: Cloud Build validates every
-        # `$NAME` template in this file at SUBMISSION time, and a bare `$GH_TOKEN`
-        # is refused outright -- "key in the template \"GH_TOKEN\" is not a valid
-        # built-in substitution" -- killing the build before it starts. Only
-        # `PROJECT_ID` / `COMMIT_SHA` (and their peers) are built-in; the braced
-        # form is not read as a template at all.
+        # The braces-with-default form is DELIBERATE. Cloud Build validates every
+        # dollar-template in this file at SUBMISSION time and refuses a key that
+        # is neither a built-in substitution nor a declared one, naming it in the
+        # refusal -- which kills the build BEFORE step 0, this issue's own failure
+        # class (measured: build 05734838-0cc3-4b35-bd2b-ab5e909fc3a3). So this
+        # file never spells the token variable as a bare dollar-template --
+        # not even here in a comment, which the validator reads too. PROJECT_ID
+        # and COMMIT_SHA ARE built-ins, so they may be spelled that way.
         if [ -z "${GH_TOKEN:-}" ]; then
           echo "gate-status: SKIPPED -- no ao-gate-status-token secret; the gate verdict is NOT posted (see issue #1350)"
           echo "  create the secret and grant the build SA read access to give this build a producer (see README.md)."
