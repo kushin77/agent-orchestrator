@@ -1,4 +1,4 @@
-# RCA-0007 / RCA-0008 — the PR-queue-clearing session (2026-09-16)
+# The PR-queue-clearing session (2026-09-16) — citing RCA-0007 / RCA-0008
 
 | Field | Value |
 |---|---|
@@ -14,7 +14,7 @@ ledger" below) — treat it as the incident writeup, and open a
 `governance/lessons` record separately if this session's PRs get real
 issue numbers on the board.
 
-## RCA-0007 — the zero-byte gate-lock wedge
+## The zero-byte gate-lock wedge (cites RCA-0007)
 
 ### Impact
 
@@ -101,7 +101,7 @@ copy is the loud, always-on notice.
 Auto-reap stays on the one path already proven safe: a worktree's own
 `release`.
 
-## RCA-0008 — the shared-core-file collision class
+## The shared-core-file collision class (cites RCA-0008)
 
 ### Impact
 
