@@ -14,6 +14,13 @@
 # Everything runs against a throwaway repo built here; the real tree is never read
 # or written.
 #
+# The DECLARED gate signal (#1345) is provoked the same way: a permit is acquired
+# through the owner's own command (`scripts/gate-lock.sh`) and the reaper must KEEP
+# the venue it names — while its unheld twin in the same run is still reaped — and
+# a mutant of the tool that ignores the store must remove it, REDing this check by
+# name. The destroyed-venue half is provoked by deleting a venue's admin dir and
+# requiring the reaper to NAME it venue-invalid instead of skipping silently.
+#
 # Tri-state: 0 the contract holds / 1 a rule is broken / 2 CANNOT-ASSESS.
 set -uo pipefail
 
@@ -29,9 +36,26 @@ if [ ! -f "$tool" ]; then
 fi
 
 work="$(mktemp -d /tmp/ao830-check.XXXXXX)"
+# The gate permit/lock store this check drives (#1345) lives INSIDE the scratch
+# tree, for the whole run: the arms below acquire REAL permits through
+# `scripts/gate-lock.sh`, and pointing the store at a scratch root is what keeps a
+# fixture from taking one of the box's four real permits — and keeps this check
+# from reading the box's real store at all. Both views the reaper reads (the
+# `AO_GATE_LOCK_ROOT` override and the `${XDG_RUNTIME_DIR}` default) are
+# redirected, so every arm measures the same isolated store.
+gate_store="$work/gate-store"
+export AO_GATE_LOCK_ROOT="$gate_store"
+export XDG_RUNTIME_DIR="$work/xdg"
+gate_acquired=""
+release_gate() { # release_gate — hand back the permit this check acquired, if any
+  [ -n "$gate_acquired" ] || return 0
+  bash "$root/scripts/gate-lock.sh" release --worktree "$gate_acquired" --owner-pid $$ >/dev/null 2>&1 || true
+  gate_acquired=""
+}
 holder_pids=()
 holder_pid=""
-cleanup() { # cleanup — release the fixtures' holders by PID, then the scratch tree
+cleanup() { # cleanup — release the gate permit, the fixtures' holders by PID, then the scratch tree
+  release_gate
   release_holders
   rm -rf "$work"
 }
@@ -560,6 +584,133 @@ else
 fi
 release_holders
 
+echo "== prune-worktrees: a LIVE GATE's venue is never removed (#1345) =="
+# The /proc predicate above is a measurement of the INSTANT, and a gate is not a
+# long-lived reader: `make verify` runs a sequence of SHORT-LIVED checks, so a scan
+# that lands between two of them sees a venue with no holder at all. Measured on
+# this box (#1345): five gate venues survived as directories whose `.git` file
+# pointed at an admin dir that no longer existed, and the gate that had run inside
+# one of them published 20 `rc 2 CANNOT-ASSESS` checks folded into `skipped` — a
+# FALSE verdict that still read like a small, believable failure.
+#
+# The gate DECLARES itself in `scripts/gate-lock.sh`'s store (holder pid + holder
+# worktree). The fixture below takes a REAL permit through that command — so this
+# arm proves the reaper agrees with the store's OWNER, not with a copy of its
+# layout — then requires KEEP by name; its unheld twin must still be reaped in the
+# same run; and a mutant that ignores the store must remove the venue, which is
+# what makes the KEEP a control rather than a coincidence.
+
+gate_repo="$work/gate-venue"
+make_repo "$gate_repo"
+gate_live="$work/venue-live"
+gate_stale="$work/venue-stale"
+clean_lane "$gate_repo" "$gate_live"
+clean_lane "$gate_repo" "$gate_stale"
+
+acquire_out="$(bash "$root/scripts/gate-lock.sh" acquire --worktree "$gate_live" \
+  --mode verify --owner-pid $$ --issue 1345 --session check 2>&1)"
+acquire_rc=$?
+if [ "$acquire_rc" -eq 0 ]; then
+  gate_acquired="$gate_live"
+  ok "premise: the store's OWNER admitted a real permit for the venue (ACTUAL: $(oneline "$acquire_out"))"
+else
+  bad "the gate permit could not be acquired (rc=$acquire_rc), so the KEEP below would prove nothing: $(oneline "$acquire_out")"
+fi
+gate_status="$(bash "$root/scripts/gate-lock.sh" status 2>&1)"
+if [[ "$gate_status" == *"HELD by"* ]] && [[ "$gate_status" == *"$gate_live"* ]]; then
+  ok "premise: the owner's own status names the venue HELD — the declaration the reaper must read"
+else
+  bad "the store does not name $gate_live HELD, so a KEEP below proves nothing (ACTUAL: $(oneline "$gate_status"))"
+fi
+
+gate_report="$(reap "$gate_repo" --apply)"
+if [ -d "$gate_live" ] && [[ "$gate_report" == *"LIVE GATE holds this venue"* ]] && [[ "$gate_report" == *"permit slot-"* ]]; then
+  ok "a venue a LIVE GATE holds is KEEP, and the KEEP names the permit (ACTUAL: $(oneline "$gate_report"))"
+else
+  bad "a gate venue with a live permit was not kept and named by permit: present=$([ -d "$gate_live" ] && echo yes || echo no) ACTUAL: $(oneline "$gate_report")"
+fi
+if [ ! -d "$gate_stale" ]; then
+  ok "its unheld twin is STILL REAPED in the same run — nothing here refuses everything"
+else
+  bad "the unheld twin was kept beside the held venue, so this arm cannot tell the two apart"
+fi
+if [[ "$gate_report" != *"BROKEN"* ]]; then
+  ok "a venue whose git linkage is intact is NOT named venue-invalid (the condition is specific)"
+else
+  bad "a healthy venue was reported venue-invalid (ACTUAL: $(oneline "$gate_report"))"
+fi
+
+# --- venue-invalid: the destruction is NAMED, not 20 silent skips ------------
+broken_repo="$work/gate-dangling"
+make_repo "$broken_repo"
+broken_lane="$work/venue-dangling"
+clean_lane "$broken_repo" "$broken_lane"
+broken_admin="$(sed -n 's/^gitdir: //p' "$broken_lane/.git" 2>/dev/null | awk 'NR == 1')"
+if [ -n "$broken_admin" ] && [ -d "$broken_admin" ]; then
+  rm -rf "$broken_admin"
+  ok "destruction reproduced: removed the admin dir $(basename "$broken_admin") that a venue's .git names"
+else
+  bad "the destruction could not be reproduced: no admin dir at '$broken_admin'"
+fi
+if git -C "$broken_lane" rev-parse HEAD >/dev/null 2>&1; then
+  bad "premise fails: git still works inside $broken_lane, so the arm below proves nothing"
+else
+  ok "premise holds: git rev-parse fails inside the venue, exactly as #1345 measured"
+fi
+
+broken_report="$(reap "$broken_repo" --apply)"
+if [ -d "$broken_lane" ] && [[ "$broken_report" == *"BROKEN $broken_lane"* ]] && [[ "$broken_report" == *"venue-invalid"* ]]; then
+  ok "a venue whose admin dir vanished is NAMED venue-invalid, never silently skipped (ACTUAL: $(oneline "$broken_report"))"
+else
+  bad "a destroyed venue was not named venue-invalid: present=$([ -d "$broken_lane" ] && echo yes || echo no) ACTUAL: $(oneline "$broken_report")"
+fi
+broken_check="$(reap "$broken_repo" --check)"
+broken_check_rc=$?
+if [ "$broken_check_rc" -eq 1 ] && [[ "$broken_check" == *"venue-invalid venue(s)"* ]]; then
+  ok "a venue-invalid venue is a --check finding (rc=1), not a report nobody reads"
+else
+  bad "a venue-invalid venue was not a --check finding (rc=$broken_check_rc)"
+fi
+
+# --- fail closed: an unreadable gate store removes nothing -------------------
+closed_store="$work/gate-store-unreadable"
+mkdir -p "$closed_store/permits"
+printf 'not a gate record\n' >"$closed_store/permits/slot-00.lock"
+closed_repo="$work/gate-closed"
+make_repo "$closed_repo"
+closed_lane="$work/venue-closed"
+clean_lane "$closed_repo" "$closed_lane"
+closed_report="$( (cd "$closed_repo" && AO_GATE_LOCK_ROOT="$closed_store" XDG_RUNTIME_DIR="$work/xdg-closed" bash "$tool" --apply) 2>&1 )"
+closed_rc=$?
+if [ "$closed_rc" -eq 2 ] && [ -d "$closed_lane" ] && [[ "$closed_report" == *"CANNOT-ASSESS"* ]]; then
+  ok "an unreadable gate store is CANNOT-ASSESS and removes nothing (fail closed), never a silent removal"
+else
+  bad "an unreadable gate store did not fail closed: rc=$closed_rc present=$([ -d "$closed_lane" ] && echo yes || echo no) ACTUAL: $(oneline "$closed_report")"
+fi
+
+# The mutant that ignores the declared gate signal must REMOVE the live venue,
+# i.e. RED the KEEP arm above by name.
+mutant_gate_off="$work/mutant-gate-signal-off.sh"
+gate_mutant_rc=0
+make_mutant "$mutant_gate_off" 's/^GATE_SIGNAL="permit"$/GATE_SIGNAL="off"/' || gate_mutant_rc=$?
+case "$gate_mutant_rc" in
+  0)
+    ok "mutant C built: GATE_SIGNAL=\"off\" (the pre-#1345 predicate); sha256 $sha_pristine -> $(sha_of "$mutant_gate_off")" ;;
+  3)
+    bad "mutant C is a NO-OP: the GATE_SIGNAL anchor moved, so nothing was reverted and nothing is proven" ;;
+  *)
+    bad "mutant C could not be built (rc=$gate_mutant_rc)" ;;
+esac
+if [ "$gate_mutant_rc" -eq 0 ]; then
+  gate_mutant_report="$(reap_with "$mutant_gate_off" "$gate_repo" --apply)"
+  if [ -d "$gate_live" ]; then
+    bad "the permit-ignoring mutant KEPT the live gate venue, so this control cannot catch the regression it exists for (ACTUAL: $(oneline "$gate_mutant_report"))"
+  else
+    ok "the permit-ignoring mutant REMOVES the live gate venue — the declared gate signal is load-bearing (ACTUAL: $(oneline "$gate_mutant_report"))"
+  fi
+fi
+release_gate
+
 # Nothing above may have touched the tool itself: the mutants are copies.
 if [ "$(sha_of "$tool")" = "$sha_pristine" ]; then
   ok "the tool is unchanged by this check (sha256 $sha_pristine)"
@@ -586,7 +737,7 @@ case "$discovered" in
 esac
 
 if [ "$fails" -eq 0 ]; then
-  echo "check-prune-worktrees: OK — liveness is cwd OR an open file under the tree, declared runtime state cannot pin a worktree, and a lane branch is reaped only when its content is provably on master"
+  echo "check-prune-worktrees: OK — a venue a live gate holds is kept by name and a destroyed venue is named venue-invalid, liveness is cwd OR an open file under the tree, declared runtime state cannot pin a worktree, and a lane branch is reaped only when its content is provably on master"
   exit 0
 fi
 echo "check-prune-worktrees: NOT-OK — $fails rule(s) broken" >&2
