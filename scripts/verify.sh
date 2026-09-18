@@ -853,8 +853,23 @@ PY
 # here so a malformed attestation is itself a gate defect, not a silent hole. A
 # schema violation here is not allowed to hide behind an otherwise-green run:
 # it forces the whole gate to FAIL (no-false-green doctrine, GR-12).
+#
+# A MISSING schema is a defect in THIS tree, not an environment condition
+# (issue #1146). The schema is a tracked contract — it moved out of the
+# generated `.verify/` root to `governance/isolation/attestation.schema.json`
+# — and it ships in the same commit as this line, so a tree has both or
+# neither. The guard here used to be `[ -f "$attestation_schema" ] && ...`,
+# which made deleting the schema the way to turn this control off while the
+# gate stayed green. A control that fails OPEN is worse than no control: the
+# attestation would go unvalidated and nothing would say so, which is exactly
+# the false green this block exists to refuse. It now fails CLOSED, by name.
+# Only a missing `python3` still skips the run — an environment precondition
+# the rest of the gate already requires.
 attestation_schema="$root/governance/isolation/attestation.schema.json"
-if [ -f "$attestation_schema" ] && command -v python3 >/dev/null 2>&1; then
+if [ ! -f "$attestation_schema" ]; then
+  echo "verify: attestation schema is missing at $attestation_schema -- it is a tracked contract, so the gate cannot validate the attestation it just wrote (NOT-OK, fails closed)" >&2
+  overall=1
+elif command -v python3 >/dev/null 2>&1; then
   if ! python3 "$root/scripts/lib/validate-attestation.py" \
       "$verify_dir/attestation.json" "$attestation_schema" >>"$log" 2>&1; then
     echo "verify: attestation.json failed schema validation (see $log) -- the gate cannot attest a shape it did not itself produce correctly" >&2
