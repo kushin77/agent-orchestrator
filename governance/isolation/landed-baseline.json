@@ -1,6 +1,11 @@
 {
   "entries": [
     {
+      "code": "commit-missing-ticket-trailer",
+      "sha": "098d304c589519c66f70c11848751176e5afdff7",
+      "why": "squash-merge of #1244 (cloudbuild logging fix) landed on master; #1244 is referenced in the body prose, not a trailing `Refs <slug>#<n>` trailer"
+    },
+    {
       "code": "commit-ref-outside-the-trailer-block",
       "sha": "afebf84844b76e692f237cafdead2da9d3b688de",
       "why": "the reference is present in the message but outside the trailing trailer block"
