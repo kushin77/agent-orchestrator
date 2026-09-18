@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cmr:catalog:module.schema:v1",
+  "$comment": "Pinned local copy of the CMR hub's cmr.module/v1 schema (issue #1163). Source: kushin77/CMR vendor/CMR/catalog/schemas/module.schema.json at the submodule gitlink b6c49aa03992dba9fe4b87b46104b8fc2f69f224, the bundle_ref recorded in this repository's cmr-pin.yaml. Byte-identical to that file apart from this $comment, which is an annotation and has no validation effect. It exists so scripts/check-module-manifest.sh has a real schema input offline: a git worktree add does not initialise the submodule, and a validator that silently skips when its schema is missing is the formality #1163 is about. The vendored path is preferred whenever it is readable; this copy is the fallback, and its absence is CANNOT-ASSESS, never a pass.",
+  "title": "CMR Module Manifest (v1)",
+  "description": "Canonical schema for a governed module in the CMR hub-and-spoke ecosystem, ratifying the module.json draft from ARCHITECTURE §3.2. Ratified by ADR-0003. The manifest `schema` field carries the version identity `cmr.module/v1`; schema evolution happens via a new ADR, never silently. Extensible by ADR-0007: required core fields are closed, extension fields (description, epic, scope, etc.) are allowed. `type` enum extended with `governance` by ADR-0007 amendment (DR-009).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "id", "name", "type", "source", "governance"],
+  "properties": {
+    "schema": {
+      "title": "Manifest schema version",
+      "description": "Version identity of this manifest. Must be exactly `cmr.module/v1` for v1.",
+      "const": "cmr.module/v1"
+    },
+    "id": {
+      "title": "Module id",
+      "description": "Namespaced module id: lowercase, dot-separated segments of `a-z`, `0-9`, and `-`. Globally unique across the catalog (e.g. `erp-crm.rbac`).",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$"
+    },
+    "name": {
+      "title": "Module name",
+      "description": "Short human-readable module name (e.g. `saas-rbac`).",
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "title": "Module type",
+      "description": "Taxonomy type (R5): what kind of governed unit this module is.",
+      "enum": [
+        "app",
+        "service",
+        "frontend",
+        "backend",
+        "middleware",
+        "integration",
+        "feature",
+        "infra",
+        "workflow",
+        "template",
+        "governance"
+      ]
+    },
+    "class": {
+      "title": "Class tags",
+      "description": "Free-form classification tags (e.g. `[\"backend\"]`).",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "source": {
+      "title": "Source repository",
+      "description": "Where the module's code lives (provenance, R3/R10).",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["repo"],
+      "properties": {
+        "repo": {
+          "title": "Source repo",
+          "description": "The module's source repository as `owner/name`.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "default_branch": {
+          "title": "Default branch",
+          "description": "Default branch of the source repository (e.g. `main`).",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "versions": {
+      "title": "Versions",
+      "description": "Version identity. The `vX.Y.Z` git tag is the source of truth (ADR-0002).",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["latest"],
+      "properties": {
+        "latest": {
+          "title": "Latest version",
+          "description": "Latest SemVer tag, e.g. `v2.4.0`.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "distribution": {
+      "title": "Distribution",
+      "description": "Hybrid distribution info (ADR-0002, R15): language-native package and/or Terraform module. NOTE: this is the hybrid-package axis — the SaaS copy-out mode is `export_eligibility` below (ADR-0010), a distinct axis.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "language": {
+          "title": "Language",
+          "description": "Primary implementation language (e.g. `typescript`, `python`, `go`, `hcl`).",
+          "type": "string"
+        },
+        "package": {
+          "title": "Package",
+          "description": "Language-native package identity (e.g. npm scope `@kushin77/saas-rbac`).",
+          "type": "string"
+        },
+        "terraform": {
+          "title": "Terraform module",
+          "description": "Terraform module registry/ref for IaC modules, or `null`.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "license": {
+      "title": "License",
+      "description": "Declared license of the module (SPDX id or `none`). For machinery eligible for SaaS copy-out this is recorded in the export ledger and granted at export time (SAAS-003 / ADR-0010 guard #6).",
+      "type": "string",
+      "minLength": 1
+    },
+    "export_eligibility": {
+      "title": "SaaS export eligibility",
+      "description": "SaaS copy-out mode (ADR-0010 / docs/SAAS-BOUNDARY.md): `private` (default) = never crosses; `export-eligible` = machinery eligible for a licensed copy-out; `public-copy` = only valid in a DESTINATION org, never in the hub. The catalog validator rejects a hub module marked `public` or `public-copy` (the flip-over the boundary forbids).",
+      "enum": ["private", "export-eligible", "public-copy"]
+    },
+    "features": {
+      "title": "Features",
+      "description": "Capabilities consumers can toggle on/off individually (R6 selective consumption).",
+      "type": "array",
+      "items": {
+        "title": "Feature",
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "title": "Feature id",
+            "type": "string",
+            "minLength": 1
+          },
+          "default": {
+            "title": "Default state",
+            "description": "Default on/off for consumers that do not override.",
+            "enum": ["on", "off"]
+          },
+          "flags": {
+            "title": "Feature flags",
+            "description": "Config/env flag keys that gate this feature (e.g. `rbac.enabled`).",
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Connectors to external systems (R6): GHL, Google Workspace, Stripe, OIDC, etc.",
+      "type": "array",
+      "items": {
+        "title": "Integration",
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "title": "Integration id",
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "title": "Integration type",
+            "description": "Connector kind (e.g. `oidc`, `oauth2`, `webhook`, `rest`).",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "title": "Dependencies",
+      "description": "Other modules this module depends on, pinned by SemVer range (R7).",
+      "type": "array",
+      "items": {
+        "title": "Dependency",
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["module"],
+        "properties": {
+          "module": {
+            "title": "Dependency module",
+            "description": "Namespaced id of the dependency module.",
+            "type": "string",
+            "minLength": 1
+          },
+          "semver": {
+            "title": "SemVer range",
+            "description": "Allowed version range, e.g. `~1.4`.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "consumers": {
+      "title": "Consumers",
+      "description": "Module ids that consume this module; populated by the sync engine.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "governance": {
+      "title": "Governance",
+      "description": "Governance profile applied to this module (declared in Terraform, applied by CI on merge).",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "branch_protection": {
+          "title": "Branch protection",
+          "description": "Named branch-protection profile (e.g. `standard`).",
+          "type": "string"
+        },
+        "security": {
+          "title": "Security controls",
+          "description": "Security controls enabled (e.g. `dependabot`, `secret-scan`, `codeql`).",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "ai_guardrails": {
+          "title": "AI guardrails",
+          "description": "AI guardrail profile (e.g. `standard`).",
+          "type": "string"
+        }
+      }
+    },
+    "provenance": {
+      "title": "Provenance",
+      "description": "Harvest provenance for canibalized assets (EPIC-06).",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "harvested_from": {
+          "title": "Harvested from",
+          "description": "Source repo/path the asset was harvested from, or `null` when not harvested.",
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}
