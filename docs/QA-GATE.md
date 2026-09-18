@@ -38,6 +38,7 @@ So the QA gate must:
 | `make qa-loop` | `scripts/qa-loop.sh` — fix → verify → re-check until green (or no auto-fix left) | reuses gate evidence |
 | `make merge-gate` | `scripts/merge-gate.sh run` — pre-merge contract (refuses dirty tree, full gate, writes commit-named attestation) | `.verify/merge-attestation.json`, `.verify/merge-gate.log` |
 | `make tests` | `scripts/run-pytest-suites.sh` — every declared suite in isolation | `.verify/test-results.json` |
+| `make tagging` | `scripts/check-tagging.sh` — the **tag authority** (AO-GR-28, #1175 + #1183): six checks — the taxonomy's shape, every borrowed vocabulary proven equal to its authority, every rule's gate name resolved, the generated matrix's freshness, every declared refusal provoked by a real mutant with its clean twin accepted, and the **`tagging` mandate** that the contract docs keep declaring the rule (`posture`/`lifecycle` incl.). Also runs inside `make verify` by auto-discovery, and `make lint` | `.verify/verify.log`'s `tagging` row |
 
 ### `make gate` signal table (per-signal evidence)
 
@@ -203,9 +204,9 @@ are asserted before this stack is merged.
 Every `scripts/verify.sh` run writes `.verify/attestation.json` — on FAIL as
 well as PASS, because a gate that only attests when it is green cannot be
 trusted to have run at all (GR-12, no-false-green). The shape it must conform
-to is `.verify/attestation.schema.json` (the one entry `.gitignore` carves out
-of the otherwise-ignored `.verify/`, since the artifacts it validates are
-generated but the contract itself is checked in):
+to is `governance/isolation/attestation.schema.json`: the contract lives
+outside the wholly-generated `.verify/` root, so `.verify/` stays a plain,
+un-negated `.gitignore` entry while the schema itself is checked in.
 
 * `run_id`, `git_sha`, `overall_verdict` at the top level;
 * `checks[]`, one entry per gate, each carrying `name`, `verdict`

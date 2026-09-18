@@ -88,7 +88,7 @@ def test_undeclared_suite_is_refused(tmp_path: Path) -> None:
               AO-GR-1:
                 status: ENFORCED
                 covered: true
-                gate: "suite:governance/controls"
+                gate: "suite:governance/totally-undeclared-suite"
             """
         )
     )

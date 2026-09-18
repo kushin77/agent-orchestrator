@@ -23,13 +23,13 @@
       "id": "messages-api",
       "default": "on",
       "flags": ["anthropic.messages"],
-      "desc": "Anthropic Messages API chat with model tiers and typed output validation."
+      "desc": "Anthropic Messages API chat with model tiers and typed output validation. Provider-specific: the deepseek module's equivalent base chat capability is its own chat-completions feature, since the two providers speak different wire protocols (Messages API vs OpenAI-compatible chat/completions)."
     },
     {
       "id": "system-lifting",
       "default": "on",
       "flags": ["anthropic.system"],
-      "desc": "System messages lifted into the top-level system field of the Messages request."
+      "desc": "System messages lifted into the top-level system field of the Messages request. Provider-specific: this step has no deepseek counterpart because the OpenAI-compatible chat/completions shape already carries a native system role message, so there is nothing to lift."
     },
     {
       "id": "graceful-degradation",

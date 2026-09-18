@@ -13,7 +13,26 @@ from pathlib import Path
 
 import pytest
 
-from conftest import ARTIFACT, REPO_ROOT, incident, rca, rca_body
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_lessons_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+ARTIFACT = _conftest.ARTIFACT
+REPO_ROOT = _conftest.REPO_ROOT
+incident = _conftest.incident
+rca = _conftest.rca
+rca_body = _conftest.rca_body
 
 import cli
 from model import CODE_RCA_ARTIFACT_UNTRACKED
@@ -46,7 +65,17 @@ def make_repo(path: Path, *, commit: bool = True) -> Path:
             {
                 "generated_at": "2026-09-15T00:00:00Z",
                 "source": "acme/widgets",
-                "issues": [{"number": 100, "state": "OPEN", "labels": []}],
+                # #100 is the issue the ledger names as INC-0001's origin, so it
+                # carries the `incident` record label (issue #1178) and a
+                # milestone, so it is reachable as a goal for the record.
+                "issues": [
+                    {
+                        "number": 100,
+                        "state": "OPEN",
+                        "labels": ["incident"],
+                        "milestone": "M24 - Enterprise Knowledge Index",
+                    }
+                ],
             }
         )
         + "\n",

@@ -17,11 +17,12 @@
 name: control-plane-web-image
 disabled: true
 description: Flag-gated build+push of the web-surface (portal) image to Artifact Registry.
-github:
-  owner: kushin77
-  name: agent-orchestrator
+repositoryEventConfig:
   push:
     branch: ^master$
+  repository: projects/purebliss-ghl/locations/us-central1/connections/capital-gh/repositories/agent-orchestrator
+  repositoryType: GITHUB
+serviceAccount: projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com
 filename: infra/cloudbuild/web-image.yaml
 substitutions:
   _AR_REPO: us-central1-docker.pkg.dev/purebliss-ghl/ao-images

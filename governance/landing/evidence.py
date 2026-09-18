@@ -30,12 +30,19 @@ SHAs; the gate writes the full one) but never a *different* commit.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 #: Where ``scripts/merge-gate.sh run`` writes the attestation (repo-relative).
 ATTESTATION_REL = Path(".verify") / "merge-attestation.json"
+
+#: Where the landing engine publishes master's own health after a successful
+#: squash-merge (RCA 2026-09-17 fix #5, #1114) — `fleet/brain.py`'s dispatch
+#: pre-check reads this same path/schema before opening a new lane's PR, so a
+#: red (or stale, head-mismatched) master is never inherited by new work.
+MASTER_ATTESTATION_REL = Path(".fleet") / "master-attestation.json"
 
 STATE_READ = "read"
 STATE_ABSENT = "absent"
@@ -159,6 +166,26 @@ def read_attestation(path: Path) -> Attestation:
         verified_by=verified_by,
         detail=detail,
     )
+
+
+def write_master_attestation(path: Path, attestation: Attestation, *, commit: str) -> Path:
+    """Publish master's own health after a successful squash-merge (fix #5).
+
+    Reuses the SAME shape :func:`read_attestation` reads — no second schema —
+    with ``commit`` overridden to the sha that is actually landing on
+    ``origin/master`` (the squash merge commit ``merge_pr`` returns; the
+    caller falls back to the pre-flight attestation's own commit when the
+    port cannot name one). The write is atomic (tmp file + ``os.replace``) so
+    a reader can never observe a half-written file — the classic split-write
+    hazard for a file another process polls on a timer.
+    """
+    payload = attestation.as_dict()
+    payload["commit"] = commit
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+    return path
 
 
 def same_commit(left: Optional[str], right: Optional[str]) -> bool:

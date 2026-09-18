@@ -11,7 +11,26 @@ from pathlib import Path
 
 import pytest
 
-from conftest import action, incident, lesson, rca, suggestion
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_lessons_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+action = _conftest.action
+incident = _conftest.incident
+lesson = _conftest.lesson
+rca = _conftest.rca
+suggestion = _conftest.suggestion
 from model import (
     CODE_DUPLICATE_ID,
     CODE_INVALID_FIELD,
@@ -25,9 +44,18 @@ from model import (
     warnings,
 )
 
+# Persistent handles for the lazy in-function imports below: a bare
+# ``from model/checker import ...`` executed at TEST-EXECUTION time (inside a
+# function body) would run after collection has already imported every
+# governance suite's conftest, so sys.modules may by then hold a sibling
+# suite's "model"/"checker" (issues #699, #702, #1042). These aliases are
+# bound at collection time, while sys.modules is still correct.
+import checker as _checker  # noqa: E402
+import model as _model  # noqa: E402
+
 
 def parse(records, path="governance/lessons/ledger.jsonl"):
-    from checker import parse_ledger_text
+    parse_ledger_text = _checker.parse_ledger_text
 
     text = "\n".join(json.dumps(r, sort_keys=True) for r in records) + "\n"
     return parse_ledger_text(text, Path(path))
@@ -158,7 +186,7 @@ def test_a_duplicate_id_is_reported_once():
 
 
 def test_a_malformed_line_is_a_hard_finding():
-    from checker import parse_ledger_text
+    parse_ledger_text = _checker.parse_ledger_text
 
     ledger = parse_ledger_text('{"id": "INC-0001",\n', Path("ledger.jsonl"))
     assert [f.code for f in ledger.findings] == [CODE_LEDGER_INVALID]
@@ -166,14 +194,14 @@ def test_a_malformed_line_is_a_hard_finding():
 
 
 def test_a_line_that_is_not_an_object_is_a_hard_finding():
-    from checker import parse_ledger_text
+    parse_ledger_text = _checker.parse_ledger_text
 
     ledger = parse_ledger_text('["not", "a", "record"]\n', Path("ledger.jsonl"))
     assert [f.code for f in ledger.findings] == [CODE_LEDGER_INVALID]
 
 
 def test_blank_lines_are_tolerated():
-    from checker import parse_ledger_text
+    parse_ledger_text = _checker.parse_ledger_text
 
     ledger = parse_ledger_text("\n\n", Path("ledger.jsonl"))
     assert ledger.entries == []
@@ -196,7 +224,7 @@ def test_finding_renders_its_remediation():
 
 
 def test_a_warning_is_not_an_error():
-    from model import Finding
+    Finding = _model.Finding
 
     soft = Finding(
         code="suggestion-open",
@@ -209,7 +237,7 @@ def test_a_warning_is_not_an_error():
 
 
 def test_report_serializes_errors_and_deviations_separately():
-    from model import Report
+    Report = _model.Report
 
     report = Report(ledger="ledger.jsonl", generated_at="2026-09-15T00:00:00Z")
     payload = report.as_dict()

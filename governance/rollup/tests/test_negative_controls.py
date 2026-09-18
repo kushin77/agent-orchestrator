@@ -8,7 +8,30 @@ a gate able to fail, and the last two prove the two scopes stay disjoint.
 
 from __future__ import annotations
 
-from conftest import build_report, inventory, org, sme
+import importlib.util as _importlib_util  # noqa: E402
+from pathlib import Path as _ConftestPath  # noqa: E402
+
+# A bare ``from conftest import ...`` is not safe here: when this suite is
+# collected alongside other governance suites, every one of their
+# ``tests/conftest.py`` files lands under the same bare module identity
+# ``conftest`` in ``sys.modules``, so whichever conftest is imported LAST
+# silently wins the name for the rest of collection (issues #699, #702, #1042).
+# Loading this file's own conftest by absolute path guarantees this module
+# always gets ITS directory's conftest regardless of collection order.
+_conftest_spec = _importlib_util.spec_from_file_location(
+    "governance_rollup_tests_conftest", _ConftestPath(__file__).with_name("conftest.py")
+)
+_conftest = _importlib_util.module_from_spec(_conftest_spec)
+_conftest_spec.loader.exec_module(_conftest)
+
+# Persistent handle for the lazy in-function "model" imports below (see
+# governance/rollup/tests/conftest.py for the rationale: issues #699, #702,
+# #1042).
+import model as _rollup_model  # noqa: E402
+build_report = _conftest.build_report
+inventory = _conftest.inventory
+org = _conftest.org
+sme = _conftest.sme
 
 TENANTS = {
     "alpha": {"ceiling": 500.0, "repos": ["fx/one", "fx/two"]},
@@ -115,7 +138,7 @@ def test_two_inventory_files_for_one_repo_are_refused_rather_than_summed(tmp_pat
     """Catches a second declaration being folded into the first in silence."""
     import yaml
 
-    from conftest import write_tree
+    write_tree = _conftest.write_tree
 
     org_doc = org({"alpha": {"ceiling": 500.0, "repos": ["fx/one"]}}, ceiling=1200.0)
     write_tree(tmp_path, org_doc, [inventory("fx/one", "alpha", [sme(spend_usd=40.0)])])
@@ -129,10 +152,10 @@ def test_two_inventory_files_for_one_repo_are_refused_rather_than_summed(tmp_pat
 
     from pathlib import Path
 
-    from conftest import ROLLUP_DIR
+    ROLLUP_DIR = _conftest.ROLLUP_DIR
 
     from inputs import load_inputs
-    from model import project
+    project = _rollup_model.project
 
     loaded = load_inputs(tmp_path / "org.yaml", tmp_path / "inventory", ROLLUP_DIR / "schema.yaml")
     assert loaded.org is not None
@@ -223,10 +246,10 @@ def test_a_repo_filed_under_the_wrong_tenant_is_refused(tmp_path):
 
 def test_the_committed_over_ceiling_fixture_still_trips_at_all_three_scopes():
     """The gate's provocation fixture is re-checked here, from the committed bytes."""
-    from conftest import ROLLUP_DIR
+    ROLLUP_DIR = _conftest.ROLLUP_DIR
 
     from inputs import load_inputs
-    from model import project
+    project = _rollup_model.project
 
     fixture = ROLLUP_DIR / "fixtures" / "over-ceiling"
     loaded = load_inputs(fixture / "org.yaml", fixture / "inventory", ROLLUP_DIR / "schema.yaml")

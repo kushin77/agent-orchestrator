@@ -156,6 +156,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 fleet_root = Path(sys.argv[1]).resolve()
@@ -180,6 +181,37 @@ import brain  # noqa: E402
 import claims as claims_mod  # noqa: E402
 import markers  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
+
+sys.path.insert(0, str(repo_root))
+from governance.landing import evidence as landing_evidence  # noqa: E402
+
+# The master-health guard (RCA 2026-09-17 fix #5) refuses any dispatch — a
+# fresh send or a re-arm's resend alike — unless a green, head-fresh
+# attestation is on disk. This driver is testing the re-arm/dedup machinery,
+# not master-health, so it publishes a green attestation for the REAL
+# origin/master head (the same head `brain.current_master_head()` will read
+# from this checkout) before any probe runs, exactly the way
+# `governance/landing/engine.py`'s `land()` does after a squash-merge.
+_real_master_head = subprocess.run(
+    ["git", "-C", str(repo_root), "rev-parse", "--verify", "-q", "origin/master"],
+    capture_output=True,
+    text=True,
+).stdout.strip()
+if _real_master_head:
+    landing_evidence.write_master_attestation(
+        brain.MASTER_ATTESTATION,
+        landing_evidence.Attestation(
+            path=brain.MASTER_ATTESTATION,
+            state=landing_evidence.STATE_READ,
+            result="PASS",
+            rc=0,
+            commit=_real_master_head,
+            branch="master",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            verified_by="check-dispatch-reconcile.sh fixture",
+        ),
+        commit=_real_master_head,
+    )
 
 CAP = int(os.environ["AO_RUNAWAY_ATTEMPTS"])
 OLD = 3600.0
