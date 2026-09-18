@@ -9,6 +9,13 @@
 # from the ledgers to the same hash, and every populated authority-tracked field
 # has exactly one writer (the one contract v2 pins).
 #
+# The board snapshot is that join's *input*, and it is a committed point-in-time
+# artifact: a clean checkout can therefore resolve against a frontier the board
+# has already left. This gate states the age the projection tolerates and refuses
+# beyond it (issue #1077) — the consumer half of the freshness rule RCA-0014
+# prescribed (`governance/ticket/freshness.py` carries the tolerance, the
+# measurement behind it, and why it differs from the dispatch liveness one).
+#
 # The gate does not merely assert those properties; it PROVOKES them. Each
 # control below mutates an input, requires the projection to refuse, and requires
 # the refusal to name the offender:
@@ -19,7 +26,10 @@
 #   * a claim for an issue the board does not carry;
 #   * a budget receipt no evidence receipt backs;
 #   * a ticket no ledger supplies a field for;
-#   * a build that embeds a timestamp (so two builds differ).
+#   * a build that embeds a timestamp (so two builds differ);
+#   * a board snapshot older than the tolerance this consumer declares;
+#   * a board snapshot with no `generated_at` at all, and one whose
+#     `generated_at` is not a timestamp (both fail closed).
 #
 # If any control passes, this gate reports FAIL: a check that cannot fail is a
 # formality (GR-12).
@@ -50,6 +60,24 @@ if [ ! -e ".board/snapshot.json" ]; then
 fi
 
 store=".verify/ticket/tickets.json"
+
+# --- input freshness: the age this consumer tolerates (issue #1077) ----------
+# Asserted BEFORE the projection, because the whole defect this closes was an
+# unattributable red: a snapshot that has aged presents as `reference-unresolved`
+# ("a ledger names an issue the board does not carry"), which reads as a bad
+# ledger entry rather than as a stale input, and it reddened two gates of record
+# for two days without naming a remedy. Here the input states its own age first.
+# The assertion is deliberately OUTSIDE the projection — a build that read the
+# clock could not be rebuilt byte-identically, so `build()`/`verify()` stay pure.
+# See governance/ticket/freshness.py for the tolerance and the measured cadence
+# behind it.
+echo "== board freshness =="
+if ! python3 governance/ticket/cli.py freshness; then
+  echo "check-ticket-projection: FAIL — the committed board snapshot is outside the age" \
+    "this consumer tolerates (see above), so every reference the projection resolves is" \
+    "against a stale frontier" >&2
+  exit 1
+fi
 
 echo "== projection =="
 if ! python3 governance/ticket/cli.py project; then
@@ -214,7 +242,47 @@ fi
 check_refused "build that embeds a timestamp" "generated_at" \
   python3 governance/ticket/cli.py verify --out "$scratch/s1.json"
 
-expected_controls=7
+# The freshness controls mutate ONLY `generated_at`, on a hermetic fixture, and
+# fix `--now` — so the verdict is a property of the fixture, never of the wall
+# clock the gate happens to run at.
+write_freshness_fixture() {  # dir generated-at-json-or-ABSENT
+  local dir="$1"
+  local value="$2"
+  mkdir -p "$dir/.board"
+  if [ "$value" = "ABSENT" ]; then
+    printf '{"source": "kushin77/agent-orchestrator", "issues": []}\n' \
+      > "$dir/.board/snapshot.json"
+  else
+    printf '{"generated_at": %s, "source": "kushin77/agent-orchestrator", "issues": []}\n' \
+      "$value" > "$dir/.board/snapshot.json"
+  fi
+}
+
+fresh_now="2026-09-17T13:00:00Z"
+
+write_freshness_fixture "$scratch/fresh" '"2026-09-17T12:00:00Z"'
+controls=$((controls + 1))
+if python3 governance/ticket/cli.py freshness --root "$scratch/fresh" \
+  --now "$fresh_now" >/dev/null 2>&1; then
+  echo "  OK    control a dated snapshot inside the tolerance is accepted"
+else
+  echo "  FAIL  control a dated snapshot inside the tolerance was refused" >&2
+  unproven=$((unproven + 1))
+fi
+
+write_freshness_fixture "$scratch/aged" '"2026-09-01T00:00:00Z"'
+check_refused "board snapshot past the tolerance" "board-snapshot-stale" \
+  python3 governance/ticket/cli.py freshness --root "$scratch/aged" --now "$fresh_now"
+
+write_freshness_fixture "$scratch/unaged" "ABSENT"
+check_refused "board snapshot that carries no age" "board-snapshot-unaged" \
+  python3 governance/ticket/cli.py freshness --root "$scratch/unaged" --now "$fresh_now"
+
+write_freshness_fixture "$scratch/garbled" '"not-a-timestamp"'
+check_refused "board snapshot whose age is not one" "board-snapshot-unaged" \
+  python3 governance/ticket/cli.py freshness --root "$scratch/garbled" --now "$fresh_now"
+
+expected_controls=11
 if [ "$controls" -ne "$expected_controls" ]; then
   echo "check-ticket-projection: FAIL — expected $expected_controls controls, ran $controls" >&2
   unproven=$((unproven + 1))
