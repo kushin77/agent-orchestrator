@@ -37,9 +37,24 @@ declared disabled.
 What is NOT claimed: Cloud Build is not retired as of this commit, and no
 trigger was deleted. Arming a live trigger is an out-of-band
 `gcloud builds triggers update` that no commit performs, so the relocation is a
-declaration here and not an observation. `scripts/check-cloudbuild.sh --live`
-is the read-back against the project's real trigger list, and with no `gcloud`
-and no credentials it reports CANNOT-ASSESS — never a pass.
+declaration here and not an observation.
+
+`scripts/check-cloudbuild.sh --live` is the read-back against the project's real
+trigger list. It is not the default: a live project's arming state is not this
+repository's code, and a gate of record that reddened every lane for another
+surface's armed trigger would be ignored within a day. An unobservable read-back
+is CANNOT-ASSESS, never a pass.
+
+MEASURED 2026-09-18, `gcloud` present and the read-back succeeding: the declared
+`disabled: true` is **not** the live state. `control-plane-verify`,
+`control-plane-apply` and `control-plane-web-image` are ARMED in project
+`purebliss-ghl`, while `control-plane-rollout-promote` and
+`control-plane-rollout-rollback` were never imported. Roughly three dozen further
+armed triggers (`capital-*`, `erp-crm-*`, `gatekeeper-*`, `pr-gate`,
+`federated-pr-ci`, ...) are live and not declared here; they belong to other
+surfaces, and #1263's scope note already records the `capital-*` set as being
+retired. Disarming the declared three is an operational step
+(`gcloud builds triggers update --disabled`), not a commit.
 
 ## Flag-gate (GR-5) — everything ships OFF
 
