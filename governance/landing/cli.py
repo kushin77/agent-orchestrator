@@ -31,8 +31,11 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from governance.landing import evidence as evidence_mod  # noqa: E402
 from governance.landing.engine import (  # noqa: E402
     EXIT_CANNOT_ASSESS,
+    EXIT_NOT_OK,
+    EXIT_OK,
     LandingEngine,
     LandingRequest,
     describe,
@@ -103,6 +106,128 @@ def cmd_land(args: argparse.Namespace) -> int:
     return result.rc
 
 
+def _rev_parse(root: Path, rev: str) -> Optional[str]:
+    """A local ref/rev resolved to its full SHA — NO fetch, NO verify.
+
+    Mirrors `fleet/brain.py`'s `current_master_head()` (same reasoning: a
+    manual `gh pr merge` bypasses `land()` entirely, so master's head can move
+    without any lane ever running this file — `git rev-parse` only reads
+    whatever ref this checkout already has). `None` when the rev cannot be
+    resolved at all, never an exception the caller has to guess about.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--verify", "-q", rev],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
+def cmd_write_master_attestation(args: argparse.Namespace) -> int:
+    """Publish master's own health from a `scripts/verify.sh` attestation.
+
+    RCA 2026-09-17 fix #5 follow-up (#1114): `governance/landing/engine.py`'s
+    `land()` writes `.fleet/master-attestation.json` after every FLEET-DRIVEN
+    merge, but an OPERATOR's manual `gh pr merge` never goes through `land()`
+    at all — so after any manual merge, master's head moves and
+    `fleet/brain.py`'s dispatch pre-check reads CANNOT-ASSESS (a stale-head
+    attestation) until the next fleet land, which may be a long time. This
+    subcommand closes that gap from the OTHER direction a verify can run from:
+    a plain `make verify` (or `bash scripts/verify.sh verify`) at whatever
+    commit is currently checked out.
+
+    It is deliberately NOT wired into `scripts/verify.sh` itself — that file
+    is currently held by an open PR (#1127, touching `scripts/verify.sh`), so
+    editing it here would collide with a sibling lane's file. This
+    subcommand + the `make master-attestation` target are the seam a
+    follow-up can hook `scripts/verify.sh` into once #1127 lands (or an
+    operator/cron job can call it directly, right after `make verify`, in the
+    meantime).
+
+    Publishes ONLY when the checkout's HEAD is `origin/master`'s current head
+    (resolved locally, no fetch — a verify run on a lane head must never be
+    mistaken for a measurement of master) AND the verify attestation it reads
+    is green. Anything else is a no-op (exit 0, a named SKIPPED line) — this
+    command deliberately never fails a caller's script merely because the
+    condition to publish did not hold; a red verify or a non-master head is an
+    ordinary, expected outcome, not an error in this subcommand's own
+    execution.
+    """
+    root = Path(args.root).resolve() if args.root else ROOT
+    attestation_path = Path(args.attestation)
+    if not attestation_path.is_absolute():
+        attestation_path = root / attestation_path
+    try:
+        payload = json.loads(attestation_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        print(f"write-master-attestation: CANNOT-ASSESS — {attestation_path} unreadable ({exc})", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    except ValueError as exc:
+        print(f"write-master-attestation: CANNOT-ASSESS — {attestation_path} is not valid JSON ({exc})", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if not isinstance(payload, dict):
+        print(f"write-master-attestation: CANNOT-ASSESS — {attestation_path} is not a JSON object", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    exit_code = payload.get("exit_code")
+    if not isinstance(exit_code, int) or isinstance(exit_code, bool):
+        print(f"write-master-attestation: CANNOT-ASSESS — {attestation_path} carries no exit_code", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    # scripts/verify.sh's own attestation names the commit `git_sha` (a
+    # different shape from the merge-gate/master-attestation `commit` field);
+    # a bare `commit` is accepted too so this also works against a
+    # merge-attestation-shaped file, without a second reader.
+    verified_sha = str(payload.get("git_sha") or payload.get("commit") or "").strip()
+
+    head = _rev_parse(root, "HEAD")
+    master_head = _rev_parse(root, "origin/master")
+    if head is None or master_head is None:
+        print(
+            "write-master-attestation: SKIPPED — HEAD or origin/master could not be resolved locally "
+            "(no fetch was run); nothing published",
+        )
+        return EXIT_OK
+    if not evidence_mod.same_commit(head, master_head):
+        print(
+            f"write-master-attestation: SKIPPED — checkout HEAD ({head}) is not origin/master's head "
+            f"({master_head}); a lane's own verify never publishes master's health",
+        )
+        return EXIT_OK
+    if exit_code != 0:
+        print(
+            f"write-master-attestation: SKIPPED — verify is red (exit_code={exit_code}) at master's head "
+            f"({master_head}); a red verify is not published — dispatch reading absence as CANNOT-ASSESS "
+            "is the correct posture for a red master, not a regression",
+        )
+        return EXIT_OK
+
+    attestation = evidence_mod.Attestation(
+        path=attestation_path,
+        state=evidence_mod.STATE_READ,
+        result=str(payload.get("result") or ""),
+        rc=exit_code,
+        commit=verified_sha or master_head,
+        branch=str(payload.get("branch") or ""),
+        timestamp=str(payload.get("timestamp") or ""),
+        verified_by=str(payload.get("verified_by") or ""),
+    )
+    target = Path(args.out).resolve() if args.out else (root / evidence_mod.MASTER_ATTESTATION_REL)
+    try:
+        written = evidence_mod.write_master_attestation(target, attestation, commit=master_head)
+    except OSError as exc:
+        print(f"write-master-attestation: CANNOT-ASSESS — could not write {target} ({exc})", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    print(f"write-master-attestation: wrote {written} (commit={master_head})")
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="landing", description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -143,12 +268,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="the rev the baseline is measured at (default: origin/master)",
     )
     land_cmd.set_defaults(func=cmd_land)
+
+    write_master_cmd = sub.add_parser(
+        "write-master-attestation",
+        help="publish master's own health from a verify attestation (RCA fix #5 follow-up, #1114)",
+    )
+    write_master_cmd.add_argument(
+        "--attestation",
+        default=str(Path(".verify") / "attestation.json"),
+        help="the scripts/verify.sh attestation to read (default: .verify/attestation.json)",
+    )
+    write_master_cmd.add_argument("--root", default="", help="the checkout to check HEAD/origin-master in (default: this repository)")
+    write_master_cmd.add_argument(
+        "--out",
+        default="",
+        help="where to write master's attestation (default: <root>/.fleet/master-attestation.json)",
+    )
+    write_master_cmd.set_defaults(func=cmd_write_master_attestation)
     return parser
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.issue <= 0:
+    if args.command == "land" and args.issue <= 0:
         print("land: CANNOT-ASSESS — --issue must be a positive issue number", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     try:

@@ -26,8 +26,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import monitor  # noqa: E402
 
-#: A fixed clock, so an age assertion is arithmetic rather than a race.
-NOW = datetime(2026, 9, 15, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+#: A clock pinned to "now" at collection time, so an age assertion is arithmetic
+#: rather than a race, but stays valid however far the real calendar has moved —
+#: a hardcoded past timestamp ages out and silently drifts past the directive TTL
+#: whenever `monitor.main()`/`cmd_queue` fall back to the real wall clock
+#: (`moment=None` -> `time.time()`), which is exactly what the two CLI-path tests
+#: below do.
+NOW = datetime.now(timezone.utc).timestamp()
 
 
 def _stamp(seconds_ago: float = 0.0) -> str:

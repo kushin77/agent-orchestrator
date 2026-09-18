@@ -1220,3 +1220,44 @@ def test_start_monitor_refuses_while_frozen(monkeypatch):
 
     with pytest.raises(watchdog.RespawnRefused):
         watchdog.start_monitor()
+
+
+# --- RCA 2026-09-17 fix #3: a per-worktree, self-owned gate-lock reap ------
+#
+# RCA-0015 (governance/lessons/rca/RCA-0015-zero-byte-gate-lock-wedge.md)
+# refused a box-wide auto-heal of gate-lock leftovers. `_self_reap_own_gate_lock`
+# is the watchdog's worktree-SCOPED alternative: it must call
+# `gatelock.reap_own_worktree` with THIS checkout's own worktree (`ROOT`),
+# never anything box-wide, and it must fold an exception into its own
+# CANNOT-ASSESS return rather than raising into the caller's pass.
+
+
+def test_self_reap_own_gate_lock_reaps_only_this_checkouts_worktree(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(
+        watchdog.gatelock,
+        "reap_own_worktree",
+        lambda worktree, **kwargs: calls.append(worktree) or True,
+    )
+    unassessable = watchdog._self_reap_own_gate_lock()
+    assert unassessable is False
+    assert calls == [watchdog.ROOT], "the self-reap must be scoped to this checkout's own worktree"
+    assert "reaped own leftover" in capsys.readouterr().out
+
+
+def test_self_reap_own_gate_lock_reports_nothing_to_reap_when_clean(monkeypatch, capsys):
+    monkeypatch.setattr(watchdog.gatelock, "reap_own_worktree", lambda worktree, **kwargs: False)
+    unassessable = watchdog._self_reap_own_gate_lock()
+    assert unassessable is False
+    assert "nothing to reap" in capsys.readouterr().out
+
+
+def test_self_reap_own_gate_lock_folds_an_exception_into_cannot_assess(monkeypatch, capsys):
+    def _boom(worktree, **kwargs):
+        raise RuntimeError("store is unusable")
+
+    monkeypatch.setattr(watchdog.gatelock, "reap_own_worktree", _boom)
+    unassessable = watchdog._self_reap_own_gate_lock()
+    assert unassessable is True
+    out = capsys.readouterr().out
+    assert "CANNOT-ASSESS" in out and "store is unusable" in out

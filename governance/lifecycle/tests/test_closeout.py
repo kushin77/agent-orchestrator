@@ -46,7 +46,6 @@ FakeOps = _conftest.FakeOps
 clean_item = _conftest.clean_item
 parked_verification = _conftest.parked_verification
 
-
 def test_a_hygienic_item_performs_nothing():
     item = clean_item()
     result = closeout(item, FakeOps(item))

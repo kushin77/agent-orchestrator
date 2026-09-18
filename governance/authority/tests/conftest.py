@@ -19,6 +19,17 @@ PKG_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if str(PKG_DIR) not in sys.path:
     sys.path.insert(0, str(PKG_DIR))
 
+# governance/authority shares the bare basenames "model" and "cli" with several
+# sibling governance/* suites (board, dispatch, lessons, ticket, waves, ...).
+# When this suite is collected alongside them in one pytest invocation, a bare
+# ``import model``/``import cli`` earlier in collection wins the shared
+# sys.modules slot for the rest of the run (issues #699, #702, #1042). Evict
+# any stale entry immediately before this package's own bare imports so the
+# fresh lookup (against the sys.path entry just inserted above) resolves to
+# THIS package's files.
+for _name in ("model", "cli"):
+    sys.modules.pop(_name, None)
+
 import model  # noqa: E402  (import after the sys.path bootstrap on purpose)
 
 SHA_A = "0123456789abcdef0123456789abcdef01234567"

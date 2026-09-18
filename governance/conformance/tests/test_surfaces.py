@@ -153,7 +153,9 @@ def policy_with(**overrides) -> SurfacePolicy:
 def test_real_policy_loads():
     policy = load_surface_policy(REAL_POLICY)
     assert policy.ladder == ("template", "class", "pattern", "enterprise", "faang", "elite")
-    assert {spec.surface for spec in policy.surfaces} == {
+    # The five #351 rows are the floor of the declared set; #590/#620/#885 and
+    # later lanes add rows, so this is a superset check, not an exact one.
+    assert {spec.surface for spec in policy.surfaces} >= {
         "shell",
         "portal",
         "gateway",
@@ -186,7 +188,9 @@ def test_real_tree_manual_requirements_are_reported():
     manual = [f for f in findings if f.code == CODE_MANUAL]
     # gateway, telemetry and registry declare a class that requires `rollback`;
     # a manual requirement is reported, never silently assumed met.
-    assert {f.subject for f in manual} == {"gateway", "telemetry", "registry"}
+    # Later rows (#590/#620/#885) also declare `enterprise`+ and are reported
+    # too, so this is a superset check.
+    assert {f.subject for f in manual} >= {"gateway", "telemetry", "registry"}
 
 
 # -- evidence measurement -----------------------------------------------------

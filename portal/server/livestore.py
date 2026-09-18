@@ -38,7 +38,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Mapping, Optional, Sequence
 
 import yaml
 
@@ -501,3 +501,291 @@ class TelemetrySnapshot:
             )
             for (day, vendor, model), bucket in sorted(buckets.items())
         ]
+
+
+# --------------------------------------------------------------------------- #
+# Fleet board (issue #880, EPIC #878 lane L1)
+# --------------------------------------------------------------------------- #
+# The console's fleet-board surface projects the SAME two files the fleet
+# CLI/cron already treats as live state — ``.board/snapshot.json`` (the issue
+# roster) and ``.board/claims.jsonl`` (the append-only claim/release/reap
+# event log) — never a copy. Every row this module emits is validated against
+# ``portal/schemas/fleet-board-row.schema.json`` before it is returned; a row
+# that fails validation is refused **by name** (its issue number and the
+# defect are reported) rather than served best-effort, so a malformed source
+# document degrades the board honestly instead of silently.
+#
+# The schema validator here is intentionally a small, dependency-free subset
+# (``type`` / ``required`` / ``properties`` / ``additionalProperties`` /
+# ``enum`` / ``const`` / ``minimum`` / ``minLength``) — the same posture
+# ``gateway/sme-routing/jsonschema_lite.py`` and ``guardrails/policy/
+# schemas.py`` take for the identical reason: the platform's stdlib+PyYAML
+# stack must stay offline, and a pillar does not reach into a sibling
+# pillar's private validator module.
+
+BOARD_ROW_SCHEMA = "ao.portal-fleet-board-row/v1"
+
+#: Repo-root-relative locations of the source documents this surface reads.
+DEFAULT_SNAPSHOT_PATH = Path(".board") / "snapshot.json"
+DEFAULT_CLAIMS_PATH = Path(".board") / "claims.jsonl"
+#: The row schema's own location (issue #880): the single source of truth for
+#: what a served row may contain — this module names no field the schema
+#: does not also declare.
+BOARD_ROW_SCHEMA_PATH = Path("portal") / "schemas" / "fleet-board-row.schema.json"
+
+
+class BoardRowInvalid(ValueError):
+    """One board row failed schema validation, named by its issue number."""
+
+    def __init__(self, identifier: str, errors: Sequence[str]) -> None:
+        self.identifier = identifier
+        self.errors = list(errors)
+        super().__init__(
+            f"board row {identifier!r} failed {BOARD_ROW_SCHEMA}: "
+            + "; ".join(self.errors)
+        )
+
+
+def load_board_row_schema(repo_root: Path | str) -> dict[str, Any]:
+    """Read ``portal/schemas/fleet-board-row.schema.json`` (fail closed)."""
+    path = Path(repo_root) / BOARD_ROW_SCHEMA_PATH
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise TelemetryUnavailableError(
+            f"missing fleet-board row schema: {path}"
+        ) from exc
+    except ValueError as exc:
+        raise TelemetryUnavailableError(
+            f"unparseable fleet-board row schema {path}: {exc}"
+        ) from exc
+    if not isinstance(document, dict):
+        raise TelemetryUnavailableError(f"schema {path} is not a JSON object")
+    return document
+
+
+def _validate_row(row: Mapping[str, Any], schema: Mapping[str, Any]) -> List[str]:
+    """Validate ``row`` against the (small, explicit) supported keyword subset."""
+    errors: List[str] = []
+    properties: Mapping[str, Any] = schema.get("properties") or {}
+    required: Sequence[str] = schema.get("required") or ()
+    additional = schema.get("additionalProperties", True)
+
+    for name in required:
+        if name not in row:
+            errors.append(f"missing required field {name!r}")
+
+    if additional is False:
+        for name in row:
+            if name not in properties:
+                errors.append(f"unexpected field {name!r}")
+
+    for name, subschema in properties.items():
+        if name not in row:
+            continue
+        value = row[name]
+        errors.extend(_validate_value(f"{name}", value, subschema))
+    return errors
+
+
+_TYPE_MAP = {
+    "string": str,
+    "integer": int,
+    "array": list,
+    "object": dict,
+    "boolean": bool,
+    "number": (int, float),
+}
+
+
+def _validate_value(path: str, value: Any, subschema: Mapping[str, Any]) -> List[str]:
+    errors: List[str] = []
+    expected_type = subschema.get("type")
+    if expected_type is not None:
+        py_type = _TYPE_MAP.get(expected_type)
+        # bool is an int subclass in Python; an integer field must not accept
+        # True/False (that would silently coerce a malformed row into "valid").
+        if py_type is int and isinstance(value, bool):
+            errors.append(f"{path}: expected integer, got boolean")
+        elif py_type is not None and not isinstance(value, py_type):
+            errors.append(f"{path}: expected {expected_type}, got {type(value).__name__}")
+    if "const" in subschema and value != subschema["const"]:
+        errors.append(f"{path}: expected constant {subschema['const']!r}, got {value!r}")
+    if "enum" in subschema and value not in subschema["enum"]:
+        errors.append(f"{path}: {value!r} is not one of {subschema['enum']!r}")
+    if isinstance(value, str) and "minLength" in subschema:
+        if len(value) < subschema["minLength"]:
+            errors.append(f"{path}: shorter than minLength {subschema['minLength']}")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in subschema and value < subschema["minimum"]:
+            errors.append(f"{path}: {value} is below minimum {subschema['minimum']}")
+    if isinstance(value, list) and isinstance(subschema.get("items"), Mapping):
+        item_schema = subschema["items"]
+        for index, item in enumerate(value):
+            errors.extend(_validate_value(f"{path}[{index}]", item, item_schema))
+    return errors
+
+
+def _latest_claims(claims_path: Path) -> dict[int, dict[str, Any]]:
+    """The most recent event per issue from the append-only claims log.
+
+    Corrupt lines are skipped (mirrors ``TelemetrySnapshot._load_usage``'s
+    honest-skip posture); a missing file reads as "nothing claimed yet".
+    """
+    latest: dict[int, dict[str, Any]] = {}
+    if not claims_path.is_file():
+        return latest
+    with open(claims_path, "r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            try:
+                issue = int(event.get("issue"))
+            except (TypeError, ValueError):
+                continue
+            latest[issue] = event
+    return latest
+
+
+@dataclass(frozen=True)
+class BoardRowRejection:
+    """One source row the schema refused, named rather than dropped silently."""
+
+    identifier: str
+    errors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BoardSnapshot:
+    """The fleet board: every schema-valid row, plus every named rejection."""
+
+    schema: str
+    rows: tuple[dict[str, Any], ...]
+    rejected: tuple[BoardRowRejection, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "rows": list(self.rows),
+            "rejected": [
+                {"identifier": item.identifier, "errors": list(item.errors)}
+                for item in self.rejected
+            ],
+        }
+
+
+def load_board_rows(
+    repo_root: Path | str,
+    *,
+    snapshot_path: Optional[Path | str] = None,
+    claims_path: Optional[Path | str] = None,
+) -> BoardSnapshot:
+    """Join ``.board/snapshot.json`` issues with their latest claim state.
+
+    Every joined row is validated against ``fleet-board-row.schema.json``
+    before being served: a row a malformed source document produced is
+    refused **by name** (its issue number, in ``rejected``) rather than
+    served — so a corrupt snapshot degrades the board honestly instead of
+    silently. A tenant/board with no issues is an empty, valid board.
+    """
+    root = Path(repo_root)
+    snap_path = (
+        Path(snapshot_path) if snapshot_path is not None else root / DEFAULT_SNAPSHOT_PATH
+    )
+    claim_path = (
+        Path(claims_path) if claims_path is not None else root / DEFAULT_CLAIMS_PATH
+    )
+    schema = load_board_row_schema(root)
+
+    try:
+        snapshot_raw = snap_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise TelemetryUnavailableError(f"missing board snapshot: {snap_path}") from exc
+    try:
+        snapshot_doc = json.loads(snapshot_raw)
+    except ValueError as exc:
+        raise TelemetryUnavailableError(
+            f"unparseable board snapshot {snap_path}: {exc}"
+        ) from exc
+    issues = snapshot_doc.get("issues") if isinstance(snapshot_doc, dict) else None
+    if not isinstance(issues, list):
+        raise TelemetryUnavailableError(f"board snapshot {snap_path} has no issues[] list")
+
+    claims = _latest_claims(claim_path)
+
+    rows: List[dict[str, Any]] = []
+    rejected: List[BoardRowRejection] = []
+    for entry in issues:
+        if not isinstance(entry, dict):
+            rejected.append(BoardRowRejection("<non-object>", ("issue entry is not an object",)))
+            continue
+        number = entry.get("number")
+        identifier = str(number) if number is not None else "<no-number>"
+        claim = claims.get(number) if isinstance(number, int) else None
+        claimed = bool(claim) and claim.get("event") == "claim"
+        row = {
+            "schema": BOARD_ROW_SCHEMA,
+            "number": number,
+            "title": entry.get("title"),
+            "state": entry.get("state"),
+            "lane": (claim.get("lane") or "") if claimed else "",
+            "claimed_by": (claim.get("agent") or "") if claimed else "",
+            "claimed_at": (claim.get("at") or "") if claimed else "",
+            "labels": entry.get("labels") if isinstance(entry.get("labels"), list) else [],
+        }
+        errors = _validate_row(row, schema)
+        if errors:
+            rejected.append(BoardRowRejection(identifier, tuple(errors)))
+            continue
+        rows.append(row)
+
+    return BoardSnapshot(schema=BOARD_ROW_SCHEMA, rows=tuple(rows), rejected=tuple(rejected))
+
+
+class BoardSurface:
+    """The route-facing wrapper ``portal.server.app`` composes (issue #880).
+
+    Feature-flag-gated OFF (GR-5) through the same fail-closed reader every
+    workbook-11 view uses (``portal.server.config_flags.surface_enabled``);
+    the flag is declared in ``portal/config/feature-flags.yaml``
+    (``surfaces.fleet_board``).
+    """
+
+    def __init__(
+        self,
+        *,
+        repo_root: Path | str,
+        enabled: Optional[bool] = None,
+        config_path: Optional[Path | str] = None,
+        snapshot_path: Optional[Path | str] = None,
+        claims_path: Optional[Path | str] = None,
+    ) -> None:
+        from portal.server.config_flags import FLEET_BOARD_SURFACE, surface_enabled
+
+        self.repo_root = Path(repo_root)
+        self.config_path = Path(config_path) if config_path is not None else None
+        self.snapshot_path = snapshot_path
+        self.claims_path = claims_path
+        if enabled is None:
+            enabled = surface_enabled(
+                self.repo_root,
+                config_path=self.config_path,
+                surface=FLEET_BOARD_SURFACE,
+            )
+        self.enabled = bool(enabled)
+
+    def rows(self) -> dict[str, Any]:
+        """The board snapshot, transport-shaped for the HTTP route."""
+        snapshot = load_board_rows(
+            self.repo_root,
+            snapshot_path=self.snapshot_path,
+            claims_path=self.claims_path,
+        )
+        return snapshot.as_dict()

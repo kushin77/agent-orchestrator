@@ -59,7 +59,7 @@ required_files=(
   "governance/spawn/liveness.py"
   "governance/spawn/cli.py"
   "governance/spawn/README.md"
-  "governance/spawn/tests/test_model.py"
+  "governance/spawn/tests/test_spawn_model.py"
   "governance/spawn/tests/test_consumption.py"
   "fleet/terminal.py"
   "fleet/watchdog.py"

@@ -55,7 +55,7 @@ RUNTIME_PATHS = {
         "STEERS",
     ),
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "RUNNER_HOLD", "WORKTREE_ROOT"),
-    "brain": ("HEARTBEAT", "WAVES", "DISPATCH_MARKERS"),
+    "brain": ("HEARTBEAT", "WAVES", "DISPATCH_MARKERS", "MASTER_ATTESTATION"),
     "health": ("SISTER_HEARTBEAT", "BRAIN_HEARTBEAT"),
     # The dispatch markers' state machine (#796): it reads and writes the marker
     # set, the run registry and the dead-letter store, so a test that reconciles
@@ -120,6 +120,45 @@ def isolate_fleet_runtime(tmp_path, monkeypatch):
     singleton = importlib.import_module("singleton")
     monkeypatch.setattr(singleton, "FLEET", tmp_path / "singleton")
     return tmp_path
+
+
+#: The fixed "master head" every test sees by default, so this suite never
+#: depends on this checkout's own real `origin/master` (which drifts as the
+#: repo is worked on, and would make CI flaky against a fixture written once).
+_DEFAULT_TEST_MASTER_HEAD = "0" * 40
+
+
+@pytest.fixture(autouse=True)
+def master_health_is_green_by_default(isolate_fleet_runtime, monkeypatch):
+    """`brain.dispatch()` refuses on a red/absent/head-stale master attestation
+    (RCA 2026-09-17 fix #5) — a fact no suite in this repo was written to
+    expect. Every test's `brain.MASTER_ATTESTATION` is already redirected into
+    `tmp_path` by `isolate_fleet_runtime`, above; this seeds it green, at a
+    fixed stand-in head that `brain.current_master_head` is also repointed to
+    (freshness is head-bound, not wall-clock — #1114 follow-up), so an
+    existing suite that dispatches an order for an unrelated reason is not
+    incidentally refused, and never shells out to real `git`. A test
+    exercising the master-health check itself (``fleet/tests/test_brain.py``)
+    overwrites this file, or repoints `current_master_head`/the constant, to
+    get a red/absent/head-stale verdict instead.
+    """
+    brain = importlib.import_module("brain")
+    monkeypatch.setattr(brain, "current_master_head", lambda: _DEFAULT_TEST_MASTER_HEAD)
+    path = brain.MASTER_ATTESTATION
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "result": "PASS",
+                "exit_code": 0,
+                "commit": _DEFAULT_TEST_MASTER_HEAD,
+                "timestamp": __import__("datetime")
+                .datetime.now(__import__("datetime").timezone.utc)
+                .isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 #: The executable the fleet's default runner names (`terminal.DEFAULT_RUNNER`).

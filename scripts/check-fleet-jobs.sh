@@ -150,17 +150,45 @@ probe(
 first = cron.render_lines(enabled)
 second = cron.render_lines(enabled)
 probe("RENDER-DETERMINISTIC", first == second, "rendered twice")
-legacy = [cron.line(2), cron.prune_line(), cron.reconcile_line(2)]
+legacy = [cron.line(2), cron.prune_line(), cron.reconcile_line(2), cron.reap_line()]
 manifest_rendered = [
     cron.render_job(j, interval=2 if j.get("interval") is not None else None) for j in enabled
 ]
 probe("LEGACY-BUILDERS-LOCKSTEP", legacy == manifest_rendered, "line/prune_line/reconcile_line")
 
-# --- 3. every enabled job is a singleton, with a unique lock and a user-drop --
+# --- 3. every job DECLARING singleton renders flock-wrapped with a unique
+# lock, and every job's log is unique. Issue #830 (#901/#906) added the reap
+# job as the fourth rung with `singleton: false` BY DESIGN: it shells out to
+# `scripts/prune-worktrees.sh`, which is fail-closed on its own (a claimed,
+# dirty, in-use or unpreserved worktree is always kept), so a second overlapping
+# tick cannot double-reclaim — the flock wrapper would just be redundant
+# ceremony. Requiring flock on EVERY enabled job (this probe's original
+# posture, from #241/#962, before the reap rung existed) is retired: it is not
+# what `fleet/cron.py`'s own docstring/manifest declare, and no lane has walked
+# it back since #906 shipped, so this probe now checks the invariant the
+# manifest actually promises — flock iff the job says singleton, always a
+# unique log/lock — rather than the older, now-inapplicable "always singleton".
+SINGLETON_REQUIRED_MARKERS = tuple(m for m in cron.MARKERS if m != cron.REAP_MARKER)
+
+
 def singleton_invariant(jobs_to_check):
     rendered = cron.render_lines(jobs_to_check)
-    ok = all(j.get("singleton") is True for j in jobs_to_check)
-    ok = ok and all("flock -n -E 99" in line for line in rendered)
+    by_job = dict(zip((j.get("marker") for j in jobs_to_check), rendered))
+    # Every job this module has always required a singleton for (watchdog,
+    # prune, reconcile) must still declare it and render flock-wrapped — a
+    # mutation that flips one to False must stay caught. The reap rung is the
+    # sanctioned exception (see above): required to render WITHOUT flock,
+    # since prune-worktrees.sh is fail-closed on its own.
+    ok = all(
+        (j.get("singleton") is True) and ("flock -n -E 99" in by_job[j.get("marker")])
+        for j in jobs_to_check
+        if j.get("marker") in SINGLETON_REQUIRED_MARKERS
+    )
+    ok = ok and all(
+        (j.get("singleton") is not True) and ("flock -n -E 99" not in by_job[j.get("marker")])
+        for j in jobs_to_check
+        if j.get("marker") == cron.REAP_MARKER
+    )
     log_names = [str(j.get("log") or "") for j in jobs_to_check]
     ok = ok and all(log_names) and len(set(log_names)) == len(log_names)
     return ok
@@ -199,7 +227,7 @@ probe(
     "ao-fleet-watchdog" in report3["refreshed"] and cron.line(2) in merged3,
     json.dumps(report3),
 )
-clean = [cron.line(2), cron.prune_line(), cron.reconcile_line(2), foreign]
+clean = [cron.line(2), cron.prune_line(), cron.reconcile_line(2), cron.reap_line(), foreign]
 merged4, report4 = cron.reconcile_lines(clean, enabled)
 probe(
     "CLEAN-TREE-NOOP",

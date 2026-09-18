@@ -63,6 +63,12 @@ prefixed:
   - gdc
   - phase
   - source
+  # The tag authority's two dimensions (issue #1182). Declared here so the
+  # filing seam recognises them as declaring labels and passes a filer's own
+  # `posture:` / `lifecycle:` through rather than refusing them; the VALUES are
+  # the tag authority's, never this file's (borrow, don't re-declare — AO-GR-28).
+  - posture
+  - lifecycle
 
 # Filing (issue #320) — the declaring labels a NEWLY FILED issue derives from this
 # policy, so the conformance gate stops being a repair queue. Every code path that
@@ -78,11 +84,21 @@ prefixed:
 # refusal instead of an unclassified issue — which is what `filing-check` exercises.
 filing:
   default_class: enterprise
+  # The tag dimensions a filing must derive (issue #1182). `posture` and
+  # `lifecycle` are the tag authority's delivery + SDLC dimensions (AO-GR-28,
+  # governance/tagging/taxonomy.yaml); a filing is born with them so the board
+  # stops accruing `required-missing` deviations the moment this lands. The
+  # VALUES below are the authority's closed vocabularies, mirrored and proven
+  # equal by scripts/check-tagging.sh's `filing-default-drift` refusal — a
+  # default that names an illegal value fails the gate by name.
+  tags: [posture, lifecycle]
   defaults:
     type: feature
     priority: P2
     area: governance
     gdc: enterprise
+    posture: overall
+    lifecycle: build
 
 # The rungs at which an issue must also cite the CMR standards it maps to. Kept
 # informational: the offline board snapshot carries labels, not bodies.

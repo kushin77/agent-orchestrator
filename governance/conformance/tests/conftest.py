@@ -19,6 +19,21 @@ PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PKG_DIR not in sys.path:
     sys.path.insert(0, PKG_DIR)
 
+# governance/conformance shares the bare basenames "model" and "checker" with
+# sibling governance/* suites. Evict any stale sys.modules entry from an
+# earlier-collected suite before this directory's test modules do their own
+# bare imports, so they resolve against THIS package's files (issues #699,
+# #702, #1042).
+for _name in ("model", "checker"):
+    sys.modules.pop(_name, None)
+
+# Persistent handle for the lazy in-fixture import below: a bare
+# ``from checker import ...`` executed at TEST-EXECUTION time (fixture call)
+# would run after collection has already imported every governance suite's
+# conftest, so sys.modules may by then hold a sibling suite's "checker"
+# (issues #699, #702, #1042). Bound here at collection time instead.
+import checker as _checker  # noqa: E402
+
 SAMPLE_POLICY = """\
 schema: cmr.conformance/policy-v1
 ladder:
@@ -96,7 +111,7 @@ def policy_file(tmp_path: Path, policy_text: str) -> Path:
 
 @pytest.fixture
 def policy(policy_file: Path):
-    from checker import load_policy
+    load_policy = _checker.load_policy
 
     return load_policy(policy_file)
 
