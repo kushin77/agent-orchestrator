@@ -31,7 +31,7 @@ issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-ru
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
         remediation remediation-scan remediation-dispatch \
-        capacity-gate \
+        capacity-gate tagging \
         control-verbs control-audit control-functions cockpit operator console operator-access operator-terminal
 
 .DEFAULT_GOAL := help
@@ -121,6 +121,10 @@ help:
 	@echo "                milestoned issue classified; mandates checked on the diff"
 	@echo "  surface-class Per-surface target solution-class (#351): every surface"
 	@echo "                meets the rung it declares, or the gate fails"
+	@echo "  tagging       Tag authority (#1175): one declared vocabulary per tag"
+	@echo "                dimension, borrowed vocabularies proven equal to their"
+	@echo "                authorities, every named gate resolved, and all eleven"
+	@echo "                refusals provoked by name with clean twins accepted"
 	@echo "  lessons       RCA + lessons enforcement (#141): every incident has an"
 	@echo "                RCA, every action recorded, every lesson evidenced"
 	@echo "  fleet-state   Unified fleet-state projection (#323): lanes + sessions +"
@@ -184,7 +188,7 @@ operator:
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
 ## lint — shell + YAML + JSON + docs (no secret scan)
-lint: shell-syntax python-syntax yaml-lint json-lint docs-lint squash-message chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners
+lint: shell-syntax python-syntax yaml-lint json-lint docs-lint squash-message chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners tagging
 	@echo ""
 	@echo "lint: OK"
 
@@ -399,6 +403,16 @@ gateway-catalog-parity:
 agent-identity-parity:
 	@bash scripts/check-agent-identity-parity.sh
 
+## provider-parity — flag UNEXPLAINED Claude/DeepSeek capability drift (issue
+## #1194): does not force literal parity (Claude=orchestrator,
+## DeepSeek=analytics worker differ by design) but requires every asymmetric
+## flag-gated module.json feature and every asymmetric capabilitySet/
+## toolAllowlist entry in the seeds/persona cards to carry an inline rationale
+## marker; the check mutates a scratch copy with an unmarked item and requires
+## it to be refused by name, so it cannot pass vacuously
+provider-parity:
+	@bash scripts/check-provider-parity.sh
+
 ## guardrail-controls — server-side guardrail control semantics (issue #343):
 ## every control defaults OFF, an unknown control is refused, a toggle writes
 ## exactly one append-only audit record and flips observable state a second
@@ -435,6 +449,16 @@ knowledge-index-build:
 ## with every refusal provoked, and the indexer proven to serve the catalogue
 erp-module:
 	@bash scripts/check-erp-module.sh
+
+## tagging — the tag authority gate (issue #1175): every tag's dimension and
+## value are declared once, every vocabulary that already has an authority here
+## is BORROWED (never re-declared) and proven still equal to it, every gate a
+## rule names resolves to a real Makefile target or verify check, and each of
+## the eleven declared refusals is provoked by a real mutant with its clean twin
+## accepted, so none of them can be a formality. Also wired into `make verify`
+## by auto-discovery.
+tagging:
+	@bash scripts/check-tagging.sh
 
 ## cross-reference — cross-reference spine (EPIC #138, issue #384): the
 ## catalogue's typed relationships are valid (closed vocabulary, resolvable

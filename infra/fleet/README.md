@@ -7,8 +7,10 @@ Owner lane: **infra** (issue #709, EPIC #706 D1). See
 ## Purpose
 
 One image that runs the fleet's scheduled automation off the box it was written
-on: the same three crontab lines, the same three rungs, the same state roots,
-the same binaries — declared instead of assumed.
+on: every crontab line the schedule declares, the same rungs, the same state
+roots, the same binaries — declared instead of assumed. The line set is read
+from its one declaration (`config/fleet-jobs.json`, through `fleet/cron.py`), so
+this file names no count that could go stale, and the gate re-measures it.
 
 The porting contract is [`inventory.yaml`](inventory.yaml), and it is enforced,
 not documented: [`../../scripts/check-fleet-cron-image.sh`](../../scripts/check-fleet-cron-image.sh)
@@ -54,7 +56,9 @@ $ docker run --rm --network=host python:3.12-slim python3 -c "import socket; pri
 
 Measured 2026-09-16: the cold build completed with `--network=host`, and the
 issue's own command then ran **unchanged and cached** — eleven `Using cache`
-layers, `rc 0`, and `cron: installed (3 line(s))`. So the image builds on this
+layers, `rc 0`, and `cron: installed (3 line(s))` — the count it prints is
+re-read from the manifest on every start, and it was three when that build ran
+(`reap` became the fourth rung later, #830/#901). So the image builds on this
 box either way; only the first, network-touching build on a host whose
 containers cannot resolve has to say so. `scripts/check-fleet-cron-image.sh`
 probes exactly this and prints which of the two it used, so the environment
@@ -63,7 +67,7 @@ the plain command builds the same image.
 
 ## The schedule has one owner, and it is not this directory
 
-`fleet/cron.py` owns the three crontab lines — their markers, their interval,
+`fleet/cron.py` owns every crontab line the manifest enables — their markers, their interval,
 their log paths and their interpreter path. The image holds **no second copy** of
 any of it: `entrypoint.sh` calls `python3 fleet/cron.py install`, and
 `.dockerignore`-style copying of a crontab into the image is refused by name in
@@ -73,10 +77,11 @@ nobody knows which.
 ```mermaid
 flowchart TD
     E["entrypoint.sh"] -->|"python3 fleet/cron.py install"| C["fleet/cron.py<br/>(the ONE owner)"]
-    C -->|"three marked lines"| CT["crontab"]
+    C -->|"one marked line per enabled job"| CT["crontab"]
     CT --> W["watchdog.py run<br/>ao-fleet-watchdog"]
     CT --> P["prune.py run --apply<br/>ao-fleet-prune"]
     CT --> R["reconcile/cli.py watch<br/>ao-fleet-reconcile"]
+    CT --> RP["prune-worktrees.sh --apply<br/>ao-fleet-reap"]
     E -->|"no command given"| F["cron -f<br/>(foreground)"]
     E -->|"command given"| X["exec the command"]
 ```
@@ -156,7 +161,7 @@ infra/fleet/
 **1. The schedule is read from its owner, and a role table that drifts fails.**
 `dev_run.py` asks `fleet/cron.py` for `MARKERS` — there is no second list of the
 jobs — and REFUSES (`role-table-drift`) when its own role table does not cover
-them exactly, so a fourth scheduled job with no declared dry-run form fails here
+them exactly, so an enabled job with no declared dry-run form fails here
 instead of being silently skipped.
 
 **2. A dispatch cannot carry `--apply`.** Every argv is checked and the token is

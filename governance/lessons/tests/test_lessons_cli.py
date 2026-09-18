@@ -65,7 +65,17 @@ def make_repo(path: Path, *, commit: bool = True) -> Path:
             {
                 "generated_at": "2026-09-15T00:00:00Z",
                 "source": "acme/widgets",
-                "issues": [{"number": 100, "state": "OPEN", "labels": []}],
+                # #100 is the issue the ledger names as INC-0001's origin, so it
+                # carries the `incident` record label (issue #1178) and a
+                # milestone, so it is reachable as a goal for the record.
+                "issues": [
+                    {
+                        "number": 100,
+                        "state": "OPEN",
+                        "labels": ["incident"],
+                        "milestone": "M24 - Enterprise Knowledge Index",
+                    }
+                ],
             }
         )
         + "\n",

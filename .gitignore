@@ -79,6 +79,9 @@ governance/board/violations.jsonl
 .fleet/*.lock
 # Run registry (which loop is tracking which directive) + report dedupe: runtime state.
 .fleet/runs/
+# The tag authority's append-only decision ledger (issue #1175). Runtime state,
+# like runs/: it records what the authority decided, not what the repo declares.
+.fleet/tagging/
 .fleet/reported/
 # Lane isolation records: runtime state, one file per minted session (issue #263)
 .fleet/lanes/

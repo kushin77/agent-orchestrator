@@ -28,6 +28,16 @@
 # mutated copy of the checker in which the refusal must be observed to
 # disappear. A probe that cannot fail proves nothing.
 #
+# PART 1 also carries the ledger -> board linkage (issue #1178): every record's
+# reach from the board is a measurement (governance/lessons/linkage.py), a
+# LESSON-*/SUGGEST-* that reaches no board issue and says nothing is an error,
+# an incident's origin (not only an RCA's) is resolved against the snapshot, and
+# every issue the ledger names as an incident's origin must carry the `incident`
+# record label — so the board rule's scope is derived from the ledger rather
+# than from the label it is checking. Two of the provoked probes change ONE real
+# fact in the real ledger and the real committed snapshot, so the rule is proven
+# able to fail on real data, not only against its own mutants.
+#
 # Deviations (an issue that records an incident still open, an action still in
 # flight, a review past its cadence) are reported with the issue that carries
 # them and do not fail the gate; `--strict` escalates them to errors.

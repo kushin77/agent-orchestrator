@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-17T14:25:47Z",
+  "generated_at": "2026-09-17T18:42:35Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1344,9 +1344,14 @@
       "number": 132,
       "title": "CMR vendor compliance gap: shared-services",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
-        "epic:vendor-compliance"
+        "area:standards",
+        "class:enterprise",
+        "epic:vendor-compliance",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
       ],
       "parent": 125,
       "blocked_by": [],
@@ -1358,9 +1363,14 @@
       "number": 133,
       "title": "CMR vendor compliance gap: googleworkspace",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
-        "epic:vendor-compliance"
+        "area:standards",
+        "class:enterprise",
+        "epic:vendor-compliance",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
       ],
       "parent": 125,
       "blocked_by": [],
@@ -1625,6 +1635,7 @@
         "area:fleet",
         "class:enterprise",
         "gdc:enterprise",
+        "incident",
         "priority:P1",
         "source:cannibalized",
         "type:feature"
@@ -1737,6 +1748,7 @@
       "labels": [
         "area:board",
         "class:enterprise",
+        "incident",
         "phase:8-autonomous-ops",
         "pillar:governance",
         "priority:P1",
@@ -4953,6 +4965,7 @@
       "labels": [
         "class:elite",
         "gdc:enterprise",
+        "incident",
         "phase:5-observability-finops",
         "pillar:observability-finops",
         "priority:P2",
@@ -6624,10 +6637,11 @@
       "number": 665,
       "title": "EPIC: ERPNext & DeepSeek FinOps \u2014 token-optimal subscription engine from CRM hook to ledger (operator mandate)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M32 - ERPNext & DeepSeek FinOps (ledger-faithful subscription engine)",
       "labels": [
         "area:erp-module",
         "class:elite",
+        "epic:erp-finops",
         "gdc:enterprise",
         "phase:5-observability-finops",
         "pillar:observability-finops",
@@ -7185,10 +7199,11 @@
       "number": 706,
       "title": "EPIC: Port the fleet's cron automation into a shared-services container (dev -> dual-run -> cutover)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
         "area:fleet",
         "class:elite",
+        "epic:cron-automation",
         "gdc:enterprise",
         "phase:8-autonomous-ops",
         "pillar:autonomous-ops",
@@ -8085,7 +8100,9 @@
       "title": "EPIC: AgentConsole \u2014 the enterprise operator console product",
       "state": "CLOSED",
       "milestone": "",
-      "labels": [],
+      "labels": [
+        "incident"
+      ],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
@@ -8120,9 +8137,12 @@
       "number": 803,
       "title": "EPIC: Enterprise readiness \u2014 strong engineering, absent delivery controls (master unprotected, no required checks, GR-15 violated)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:fleet",
         "class:elite",
+        "epic:delivery-controls",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
         "priority:P1",
         "type:epic"
@@ -8262,13 +8282,13 @@
     {
       "number": 830,
       "title": "fix(fleet): the worktree reaper shipped for #516 and is scheduled nowhere \u2014 the pile rebuilt, and 302 branches have no reaper at all",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:19:07Z",
       "files": []
     },
     {
@@ -8573,8 +8593,16 @@
       "number": 877,
       "title": "Retire the measured shell-pattern gaps (SP-7 SP-8) and enforce them (EPIC #616, after #621)",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "epic:git-governance",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
       "parent": 616,
       "blocked_by": [],
       "cross_refs": [],
@@ -8585,10 +8613,12 @@
       "number": 878,
       "title": "EPIC: every surface to elite, zero-human operation, paperclip/hermes at the head",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
+        "area:fleet",
         "class:elite",
-        "class:iac",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
         "pillar:control-plane",
         "priority:P0",
@@ -8603,7 +8633,7 @@
     {
       "number": 880,
       "title": "lane L1: Portal live surfaces (load all new)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -8614,13 +8644,13 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:27:52Z",
       "files": []
     },
     {
       "number": 881,
       "title": "lane L2: Portal env / Secret Manager",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -8631,7 +8661,7 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:27:52Z",
       "files": []
     },
     {
@@ -8671,7 +8701,7 @@
     {
       "number": 884,
       "title": "lane L5: IaC",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -8682,7 +8712,7 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:27:52Z",
       "files": []
     },
     {
@@ -8705,7 +8735,7 @@
     {
       "number": 886,
       "title": "lane L7: Telemetry",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -8716,7 +8746,7 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:27:53Z",
       "files": []
     },
     {
@@ -8773,7 +8803,7 @@
     {
       "number": 890,
       "title": "lane L11: Control coverage",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -8784,7 +8814,7 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:27:53Z",
       "files": []
     },
     {
@@ -8915,8 +8945,16 @@
       "number": 917,
       "title": "Session close-out governance: close every session, reconcile orphans, and make session identity visible to the sweeper",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
@@ -8989,11 +9027,17 @@
       "number": 931,
       "title": "[bug] check-verdict-contains under-counts: four pipe-into-grep shapes escape its \"must never under-count\" anchor",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
         "type:bug"
       ],
-      "parent": null,
+      "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
@@ -9034,8 +9078,16 @@
       "number": 935,
       "title": "rollout: register surfaces.edge_cutover (deferred by #731 \u2014 surfaces.* rows + rollout registration)",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
       "parent": 731,
       "blocked_by": [],
       "cross_refs": [],
@@ -9046,8 +9098,16 @@
       "number": 936,
       "title": "check-edge-cutover.sh deletes the terraform log that names its own failure cause",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:bug"
+      ],
       "parent": 731,
       "blocked_by": [],
       "cross_refs": [],
@@ -9121,8 +9181,16 @@
       "number": 944,
       "title": "no declared environment-variable surface, and infra/ is not a declared surface root",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "epic:git-governance",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:governance"
+      ],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
@@ -9145,8 +9213,16 @@
       "number": 946,
       "title": "EPIC #607 residual: the owner-executed go-live (GCP + approval codes + run-half cutover)",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:task"
+      ],
       "parent": 607,
       "blocked_by": [],
       "cross_refs": [],
@@ -9291,9 +9367,17 @@
       "number": 966,
       "title": "rollout-state declares flags no plan phase reaches, and check_rollout only enforces the reverse direction",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
-      "parent": null,
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
@@ -9303,9 +9387,17 @@
       "number": 967,
       "title": "nothing projects a promotion's live state into the registry declaration the portal reads \u2014 the last manual step",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
-      "parent": null,
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
@@ -9315,9 +9407,17 @@
       "number": 968,
       "title": "load_fleet_console() puts <repo>/fleet on sys.path, shadowing the telemetry package (latent ModuleNotFoundError)",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
-      "parent": null,
+      "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:surfaces-elite",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
@@ -9343,11 +9443,14 @@
       "number": 973,
       "title": "[lifecycle] LANE_NOT_RECLAIMED \u2014 #241",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:board",
         "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
+        "priority:P1",
         "type:governance"
       ],
       "parent": null,
@@ -9457,11 +9560,14 @@
       "number": 992,
       "title": "[lifecycle] VERIFY_EVIDENCE_MISSING \u2014 #955",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
         "area:board",
         "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
+        "priority:P1",
         "type:governance"
       ],
       "parent": null,
@@ -9526,10 +9632,14 @@
       "number": 1003,
       "title": "lifecycle close-out verifies the frozen lane head, so an already-merged item can owe VERIFY_EVIDENCE_MISSING forever (#955)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
+        "area:fleet",
         "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
+        "priority:P1",
         "type:task"
       ],
       "parent": null,
@@ -9637,10 +9747,14 @@
       "number": 1025,
       "title": "the money path reads the live clock in 11 places behind 6 duplicate seams, and 63 test modules pin a date literal \u2014 so a green can expire with the calendar (#506)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
       "labels": [
+        "area:fleet",
         "class:enterprise",
+        "epic:session-fleet",
+        "gdc:enterprise",
         "pillar:observability-finops",
+        "priority:P1",
         "type:task"
       ],
       "parent": null,
@@ -9653,10 +9767,15 @@
       "number": 1028,
       "title": "institutionalize the #506 date bomb across RCA / pattern / class / template / system-app (learn it once, refuse it mechanically thereafter)",
       "state": "OPEN",
-      "milestone": "",
+      "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:lessons",
         "class:enterprise",
+        "epic:git-governance",
+        "gdc:enterprise",
         "pillar:autonomous-ops",
+        "pillar:governance",
+        "priority:P2",
         "type:task"
       ],
       "parent": null,
@@ -9701,7 +9820,7 @@
     {
       "number": 1034,
       "title": "the last four untracked master reds block every lane's landing \u2014 lifecycle-reclaim, gate-lock, fleet-jobs, fleet-cron-dev-run (clean-checkout measured)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:enterprise",
@@ -9712,7 +9831,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:07:06Z",
       "files": []
     },
     {
@@ -9730,7 +9849,7 @@
     {
       "number": 1042,
       "title": "governance/*/tests share 10 duplicate test basenames \u2014 pytest cannot collect governance/ as one tree",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:fleet",
@@ -9740,7 +9859,7 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:07:13Z",
       "files": []
     },
     {
@@ -9900,9 +10019,17 @@
       "number": 1077,
       "title": "master red: the committed board snapshot is 2 days stale, so the ticket projection and every PMO view are red on a clean checkout",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
-      "parent": null,
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
@@ -9911,22 +10038,30 @@
     {
       "number": 1078,
       "title": "master red: check-rbac-head-binding cannot collect the identity/rbac suite (ModuleNotFoundError: No module named 'rbac') while its own probe is green",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:19:01Z",
       "files": []
     },
     {
       "number": 1082,
       "title": "check-portal-auth-env maps an INTERRUPTED pytest suite to FAIL, reporting a red it cannot evidence",
       "state": "OPEN",
-      "milestone": "",
-      "labels": [],
-      "parent": null,
+      "milestone": "Agent Single Pane of Glass (e2e)",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",
@@ -9935,7 +10070,7 @@
     {
       "number": 1098,
       "title": "fix(lifecycle): a squash-merged item can never record verification \u2014 the lane must equal the PR head the merge replaced",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "class:elite",
@@ -9946,13 +10081,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T15:21:26Z",
       "files": []
     },
     {
       "number": 1102,
       "title": "gate: wire check-squash-message.sh into make verify and the fleet merge path (#1001 follow-up)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "pillar:autonomous-ops",
@@ -9962,13 +10097,13 @@
       "parent": 878,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T14:34:45Z",
       "files": []
     },
     {
       "number": 1106,
       "title": "verify red cluster A: gate-lock + lifecycle-reclaim fail with 'No module named fleet' from a detached worktree; git-config demands per-worktree identity (#803 flip precondition)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "priority:P0"
@@ -9976,13 +10111,13 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T14:53:22Z",
       "files": []
     },
     {
       "number": 1107,
       "title": "verify red cluster B: ticket projection refuses (INC-0007 \u2192 #1029 unresolved) and takes pmo-rollup + lessons-sync + cross-repo-lessons red (#803 flip precondition)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "priority:P0"
@@ -9990,16 +10125,72 @@
       "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-17T14:53:19Z",
       "files": []
     },
     {
       "number": 1108,
       "title": "verify red cluster C: fleet-jobs probes, fleet-cron-dev-run compose health, .fleet lease files not gitignored (#803 flip precondition)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:32:39Z",
+      "files": []
+    },
+    {
+      "number": 1109,
+      "title": "gate-lock: a holder reaps its own leftover on exit; the watchdog sweeps only its own worktree (RCA 2026-09-17 fix #3)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:07:09Z",
+      "files": []
+    },
+    {
+      "number": 1113,
+      "title": "check-dispatch-queue: 19 closed issues still queued, exposed by a fresh board snapshot (#1107 follow-up)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:17:40Z",
+      "files": []
+    },
+    {
+      "number": 1114,
+      "title": "dispatch: refuse to open new lanes while master is red, except lanes that fix master (RCA 2026-09-17 fix #5)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:12:55Z",
+      "files": []
+    },
+    {
+      "number": 1123,
+      "title": "master red: check-cross-repo-lessons \u2014 19 hub ledger records have no counterpart declaration and are not listed local-only",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:lessons",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
       ],
       "parent": 803,
       "blocked_by": [],
@@ -10008,12 +10199,521 @@
       "files": []
     },
     {
-      "number": 1109,
-      "title": "gate-lock: a holder reaps its own leftover on exit; the watchdog sweeps only its own worktree (RCA 2026-09-17 fix #3)",
+      "number": 1130,
+      "title": "verify red cluster D: landing driver's composed PR body lacks the Gate-changing line (check-landing + check-pr-contract), and 4 landed squash commits lack ticket trailers (check-isolation-landed) (#803 flip precondition)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:22:27Z",
+      "files": []
+    },
+    {
+      "number": 1136,
+      "title": "wire write-master-attestation into scripts/verify.sh once #1127 lands (follow-up to #1114)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1138,
+      "title": "Declare the repo merge-message policy as code (squash = PR title + PR body) with a read-back gate; baseline the 5 trailer-less squash commits (#803)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "priority:P0"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T15:32:42Z",
+      "files": []
+    },
+    {
+      "number": 1145,
+      "title": "the merge queue proves the message but never the work: merging #1118 made master red on verdict-contains, plus 4 measured pr-queue.sh defects",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1146,
+      "title": "master red: check-gitignore \u2014 .verify/attestation.schema.json is tracked under a root the gate declares wholly generated",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1147,
+      "title": "check-pr-contract --pr uses a two-dot range, so it judges a lane by master's files and refuses correct PRs (every lane cut from an older master)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1148,
+      "title": "P1: `/healthz` job-set check cannot fail \u2014 `EXPECTED_JOBS = 3` is a stale literal, so a document missing the 4th enabled rung (`ao-fleet-reap`) still answers 200",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:cron-automation",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1149,
+      "title": "lifecycle: a merged item's evidence subject must be the tree that landed, not the branch tip that advanced after the squash",
+      "state": "OPEN",
+      "milestone": "M26 - Session Fleet Operating Model (Brain / Fleet Brain / Subagents)",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "epic:session-fleet",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1152,
+      "title": "check-verdict-contains is red on master again \u2014 3 piped-grep sites from #1118 (#1145)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1145,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1153,
+      "title": "check-verdict-contains: fix or record scripts/prune-worktrees.sh + check-prune-worktrees.sh (piped-grep idiom, 2+1 sites)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1154,
+      "title": "master red: check-isolation-landed \u2014 origin/master's own tip d3eb77f carries no trailer and is not recorded in governance/isolation/landed-baseline.json",
+      "state": "CLOSED",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T17:41:56Z",
+      "files": []
+    },
+    {
+      "number": 1156,
+      "title": "Measured E2E gap analysis: system-app + app-model + governance (declared to implemented to gated to exercised)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T18:28:51Z",
+      "files": []
+    },
+    {
+      "number": 1157,
+      "title": "P1: infra/fleet/dev_run.py writes the whole process environment \u2014 including live API keys \u2014 into .verify/dev-run/decision.json",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 706,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1158,
+      "title": "PMO: board metadata conformance pass \u2014 labels, milestones, epic membership, chain edges (open board)",
+      "state": "CLOSED",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T18:13:58Z",
+      "files": []
+    },
+    {
+      "number": 1159,
+      "title": "fix(fleet): the reaper's \"in use\" test cannot see a peer session's live worktree \u2014 10 live trees classified removable",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "class:elite",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1160,
+      "title": "the filing default derives area:governance, which does not exist \u2014 every defaulted filing is refused by GitHub while filing-check stays green",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1161,
+      "title": "check-system-app-declaration.sh observes category:\"system\" only in .json/.yaml/.yml, so its \"the tree matches the claim\" line cannot see a .ts declaration",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1162,
+      "title": "the terminal cockpit client (control-plane/cockpit/) is run by make cockpit and gated by nothing; its suite is undeclared",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:control-plane",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1163,
+      "title": "this repo's own module.json is never validated against cmr.module/v1, though the admission contract requires it of every child",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1164,
+      "title": "governance/dupcheck/check-duplicates.sh implements the ADR-0010 no-fork rule and is invoked by no gate \u2014 the rule is advisory",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:governance",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1168,
+      "title": "governance/dispatch: frontier() names an epic-closed issue that claim refuses (measured: status says #132, eligible refuses it)",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 803,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1170,
+      "title": "gate-lock: 160 zero-byte leftover worktree locks accumulate; doctor sits permanently at rc 13 and no safe prune verb exists",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1172,
+      "title": "master red (recurrence): check-isolation-landed refuses origin/master again \u2014 0aa836c (#1171) landed direct with no trailer, 3 min after #1169 cleared the previous one",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-17T17:57:18Z",
+      "files": []
+    },
+    {
+      "number": 1174,
+      "title": "bootstrap .fleet/master-attestation.json once the box gate cap frees (follow-up to #1114/#1119/#1136)",
       "state": "OPEN",
       "milestone": "",
       "labels": [],
       "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1175,
+      "title": "e2e tagging: one declared tag authority, tag -> gate derivation, and a gate that can fail",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P2",
+        "type:feature"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1176,
+      "title": "check-paperclip-routines is CANNOT-ASSESS on master (rc 2) and is skipped by the composite: ao-fleet-reap is scheduled but no routine claims it",
+      "state": "OPEN",
+      "milestone": "M31 - Gate hygiene & master-red clearance",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "epic:delivery-controls",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1178,
+      "title": "Lessons ledger -> board: make every record's linkage real, and provable on real data",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:lessons",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1179,
+      "title": "governance/dispatch: the entry point is dead by construction \u2014 no producer for the board liveness contract, silent epic-closed dead-end, and frontier() naming work claim refuses",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pillar:autonomous-ops",
+        "priority:P1",
+        "type:governance"
+      ],
+      "parent": 803,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",

@@ -350,3 +350,19 @@ surfaces:
       scripts/check-cmr-knowledge.sh, and the live_sync module (live_sync.py)
       that together carry it to `elite`. Declared at the rung its evidence
       measures, never above it.
+  - surface: tagging
+    path: governance/tagging
+    declared_class: elite
+    notes: >-
+      The tag authority (issue #1175): contract (README.md), a suite (tests/),
+      the declared policy controls (controls.yaml + policy.py, read by cli.py's
+      authority findings and held to the taxonomy, the rules and the declared
+      limits), the append-only decision ledger (ledger.py, written to
+      .fleet/tagging/ledger.jsonl and validated against tagging.schema.json
+      BEFORE each write), the frozen record shapes (tagging.schema.json,
+      validated through governance/modules/schema.py so no third-party
+      validator is needed), the dedicated gate scripts/check-tagging.sh, and
+      the live_sync module live.py (the read-only projection of the board's
+      declared tags and the ledger, exposed through the existing
+      `cli.py board --live` verb) that carries it past `faang` to `elite`.
+      Declared at the rung its evidence measures, never above it.

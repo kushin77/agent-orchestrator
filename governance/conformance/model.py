@@ -87,6 +87,11 @@ class Policy:
     # class is then refused rather than filed unclassified (issue #320).
     filing_default_class: str = ""
     filing_defaults: Mapping[str, str] = field(default_factory=dict)
+    # The tag dimensions a filing must also derive, in declaration order. Their
+    # VALUES are the tag authority's (issue #1182); this field is only the LIST
+    # of dimensions, so the filing seam derives them without re-declaring the
+    # vocabulary.
+    filing_tags: Tuple[str, ...] = ()
     strictable: bool = True
 
     @property
@@ -138,6 +143,9 @@ class Policy:
         for name in self.expectations_for(declared_class):
             if name not in names:
                 names.append(name)
+        for name in self.filing_tags:
+            if name not in names:
+                names.append(name)
         return tuple(names)
 
     def rank(self, name: str) -> int:
@@ -164,6 +172,7 @@ class Policy:
             "filing": {
                 "default_class": self.filing_default_class,
                 "defaults": dict(self.filing_defaults),
+                "tags": list(self.filing_tags),
             },
         }
 

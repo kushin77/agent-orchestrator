@@ -308,3 +308,53 @@ as **present** in this repo today (`scripts/check-branch-protection.sh`,
 `scripts/check-codeowners.sh`) — the residual #803 tracks is making
 GitHub-side branch protection itself IaC-declared (issue #6 / PR #1075), not
 the absence of a local check.
+
+## 9. The tag authority (mandatory)
+
+Every governed artifact — issue, PR, branch, commit, surface, release — is
+classified against one declared vocabulary: the **tag authority** at
+`governance/tagging/taxonomy.yaml` (AO-GR-28, issues #1175 + #1183). This section
+is the governance half of that rule; the mechanism is
+`scripts/check-tagging.sh`, which runs inside `make verify`.
+
+**One authority, borrowed from — never a second copy.** The `class` ladder is
+borrowed from `governance/conformance/policy.yaml` and the FinOps tiers from
+`governance/finops/policy.json`. Those values are **mirrored in the taxonomy and
+proven equal to their authority by the gate**, because a borrow that reads its
+own values can never fail: the mirror is what makes drift detectable. A lane may
+not mint a rung, a tier or a role by editing one side.
+
+**The dimensions.** Board classification (`class`, `type`, `priority`, `area`,
+`pillar`, `phase`, `gdc`, `source`, `epic`) is joined by two this authority adds:
+
+| Dimension | Values | What it decides |
+|---|---|---|
+| `posture` | `overall`, `saas`, `iac`, `no-human-needed`, `human-gated` (multi-valued) | which delivery gates apply: `iac` owes declared-infrastructure plus **flag-gated-OFF**; `saas` owes the identity and boundary evidence; `no-human-needed` must finish with **no operator input at all** and forbids escalation markers; `human-gated` owes the pre-merge contract |
+| `lifecycle` | `plan`, `build`, `verify`, `release`, `operate`, `retire` | which half of the pipeline applies — the SDLC stage, and therefore the `pr`/`ci`/`cd`/`ops` channel a gate runs in |
+
+`posture:no-human-needed` and `posture:human-gated` are **mutually exclusive**
+and both at once is refused by name: a contradiction is not a preference, and
+silently picking a winner is how a plan becomes a guess.
+
+**A tag set derives the gates it owes.** `governance/tagging/rules.yaml` maps a
+tag set to gates by channel, at the FinOps floor the doctrine sets — every gate
+named as `make:<target>` or `check:<name>`, and every name **resolved** against
+the Makefile and the check registry `scripts/verify.sh` builds. Rename a gate and
+the tagging gate fails by name rather than describing a pipeline that no longer
+exists. Ask for the plan with:
+
+```bash
+python3 governance/tagging/cli.py plan --tag class:elite --tag posture:iac --tag lifecycle:release
+```
+
+**Calibration.** `class`, `type`, `priority` and `area` are **required**;
+`posture` and `lifecycle` are **recommended**, reported as deviations and
+escalated only by `--strict`, because the board predates them. Enforcing a
+brand-new dimension against a legacy board would paint the gate red for a reason
+no lane can fix by working its own issue. The prevention half — the filing path
+deriving both dimensions so no NEW issue is born unclassified — is issue #1182.
+
+**This section is enforced, not advisory.** `tagging-mandate` FAILS naming the
+document and the marker the moment `AGENTS.md`, `docs/GOLDEN-RULES.md`, this
+file, `docs/EXECUTION-PLAN.md` or `docs/QA-GATE.md` stops declaring the rule
+(GR-29: a rule only prose carries is advice).

@@ -241,6 +241,14 @@ rules:
     gate: scripts/check-fleet-durability-rules.sh
     note: "check-fleet-durability-rules.sh asserts the rule text and its named control exist in the doctrine docs. No dedicated script asserts the runbook names SIGTERM as the clean restart signal and SIGHUP as documented-unhandled at the process level — recorded PARTIAL, not ENFORCED."
 
+  AO-GR-28:
+    status: ENFORCED
+    covered: true
+    origin: local
+    modules: [governance/tagging/]
+    gate: scripts/check-tagging.sh
+    note: "The tag authority (#1175) made constitutional (#1183): one declared vocabulary for every governed artifact, borrowing the class ladder from governance/conformance/policy.yaml and the FinOps tiers from governance/finops/policy.json — mirrored and proven equal, because a borrow that reads its own values can never fail. scripts/check-tagging.sh runs six checks: the authority's shape, drift against every borrowed authority, rule/gate resolution, the frozen shapes and declared controls, matrix freshness, the suite, THIRTEEN provoked refusals each with its clean twin, the artifact round trips, and tagging-mandate — which FAILS naming the document AND the marker when AGENTS.md, docs/GOLDEN-RULES.md, docs/GOVERNANCE.md, docs/EXECUTION-PLAN.md or docs/QA-GATE.md stops declaring the rule. Wired into make verify by auto-discovery (#698) and into make lint."
+
   # ---- Hub (kushin77/CMR) rules this repo's spine cites by number --------
   GR-2:
     status: ENFORCED
@@ -347,6 +355,14 @@ rules:
     modules: []
     gate: "-"
     note: "Cited in AGENTS.md numbered doctrine item 12, \"No-questions (GR-22)\": apply the documented default, escalate only when genuinely absent. No scripts/check-*.sh asserts this behavioral default. Honest GAP."
+
+  GR-29:
+    status: PARTIAL
+    covered: true
+    origin: hub-cited
+    modules: [governance/tagging/]
+    gate: scripts/check-tagging.sh
+    note: "Cited by AO-GR-28 (\"a rule only prose carries is advice\"). The principle — a doc-only rule is advisory, only a platform-enforced gate is binding — is instantiated for THIS rule by scripts/check-tagging.sh's tagging-mandate check, which reads the contract documents and fails naming the document and the marker the moment one stops declaring the tag authority. Recorded PARTIAL, not ENFORCED: no gate enumerates doc-only rules in general and refuses them, so the principle is enforced rule-by-rule as each gate ships rather than by one control."
 
 # ---- #803 delivery controls (branch protection, required checks, CODEOWNERS) ----
 # #803 is an open EPIC (PR #1075 in flight) that this lane does not close.

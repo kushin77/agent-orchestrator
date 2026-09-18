@@ -347,7 +347,14 @@ if [ "$branches" -eq 1 ]; then
     case "$branch" in
       master|main|HEAD) continue ;;
     esac
-    if printf '%s\n' "$checked_out" | grep -qxF -- "$branch"; then
+    is_checked_out=0
+    while IFS= read -r co_branch; do
+      if [ "$co_branch" = "$branch" ]; then
+        is_checked_out=1
+        break
+      fi
+    done <<< "$checked_out"
+    if [ "$is_checked_out" -eq 1 ]; then
       continue
     fi
     if ! landed_by_content "$branch"; then
