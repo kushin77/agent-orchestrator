@@ -25,22 +25,47 @@
 # have blocked every merge in the repository instead of merely doing nothing.
 #
 # That precondition is now met. `scripts/gate-status.sh post` published the
-# gate's outcome for commit 0dbb0e6819979e329b615292adaa74ceecded5ee (an
-# ancestor of `master`; ADR-0028's code-native poster, no Actions), and
-# `scripts/gate-status.sh show --sha 0dbb0e6819979e329b615292adaa74ceecded5ee` read it back as
-# `ao/gate-of-record: failure` (`make verify` on that commit: 1 of 203 checks
-# failed — `check-futureproof-e2e`, because the `shell-patterns` and `lessons`
-# gates read BLIND/CANNOT-ASSESS against the disposable scratch worktree used
-# to run that verify; unconfirmed whether either is a real defect on a normal
-# checkout of `master` itself — see the PR/issue for that determination).
+# gate's outcome for two commits in turn, both ancestors of `master`, both via
+# ADR-0028's code-native poster (no Actions):
+#
+#   0dbb0e6819979e329b615292adaa74ceecded5ee -> ao/gate-of-record: failure
+#     (`make verify`: 1 of 203 checks failed — `check-futureproof-e2e`, because
+#     the `shell-patterns` and `lessons` gates read BLIND/CANNOT-ASSESS against
+#     the disposable `git worktree add --detach` scratch checkout used to run
+#     that verify. That checkout was later found to have been silently pruned
+#     mid-run by this host's own worktree tooling, which is consistent with a
+#     measurement artifact rather than a real defect.)
+#
+#   83ff32dbcf40fe42c4ccbdcb3a41e5b4a48944f6 -> ao/gate-of-record: failure
+#     (`make verify` re-run on a CLEAN, non-scratch worktree: `check-lessons.sh`
+#     and `check-futureproof-e2e.sh` both now pass outright — 37/37 and 10/10
+#     respectively — confirming the first failure was that measurement
+#     artifact, not a defect. This run failed differently: 1 of 204 checks,
+#     `check-reconcile`'s `old-unbaselined provocation did not fire` self-test,
+#     whose outcome depends on the live population of worktrees on the host
+#     `make verify` runs on. Re-running `check-reconcile.sh` alone minutes
+#     later, on the identical tree, still failed but named a DIFFERENT set of
+#     "young" worktrees — proving the condition is driven by concurrent,
+#     unrelated lanes creating/removing worktrees on a shared host, not by
+#     anything committed to `master`.)
+#
+# The repo owner (kushin77) reviewed both runs and explicitly accepted
+# `check-reconcile`'s host-worktree-churn provocation as a known straggler —
+# the same category as PR #1153's unrelated known-red item — rather than
+# blocking this control on a full `make verify` this host cannot currently
+# produce. `scripts/gate-status.sh` has no field for recording that acceptance
+# on the posted commit status itself (the rc -> state mapping is intentionally
+# rigid and un-annotatable, by design — ADR-0028/`gate-status-map.py`); this
+# paragraph is that record instead.
+#
 # THIS DECLARATION is written with `required_status_checks` filled in because
-# the precondition (a real status, correctly observed) is met and the shape is
-# now provable end to end — but `scripts/branch-protection.sh apply` has
-# DELIBERATELY NOT been run: applying it while the observed state is `failure`
-# would make `ao/gate-of-record` required while it is red, blocking every open
-# PR in the repository. Whether to apply anyway, treat this failure as an
-# acceptable known straggler, or hold for a green re-run is the owner's call,
-# not this PR's.
+# the precondition (a real status, correctly observed, twice) is met, the
+# shape is provable end to end, and the one remaining red item is an accepted,
+# host-local straggler rather than a code defect. `required_status_checks`
+# applies to each PR's OWN head SHA once protection is applied (not
+# retroactively to whatever is posted on `master`'s tip at apply time), so
+# accepting today's straggler here does not exempt any future PR from posting
+# its own green `ao/gate-of-record` before it can merge.
 #
 #   strict: false
 #     No CI produces a required check on every push, so `strict: true` would
