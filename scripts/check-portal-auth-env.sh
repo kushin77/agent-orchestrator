@@ -39,7 +39,12 @@
 # It also runs portal/tests/test_auth_gate_secret_env.py, the offline
 # reproduction of the issue's post-deploy criterion (the mirror reaches the
 # container's mount path, and a signed-in session reaches /api/console/me with
-# HTTP 200).
+# HTTP 200). That suite is run with the pytest configuration PINNED (section 4):
+# pytest resolves rootdir/inifile by walking up from the TEST PATH, so a checkout
+# that lives under a directory carrying a pytest.ini is governed by that file — a
+# neighbouring lane's stray `/tmp/pytest.ini` (`addopts = --import-mode=importlib`)
+# turned every run of this suite from a `/tmp/<issue>.wt` checkout into a
+# collection error (rc 2), a red gate with no bearing on the product (#1043).
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 # CANNOT-ASSESS must never be reported as a pass.
@@ -447,15 +452,80 @@ if ! command -v pytest >/dev/null 2>&1 && ! python3 -m pytest --version >/dev/nu
   echo "check-portal-auth-env: CANNOT-ASSESS — pytest is not available" >&2
   exit 2
 fi
+
+# THE VENUE TRAP THIS PIN EXISTS FOR (measured, issue #1043). `portal/tests/`
+# imports its neighbour (`from conftest import AUTH_GATE, login_as`), which works
+# only because pytest's default *prepend* import mode puts the test's directory on
+# sys.path. pytest resolves rootdir/inifile by walking UP FROM THE TEST PATH, so a
+# checkout living under a directory that carries a `pytest.ini` is governed by that
+# file: on this box a neighbouring lane left `/tmp/pytest.ini` holding
+# `addopts = --import-mode=importlib`, and the suite then died at collection with
+# `ModuleNotFoundError: No module named 'conftest'` (rc 2) in every `/tmp/<issue>.wt`
+# checkout — the same suite is rc 0 from a checkout that does not sit under one.
+# `-c` pins the configuration to an empty file this gate owns, so the invocation is
+# the repo's own wherever the checkout happens to live (the repo ships no pytest
+# config); `--rootdir` pins the other half of what that file would have decided.
+# The two halves below prove the pin is load-bearing rather than decorative.
+pinned_ini="$work/pytest-pinned.ini"
+: >"$pinned_ini"
+pytest_pin=(python3 -m pytest -c "$pinned_ini" --rootdir "$root" -p no:cacheprovider)
+
+# The trap, PROVOKED: a checkout-shaped path under a directory carrying a hostile
+# pytest.ini. The symlink is resolved for `Path(__file__)` (so the suite still runs
+# against THIS tree) while pytest's rootdir walk sees the hostile ancestor — the
+# measured failure mode, reproduced here rather than described.
+trap_dir="$work/venue"
+mkdir -p "$trap_dir"
+printf '[pytest]\naddopts = --import-mode=importlib\n' >"$trap_dir/pytest.ini"
+ln -sfn "$root" "$trap_dir/repo"
+trap_test="$trap_dir/repo/portal/tests/test_auth_gate_secret_env.py"
+
+trap_unpinned_rc=0
+env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q "$trap_test" \
+  >"$work/trap-unpinned.out" 2>&1 || trap_unpinned_rc=$?
+trap_pinned_rc=0
+env PYTHONDONTWRITEBYTECODE=1 "${pytest_pin[@]}" -q "$trap_test" \
+  >"$work/trap-pinned.out" 2>&1 || trap_pinned_rc=$?
+if [ "$trap_pinned_rc" -ne 0 ]; then
+  printf '  FAIL  the pinned invocation failed under a hostile ancestor pytest.ini (rc=%s)\n' \
+    "$trap_pinned_rc" >&2
+  sed -n '1,12p' "$work/trap-pinned.out" >&2
+  fail=$((fail + 1))
+elif [ "$trap_unpinned_rc" -ne 0 ]; then
+  trap_detail="$(grep -m1 -i 'no module named' "$work/trap-unpinned.out" | sed 's/^[[:space:]]*//' | cut -c1-64)"
+  [ -n "$trap_detail" ] || trap_detail="$(grep -m1 'ERROR' "$work/trap-unpinned.out" | sed 's/^[[:space:]]*//' | cut -c1-64)"
+  if [ -z "$trap_detail" ]; then
+    echo "  OK    the ancestor-pytest.ini trap is real (unpinned rc=$trap_unpinned_rc) and the pinned invocation is immune (pinned rc=0)"
+  else
+    echo "  OK    the ancestor-pytest.ini trap is real (unpinned rc=$trap_unpinned_rc: $trap_detail) and the pinned invocation is immune (pinned rc=0)"
+  fi
+else
+  echo "  ..    the ancestor-pytest.ini trap did not reproduce in this environment (unpinned rc=0), so the pin is asserted but not provoked here"
+fi
+
 # The verdict is pytest's OWN exit code: piping into `tail` would report tail's.
 suite_rc=0
-suite_out="$(env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
+suite_out="$(env PYTHONDONTWRITEBYTECODE=1 "${pytest_pin[@]}" -q \
   portal/tests/test_auth_gate_secret_env.py 2>&1)" || suite_rc=$?
 printf '%s\n' "$suite_out" | tail -3
 if [ "$suite_rc" -eq 0 ]; then
   echo "  OK    the mirror reaches the mount path and a real session reaches /api/console/me"
 else
   printf '  FAIL  the offline reproduction of the post-deploy criterion failed (rc=%s)\n' "$suite_rc" >&2
+  fail=$((fail + 1))
+fi
+
+# CONTROL: a suite that does not actually run must not be readable as a pass. A
+# selector matching nothing makes pytest exit non-zero (5: no tests ran), so this
+# proves the OK above is pytest's own exit code and not a pipeline's.
+suite_control_rc=0
+env PYTHONDONTWRITEBYTECODE=1 "${pytest_pin[@]}" -q \
+  -k 'no_test_is_named_this_by_issue_1043' portal/tests/test_auth_gate_secret_env.py \
+  >"$work/suite-control.out" 2>&1 || suite_control_rc=$?
+if [ "$suite_control_rc" -ne 0 ]; then
+  echo "  OK    CONTROL: an empty selection exits $suite_control_rc, not 0 — the verdict above is the suite's own exit code"
+else
+  printf '  FAIL  CONTROL: an empty selection exited 0, so the verdict above is not the suite exit code\n' >&2
   fail=$((fail + 1))
 fi
 
