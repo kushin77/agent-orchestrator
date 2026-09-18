@@ -132,7 +132,24 @@ Exit contract, shared with the rest of the fleet's guards: `0` OK / `1` NOT-OK /
   machine guard's timer owns that.
 - **It does not delete anything of yours.** The one removal it performs is a
   0-byte file it has just proved empty, in `--copy`. Reclaiming scratch is
-  `scripts/prune-worktrees.sh` and #516.
+  `scripts/prune-worktrees.sh` and #516. A worktree's HEAD not being reachable
+  from `origin/master` by name, or its remote branch having been deleted after
+  a squash-merge, does not by itself mean the work is unlanded — the pruner
+  also checks CONTENT equivalence (`governance/isolation/worktree.py`'s
+  `content_landed`, the same test `--branches` already used for lane branches,
+  #1265) before keeping a worktree "just in case" — including, as a third
+  fallback, reverse-applying the lane's own zero-context patch against a
+  scratch index of `origin/master`, which lands the common case where master
+  later edited the SAME file elsewhere and a whole-file blob comparison alone
+  would still say "unlanded." `scripts/check-worktree-cap.sh`
+  is the box-wide companion gate: it reds `worktree-cap-exceeded:<n>/<cap>`
+  when live worktrees exceed open lane records plus a declared slack (or a
+  dated, host-scoped `ratchet` in `worktree-cap.yaml` while the real pile is
+  still shrinking towards that slack — printed as a `worktree-cap-ratchet:<n>`
+  NOTE, and never honoured past its own `expires` date)
+  (`governance/isolation/worktree-cap.yaml`), and `reaper-unscheduled` when
+  nothing actually installs `prune-worktrees.sh` in the crontab a scheduler
+  reads — a declaration is not an installation.
 - **It does not lint untracked scratch.** The gating `--lint` covers the repo's
   tracked `*.sh`. A scratch driver in `/tmp` is linted only when someone runs
   `--lint <dir>` — which the discipline above tells agents to do.

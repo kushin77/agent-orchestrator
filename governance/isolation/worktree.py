@@ -430,3 +430,203 @@ def guard_lane_name(name: str) -> str:
     if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", name):
         raise ProvisionRefused(f"{REFUSAL_UNSAFE_NAME}: unsafe lane name {name!r}")
     return name
+
+
+#: Runtime state (gitignored): every content-equivalence reap is recorded here
+#: before the worktree/branch is removed, so an operator can reconstruct what
+#: happened to a HEAD that is no longer preserved by name on origin.
+REAPED_BRANCHES_LOG = ".fleet/reaped-branches.jsonl"
+
+
+def content_landed(main: Path | str, ref: str, base: str = "origin/master") -> bool:
+    """Is ``ref``'s own change already fully present in ``base``, BY CONTENT?
+
+    Issue #1265: a worktree whose HEAD is not reachable from ``base`` and not on
+    any preserved remote branch is not necessarily unlanded work — this repo
+    squash-merges, so a fully-landed commit is never an ancestor of ``base`` and
+    its remote branch is routinely deleted after merge (measured 2026-09-18: 49
+    of 88 remaining worktrees were kept for exactly that reason, "HEAD is not
+    preserved on origin", although every one of them was content-landed).
+
+    This is the SAME test ``prune-worktrees.sh --branches`` already applies to
+    lane branches (issue #830) — lifted here, in one place, so the worktree
+    keep-rule and the branch keep-rule share one implementation instead of two
+    copies that can drift: take the merge-base of ``ref`` and ``base``, list
+    every path ``ref`` changed since it, and require ``base`` to hold EXACTLY
+    that content for each path. If ``base`` moved on and differs anywhere — or
+    nothing can be compared (unknown ref, no common history, no changed paths) —
+    the ref is NOT landed, and the caller must keep it. Failing closed is the
+    only safe direction here: this function only ever widens what may be
+    reclaimed, never what may be discarded.
+    """
+    if git(main, "merge-base", "--is-ancestor", ref, base).returncode == 0:
+        return True
+
+    merge_base = git(main, "merge-base", ref, base)
+    if merge_base.returncode != 0:
+        return False
+    base_sha = merge_base.stdout.strip()
+    if not base_sha:
+        return False
+
+    changed = git(main, "diff", "--name-only", base_sha, ref)
+    if changed.returncode != 0:
+        return False
+    # A path a MACHINE rewrites (`.board/focus.json`, anything under `.fleet/`)
+    # is not the lane's own change (#834) — comparing it here would compare
+    # regenerated scratch state a later fleet run has since rewritten, and keep
+    # a fully-landed worktree FOR EVER over a file it never authored as work.
+    paths = [line for line in changed.stdout.splitlines() if line and not _is_machine_managed(line)]
+    if not paths:
+        return False
+
+    all_paths_equal = True
+    for path in paths:
+        theirs = git(main, "rev-parse", "--verify", "--quiet", f"{ref}:{path}")
+        ours = git(main, "rev-parse", "--verify", "--quiet", f"{base}:{path}")
+        theirs_sha = theirs.stdout.strip() if theirs.returncode == 0 else ""
+        ours_sha = ours.stdout.strip() if ours.returncode == 0 else ""
+        if theirs_sha != ours_sha:
+            all_paths_equal = False
+            break
+    if all_paths_equal:
+        return True
+
+    # Third method, tried only when the whole-file comparison above fails
+    # (issue #1265 comment 2): master routinely touches the SAME FILE again
+    # after landing a lane's hunk, so "the file's blob differs" is common even
+    # when every hunk the lane actually wrote is still there. Build the lane's
+    # own patch and test whether REVERSING it against a scratch index of
+    # ``base`` applies cleanly — that succeeds iff every hunk in the patch is
+    # present in ``base``'s content for that path, regardless of what else in
+    # the file changed since.
+    return _reverse_patch_landed(main, base_sha, ref, base)
+
+
+def _reverse_patch_landed(main: Path | str, base_sha: str, ref: str, base: str) -> bool:
+    """Is ``ref``'s own patch (vs ``base_sha``) reverse-appliable onto ``base``?
+
+    Builds ``git diff --no-renames base_sha ref`` (excluding machine-managed
+    paths), then checks it with ``git apply --cached --check -R`` against a
+    THROWAWAY index seeded from ``base`` via ``GIT_INDEX_FILE`` — never the
+    repository's real index, and nothing is written to the working tree. If
+    the reverse-apply succeeds, every hunk the patch would add is already
+    present in ``base``: landed. Any failure along the way (no git-dir, a
+    patch git cannot even build, a hunk missing or since reverted) is NOT
+    landed — this only ever widens what may be reclaimed.
+    """
+    import tempfile
+
+    exclude_pathspecs = [f":(exclude){path}" for path in MACHINE_MANAGED_PATHS]
+    exclude_pathspecs += [f":(exclude){prefix}*" for prefix in MACHINE_MANAGED_PREFIXES]
+    # -U0: zero context lines. A context line is a claim "this line, near my
+    # change, was unchanged" — and master routinely edits a NEARBY line in the
+    # same file without touching the lane's own hunk at all. Matching context
+    # would make this method fail on exactly the case it exists for; matching
+    # only the changed lines themselves is the whole point of "by content."
+    diff = git(main, "diff", "--no-renames", "-U0", base_sha, ref, "--", ".", *exclude_pathspecs)
+    if diff.returncode != 0 or not diff.stdout.strip():
+        return False
+    patch = diff.stdout
+
+    git_dir_result = git(main, "rev-parse", "--absolute-git-dir")
+    if git_dir_result.returncode != 0:
+        return False
+    git_dir = git_dir_result.stdout.strip()
+
+    with tempfile.TemporaryDirectory() as scratch:
+        index_path = str(Path(scratch) / "index")
+        env = {
+            **os.environ,
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_DIR": git_dir,
+            "GIT_INDEX_FILE": index_path,
+        }
+        read_tree = subprocess.run(
+            ["git", "read-tree", base], cwd=str(main), capture_output=True, text=True, env=env
+        )
+        if read_tree.returncode != 0:
+            return False
+        apply_check = subprocess.run(
+            ["git", "apply", "--cached", "--check", "-R", "--unidiff-zero"],
+            input=patch,
+            cwd=str(main),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        return apply_check.returncode == 0
+
+
+def record_reaped(
+    main: Path | str,
+    *,
+    branch: str,
+    head_sha: str,
+    worktree: str,
+    reason: str,
+) -> Path:
+    """Append one reap record to :data:`REAPED_BRANCHES_LOG`, runtime state.
+
+    Called BEFORE removal (#1265): once a worktree's remote branch is gone,
+    ``HEAD is not preserved on origin`` can never be re-derived, so this is the
+    only record that a given SHA was ever content-landed and reclaimed.
+
+    ``.fleet/`` is gitignored runtime state that lives beside the MAIN
+    checkout's git dir, never inside a linked worktree (mirrored from
+    ``prune-worktrees.sh``'s own lookup) — ``main`` here is often the worktree
+    the reaper happens to be RUN FROM, and writing there silently split the
+    ledger per-worktree instead of keeping the one record an operator reads.
+    """
+    import time
+
+    common = git(main, "rev-parse", "--git-common-dir")
+    root = Path(main)
+    if common.returncode == 0:
+        common_dir = Path(common.stdout.strip())
+        if not common_dir.is_absolute():
+            common_dir = Path(main).resolve() / common_dir
+        root = common_dir.resolve().parent
+
+    path = root / REAPED_BRANCHES_LOG
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "branch": branch,
+        "head_sha": head_sha,
+        "worktree": worktree,
+        "reason": reason,
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+    return path
+
+
+def _cli(argv: list[str] | None = None) -> int:
+    """A minimal standalone CLI: ``content-landed`` only.
+
+    This module is not the repo's shared isolation CLI (``cli.py``, which this
+    issue's file list does not touch) — it is a small, direct entry point so
+    ``scripts/prune-worktrees.sh`` can call the ONE content-equivalence
+    implementation from bash without duplicating it (issue #1265).
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="worktree.py")
+    sub = parser.add_subparsers(dest="command", required=True)
+    landed = sub.add_parser("content-landed", help="exit 0 iff REF is content-landed on BASE")
+    landed.add_argument("ref")
+    landed.add_argument("--base", default="origin/master")
+    landed.add_argument("--root", default=".")
+    args = parser.parse_args(argv)
+
+    if args.command == "content-landed":
+        return 0 if content_landed(args.root, args.ref, args.base) else 1
+    return 2
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(_cli(sys.argv[1:]))
