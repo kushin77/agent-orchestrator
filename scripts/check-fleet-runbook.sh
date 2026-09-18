@@ -127,7 +127,7 @@ if [ "$fail" -eq 0 ]; then
 fi
 
 # --- provocation: each case must be reported, naming every missing capability
-work="$(mktemp -d)"
+work="$(mktemp -d "/tmp/ao877-fleet-runbook.$(printf 'X%.0s' 1 2 3 4 5 6)")"
 trap 'rm -f "$mutant"; rm -rf "$work"' EXIT
 
 head_sha="$(git rev-parse --short HEAD 2>/dev/null || true)"

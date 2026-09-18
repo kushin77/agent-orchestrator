@@ -27,8 +27,17 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from typing import Any, Optional
+
+#: The one clock seam (``telemetry/clock.py``, issue #1025) — re-exported, never
+#: redefined.  ``now_utc_iso``/``today_utc``/``this_month_utc`` stay the public
+#: names this lane has always exposed, and every one of them is now answered by
+#: the same seam a test or a gate can pin.
+from telemetry.clock import (  # noqa: F401  (re-exported seam)
+    now_utc_iso,
+    this_month_utc,
+    today_utc,
+)
 
 # --------------------------------------------------------------------------- #
 # Enforcer decision ladder (consumed from gateway/finops, issue #17)
@@ -122,13 +131,9 @@ CAPS = frozenset({CAP_SOFT, CAP_HARD})
 DEFAULT_ALERT_AT_PCT = 1.0
 
 # --------------------------------------------------------------------------- #
-# Time helpers (mirror the metering/observability RFC 3339 ``Z`` shape)
+# Time helpers — the clock itself lives in the one seam
+# (``telemetry/clock.py``, issue #1025); only pure string bucketing stays here.
 # --------------------------------------------------------------------------- #
-def now_utc_iso() -> str:
-    """UTC timestamp in the repo-wide RFC 3339 ``Z`` shape."""
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def day_bucket(ts: str) -> str:
     """UTC calendar-day bucket (``YYYY-MM-DD``) for a record timestamp."""
     return ts[:10]
@@ -139,14 +144,10 @@ def month_bucket(ts: str) -> str:
     return ts[:7]
 
 
-def today_utc() -> str:
-    """Today's UTC ``YYYY-MM-DD`` bucket."""
-    return now_utc_iso()[:10]
-
-
-def this_month_utc() -> str:
-    """This UTC month's ``YYYY-MM`` bucket."""
-    return now_utc_iso()[:7]
+# ``today_utc`` / ``this_month_utc`` / ``now_utc_iso`` are re-exported from the
+# seam above, so the rail fallbacks this lane owns (``day or today_utc()``,
+# ``month or this_month_utc()``) follow a pinned clock too instead of the
+# calendar — which is exactly what makes the money path freezable (#1025).
 
 
 # --------------------------------------------------------------------------- #

@@ -163,7 +163,7 @@ rm -f /tmp/tf-iac-fmt.$$
 validate_dir() {
   local dir="$1"
   local td
-  td="$(mktemp -d)"
+  td="$(mktemp -d "/tmp/ao877-tf-iac.$(printf 'X%.0s' 1 2 3 4 5 6)")"
   local rc=0
   local lock_file="$dir/.terraform.lock.hcl"
   local lock_preexisting=0
@@ -198,7 +198,7 @@ rm -f /tmp/tf-iac-init.$$ /tmp/tf-iac-validate.$$
 # exactly why GR-28 needs its own machine check here.
 neg_flag_default_true() {
   local scratch
-  scratch="$(mktemp -d)"
+  scratch="$(mktemp -d "/tmp/ao877-tf-neg.$(printf 'X%.0s' 1 2 3 4 5 6)")"
   local mod="$tf_root/modules/control-plane-service"
   cp -r "$mod" "$scratch/mutant"
 
@@ -267,7 +267,7 @@ fi
 # --- 4. negative control: a .tf with a syntax error is refused --------------
 neg_tf_syntax_error() {
   local scratch
-  scratch="$(mktemp -d)"
+  scratch="$(mktemp -d "/tmp/ao877-tf-syntax.$(printf 'X%.0s' 1 2 3 4 5 6)")"
   cp "$tf_root"/versions.tf "$scratch/" 2>/dev/null
   cp "$tf_root"/providers.tf "$scratch/" 2>/dev/null
   cat >"$scratch/broken.tf" <<'HCL'
@@ -279,10 +279,10 @@ HCL
 
   local out
   local vrc=0
-  if ! (cd "$scratch" && TF_DATA_DIR="$(mktemp -d)" "$BIN" init -backend=false -input=false >/dev/null 2>&1); then
+  if ! (cd "$scratch" && TF_DATA_DIR="$(mktemp -d "/tmp/ao877-tf-data.$(printf 'X%.0s' 1 2 3 4 5 6)")" "$BIN" init -backend=false -input=false >/dev/null 2>&1); then
     :
   fi
-  out="$(cd "$scratch" && TF_DATA_DIR="$(mktemp -d)" "$BIN" validate -no-color 2>&1)"
+  out="$(cd "$scratch" && TF_DATA_DIR="$(mktemp -d "/tmp/ao877-tf-data.$(printf 'X%.0s' 1 2 3 4 5 6)")" "$BIN" validate -no-color 2>&1)"
   vrc=$?
   rm -rf "$scratch"
 

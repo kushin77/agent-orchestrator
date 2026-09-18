@@ -184,6 +184,11 @@ CODE_BOARD_INCIDENT_WITHOUT_RCA = "board-incident-without-rca"
 CODE_BOARD_INCIDENT_PENDING = "board-incident-pending"
 CODE_RCA_REVIEW_OVERDUE = "rca-review-overdue"
 CODE_CORRECTIVE_ACTION_OPEN = "corrective-action-open"
+#: An open action whose own stated closure condition has already been met: the
+#: board snapshot the ledger is checked against reports its ``remediation_issue``
+#: CLOSED. The record and the board contradict each other, so this is an error
+#: rather than the benign ``corrective-action-open`` deviation (#1028).
+CODE_CORRECTIVE_ACTION_REMEDIATION_LANDED = "corrective-action-remediation-landed"
 CODE_SUGGESTION_OPEN = "suggestion-open"
 CODE_DOC_RCA_ID_UNKNOWN = "doc-rca-id-unknown"
 CODE_DOC_RCA_ARTIFACT_MISMATCH = "doc-rca-artifact-mismatch"

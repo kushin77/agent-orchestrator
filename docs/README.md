@@ -48,6 +48,47 @@ Index of the repo's canonical documentation. Agents start at
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
 
+## Fleet, governance and FinOps docs
+
+Indexed by issue #1206: these 31 docs were previously carried as an exemption
+baseline in `scripts/check-docs.sh` (the `idx_quarantine` list, held open under
+issue #629). The baseline is now empty, so every tracked `docs/**/*.md` is
+reachable from this index.
+
+| Doc | Purpose |
+|-----|---------|
+| [`GOLDEN-RULES.md`](GOLDEN-RULES.md) | The canonical product spine (AO-GR-1..AO-GR-28) that `AGENTS.md` and the root ratification pointer defer to. |
+| [`AGENT-IDENTITY.md`](AGENT-IDENTITY.md) | One shared agent-identity schema, owner lane `registry` (issue #346, parent #338). |
+| [`MODULE-REGISTRY.md`](MODULE-REGISTRY.md) | Module registry — the measured module inventory, pointing at the contract in `governance/modules/README.md` (issue #445). |
+| [`MODULE-BRIEF.md`](MODULE-BRIEF.md) | Module brief — what every repo must carry, at which pin, and whether it is current (issue #447, ADR-0012). |
+| [`CONTROL-COVERAGE.md`](CONTROL-COVERAGE.md) | Control coverage — the enterprise spine (issue #874). |
+| [`OBSERVABILITY.md`](OBSERVABILITY.md) | Observability — the monitoring boundary for agent-orchestrator; declared and gated (issue #496, EPIC #494). |
+| [`QA-GATE.md`](QA-GATE.md) | QA gate stack — `make gate`, qa-loop and merge gate (issue #29). |
+| [`SURFACE-CLASS.md`](SURFACE-CLASS.md) | Per-surface target solution-classes — the CMR quality rung each product surface declares. |
+| [`MECHANICAL-EXECUTION-LAYER.md`](MECHANICAL-EXECUTION-LAYER.md) | Mechanical execution layer — concept & intent (intent-only spec, issue #239). |
+| [`BOARD-ATTACK-PLAN.md`](BOARD-ATTACK-PLAN.md) | Board attack plan (milestone → epic → class) — the PMO coordination artifact; no product code. |
+| [`FLEET-STATE.md`](FLEET-STATE.md) | Unified fleet-state projection across the five stores one work item touches (issue #323). |
+| [`FLEET-CAPABILITY-DRIFT.md`](FLEET-CAPABILITY-DRIFT.md) | Capability drift — restarting a rung that does not implement what the repository declares (issue #319). |
+| [`FLEET-DASHBOARD-GAP-ANALYSIS.md`](FLEET-DASHBOARD-GAP-ANALYSIS.md) | Fleet dashboard gap analysis — terminal TUI vs web single-pane-of-glass (issue #330). |
+| [`LEASE-POLICY.md`](LEASE-POLICY.md) | One declared policy for every fleet lease and TTL (issue #322). |
+| [`SESSION-FLEET-SYNC.md`](SESSION-FLEET-SYNC.md) | Session fleet sync — the sync contract and gap register (issue #181). |
+| [`CROSS-REPO-LESSONS-SYNC.md`](CROSS-REPO-LESSONS-SYNC.md) | The declared relationship between the two lessons loops either side of the repo boundary. |
+| [`SHARED-SERVICES-FALLBACK.md`](SHARED-SERVICES-FALLBACK.md) | Shared-services fallback rung — frozen contract, owner lane `gateway/health` (issue #375). |
+| [`LIVE-DATA-BRIDGE.md`](LIVE-DATA-BRIDGE.md) | Live data bridge (`ao.bridge/v1`) — the versioned read transport over the four state families. |
+| [`GLOSSARY.md`](GLOSSARY.md) | Glossary — the fleet's role vocabulary (normative pointer, issue #777). |
+| [`SHELL-PATTERNS.md`](SHELL-PATTERNS.md) | Shell patterns — the shapes this repository refuses (EPIC #616, issue #621). |
+| [`SCRATCH-SPACE-DISCIPLINE.md`](SCRATCH-SPACE-DISCIPLINE.md) | Scratch-space discipline — keeping an agent's scratch from taking the machine (issue #488). |
+| [`OPERATOR-ACCESS.md`](OPERATOR-ACCESS.md) | Principal access — every way into the fleet, and what each one needs (runbook, issue #763). |
+| [`PORTAL-OFFLINE-DEV.md`](PORTAL-OFFLINE-DEV.md) | Portal offline dev run — the fleet SPoG with zero external infra (dev stopgap, issue #732). |
+| [`EDGE-CUTOVER.md`](EDGE-CUTOVER.md) | Edge cutover — how `ai.purebliss.app` is fronted and what is retired; a declaration, not a deployment (issue #731). |
+| [`CHAT-MOUNT.md`](CHAT-MOUNT.md) | The chat mount contract — how the conversational surface appears in the OS shell (issue #511, EPIC #500). |
+| [`CODEIDX-CAPABILITY-REGISTER.md`](CODEIDX-CAPABILITY-REGISTER.md) | What the fleet needs from `kushin77/code-indexing`, per capability, and how we know we have it. |
+| [`DIAGRAMS-CAPABILITY-REGISTER.md`](DIAGRAMS-CAPABILITY-REGISTER.md) | What "fully capable" means for the fleet's diagrams surface (issue #467). |
+| [`erp-finops/compliance-audit.md`](erp-finops/compliance-audit.md) | ERP/FinOps compliance audit — phase-4 validation & governance (issue #676, EPIC #665). |
+| [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
+| [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
+| [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
+
 ## Planned (later issues)
 
 - `adr/` — architecture decision records (issue #7).

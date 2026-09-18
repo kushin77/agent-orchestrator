@@ -28,7 +28,14 @@
       "kind": "org-consolidated-index",
       "state": "declared-intent-unconfirmed"
     },
-    "note": "Second lessons ledger: the CMR hub's consolidated index. No mechanical coupling with governance/lessons/ledger.jsonl exists today (no shared record ids, no cross-reference), so this is a DECLARED INTENT, not a confirmed mapping. The frozen baseline is governance/lessons-sync/cmr-ledger.json; every CMR record must carry a disposition (hub-only, or mirrors naming a local counterpart) and a record with none is reported by id."
+    "local_only_reasons": {
+      "no-hub-counterpart": {
+        "why": "No kushin77/CMR index row mirrors this local record: the hub index is org-scoped (its rows span CMR's own issues) while this record is this repository's own artifact. Recording the reason per record is what keeps a local-only listing a judgement rather than a silence.",
+        "predicate": "no-hub-row-mirrors-this-id"
+      }
+    },
+    "local_only_reasons_note": "The closed vocabulary a `local-only` declaration in governance/lessons-sync/cmr-ledger.json must draw its reason from. Each reason names a predicate the pass implements; a reason outside this vocabulary, a predicate that is not implemented, or a predicate that no longer holds for the record is reported by id. A declaration also states the hub revision it was judged against (`judged_against`, compared to the freeze's `_provenance.vendor_commit`), so a re-frozen hub invalidates every declaration instead of silently inheriting it, and the ref the record itself carries (`record_ref`), so a declaration cannot be disassociated from the record it covers.",
+    "note": "Second lessons ledger: the CMR hub's consolidated index. No mechanical coupling with governance/lessons/ledger.jsonl exists today (no shared record ids, no cross-reference), so this is a DECLARED INTENT, not a confirmed mapping. The frozen baseline is governance/lessons-sync/cmr-ledger.json; every CMR record must carry a disposition (hub-only, or mirrors naming a local counterpart) and a record with none is reported by id. The local side is judged the same way: every local record no hub row mirrors must carry a `local-only` declaration, from the vocabulary above."
   },
   "sync": {
     "direction": "one-way:writer->derived",

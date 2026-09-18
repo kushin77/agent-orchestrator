@@ -27,7 +27,10 @@ _e2e_root = os.path.dirname(_here)
 _repo_root = os.path.dirname(_e2e_root)
 _paths = [_repo_root] + [
     os.path.join(_repo_root, rel)
-    for rel in ("gateway", "identity", "registry", "guardrails")
+    # ``control-plane/sdk/python`` is the shipped consumer SDK (``aosdk``); the
+    # e2e suite drives it against the real control-plane surface (issue #1229),
+    # and this mirrors the SDK's own tests/conftest.py.
+    for rel in ("gateway", "identity", "registry", "guardrails", "control-plane/sdk/python")
 ]
 for _path in _paths:
     if _path not in sys.path:

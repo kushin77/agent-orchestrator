@@ -157,6 +157,9 @@ fi
 
 report="$(reap "$branches" --check --branches)"
 rc=$?
+# Bash-native substring test (issue #1145): a quiet grep exits on its first
+# match and can SIGPIPE its producer, so under pipefail it can report a
+# needle that IS present as absent. Same input, no producer to kill.
 if [ "$rc" -eq 1 ] && [[ "$report" == *"STALE  branch issue-42-lane"* ]]; then
   ok "a landed branch that still exists is a finding (--check --branches rc=1)"
 else
@@ -191,6 +194,7 @@ held_lane="$work/lane-held"
 git_ "$held" worktree add -q -b issue-44-lane "$held_lane"
 git_ "$held" push -qu origin issue-44-lane
 held_out="$(reap "$held" --branches --apply)"
+# Bash-native substring test (issue #1145), same reason as above.
 if [[ "$held_out" == *"issue-44-lane"* ]]; then
   bad "a branch a worktree is standing on was treated as a candidate"
 elif git_ "$held" rev-parse --verify --quiet issue-44-lane >/dev/null 2>&1; then
