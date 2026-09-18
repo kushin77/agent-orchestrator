@@ -26,6 +26,10 @@
 #      would commit.
 #   3. HISTORY — a root declared wholly generated may hold no tracked file at
 #      all. A tracked file under `.verify/` is runtime state already committed.
+#      This rule has NO exceptions. The one named carve-out that ever existed
+#      (#1139, for the attestation schema parked inside `.verify/`) was removed
+#      by #1146 once #1143 relocated that schema out of the root; the
+#      declaration section below records why it was removed, not kept.
 #
 # MEASURED CONSEQUENCE (2026-09-15, `master` @ 84afa90, worktree ao-625-08cee8aa)
 #   Tracked code writes runtime state to `.board/claims/`, `.fleet/waves/` and
@@ -48,9 +52,13 @@
 #   property under test is definitively false when there is no `.gitignore`, so
 #   that is NOT-OK. No branch of this script returns 2 for "could not tell".
 #
-# NOT YET WIRED INTO `make verify`: `scripts/verify.sh` iterates an explicit
-# check list, so a new `scripts/check-*.sh` does not run on its own. Adding this
-# one to that list is issue #630's lane; until then this gate is run directly.
+# WIRED INTO `make verify`. `scripts/discover-checks.sh` (#698) auto-discovers
+# every `scripts/check-*.sh`, and this one is not denylisted in
+# `scripts/check-denylist.txt` — `discover_check_scripts` prints
+# `gitignore|bash scripts/check-gitignore.sh`. When this file was first written
+# the explicit check list meant an unregistered script was inert; #698 replaced
+# that with discovery. Corrected here because a comment claiming a live gate is
+# inert is the doc-vs-reality drift this gate itself exists to refuse.
 #
 # Usage: bash scripts/check-gitignore.sh
 #   AO_GITIGNORE_ROOT=<dir> assesses <dir> instead of the tree this script lives
@@ -89,18 +97,33 @@ runtime_roots=(.board .fleet .verify)
 # runtime state that already reached history.
 wholly_generated=(.verify)
 
-# Named exceptions: a tracked, reviewable file under a wholly-generated root
-# that is NOT the runtime state that root exists to keep out of git — checked
-# in by NAME, so an exception is a deliberate, auditable line here, not a
-# root silently downgraded to "mostly generated". `.verify/attestation.schema.json`
-# (#882, closing #1001) is the JSON Schema the verify-gate's own attestation
-# document must conform to (both PASS and FAIL runs): it is source, checked
-# in like any other schema, never written by `scripts/verify.sh` itself
-# (that writes `.verify/attestation.json`, still covered by check 1/2 above,
-# never this list).
-wholly_generated_exceptions=(
-  ".verify/attestation.schema.json"
-)
+# Named exceptions: NONE, deliberately (issue #1146).
+#
+# This list ever held exactly one entry, and that entry was the gate being
+# weakened to reach green. The chain, measured from history:
+#
+#   * `scripts/verify.sh` must attest against a JSON Schema — a checked-in
+#     contract, real source (#882, closing #1001).
+#   * Its lane put that schema at `.verify/attestation.schema.json`, i.e. inside
+#     the one root this gate declares wholly generated. Check 3 then failed on
+#     it, correctly: a tracked file under a generated root is runtime state that
+#     already reached history.
+#   * #1139 resolved that by carving the single path out of check 3 by name
+#     (`wholly_generated_exceptions`), arguing in its own message that this was
+#     narrower than "weakening the root declaration itself". Narrower, but still
+#     a weakness: rule 3 became conditionally absolute, and a tracked file under
+#     a generated root had a way to print OK.
+#   * #1143 then did the honest fix — relocated the schema to
+#     `governance/isolation/attestation.schema.json` and restored a plain,
+#     un-negated `.verify/` ignore — which left this list excusing a path that
+#     no longer exists.
+#
+# The list is removed rather than emptied. An exception with no subject is a
+# hole held open for a file that is now correctly outside the root, and keeping
+# it would re-legalise precisely the state the relocation was performed to end.
+# Acceptance 2 of #1146 asks for the reason to be recorded in the file that
+# asserts the check; this is that record. Check 3 is now absolute — any tracked
+# file under a wholly-generated root fails by name, with no way to be excused.
 
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 root="$script_root"
@@ -205,17 +228,6 @@ for candidate in "${wholly_generated[@]}"; do
   else
     while IFS= read -r offender; do
       [ -n "$offender" ] || continue
-      exempt=0
-      for allowed in "${wholly_generated_exceptions[@]}"; do
-        if [ "$offender" = "$allowed" ]; then
-          exempt=1
-          break
-        fi
-      done
-      if [ "$exempt" -eq 1 ]; then
-        printf '  OK    %s tracked, but named as a source exception (not runtime state)\n' "$offender"
-        continue
-      fi
       printf '  FAIL  %s (tracked under a wholly generated root — runtime state already in history)\n' \
         "$offender" >&2
       fail=$((fail + 1))
