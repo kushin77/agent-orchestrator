@@ -461,6 +461,23 @@ def fleet_signal(repo: Path, environment: dict, timeout: int) -> dict:
     }
 
 
+def decision_env(environment: dict[str, str]) -> dict:
+    """The decision document's ``env`` section — declared surface, never the ambient one.
+
+    ``environment`` (``self.environment``) is ``dict(os.environ)`` plus the
+    resolved contract, because a dispatched role's subprocess needs its own
+    real environment (PATH, HOME, credential paths for tools it shells out
+    to). None of that belongs in a document that gets read as evidence
+    (``scripts/check-fleet-cron-dev-run.sh`` copies it out; ``healthz.py``
+    re-reads it): issue #1157. Only the ``AO_FLEET_*`` values this run is
+    governed by are recorded, by name — never a raw value for anything else.
+    """
+    return {
+        "declared": env_contract.resolve(environment),
+        "undeclared_ao_fleet_names_present": env_contract.undeclared(environment),
+    }
+
+
 # ---------------------------------------------------------------------------
 # The run.
 # ---------------------------------------------------------------------------
@@ -599,7 +616,7 @@ class DevRun:
             "reason": reason,
             "started_at": self.document.get("started_at", now()),
             "finished_at": now(),
-            "env": self.environment,
+            "env": decision_env(self.environment),
             "schedule": {
                 "owner": "fleet/cron.py",
                 "markers": markers,
@@ -673,7 +690,7 @@ class DevRun:
             "reason": f"{code}: {detail}",
             "started_at": self.document.get("started_at", now()),
             "finished_at": now(),
-            "env": self.environment,
+            "env": decision_env(self.environment),
             "jobs": [],
             "findings": self.findings,
             "refusal": {"code": code, "detail": detail},
