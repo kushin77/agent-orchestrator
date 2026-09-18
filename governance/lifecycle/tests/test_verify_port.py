@@ -232,3 +232,114 @@ def test_the_real_port_retries_a_park_and_records_every_attempt(tmp_path, monkey
     assert "2 attempt(s)" in raised.value.detail
     assert raised.value.verdict == gate.VERDICT_PARKED
     assert not journal_path(LANE_ISSUE, tmp_path).exists()
+
+
+def _stub_gate_writing_attestation(
+    root: Path, monkeypatch, *, git_sha: str, checks: list[dict], retries: int = 0
+) -> None:
+    """A failing stub gate that leaves the per-check record a real failed run leaves.
+
+    ``scripts/verify.sh`` writes ``.verify/attestation.json`` **even on failure**, so a
+    red run does carry the one fact its own banner omits: which checks failed. The stub
+    reproduces that, in the worktree it is run in, because that is where the real gate
+    writes it.
+    """
+    binary_dir = root / "bin"
+    binary_dir.mkdir(exist_ok=True)
+    stub = binary_dir / "make"
+    stub.write_text(
+        "#!/usr/bin/env bash\n"
+        "mkdir -p .verify\n"
+        "printf '%s' \"$STUB_ATTESTATION\" > .verify/attestation.json\n"
+        "printf 'verify: FAIL (2 of 120 checks failed)\\n' >&2\n"
+        "printf 'make: *** [Makefile:146: verify] Error 1\\n' >&2\n"
+        "exit 2\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binary_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv(
+        "STUB_ATTESTATION", json.dumps({"git_sha": git_sha, "checks": checks})
+    )
+    monkeypatch.setenv("AO_LIFECYCLE_GATE_RETRIES", str(retries))
+    monkeypatch.setenv("AO_LIFECYCLE_GATE_RETRY_WAIT", "0")
+
+
+def test_a_failed_gate_names_the_checks_it_measured_red(tmp_path, monkeypatch):
+    """A red verification says WHICH check it disagreed with (#1247).
+
+    The gate's own FAIL banner names how many checks failed and which ones were
+    **skipped** — never which ones failed — so without the attestation's per-check
+    results an operator is told that something is wrong and not what, and the only way
+    to learn more is to run the whole composite gate again. Measured on #627 and #629:
+    their close-outs refused with "1 of 142 checks failed" and "2 of 142 checks failed"
+    and nothing else, which is why the two board findings that record it (#1247, #1251)
+    could not be acted on.
+    """
+    _worktree, head = _scratch_root(tmp_path)
+    _stub_gate_writing_attestation(
+        tmp_path,
+        monkeypatch,
+        git_sha=head,
+        checks=[
+            {"name": "shell-syntax", "rc": 0},
+            {"name": "isolation-landed", "rc": 1},
+            {"name": "gate-lock", "rc": 2},
+            {"name": "docs", "rc": 1},
+        ],
+    )
+
+    with pytest.raises(RuntimeError) as raised:
+        GhOps(root=tmp_path).record_verification(LANE_ISSUE, head)
+
+    message = str(raised.value)
+    assert "failing check(s): isolation-landed, docs" in message
+    # A check the gate could not assess is a SKIP, never a failure (its own tri-state).
+    assert "gate-lock" not in message
+    # And the names come first: this is the string closeout clamps at 300 characters,
+    # so a failure whose name sits after the counts is still unactionable.
+    assert "failing check(s): isolation-landed, docs" in message[:300]
+    assert not journal_path(LANE_ISSUE, tmp_path).exists()
+
+
+def test_a_stale_attestation_is_never_read_as_this_runs_failure(tmp_path, monkeypatch):
+    """A run that wrote no attestation must not be described by the previous one's red.
+
+    A lane keeps the attestation of an earlier run in the same worktree, and a red one
+    names checks *that* run failed. Reporting them here would be a failure report
+    assembled from another measurement — the substitution this module exists to prevent,
+    so the count is reported and no name is invented.
+    """
+    worktree, head = _scratch_root(tmp_path)
+    verify_dir = worktree / ".verify"
+    verify_dir.mkdir()
+    (verify_dir / "attestation.json").write_text(
+        json.dumps({"git_sha": head, "checks": [{"name": "an-older-run", "rc": 1}]}),
+        encoding="utf-8",
+    )
+    old = 1_600_000_000
+    os.utime(verify_dir / "attestation.json", (old, old))
+    # A failing gate that writes no attestation at all: the run died before its record.
+    _stub_gate(tmp_path, monkeypatch, "failed")
+
+    with pytest.raises(RuntimeError) as raised:
+        GhOps(root=tmp_path).record_verification(LANE_ISSUE, head)
+
+    assert "an-older-run" not in str(raised.value)
+    assert "a check failed" in str(raised.value)
+
+
+def test_an_attestation_for_another_commit_is_never_read_as_this_runs_failure(
+    tmp_path, monkeypatch
+):
+    """The record must belong to the tree that was gated, not merely to the worktree."""
+    _worktree, head = _scratch_root(tmp_path)
+    _stub_gate_writing_attestation(
+        tmp_path, monkeypatch, git_sha="f" * 40, checks=[{"name": "another-tree", "rc": 1}]
+    )
+
+    with pytest.raises(RuntimeError) as raised:
+        GhOps(root=tmp_path).record_verification(LANE_ISSUE, head)
+
+    assert "another-tree" not in str(raised.value)
+    assert "a check failed" in str(raised.value)
