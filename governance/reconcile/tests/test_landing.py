@@ -167,3 +167,94 @@ def test_every_proof_names_how_it_was_proven_and_at_which_commit(repo: Path):
     kind, how, sha = proof.split(":")
     assert (kind, how) == ("landed", "ancestor")
     assert len(sha) == 12 and _git(repo, "rev-parse", "HEAD").strip().startswith(sha)
+
+
+# --- the landing convention names TWO numbers (#1310) ------------------------
+#
+# A squash landing carries the pull request in its *subject* (``… (#1165)``) and
+# the issue it closes in its *body* (``Closes #1158``). A candidate generator
+# that read only subjects therefore looked in an empty bucket whenever a lane's
+# pull request number differed from its issue number — the normal case here —
+# and reported landed work as work that exists nowhere. Measured at
+# ``origin/master bbe3c83`` (2026-09-18): 5 of the 23 artifacts the real-tree
+# quarantine was still excusing were exactly this false finding, and one of them
+# crossed the age grace while the gate ran and red the whole fleet.
+
+
+def test_a_landing_naming_its_pull_request_and_closing_its_issue_is_proven(repo: Path):
+    """The issue number appears in no subject — the proof must still find it."""
+    _git(repo, "checkout", "-q", "-b", "issue-1158")
+    _commit(repo, "docs(pmo): the lane's work", {"audit.md": "audit\n"})
+    _git(repo, "checkout", "-q", "master")
+    (repo / "audit.md").write_text("audit\n", encoding="utf-8")
+    _git(repo, "add", "audit.md")
+    _git(repo, "commit", "-q", "-m", "docs(pmo): the lane's work (#1165)", "-m", "Closes #1158")
+    _push(repo)
+    # A later sibling edits the same file, so tree containment can no longer
+    # prove it and patch identity is the only proof left — which is the half
+    # this case is about.
+    (repo / "audit.md").write_text("audit\nmore\n", encoding="utf-8")
+    _git(repo, "add", "audit.md")
+    _git(repo, "commit", "-q", "-m", "chore: sibling edit")
+    _push(repo)
+    # The precondition the case rests on: the issue number is in NO subject.
+    assert "#1158" not in _git(repo, "log", "--format=%s", "origin/master")
+    proof = RepoLanding(repo).proof(BRANCH, "issue-1158", "issue-1158")
+    assert proof.startswith("landed:patch-identity:"), proof
+
+
+def test_a_body_reference_is_never_an_excuse_on_its_own(repo: Path):
+    """Widening the candidate search must not become a wildcard.
+
+    A commit on the default branch *closes* this artifact's issue, so the issue
+    is a real candidate — and the artifact is still unexplained, because the
+    patch is what proves a landing, never the name.
+    """
+    _git(repo, "checkout", "-q", "-b", "issue-7-only-here")
+    _commit(repo, "feat: work that exists nowhere else", {"orphan.txt": "orphan\n"})
+    _git(repo, "checkout", "-q", "master")
+    (repo / "note.txt").write_text("x\n", encoding="utf-8")
+    _git(repo, "add", "note.txt")
+    _git(repo, "commit", "-q", "-m", "docs: unrelated work (#97)", "-m", "Closes #7")
+    _push(repo)
+    # The candidate exists — and does not excuse the artifact.
+    assert "#7" in _git(repo, "log", "--format=%b", "origin/master")
+    assert RepoLanding(repo).proof(BRANCH, "issue-7-only-here", "issue-7-only-here") == ""
+
+
+def test_a_closer_that_is_not_on_the_body_s_first_line_is_still_found(repo: Path):
+    """A body carries embedded newlines; a line-oriented scan drops the closer.
+
+    Candidate commits are read as RECORDS. Read as lines instead, a `Closes #n`
+    sitting on any later body line is parsed as if it were a commit hash of its
+    own and the candidate is silently lost — which is a false finding of exactly
+    the kind this module exists to remove.
+    """
+    _git(repo, "checkout", "-q", "-b", "issue-1158")
+    _commit(repo, "docs(pmo): the lane's work", {"audit.md": "audit\n"})
+    _git(repo, "checkout", "-q", "master")
+    (repo / "audit.md").write_text("audit\n", encoding="utf-8")
+    _git(repo, "add", "audit.md")
+    _git(
+        repo,
+        "commit",
+        "-q",
+        "-m",
+        "docs(pmo): the lane's work (#1165)",
+        "-m",
+        "Reviewed-by: someone else",
+        "-m",
+        "Closes #1158",
+    )
+    _push(repo)
+    (repo / "audit.md").write_text("audit\nmore\n", encoding="utf-8")
+    _git(repo, "add", "audit.md")
+    _git(repo, "commit", "-q", "-m", "chore: sibling edit")
+    _push(repo)
+    landing = _git(repo, "log", "--format=%H", "-1", "--grep=(#1165)", "origin/master").strip()
+    body = _git(repo, "log", "-1", "--format=%b", landing)
+    # The precondition: the closer is NOT on the body's first line.
+    assert body.splitlines()[0] == "Reviewed-by: someone else"
+    assert "Closes #1158" in body
+    proof = RepoLanding(repo).proof(BRANCH, "issue-1158", "issue-1158")
+    assert proof.startswith("landed:patch-identity:"), proof
