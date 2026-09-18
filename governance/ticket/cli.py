@@ -1,9 +1,12 @@
 """CLI for the ticket projection (issue #401).
 
 ``project`` writes the projection; ``verify`` re-derives it, proves the store is
-rebuildable and fails on any difference. Exit codes follow the fleet tri-state
-contract: ``0`` OK / ``1`` NOT-OK / ``2`` CANNOT-ASSESS (never reported as a
-pass).
+rebuildable and fails on any difference. ``freshness`` states the age this
+consumer tolerates on the committed board snapshot and refuses a snapshot outside
+it (issue #1077) — it is deliberately *not* part of ``build()``, which must stay
+rebuilt byte-identically and therefore never reads the clock. Exit codes follow
+the fleet tri-state contract: ``0`` OK / ``1`` NOT-OK / ``2`` CANNOT-ASSESS
+(never reported as a pass).
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ import sys
 from pathlib import Path
 
 from builder import build, verify
+from freshness import DEFAULT_MAX_AGE_HOURS, assess, parse_iso
 from model import (
     STORE_RELPATH,
     CannotAssess,
@@ -92,6 +96,27 @@ def main(argv: list[str] | None = None) -> int:
         "--out", default=None, help=f"projected store path (default: {STORE_RELPATH})"
     )
 
+    fresh = sub.add_parser(
+        "freshness",
+        help="assert the committed board snapshot's age is inside the tolerance",
+    )
+    fresh.add_argument("--root", default=".", help="repository root (default: .)")
+    fresh.add_argument(
+        "--max-age-hours",
+        type=float,
+        default=None,
+        help=f"the tolerated age in hours (default: {DEFAULT_MAX_AGE_HOURS:g})",
+    )
+    fresh.add_argument(
+        "--now",
+        default=None,
+        help=(
+            "NEGATIVE-CONTROL SEAM: evaluate the age at this instant instead of the "
+            "wall clock, so the gate can provoke the refusal deterministically. The "
+            "gate's assertion on the real snapshot never passes it."
+        ),
+    )
+
     args = parser.parse_args(argv)
 
     try:
@@ -114,6 +139,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
+        if args.command == "freshness":
+            moment = parse_iso(args.now) if args.now else None
+            report = assess(args.root, max_age_hours=args.max_age_hours, now=moment)
+            if not report.ok:
+                return _fail(report.violations)
+            print(f"ticket-freshness: OK — {report.render()}")
+            return 0
+
         result = verify(args.root, store=args.out)
         _note(result.warnings)
         if not result.ok:
@@ -124,7 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     except CannotAssess as exc:
-        print(f"ticket-projection: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        label = "ticket-freshness" if args.command == "freshness" else "ticket-projection"
+        print(f"{label}: CANNOT-ASSESS — {exc}", file=sys.stderr)
         return 2
 
 
