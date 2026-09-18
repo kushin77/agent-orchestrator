@@ -29,7 +29,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 try:  # PyYAML is the platform standard stack; absence is CANNOT-ASSESS, not a crash.
     import yaml

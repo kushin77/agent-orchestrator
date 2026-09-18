@@ -561,7 +561,9 @@ def cmd_pool(args: argparse.Namespace) -> int:
             return EXIT_CANNOT_ASSESS
         snapshot = _load_snapshot(snapshot_path)
         try:
-            focus = focus_mod.load(args.focus)
+            # Load only to VALIDATE the focus file: it raises FocusInvalid on a
+            # malformed declaration, while the epic itself is resolved below.
+            focus_mod.load(args.focus)
         except focus_mod.FocusInvalid as exc:
             print(f"pool: NOT-OK — {exc}", file=sys.stderr)
             return EXIT_NOT_OK
