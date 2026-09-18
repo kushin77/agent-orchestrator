@@ -24,7 +24,17 @@
 # not recognise must be REFUSED by name with a non-zero exit. Before the fix both
 # were accepted silently: pillar/phase were dropped and exit was 0.
 #
-# Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (no policy, no snapshot).
+# And it resolves the labels the filing DEFAULTS derive against the recorded label
+# inventory (issue #1160): deriving a label is not the repository having it, and
+# `gh issue create` refuses a label that does not exist — so the policy's default
+# `area: governance` made every defaulted filing fail in production while this gate
+# stayed green. Section 5 reads governance/conformance/labels.json and refuses a
+# default naming a label the inventory does not record, naming the file, the label
+# and the ONE refresh verb. An inventory that cannot be read is CANNOT-ASSESS
+# (rc 2), never a pass: absence fails closed.
+#
+# Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (no policy, no snapshot,
+# no readable label inventory). CANNOT-ASSESS must never be reported as a pass.
 #
 # Usage: bash scripts/check-conformance.sh
 set -u
@@ -90,6 +100,24 @@ if [ "$rc" -eq 0 ]; then
 elif ! printf '%s' "$refused" | grep -q 'priorty'; then
   echo "check-conformance: FAIL — the refusal does not name the unrecognised field" >&2
   printf '%s\n' "$refused" >&2
+  fail=1
+fi
+
+# 5. The filing defaults RESOLVE (issue #1160): every label the policy's
+#    `filing.defaults` derive must exist on the repository, because `gh issue
+#    create` refuses a label it does not have — so a default naming one breaks the
+#    default filing path while a derivation-only control stays green. The verdict
+#    and the refusal both come from `cli.py labels`, which reads the recorded
+#    inventory; an unreadable inventory is CANNOT-ASSESS (rc 2), never a pass.
+resolved="$(python3 governance/conformance/cli.py labels 2>&1)"
+rc=$?
+if [ "$rc" -eq 2 ]; then
+  echo "check-conformance: CANNOT-ASSESS — ${resolved##*CANNOT-ASSESS — }" >&2
+  exit 2
+fi
+printf '%s\n' "$resolved"
+if [ "$rc" -ne 0 ]; then
+  echo "check-conformance: FAIL — the filing defaults do not resolve (rc=$rc)" >&2
   fail=1
 fi
 
