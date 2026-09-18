@@ -18,7 +18,7 @@
 #      not assume that — it still requires the same rationale marker in `desc`,
 #      so a genuinely-forgotten port is caught the same way an unported
 #      optional flag would be.
-#   2. registry/profiles/seeds/{claude,deepseek}.1.0.0.yaml `capabilitySet` and
+#   2. registry/profiles/seeds/{claude,deepseek}.1.0.1.yaml `capabilitySet` and
 #      `toolAllowlist` lists.
 #   3. registry/personas/cards/{claude,deepseek}.yaml `capabilitySet` and
 #      `toolAllowlist` lists.
@@ -162,8 +162,8 @@ compare_features(
 
 for key in ("capabilitySet", "toolAllowlist"):
     compare_yaml_list(
-        root / "registry/profiles/seeds/claude.1.0.0.yaml",
-        root / "registry/profiles/seeds/deepseek.1.0.0.yaml",
+        root / "registry/profiles/seeds/claude.1.0.1.yaml",
+        root / "registry/profiles/seeds/deepseek.1.0.1.yaml",
         key,
         "profile seeds",
     )
@@ -211,8 +211,8 @@ seed_tree() {
   local dir="$1"
   mkdir -p "$dir/registry/profiles/seeds" "$dir/registry/personas/cards" \
     "$dir/gateway/catalog/modules/claude-anthropic" "$dir/gateway/catalog/modules/deepseek"
-  cp "$root/registry/profiles/seeds/claude.1.0.0.yaml" "$dir/registry/profiles/seeds/claude.1.0.0.yaml"
-  cp "$root/registry/profiles/seeds/deepseek.1.0.0.yaml" "$dir/registry/profiles/seeds/deepseek.1.0.0.yaml"
+  cp "$root/registry/profiles/seeds/claude.1.0.1.yaml" "$dir/registry/profiles/seeds/claude.1.0.1.yaml"
+  cp "$root/registry/profiles/seeds/deepseek.1.0.1.yaml" "$dir/registry/profiles/seeds/deepseek.1.0.1.yaml"
   cp "$root/registry/personas/cards/claude.yaml" "$dir/registry/personas/cards/claude.yaml"
   cp "$root/registry/personas/cards/deepseek.yaml" "$dir/registry/personas/cards/deepseek.yaml"
   cp "$root/gateway/catalog/modules/claude-anthropic/module.json" "$dir/gateway/catalog/modules/claude-anthropic/module.json"
@@ -236,7 +236,7 @@ fi
 # Mutation A — an unmarked capability injected into the claude seed.
 work_a="$scratch_root/a-unmarked-capability"
 seed_tree "$work_a"
-python3 - "$work_a/registry/profiles/seeds/claude.1.0.0.yaml" <<'PY'
+python3 - "$work_a/registry/profiles/seeds/claude.1.0.1.yaml" <<'PY'
 import sys
 from pathlib import Path
 p = Path(sys.argv[1])
@@ -289,7 +289,7 @@ fi
 # block and hide the item that follows.
 work_c="$scratch_root/c-comment-then-unmarked"
 seed_tree "$work_c"
-python3 - "$work_c/registry/profiles/seeds/deepseek.1.0.0.yaml" <<'PY'
+python3 - "$work_c/registry/profiles/seeds/deepseek.1.0.1.yaml" <<'PY'
 import sys
 from pathlib import Path
 p = Path(sys.argv[1])

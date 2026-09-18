@@ -72,7 +72,6 @@ suite	gateway/catalog	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	gateway/limits	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	gateway/mcp	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	gateway/proxy	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	registry/profiles	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	registry/prompts	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	registry/personas	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
 suite	registry/events	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
