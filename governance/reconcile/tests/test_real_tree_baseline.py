@@ -25,6 +25,7 @@ from governance.reconcile.real_tree_baseline import (  # noqa: E402
     check_real_tree,
     load_baseline,
     load_quarantine,
+    repository_venue,
 )
 from governance.reconcile.sweep import RepoOps  # noqa: E402
 
@@ -481,25 +482,33 @@ def _write_quarantine(
     state: str = "open",
     measured_at: float | None = None,
     max_age_hours: float = 24,
+    venue_of: Path | None = None,
+    venue: str | None = None,
 ) -> None:
+    """A fixture document. It declares a venue by default (#1321).
+
+    ``venue_of`` names a repository whose instance the exemptions were measured
+    in; a caller that wants a document measured *elsewhere* passes ``venue``
+    explicitly. An exemption without a venue cannot be interpreted at all, so
+    the default is the scratch repo rather than nothing.
+    """
     moment = time.time() if measured_at is None else measured_at
-    path.write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "note": "test",
-                "tracked_by": tracked_by,
-                "tracking": {
-                    "state": state,
-                    "measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(moment)),
-                    "measured_by": "the test suite",
-                    "max_age_hours": max_age_hours,
-                },
-                "quarantine": entries,
-            }
-        ),
-        encoding="utf-8",
-    )
+    payload = {
+        "version": 1,
+        "note": "test",
+        "tracked_by": tracked_by,
+        "tracking": {
+            "state": state,
+            "measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(moment)),
+            "measured_by": "the test suite",
+            "max_age_hours": max_age_hours,
+        },
+        "quarantine": entries,
+    }
+    resolved_venue = venue if venue is not None else repository_venue(venue_of)
+    if resolved_venue:
+        payload["venue"] = {"git_common_dir": resolved_venue, "measured_on": "the test suite"}
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _ancient_branch(repo: Path, name: str) -> str:
@@ -520,6 +529,7 @@ def test_a_named_entry_at_the_recorded_tip_is_honoured(scratch_repo: Path, tmp_p
     _write_quarantine(
         document,
         [{"kind": "branch", "name": "issue-rule17-work", "tip": tip, "reason": "rule 17: work exists nowhere else"}],
+        venue_of=scratch_repo,
     )
     verdict = check_real_tree(
         scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
@@ -538,6 +548,7 @@ def test_an_entry_that_matches_nothing_fails_as_a_stale_exemption(scratch_repo: 
     _write_quarantine(
         document,
         [{"kind": "branch", "name": "issue-long-gone", "tip": "0" * 40, "reason": "nothing is there"}],
+        venue_of=scratch_repo,
     )
     verdict = check_real_tree(
         scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
@@ -556,6 +567,7 @@ def test_an_artifact_whose_tip_has_moved_is_not_absorbed(scratch_repo: Path, tmp
     _write_quarantine(
         document,
         [{"kind": "branch", "name": "issue-moved", "tip": "f" * 40, "reason": "recorded at some other tip"}],
+        venue_of=scratch_repo,
     )
     verdict = check_real_tree(
         scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
@@ -583,6 +595,7 @@ def test_a_lease_that_does_not_hold_honours_nothing(scratch_repo: Path, tmp_path
     _write_quarantine(
         document,
         [{"kind": "branch", "name": "issue-loan", "tip": tip, "reason": "would be honoured"}],
+        venue_of=scratch_repo,
         **lease,
     )
     verdict = check_real_tree(
@@ -610,7 +623,9 @@ def test_an_entry_without_a_tip_is_refused_outright(scratch_repo: Path, tmp_path
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline, [])
     document = tmp_path / "quarantine.json"
-    _write_quarantine(document, [{"kind": "branch", "name": "issue-unpinned", "reason": "no tip"}])
+    _write_quarantine(
+        document, [{"kind": "branch", "name": "issue-unpinned", "reason": "no tip"}], venue_of=scratch_repo
+    )
     verdict = check_real_tree(scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo))
     assert not verdict.assessable
     assert "tip" in verdict.reason
@@ -641,10 +656,22 @@ def test_the_real_quarantine_document_is_well_formed_and_every_entry_is_pinned()
     """
     document = REPO_ROOT / "governance" / "reconcile" / "real-tree-quarantine.json"
     assert document.exists(), "the named quarantine must exist for the gate to be honest about it"
-    lease, entries = load_quarantine(document)
+    lease, entries, venue = load_quarantine(document)
     assert lease.tracked_by.startswith("#")
     assert lease.state in {"open", "closed"}
     assert lease.max_age_hours > 0
+    # The venue is what makes an entry interpretable at all (#1321): "the
+    # artifact is gone" (a resolution, at its own venue) and "the artifact was
+    # never here" (inert, at any other) are different facts, so a document that
+    # does not declare one cannot be read. The *check* is the thing that
+    # compares it against the instance it runs in — being a pristine clone is a
+    # legitimate reason for this document not to be in force, not a defect, so
+    # the invariant asserted HERE is that the declaration exists and is a
+    # path-shaped identity, never that it equals this checkout's.
+    assert venue.git_common_dir.startswith("/"), "the venue must be an absolute path"
+    assert venue.git_common_dir.rstrip("/").endswith(".git"), (
+        "the venue is the repository instance (git_common_dir), not a display name"
+    )
     # An empty list is a legitimate state: every previously-named exemption has
     # been resolved (landed, pushed or reclaimed) and the document shrank to
     # nothing, exactly as designed (#1291) — it is not required to always hold
@@ -655,3 +682,132 @@ def test_the_real_quarantine_document_is_well_formed_and_every_entry_is_pinned()
         assert entry.kind in {"branch", "worktree"}
         assert entry.tip and len(entry.tip) == 40
         assert len(entry.reason.strip()) > 40, f"the reason must say something: {entry.name}"
+
+
+# --- the venue of an exemption (#1321) ---------------------------------------
+#
+# #1300 quarantined 23 artifacts by name; #1317 emptied the document because on
+# any checkout but one box those entries "match nothing" and therefore FAIL as
+# stale exemptions — measured `0 new-and-old, 538 stale; 23 stale quarantine
+# exemption(s)` on a pristine clone. Both readings were right about their own
+# checkout and wrong about the other: an entry names a disk artifact of ONE
+# repository instance. So the document declares the instance it was measured in,
+# and a check running anywhere else must (a) honour nothing from it (fail-closed:
+# the artifact stays a finding) and (b) not fail on it (its staleness is a claim
+# about a disk this checkout cannot observe) — while the instance it does speak
+# for keeps every tooth: the tests above, which declare `venue_of=scratch_repo`.
+
+
+def test_an_exemption_measured_elsewhere_is_inert_here(scratch_repo: Path, tmp_path: Path):
+    """The #1317 case, both halves, differing ONLY in the declared venue.
+
+    Same artifact, same entry, same tip: at another venue it honours nothing and
+    is not fatal; at its own venue it is honoured and reported. Without the
+    second half this would be satisfied by a document that never honours
+    anything anywhere.
+    """
+    tip = _ancient_branch(scratch_repo, "issue-box-local")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    entry = {"kind": "branch", "name": "issue-box-local", "tip": tip, "reason": "rule 17: box-local"}
+
+    elsewhere = tmp_path / "quarantine-elsewhere.json"
+    _write_quarantine(elsewhere, [entry], venue="/somewhere/else/.git")
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=elsewhere, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert verdict.assessable
+    assert verdict.quarantined == (), "no exemption may be honoured outside its own venue"
+    assert [e.name for e in verdict.inapplicable_quarantine] == ["issue-box-local"]
+    assert verdict.stale_quarantine == (), (
+        "an entry that is merely inert here must not fail here — that is exactly the red"
+        " #1317 measured on a pristine clone"
+    )
+    assert "issue-box-local" in {e.name for e in verdict.new_violations}, (
+        "the artifact must stay a finding: a document that speaks for another venue cannot"
+        " excuse it, so inert is fail-closed, never a pass"
+    )
+    assert "NOT IN FORCE" in verdict.describe()
+    assert "issue-box-local" in verdict.describe(), "an inert exemption is still reported by name"
+
+    own_venue = tmp_path / "quarantine-own.json"
+    _write_quarantine(own_venue, [entry], venue_of=scratch_repo)
+    same = check_real_tree(
+        scratch_repo, baseline, quarantine_path=own_venue, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert same.ok, same.describe()
+    assert [e.name for e in same.quarantined] == ["issue-box-local"]
+    assert same.inapplicable_quarantine == ()
+
+
+def test_entries_without_a_declared_venue_are_cannot_assess(scratch_repo: Path, tmp_path: Path):
+    """Without a venue there is no way to tell "gone" from "never here": rc 2, never a pass."""
+    tip = _ancient_branch(scratch_repo, "issue-no-venue")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [{"kind": "branch", "name": "issue-no-venue", "tip": tip, "reason": "no venue declared"}],
+        venue="",
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert not verdict.assessable
+    assert not verdict.ok
+    assert "venue" in verdict.reason
+    assert "CANNOT-ASSESS" in verdict.describe()
+
+
+def test_an_empty_document_is_inert_and_its_lease_is_not_evaluated(
+    scratch_repo: Path, tmp_path: Path
+):
+    """A lease bounding no entry cannot turn anything green, so it is not a violation.
+
+    GR-12: a check whose pass and fail paths collapse into the same verdict — a
+    lapsed lease over an empty exemption list — is a formality, not a check.
+    This does not open a green either: an artifact the document does not name
+    (any of them, once the list is empty) fails by name as unbaselined-and-old.
+    """
+    _ancient_branch(scratch_repo, "issue-not-named-anywhere")
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, [])
+    document = tmp_path / "quarantine.json"
+    _write_quarantine(
+        document,
+        [],
+        state="closed",
+        measured_at=time.time() - 30 * 3600,
+        venue="",
+    )
+    verdict = check_real_tree(
+        scratch_repo, baseline, quarantine_path=document, ops=RepoOps(scratch_repo), grace_hours=24
+    )
+    assert verdict.assessable
+    assert verdict.stale_quarantine == ()
+    assert verdict.quarantined == ()
+    assert "empty" in verdict.describe()
+    assert "issue-not-named-anywhere" in {e.name for e in verdict.new_violations}
+
+
+def test_the_venue_identity_is_shared_by_every_worktree_of_one_instance(
+    scratch_repo: Path, tmp_path: Path
+):
+    """Why `git_common_dir`, and not the worktree path: lanes must answer like their checkout.
+
+    A lane worktree is the normal place this gate runs, and the shared checkout
+    is where the artifacts live — one identity for both is what makes a
+    box-scoped document usable from a lane at all. A different repository
+    instance (any clone, any other init) must answer differently, which is the
+    whole property the venue rule rests on.
+    """
+    lane = tmp_path / "lane-wt"
+    _git(scratch_repo, "worktree", "add", "-q", "-b", "issue-lane", str(lane))
+    assert repository_venue(lane) == repository_venue(scratch_repo)
+
+    other = tmp_path / "another-instance"
+    other.mkdir()
+    _git(other, "init", "-q", "-b", "master")
+    assert repository_venue(other) != repository_venue(scratch_repo)
+    assert repository_venue(other).startswith("/")

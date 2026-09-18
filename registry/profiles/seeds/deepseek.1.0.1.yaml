@@ -1,4 +1,4 @@
-# AgentProfile seed: deepseek (reasoning + data-analysis worker) v1.0.0
+# AgentProfile seed: deepseek (reasoning + data-analysis worker) v1.0.1
 #
 # PROVENANCE (see seeds/PROVENANCE.md for the full table):
 #   - kushin77/leaderboard lib/fleet-roster.sh + scripts/elite/finops-router.sh
@@ -8,7 +8,7 @@
 #     (ds-worker-* pool: analytics + debugging)
 #   - registry/profiles/catalog.yaml (closed vocabulary; id/tier/memory semantics)
 id: deepseek
-version: 1.0.0
+version: 1.0.1
 owner: platform/purebliss
 systemPromptRef: deepseek/primary@v1
 toolAllowlist:
@@ -16,7 +16,7 @@ toolAllowlist:
   - file_write
   - shell_exec
   - web_fetch
-  - sql_query
+  - sql_query  # role-only: analytics worker SQL access, not applicable to the orchestrator
   - search_memory
   - store_memory
 constraintSet:
@@ -27,8 +27,8 @@ constraintSet:
 capabilitySet:
   - code-author
   - research
-  - data-analysis
-  - memory-ops
+  - data-analysis  # role-only: analytics worker, not applicable to the orchestrator
+  - memory-ops  # role-only: analytics worker memory operations, not applicable to the orchestrator
 defaultModelTier: MED
 memoryScope:
   - user
