@@ -17,19 +17,24 @@ options:
 # issue #1350: the now-required check `ao/gate-of-record` (#1342) needs a
 # producer. This step posts the gate's own rc with `scripts/gate-status.sh`,
 # authenticated by a fine-grained PAT (`statuses:write` only) held in Secret
-# Manager -- Cloud Build has no `gh` login, so the token arrives as GH_TOKEN
-# (scripts/gate-status.sh falls back to a raw authenticated `curl`).
+# Manager -- Cloud Build has no `gh` login, so the token is READ INSIDE THE STEP
+# and handed to the poster as GH_TOKEN (scripts/gate-status.sh falls back to a
+# raw authenticated `curl` when `gh` is absent).
 #
-# ORDER IS PART OF THE CONTROL: `availableSecrets` is resolved BEFORE any step
-# runs, so the secret must exist before this trigger is enabled. That is the
-# honest failure mode -- a build that cannot produce the check fails loudly by
-# name instead of going green while branch protection blocks every merge on a
-# status nothing wrote (the #724 defect class). The step's own GH_TOKEN guard
-# below is the second line of that same refusal.
-availableSecrets:
-  secretManager:
-    - versionName: projects/$PROJECT_ID/secrets/ao-gate-status-token/versions/latest
-      env: GH_TOKEN
+# THE POST IS BEST-EFFORT; THE GATE IS NOT. Cloud Build resolves
+# `availableSecrets` BEFORE any step runs, so declaring the PAT there made an
+# absent secret hard-fail the entire build at step 0: the gate never ran, and
+# the red build said nothing about the code under review (measured: build
+# 27b692b8-0da5-483b-89d9-8f4e348dd806, `Secret [ao-gate-status-token] not found
+# or has no versions`). Issue #1350 settles which of the two a build must
+# sacrifice: the gate always runs and always reports its own rc, and a missing
+# token is logged and skipped WITHOUT failing the step. The trade is named, not
+# hidden -- while the secret is absent this build produces no
+# `ao/gate-of-record` status, so the required check has no *automatic* producer
+# and merges ride the documented operator override (see README.md, "The verify
+# runner posts `ao/gate-of-record`", and docs/RELEASE-PLAN.md section 5).
+# Nothing is fetched through `availableSecrets`, so no secret is required for
+# this build to run.
 
 steps:
   # Toolchain attestation + the gate itself, in one step: Cloud Build steps
@@ -47,7 +52,6 @@ steps:
   - id: verify
     name: 'python:3.14'
     entrypoint: 'bash'
-    secretEnv: ['GH_TOKEN']
     args:
       - '-lc'
       - |
@@ -71,27 +75,44 @@ steps:
         rc=0
         bash scripts/verify.sh verify || rc=$?
 
+        # Best-effort token (issue #1350): read the statuses:write PAT from
+        # Secret Manager HERE, never through `availableSecrets` -- that block is
+        # resolved before step 0, so a missing secret would end the build before
+        # the gate above ever ran. Both ways this can come up empty (the secret
+        # does not exist yet, or this image has no `gcloud`) are EMPTY, never
+        # fatal: `|| true` under `set -e` is what makes the fetch non-fatal, and
+        # `command -v` keeps an absent CLI from printing a bare "not found".
+        GH_TOKEN=""
+        if command -v gcloud >/dev/null 2>&1; then
+          GH_TOKEN="$(gcloud secrets versions access latest --secret=ao-gate-status-token --project="$PROJECT_ID" 2>/dev/null || true)"
+        fi
+        export GH_TOKEN
+
         # $COMMIT_SHA is the PR head on a pull_request-triggered build (Cloud
         # Build's documented substitution), so this status lands on the commit
         # branch protection evaluates.
         if [ -z "${COMMIT_SHA:-}" ]; then
-          echo "gate-status: CANNOT-ASSESS — COMMIT_SHA is empty, so no commit status can be"
-          echo "  attached to the commit under review (not a pass, and not a verdict on the gate)"
-          exit 2
+          echo "gate-status: SKIPPED -- COMMIT_SHA is empty, so no commit status can be attached"
+          echo "  to the commit under review; the gate verdict is NOT posted (see issue #1350)"
+          exit "$rc"
         fi
 
-        # A required check nothing produces is worse than no check: every merge
-        # is blocked and the block looks like a red gate. So a build that cannot
-        # publish the status is CANNOT-ASSESS (2) BY NAME, never a silent skip
-        # and never a fabricated success.
-        if [ -z "${GH_TOKEN:-}" ]; then
-          echo "gate-status: CANNOT-ASSESS — no GH_TOKEN in the build environment, so the required"
-          echo "  check cannot be produced for $COMMIT_SHA. Create the ao-gate-status-token secret"
-          echo "  and grant the build SA access BEFORE enabling this trigger (see README.md)."
-          exit 2
+        # No token: skip posting BY NAME and hand back the GATE's own rc. A
+        # build that cannot publish the check is not a verdict on the code under
+        # review, so the absent secret must not become the step's outcome.
+        if [ -z "$GH_TOKEN" ]; then
+          echo "gate-status: SKIPPED -- no ao-gate-status-token secret; the gate verdict is NOT posted (see issue #1350)"
+          echo "  create the secret and grant the build SA read access to give this build a producer (see README.md)."
+          exit "$rc"
         fi
+
+        # scripts/gate-status.sh owns the tri-state mapping (0 OK / 1 NOT-OK / 2
+        # CANNOT-ASSESS -> success / failure / error) -- rc 2 is never posted as
+        # success. A POST that fails once the token WAS available produced no
+        # check at all, so it is CANNOT-ASSESS (2) by name rather than a silent
+        # skip.
         if ! bash scripts/gate-status.sh post --sha "$COMMIT_SHA" --rc "$rc"; then
-          echo "gate-status: CANNOT-ASSESS — the gate ran (rc $rc) but its status was not published"
+          echo "gate-status: CANNOT-ASSESS -- the gate ran (rc $rc) but its status was not published"
           echo "  for $COMMIT_SHA; the build is not reported as a gated run."
           exit 2
         fi

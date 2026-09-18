@@ -75,19 +75,36 @@ the commit branch protection actually evaluates.
 
 `scripts/gate-status.sh` owns the tri-state mapping (0 OK / 1 NOT-OK /
 2 CANNOT-ASSESS → success / failure / error; CANNOT-ASSESS is never posted as
-success). Cloud Build has no `gh` login, so the token arrives as `GH_TOKEN`
-from Secret Manager as `secretEnv`, and the poster falls back from `gh` to a
-raw authenticated `curl` call when `gh` is absent.
+success). Cloud Build has no `gh` login, so the `verify` step reads the PAT from
+Secret Manager (`gcloud secrets versions access`) and exports it as `GH_TOKEN`
+for the poster, which falls back from `gh` to a raw authenticated `curl` call
+when `gh` is absent.
 
-### A build that cannot publish the status is CANNOT-ASSESS, not a skip
+### A missing token skips the POST — the gate still runs and still reports its rc
 
-`availableSecrets` is resolved **before any step runs**, so the secret must
-exist before this trigger is enabled. A missing token does not degrade to
-"posted nothing and went green": the step refuses by name and exits `2`
-(CANNOT-ASSESS), which is the honest report of a run whose required check was
-never produced. The alternative — a green build with an unproduced required
-check — is strictly worse than no check at all, because it looks exactly like a
-red gate and blocks every merge.
+The build must not spend the gate's verdict to publish it. Cloud Build resolves
+`availableSecrets` **before any step runs**, so declaring the PAT there made an
+absent secret fail the whole build at step 0: `make verify` never ran, and the
+red build said nothing about the code under review (measured: build
+`27b692b8-0da5-483b-89d9-8f4e348dd806`, `Secret [ao-gate-status-token] not found
+or has no versions`). Issue #1350 settles the order: the gate always runs and
+always reports its own rc, and a token that cannot be read is logged and skipped
+—
+
+```
+gate-status: SKIPPED -- no ao-gate-status-token secret; the gate verdict is NOT posted (see issue #1350)
+```
+
+— without failing the step. The step exits with the **gate's** rc, so a skipped
+POST is never mistaken for a verdict on the code, and a red gate still fails the
+build (a POST can never turn one green). The one path that stays CANNOT-ASSESS
+is the opposite case: a token that *was* available and a POST that then failed
+produced no check where one was possible, so that exits `2` by name.
+
+The trade is named rather than hidden: **while the secret is absent, this build
+produces no `ao/gate-of-record` status**, so the required check has no
+*automatic* producer and merges ride the operator override — the gap recorded in
+`docs/RELEASE-PLAN.md` §4/§5.
 
 ### Ordering: what has to exist before the check can be relied on
 
@@ -136,9 +153,11 @@ gcloud secrets add-iam-policy-binding ao-gate-status-token \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-Do (1) **before** enabling the trigger: with `availableSecrets` declared, a
-build started while the secret is absent fails before its steps run, naming the
-missing secret — a loud refusal, not a silent hole.
+Do (1) **before** relying on the check: without the secret the `verify` build
+still runs the gate and still reports its own rc, but it posts nothing (the
+`SKIPPED` line above), so the required status has to come from somewhere else —
+a lane invoking the poster locally, or the operator override. With the secret in
+place the build supplies the status itself.
 
 
 ## Web surface (issue #258)

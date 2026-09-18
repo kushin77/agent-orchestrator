@@ -89,10 +89,14 @@ based on (§1) — to record that #1072 and #1073 landed in between.
   `required_status_checks.contexts = [ao/gate-of-record]` live, every open PR
   `BLOCKED`. But the requirement is evaluated per head, so a merge needs a
   status on the commit under review, and the only producers are the `verify`
-  trigger (ships `disabled: true`) and a lane invoking
-  `scripts/gate-status.sh post` (#1350/#1354). Until the trigger is promoted,
-  merges pass on the operator override (`enforce_admins: false`) — which is
-  exactly how a required check degrades into a routinely-bypassed one.
+  build and a lane invoking `scripts/gate-status.sh post` (#1350/#1354). The
+  build config no longer *requires* the token to run (it would otherwise die
+  before step 0 on an absent secret, reporting nothing about the code), so what
+  it publishes now depends on `ao-gate-status-token` existing in Secret Manager:
+  with the secret it posts the gate's own rc, without it the step logs `SKIPPED`
+  and produces nothing (#1350). Until the secret exists, merges pass on the
+  operator override (`enforce_admins: false`) — which is exactly how a required
+  check degrades into a routinely-bypassed one.
 - **A fail-closed producer can wedge the queue.** With the context required, a
   producer that stops publishing (expired token, disabled trigger) makes every
   PR unmergeable rather than merely ungated. The escape is the declared policy
