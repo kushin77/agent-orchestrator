@@ -544,10 +544,20 @@ merged_tree_evidence_by_ref() { # <pr-number> <head-oid> <base-ref>
     echo "pr-queue: REFUSED — merged-tree-unverified:$number — no head OID to judge" >&2
     return 1
   fi
+  # A plain `git fetch origin <branch>` only updates FETCH_HEAD — it does
+  # NOT create/update the refs/remotes/origin/<branch> tracking ref unless
+  # the repo's remote already carries that fetch refspec. Cloud Build's
+  # checkout (detached HEAD, ad hoc `git fetch origin master` with no
+  # standing refspec) hits exactly that: `git rev-parse origin/master`
+  # then fails outright, so the merge-base check below never runs and
+  # every merge gets refused as merged-tree-unverified. Fetch with an
+  # explicit refspec so the tracking ref is always updated, regardless of
+  # what refspecs the remote happens to have configured.
   case "$base_ref" in
-    origin/*) git fetch --quiet origin "${base_ref#origin/}" >/dev/null 2>&1 || true ;;
-    *) git fetch --quiet origin "$base_ref" >/dev/null 2>&1 || true; base_ref="origin/$base_ref" ;;
+    origin/*) branch="${base_ref#origin/}" ;;
+    *) branch="$base_ref"; base_ref="origin/$base_ref" ;;
   esac
+  git fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch" >/dev/null 2>&1 || true
   tip="$(git rev-parse "$base_ref" 2>/dev/null)"
   if [ -z "$tip" ]; then
     echo "pr-queue: REFUSED — merged-tree-unverified:$number — could not read the current tip of $base_ref" >&2

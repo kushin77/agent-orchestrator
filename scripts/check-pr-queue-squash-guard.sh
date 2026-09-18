@@ -60,6 +60,14 @@ MT_SCRATCH="$(mktemp -d "$root/.ao1254-mt-guard.XXXXXX")" || {
 # merge-base check trivially passes (issue #1254 step 6 made that check
 # unconditional for every PR the apply loop merges, not just this file's
 # original squash-message scope).
+#
+# A CI checkout that only ran `git fetch origin master` (no standing fetch
+# refspec, e.g. Cloud Build's detached-HEAD checkout) never creates/updates
+# refs/remotes/origin/master, so a bare `rev-parse origin/master` can fail
+# there even though it succeeds on a dev box clone. Refresh the ref
+# ourselves with an explicit refspec before resolving it, so this gate's
+# own fixture setup does not depend on the checkout having already done so.
+git -C "$root" fetch --quiet origin "+refs/heads/master:refs/remotes/origin/master" >/dev/null 2>&1 || true
 RUN_CASE_TIP="$(git -C "$root" rev-parse origin/master 2>/dev/null)"
 fixture='[
   {"number":10,"title":"ready one","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","files":[{"path":"README.md"}],"body":"## Pre-existing red\n\nNone — no failing gate is claimed to be pre-existing.\n","headRefOid":"'"$RUN_CASE_TIP"'"}
@@ -163,6 +171,7 @@ echo ""
 # =============================================================================
 echo "== check-pr-queue-squash-guard: merged-tree evidence (issue #1254) =="
 
+git fetch --quiet origin "+refs/heads/master:refs/remotes/origin/master" >/dev/null 2>&1 || true
 MASTER_TIP="$(git rev-parse origin/master 2>/dev/null)"
 MASTER_ANCESTOR="$(git rev-parse origin/master~3 2>/dev/null)"
 
