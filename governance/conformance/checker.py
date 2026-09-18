@@ -17,7 +17,18 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 from model import (
     CODE_CLASS_AMBIGUOUS,
@@ -40,6 +51,28 @@ SNAPSHOT_RELPATH = Path(".board") / "snapshot.json"
 POLICY_RELPATH = Path("governance") / "conformance" / "policy.yaml"
 REPORT_RELPATH = Path(".verify") / "conformance-report.json"
 SUITES_RELPATH = Path("scripts") / "pytest-suites.txt"
+
+# -- the recorded label vocabulary (issue #1160) ------------------------------
+# Deriving a declaring label is not the same as the repository HAVING it. `gh
+# issue create` refuses a label that does not exist — so a `filing.defaults` entry
+# naming one makes the *defaulted* filing path fail in production, which no
+# derivation-only control can see: the seam hands `gh` a label set it cannot check
+# and the refusal happens after the plan was built. The gate therefore resolves
+# every label the policy's filing defaults derive against a committed inventory
+# recorded from the live label set — the same committed-offline-artifact pattern
+# `.board/snapshot.json` uses for the board, with one documented refresh verb.
+LABELS_RELPATH = Path("governance") / "conformance" / "labels.json"
+
+# The ONE refresh verb, named in every refusal: an inventory verified offline can
+# never refresh itself, and a gate that fails closed without naming the way to
+# open it is a dead end rather than an instruction.
+LABELS_REFRESH_VERB = "python3 governance/conformance/cli.py labels --refresh"
+
+# The finding code for a default that names a label the repository does not have.
+# The other filing-path codes live in `model.py`; this one describes the
+# resolution half of the same seam and is declared here, beside the inventory it
+# is graded against.
+CODE_FILING_LABEL_UNRESOLVED = "filing-label-unresolved"
 
 # Paths that must never receive a new file without the IaC mandate satisfied.
 INFRA_PREFIXES = ("infra/",)
@@ -143,6 +176,177 @@ def load_snapshot(path: Path) -> List[Mapping[str, Any]]:
         return []
     issues = raw.get("issues") if isinstance(raw, Mapping) else None
     return list(issues) if isinstance(issues, list) else []
+
+
+# -- the recorded label vocabulary (issue #1160) ------------------------------
+
+
+class LabelsUnavailable(Exception):
+    """The recorded label inventory cannot be read.
+
+    ABSENCE FAILS CLOSED (issue #1160). The inventory is the authority a
+    resolvability claim is graded against, so a missing, unparseable or empty file
+    is CANNOT-ASSESS — never a pass, and never an empty vocabulary that would
+    resolve every label by accident.
+    """
+
+
+def load_label_inventory(path: Path) -> FrozenSet[str]:
+    """The repository's recorded label vocabulary, or :class:`LabelsUnavailable`.
+
+    An empty `labels` list is unreadable for the same reason a missing file is:
+    neither can support the claim that a derived label exists on the repository.
+    """
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise LabelsUnavailable(
+            "cannot read the label inventory %s: %s — record it with `%s`"
+            % (path, exc, LABELS_REFRESH_VERB)
+        ) from exc
+    except ValueError as exc:
+        raise LabelsUnavailable(
+            "the label inventory %s is not valid JSON: %s — re-record it with `%s`"
+            % (path, exc, LABELS_REFRESH_VERB)
+        ) from exc
+
+    names = raw.get("labels") if isinstance(raw, Mapping) else None
+    if not isinstance(names, list) or not names:
+        raise LabelsUnavailable(
+            "the label inventory %s records no `labels` list — a vocabulary that "
+            "records nothing cannot support a resolvability claim; record it with "
+            "`%s`" % (path, LABELS_REFRESH_VERB)
+        )
+    return frozenset(str(name).strip() for name in names if str(name).strip())
+
+
+def default_filing_labels(policy: Policy) -> Tuple[str, ...]:
+    """The labels a filing that declares nothing would carry.
+
+    The policy's own claim, measured through the seam's own plan rather than
+    re-deriving the label set here: a second implementation of the derivation is a
+    second thing that can drift from the first, and then the gate would be
+    grading the wrong artifact.
+    """
+    from filing import FilingRequest, plan_filing  # noqa: PLC0415 - flat sibling
+
+    return tuple(plan_filing(FilingRequest(title="t", body="b"), policy).labels)
+
+
+def unresolvable_labels(labels: Sequence[str], inventory: Iterable[str]) -> Tuple[str, ...]:
+    """The labels of ``labels`` the recorded inventory does not carry, in order."""
+    known = set(inventory)
+    return tuple(dict.fromkeys(label for label in labels if label and label not in known))
+
+
+def audit_filing_labels(
+    policy: Policy,
+    inventory: Iterable[str],
+    *,
+    policy_path: Path = POLICY_RELPATH,
+    inventory_path: Path = LABELS_RELPATH,
+) -> Tuple[Finding, ...]:
+    """Every label a *defaulted* filing derives must exist on the repository (#1160).
+
+    A `filing.defaults` entry naming a label `gh` does not have is not a cosmetic
+    metadata gap: the default path is the one an auto-filed micro-task takes, and
+    `gh issue create` refuses the whole create with
+    ``could not add label: '<label>' not found``. The refusal names the file the
+    default lives in, the label, and the one refresh verb — so the operator who
+    sees it does not have to find out how to record a new label first.
+    """
+    findings: List[Finding] = []
+    for label in unresolvable_labels(default_filing_labels(policy), inventory):
+        findings.append(
+            Finding(
+                code=CODE_FILING_LABEL_UNRESOLVED,
+                message="the filing defaults in %s derive the label '%s', which %s "
+                "does not record on this repository; `gh issue create --label %s` "
+                "is refused with `could not add label: '%s' not found`, so every "
+                "filing that leaves this label to the default fails"
+                % (policy_path, label, inventory_path, label, label),
+                subject=str(policy_path),
+                remediation="point `filing.defaults` at a label the repository has "
+                "(or mint the declared one), then re-record the inventory with `%s`"
+                % LABELS_REFRESH_VERB,
+            )
+        )
+    return tuple(findings)
+
+
+LABELS_SOURCE = "kushin77/agent-orchestrator"
+LABELS_RECORD_ARGV = (
+    "gh",
+    "label",
+    "list",
+    "--repo",
+    LABELS_SOURCE,
+    "--limit",
+    "400",
+    "--json",
+    "name",
+)
+LABELS_SCHEMA = "cmr.conformance/labels-v1"
+
+
+def record_label_inventory(
+    path: Path,
+    *,
+    repo: str = LABELS_SOURCE,
+    runner: Optional[Callable[..., "subprocess.CompletedProcess"]] = None,
+) -> Tuple[bool, str]:
+    """Perform the ONE inventory refresh; return ``(recorded, detail)``.
+
+    The counterpart of ``governance/dispatch/snapshot.py``'s ``refresh``: one path
+    touches the network, one place the command is composed, and a refused network or
+    a failing ``gh`` is reported as ``(False, reason)`` — a first-class outcome,
+    never a crash. `--jq` is deliberately not used here: the recording must not
+    depend on a query language being installed, so the `name` field is projected in
+    Python from the JSON `gh` returns.
+    """
+    import subprocess  # noqa: PLC0415 - only the refresh path needs it
+
+    argv = [token if token != LABELS_SOURCE else repo for token in LABELS_RECORD_ARGV]
+    run = runner or subprocess.run
+    try:
+        result = run(argv, capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, "cannot run `%s`: %s" % (" ".join(argv), exc)
+    if result.returncode != 0:
+        return False, "`%s` failed: %s" % (
+            " ".join(argv),
+            (result.stderr or "").strip()[-200:],
+        )
+    try:
+        raw = json.loads(result.stdout or "[]")
+    except ValueError as exc:
+        return False, "`%s` returned no JSON: %s" % (" ".join(argv), exc)
+    names = sorted(
+        {
+            str(entry.get("name", "")).strip()
+            for entry in raw
+            if isinstance(entry, Mapping) and str(entry.get("name", "")).strip()
+        }
+    )
+    if not names:
+        return False, "`%s` returned no labels; recording an empty vocabulary" % (
+            " ".join(argv),
+        )
+    payload = {
+        "schema": LABELS_SCHEMA,
+        "generated_at": now_iso(),
+        "source": repo,
+        "recorded_with": " ".join(argv),
+        "refresh": LABELS_REFRESH_VERB,
+        "labels": names,
+    }
+    target = Path(path)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    except OSError as exc:
+        return False, "cannot write the label inventory %s: %s" % (target, exc)
+    return True, "recorded %d label(s) from %s" % (len(names), repo)
 
 
 def classify(issue: Mapping[str, Any]) -> Classified:
