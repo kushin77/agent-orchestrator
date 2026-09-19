@@ -1565,13 +1565,17 @@ json.dump(
 )
 PY
 
+  # NOTE the containment form: bash-native `[[ … == *"needle"* ]]`, never a pipe
+  # into `grep -q`. `check-verdict-contains` counts the pipe idiom per file and its
+  # record is shrink-only, so a new `printf | grep -q` here REFUSES the whole gate
+  # (measured: nine of them took this file 15 -> 24 against a recorded 15).
   # 12. a MEASURED finding the record names is booked as recorded legacy and the
   #     repository verdict is OK — with the residue named, never hidden.
   baseline_file="$recorded_baseline"
   out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
   if [ $? -eq 0 ] \
-     && printf '%s' "$out" | grep -qF "recorded legacy  commit-missing-ticket-trailer:${c_sha:0:12}" \
-     && printf '%s' "$out" | grep -qF "LANDED OK"; then
+     && [[ "$out" == *"recorded legacy  commit-missing-ticket-trailer:${c_sha:0:12}"* ]] \
+     && [[ "$out" == *"LANDED OK"* ]]; then
     printf '  OK    a recorded post-boundary finding is booked as recorded legacy, not refused\n'
   else
     printf '  FAIL  a recorded post-boundary finding was not booked as recorded legacy\n%s\n' "$out" >&2
@@ -1586,9 +1590,9 @@ PY
   baseline_file="$partial_baseline"
   out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
   if [ $? -eq 1 ] \
-     && printf '%s' "$out" | grep -qF "  FAIL  commit-missing-ticket-trailer:${c_sha:0:12}" \
-     && printf '%s' "$out" | grep -qF "recorded legacy  commit-ref-only-in-subject:${b_sha:0:12}" \
-     && printf '%s' "$out" | grep -qF ", 1 recorded legacy)"; then
+     && [[ "$out" == *"  FAIL  commit-missing-ticket-trailer:${c_sha:0:12}"* ]] \
+     && [[ "$out" == *"recorded legacy  commit-ref-only-in-subject:${b_sha:0:12}"* ]] \
+     && [[ "$out" == *", 1 recorded legacy)"* ]]; then
     printf '  OK    an unrecorded finding is refused while a recorded one is booked, in one run\n'
   else
     printf '  FAIL  the record did not book/refuse per commit\n%s\n' "$out" >&2
@@ -1598,7 +1602,7 @@ PY
   # 13b. …and an EMPTY record grandfathers nothing at all.
   baseline_file="$empty_baseline"
   out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
-  if [ $? -eq 1 ] && printf '%s' "$out" | grep -qF "commit-missing-ticket-trailer:${c_sha:0:12}"; then
+  if [ $? -eq 1 ] && [[ "$out" == *"commit-missing-ticket-trailer:${c_sha:0:12}"* ]]; then
     printf '  OK    an empty record grandfathers nothing (the record is the act)\n'
   else
     printf '  FAIL  an empty record was treated as a pass\n%s\n' "$out" >&2
@@ -1612,7 +1616,7 @@ PY
   #     verbatim re-check.
   baseline_file="$recorded_baseline"
   out="$(landed_audit "$base..HEAD" "$a_sha" 2>&1)"
-  if [ $? -eq 1 ] && printf '%s' "$out" | grep -qF "commit-missing-ticket-trailer:${c_sha:0:12}"; then
+  if [ $? -eq 1 ] && [[ "$out" == *"commit-missing-ticket-trailer:${c_sha:0:12}"* ]]; then
     printf '  OK    the record does not weaken the predicate path its consumers read\n'
   else
     printf '  FAIL  the record leaked into the predicate path (explicit --range)\n%s\n' "$out" >&2
@@ -1623,7 +1627,7 @@ PY
   #     the file would be a way to switch the check off. Both shapes are provoked.
   baseline_file="$work/absent-baseline.json"
   out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
-  if [ $? -eq 1 ] && printf '%s' "$out" | grep -qF "baseline-missing"; then
+  if [ $? -eq 1 ] && [[ "$out" == *"baseline-missing"* ]]; then
     printf '  OK    a missing record is refused (rc 1, never a skip)\n'
   else
     printf '  FAIL  a missing record was not refused as NOT-OK\n%s\n' "$out" >&2
@@ -1631,7 +1635,7 @@ PY
   fi
   baseline_file="$malformed_baseline"
   out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
-  if [ $? -eq 1 ] && printf '%s' "$out" | grep -qF "baseline-malformed"; then
+  if [ $? -eq 1 ] && [[ "$out" == *"baseline-malformed"* ]]; then
     printf '  OK    a malformed record is refused by name\n'
   else
     printf '  FAIL  a malformed record was not refused by name\n%s\n' "$out" >&2
