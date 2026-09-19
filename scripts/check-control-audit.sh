@@ -88,13 +88,21 @@ trap 'rm -rf "$work"' EXIT
 
 # Only the trees the suite imports are copied. `fleet/` is carried because one
 # case compares this module's stream shape against the fleet's own writer in a
-# subprocess; `control-plane/` carries the verb registry the surface reads.
+# subprocess; `control-plane/` carries the verb registry the surface reads;
+# `infra/rollout/registry_projection.py` is the pure projection
+# `portal/server/fleet.py` imports at module level (#967) -- without it every
+# negative control below fails to IMPORT (pytest rc 4) instead of going red.
 for tree in portal telemetry identity control-plane fleet; do
   if ! cp -a "$tree" "$repo/$tree" 2>/dev/null; then
     echo "check-control-audit: CANNOT-ASSESS — cannot copy $tree into the scratch tree" >&2
     exit 2
   fi
 done
+mkdir -p "$repo/infra/rollout"
+if ! cp infra/rollout/registry_projection.py "$repo/infra/rollout/registry_projection.py" 2>/dev/null; then
+  echo "check-control-audit: CANNOT-ASSESS — cannot copy infra/rollout/registry_projection.py into the scratch tree" >&2
+  exit 2
+fi
 
 fail=0
 ran=0

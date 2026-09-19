@@ -152,6 +152,14 @@ variables:
     secret: false
     required_by: [deploy, local-run]
     readers: [portal/server/surface_state.py, e2e/go_live_delivery.py]
+  - name: AO_ROLLOUT_LIVE_STATE
+    purpose: >-
+      the rollout live-state.yaml document the fleet surface reader projects
+      into a surface's effective default (issue #967); absent, it falls back
+      to the repo-relative infra/rollout/live-state.yaml.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/fleet.py]
   - name: AO_PORTAL_CHAT_STORE
     purpose: the transcript store directory the console's chat surface reads.
     secret: false

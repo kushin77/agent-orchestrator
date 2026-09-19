@@ -693,8 +693,13 @@ mkdir -p "$scratch/infra/cloudflare" "$scratch/infra/feature-flags" \
 # namespace package (no __init__.py), so one is copied only when a checkout
 # actually has one -- a hard requirement here would break the scratch tree on
 # the layout the repo really uses.
+# `infra/rollout/registry_projection.py` is the pure projection the reader
+# consults for a promotion's live state (#967): a module-level import, so
+# without it here the reader raises ImportError and the ON control goes vacuous
+# exactly as described above (measured on the 2026-09-19 train: 3 violations).
 for rel in "$script_rel" "$ingress_rel" portal/server/__init__.py \
-  portal/server/fleet.py portal/server/surface_state.py; do
+  portal/server/fleet.py portal/server/surface_state.py \
+  infra/rollout/registry_projection.py; do
   mkdir -p "$scratch/$(dirname "$rel")"
   if ! cp "$rel" "$scratch/$rel"; then
     problem "the scratch tree could not copy ${rel}: the flag probe cannot drive the route"

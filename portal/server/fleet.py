@@ -33,12 +33,23 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
+from infra.rollout.registry_projection import project_surface
 from portal.server import surface_state
 
 #: The registry surface key that gates this endpoint family.
 FLEET_SURFACE = "fleet_projection"
 #: The flag declaration read at boot (repo-root relative).
 REGISTRY_RELATIVE = Path("infra") / "feature-flags" / "registry.yaml"
+#: The rollout live-state document read at boot (repo-root relative). This is
+#: the projection consumer for issue #967: a surface a real go-live has
+#: promoted to `full` in this file reads as effectively promoted even before a
+#: human hand-edits the registry's own `default`/`promoted` fields — the
+#: manual step #967 measured. `infra/rollout/registry_projection.py` is the
+#: pure function; this is its one read-time caller.
+LIVE_STATE_RELATIVE = Path("infra") / "rollout" / "live-state.yaml"
+#: Explicit argument -> this environment variable -> :data:`LIVE_STATE_RELATIVE`,
+#: the same three-step resolution :data:`REGISTRY_ENV` uses.
+LIVE_STATE_ENV = "AO_ROLLOUT_LIVE_STATE"
 #: Explicit argument -> this environment variable -> :data:`REGISTRY_RELATIVE`.
 #: The same resolution the runtime stores use (``portal/server/surface_state.py``
 #: for the rollback overlay, ``portal/server/control_audit.py`` for its rails), so
@@ -113,14 +124,50 @@ def declares_on(entry: Any) -> bool:
     )
 
 
+def read_live_state_doc(
+    repo_root: Path | str,
+    *,
+    live_state_path: Optional[Path | str] = None,
+) -> Optional[dict[str, Any]]:
+    """The rollout ``live-state.yaml`` document, or ``None`` when it cannot be read.
+
+    An **absent** file is the normal, honest "nothing promoted yet" case
+    (``infra/rollout/live-state.yaml``'s own header): it reads as ``{"flags":
+    {}}``, not CANNOT-ASSESS, so a checkout that has never run a promotion
+    behaves exactly as it did before this projection existed. A *present but
+    unreadable* file fails closed to ``None`` — a projection built on a
+    document it could not actually read must never be assumed to promote
+    nothing (the same asymmetry ``surface_state.read_rollbacks`` already has).
+    """
+    path = (
+        Path(live_state_path)
+        if live_state_path is not None
+        else Path(os.environ.get(LIVE_STATE_ENV) or Path(repo_root) / LIVE_STATE_RELATIVE)
+    )
+    try:
+        import yaml
+    except ImportError:
+        return None
+    if not path.exists():
+        return {"schema_version": 1, "flags": {}}
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    return document
+
+
 def read_surface_default(
     repo_root: Path | str,
     *,
     registry_path: Optional[Path | str] = None,
     surface: str = FLEET_SURFACE,
     overlay_path: Optional[Path | str] = None,
+    live_state_path: Optional[Path | str] = None,
 ) -> str:
-    """A surface's EFFECTIVE default: an engaged rollback beats the declaration.
+    """A surface's EFFECTIVE default: an engaged rollback beats everything else.
 
     The rollback half of the rollout contract (#802). A runtime rollback engaged
     by the rollout anchor (``portal.server.surface_state``) reads as ``"off"``
@@ -129,13 +176,26 @@ def read_surface_default(
     *unreadable* rollback document is ``"off"`` too: a kill switch nobody can
     read must never be assumed to be disengaged.
 
-    Then the declaration decides, and it fails closed: a missing registry, an
-    unreadable/invalid document, a missing ``surfaces`` section, or a missing
-    entry all read as ``"off"``. Only an explicit ``default: on`` (or boolean
-    ``True``) turns the surface on.
+    Then the rollout's **live state** is consulted (issue #967): a surface a
+    real go-live has promoted to ``full`` in ``infra/rollout/live-state.yaml``
+    reads as ``"on"`` even before a human hand-edits the registry's static
+    ``default`` — closing the manual step #967 measured, without this repo
+    ever mutating ``registry.yaml`` at read time. A canary/gradual promotion is
+    real but not yet serving everyone, so it does not turn the default on by
+    itself; only ``stage == "full"`` does
+    (``infra.rollout.registry_projection.project_surface``).
+
+    Only then does the static declaration decide, and it fails closed: a
+    missing registry, an unreadable/invalid document, a missing ``surfaces``
+    section, or a missing entry all read as ``"off"``. Only an explicit
+    ``default: on`` (or boolean ``True``) turns the surface on by declaration
+    alone.
     """
     if surface_state.is_rolled_back(repo_root, surface, path=overlay_path):
         return "off"
+    live_state_doc = read_live_state_doc(repo_root, live_state_path=live_state_path)
+    if live_state_doc is not None and project_surface(surface, live_state_doc)["live"]:
+        return "on"
     surfaces = read_registry_surfaces(repo_root, registry_path=registry_path)
     if surfaces is None:
         return "off"
