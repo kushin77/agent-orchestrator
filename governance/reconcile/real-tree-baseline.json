@@ -141,6 +141,11 @@
     },
     {
       "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae0c65f879c7b5e0a",
+      "reason": "measured 2026-09-19T14:45Z by the #1441 lane at origin/master d6b3eb8d: the MEASUREMENT VENUE of PR #1120, whose HEAD is preserved by name on the local branch pr1120head (that ref is the only thing that contains da85ac4cfcec; detached there, clean). PR #1120 MERGED as 2787ed8d8bf2, an ancestor of origin/master (`git merge-base --is-ancestor 2787ed8d8bf2 origin/master` = YES), so the venue's work is on the default branch by merge rather than pending on this box: 6 of the 7 paths it changes are BYTE-IDENTICAL to that landing's blobs — `git diff --name-only f2aff0a8ee33 da85ac4cfcec` names governance/lifecycle/{README.md,audit.py,cli.py,closeout.py,model.py,tests/conftest.py,tests/test_frozen_head.py}, and `git rev-parse <ref>:<path>` is equal for all of them except cli.py, the one file the PR re-head-ed to b85dee705273 after this venue was cut (PR head, and the PR carried that single commit). It holds nothing of its own: `git status --porcelain -uall` in the venue is empty, `isolation.worktree.foreign_uncommitted()` returns [], no record under .fleet/lanes names it, no declared-venue file names it, no /proc/<pid>/cwd matches it, and `git worktree list --porcelain` reports no lock on it (the strong signal #1440 measured for a claude agent's tree). Recorded, NOT removed: the repo's own reclaim predicate fails closed on it (`content_landed(<main>, da85ac4cfcec, origin/master)` = False — the audit's per-blob and reverse-patch proofs both decline once the default branch has touched the same files), so deleting another session's .claude agent venue from here would be an unreviewed act rather than a reclaim; and NOT quarantined, because rule 17's keep-and-report class (work that exists nowhere else) does not apply to work that merged. The audit keeps reporting it on every pass: it is listed here by name and counted among the baselined artifacts."
+    },
+    {
+      "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae21c1b75566fee9b",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },
