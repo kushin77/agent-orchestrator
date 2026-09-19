@@ -127,7 +127,7 @@ secret exists on a runner that cannot read it:
 | `SKIPPED -- no ao-gate-status-token secret` | gcloud is present, the secret could not be read | create the secret + grant the build SA (below) |
 
 The image is deliberately **not** changed here. The step's image decides which
-checks can assess in this venue, and that shape is #1361's, not this change's: 
+checks can assess in this venue, and that shape is #1361's, not this change's:
 swapping it to a cloud-sdk image to pick up gcloud would change which of the 12
 venue-limited checks answer `CANNOT-ASSESS` in CI.
 
