@@ -5,7 +5,7 @@
 # (`{runtime, commit, state, ts}`), registered in `fleet/runtimes.yaml`. This
 # gate gathers the real inputs (beats under `.fleet/runtime-beats/`, git
 # distance to `origin/master`, directives in flight under `.fleet/inbox/`) and
-# hands them to the PURE judge in `fleet/liveness.py::judge`, which is what
+# hands them to the PURE judge in `fleet/runtime_liveness.py::judge`, which is what
 # `--self-test` provokes directly.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. Findings are named
@@ -31,7 +31,7 @@ for arg in "$@"; do
   esac
 done
 
-PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" python3 -m fleet.liveness "$verb" --root "$root"
+PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" python3 -m fleet.runtime_liveness "$verb" --root "$root"
 rc=$?
 
 case "$rc" in

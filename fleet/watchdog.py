@@ -1216,14 +1216,14 @@ def bounded_remedy(
 
 # ── deepseek-sister: bounded restart on liveness drift (issue #1271) ────────
 #
-# `scripts/check-runtime-liveness.sh` (`fleet/liveness.py`) reds
-# `runtime-drift:deepseek-sister` when the sister's beat reports a commit that
+# `scripts/check-runtime-liveness.sh` (`fleet/runtime_liveness.py`) reds
+# `runtime-drift:deepseek-sister` when the dispatcher's beat reports a commit that
 # trails `origin/master` by more than its budget with no directive in flight —
 # the doctrine gap #1271 was opened for ("`fleet status` reported the DeepSeek
-# sister paused ... for hours; nobody acted"). The remedy is the SAME bounded
+# dispatcher paused ... for hours; nobody acted"). The remedy is the SAME bounded
 # shape #773/#1105/#830 already gives every other rung: `bounded_remedy` is
 # reused as-is (attempt cap, exponential backoff, escalate-once, park) rather
-# than re-implemented, so a trailing sister gets exactly one respawn per
+# than re-implemented, so a trailing dispatcher gets exactly one respawn per
 # attempt, escalates once after `respawn_attempt_cap()` attempts that changed
 # nothing, and then PARKS until a principal reruns
 # `python3 fleet/watchdog.py rearm --rung deepseek-sister`.
@@ -1231,7 +1231,7 @@ def bounded_remedy(
 # The drift record is kept under its own name, `deepseek-sister`, distinct from
 # the local `sister` rung `RUNGS` already tracks: `RUNGS`'s drift compares the
 # running loop's commit against the CHECKOUT's HEAD (is the local process
-# stale relative to the tree it is running from); this compares the sister's
+# stale relative to the tree it is running from); this compares the dispatcher's
 # POSTED BEAT against `origin/master` (is the fleet-wide liveness view able to
 # see it moving at all) — two different questions that happen to share a
 # remedy.
@@ -1249,11 +1249,11 @@ def restart_deepseek_sister_on_drift(
 ) -> tuple[str, bool]:
     """Bounded auto-restart for a drifted `deepseek-sister` beat (issue #1271).
 
-    Called with the sister's own reported commit and the `origin/master`
+    Called with the dispatcher's own reported commit and the `origin/master`
     baseline the liveness gate compared it against — NOT invoked on every
-    watchdog tick, only when `fleet/liveness.py` has already reported
+    watchdog tick, only when `fleet/runtime_liveness.py` has already reported
     `runtime-drift:deepseek-sister` for this observation, so a healthy or
-    merely-stale sister is never restarted from here.
+    merely-stale dispatcher is never restarted from here.
     """
     return bounded_remedy(
         DEEPSEEK_SISTER_RUNG,

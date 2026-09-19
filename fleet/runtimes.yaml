@@ -2,7 +2,7 @@
 # runtime-agnostic note).
 #
 # Every runtime that beats through `integrations/paperclip/adapters/heartbeat`
-# must be registered here first: `fleet/liveness.py` refuses (`runtime-
+# must be registered here first: `fleet/runtime_liveness.py` refuses (`runtime-
 # unregistered:<id>`) a beat whose `runtime` id is not listed, rather than
 # silently accepting an unknown reporter.
 #

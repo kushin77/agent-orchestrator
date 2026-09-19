@@ -1,4 +1,4 @@
-"""fleet/liveness.py — the pure runtime-liveness judge (issue #1271).
+"""fleet/runtime_liveness.py — the pure runtime-liveness judge (issue #1271).
 
 Every runtime beats through `integrations/paperclip/adapters/heartbeat`
 (`{runtime, commit, state, ts}`), registered in `fleet/runtimes.yaml`. This
@@ -19,7 +19,17 @@ Findings, each named `<code>:<runtime-id>`:
                             does not declare.
 
 A runtime with no beat at all is `runtime-stale:<id>` too — "never reported" is
-the maximum case of "too old", not a pass.
+the maximum case of "too old", not a pass — ONCE the fleet has started beating.
+Before the first beat exists anywhere (`.fleet/runtime-beats/` is empty) there
+is nothing to judge staleness AGAINST: that state is reported as `no-beats-yet`
+and is OK with a note, never NOT-OK, because a gate that reds the real tree on
+the commit that introduces it measures nothing and blocks every lane (#1271).
+The judge engages the moment one runtime beats: from then on every registered
+runtime without a beat is `runtime-stale:<id>`.
+
+Module name: `runtime_liveness`, not `liveness` — `governance/dispatch/claims.py`
+puts `fleet/` on `sys.path[0]`, so a `fleet/liveness.py` would shadow
+`governance/dispatch/liveness.py` for every `import liveness` that follows.
 """
 
 from __future__ import annotations
@@ -52,6 +62,13 @@ DEFAULT_DRIFT_COMMITS = 5
 CODE_STALE = "runtime-stale"
 CODE_DRIFT = "runtime-drift"
 CODE_UNREGISTERED = "runtime-unregistered"
+#: The note printed when no runtime has ever beaten: OK, engaged by the first beat.
+NOTE_NO_BEATS_YET = "no-beats-yet"
+
+
+def no_beats_yet(beats: dict[str, dict]) -> bool:
+    """True when no runtime has ever posted a beat — there is nothing to judge."""
+    return not beats
 
 
 @dataclass(frozen=True)
@@ -95,6 +112,12 @@ def judge(
 
     distances = commit_distance or {}
     findings: list[Finding] = []
+
+    if no_beats_yet(beats):
+        # Nothing has beaten yet, so no beat can be stale relative to another:
+        # the caller reports `no-beats-yet` (an OK with a note, see the module
+        # docstring). Registered runtimes are judged from the first beat on.
+        return findings
 
     # Unregistered beats: reported by NAME, and nothing else is judged about
     # them — an unregistered id has no declared window or budget to hold it to.
@@ -229,6 +252,16 @@ def gather_and_judge(
     return findings, None
 
 
+def beat_module_beats(root: Path) -> dict[str, dict]:
+    """The beats under `root`, read the way the gate reads them (empty on any refusal)."""
+    from integrations.paperclip.adapters.heartbeat import beat as beat_module
+
+    try:
+        return beat_module.read_all_beats(root)
+    except Exception:  # noqa: BLE001 - a no-beats note must never crash the verdict
+        return {}
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     now = float(args.now) if args.now is not None else None
@@ -242,6 +275,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"check-runtime-liveness: CANNOT-ASSESS — {reason}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     if not findings:
+        if no_beats_yet(beat_module_beats(root)):
+            print(
+                f"check-runtime-liveness: OK — {NOTE_NO_BEATS_YET}: no runtime has posted a "
+                "beat under .fleet/runtime-beats/ yet, so there is nothing to judge staleness "
+                "against; the judge engages with the first beat (post one with "
+                "integrations/paperclip/adapters/heartbeat/cli.py)"
+            )
+            return EXIT_OK
         print("check-runtime-liveness: OK — every registered runtime is live")
         return EXIT_OK
     for finding in findings:
@@ -292,6 +333,22 @@ def _self_test(root: Path) -> int:
                 json.dumps({"runtime": runtime_id, "commit": commit, "state": "running", "ts": ts}),
                 encoding="utf-8",
             )
+
+        # 0. No beat anywhere yet: `no-beats-yet`, OK — nothing to judge against.
+        findings, reason = gather_and_judge(scratch, now=1_000_010.0)
+        probe(
+            "NO-BEATS-YET-IS-OK",
+            reason is None and findings == [] and no_beats_yet(beat_module_beats(scratch)),
+            f"{reason}/{[f.name for f in findings]}",
+        )
+        # 0b. The FIRST beat engages the judge: the other registered id is stale by name.
+        write_beat("claude-session", "aaa", 1_000_000.0)
+        findings, reason = gather_and_judge(scratch, now=1_000_010.0, drift_commits=999999)
+        probe(
+            "FIRST-BEAT-ENGAGES-THE-JUDGE",
+            reason is None and [f.name for f in findings] == ["runtime-stale:deepseek-sister"],
+            f"{reason}/{[f.name for f in findings]}",
+        )
 
         # 1. A healthy, fresh, undrifted pair: no findings.
         write_beat("claude-session", "aaa", 1_000_000.0)

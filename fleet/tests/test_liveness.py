@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from fleet import liveness
+from fleet import runtime_liveness as liveness
 
 REGISTRY = {
     "claude-session": {"kind": "agent"},
@@ -30,6 +30,11 @@ def test_stale_beat_reds_by_name():
     names = [f.name for f in findings]
     assert "runtime-stale:claude-session" in names
     assert "runtime-stale:deepseek-sister" not in names
+
+
+def test_no_beats_anywhere_is_no_beats_yet_not_a_finding():
+    assert liveness.no_beats_yet({})
+    assert liveness.judge(beats={}, registry=REGISTRY, now=1000.0) == []
 
 
 def test_missing_beat_is_stale():
