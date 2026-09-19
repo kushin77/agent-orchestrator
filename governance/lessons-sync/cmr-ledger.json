@@ -715,6 +715,12 @@
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     },
     {
+      "id": "LESSON-0015",
+      "reason": "no-hub-counterpart",
+      "record_ref": "52fe84d6e714eee522190c1fb8f0fe507673eb4a",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
       "id": "SUGGEST-0014",
       "reason": "no-hub-counterpart",
       "record_ref": "#1356",
