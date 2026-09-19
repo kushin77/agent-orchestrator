@@ -71,12 +71,12 @@ class TestEmissionOnEveryOutcome:
         backend = ScriptedBackend().on(
             "deepseek", lambda c, i: backend.result("deepseek", VALID_CLASSIFY_JSON)
         )
-        from limits.budget import BudgetController, BudgetMode, BudgetPolicy
+        from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy
         from limits.limiter import LimitsEngine
 
         engine = LimitsEngine(
             budget=BudgetController(
-                default_policy=BudgetPolicy(cap_tokens=50, mode=BudgetMode.ENFORCE)
+                default_policy=TokenBudgetPolicy(cap_tokens=50, mode=BudgetMode.ENFORCE)
             )
         )
         audit, metering = ListCallRecordSink(), ListCallRecordSink()

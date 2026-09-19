@@ -58,12 +58,12 @@ def _build_with_limits(engine, task=None):
 
 class TestBudgetEnforcement:
     def test_budget_exhausted_blocks_never_silent(self):
-        from limits.budget import BudgetController, BudgetMode, BudgetPolicy
+        from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy
         from limits.limiter import LimitsEngine
 
         engine = LimitsEngine(
             budget=BudgetController(
-                default_policy=BudgetPolicy(cap_tokens=50, mode=BudgetMode.ENFORCE)
+                default_policy=TokenBudgetPolicy(cap_tokens=50, mode=BudgetMode.ENFORCE)
             )
         )
         gateway = _build_with_limits(engine)
@@ -76,12 +76,12 @@ class TestBudgetEnforcement:
         assert _backend_holder.calls == []  # the provider was never called
 
     def test_budget_allows_under_cap(self):
-        from limits.budget import BudgetController, BudgetMode, BudgetPolicy
+        from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy
         from limits.limiter import LimitsEngine
 
         engine = LimitsEngine(
             budget=BudgetController(
-                default_policy=BudgetPolicy(cap_tokens=1_000_000, mode=BudgetMode.ENFORCE)
+                default_policy=TokenBudgetPolicy(cap_tokens=1_000_000, mode=BudgetMode.ENFORCE)
             )
         )
         gateway = _build_with_limits(engine)
