@@ -619,6 +619,49 @@ def test_a_missing_age_is_reported_as_unknown_not_zero(tmp_path, taxonomy):
 
 
 # ---------------------------------------------------------------------------
+# `board --live` staleness gate (issue #1427): the offline snapshot the board
+# gate reads can drift from live GitHub state undetected. `--max-stale-minutes`
+# is the mechanism; these drive it with a stale twin (must FAIL, rc=1) and a
+# fresh twin (must PASS, rc=0), because a check with no clean twin is not
+# proven able to pass, and one with no stale twin is not proven able to fail
+# (GR-12: a gate that cannot fail is a formality).
+# ---------------------------------------------------------------------------
+import cli as CLI  # noqa: E402
+
+
+def test_board_live_fails_past_the_stale_threshold(tmp_path, monkeypatch, capsys):
+    path = _snapshot(tmp_path, [GOOD_ISSUE], minutes_ago=120.0)
+    monkeypatch.chdir(ROOT)
+    rc = CLI.main(["board", "--live", "--snapshot", str(path), "--max-stale-minutes", "60"])
+    assert rc == CLI.NOT_OK
+    assert "FAIL" in capsys.readouterr().out
+
+
+def test_board_live_passes_a_fresh_snapshot_at_the_same_threshold(tmp_path, monkeypatch, capsys):
+    path = _snapshot(tmp_path, [GOOD_ISSUE], minutes_ago=5.0)
+    monkeypatch.chdir(ROOT)
+    rc = CLI.main(["board", "--live", "--snapshot", str(path), "--max-stale-minutes", "60"])
+    assert rc == CLI.OK
+    assert "FAIL" not in capsys.readouterr().out
+
+
+def test_board_live_zero_threshold_disables_the_staleness_check(tmp_path, monkeypatch):
+    # 0 (or negative) is the explicit opt-out — distinct from the pre-#1427 bug
+    # where the *default* of 0.0 silently disabled the check for every caller
+    # who never passed --max-stale-minutes at all.
+    path = _snapshot(tmp_path, [GOOD_ISSUE], minutes_ago=10_000.0)
+    monkeypatch.chdir(ROOT)
+    rc = CLI.main(["board", "--live", "--snapshot", str(path), "--max-stale-minutes", "0"])
+    assert rc == CLI.OK
+
+
+def test_board_live_default_threshold_is_a_real_positive_number():
+    # Regression guard for the falsy-zero bug this issue fixes: the shipped
+    # default must be a threshold that actually bounds staleness, not 0.0.
+    assert CLI.TAGGING_BOARD_STALENESS_MINUTES > 0
+
+
+# ---------------------------------------------------------------------------
 # the mandate — the constitution must keep declaring the rule (issue #1183)
 # ---------------------------------------------------------------------------
 import mandate as MD  # noqa: E402

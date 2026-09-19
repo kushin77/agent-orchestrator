@@ -12,6 +12,10 @@
 # `context=ao/gate-probe state=success` posted and read back on master.)
 #
 #   post    --sha <sha> --rc <0|1|2>     publish the gate's outcome for a commit
+#           [--detail <text>]            and --detail says WHY: the name of the
+#                                        check that failed, appended to the
+#                                        description as a SUFFIX (bounded to the
+#                                        API's 140-character description cap)
 #   post    --attestation <file>         publish the rc the GATE ITSELF recorded,
 #                                        bound to the commit it measured
 #   reconcile --sha <sha>                make the PUBLISHED context agree with the
@@ -78,6 +82,19 @@
 #     rather than free text; it is not an access boundary, because anyone
 #     holding the token can post a status directly, and this poster guards the
 #     AUTOMATIC second producer, not a forgery.
+#
+# DETAIL SEAM (issue #1407): the description is a FIXED string per rc, so every
+# red PR page read `make verify: FAIL` and WHICH check failed was knowable only
+# by opening the build log -- a required check that cannot name its own refusal.
+# `post --detail <text>` appends the producer's answer to that string. A detail
+# is a SUFFIX and nothing else: the outcome comes from --rc (or from the gate's
+# own attestation), no detail is an input to it, so no detail can turn a
+# CANNOT-ASSESS into a pass -- the #739 false-green class. The suffix is bounded
+# in gate-status-map.py, which truncates it deliberately to fit the API's
+# 140-character cap and marks the cut, because the API would otherwise truncate
+# the overflow itself at a position this poster does not choose. Only the verb
+# that publishes an outcome from --rc takes a detail, so `--detail` on another
+# verb is REFUSED rather than accepted and dropped.
 #
 # `reconcile` is the other half of the same invariant, and it exists because the
 # halves are not symmetric in TIME: a green published before the venue produced
@@ -402,6 +419,7 @@ rc=""
 sha=""
 attestation=""
 venue_run=""
+detail=""
 mode=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -411,8 +429,9 @@ while [ $# -gt 0 ]; do
     --rc)  rc="${2:-}";  shift ;;
     --attestation) attestation="${2:-}"; shift ;;
     --venue-run) venue_run="${2:-}"; shift ;;
+    --detail) detail="${2:-}"; shift ;;
     --repo) REPO="${2:-}"; shift ;;
-    -h|--help) sed -n '2,56p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,60p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" 1 ;;
   esac
   shift
@@ -428,7 +447,19 @@ fi
 
 [ "$mode" = "self-test" ] && { self_test; exit $?; }
 
-[ -n "$mode" ] || die "usage: $0 {post|reconcile|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] [--venue-run <build-id>] | --self-test" 2
+[ -n "$mode" ] || die "usage: $0 {post|reconcile|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] [--venue-run <build-id>] [--detail <text>] | --self-test" 2
+
+# A detail describes the outcome of a `post`. The other verbs publish a
+# description this command OWNS -- `reconcile` names the withdrawal it makes --
+# so a detail offered to one of them would be silently dropped, and a flag that
+# is accepted and ignored is worse than one that is refused: the producer would
+# believe it had reached the PR page. Checked here, before any read or write.
+if [ -n "$detail" ]; then
+  case "$mode" in
+    post|dry-run) ;;
+    *) die "REFUSED — --detail describes the description a 'post' publishes, and '$mode' publishes one this command owns; it would be silently dropped" 2 ;;
+  esac
+fi
 
 # Publish ONE status for ONE commit. Both verbs that write go through here, so
 # the venue-agreement guard and the reporting path cannot drift apart.
@@ -516,13 +547,17 @@ case "$mode" in
       success|failure|error|pending) ;;
       *) die "REFUSED — the mapper returned an invalid state: $state" 2 ;;
     esac
-    description="$(python3 - "$rc" <<'PY'
+    # The description is built by the mapper too -- the same function the
+    # checker provokes -- so a detail cannot be rendered by one path and posted
+    # by another. The detail is a SUFFIX: it is passed to `summarize` and reaches
+    # nothing else, which is why no detail can change the outcome above.
+    description="$(python3 - "$rc" "$detail" <<'PY'
 import sys
 sys.path.insert(0, "scripts")
 from importlib import util
 spec = util.spec_from_file_location("gsmap", "scripts/gate-status-map.py")
 mod = util.module_from_spec(spec); spec.loader.exec_module(mod)
-print(mod.summarize(int(sys.argv[1])))
+print(mod.summarize(int(sys.argv[1]), sys.argv[2] or None))
 PY
 )"
     if [ "$mode" = "dry-run" ]; then

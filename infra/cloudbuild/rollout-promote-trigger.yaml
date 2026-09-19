@@ -18,5 +18,34 @@ github:
   push:
     tag: ^go-live/.*$
 filename: infra/cloudbuild/rollout-promote.yaml
+# EVERY substitution rollout-promote.yaml consumes is declared here, so the pair
+# can be SUBMITTED as declared: Cloud Build refuses a build AT SUBMISSION whose
+# config spells a bare dollar template that neither the config nor a trigger
+# naming it declares (the refusal that cost #1350 two ~20-minute CI round trips;
+# enforced offline by scripts/check-cloudbuild.sh, issue #1369).
+#
+# The posture of the only promotion route is readable in one place, mirroring
+# apply-trigger.yaml: the rollout flag is "false", and every key a reviewed
+# go-live must supply holds an INERT sentinel rather than a real target - a
+# committed default for _FLAG / _TO_STAGE would silently pick a promotion. None
+# of them is read while the trigger ships disabled: the pipeline refuses at its
+# first step unless _ENABLE_ROLLOUT is "true". And a sentinel that ever were
+# read is refused at the point of use rather than honoured - "none" is not a
+# declared flag (the engine raises "unknown flag") and is not in the closed
+# stage vocabulary (off/canary/gradual/full).
 substitutions:
   _ENABLE_ROLLOUT: "false"
+  # The deployer SA: the same one-time bootstrap identity apply-trigger.yaml
+  # declares (the deployer SA does not exist yet - the first apply creates it).
+  # Supplied/overridden at import; never a credential (GR-6).
+  _DEPLOYER_SA: "projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com"
+  # Which flag to promote, and to which stage: deliberately inert placeholders.
+  _FLAG: "none"
+  _TO_STAGE: "none"
+  # Approval-as-code: the approval id and the executing actor. A promotion needs
+  # one approval record per (flag, target stage), so no repo-wide default exists;
+  # separation of duties (AO-GR-14) is enforced by validate-approval, not here.
+  _APPROVAL_ID: "none"
+  _ACTOR: "none"
+  # The approvals ledger the go-live runbook documents (infra/rollout/approvals).
+  _APPROVALS_DIR: "infra/rollout/approvals"

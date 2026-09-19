@@ -392,17 +392,63 @@ def describe(report: OrphanReport) -> str:
     return "\n".join(lines)
 
 
+def fleet_root(root: Path | str) -> Path:
+    """The MAIN checkout that owns the runtime state ``root`` describes (#1436).
+
+    ``.fleet/`` (lane records, sent directives, the mailbox) and ``.board/`` are
+    gitignored runtime state that lives **beside the main checkout's git dir**,
+    never inside a linked worktree — so a walk started from a lane described a
+    fleet that was not there. Measured 2026-09-19: run from a lane worktree the
+    walk read **0 lane records**, which zeroed the two kinds read from
+    ``.fleet/`` and *inflated* the three read from git, because the lane
+    exclusions had nothing left to exclude (worktree 33->58, branch 102->114,
+    pr 5->13). The gate walks the main checkout, so the two disagreed and the
+    issue's own ``Verify:`` command could not reproduce the gate.
+
+    Read from git rather than guessed: ``--git-common-dir`` is the one value
+    every worktree of one instance shares and which no clone has — the same
+    resolution :func:`governance.isolation.worktree.record_reaped` already
+    performs for the reap ledger, so the walk and the ledger it writes agree on
+    which checkout owns the state. A root git cannot answer for is returned
+    unchanged, so this only ever widens what the walk can see and never makes a
+    walk that worked before stop working.
+    """
+    import subprocess  # noqa: PLC0415
+
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        # `--path-format` needs git >= 2.31; the plain form is relative to `root`.
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--git-common-dir"], capture_output=True, text=True
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return Path(root)
+        candidate = Path(root) / result.stdout.strip()
+    else:
+        candidate = Path(result.stdout.strip())
+    common = candidate.resolve()
+    return common.parent if common.name == ".git" else Path(root)
+
+
 class RepoOrphanOps:
     """The real reads, over git, ``gh`` and the runtime state under ``root``.
 
     ``root`` is the MAIN checkout (``.fleet/`` lives beside its git dir); the
-    ``gh`` reads resolve the repository from that directory.
+    ``gh`` reads resolve the repository from that directory. The root is
+    resolved through :func:`fleet_root` so a walk run *from a lane worktree*
+    reads the fleet's state rather than the lane's empty one (#1436) — the
+    port's own contract, defended here rather than at the caller, the way
+    ``isolation.worktree.record_reaped`` already defends the reap ledger.
     """
 
     def __init__(self, root: Path | str, *, snapshot: Path | str | None = None) -> None:
         import subprocess  # noqa: PLC0415
 
-        self.root = Path(root)
+        self.root = fleet_root(root)
         self.snapshot = Path(snapshot) if snapshot is not None else self.root / ".board" / "snapshot.json"
         self._subprocess = subprocess
 
