@@ -15,8 +15,17 @@
 #   3. on a REAL scratch repository: a subagent-shaped worktree under
 #      `.claude/worktrees/agent-*` with no lane record is named orphan-worktree
 #      and NOT removed; the same tree, once its content is on the default
-#      branch, is reclaimed under --apply with its tip recorded first; a branch
+#      branch, is reclaimed under --apply with its tip recorded; a branch
 #      with unpushed work is named with its SHA and never deleted;
+#  3b. on a REAL scratch repository, IN USE is refused by name (#1440): the tree
+#      a live process is sitting in, the tree a venue record names, and the tree
+#      git holds its own lock on are each refused under --apply with the
+#      offending PROCESS, RECORD or LOCK REASON in the finding — while a tree
+#      nothing is using, with exactly the same content-landed proof, is still
+#      reclaimed; an unreadable liveness signal is CANNOT-ASSESS, never "not in
+#      use"; and the whole section FALSIFIES itself by re-running the same
+#      controls against a mutant of orphans.py with the liveness guard removed,
+#      which must red on the in-use arms and stay green on the dead one.
 #   4. the REAL tree is walked (from the MAIN checkout, wherever this runs) and
 #      held to the budget — the walk's own tri-state is honoured, so a box where
 #      `gh` cannot be run is CANNOT-ASSESS with the precondition printed.
@@ -167,7 +176,7 @@ applied = o.walk(Ops(main), apply=True, budget=BIG)
 tree = next(x for x in applied.by_kind(o.ORPHAN_WORKTREE) if x.name == str(sub))
 check("...and reclaimed under --apply", tree.outcome == o.RECLAIMED and not sub.exists(), tree.outcome)
 ledger = (main / ".fleet" / "reaped-branches.jsonl").read_text() if (main / ".fleet" / "reaped-branches.jsonl").exists() else ""
-check("its tip was recorded to .fleet/reaped-branches.jsonl first", sub_tip in ledger and "orphan-walk" in ledger, ledger[:200])
+check("its tip was recorded to .fleet/reaped-branches.jsonl (after the removal it describes, #1440)", sub_tip in ledger and "orphan-walk" in ledger, ledger[:200])
 check("the unpushed branch is STILL there after the second --apply", git(main, "rev-parse", "--verify", "--quiet", "refs/heads/issue-1003", check=False) == branch_tip)
 
 # The budget: one orphan-branch against a budget of 0 is red by name.
@@ -180,6 +189,260 @@ rc=$?
 cat "$work/real.log"
 if [ "$rc" -ne 0 ]; then
   echo "  FAIL  the real-repository controls did not all hold (rc=$rc)" >&2
+  fail=$((fail + 1))
+fi
+
+# --- 3b. in use is refused, and the refusal provably bites (#1440) ------------
+# The reclaim proof above answers "would this lose work?". It does NOT answer
+# "is anything USING this?", and on 2026-09-18 that gap deleted a live Claude
+# agent's worktree and a worktree another lane had recorded as its venue. This
+# section puts four content-LANDED trees on a real repository, each in use a
+# different way, and requires the walk to refuse the three in-use ones BY NAME
+# while still reclaiming the one nothing is using.
+#
+# It then FALSIFIES itself: the same controls run again against a mutant of
+# orphans.py with the liveness guard neutralised (`if positive:` -> `if False:`),
+# and must RED there — on the in-use arms specifically, while the dead-tree arm
+# stays green, so what the arms measure is the liveness verdict and not a
+# general breakage. A mutation that does not apply is CANNOT-ASSESS, because an
+# arm that silently tests nothing is the formality this section exists to avoid.
+echo "== 3b. a real repository: IN USE is refused by name, and the control bites =="
+python3 - "$root" "$work" >"$work/liveness.log" 2>&1 <<'PY'
+import importlib.util, json, os, subprocess, sys, time
+from pathlib import Path
+
+root, work = Path(sys.argv[1]), Path(sys.argv[2])
+sys.path.insert(0, str(root))
+from governance.reconcile import orphans as o
+
+# The one line this section falsifies. Named once, so the mutant and the guard
+# it removes cannot drift apart silently.
+GUARD = "    positive = [signal for signal in measured if signal.hit]\n    if positive:"
+
+BIG = {k: 100 for k in o.KINDS}
+CASES = "ABCD"
+KEY = {"A": "a", "B": "b", "C": "c", "D": "d"}
+rows = []
+
+
+def emit(label, cond, detail=""):
+    """Report one arm. ``rows`` is the program's own tally and is NEVER handed to
+    a loop that emits — appending to a list while iterating it is an infinite
+    loop (measured here: a 4.8 GB log in under a minute)."""
+    rows.append((label, bool(cond)))
+    print(("  OK    " if cond else "  FAIL  ") + label + (f" ({detail})" if detail and not cond else ""))
+
+
+def git(cwd, *args, check=True):
+    r = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+    if check and r.returncode != 0:
+        raise SystemExit(f"git {' '.join(args)} failed in {cwd}: {r.stderr.strip()}")
+    return r.stdout.strip()
+
+
+def commit(cwd, name, text, msg):
+    (Path(cwd) / name).write_text(text)
+    git(cwd, "add", name)
+    git(cwd, "-c", "user.name=gate", "-c", "user.email=gate@example.com", "commit", "-q", "-m", msg)
+    return git(cwd, "rev-parse", "HEAD")
+
+
+def land(main, base, case, branch):
+    """One worktree whose content is LANDED on master, so the OLD proof is true of it."""
+    tree = base / f"tree-{KEY[case]}"
+    git(main, "worktree", "add", "-q", "-b", branch, str(tree), "master")
+    commit(tree, f"{KEY[case]}.txt", f"{KEY[case]}\n", f"{case}\n\nRefs kushin77/agent-orchestrator#1265")
+    git(main, "checkout", "-q", "master")
+    (main / f"{KEY[case]}.txt").write_text(f"{KEY[case]}\n")
+    git(main, "add", ".")
+    git(main, "-c", "user.name=gate", "-c", "user.email=gate@example.com", "commit", "-q",
+        "-m", f"squash {case}\n\nRefs kushin77/agent-orchestrator#1265\nCloses #1265")
+    git(main, "push", "-q", "origin", "master")
+    git(main, "fetch", "-q", "origin")
+    return tree
+
+
+def ops_class(module):
+    """The port, built from ``module``'s OWN OrphanOps.
+
+    It has to be the module's own class, not one subclass: the liveness read
+    lives on ``RepoOrphanOps.in_use``, so an Ops subclassing the REAL module
+    would keep calling the real ``judge_use`` and the mutant would be falsified
+    against itself — every arm green, the falsification vacuous. (Measured here:
+    the first version of this section did exactly that, and the mutant came back
+    with zero reds.)
+    """
+
+    class Ops(module.RepoOrphanOps):
+        def open_pull_requests(self):
+            return []
+
+        def issue_states(self, issues):
+            return {n: "open" for n in issues}
+
+    return Ops
+
+
+def walk(module, ops, apply=False):
+    report = module.walk(ops, apply=apply, budget=BIG)
+    return {orphan.name: orphan for orphan in report.orphans}, report
+
+
+def reaps(main):
+    path = main / ".fleet" / "reaped-branches.jsonl"
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def controls(module, tag):
+    """The liveness control, one arm per behaviour — run against the real module
+    AND against the mutant, so the arms must come out green on one and red on
+    the other. Built fresh per run: the --apply arms remove what they reclaim.
+
+    Returns its OWN list of ``(label, condition)``; the caller emits them into
+    the program's tally. The two must never be the same list.
+    """
+    arms = []
+
+    def check(label, cond, detail=""):
+        arms.append((label, bool(cond)))
+
+    base = work / tag
+    base.mkdir(parents=True, exist_ok=True)
+    spool = base / "ao-orch"
+    holder = None
+    try:
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "master", str(base / "origin.git")], check=True)
+        main = base / "main"
+        subprocess.run(["git", "clone", "-q", str(base / "origin.git"), str(main)], check=True, capture_output=True)
+        commit(main, "seed.txt", "seed\n", "seed")
+        git(main, "push", "-q", "origin", "master")
+        git(main, "fetch", "-q", "origin")
+        trees = {case: land(main, base, case, f"issue-91{ord(KEY[case]) % 10}") for case in CASES}
+
+        # A: a live process whose working directory is inside it.
+        holder = subprocess.Popen(["sleep", "600"], cwd=str(trees["A"]), start_new_session=True)
+        # B: a recorded venue naming it — the measured shape, one absolute path.
+        spool.mkdir(parents=True, exist_ok=True)
+        (spool / "master-venue.txt").write_text(f"{trees['B']}\n")
+        # C: git's own lock, with a reason.
+        git(main, "worktree", "lock", "--reason", "claude agent fixture holder", str(trees["C"]))
+        # D: deliberately nothing.
+
+        ops = ops_class(module)(main, venue_roots=[spool])
+        dry, _ = walk(module, ops, apply=False)
+        found = {case: dry[str(trees[case])] for case in CASES}
+        check("a live holder is refused BY NAME (A)", (not found["A"].reclaimable)
+              and found["A"].outcome == module.REPORTED and "IN USE" in found["A"].detail
+              and str(holder.pid) in found["A"].detail, found["A"].detail)
+        check("a recorded venue is refused BY NAME (B)", (not found["B"].reclaimable)
+              and "IN USE" in found["B"].detail and "master-venue.txt" in found["B"].detail, found["B"].detail)
+        check("git's own lock is refused BY NAME (C)", (not found["C"].reclaimable)
+              and "IN USE" in found["C"].detail and "claude agent fixture holder" in found["C"].detail,
+              found["C"].detail)
+        check("a genuinely dead tree is still reclaimable (D)", found["D"].reclaimable
+              and found["D"].outcome == module.WOULD_RECLAIM)
+
+        applied, _ = walk(module, ops, apply=True)
+        check("--apply leaves the three in-use trees exactly where they were", trees["A"].exists()
+              and trees["B"].exists() and trees["C"].exists())
+        check("--apply still reclaims the dead tree", not trees["D"].exists()
+              and applied[str(trees["D"])].outcome == module.RECLAIMED)
+        records = reaps(main)
+        check("the ledger holds exactly one reap, and it names the dead tree",
+              len(records) == 1 and records[0]["worktree"] == str(trees["D"]),
+              json.dumps(records)[:200])
+
+        # An UNREADABLE liveness signal is CANNOT-ASSESS — never "not in use".
+        tree_e = base / "tree-e"
+        git(main, "worktree", "add", "-q", "-b", "issue-9199", str(tree_e), "master")
+        commit(tree_e, "e.txt", "e\n", "E\n\nRefs kushin77/agent-orchestrator#1265")
+        git(main, "checkout", "-q", "master")
+        (main / "e.txt").write_text("e\n")
+        git(main, "add", ".")
+        git(main, "-c", "user.name=gate", "-c", "user.email=gate@example.com", "commit", "-q",
+            "-m", "squash E\n\nRefs kushin77/agent-orchestrator#1265\nCloses #1265")
+        git(main, "push", "-q", "origin", "master")
+        git(main, "fetch", "-q", "origin")
+        (spool / "bad-venue.json").write_text("{not json", encoding="utf-8")
+        blind, report = walk(module, ops, apply=True)
+        check("an unreadable venue record is CANNOT-ASSESS, never 'not in use' (E)",
+              module.LIVENESS_UNMEASURED in report.unmeasured and not report.assessable
+              and not report.ok and blind[str(tree_e)].outcome == module.REPORTED and tree_e.exists(),
+              json.dumps(report.unmeasured)[:200])
+    finally:
+        if holder is not None:
+            for signal in (15, 9):
+                try:
+                    os.kill(holder.pid, signal)
+                except OSError:
+                    break
+                time.sleep(0.3)
+    return arms
+
+
+def load_mutant():
+    src = (root / "governance" / "reconcile" / "orphans.py").read_text(encoding="utf-8")
+    if src.count(GUARD) != 1:
+        raise SystemExit(
+            "check-reconcile-orphans: CANNOT-ASSESS — the liveness guard this section falsifies is not in "
+            "governance/reconcile/orphans.py any more, so the mutant would not have applied and the "
+            "falsification would silently test nothing"
+        )
+    mutant = work / "mutant-orphans.py"
+    mutant.write_text(src.replace(GUARD, GUARD.replace("if positive:", "if False:  # the guard, removed"), 1),
+                      encoding="utf-8")
+    if mutant.read_text(encoding="utf-8") == src:
+        raise SystemExit("check-reconcile-orphans: CANNOT-ASSESS — the mutation did not change orphans.py")
+    spec = importlib.util.spec_from_file_location("reconcile_orphans_mutant", mutant)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["reconcile_orphans_mutant"] = module
+    spec.loader.exec_module(module)
+    # Measuring that the mutation DID something, not assuming it: a mutant whose
+    # guard survived would make the whole falsification vacuous.
+    probe = module.judge_use([module.Signal("probe", True, hit="a positive signal")])
+    if probe.verdict == module.IN_USE:
+        raise SystemExit(
+            "check-reconcile-orphans: CANNOT-ASSESS — the mutant still answers IN USE for a positive signal, "
+            f"so the guard was not removed ({probe})"
+        )
+    return module
+
+
+# The venue spool honours its env seam, and .fleet/venues is a default store.
+os.environ[o.VENUE_SPOOL_ENV] = str(work / "seam-spool")
+try:
+    declared = o.RepoOrphanOps(work / "no-such-root").venue_roots
+finally:
+    os.environ.pop(o.VENUE_SPOOL_ENV, None)
+emit("the venue spool honours $AO_VENUE_SPOOL", (work / "seam-spool") in declared, str(declared))
+emit(".fleet/venues is a default venue store",
+     (work / "no-such-root" / o.VENUE_DIR) in declared, str(declared))
+
+print("  -- the control, on the code under test --")
+for label, cond in list(controls(o, "liveness-real")):
+    emit(label, cond)
+
+print("  -- the same control, with the liveness guard removed (the falsification) --")
+reds = [label for label, cond in list(controls(load_mutant(), "liveness-mutant")) if not cond]
+for label in reds:
+    print(f"    RED   {label}")
+# Matched on the arm's own PREFIX: a looser substring matches the ledger arm,
+# whose label mentions the dead tree too (measured — it made this arm fail on a
+# falsification that had in fact worked).
+emit("the in-use arms red on the mutant — the counterfactual that makes them controls",
+     any(label.startswith("a live holder") for label in reds)
+     and any(label.startswith("a recorded venue") for label in reds)
+     and any(label.startswith("git's own lock") for label in reds), str(reds))
+emit("the dead-tree arm stays GREEN on the mutant, so what the arms measure is the liveness verdict",
+     not any(label.startswith("a genuinely dead tree") for label in reds), str(reds))
+raise SystemExit(0 if all(cond for _, cond in rows) else 1)
+PY
+rc=$?
+cat "$work/liveness.log"
+if [ "$rc" -ne 0 ]; then
+  echo "  FAIL  the liveness controls or their falsification did not hold (rc=$rc)" >&2
   fail=$((fail + 1))
 fi
 
