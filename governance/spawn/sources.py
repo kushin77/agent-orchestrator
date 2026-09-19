@@ -17,6 +17,11 @@ field                   source
 `budget`                the attempt budget (`fleet/runaway.py`, issue #723)
 `gate`                  the gate of record + AO-GR-22's one-gate bound
 `verify`                the issue's own `Verify:` clause
+`spawn`                 `governance/spawn/admission.py` — the admission inputs
+                        the three judges read (`runtime`, `role`, `tier`,
+                        `actor`, plus the class and the declared verbs/skills/
+                        secrets), materialised with the tables' own defaults
+                        (issue #1413)
 ======================  ==================================================
 
 Nothing here decides anything: it reads, and it reports what it could not read
@@ -409,14 +414,33 @@ def collect(
     files: Sequence[str] | None = None,
     root: Path | str = ROOT,
     snapshot: Mapping[int, dict[str, Any]] | None = None,
+    runtime: str = "",
+    role: str = "",
+    tier: str = "",
+    model: str = "",
+    task_class: str = "",
+    actor: str = "",
+    verbs: Sequence[str] = (),
+    skills: Sequence[str] = (),
+    secrets: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Every field the envelope needs, read from its owner. Never a guess.
 
     The caller supplies only what it already holds (the directive's issue/lane,
-    the minted worktree and env, the issue body). Everything else is read here,
-    so the remote loop and a local spawn cannot disagree about what a spawn
-    carries — they call this same function.
+    the minted worktree and env, the issue body, and the admission inputs it
+    wants judged: runtime/role/tier/model/class/actor and any declared
+    verbs/skills/secrets). Everything else is read here, so the remote loop and a
+    local spawn cannot disagree about what a spawn carries — they call this same
+    function.
+
+    The ``spawn`` block is shaped by :func:`governance.spawn.admission.spawn_record`,
+    which MATERIALISES the four lane-binding values (#1301's ``{runtime, role,
+    tier, actor}``) with the defaults the tables already declare — so the document
+    an auditor reads states the admission it was granted, and the three judges are
+    judged on values, never on silence.
     """
+    from governance.spawn import admission  # noqa: PLC0415 - one reader of the admission tables
+
     session = session_field(env)
     repo_slug = session.get("repo_slug") or ""
     resolved_worktree = worktree or str(session.get("worktree") or "")
@@ -439,11 +463,21 @@ def collect(
         "budget": budget_field(directive_id),
         "gate": gate_field(resolved_worktree),
         "verify": verify_field(body),
-        "spawn": {
-            "path": path,
-            "agent": agent_id or str(session.get("agent") or ""),
-            "directive": directive_id,
-        },
+        "spawn": admission.spawn_record(
+            path=path,
+            agent=agent_id or str(session.get("agent") or ""),
+            directive=directive_id,
+            env=env,
+            runtime=runtime,
+            role=role,
+            tier=tier,
+            model=model,
+            task_class=task_class,
+            actor=actor,
+            verbs=verbs,
+            skills=skills,
+            secrets=secrets,
+        ),
     }
 
 

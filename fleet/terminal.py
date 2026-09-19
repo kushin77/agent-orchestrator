@@ -475,6 +475,47 @@ def preflight(runner: str) -> tuple[bool, str]:
     return True, f"runner resolved: {argv[0]}"
 
 
+#: The runtime id this loop IS, and the one it SPAWNS (fleet/runtimes.yaml).
+SISTER_RUNTIME_ID = "deepseek-sister"
+EXECUTOR_RUNTIME_ID = "deepseek-executor"
+
+
+def beat_runtime(runtime_id: str, state: str = "running") -> None:
+    """Post this loop's runtime beat (#1412) — at start and on every poll cycle.
+
+    The sibling of `write_heartbeat` above and a different question: that beat says
+    what this LOOP is doing for the fleet's own status surface, this one is the
+    liveness record `scripts/check-runtime-liveness.sh` judges against
+    `fleet/runtimes.yaml` (`runtime-stale:<id>` when it stops arriving). Until
+    #1412 nothing produced it, so the judge could only ever report `no-beats-yet`.
+
+    Never fatal: a liveness stamp must not be able to kill the thing it reports on.
+    A refusal (an unregistered id, an unreadable registry) is printed and the loop
+    carries on — the judge then reports the runtime stale, which is the truth.
+
+    `beats` is resolved LAZILY, through a function rather than a module-level
+    import: gate fixtures copy `fleet/terminal.py` alone into a scratch tree
+    (`scripts/check-orphan-handoff.sh` provokes its mutation that way), and a hard
+    import would make the loop unloadable there — a scratch tree that cannot import
+    the loop fails a vacuity control for the wrong reason.
+
+    The beat lands in `beats.ROOT` (the fleet tree the producer owns) rather than in
+    `terminal.ROOT`, and that is the difference between a test that is isolated and
+    one that reds the gate of record: `fleet/tests/conftest.py` redirects
+    `beats.ROOT` for every test, so a suite that drives this loop cannot leave a
+    beat behind — one stray beat engages the judge on the next gate run and reports
+    every OTHER registered runtime `runtime-stale`. Measured, on this lane, before
+    the split: two suite runs left `deepseek-sister`/`deepseek-executor` beats in
+    the worktree and `check-runtime-liveness` went red on five innocent runtimes.
+    """
+    try:
+        import beats
+    except ImportError as exc:
+        print(f"[beats] {runtime_id} beat REFUSED — fleet/beats.py is not importable: {exc}", file=sys.stderr, flush=True)
+        return
+    beats.best_effort(runtime_id, state, root=beats.ROOT, cwd=ROOT)
+
+
 def start_session_beat(env: dict | None, pid: int) -> object | None:
     """Beat a per-session heartbeat for the lane this dispatch owns (#304).
 
@@ -592,6 +633,10 @@ def run_once(
     if dry_run:
         print("DRY-RUN:", " ".join(shlex.quote(part) for part in command), flush=True)
         return 0, f"DRY-RUN (not executed) in {cwd}"
+    # The executor runtime beats the moment it is about to exist (#1412): the
+    # dispatch reached a spawn, which is exactly what `deepseek-executor` being
+    # alive means. `RunBeater` above keeps it fresh for as long as the child runs.
+    beat_runtime(EXECUTOR_RUNTIME_ID)
     # Resolve the executable in code, not by inheriting whatever PATH happened to
     # start this loop (#733): argv[0] is handed to the child as an ABSOLUTE path,
     # so the spawn cannot fail on a PATH the fleet does not control. The loop's
@@ -2336,6 +2381,10 @@ class RunBeater:
         while not self._stop.wait(interval):
             child = self._slot.get("child")
             refresh_run(self._directive_id, child_pid=getattr(child, "pid", None))
+            # A run that outlives one interval keeps its runtime's beat fresh
+            # (#1412): the executor IS alive while its child is, and a beat that
+            # only marked the spawn would report a 40-minute run as a dead one.
+            beat_runtime(EXECUTOR_RUNTIME_ID)
 
     def start(self) -> RunBeater:
         self._thread.start()
@@ -2404,6 +2453,11 @@ def loop(args: argparse.Namespace) -> int:
         print(f"[terminal] preflight OK — {runner_detail}", flush=True)
     else:
         print(f"[terminal] PREFLIGHT FAILED — {runner_detail}", flush=True)
+    # The dispatcher runtime beats at START and on every poll cycle (#1412) — the two
+    # moments its liveness can honestly be asserted, and the reason the judge's
+    # `runtime-stale:deepseek-sister` means "this loop stopped", not "nobody
+    # implemented a producer for it" (which is what it meant before this landed).
+    beat_runtime(SISTER_RUNTIME_ID)
 
     def run_worker(
         directive: dict,
@@ -2501,6 +2555,10 @@ def loop(args: argparse.Namespace) -> int:
     idle_printed = False
     paused_printed = False
     while True:
+        # The poll cycle's own beat (#1412), first in the cycle so it advances on
+        # every path through it — including the `continue`s below, which is where
+        # a beat written at the END of the cycle would silently stop arriving.
+        beat_runtime(SISTER_RUNTIME_ID)
         # Mid-run steering (issue #367): deliver any steer the director queued for a
         # live run before this cycle does anything else.
         delivered_steers = deliver_pending_steers()
