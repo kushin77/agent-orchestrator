@@ -223,6 +223,24 @@ python3 -m pytest gateway/finops/tests -q
 | CFO enforcement is deterministic — "zero-token arithmetic", no generative loop in the cap path | `RoleBudget.decide()` is a pure percentage comparison; `test_role_enforcer_is_deterministic_and_token_free` bans `random`/`time.`/`subprocess`/… in its source |
 | `budgets.yaml` documents the per-role vocabulary; tests include a **mutation-proved** refusal | `budgets.yaml` `roles:` block; `test_role_cap_refusal_is_mutation_proved` disables the hard-cap comparison then the policy mapping and asserts the refusal probes die |
 
+## One tiers.yaml judges every runtime's spawn (issue #1274)
+
+Before this issue, `tiers.yaml` only gated the fleet's own model call
+(`chooser.py`) — a Claude subagent dispatch or a hermes persona render could
+still be handed a tier the table forbids for its task class, because nothing
+re-checked them against the same window. `governance/spawn/tiering.py` closes
+that gap: it is a pure judge (`judge(role, task_class, tier)`) that reads
+*only* this file (via `loader.load_tier_table`, never a second copy of the
+ladder) and refuses `FINOPS-ROLE-NOT-ALLOWED` for a fleet spawn, a
+`claude-subagent`, or a `hermes-persona` alike, whenever the requested tier
+sits outside the task class's `defaultTier..maxTier` window (floored at
+`security.floorTier` for guarded classes). Run it directly with
+`python3 -m governance.spawn.tiering judge --role R --class C --tier T`; the
+control is proven in `scripts/check-tier-parity.sh`. `integrations/hermes/mapping.py`
+exposes the consumer hook (`judge_persona_tier`); wiring it into the Claude
+subagent dispatch render (`governance/spawn/render.py`) is a follow-up owned
+by another lane this wave (see the PR's "Wiring needed" section).
+
 ## Provenance
 
 Cannibalized and adapted from fleet sources (see
