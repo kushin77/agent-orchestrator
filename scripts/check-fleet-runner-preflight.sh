@@ -32,6 +32,15 @@
 #     one with the preflight neutralised, one with the hold removed — and the gate
 #     must FAIL for each. The mutation is asserted to have actually applied, and
 #     the mutant runs in an isolated tree so nothing it does can touch this repo.
+#   * ISOLATION (#1459): the probe in section 3b drives the REAL spawn path, which
+#     posts a runtime beat (#1412) BEFORE the loop refuses or spawns — and
+#     `beats.ROOT` is a module constant pointing at the checkout the producer was
+#     imported from. Un-redirected, that beat lands in THIS repository, where
+#     `scripts/check-runtime-liveness.sh` reads it and reports every OTHER
+#     registered runtime `runtime-stale`: the composite's verdict would depend on
+#     which check ran first. The probe is pointed at a tree this check owns, and
+#     the repository's own beats are snapshotted before and after, so a leak is a
+#     NAMED failure here instead of a mystery red in another check.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
@@ -78,6 +87,36 @@ if ! mkdir "$work" 2>/dev/null; then
   exit 2
 fi
 trap 'rm -rf "$work"' EXIT
+
+# The runtime-beat producer (#1412) posts a beat — `<beats.ROOT>/.fleet/runtime-beats/
+# <id>.json` — BEFORE the loop refuses or spawns, and `beats.ROOT` is a module
+# constant pointing at the checkout the producer was imported from. The probe in
+# section 3b drives `run_once` for real IN THIS REPOSITORY, so un-redirected it
+# stamps a beat here — where `scripts/check-runtime-liveness.sh` reads it and
+# reports every OTHER registered runtime `runtime-stale` (#1459). Every probe
+# below is pointed at a tree THIS CHECK owns instead, exactly as
+# `fleet/tests/conftest.py` points every test: the tree carries the registry the
+# producer checks its id against, so the beat really is written, just not into
+# the repository.
+beats_tree="$work/beats-tree"
+if ! mkdir -p "$beats_tree/fleet" "$beats_tree/.fleet/runtime-beats" 2>/dev/null; then
+  echo "check-fleet-runner-preflight: CANNOT-ASSESS — cannot create $beats_tree" >&2
+  exit 2
+fi
+if [ -f fleet/runtimes.yaml ]; then
+  cp -a fleet/runtimes.yaml "$beats_tree/fleet/runtimes.yaml" || exit 2
+fi
+
+beats_files() { # beats_files <tree> — each beat file with the size+mtime a rewrite would move
+  if [ -d "$1/.fleet/runtime-beats" ]; then
+    find "$1/.fleet/runtime-beats" -maxdepth 1 -type f -name '*.json' -printf '%f %s %T@\n' 2>/dev/null | sort
+  fi
+}
+
+# The repository's own beats BEFORE this check runs anything: compared again at
+# the end, so a leaked beat is named here rather than surfacing as an
+# order-dependent `runtime-stale` in another check.
+repo_beats_before="$(beats_files "$root")"
 
 fail=0
 note_fail() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
@@ -297,14 +336,26 @@ exit 0
 STUB
   chmod +x "$home/.local/bin/claude-733-probe" || return 1
   env -C "$root" HOME="$home" PATH=/usr/bin:/bin AO_FLEET_DIR="$work/fleet-spawn" \
-    PYTHONDONTWRITEBYTECODE=1 python3 - > "$log" 2>&1 <<'PY'
+    PYTHONDONTWRITEBYTECODE=1 python3 - "$beats_tree" > "$log" 2>&1 <<'PY'
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, "fleet")
 sys.path.insert(0, ".")
 import terminal  # noqa: E402
 from governance.spawn import sources  # noqa: E402
+
+# The beat this probe's spawn path posts (#1412) belongs to THIS CHECK, not to the
+# repository `run_once` was imported from: `beats.ROOT` is a module constant, and
+# a beat left in the repository engages `scripts/check-runtime-liveness.sh` and
+# reports every other registered runtime `runtime-stale` (#1459). Same
+# redirection `fleet/tests/conftest.py` gives every test.
+try:
+    import beats  # noqa: E402
+    beats.ROOT = Path(sys.argv[1]).resolve()
+except ImportError:  # the producer (#1412) is not in this tree: nothing to redirect
+    pass
 
 # The spawn envelope is a PRECONDITION (#793): a probe that drives the run path
 # supplies one, so this check keeps measuring the RUNNER (resolve it off PATH,
@@ -380,6 +431,22 @@ if spawn_case "$spawn_home" "$spawn_marker" "$spawn_log" \
   echo "        spawned argv (truncated): $(head -c 120 "$spawn_marker")"
 else
   note_fail "[spawn] the off-PATH runner was not executed: $(cat "$spawn_log" 2>/dev/null | tail -3) $(cat "$spawn_marker" 2>/dev/null)"
+fi
+
+# --- 3c. the beat the spawn path posts lands in THIS CHECK's tree -------------
+#
+# The redirect above is only honest if the producer still RUNS: a probe that
+# avoided the beat by avoiding the spawn path would prove nothing. So the beat
+# must be present, in the tree this check owns.
+producer_beats="$(beats_files "$beats_tree")"
+if [ -f fleet/beats.py ]; then
+  if printf '%s\n' "$producer_beats" | grep -q '^deepseek-executor\.json '; then
+    echo "  OK    [beats] the spawn path posted its runtime beat (#1412) into this check's own tree"
+  else
+    note_fail "[beats] the spawn path's runtime beat is not in $beats_tree/.fleet/runtime-beats/ — the redirect is not reaching the producer"
+  fi
+else
+  echo "  OK    [beats] #1412's producer is not in this tree, so no probe here can post a beat"
 fi
 
 # --- 4. the mutation proof ---------------------------------------------------
@@ -535,9 +602,17 @@ then
   fail=$((fail + 1))
 fi
 
+# --- 5. the isolation the redirect buys: the repository is untouched ---------
+repo_beats_after="$(beats_files "$root")"
+if [ "$repo_beats_before" = "$repo_beats_after" ]; then
+  echo "  OK    [beats] this check left no runtime beat in the repository"
+else
+  note_fail "[beats] this check posted a runtime beat into $root/.fleet/runtime-beats/ (before=[$(printf '%s' "$repo_beats_before" | tr '\n' ' ')] after=[$(printf '%s' "$repo_beats_after" | tr '\n' ' ')]) — a stray beat engages scripts/check-runtime-liveness.sh, which then reports every OTHER registered runtime runtime-stale, so the composite's verdict depends on which check ran first (#1459)"
+fi
+
 if [ "$fail" -gt 0 ]; then
   echo "check-fleet-runner-preflight: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-fleet-runner-preflight: OK — the runner is resolved in code, one escalation holds the queue, and both mutants are detected"
+echo "check-fleet-runner-preflight: OK — the runner is resolved in code, one escalation holds the queue, both mutants are detected, and the spawn path's runtime beat landed in this check's own tree instead of the repository"
 exit 0
