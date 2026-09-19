@@ -4,10 +4,9 @@
   "entries": [
     {
       "check": "branch-protection",
-      "kind": "venue",
-      "issue": 1361,
-      "precondition": { "command": "gh auth status" },
-      "reason": "The Cloud Build verify container installs no `gh`, so the check's own precondition library answers `CANNOT-ASSESS gh-unauthenticated: gh is not installed` (scripts/lib/preconditions.sh, required by scripts/check-branch-protection.sh). The declared probe is that library's OWN predicate, quoted verbatim. It stops biting the moment the image carries an authenticated `gh` -- and then the check must assess or the run is refused by name (#1361)."
+      "kind": "standing-gap",
+      "issue": 1382,
+      "reason": "`CANNOT-ASSESS REQUIRED-BUT-UNOBSERVED` / `REQUIRED-BUT-GATED-OFF` -- branch protection REQUIRES `ao/gate-of-record` (#1342), the only producers on a PR verdict path (infra/cloudbuild/verify.yaml, the fleet runner rung) ship flag-gated OFF, and so no status is ever present on the commit under test; the check names this rather than passing (#1357). Its inputs ARE present in every venue that can run `gh auth status`, so this is not a venue gap: it is the open gap #1382 tracks (nothing on the ordinary lane path produces the required context). In the Cloud Build venue the same check answers `gh-unauthenticated: gh is not installed` (#1361), also rc 2. This entry goes STALE the moment a promoted producer posts the status and the check assesses -- delete it then."
     },
     {
       "check": "cmr-knowledge",
@@ -41,22 +40,25 @@
       "check": "fleet-cron-dev-run",
       "kind": "venue",
       "issue": 1361,
-      "precondition": { "command": "docker compose version" },
+      "precondition": {
+        "command": "docker compose version"
+      },
       "reason": "`CANNOT-ASSESS compose-plugin-missing: install the docker compose v2 plugin (docker compose version must succeed)` -- and that is the probe this entry declares, verbatim from the check's own guard (scripts/check-fleet-cron-dev-run.sh). The Cloud Build container installs no docker (#1361)."
     },
     {
       "check": "fleet-cron-image",
       "kind": "venue",
       "issue": 1361,
-      "precondition": { "command": "docker info" },
+      "precondition": {
+        "command": "docker info"
+      },
       "reason": "`check-fleet-cron-image: CANNOT-ASSESS -- docker not found; the live controls were not run` (the declared-surface half is green; the live half is unreachable). `docker info` is the check's own probe of the daemon (scripts/check-fleet-cron-image.sh), supplied only when docker AND a reachable daemon are (#1361)."
     },
     {
       "check": "gate-status",
-      "kind": "venue",
-      "issue": 1361,
-      "precondition": { "command": "gh auth status" },
-      "reason": "`CANNOT-ASSESS gh-unauthenticated: gh is not installed` -- the mapping and the poster are asserted and sound, but the LIVE status cannot be observed without an authenticated `gh` (scripts/check-gate-status.sh probes it with this same command). Named here rather than left an anonymous skip (#1357 owns the producer half) (#1361)."
+      "kind": "standing-gap",
+      "issue": 1382,
+      "reason": "`CANNOT-ASSESS REQUIRED-BUT-GATED-OFF` -- the rc->state mapping and the poster are asserted and sound, and a producer exists on the PR verdict path, but that trigger ships flag-gated OFF (`disabled: true`, #1350) so nothing produces `ao/gate-of-record` until it is promoted out of band; the LIVE status is therefore never observable and the check refuses to call that a pass (#1357). Not a venue gap: `gh auth status` succeeds here and the check still cannot assess. The open issue that tracks the producer gap is #1382; in Cloud Build the same check is `gh-unauthenticated` (#1361), also rc 2. STALE the moment the check assesses -- delete it then."
     },
     {
       "check": "module-brief",
@@ -76,14 +78,18 @@
       "check": "repo-settings",
       "kind": "venue",
       "issue": 1361,
-      "precondition": { "command": "gh auth status" },
+      "precondition": {
+        "command": "gh auth status"
+      },
       "reason": "`CANNOT-ASSESS gh-unauthenticated: gh is not installed` -- the same shared precondition library as branch-protection (scripts/lib/preconditions.sh, required by scripts/check-repo-settings.sh) (#1361)."
     },
     {
       "check": "worktree-cap",
       "kind": "venue",
       "issue": 1361,
-      "precondition": { "command": "crontab -l" },
+      "precondition": {
+        "command": "crontab -l"
+      },
       "reason": "`check-worktree-cap: CANNOT-ASSESS -- reaper schedule could not be determined: prune-worktrees: schedule: CANNOT-ASSESS -- crontab -l failed with rc=127: ... crontab: command not found`. The reaper's schedule is read from the LIVE crontab, by design (scripts/prune-worktrees.sh), so with no `crontab` binary the question cannot be answered at all. `crontab -l` is that probe quoted verbatim (#1361)."
     }
   ],
