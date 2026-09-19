@@ -110,10 +110,11 @@ steps:
         # than a claim.
         #
         # The path is spelled LITERALLY here and below, with no shell variable:
-        # the submission-time validator reads bare dollar-templates in this file
-        # (the same class that refused `$GH_TOKEN`, build
-        # 05734838-0cc3-4b35-bd2b-ab5e909fc3a3), so introducing a new one for a
-        # fixed path buys nothing and risks exactly that failure.
+        # the submission-time validator reads bare dollar-templates in this file,
+        # comments included (the class that refused the token template, build
+        # 05734838-0cc3-4b35-bd2b-ab5e909fc3a3), so introducing a new one -- or
+        # naming that one -- for a fixed path buys nothing and risks exactly that
+        # failure.
         if ! bash scripts/gate-status.sh dry-run --attestation .verify/attestation.json --sha "${COMMIT_SHA:-}"; then
           echo "gate-status: CANNOT-ASSESS -- the gate's own record (.verify/attestation.json) does not"
           echo "  name a publishable commit, so this build has no verdict to post."
