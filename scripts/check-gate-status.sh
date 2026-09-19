@@ -64,6 +64,14 @@
 #
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
+# A CHECK THAT CANNOT NAME ITS OWN REFUSAL (#1407)
+# The description the required context carries was a FIXED string per rc, so every
+# red PR page read `make verify: FAIL` and the failing check's name existed only
+# inside the build log. Section 3c provokes the opposite: `post --detail <text>`
+# must put the name on the PR page, and must NOT be able to put a PASS there -- a
+# detail that can manufacture a green is the #739 class this repository measures
+# rather than assumes.
+#
 # Usage: bash scripts/check-gate-status.sh
 #        bash scripts/check-gate-status.sh --producer-probe [--root DIR]
 #          answer ONLY the producing question over DIR and exit 0/1/2, so
@@ -102,7 +110,7 @@ while [ $# -gt 0 ]; do
     # the producer is enabled.
     --live-state) live_state_override="${2:-}"; shift ;;
     --live-source) live_source_override="${2:-}"; shift ;;
-    -h|--help) sed -n '2,79p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,87p' "$0"; exit 0 ;;
     *) : ;;
   esac
   shift
@@ -649,6 +657,147 @@ if [ -f "$POSTER" ]; then
     echo "check-gate-status: FAIL — the poster did not refuse an unknown rc (rc=$rc, expected 2)" >&2
     fail=1
   fi
+fi
+
+# 3c. DETAIL — the description must be able to say WHY the gate redded (#1407).
+#
+#    The description was a FIXED string per rc, so every red PR page read
+#    `make verify: FAIL` and WHICH check failed was knowable only by opening the
+#    build log: a required check that cannot name its own refusal. The poster now
+#    takes `--detail <text>`, and the seam has TWO halves that must both hold:
+#
+#      * the detail REACHES the description -- and reaches the POSTED payload,
+#        not only the dry-run text, because a seam that stops one step short is a
+#        description the operator still never sees;
+#      * the detail does NOT reach the OUTCOME. A detail able to turn a
+#        CANNOT-ASSESS (rc 2) into a pass is exactly the #739 false-green class.
+#
+#    Every arm is offline. The posting arm shadows `gh` with a stub that records
+#    its argv, so the POST path itself is measured without making a request.
+if [ -f "$POSTER" ]; then
+  det_sha=0000000000000000000000000000000000000000
+  desc_of() { printf '%s\n' "$1" | sed -n 's/^  description = //p' | head -1; }
+  state_of() { printf '%s\n' "$1" | sed -n 's/^  state       = //p' | head -1; }
+  # The arm form below states the EXPECTATION beside the ACTUAL value, because an
+  # arm that only reports "ok=NO" cannot be audited.
+  darm() { # darm <label> <expect> <actual>
+    _dlbl="$1"; _dexp="$2"; _dact="$3"
+    if [ "$_dexp" = "$_dact" ]; then
+      echo "  OK    $_dlbl"
+      echo "        expect: $_dexp"
+      echo "        actual: $_dact"
+    else
+      echo "check-gate-status: FAIL — the detail arm '$_dlbl' did not hold" >&2
+      echo "        expect: $_dexp" >&2
+      echo "        actual: $_dact" >&2
+      fail=1
+    fi
+  }
+
+  # (a) PARITY. With NO detail the description is byte-identical to today's. The
+  #     three strings are pinned HERE as literals, so a drift in the mapper reds
+  #     this gate instead of quietly matching itself in two places at once.
+  declare -A TODAY=( [0]="make verify: PASS" [1]="make verify: FAIL" [2]="make verify: CANNOT-ASSESS (not a pass)" )
+  for rc in 0 1 2; do
+    det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc "$rc" 2>&1)"
+    darm "rc $rc with no --detail keeps today's description byte-for-byte" \
+      "${TODAY[$rc]}" "$(desc_of "$det_out")"
+  done
+
+  # (b) The detail REACHES the description, in front of an intact outcome string.
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 1 --detail 'check-reconcile' 2>&1)"
+  darm "post --rc 1 --detail 'check-reconcile' renders a description naming it" \
+    "make verify: FAIL -- check-reconcile" "$(desc_of "$det_out")"
+  darm "and the outcome is still the rc's own (the detail is a suffix)" \
+    "failure" "$(state_of "$det_out")"
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 1 --detail "$(printf 'check-a\n  check-b')" 2>&1)"
+  darm "a detail carrying newlines is flattened to ONE description line" \
+    "make verify: FAIL -- check-a check-b" "$(desc_of "$det_out")"
+
+  # (c) THE #739 ARM: a detail can not turn rc 2 into a pass. A status page reads
+  #     the STATE as well as the description, so both are asserted.
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 2 --detail 'success PASS green' 2>&1)"
+  darm "a passing-sounding detail on rc 2 is STILL published as an error" \
+    "error" "$(state_of "$det_out")"
+  case "$det_out" in
+    *"state       = success"*)
+      echo "check-gate-status: FAIL — a detail turned CANNOT-ASSESS into a pass (the #739 class)" >&2
+      fail=1 ;;
+    *)
+      echo "  OK    no state built for rc 2 is a pass, whatever the detail says" ;;
+  esac
+  case "$(desc_of "$det_out")" in
+    "make verify: CANNOT-ASSESS (not a pass)"*)
+      echo "  OK    and the description still leads with the CANNOT-ASSESS outcome" ;;
+    *)
+      echo "check-gate-status: FAIL — a detail displaced the CANNOT-ASSESS outcome string" >&2
+      printf '        actual: %s\n' "$(desc_of "$det_out")" >&2
+      fail=1 ;;
+  esac
+  # A detail is not a SOURCE of the outcome: offered with no --rc it must still be
+  # CANNOT-ASSESS, never an outcome guessed from the text of the detail.
+  bash "$POSTER" dry-run --sha "$det_sha" --detail 'check-reconcile' >/dev/null 2>&1
+  darm "a --detail with no --rc is still CANNOT-ASSESS (a detail is not an outcome)" \
+    2 "$?"
+
+  # (d) BOUNDED. GitHub cuts a status description at 140 characters, so the poster
+  #     must cut it deliberately: keep the outcome string, mark the cut. The API's
+  #     own limit is pinned here as a literal -- it is an external fact, not a
+  #     number this repository gets to choose.
+  cut_mark="$(python3 -c 'print("\u2026", end="")')"
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 2 --detail "$(printf 'c%.0s' $(seq 1 500))" 2>&1)"
+  det_desc="$(desc_of "$det_out")"
+  darm "a 500-character detail still fits the API's 140-character description cap" \
+    "<=140" "$([ "${#det_desc}" -le 140 ] && echo '<=140' || echo ">140 (${#det_desc})")"
+  case "$det_desc" in
+    "make verify: CANNOT-ASSESS (not a pass)"*"$cut_mark")
+      echo "  OK    and the truncation is MARKED, and the outcome string is what survived it" ;;
+    *)
+      echo "check-gate-status: FAIL — a truncated description neither kept its outcome string nor said it was cut" >&2
+      printf '        actual: %s\n' "$det_desc" >&2
+      fail=1 ;;
+  esac
+
+  # (e) The POST path itself: the detail must reach the PAYLOAD, not just the
+  #     dry-run text. `--rc 1` is deliberate -- the venue guard gates `success`
+  #     only, so a red reaches publish_status with no live read at all.
+  det_bin="$(mktemp -d /tmp/cgs-detail.XXXXXX)" || det_bin=""
+  if [ -z "$det_bin" ]; then
+    echo "check-gate-status: CANNOT-ASSESS — mktemp failed, so the posting arm could not be provoked" >&2
+    exit 2
+  fi
+  mkdir -p "$det_bin/bin"
+  cat > "$det_bin/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+# Fixture stand-in for `gh`: records its argv and answers success. The boundary
+# stubbed is the API, never the poster -- its parsing and decision all run.
+printf '%s\n' "$*" >> "${STUB_ARGV:?}"
+exit 0
+STUB
+  chmod +x "$det_bin/bin/gh"
+  : > "$det_bin/argv.txt"
+  STUB_ARGV="$det_bin/argv.txt" PATH="$det_bin/bin:$PATH" \
+    bash "$POSTER" post --sha "$det_sha" --rc 1 --detail 'check-shell-patterns' \
+    >"$det_bin/out.txt" 2>&1
+  det_rc=$?
+  darm "post --rc 1 --detail ... succeeds through the shadowed gh (no request made)" \
+    0 "$det_rc"
+  case "$(cat "$det_bin/argv.txt")" in
+    *"description=make verify: FAIL -- check-shell-patterns"*)
+      echo "  OK    and the detail reaches the POSTED payload: $(tr '\n' ' ' < "$det_bin/argv.txt")" ;;
+    *)
+      echo "check-gate-status: FAIL — the detail did not reach the posted payload" >&2
+      printf '        argv: %s\n' "$(tr '\n' ' ' < "$det_bin/argv.txt")" >&2
+      printf '        out:  %s\n' "$(tr '\n' ' ' < "$det_bin/out.txt")" >&2
+      fail=1 ;;
+  esac
+  rm -rf "$det_bin"
+
+  # (f) A verb that does not publish an outcome from --rc must REFUSE the detail
+  #     rather than accept and drop it: a flag that is silently ignored leaves the
+  #     producer believing it reached the PR page.
+  bash "$POSTER" reconcile --sha "$det_sha" --detail 'check-reconcile' >/dev/null 2>&1
+  darm "--detail on 'reconcile' is REFUSED, never silently dropped" 2 "$?"
 fi
 
 # 4. LIVE PRODUCER STATE — provoked (#1394).
