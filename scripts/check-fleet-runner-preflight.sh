@@ -300,11 +300,25 @@ STUB
     PYTHONDONTWRITEBYTECODE=1 python3 - > "$log" 2>&1 <<'PY'
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, "fleet")
 sys.path.insert(0, ".")
 import terminal  # noqa: E402
+import beats  # noqa: E402
 from governance.spawn import sources  # noqa: E402
+
+# This probe runs `terminal.run_once` against the REAL `fleet/terminal.py` at
+# `$root` (only HOME/PATH/AO_FLEET_DIR are sandboxed above), so it can assert a
+# runner really resolves and really spawns. Since #1412, `run_once` also posts
+# the `deepseek-executor` runtime beat (`terminal.beat_runtime`), and that beat
+# lands in `beats.ROOT` — a module constant, not `AO_FLEET_DIR` — which defaults
+# to this real repository. Redirected here for the same reason
+# `fleet/tests/conftest.py` redirects it for pytest: one stray beat here would
+# engage `scripts/check-runtime-liveness.sh`'s judge on the real tree and report
+# every OTHER registered runtime `runtime-stale`, reproduced 2026-09-19 (this
+# gate is what wrote it).
+beats.ROOT = Path(os.environ["AO_FLEET_DIR"])
 
 # The spawn envelope is a PRECONDITION (#793): a probe that drives the run path
 # supplies one, so this check keeps measuring the RUNNER (resolve it off PATH,

@@ -86,6 +86,7 @@ state_dirs=(
   .fleet/lifecycle
   .fleet/sessions
   .fleet/watchdog
+  .fleet/runtime-beats
 )
 
 # Roots under which no untracked, unignored path may exist. Wider than

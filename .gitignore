@@ -93,6 +93,10 @@ governance/board/violations.jsonl
 # record per rung holding its attempt count and escalation, plus the
 # one-per-incident escalation artifacts. Runtime state, never committed.
 .fleet/watchdog/
+# Runtime liveness beats (tracked module: fleet/beats.py, issue #1412): one
+# record per registered runtime, written by fleet.beats.post() on every beat.
+# Runtime state, never committed.
+.fleet/runtime-beats/
 # Fleet monitor runtime output (tracked module: fleet/monitor.py)
 .fleet/open-eye.log
 .fleet/open-eye.heartbeat
