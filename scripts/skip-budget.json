@@ -1,0 +1,96 @@
+{
+  "schema": "ao.verify.skip-budget/v1",
+  "why": "The named, shrink-only record of every check `make verify` is allowed to record as SKIP (rc 2 CANNOT-ASSESS) -- scripts/verify.sh's skip ratchet (issue #1199). A skip is named here or the run is REFUSED by name: the composite will not publish a `verify: PASS` whose skip set is narrated by nobody. Two kinds, both precise: `venue` (the check cannot assess because a NAMED PRECONDITION this venue must supply is not supplied -- honoured only while it is NOT supplied, so it de-activates itself the moment the venue supplies it; a check that still cannot assess WITH its precondition supplied is a defect of the CHECK, #1176, and is refused by name). A venue precondition has exactly TWO measured forms, never an assertion: a repo-relative PATH that must be absent (`vendor/CMR/sync`), and a COMMAND this venue must be able to run (`gh auth status`, supplied only when the command exits 0). The command form is the check's OWN probe quoted verbatim -- scripts/check-skip-ratchet.sh refuses a command that no file under scripts/ runs, so this record cannot invent a precondition nobody measures -- and `standing-gap` (the check's inputs ARE present and it still cannot assess, so it must name the OPEN issue that tracks it and is STALE the moment it assesses -- the entry must then be deleted). An entry that matters is matched EXACTLY (check + kind + the declared precondition, or the issue), so it cannot widen to cover a different blindness.",
+  "entries": [
+    {
+      "check": "branch-protection",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": { "command": "gh auth status" },
+      "reason": "The Cloud Build verify container installs no `gh`, so the check's own precondition library answers `CANNOT-ASSESS gh-unauthenticated: gh is not installed` (scripts/lib/preconditions.sh, required by scripts/check-branch-protection.sh). The declared probe is that library's OWN predicate, quoted verbatim. It stops biting the moment the image carries an authenticated `gh` -- and then the check must assess or the run is refused by name (#1361)."
+    },
+    {
+      "check": "cmr-knowledge",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": "vendor/CMR/sync/validate-cmr-pin.py",
+      "reason": "`CANNOT-ASSESS CMR_VALIDATOR_UNAVAILABLE: vendor/CMR/sync/validate-cmr-pin.py not present (vendor/CMR submodule not initialized?)` -- in Cloud Build the submodule cannot be initialised offline (`fatal: could not read Username for 'https://github.com'`), so this path is absent there and present in every worktree (#1361)."
+    },
+    {
+      "check": "cmr-pin",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": "vendor/CMR/sync/validate-cmr-pin.py",
+      "reason": "`check-cmr-pin: CANNOT-ASSESS -- vendor/CMR/sync/validate-cmr-pin.py not present (vendor/CMR submodule not initialized?)` -- the same absent precondition as cmr-knowledge (#1361)."
+    },
+    {
+      "check": "codeidx-surface",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": "vendor/CMR/templates/module/.mcp.json",
+      "reason": "`check-codeidx-surface: CANNOT-ASSESS - vendored mandatory seed unreadable: vendor/CMR/templates/module/.mcp.json (initialise vendor/CMR)` -- named by the check itself (#1361)."
+    },
+    {
+      "check": "diagrams-declaration",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": "vendor/CMR/catalog/schemas/architecture-manifest.schema.json",
+      "reason": "`check-diagrams-declaration: CANNOT-ASSESS - vendored contract unreadable: .../architecture-manifest.schema.json, .../gdc-manifest.schema.json, .../templates/module/gdc-manifest.yaml (initialise vendor/CMR)` -- the first of the three paths the check names (#1361)."
+    },
+    {
+      "check": "fleet-cron-dev-run",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": { "command": "docker compose version" },
+      "reason": "`CANNOT-ASSESS compose-plugin-missing: install the docker compose v2 plugin (docker compose version must succeed)` -- and that is the probe this entry declares, verbatim from the check's own guard (scripts/check-fleet-cron-dev-run.sh). The Cloud Build container installs no docker (#1361)."
+    },
+    {
+      "check": "fleet-cron-image",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": { "command": "docker info" },
+      "reason": "`check-fleet-cron-image: CANNOT-ASSESS -- docker not found; the live controls were not run` (the declared-surface half is green; the live half is unreachable). `docker info` is the check's own probe of the daemon (scripts/check-fleet-cron-image.sh), supplied only when docker AND a reachable daemon are (#1361)."
+    },
+    {
+      "check": "gate-status",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": { "command": "gh auth status" },
+      "reason": "`CANNOT-ASSESS gh-unauthenticated: gh is not installed` -- the mapping and the poster are asserted and sound, but the LIVE status cannot be observed without an authenticated `gh` (scripts/check-gate-status.sh probes it with this same command). Named here rather than left an anonymous skip (#1357 owns the producer half) (#1361)."
+    },
+    {
+      "check": "module-brief",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": "vendor/CMR/catalog/mandatory.tsv",
+      "reason": "`check-module-brief: CANNOT-ASSESS -- the pinned hub catalog is absent; expected vendor/CMR/catalog/mandatory.tsv and vendor/CMR/catalog/modules` -- named by the check itself (#1361)."
+    },
+    {
+      "check": "module-registry",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": "vendor/CMR/catalog/mandatory.tsv",
+      "reason": "`check-module-registry: CANNOT-ASSESS -- the pinned hub catalog is absent; expected vendor/CMR/catalog/mandatory.tsv and vendor/CMR/catalog/modules` -- the venue case this record documented from the start, now naming the open issue that tracks the CI half (#1361)."
+    },
+    {
+      "check": "repo-settings",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": { "command": "gh auth status" },
+      "reason": "`CANNOT-ASSESS gh-unauthenticated: gh is not installed` -- the same shared precondition library as branch-protection (scripts/lib/preconditions.sh, required by scripts/check-repo-settings.sh) (#1361)."
+    },
+    {
+      "check": "worktree-cap",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": { "command": "crontab -l" },
+      "reason": "`check-worktree-cap: CANNOT-ASSESS -- reaper schedule could not be determined: prune-worktrees: schedule: CANNOT-ASSESS -- crontab -l failed with rc=127: ... crontab: command not found`. The reaper's schedule is read from the LIVE crontab, by design (scripts/prune-worktrees.sh), so with no `crontab` binary the question cannot be answered at all. `crontab -l` is that probe quoted verbatim (#1361)."
+    }
+  ],
+  "why-these-entries-exist": [
+    "The list holds ONLY the gaps of the CLOUD BUILD venue (#1361) and no local one, and that is a measurement, not an omission. In the two venues a DEVELOPER produces, nothing skips: (a) a FRESH WORKTREE (`git worktree add` of this repo) was run end to end -- 202 checks rc 0, 1 check rc 1 (an unrelated `reconcile` real-tree drift baseline), 0 checks rc 2, verdict `verify: FAIL (1 of 203 checks failed)` with NO `skipped:` clause at all; (b) the populated checkout of the same commit. A skip that appears on the developer box is therefore a FINDING, not a known limit, and the ratchet refuses it by name with the remedy printed beside it -- which is the property this issue asked for: a skip bucket that cannot be permanently populated. Every entry that IS in this record is one of the required check's runner's own gaps: `control-plane-verify (purebliss-ghl)` runs `make verify` inside a bare `python:3.14` container with no `gh`, no docker (so no compose v2 plugin), no `crontab`, and no network with which to initialise `vendor/CMR`, so those twelve checks answer rc 2 there on EVERY run. That is filed as #1361, the open issue each entry names; supplying the tool or repairing the check deletes the entry, and a stale entry fails the run by name. Each of them is an `unused_venue_entry` on every local run -- a NOTE, never a failure -- and bites only in the venue whose precondition is genuinely absent.",
+    "The two checks that used to occupy the bucket are NOT here because they were REPAIRED, not because they were excused: `dispatch-queue` (#1189) and `paperclip-routines` (#1176) both reach real verdicts (measured at origin/master a60ab88: rc 0 each, 9 and 11 controls provoked). Naming them would be the fiction this ratchet exists to prevent.",
+    "The `venue` KIND is not hypothetical and was measured too: in a tree carrying no local submodule objects (so `git submodule update --init vendor/CMR` cannot succeed offline), `module-registry`, `diagrams-declaration` and `codeidx-surface` each answer rc 2 -- `the pinned hub catalog is absent` / `vendored contract unreadable` / `vendored mandatory seed unreadable` -- exactly as each check's own header declares. A lane in that venue names them with the precondition path it is missing, or supplies the submodule; it does not get a silent PASS.",
+    "Growing this list is a deliberate act naming the PRECONDITION the venue lacks -- a repo-relative PATH, or a COMMAND the venue must be able to run -- together with the OPEN issue that tracks supplying it (#1361 for the Cloud Build container); shrinking it is automatic -- an entry whose check assesses FAILS the run until the entry is deleted."
+  ]
+}

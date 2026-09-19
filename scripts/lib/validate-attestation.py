@@ -15,6 +15,12 @@ non-zero and non-two (the tri-state's genuine-failure code) must never carry
 verdict OK, and the top-level `overall_verdict` must be the worst of the
 per-check verdicts.
 
+The same class, one level out (issue #1199): a run that records a SKIP must
+ACCOUNT for it in `skip_ratchet` -- a skip nothing names is a standing gap the
+board cannot read, and a record claiming `verdict: OK` while it carries
+unbudgeted skips, stale exemptions or findings of its own is a false green of
+exactly the same kind.
+
 Usage:
   python3 scripts/lib/validate-attestation.py <attestation.json> <schema.json>
 
@@ -80,6 +86,7 @@ def _semantic_findings(doc: dict) -> list[str]:
     findings: list[str] = []
     checks = doc.get("checks") if isinstance(doc.get("checks"), list) else []
     worst = "OK"
+    skipped: list[str] = []
     for i, chk in enumerate(checks):
         if not isinstance(chk, dict):
             continue
@@ -89,11 +96,64 @@ def _semantic_findings(doc: dict) -> list[str]:
             findings.append(f"check[{i}]-red-reported-ok:{chk.get('name', '?')}")
         if isinstance(rc, int) and rc == 2 and verdict == "OK":
             findings.append(f"check[{i}]-cannot-assess-reported-ok:{chk.get('name', '?')}")
+        if isinstance(rc, int) and rc == 2:
+            skipped.append(str(chk.get("name", "?")))
         if verdict in _VERDICT_RANK and _VERDICT_RANK[verdict] > _VERDICT_RANK[worst]:
             worst = verdict
     overall = doc.get("overall_verdict")
     if overall in _VERDICT_RANK and _VERDICT_RANK[overall] < _VERDICT_RANK[worst]:
         findings.append(f"overall-verdict-better-than-worst-check:{overall}<{worst}")
+
+    # The skip ratchet (issue #1199): a skip the record does not account for is
+    # the same class of false green as a red reported OK -- the verdict line and
+    # the counters would say "N skipped" while nothing named WHICH standing gap
+    # that is. The record must therefore account for exactly the skips this run
+    # recorded, and may not claim OK while it carries findings of its own.
+    ratchet = doc.get("skip_ratchet")
+    if skipped and not isinstance(ratchet, dict):
+        findings.append(
+            "skip-ratchet-missing:%d check(s) recorded SKIP with no skip_ratchet record"
+            % len(skipped)
+        )
+    elif isinstance(ratchet, dict):
+        named = {
+            str(e.get("check"))
+            for e in ratchet.get("standing_skips", [])
+            if isinstance(e, dict)
+        }
+        # A `venue` standing skip must declare WHAT this venue fails to supply
+        # (issues #1199/#1361): the ratchet cannot write one without it (its own
+        # loader refuses the entry), so a record carrying one was NOT produced by
+        # the run it claims to describe.
+        for entry in ratchet.get("standing_skips", []):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("kind") == "venue" and not str(
+                entry.get("precondition") or ""
+            ).strip():
+                findings.append(
+                    f"venue-skip-with-no-precondition:{entry.get('check', '?')}"
+                )
+        unbudgeted = {
+            str(n) for n in ratchet.get("unbudgeted_skips", []) if isinstance(n, str)
+        }
+        for name in skipped:
+            if name not in named and name not in unbudgeted:
+                findings.append(f"skip-not-accounted:{name}")
+        for name in named | unbudgeted:
+            if name not in skipped:
+                findings.append(f"skip-ratchet-accounts-for-a-check-that-did-not-skip:{name}")
+        stale = ratchet.get("stale_entries")
+        findings_list = ratchet.get("findings")
+        if ratchet.get("verdict") == "OK" and (
+            unbudgeted or (isinstance(stale, list) and stale) or (isinstance(findings_list, list) and findings_list)
+        ):
+            findings.append("skip-ratchet-verdict-ok-while-carrying-findings")
+    skipped_count = doc.get("skipped")
+    if isinstance(skipped_count, int) and skipped_count != len(skipped):
+        findings.append(
+            f"skipped-count-disagrees-with-the-checks:{skipped_count}!={len(skipped)}"
+        )
     return findings
 
 
