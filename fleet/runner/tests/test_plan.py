@@ -195,6 +195,35 @@ def test_a_local_green_does_not_outrank_a_cloud_build_red():
     assert "cloud-build=red" in verdict.explain()
 
 
+# --- lesson 8 (#1378: a foreign red with no local run is re-queued, not stuck) --
+def test_a_foreign_red_with_no_local_record_is_requeued():
+    prs = [OpenPR(number=16, head_sha=NEW)]
+    table = ev.EvidenceTable([Evidence(16, NEW, SOURCE_CLOUD_BUILD, RED)])
+    actions = plan(prs, table, master_tip=TIP)
+    assert not kinds(actions, REFUSE)
+    assert one(actions, VERIFY, 16).reason == f"requeue:foreign-red:16:{SOURCE_CLOUD_BUILD}"
+
+
+def test_a_foreign_red_with_a_local_red_record_stays_refused():
+    prs = [OpenPR(number=17, head_sha=NEW)]
+    table = ev.EvidenceTable(
+        [Evidence(17, NEW, SOURCE_CLOUD_BUILD, RED), Evidence(17, NEW, SOURCE_LOCAL, RED)]
+    )
+    actions = plan(prs, table, master_tip=TIP)
+    assert not kinds(actions, VERIFY)
+    assert one(actions, REFUSE, 17).reason == "verify-red:17:local-marker"
+
+
+def test_a_foreign_red_with_a_local_green_merges_instead():
+    prs = [OpenPR(number=18, head_sha=NEW)]
+    table = ev.EvidenceTable(
+        [Evidence(18, NEW, SOURCE_CLOUD_BUILD, RED), Evidence(18, NEW, SOURCE_LOCAL, GREEN)]
+    )
+    actions = plan(prs, table, master_tip=TIP)
+    assert not kinds(actions, VERIFY) and not kinds(actions, REFUSE)
+    assert one(actions, MERGE, 18).reason == f"green:{SOURCE_LOCAL}:18"
+
+
 # --- lesson 7 (planner half: a failed prune plans no new verify) ----------------
 def test_a_failed_gatelock_prune_plans_no_verify():
     prs = [OpenPR(number=14, head_sha=NEW)]

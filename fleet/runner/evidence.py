@@ -109,6 +109,16 @@ class Verdict:
     def requeue(self) -> bool:
         return self.state in REQUEUE_STATES or self.state == "none"
 
+    @property
+    def has_local_record(self) -> bool:
+        """Whether ANY record for this head came from the local marker,
+        regardless of its state or whether it is the basis (issue #1378).
+
+        Used to distinguish a foreign RED the runner has never itself
+        verified (re-queue it) from one it already ran locally (stay
+        refused, no point burning a slot re-running it)."""
+        return any(r.source == SOURCE_LOCAL for r in self.records)
+
     def explain(self) -> str:
         if self.basis is None:
             return f"no evidence for #{self.pr}@{self.sha[:12]}"
