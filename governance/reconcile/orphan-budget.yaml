@@ -18,17 +18,42 @@
 # and no lane record for their branch), issue-lane=19 (lane records whose issue
 # is closed), directive=111 (`.fleet/sent/` orders naming a closed issue).
 # Reclaimable with evidence on that day: 9 worktrees + 1 branch (content-landed).
+#
+# RE-MEASURED 2026-09-19 (issue #1414) — the same dry-run walk over the shared
+# checkout, on ElevatedIQ-AK: worktree=26, branch=102, pr=0, issue-lane=32,
+# directive=112 (`measured.counts` below carries all five). The pile GREW for two
+# kinds and those numbers are therefore NOT raised here: orphan-branch (102 > 95)
+# and orphan-issue-lane (32 > 25) are ABOVE their declared budget, which is a
+# finding to shrink, not a number to re-excuse — a loosening needs its own issue.
+# The one kind with room to tighten is tightened: orphan-worktree 55 -> 36
+# (measured 26 + the same 10 churn headroom). `scripts/check-ratchets.sh` (#1414)
+# reds the day `expires` arrives with no `renewed_at`, so this deadline is no
+# longer a date nobody reads.
 budget:
-  orphan-worktree: 55      # measured 44 + 11 churn headroom
-  orphan-branch: 95        # measured 85 + 10
-  orphan-pr: 20            # measured 11 + 9 (a wave of lanes opens PRs before `lane:` is composed, #1254)
-  orphan-issue-lane: 25    # measured 19 + 6
-  orphan-directive: 115    # measured 111 + 4
+  orphan-worktree: 36      # 2026-09-19: measured 26 + 10 churn headroom (was 44 + 11)
+  orphan-branch: 95        # 2026-09-19: measured 102 — ABOVE this budget, not raised (#1414)
+  orphan-pr: 20            # 2026-09-19: measured 0 (a wave of lanes opens PRs before `lane:` is composed, #1254)
+  orphan-issue-lane: 25    # 2026-09-19: measured 32 — ABOVE this budget, not raised (#1414)
+  orphan-directive: 115    # 2026-09-19: measured 112 (was 111)
 measured:
   host: ElevatedIQ-AK
-  date: "2026-09-18"
+  date: "2026-09-19"
+  command: "orphans.walk(RepoOrphanOps(<main checkout>), apply=False) — `cli.py sweep --orphans`, dry-run"
+  counts:
+    orphan-worktree: 26
+    orphan-branch: 102
+    orphan-pr: 0
+    orphan-issue-lane: 32
+    orphan-directive: 112
+  above_budget:
+    - orphan-branch
+    - orphan-issue-lane
+renewed_at: "2026-09-19"
 expires: "2026-10-02"
 note: >-
-  Seeded from the first measured walk; the OWNER re-measures and approves these
-  numbers once (`sweep --orphans` on the shared checkout), then they only go down.
-  After `expires` the allowance is 0 and the walk reds on the first orphan.
+  Seeded from the first measured walk and re-measured 2026-09-19 (#1414); the OWNER
+  re-measures and approves these numbers once (`sweep --orphans` on the shared
+  checkout), then they only go down. Two kinds were above their budget when this was
+  re-measured (orphan-branch 102/95, orphan-issue-lane 32/25) and were left alone —
+  the pile shrinks, it is not re-excused. After `expires` the allowance is 0 and the
+  walk reds on the first orphan.
