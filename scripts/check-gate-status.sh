@@ -34,21 +34,33 @@
 # producer does not exist is not a control; it is a bypass generator, and the
 # gate that polices it must say so BY NAME instead of passing.
 #
-# So section 5 asks the producing question over the TREE alone (no network, so it
-# is deterministic and sandbox-safe):
+# So section 5 asks the producing question in TWO halves, and keeps them apart
+# because they are answerable from different places (#1394):
 #
-#   * the context is REQUIRED -- in the policy's
-#     `protection.required_status_checks.contexts`, or named by ADR-0028's
-#     `required_status_contexts` -- and
-#   * no invocation of the poster exists on the path that MAKES the verdict
-#     (`infra/cloudbuild/*.yaml`, the unattended runner that runs the gate of
-#     record), or none exists anywhere at all.
+#   * THE TREE -- does the context have a producer that is REACHED from the path
+#     that MAKES the verdict (`infra/cloudbuild/*.yaml`)? Offline, deterministic,
+#     and provable. No producer anywhere, or none on that path, is rc 1 BY NAME.
+#   * THE LIVE STATE -- is that producer actually PRODUCING? The tree cannot
+#     answer this even though it looks like it can: the only field it carries is
+#     `infra/cloudbuild/verify-trigger.yaml`'s `disabled:`, and this repository
+#     PINS that `true` by policy (scripts/check-cloudbuild.sh requires
+#     `disabled: true` on the import stub, GR-5), so a probe that reads it as
+#     live state names a condition the tree can never falsify. Measured
+#     2026-09-19: the LIVE trigger is ENABLED and the context IS posted, while
+#     that same probe answered `CANNOT-ASSESS REQUIRED-BUT-GATED-OFF` -- rc 2,
+#     forever, on a healthy repository. A gate that reports a named condition
+#     from a stale source of truth is not a control, so the declared value is now
+#     an OBSERVATION and the verdict is read from `gh` -- the only half that
+#     reality can contradict.
 #
-# "Produced" is asserted at the two moments it can honestly be asserted: a
-# producer path must EXIST and be reached from the verdict path (offline, and
-# provable), and a status must be OBSERVED on the commit under test (the
-# read-back). A REQUIRED context that is not observed is CANNOT-ASSESS naming it
-# -- never the green note it used to be.
+# The live half therefore answers one of three things, and never blurs them:
+#
+#   * the context IS being produced (observed on the commit under test or on a
+#     recent commit) -> the producer exists AND is live -> rc 0;
+#   * the source WAS READ and nothing is producing -> rc 1 BY NAME (a finding
+#     about the repository, not an inability to assess);
+#   * the source could NOT be read -> rc 2 CANNOT-ASSESS naming the source --
+#     never a green, and never a false named verdict.
 #
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
@@ -56,7 +68,15 @@
 #        bash scripts/check-gate-status.sh --producer-probe [--root DIR]
 #          answer ONLY the producing question over DIR and exit 0/1/2, so
 #          scripts/check-branch-protection.sh drives THIS implementation rather
-#          than a second copy of the rule.
+#          than a second copy of the rule. The live question is asked only when
+#          DIR IS this repository's own tree -- a fixture is not the repository
+#          the live state describes -- and a foreign tree gets the declared
+#          verdict, which is what the four #1357 fixtures assert.
+#        bash scripts/check-gate-status.sh --producer-probe --root DIR \
+#             --live-state enabled|disabled|unreadable [--live-source S]
+#          the provocation seat: stand a live answer in for a fixture. REFUSED
+#          on this repository's own tree, so the gate can never be told that its
+#          own producer is enabled.
 set -u
 
 # --- the probe seam, parsed BEFORE anything else -------------------------
@@ -67,11 +87,22 @@ set -u
 # function through `--producer-probe`.
 probe_mode=0
 root_override=""
+live_state_override=""
+live_source_override=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --producer-probe) probe_mode=1 ;;
     --root) root_override="${2:-}"; shift ;;
-    -h|--help) sed -n '2,70p' "$0"; exit 0 ;;
+    # The PROVOCATION input for the live half (#1394). The live producer state
+    # is the one input reality can contradict, so it cannot be asserted -- it is
+    # READ, from `gh`, inside live_producer_state(). A fixture is not the
+    # repository the live state describes, so its arms must be able to stand a
+    # live answer in; this is that seat, and it is refused on this repository's
+    # OWN tree (see the probe block), so no run of this gate can be told that
+    # the producer is enabled.
+    --live-state) live_state_override="${2:-}"; shift ;;
+    --live-source) live_source_override="${2:-}"; shift ;;
+    -h|--help) sed -n '2,79p' "$0"; exit 0 ;;
     *) : ;;
   esac
   shift
@@ -199,24 +230,110 @@ reaches_producer() {
   return 1
 }
 
-# producer_probe <root> -- the producing question, over one tree.
+# live_producer_state <root> <context> -- the ONE input reality can contradict:
+# is the producer actually producing? Printed as "<state> <source>" on one line.
+#
+#   enabled    the required context was OBSERVED -- on the commit under test, or
+#              on one of the most recent default-branch commits
+#   disabled   the source WAS readable and no such observation exists: the
+#              producer is genuinely not producing
+#   unreadable the source could not be read at all; a caller must never turn this
+#              into either verdict
+#
+# WHY THIS EXISTS, measured 2026-09-19 (#1394): the LIVE trigger is ENABLED and
+# the context IS posted -- `gcloud builds triggers describe control-plane-verify`
+# answers `control-plane-verify  infra/cloudbuild/verify.yaml` (an empty
+# `disabled` field, i.e. enabled), and `ao/gate-of-record` is observed on
+# 2adbe48b (twice), 83ff32db and 0dbb0e68 -- while the tree's own
+# `infra/cloudbuild/verify-trigger.yaml` declares `disabled: true`, pinned there
+# BY THIS REPOSITORY'S POLICY: scripts/check-cloudbuild.sh calls
+# `check_trigger "$cb_dir/verify-trigger.yaml" _ENABLE_VERIFY`, which requires
+# `disabled is not True -> "must ship disabled: true (GR-5)"`. So the tree
+# question "is this path gated off?" can never be falsified from the tree, and a
+# probe that reads it as LIVE state names a condition the world contradicts --
+# rc 2 forever, on a repository that is healthy. The declared value stays an
+# OBSERVATION; the verdict is taken here, from the thing that can be wrong.
+live_producer_state() {
+  lroot="$1"
+  lctx="$2"
+  if ! command -v gh >/dev/null 2>&1; then
+    printf 'unreadable gh-not-installed\n'
+    return 0
+  fi
+  if ! gh auth status >/dev/null 2>&1; then
+    printf 'unreadable gh-unauthenticated\n'
+    return 0
+  fi
+  lslug="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"
+  if [ -z "$lslug" ]; then
+    printf 'unreadable gh-repo-unresolvable\n'
+    return 0
+  fi
+  lwindow="${AO_GATE_STATUS_WINDOW:-20}"
+  case "$lwindow" in ''|*[!0-9]*) lwindow=20 ;; esac
+  [ "$lwindow" -gt 50 ] && lwindow=50
+  # The commit under test is probed FIRST -- a head that carries the status is
+  # found in one request, and the requirement is per-PR-head once protection is
+  # applied (governance/platform/branch-protection.yaml).
+  lhead="$(git -C "$lroot" rev-parse HEAD 2>/dev/null)"
+  lrecent="$(gh api "repos/$lslug/commits?per_page=$lwindow" --jq '.[].sha' 2>/dev/null)"
+  lread=0
+  lfound=0
+  for lc in $lhead $lrecent; do
+    [ -n "$lc" ] || continue
+    if ! lctxs="$(gh api "repos/$lslug/commits/$lc/statuses" \
+                   --jq '[.[].context]|join(",")' 2>/dev/null)"; then
+      continue
+    fi
+    lread=$((lread + 1))
+    case ",$lctxs," in
+      *",$lctx,"*) lfound=1; break ;;
+    esac
+  done
+  if [ "$lfound" -eq 1 ]; then
+    printf 'enabled gh-status-observed\n'
+  elif [ "$lread" -gt 0 ]; then
+    printf 'disabled gh-status-absent-in-last-%s-commits\n' "$lwindow"
+  else
+    printf 'unreadable gh-statuses-unreadable\n'
+  fi
+  return 0
+}
+
+# probe_line <required> <verdict> -- the machine-readable first line. `live=` is
+# added by #1394 so the caller can act on the live state without re-reading it
+# (and without the two halves of the rule being able to disagree).
+probe_line() {
+  printf 'probe: required=%s context=%s verdict=%s live=%s live_source=%s\n' \
+    "$1" "$pctx" "$2" "${live_state:--}" "${live_source:--}"
+}
+
+# producer_probe <root> [live-mode] -- the producing question, over one tree.
 #   0 the REQUIRED context has a producer on every path that makes the verdict
 #     (or nothing is REQUIRED, so no producer is owed)
 #   1 REQUIRED-BUT-UNPRODUCED -- a producer path is absent, and the refusal names
 #     the context and the missing producer
-#   2 CANNOT-ASSESS -- the requirement or the verdict path could not be located
-# The first line is machine-readable so a caller can read the answer without
-# re-deriving it; the lines after it are the human refusal.
+#   2 CANNOT-ASSESS -- the requirement or the verdict path could not be located,
+#     the live producer state could not be read, or (live) nothing is producing
+#
+# `live-mode` is one of:
+#   ask       read the live state from live_producer_state() -- the real answer
+#   skip      ask nothing: the DECLARED state stands as the verdict. This is what
+#             a foreign tree gets: a fixture is not the repository the live state
+#             describes, so there is no live fact about it to read (#1394)
+#   enabled|disabled|unreadable
+#             the provocation seat -- a fixture's live answer, stood in
 producer_probe() {
   r="${1:-}"
+  lmode="${2:-skip}"
   if [ -z "$r" ] || [ ! -d "$r" ]; then
-    printf 'probe: required=unknown context=unknown verdict=unreadable\n'
+    printf 'probe: required=unknown context=unknown verdict=unreadable live=-\n'
     echo "check-gate-status: CANNOT-ASSESS — there is no tree to probe: '${r}'" >&2
     return 2
   fi
   pol="$r/governance/platform/branch-protection.yaml"
   if [ ! -f "$pol" ]; then
-    printf 'probe: required=unknown context=unknown verdict=unreadable\n'
+    printf 'probe: required=unknown context=unknown verdict=unreadable live=-\n'
     echo "check-gate-status: CANNOT-ASSESS — the declared policy is missing: $pol, so what is REQUIRED cannot be read" >&2
     return 2
   fi
@@ -247,7 +364,7 @@ print(" ".join(str(c) for c in contexts))
 PY
 )" || required_ctxs=""
   if [ -z "$required_ctxs" ] && ! grep -q 'required_status_checks' "$pol"; then
-    printf 'probe: required=unknown context=unknown verdict=unreadable\n'
+    printf 'probe: required=unknown context=unknown verdict=unreadable live=-\n'
     echo "check-gate-status: CANNOT-ASSESS — $pol could not be parsed, so what is REQUIRED cannot be read (PyYAML missing or the file is unreadable)" >&2
     return 2
   fi
@@ -266,6 +383,25 @@ PY
     *" $pctx "*) required=1 ;;
   esac
 
+  # THE LIVE HALF (#1394). Resolved here, once, from a source that is not the
+  # tree, because the tree cannot answer this question and only pretends to.
+  live_state=""
+  live_source=""
+  case "$lmode" in
+    ask)
+      lres="$(live_producer_state "$r" "$pctx")"
+      live_state="${lres%% *}"
+      live_source="${lres#* }" ;;
+    skip) : ;;
+    enabled|disabled|unreadable)
+      live_state="$lmode"
+      live_source="${3:-provocation-seam}" ;;
+    *)
+      probe_line unknown unreadable
+      echo "check-gate-status: CANNOT-ASSESS — unknown live mode '$lmode'" >&2
+      return 2 ;;
+  esac
+
   # The producers that exist anywhere in the tree, and the paths the repo names
   # as the ones that make the PR verdict. Both are computed from the tree, so
   # neither can be told a story.
@@ -279,17 +415,17 @@ PY
   vrc=$?
 
   if [ "$required" -eq 0 ]; then
-    printf 'probe: required=0 context=%s verdict=not-required\n' "$pctx"
+    probe_line 0 not-required
     echo "  OK  no status context is REQUIRED by governance/platform/branch-protection.yaml, so no producer is owed and no merge is deadlocked by its absence"
     return 0
   fi
   if [ "$vrc" -ne 0 ] || [ -z "$vlist" ]; then
-    printf 'probe: required=1 context=%s verdict=unlocatable\n' "$pctx"
+    probe_line 1 unlocatable
     echo "check-gate-status: CANNOT-ASSESS REQUIRED-BUT-UNLOCATABLE — '$pctx' is REQUIRED, but no path that evaluates a pull request could be located (no trigger under $fx_verdict_dir declares repositoryEventConfig.pullRequest with a filename, or the declarations could not be parsed), so the path that MAKES the PR verdict cannot be identified and no producer can be proven on it; that is never a pass" >&2
     return 2
   fi
   if [ -z "$sites" ]; then
-    printf 'probe: required=1 context=%s verdict=unproduced\n' "$pctx"
+    probe_line 1 unproduced
     echo "check-gate-status: FAIL REQUIRED-BUT-UNPRODUCED — the REQUIRED context '$pctx' has NO PRODUCER: no non-test, non-doc invocation of 'bash scripts/$fx_name $fx_verb' exists anywhere in this tree" >&2
     printf '    the PR verdict is made by: %s\n' "$(printf '%s' "$vlist" | cut -d' ' -f1 | tr '\n' ' ')" >&2
     return 1
@@ -306,7 +442,7 @@ PY
 "
   done <<< "$vlist"
   if [ -n "$unproduced" ]; then
-    printf 'probe: required=1 context=%s verdict=unproduced\n' "$pctx"
+    probe_line 1 unproduced
     echo "check-gate-status: FAIL REQUIRED-BUT-UNPRODUCED — the context '$pctx' is REQUIRED by governance/platform/branch-protection.yaml, but nothing posts it on the path that evaluates a pull request:" >&2
     echo "    required context : $pctx" >&2
     echo "    missing producer : no invocation of 'bash scripts/$fx_name $fx_verb' in" >&2
@@ -321,17 +457,48 @@ PY
     return 1
   fi
   if [ -n "$gated_off" ]; then
-    printf 'probe: required=1 context=%s verdict=gated-off\n' "$pctx"
-    echo "check-gate-status: CANNOT-ASSESS REQUIRED-BUT-GATED-OFF — '$pctx' is REQUIRED and its producer exists on the PR path, but that trigger ships flag-gated OFF, so nothing produces the check until it is promoted out of band; the requirement is not satisfiable yet, which is never a pass:" >&2
-    printf '      %s\n' $gated_off >&2
-    return 2
+    # The PR verdict path ships DECLARED flag-gated OFF. Whether that is the LIVE
+    # truth is a different question, and only the live half can answer it: the
+    # declaration is pinned by this repository's own policy (check-cloudbuild.sh
+    # requires `disabled: true` on the import stub, GR-5), so it can never be
+    # falsified from the tree, and reading it as live state is the #1394 defect.
+    case "$live_state" in
+      enabled)
+        probe_line 1 produced
+        echo "  OK  the REQUIRED context '$pctx' has a producer on the path that evaluates a pull request, and the LIVE producer state is '$live_source' — the context IS being produced"
+        printf '      OBSERVATION, not a verdict: %s declares the PR verdict path flag-gated OFF.\n' "$gated_off"
+        echo "      That declaration is pinned true by this repository's own policy (scripts/check-cloudbuild.sh, GR-5) and is therefore unfalsifiable from the tree; the verdict is taken from the live read-back instead (#1394)."
+        return 0 ;;
+      disabled)
+        # The source WAS readable and it says nothing is producing. That is not an
+        # inability to assess -- it is a FINDING, so it is rc 1 like every other
+        # unproduced-context refusal, not rc 2. (rc 2 here would also be the wrong
+        # shape for the skip budget: a skip means "this venue cannot answer", and
+        # this venue just did.)
+        probe_line 1 unobserved
+        echo "check-gate-status: FAIL REQUIRED-BUT-UNOBSERVED — '$pctx' is REQUIRED and a producer exists on the PR verdict path, and the live producer state WAS read ('$live_source'), but the context is not observed on the commit under test nor on any of the most recent commits: the producer is genuinely not producing, so the requirement is not satisfiable, which is never a pass:" >&2
+        printf '      declared flag-gated OFF as well: %s\n' $gated_off >&2
+        return 1 ;;
+      unreadable)
+        probe_line 1 live-unreadable
+        echo "check-gate-status: CANNOT-ASSESS LIVE-PRODUCER-UNREADABLE — '$pctx' is REQUIRED and a producer exists on the PR verdict path, but the live producer state could NOT be read from its source ('$live_source'): neither 'it is producing' nor 'it is gated off' can be claimed, because the source — not the tree — is what decides this, and an unreadable source is never a pass" >&2
+        printf '      the declaration this leaves unresolved: %s\n' $gated_off >&2
+        return 2 ;;
+      *)
+        probe_line 1 gated-off
+        echo "check-gate-status: CANNOT-ASSESS REQUIRED-BUT-GATED-OFF — '$pctx' is REQUIRED and its producer exists on the PR path, but that trigger ships flag-gated OFF, so nothing produces the check until it is promoted out of band; the requirement is not satisfiable yet, which is never a pass:" >&2
+        printf '      %s\n' $gated_off >&2
+        echo "      (no live question was asked here — the tree under probe is not the repository the live state describes, so the declaration stands as the only available observation)" >&2
+        return 2 ;;
+    esac
   fi
-  printf 'probe: required=1 context=%s verdict=produced\n' "$pctx"
+  probe_line 1 produced
   echo "  OK  the REQUIRED context '$pctx' has a producer on the path that evaluates a pull request"
   return 0
 }
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+own_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$own_root"
 if [ -n "$root_override" ]; then
   root="$(cd "$root_override" 2>/dev/null && pwd)" || {
     echo "check-gate-status: CANNOT-ASSESS — --root is not a readable directory: $root_override" >&2
@@ -339,8 +506,34 @@ if [ -n "$root_override" ]; then
   }
 fi
 if [ "$probe_mode" -eq 1 ]; then
-  producer_probe "$root"
+  # THE SAME-TREE RULE (#1394). The live producer state is a fact about THIS
+  # repository, so the live question is asked only when the tree under probe IS
+  # this repository's tree. A fixture is not: there is no trigger of its own and
+  # no live poster, so asking about it would be a category error -- and it would
+  # have silently INVERTED the four provocation arms in
+  # scripts/check-branch-protection.sh, whose `gatedoff` fixture must keep
+  # answering the declared-state verdict. So a foreign tree gets `skip`, and the
+  # provocation seat (`--live-state`) supplies a live answer explicitly.
+  if [ "$root" = "$own_root" ]; then
+    if [ -n "$live_state_override" ]; then
+      echo "check-gate-status: CANNOT-ASSESS — --live-state is REFUSED on this repository's OWN tree: the live producer state is READ here, never asserted (#1394)" >&2
+      exit 2
+    fi
+    producer_probe "$root" ask
+  else
+    case "$live_state_override" in
+      '') producer_probe "$root" skip ;;
+      enabled|disabled|unreadable)
+        producer_probe "$root" "$live_state_override" "$live_source_override" ;;
+      *) echo "check-gate-status: CANNOT-ASSESS — --live-state must be enabled, disabled or unreadable (got '$live_state_override')" >&2
+         exit 2 ;;
+    esac
+  fi
   exit $?
+fi
+if [ -n "$live_state_override" ]; then
+  echo "check-gate-status: CANNOT-ASSESS — --live-state requires --producer-probe: the live state is read on this repository's own tree, never asserted" >&2
+  exit 2
 fi
 cd "$root" || exit 2
 
@@ -458,6 +651,102 @@ if [ -f "$POSTER" ]; then
   fi
 fi
 
+# 4. LIVE PRODUCER STATE — provoked (#1394).
+#
+#    The defect this provokes: the probe read the checked-in import stub's
+#    `disabled:` as LIVE state, so it answered REQUIRED-BUT-GATED-OFF (rc 2) on a
+#    repository whose trigger is ENABLED and whose context IS posted -- naming a
+#    condition the world contradicts, forever, with no way for the tree to
+#    falsify it (scripts/check-cloudbuild.sh PINS that field `true` by policy).
+#
+#    Four arms, and every one of them is stated as a PAIR -- the expectation
+#    beside the line that was actually produced -- because an arm that only says
+#    "ok=NO" cannot be audited. The negative control is the last one: the
+#    provocation seat must be REFUSED on this repository's own tree, or the gate
+#    could be told that the producer is enabled.
+mk_live_fixture() { # mk_live_fixture <dir> <disabled: true|false>
+  mkdir -p "$1/infra/cloudbuild" "$1/governance/platform" "$1/scripts"
+  cat > "$1/governance/platform/branch-protection.yaml" <<'YAML'
+required_status_contexts:
+  - ao/gate-of-record
+YAML
+  printf 'repositoryEventConfig:\n  pullRequest:\n    branch: ^master$\nfilename: infra/cloudbuild/verify.yaml\ndisabled: %s\n' \
+    "$2" > "$1/infra/cloudbuild/verify-trigger.yaml"
+  cat > "$1/infra/cloudbuild/verify.yaml" <<'YAML'
+steps:
+  - name: verdict
+    args: ["bash scripts/gate-status.sh post --sha 1 --rc 0"]
+YAML
+}
+
+arm() { # arm <label> <want-rc> <want-needle> <forbid-needle> <out> <rc>
+  _lbl="$1"; _wantrc="$2"; _need="$3"; _forbid="$4"; _out="$5"; _rc="$6"
+  _ok=1
+  [ "$_rc" = "$_wantrc" ] || _ok=0
+  case "$_out" in *"$_need"*) : ;; *) _ok=0 ;; esac
+  case "$_forbid" in
+    '') : ;;
+    *) case "$_out" in *"$_forbid"*) _ok=0 ;; esac ;;
+  esac
+  if [ "$_ok" -eq 1 ]; then
+    echo "  OK    $_lbl"
+    echo "        expect: rc=$_wantrc and '$_need'${_forbid:+ and NOT '$_forbid'}"
+    echo "        actual: $(printf '%s' "$_out" | grep -E '^probe:' | head -1)  rc=$_rc"
+  else
+    echo "check-gate-status: FAIL — provoked arm '$_lbl' did not hold" >&2
+    echo "        expect: rc=$_wantrc and '$_need'${_forbid:+ and NOT '$_forbid'}" >&2
+    echo "        actual: $(printf '%s' "$_out" | grep -E '^probe:' | head -1)  rc=$_rc" >&2
+    printf '%s\n' "$_out" | sed 's/^/        /' >&2
+    fail=1
+  fi
+}
+
+live_fx="$(mktemp -d "${TMPDIR:-/tmp}/cgs-live.XXXXXX")" || live_fx=""
+if [ -z "$live_fx" ]; then
+  echo "check-gate-status: CANNOT-ASSESS — mktemp failed, so the live arms could not be provoked" >&2
+  exit 2
+fi
+trap 'rm -rf "$live_fx"' EXIT
+mk_live_fixture "$live_fx/off" true
+
+# 4a. THE DEFECT: a DECLARED-off path whose live producer IS enabled and posting
+#     must not carry the gated-off verdict, and must assess.
+out="$(bash scripts/check-gate-status.sh --producer-probe --root "$live_fx/off" \
+        --live-state enabled --live-source fixture-status-observed 2>&1)"; rc=$?
+arm "a DECLARED-off PR path with a LIVE, enabled, posting producer is PRODUCED" \
+    0 'verdict=produced' 'REQUIRED-BUT-GATED-OFF' "$out" "$rc"
+
+# 4b. The other way: with the source READABLE and nothing producing, it must still
+#     refuse, by name, and must NOT go green -- and it is a FINDING (rc 1), not an
+#     inability to assess (rc 2), because this venue just answered the question.
+out="$(bash scripts/check-gate-status.sh --producer-probe --root "$live_fx/off" \
+        --live-state disabled --live-source fixture-none-observed 2>&1)"; rc=$?
+arm "a producer that is genuinely not producing is REFUSED by name" \
+    1 'REQUIRED-BUT-UNOBSERVED' 'verdict=produced' "$out" "$rc"
+
+# 4c. An UNREADABLE source is CANNOT-ASSESS naming the source — never a green, and
+#     never the false named verdict from the stale declaration.
+out="$(bash scripts/check-gate-status.sh --producer-probe --root "$live_fx/off" \
+        --live-state unreadable --live-source fixture-gh-not-installed 2>&1)"; rc=$?
+arm "an UNREADABLE live source is CANNOT-ASSESS naming the source" \
+    2 'LIVE-PRODUCER-UNREADABLE' 'verdict=produced' "$out" "$rc"
+case "$out" in
+  *fixture-gh-not-installed*) echo "  OK    and the refusal NAMES the source it could not read" ;;
+  *) echo "check-gate-status: FAIL — the unreadable refusal did not name its source" >&2; fail=1 ;;
+esac
+
+# 4d. NEGATIVE CONTROL — the seat must be REFUSED on this repository's own tree.
+out="$(bash scripts/check-gate-status.sh --producer-probe --root "$root" \
+        --live-state enabled 2>&1)"; rc=$?
+arm "telling this repository that its producer is enabled is REFUSED" \
+    2 'REFUSED on this repository' 'verdict=produced' "$out" "$rc"
+
+# 4e. No live question on a FOREIGN tree: the declared state stands (this is the
+#     shape scripts/check-branch-protection.sh's fixtures depend on).
+out="$(bash scripts/check-gate-status.sh --producer-probe --root "$live_fx/off" 2>&1)"; rc=$?
+arm "a foreign tree gets the DECLARED verdict, not a live one" \
+    2 'REQUIRED-BUT-GATED-OFF' '' "$out" "$rc"
+
 # 5. PRODUCER — the REQUIRED context must have a PRODUCER (#1357).
 #
 #    Everything above proves the poster's machinery; this proves the poster is
@@ -474,10 +763,25 @@ fi
 #    of the rule is shown to be able to fail, and the negative control (nothing
 #    REQUIRED) is shown NOT to fire.
 producer_now=0
-producer_out="$(producer_probe "$root" 2>&1)"
+producer_out="$(producer_probe "$root" ask 2>&1)"
 prc=$?
 case "$producer_out" in
   *"required=1"*) producer_now=1 ;;
+esac
+probe_live="-"
+producer_live_source="-"
+# shellcheck disable=SC2034
+live_field="$(printf '%s' "$producer_out" | grep -oE 'live=[^ ]+' | head -1)"
+live_src_field="$(printf '%s' "$producer_out" | grep -oE 'live_source=[^ ]+' | head -1)"
+live_field="${live_field#live=}"
+live_src_field="${live_src_field#live_source=}"
+case "$live_field" in
+  enabled|disabled|unreadable) probe_live="$live_field" ;;
+  *) probe_live="-" ;;
+esac
+case "$live_src_field" in
+  ''|'-') producer_live_source="-" ;;
+  *) producer_live_source="$live_src_field" ;;
 esac
 case "$prc" in
   0) printf '%s\n' "$producer_out" ;;
@@ -488,39 +792,40 @@ case "$prc" in
      fail=1 ;;
 esac
 
-# 6. LIVE read-back — is this commit actually carrying the status? Offline is
-#    CANNOT-ASSESS (2), never a pass.
+# 6. LIVE read-back — the half that reality can contradict.
 #
-#    Read back the commit the ADR's mechanism was proven on. Absence is NOT a
-#    failure here: a commit that predates the poster is legitimately ungated, and
-#    the context is not yet required (that is a separate, deliberate step --
-#    requiring a context nothing posts would deadlock every merge, which is
-#    exactly the #724 defect: an inert control with a gate that could not see it).
+#    #1394 replaced the per-HEAD question with a question about the MECHANISM,
+#    because the per-head form made this check unable to reach OK on the
+#    repository it polices: the required context is posted on the commits a
+#    verdict was made for, not on every commit, so "is it on HEAD?" answers
+#    "no" for most heads while the producer is demonstrably working. The verdict
+#    is now read from the live producer state (section 5's probe already read it
+#    -- `live=` carries it, so the two halves cannot disagree):
+#
+#      enabled    the context IS being produced -> this half passes
+#      disabled   the source WAS read and nothing is producing -> CANNOT-ASSESS
+#      unreadable the source could NOT be read -> CANNOT-ASSESS naming it
+#
+#    An unobserved context when nothing is REQUIRED is not a failure at all --
+#    no merge is deadlocked by the absence of a check nobody requires.
 live_rc=0
-if ! command -v gh >/dev/null 2>&1; then
-  echo "  CANNOT-ASSESS gh-unauthenticated: gh is not installed — install gh and run 'gh auth login'"
-  live_rc=2
-elif ! gh auth status >/dev/null 2>&1; then
-  echo "  CANNOT-ASSESS gh-unauthenticated: gh is installed but not authenticated — run 'gh auth login'"
-  live_rc=2
-elif bash "$POSTER" show --sha "$(git rev-parse HEAD)" >/tmp/cgs-live.log 2>&1; then
-  echo "  OK  the LIVE read-back found $context_poster on this commit"
+if [ "$producer_now" -eq 0 ]; then
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    echo "  note  no $context_poster status observed — the context is not REQUIRED, so no merge is deadlocked by its absence"
+  fi
 else
-  rc=$?
-  case "$rc" in
-    1) # Absence is only "expected" when nothing REQUIRES the context. Once it is
-       # required, an unobserved status means this commit cannot satisfy the
-       # control at all, and reporting that as a pass is precisely the formality
-       # #1357 is about -- so it is CANNOT-ASSESS, naming the context.
-       if [ "$producer_now" -eq 1 ]; then
-         echo "  CANNOT-ASSESS REQUIRED-BUT-UNOBSERVED — branch protection REQUIRES '$context_poster' but no status is present on $(git rev-parse --short HEAD), so this commit cannot satisfy it; the required check has no observed producer here, and a merge proceeds only through the admin bypass (enforce_admins=false)"
-         live_rc=2
-       else
-         echo "  note  no $context_poster status on HEAD — the context is not REQUIRED, so no merge is deadlocked by its absence"
-       fi ;;
-    2) echo "  CANNOT-ASSESS  the status could NOT be read back (API unreachable) — not a pass"
-       live_rc=2 ;;
-    *) echo "  note  read-back returned $rc" ;;
+  case "$probe_live" in
+    enabled)
+      echo "  OK  the LIVE producer state was OBSERVED on the repository ($producer_live_source): branch protection REQUIRES '$context_poster' and the context IS being produced, so the read-back half is satisfied by the mechanism rather than by one head" ;;
+    disabled)
+      echo "  FAIL REQUIRED-BUT-UNOBSERVED — branch protection REQUIRES '$context_poster' and the live source WAS read ($producer_live_source), but nothing is producing the context: the requirement cannot be satisfied, and a merge would proceed only through the admin bypass (enforce_admins=false)"
+      fail=1 ;;
+    unreadable)
+      echo "  CANNOT-ASSESS LIVE-PRODUCER-UNREADABLE — the live producer state could not be read from its source ($producer_live_source), so neither 'produced' nor 'gated off' can be claimed for the REQUIRED context '$context_poster': an unreadable source is never a pass"
+      live_rc=2 ;;
+    *)
+      echo "  CANNOT-ASSESS  the live producer state was not resolved by the producer probe — not a pass"
+      live_rc=2 ;;
   esac
 fi
 
