@@ -141,7 +141,7 @@ fi
 # Each allowlist refusal must name the offender, not just fail generically.
 check_needle() { # check_needle <mutant> <needle>
   out="$($channel verify --message "$work/$1.json" 2>&1)"
-  if printf '%s' "$out" | grep -qF "$2"; then
+  if [[ "$out" == *"$2"* ]]; then
     echo "  OK    mutant '$1' named '$2'"
   else
     echo "  FAIL  mutant '$1' did not name '$2':" >&2
