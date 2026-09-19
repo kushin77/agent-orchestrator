@@ -17,8 +17,9 @@
 #        path in scripts/verify.sh. Rename either and this fails BY NAME.
 #     2. python-patterns-declared-has-owner — every row in the DECLARED table
 #        (PP-2, PP-3, PP-4) names a measured count AND an issue that owns its
-#        retirement (`#NNNN`). A declared pattern with no owner is a silent
-#        TODO with no one accountable for closing it.
+#        retirement (`#NNNN`). A declared pattern with no owner is an unowned
+#        commitment nobody is accountable for closing — which is the defect
+#        this rule exists to name.
 #     3. python-patterns-ids-unique — every `PP-N` id used anywhere in the doc
 #        resolves to exactly one row, in the enforced table (PP-1) or the
 #        DECLARED table (PP-2..), never both and never zero.
