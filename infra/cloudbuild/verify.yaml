@@ -52,6 +52,18 @@ steps:
   - id: verify
     name: 'python:3.14'
     entrypoint: 'bash'
+    # The venue must supply a MULTI-BYTE LOCALE (issue #1424). bash's `${#var}`
+    # counts BYTES in the C locale and CHARACTERS in a UTF-8 one, and
+    # check-gate-status.sh asserts a status description against the API's
+    # 140-CHARACTER cap with exactly that expansion -- so in a byte-counting
+    # shell a CORRECT poster measures 142 and the check reds for a fact about
+    # the venue rather than about the tree. Declared here rather than in the
+    # step body so it applies to every command the step runs; the step ASSERTS
+    # the declaration took effect, below. C.UTF-8 is glibc's own locale, so a
+    # Debian-based image needs no locale-gen.
+    env:
+      - 'LANG=C.UTF-8'
+      - 'LC_ALL=C.UTF-8'
     args:
       - '-lc'
       - |
@@ -68,6 +80,48 @@ steps:
         python3 -c 'import yaml' || { echo "PyYAML missing"; exit 1; }
         PATH=/usr/bin:/bin python3 -c 'import yaml' || { echo "PyYAML missing on /usr/bin/python3"; exit 1; }
         echo "toolchain OK"
+
+        # --- the venue's locale, ASSERTED (issue #1424) ----------------------
+        # The step declares LANG/LC_ALL above; this proves the declaration
+        # TOOK, because a byte-counting shell is invisible everywhere else. A
+        # multi-byte character measures 1 in a multi-byte locale and 3 in a
+        # byte-counting one, so an image that drops the locale is NAMED here
+        # instead of surfacing as a mystery check red several hundred lines
+        # later. It is a WARNING and not fatal, deliberately: the gate's own
+        # verdict is this step's outcome, and a venue that cannot measure
+        # characters still gets to report the check's real rc.
+        ven_mark="$(python3 -c 'print(chr(0x2026), end="")')"
+        if [ "${#ven_mark}" -ne 1 ]; then
+          echo "verify-venue: WARN -- LANG=${LANG:-<unset>} LC_ALL=${LC_ALL:-<unset>} leaves a BYTE-counting shell (a multi-byte character measures ${#ven_mark}), so a 140-character status description measures 142 and check-gate-status.sh's cap assertion fails"
+        else
+          echo "verify-venue: locale OK (LANG=${LANG:-<unset>} LC_ALL=${LC_ALL:-<unset>}): a multi-byte character measures 1"
+        fi
+
+        # --- the venue's ref SCOPE (issue #1424) -----------------------------
+        # History DEPTH is not history's only axis, and deepening alone was
+        # assumed to be enough. The checkout this step is handed carries ONE
+        # branch's refs, so an object the REPOSITORY holds but no fetched ref
+        # reaches is simply absent from it, and a check that judges CITED
+        # EVIDENCE then answers "not in this repository's history" about a
+        # commit the repository does hold. Measured verbatim on three heads
+        # (063cca53, 2e2ac5c6, 26385b4b): check-lessons answered
+        # `evidence-unresolvable` for LESSON-0015 (commit 52fe84d6, reachable
+        # from refs/pull/1356/head) and SUGGEST-0018 (commit 9724c0c9,
+        # reachable from refs/pull/1408/head) -- both served by the API, both
+        # on a closed pull request's head ref, neither on the default branch.
+        # Reproduced in a single-branch clone of this tree, and cleared by the
+        # fetch below. Supply the ref scope too, so the judgement is about the
+        # REPOSITORY rather than about this checkout. BEST-EFFORT and NAMED:
+        # a fetch that cannot reach the origin must not become the step's
+        # outcome, and the log must say which half landed instead of leaving
+        # it to be inferred.
+        for refset in '+refs/heads/*:refs/remotes/origin/*' '+refs/pull/*/head:refs/remotes/origin/pr/*'; do
+          if git fetch --quiet origin "$refset" 2>&1; then
+            echo "verify-venue: fetched $refset"
+          else
+            echo "verify-venue: WARN -- could not fetch $refset; evidence reachable only from it stays unresolvable"
+          fi
+        done
 
         # `make verify` is the gate of record, run through the same entrypoint
         # the Makefile uses. Its rc is CAPTURED (the `|| rc=$?` guard keeps
