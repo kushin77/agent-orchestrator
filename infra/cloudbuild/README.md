@@ -25,8 +25,31 @@
 | `control-plane-apply`  | `ci_cd.apply_trigger`  | `disabled: true` | `_ENABLE_APPLY: "false"` |
 
 `scripts/check-cloudbuild.sh` (wired into `make verify`) asserts: every YAML
-here parses, both triggers are `disabled: true`, and the `_ENABLE_*`
-substitutions mirror the OFF default.
+here parses, both triggers are `disabled: true`, the `_ENABLE_*` substitutions
+mirror the OFF default, and no config declares a bare `$NAME` template the
+**submission-time** validator would refuse (below).
+
+## Submission-time templates (issue #1369)
+
+A YAML parse cannot see this class: Cloud Build refuses a build **at submission**
+when a config spells a bare `$NAME` that is neither a built-in substitution nor a
+declared one, and it reads **comments** too. Measured twice in one lane (#1350 /
+PR #1354), costing two ~20-minute CI round trips — the second caused by the
+comment written *while citing* the first failure. It kills the build before step
+0, so `make verify` never runs and the red says nothing about the code under
+review.
+
+The check refuses every undeclared bare `$NAME`, by file and line, and accepts
+exactly what the validator accepts: built-ins (`$PROJECT_ID`, `$COMMIT_SHA`,
+`$SHORT_SHA`), lowercase shell names (`$rc`, `$?`), braced forms
+(`${GH_TOKEN:-}`), escaped `$$`, and any name declared by the config's own
+`substitutions:` map or by the `substitutions:` map of a `*-trigger.yaml` whose
+`filename:` names that config.
+
+Accepted exceptions live in `template-baseline.txt` — one row per token, each
+naming its tracking issue and an immutable 40-hex anchor. A row is honoured only
+while its finding is live: declaring the key makes the row **STALE** and the gate
+fails until it is deleted, so the list can only shrink by fixing the finding.
 
 ## Workbook-surface switches (issue #644, workbook-13)
 
