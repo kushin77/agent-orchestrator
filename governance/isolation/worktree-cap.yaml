@@ -20,9 +20,28 @@ slack: 10
 # the declared `slack` above is the only cap — this block is not renewed
 # automatically, so the pile has to keep shrinking rather than being re-measured
 # and re-excused forever.
+#
+# RE-MEASURED 2026-09-19 (issue #1414), and TIGHTENED 90 -> 60. The instrument
+# is this ratchet's own consumer, whose header line prints the count it compares
+# against the cap: `check-worktree-cap: 50 worktree(s), 47 open lane record(s),
+# slack 10, cap 90`. So `measured_count: 50` is that count on ElevatedIQ-AK at
+# 2026-09-19, and `measured: 60` is it plus the SAME `churn_headroom: 10` the
+# 2026-09-18 number carried (that day's post-reap 80 + 10 = 90). No number here
+# is loosened — a loosening would need its own issue, and the ratchet shrinks
+# instead. `scripts/check-ratchets.sh` (#1414) reds the day `expires` arrives
+# with no `renewed_at`, so the deadline is no longer a date nobody reads.
 ratchet:
-  measured: 90
+  measured: 60
+  measured_count: 50
+  churn_headroom: 10
+  measured_by: "bash scripts/check-worktree-cap.sh"
   host: ElevatedIQ-AK
+  renewed_at: "2026-09-19"
   expires: "2026-10-02"
-  note: "post-reap count 80 on 2026-09-18 + 10 churn headroom; ratchet expires 2026-10-02, then slack 10 applies"
+  note: >-
+    Re-measured 2026-09-19 (#1414) with the gate's own count: 50 worktrees on
+    ElevatedIQ-AK + 10 churn headroom = 60, tightened from the 2026-09-18
+    ratchet of 90 (that day's post-reap 80 + 10). Cap = lanes + max(slack,
+    measured - lanes), so 47 lanes + 13 = 60 the day it was measured; after
+    2026-10-02 the declared `slack: 10` above is the only cap.
 
