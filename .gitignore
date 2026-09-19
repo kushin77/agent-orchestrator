@@ -126,6 +126,9 @@ governance/board/violations.jsonl
 # issue #304): one append-only JSONL record per reconcile pass, runtime
 # state under the reconciled repository root, never committed.
 .fleet/reconcile/ledger.jsonl
+# PR runner runtime state (tracked module: fleet/runner/, issue #1343): the
+# ledger, local evidence markers, holds, the fetch lock and scratch worktrees.
+.fleet/runner/
 
 # Local environment / secrets
 .env
