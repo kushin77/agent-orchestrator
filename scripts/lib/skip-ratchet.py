@@ -32,17 +32,37 @@ THE RULES (rc-2 semantics themselves are NOT changed)
   the composite as green:
 
   * NAMED      every skipped check must be named in `scripts/skip-budget.json`.
-               A name carries either a `standing-gap` entry (the inputs ARE
-               present and it still cannot assess -- #1176's argument -- so it
-               must point at the open issue that tracks it) or a `venue` entry
-               (it cannot assess because a NAMED PRECONDITION of this venue is
-               not supplied: either a repo-relative PATH that is absent, e.g.
-               `vendor/CMR/sync` in a worktree whose submodule was never
-               initialised, or a COMMAND the venue must be able to run, e.g.
-               `{"command": "gh auth status"}` in a container that installs no
-               `gh` -- #1361). A skipped check with no entry is REFUSED by
-               name: the composite will not publish a PASS whose skip set is
-               narrated by nobody.
+               A name carries a `standing-gap` entry (the inputs ARE present and
+               it still cannot assess -- #1176's argument -- so it must point at
+               the open issue that tracks it), a `venue` entry (it cannot assess
+               because a NAMED PRECONDITION of this venue is not supplied: either
+               a repo-relative PATH that is absent, e.g. `vendor/CMR/sync` in a
+               worktree whose submodule was never initialised, or a COMMAND the
+               venue must be able to run, e.g. `{"command": "gh auth status"}` in
+               a container that installs no `gh` -- #1361), or a
+               `live-dependent` entry (its ASSESSABILITY is a property of the
+               WORLD -- the LIVE mechanism it reads did not answer, and the
+               entry's `mechanism` names that mechanism -- #1410, below). A
+               skipped check with no entry is REFUSED by name: the composite
+               will not publish a PASS whose skip set is narrated by nobody.
+  * HONEST     a `live-dependent` entry is honoured BY NAME while its check
+               cannot assess for a LIVE-dependent reason, and it SAYS SO: the
+               standing line names the LIVE mechanism that did not answer and the
+               open issue that tracks it, and it declares the CHECK not the thing
+               to repair (#1410). That declaration is the whole reason the kind
+               exists -- once a `venue` precondition WAS supplied and the check
+               still could not assess, the refusal told the operator to repair a
+               check that was behaving correctly, which is a mislabel wearing a
+               diagnosis, not a diagnosis. Two consequences, both mechanical: a
+               `live-dependent` entry whose check ASSESSES is NOT stale (it is
+               reported as not biting, never failed -- the mechanism answered,
+               which is the entry's own remedy), while one whose check FAILS
+               (rc 1) is REFUSED by name, because a FAILING check is a FINDING,
+               not a skip, and honouring it would hide a defect behind the name
+               of a mechanism that answered. It declares no `precondition`: a
+               precondition is a named thing THIS VENUE supplies, and this kind's
+               blindness is not this venue's to supply. The shrink-only property
+               is kept -- it must name the OPEN issue that tracks the mechanism.
   * SHRINKING  a `standing-gap` entry is STALE the moment its check assesses --
                the run FAILS naming the entry, and the entry must be deleted.
                The list can only shrink and cannot outlive its fix.
@@ -86,7 +106,17 @@ BUDGET_SCHEMA = "ao.verify.skip-budget/v1"
 
 STANDING_GAP = "standing-gap"
 VENUE = "venue"
-KINDS = (STANDING_GAP, VENUE)
+# The third kind (#1410): the check's ASSESSABILITY depends on a LIVE mechanism
+# that must answer. An authenticated-but-unreadable GitHub source is a property
+# of the WORLD, not a defect of the check -- so the refusal must not tell the
+# operator to repair a check that is behaving correctly, which is exactly what
+# the `venue` kind did once its named precondition WAS supplied (#1394's measured
+# residual: gh answered, the API read did not, and the red was right while the
+# reason was wrong). Honoured BY NAME, because there is no precondition left to
+# measure; NOT stale when the check assesses; still REFUSED when the check FAILS,
+# because a failing check is a finding, not a skip.
+LIVE_DEPENDENT = "live-dependent"
+KINDS = (STANDING_GAP, VENUE, LIVE_DEPENDENT)
 
 # --- venue preconditions (issues #1199/#1351, #1361) --------------------------
 #
@@ -177,7 +207,7 @@ def load_budget(path: Path) -> Tuple[List[dict], List[str]]:
                     "entry[%d] (%s) is a standing-gap with no open issue number"
                     % (i, name)
                 )
-        else:
+        elif kind == VENUE:
             findings.extend(precondition_findings(i, name, entry.get("precondition")))
             if "issue" in entry and not (
                 isinstance(entry["issue"], int)
@@ -189,6 +219,8 @@ def load_budget(path: Path) -> Tuple[List[dict], List[str]]:
                     "(a venue entry MAY name the open issue that tracks the gap)"
                     % (i, name, entry["issue"])
                 )
+        else:
+            findings.extend(live_dependent_findings(i, name, entry))
     return entries, findings
 
 
@@ -240,6 +272,45 @@ def precondition_findings(index: int, name: str, value) -> List[str]:
             % (index, name, value)
         ]
     return []
+
+
+def live_dependent_findings(index: int, name: str, entry: dict) -> List[str]:
+    """Shape findings for one `live-dependent` entry (#1410).
+
+    Three rules, each of which the run REFUSES rather than narrates: the entry
+    must name the OPEN issue that tracks the mechanism (the shrink-only
+    property), it must name WHICH live mechanism failed to answer (what makes the
+    honouring honest instead of a shrug), and it must NOT carry a precondition --
+    a precondition is a named thing THIS VENUE supplies, so an entry carrying one
+    is a `venue` entry mislabelled, and this kind's whole point is that its
+    blindness is not this venue's to supply.
+    """
+    findings: List[str] = []
+    issue = entry.get("issue")
+    if not isinstance(issue, int) or isinstance(issue, bool) or issue <= 0:
+        findings.append(
+            "entry[%d] (%s) is live-dependent with no open issue -- the kind is "
+            "honoured BY NAME while the LIVE mechanism cannot answer, so it must "
+            "name the OPEN issue that tracks that mechanism (the list can only "
+            "shrink, and it cannot outlive its fix)" % (index, name)
+        )
+    mechanism = entry.get("mechanism")
+    if not isinstance(mechanism, str) or not mechanism.strip():
+        findings.append(
+            "entry[%d] (%s) is live-dependent with no 'mechanism' -- the honest "
+            "expression of this kind is WHICH live mechanism did not answer (e.g. "
+            "'the GitHub commit statuses API, read with gh'), so the standing line "
+            "can name the world that is silent instead of the check that is right"
+            % (index, name)
+        )
+    if "precondition" in entry:
+        findings.append(
+            "entry[%d] (%s) is live-dependent and declares a precondition %r -- "
+            "this kind is honoured BY NAME, not by a measured precondition of this "
+            "venue: a check whose blindness is a named thing the venue supplies is "
+            "a `venue` entry" % (index, name, entry["precondition"])
+        )
+    return findings
 
 
 def precondition_argv(value) -> List[str]:
@@ -297,6 +368,10 @@ def entry_record(entry: dict, root: Path) -> dict:
         "check": entry["check"],
         "kind": kind,
         "issue": entry.get("issue") if isinstance(entry.get("issue"), int) else None,
+        # The LIVE mechanism this entry names (#1410): WHICH part of the world did
+        # not answer. Carried into the attestation so the board reads why a check
+        # sat in the skip bucket from the record rather than from prose.
+        "mechanism": entry.get("mechanism") if kind == LIVE_DEPENDENT else None,
         "precondition": precondition_label(declared) if declared is not None else None,
         "precondition_kind": precondition_kind(declared) if declared is not None else None,
         "precondition_present": (
@@ -343,6 +418,29 @@ def read_names(path: Path) -> List[str]:
 
 # --- the ratchet --------------------------------------------------------------
 
+def live_dependent_line(name: str, record: dict) -> str:
+    """The honoured-by-name line for a `live-dependent` skip (#1410).
+
+    It names the LIVE mechanism that did not answer and the open issue that tracks
+    it, and it says plainly that the CHECK is not the thing to repair -- that
+    declaration is the reason this kind exists. The `venue` kind's refusal, once
+    its precondition WAS supplied, told the operator to repair the check (#1176's
+    own wording); for a check whose blindness is the WORLD's, that is a mislabel
+    wearing a diagnosis.
+    """
+    tracked = (
+        " (the open issue that tracks the mechanism is #%s)" % record["issue"]
+        if record.get("issue")
+        else ""
+    )
+    return (
+        "verify: standing skip %s -- live-dependent: the LIVE mechanism %r did not "
+        "answer here, so the check cannot assess -- a property of the WORLD, not a "
+        "defect of the check, and the check is honoured BY NAME rather than "
+        "repaired%s" % (name, record.get("mechanism") or "?", tracked)
+    )
+
+
 def evaluate(
     root: Path,
     results: Sequence[Tuple[str, int]],
@@ -360,6 +458,7 @@ def evaluate(
     unbudgeted: List[str] = []
     stale: List[dict] = []
     unused_venue: List[str] = []
+    unused_live: List[str] = []
     refused: List[str] = []
     lines: List[str] = []
 
@@ -407,6 +506,8 @@ def evaluate(
                     "precondition of this venue), so no verdict is available here%s"
                     % (name, precondition, tracked)
                 )
+        elif entry["kind"] == LIVE_DEPENDENT:
+            lines.append(live_dependent_line(name, record))
         else:
             lines.append(
                 "verify: standing skip %s -- standing gap tracked by #%s: %s"
@@ -437,6 +538,31 @@ def evaluate(
                 "must be DELETED from %s -- the list can only shrink and cannot "
                 "outlive its fix" % (name, rc, budget_label)
             )
+        elif entry["kind"] == LIVE_DEPENDENT:
+            # It did NOT skip, so its LIVE mechanism answered. The split here is
+            # the point of the kind (#1410): an ASSESSING check (rc 0) does NOT
+            # stale the entry -- the mechanism came back, which is the entry's own
+            # remedy -- while a FAILING check is a FINDING and is refused by name,
+            # because honouring it would hide a defect behind the name of a
+            # mechanism that answered.
+            if rc == 0:
+                unused_live.append(name)
+            else:
+                record_here = entry_record(entry, root)
+                refused.append(
+                    "live-dependent entry '%s' -- its check does not skip here (%s): "
+                    "the LIVE mechanism it names answered, so the blindness this "
+                    "entry declares is over and a failing check is a FINDING, not a "
+                    "skip; delete the entry from %s and repair the finding (the "
+                    "mechanism %r is tracked by #%s)"
+                    % (
+                        name,
+                        "rc %s" % rc if rc is not None else "no verdict row",
+                        budget_label,
+                        record_here.get("mechanism") or "?",
+                        record_here.get("issue"),
+                    )
+                )
         else:
             unused_venue.append(name)
 
@@ -449,6 +575,7 @@ def evaluate(
         "unbudgeted_skips": unbudgeted,
         "stale_entries": stale,
         "unused_venue_entries": unused_venue,
+        "unused_live_entries": unused_live,
         "findings": refused,
     }
     return record, rc, lines
@@ -501,6 +628,7 @@ def run(
             "unbudgeted_skips": [],
             "stale_entries": [],
             "unused_venue_entries": [],
+            "unused_live_entries": [],
             "findings": shape_findings,
         }
         _write(json_out, record)
@@ -522,6 +650,14 @@ def run(
             "verify: skip ratchet note -- %d venue entr(y/ies) did not bite in this "
             "run (their precondition is present here): %s"
             % (len(record["unused_venue_entries"]), ", ".join(record["unused_venue_entries"]))
+        )
+    if record["unused_live_entries"]:
+        print(
+            "verify: skip ratchet note -- %d live-dependent entr(y/ies) did not bite "
+            "in this run (their check assessed, so the LIVE mechanism answered and "
+            "this kind does NOT go stale -- the entry is reported, never a failure, "
+            "and is deleted when the issue that tracks the mechanism closes): %s"
+            % (len(record["unused_live_entries"]), ", ".join(record["unused_live_entries"]))
         )
     _write(json_out, record)
     _write_text(note_out, note_for(record))
@@ -757,6 +893,85 @@ def self_test() -> int:
                 entries=[{"check": "a", "kind": STANDING_GAP, "reason": "no ticket named"}],
             )
         )
+        # --- the THIRD kind (#1410): the check's assessability is the world's -----
+        # Its whole reason for existing is that a REFUSAL was mislabelling a check
+        # that was behaving correctly, so the rules are provoked in both
+        # directions: the honoured-by-name line (which must name the LIVE
+        # mechanism AND the open issue), the NOT-stale half (an assessing check is
+        # never a stale entry for this kind), and the refusal when the check itself
+        # FAILS -- a failing check is a finding, not a skip.
+        LIVE_ENTRY = {
+            "check": "gate-status",
+            "kind": LIVE_DEPENDENT,
+            "issue": 1382,
+            "mechanism": "the GitHub commit statuses API, read with gh",
+            "reason": "an authenticated-but-unreadable source is a property of the world",
+        }
+        results.append(
+            _case(
+                scratch, "live-dependent-skip-honoured-by-name", 0,
+                "live-dependent: the LIVE mechanism",
+                results=[("gate-status", 2)], names=["gate-status"], entries=[LIVE_ENTRY],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "live-dependent-skip-names-the-world", 0,
+                "a property of the WORLD, not a defect of the check",
+                results=[("gate-status", 2)], names=["gate-status"], entries=[LIVE_ENTRY],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "live-dependent-skip-names-the-open-issue", 0,
+                "the open issue that tracks the mechanism is #1382",
+                results=[("gate-status", 2)], names=["gate-status"], entries=[LIVE_ENTRY],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "live-dependent-assessing-is-NOT-stale", 0,
+                "1 live-dependent entr(y/ies) did not bite",
+                results=[("gate-status", 0)], names=["gate-status"], entries=[LIVE_ENTRY],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "live-dependent-failing-check-refused", 1,
+                "a failing check is a FINDING, not a skip",
+                results=[("gate-status", 1)], names=["gate-status"], entries=[LIVE_ENTRY],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "live-dependent-without-issue-refused", 2,
+                "live-dependent with no open issue",
+                results=[("gate-status", 2)], names=["gate-status"],
+                entries=[{"check": "gate-status", "kind": LIVE_DEPENDENT,
+                          "mechanism": "the live statuses source",
+                          "reason": "no ticket named"}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "live-dependent-without-mechanism-refused", 2,
+                "is live-dependent with no 'mechanism'",
+                results=[("gate-status", 2)], names=["gate-status"],
+                entries=[{"check": "gate-status", "kind": LIVE_DEPENDENT,
+                          "issue": 1382, "reason": "no mechanism named"}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "live-dependent-with-a-precondition-refused", 2,
+                "is live-dependent and declares a precondition",
+                results=[("gate-status", 2)], names=["gate-status"],
+                entries=[{"check": "gate-status", "kind": LIVE_DEPENDENT, "issue": 1382,
+                          "mechanism": "the live statuses source",
+                          "precondition": {"command": "gh auth status"},
+                          "reason": "a venue entry mislabelled"}],
+            )
+        )
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
 
@@ -810,6 +1025,7 @@ def main(argv: List[str]) -> int:
                 "unbudgeted_skips": [],
                 "stale_entries": [],
                 "unused_venue_entries": [],
+                "unused_live_entries": [],
                 "findings": [str(exc)],
             },
         )
