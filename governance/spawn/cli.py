@@ -107,8 +107,16 @@ def _release(args: argparse.Namespace, root: Path) -> str:
     return (result.stdout + result.stderr).strip()
 
 
-def _mint(args: argparse.Namespace, root: Path) -> tuple[dict[str, str], str]:
-    """Mint the lane through `governance/isolation`; return (env, worktree)."""
+def _mint(args: argparse.Namespace, root: Path, record: Mapping[str, Any] | None = None) -> tuple[dict[str, str], str]:
+    """Mint the lane through `governance/isolation`; return (env, worktree).
+
+    The admission the spawn was granted travels with the mint: `isolation open`
+    records the lane's `runtime` and `actor` in the lane record (#1301), so the
+    four lane-binding values `{runtime, role, tier, actor}` are not only in the
+    envelope but in the record every runtime's plane reads. `role` and `tier` are
+    NOT isolation's fields — see the note in this module's `cmd_open`.
+    """
+    binding = dict(record or {})
     command = [
         sys.executable, str(ROOT / "governance" / "isolation" / "cli.py"), "open",
         "--issue", str(args.issue),
@@ -117,6 +125,10 @@ def _mint(args: argparse.Namespace, root: Path) -> tuple[dict[str, str], str]:
         "--main", str(root),
         "--base", args.base,
     ]
+    if binding.get("runtime"):
+        command += ["--runtime", str(binding["runtime"])]
+    if binding.get("actor"):
+        command += ["--actor", str(binding["actor"])]
     if args.fetch:
         command.append("--fetch")
     if args.worktree_root:
@@ -182,6 +194,41 @@ def _produce(args: argparse.Namespace, root: Path, env: Mapping[str, str], workt
         body=_body(args),
         files=args.files,
         root=root,
+        runtime=args.runtime,
+        role=args.role,
+        tier=args.tier,
+        model=args.model,
+        task_class=args.spawn_class,
+        actor=args.actor,
+        verbs=args.verb,
+        skills=args.skill,
+        secrets=args.secret,
+    )
+
+
+def _admission_record(args: argparse.Namespace, env: Mapping[str, str]) -> dict:
+    """The spawn block the three judges read, before anything is created.
+
+    Resolved by the same producer the envelope uses (`admission.spawn_record`), so
+    the record judged here and the record the admitted envelope carries are the
+    same object's two readings rather than two computations that might disagree.
+    """
+    from governance.spawn import admission  # noqa: PLC0415 - the admission inputs' one producer
+
+    return admission.spawn_record(
+        path=args.path,
+        agent=args.agent,
+        directive=args.directive,
+        env=env,
+        runtime=args.runtime,
+        role=args.role,
+        tier=args.tier,
+        model=args.model,
+        task_class=args.spawn_class,
+        actor=args.actor,
+        verbs=args.verb,
+        skills=args.skill,
+        secrets=args.secret,
     )
 
 
@@ -189,9 +236,32 @@ def _produce(args: argparse.Namespace, root: Path, env: Mapping[str, str], workt
 
 
 def cmd_open(args: argparse.Namespace) -> int:
-    """The local spawn path: claim, mint, assemble, write, print — or refuse."""
+    """The local spawn path: admit, claim, mint, assemble, write, print — or refuse.
+
+    Admission comes FIRST, before the claim and before the mint, because a spawn
+    that is refused must not leave anything behind to unwind: no worktree may
+    exist for a spawn at a forbidden tier or by an undeclared actor (issue
+    #1413). The refusal prints which judge refused it; `scripts/check-spawn-envelope.sh`
+    proves the ordering by driving a REFUSED spawn with minting ENABLED and
+    requiring the mint never to have been attempted.
+
+    The lane record `isolation open` writes carries `runtime` and `actor` (its own
+    #1301 fields) from that same admission; `role` and `tier` are NOT isolation
+    fields, so they live in the envelope this command writes beside the run
+    markers (`.fleet/spawn/<session>.json`) until the isolation record declares
+    them.
+    """
     root = sources.env_root(args.root)
     env: dict[str, str] = dict(os.environ)
+    record = _admission_record(args, env)
+    refusals = model.admission_refusals({"spawn": record})
+    if refusals:
+        print(
+            "spawn: refused at the admission point — nothing was created by this refusal "
+            "(no claim was taken and no lane was provisioned)",
+            file=sys.stderr,
+        )
+        return _refuse(refusals)
     worktree = args.worktree or ""
     claimed = False
     if not args.no_claim:
@@ -200,7 +270,7 @@ def cmd_open(args: argparse.Namespace) -> int:
         if not ok:
             print(f"spawn: claim not taken — {detail}", file=sys.stderr)
     if not args.no_mint:
-        minted, problem = _mint(args, root)
+        minted, problem = _mint(args, root, record)
         if problem:
             print(f"spawn: lane not minted — {problem}", file=sys.stderr)
         else:
@@ -283,6 +353,36 @@ def _common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--directive", default="")
     parser.add_argument("--root", default="")
     parser.add_argument("--worktree", default="")
+    # The admission inputs (issue #1413), judged BEFORE anything is created. Each
+    # falls back to its AO_* variable, then to the declaration the tables already
+    # make — so a caller that declares nothing is still judged, on values.
+    parser.add_argument(
+        "--runtime", default="",
+        help="the wire runtime id this spawn runs as (default $AO_RUNTIME, then claude-subagent)",
+    )
+    parser.add_argument(
+        "--role", default="",
+        help="the FinOps role the spawn asks under (default $AO_ROLE, then the role its --path speaks as)",
+    )
+    parser.add_argument(
+        "--tier", default="",
+        help="the requested model tier (L0/L1/L2, default $AO_MODEL_TIER, then the class's own defaultTier)",
+    )
+    parser.add_argument(
+        "--model", default="",
+        help="the requested MODEL id instead of a tier (its rung is read off the tiers.yaml ladder)",
+    )
+    parser.add_argument(
+        "--class", dest="spawn_class", default="",
+        help="the FinOps task class (default $AO_TASK_CLASS, then code-author)",
+    )
+    parser.add_argument(
+        "--actor", default="",
+        help="the identity acting (default $AO_ACTOR, then the runtime); resolved by the identity lane",
+    )
+    parser.add_argument("--verb", action="append", default=[], help="a control verb this spawn will call (repeatable)")
+    parser.add_argument("--skill", action="append", default=[], help="a skill this spawn will use (repeatable)")
+    parser.add_argument("--secret", action="append", default=[], help="a secret path this spawn will read (repeatable)")
 
 
 def build_parser() -> argparse.ArgumentParser:

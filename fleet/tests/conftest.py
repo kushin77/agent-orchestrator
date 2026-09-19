@@ -55,6 +55,12 @@ RUNTIME_PATHS = {
         "STEERS",
     ),
     "terminal": ("HEARTBEAT", "RUNS", "REPORTED", "PAUSED", "STOPPING", "RUNNER_HOLD", "WORKTREE_ROOT"),
+    # The runtime-beat producers (#1412) write `.fleet/runtime-beats/<id>.json` for
+    # the judgement `scripts/check-runtime-liveness.sh` makes. `beats.ROOT` is the
+    # target they resolve, so it is redirected here: ONE stray beat left in the real
+    # tree would engage the judge on the next gate run and report every other
+    # registered runtime `runtime-stale`, i.e. a test could red the gate of record.
+    "beats": ("ROOT",),
     "brain": ("HEARTBEAT", "WAVES", "DISPATCH_MARKERS", "MASTER_ATTESTATION"),
     "health": ("SISTER_HEARTBEAT", "BRAIN_HEARTBEAT"),
     # The dispatch markers' state machine (#796): it reads and writes the marker

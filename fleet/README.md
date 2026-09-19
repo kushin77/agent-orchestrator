@@ -965,3 +965,103 @@ tail -3 .fleet/watchdog.log   # the last pass names both commits per rung
 # Force the loop onto current code without a restart: it pulls, gates, re-execs.
 python3 fleet/channel.py send ... # a `refresh` control
 ```
+
+## Runtime liveness — every runtime beats (issue #1412)
+
+`fleet/runtimes.yaml` is the runtime contract — seven ids (`claude-session`,
+`claude-subagent`, `deepseek-sister`, `deepseek-executor`, `copilot-agent`,
+`hermes`, `paperclip`), and it is the **one** authority for that vocabulary: the
+notices rule (`governance/notices/`), the channel's message validation
+(`fleet/channel.py`), the lane-record registry (`governance/isolation/`) and the
+beat adapter all read it through `fleet/runtimes.py`.
+
+Each runtime refreshes `.fleet/runtime-beats/<id>.json` — `{runtime, commit, state,
+ts}`, written atomically by `fleet/beats.py` on top of the adapter that owns the
+record. `scripts/check-runtime-liveness.sh` (in `make verify`) judges them:
+
+```
+runtime-stale:<id>          the beat is older than the window (3600s by default)
+runtime-drift:<id>          the beat's commit trails origin/master and no directive is in flight
+runtime-unregistered:<id>   a beat exists for an id the contract does not declare
+runtime-unbeaten:<id>       registered, and no beat has EVER been recorded here — a GAP, never a red
+```
+
+A runtime that stops beating is `runtime-stale:<id>`. The judge holds that rule for
+every runtime that HAS beaten — once the fleet has started beating, "never reported"
+is the maximum case of "too old" — but the gate names the two facts APART on a real
+tree, because a tree where no producer is installed cannot supply the difference. A
+registered runtime with no beat at all is `runtime-unbeaten:<id>`: a **named gap**,
+printed and never a red, because no producer was ever installed for it here (a lane
+worktree has no cron, and a beat the gate faked would go stale inside the window and
+red again). A beat that EXISTS and has passed the window stays a red. The gate's
+`reframe_controls` provokes that split on every run.
+
+The gate also **drives every producer** on a scratch
+fleet before it judges anything (`--producers`): seven fresh beats must be judged
+live, and a backdated one must be named by name with the other six NOT named. That
+stage exists because the alternative was measured: #1376 landed the registry, the
+adapter and the judge, and nothing wrote a beat, so the gate could only ever say
+`no-beats-yet` — inert, and unable to tell a dead runtime from a silent one. It is
+also what keeps the gap from being a weakening: "beat, then stopped" is proven red on
+every run, on a fleet the gate builds itself.
+
+### Who writes each beat
+
+| runtime | producer |
+|---|---|
+| `claude-session` | `fleet/hooks/claude-beat.sh` from a `SessionStart` hook |
+| `claude-subagent` | the same hook from a `SubagentStop` hook (`--runtime claude-subagent`) |
+| `deepseek-sister` | `fleet/terminal.py::loop` — at start, and on every poll cycle |
+| `deepseek-executor` | `fleet/terminal.py::run_once` at each spawn, refreshed by the run's beater |
+| `copilot-agent` | the SME profile card's beat line (`python3 -m fleet.beats post --runtime copilot-agent`, at session start) |
+| `hermes` | `integrations/hermes/cli.py probe` — on a live call that answered |
+| `paperclip` | `integrations/paperclip/api/cli.py health` — on a live read that is OK or degraded |
+
+The Claude rung is refreshed at most once per `--min-interval` (300s by default):
+the hook fires on **every** tool call in every session on the box, and a liveness
+stamp is not worth a process spawn per call. A skip is reported (`--verbose`), never
+silent.
+
+### The Claude session hook — one line, and installing it is the owner's step
+
+The fleet **provides** the hook; it never edits anyone's live settings. The install
+is one line: the value of `"hooks"` in `~/.claude/settings.json`.
+
+```bash
+bash fleet/hooks/claude-beat.sh --print-install    # paste the line it prints as the value of "hooks"
+```
+
+```
+{"SessionStart":[{"hooks":[{"type":"command","command":"…/fleet/hooks/claude-beat.sh --min-interval 300"}]}],"PostToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"…/fleet/hooks/claude-beat.sh --min-interval 300"}]}],"SubagentStop":[{"hooks":[{"type":"command","command":"…/fleet/hooks/claude-beat.sh --runtime claude-subagent --min-interval 300"}]}]}
+```
+
+The beat lands in **this** tree's `.fleet/runtime-beats/` (the tree that owns the
+hook), whatever worktree the session is standing in, and its `commit` is the commit
+the session is **running** (`git rev-parse HEAD` of `$CLAUDE_PROJECT_DIR`). The
+script exits 0 (beat written, or legitimately skipped) or 1 (could not beat, named
+on stderr) and **never 2**: in Claude's hook contract exit 2 *blocks* the session,
+and a liveness stamp must never be able to block the work it reports on.
+
+### The Copilot SME cards carry the same line
+
+Every SME profile card declares, at its session start:
+
+```bash
+python3 -m fleet.beats post --runtime copilot-agent
+```
+
+The canonical card set is `kushin77/CMR docs/SME-PROFILES.md` (ADR-0010): an
+in-repo copy is refused by `scripts/check-duplicates.sh`, so the line belongs in
+that document, and the command it names is this repo's (`fleet/beats.py`).
+
+### By hand
+
+```bash
+python3 -m fleet.beats post --runtime hermes --force   # the running commit is measured, never guessed
+python3 -m fleet.beats show                            # exactly what the judge will read
+python3 -m fleet.beats post --runtime ghost            # REFUSED: runtime-unregistered:ghost (rc 1)
+```
+
+A producer never guesses its commit: `post` refuses when `git rev-parse HEAD` cannot
+be measured, rather than stamping a beat whose drift cannot be compared to anything.
+
