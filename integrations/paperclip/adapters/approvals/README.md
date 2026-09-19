@@ -97,6 +97,32 @@ python3 integrations/paperclip/adapters/approvals/cli.py verify
 python3 -m pytest -q integrations/paperclip/adapters/approvals/tests
 ```
 
+## The signed record (issue #1272) — a second, distinct authority
+
+Everything above is a *projection*. Issue #1272 is the opposite problem: for
+`merge` / `delete` / `pause` / `flip` scopes there was never an authoritative
+record to project — "approved" typed in chat was the whole authority. `record.py`
+is that authority: `ApprovalRecord{actor, kind, target, ts, expires, signature}`,
+HMAC-SHA256-signed with `AO_APPROVALS_HMAC_KEY` (declared in
+`infra/env/registry.yaml`, `secret: true`; no key, no key literal in this
+package — fail closed, GR-6), stored one JSON file per scope under
+`.fleet/approvals/`. `record_cli.py` is the write path:
+
+```bash
+python3 integrations/paperclip/adapters/approvals/record_cli.py grant --actor operator --scope merge:pr#123 --ttl-seconds 900
+python3 integrations/paperclip/adapters/approvals/record_cli.py check --scope merge:pr#123
+python3 integrations/paperclip/adapters/approvals/record_cli.py list
+python3 integrations/paperclip/adapters/approvals/record_cli.py self-test
+```
+
+`check` refuses by name: `approval-missing:<scope>`, `approval-tampered:<scope>`,
+`approval-expired:<scope>`, `approval-used:<scope>` (a `merge` scope is
+single-use — the record is marked used on its first successful `check`; the
+other three kinds are re-checkable). `scripts/merge-pr.sh` calls `check` before
+merging, behind `AO_APPROVAL_REQUIRED=1` (default off — the runner rung flips
+it later); `scripts/check-pr-queue-squash-guard.sh` is the negative control
+proving the missing-record refusal and the grant->merge path.
+
 `scripts/check-paperclip-approvals.sh` is **not yet wired** into
 `make verify`: the three shared build files (`Makefile`, `scripts/verify.sh`,
 `scripts/pytest-suites.txt`) are owned by the EPIC's wiring lane **#420**, and
