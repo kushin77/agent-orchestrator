@@ -114,7 +114,10 @@
 #   gate fails until it is deleted), the reason comes from a closed vocabulary,
 #   the tracker must be OPEN in the committed board snapshot, and malformed,
 #   duplicated or glob-shaped rows fail rather than being skipped. Every honoured
-#   row is REPORTED by name.
+#   row is REPORTED by name. The tracker is deliberately NOT the issue the change
+#   lands under: an issue that closes with the PR would strip a row that is still
+#   live the moment it merged, which is the TRACKER-CLOSED refusal firing
+#   correctly.
 #
 # PROVEN ON EVERY RUN (GR-12)
 #   The provocation drives the SAME decision function the repository run uses: a

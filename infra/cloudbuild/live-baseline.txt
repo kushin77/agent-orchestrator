@@ -31,6 +31,13 @@
 # `gcloud builds triggers update --disabled` (a live mutation, so it is an
 # OWNER step, never a lane step), and #1415's own 7-day hold gates deleting
 # them. This file is what makes that gap visible instead of silent.
-control-plane-apply	#1415	declared-disabled-live-enabled
-control-plane-web-image	#1415	declared-disabled-live-enabled
-control-plane-verify	#1415	declared-disabled-live-enabled
+#
+# WHY THE TRACKER IS #1465 AND NOT #1415: the tracker must stay OPEN while its
+# row is live, or the gate refuses the row as TRACKER-CLOSED. #1415 delivered
+# the declaration half and the proof of drift and closes with its PR; the
+# residual LIVE work (disable, then delete after the 7-day hold) is its own
+# issue, #1465. Pointing a row at the issue that the same PR closes would strip
+# a live exception the moment it merged.
+control-plane-apply	#1465	declared-disabled-live-enabled
+control-plane-web-image	#1465	declared-disabled-live-enabled
+control-plane-verify	#1465	declared-disabled-live-enabled

@@ -110,10 +110,11 @@ templates, and nothing requires a template to be live.
 Measured 2026-09-19, as committed in `infra/cloudbuild/live-triggers.json`: three
 triggers live for this repository, all three **ENABLED**, all three declared
 `disabled: true`. The gate therefore reports three *baselined* disagreements
-tracked by #1415, and fails **by name** on any disagreement that is not in the
-baseline. Bring a live trigger in line and its row goes **STALE** — the gate fails
-naming it until the row is deleted, so the baseline can only shrink by fixing the
-drift.
+tracked by **#1465** (the owner issue for the residual live work — not #1415,
+whose PR closes it, because a row must not outlive its tracker), and fails **by
+name** on any disagreement that is not in the baseline. Bring a live trigger in
+line and its row goes **STALE** — the gate fails naming it until the row is
+deleted, so the baseline can only shrink by fixing the drift.
 
 ## Why this exists (issue #6)
 
@@ -300,12 +301,14 @@ the measured case, the contradicting red, the healthy path, the venue's own
 report, an unreadable verdict, a conclusion nobody enumerated, and a **mutant
 with the guard removed**, which must restore the false green.
 
-### Owner step — DELETE the token secret and the triggers (not run by this task, #1415)
+### Owner step — DELETE the token secret and the triggers (not run by this task, tracked by #1465)
 
 None of this runs from a lane. Every command below is a **live mutation** of the
 project, so it is an OWNER step, and the deletion half is additionally gated on
 **the declarations having held for 7 days** (#1415 step 4) — it cannot be
-done today, and no lane may do it:
+done today, and no lane may do it. It is tracked by **#1465**, which is also the
+tracker the rows in `live-baseline.txt` name: a row must stay justified by an
+OPEN issue, so it cannot point at #1415, whose PR closes it.
 
 ```bash
 # 1. Bring the three declarations' live state in line with what the repo declares
