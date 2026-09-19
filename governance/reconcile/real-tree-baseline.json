@@ -2813,6 +2813,21 @@
       "kind": "branch",
       "name": "issue-worktree-hygiene",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1310",
+      "reason": "measured 2026-09-19: NOT content-landed (the diff over the default branch is non-empty), so rule 17 forbids the worker to discard it; recorded rather than reclaimed because the artifact is another lane's and holds unlanded commits"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-pcm-board-freshness",
+      "reason": "measured 2026-09-19: NOT content-landed, so rule 17 forbids the worker to discard it; recorded (not reclaimed) because the artifact is another lane's and holds unlanded commits"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ac93099db7773c3c9",
+      "reason": "measured 2026-09-19: a subagent worktree no lane record names, past the 24h grace; not reclaimed because its HEAD is not content-landed and the walk's reclaim proof answers 'would this lose work', not 'is this in use' (#1440)"
     }
   ]
 }
