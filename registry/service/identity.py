@@ -53,8 +53,10 @@ from identity.sso.jose import jwt_encode, jwt_unsign  # noqa: E402
 from identity.sso.model import ALG_HS256  # noqa: E402
 
 from .errors import (  # noqa: E402
+    ActorUnresolvedError,
     AgentNotActiveError,
     CrossTenantDenied,
+    DelegationUndeclaredError,
     IdentityError,
     InvalidCredentialError,
     SessionExpiredError,
@@ -62,6 +64,10 @@ from .errors import (  # noqa: E402
 )
 from .model import STATUS_ACTIVE  # noqa: E402
 from .store import RegistryStore  # noqa: E402
+
+import yaml  # noqa: E402
+
+_ACTORS_YAML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "actors.yaml")
 
 ISSUER = "urn:agent-orchestrator:registry"
 DEFAULT_AUDIENCE = ("control-plane",)
@@ -276,3 +282,43 @@ class IdentityService:
                 f"allowed set for tenant {tenant_id!r}"
             )
         return True
+
+
+# --------------------------------------------------------------------- #
+# actor identity resolution (issue #1275) — one identity per actor across
+# GitHub, the mailbox, paperclip and hermes.
+# --------------------------------------------------------------------- #
+def _load_actor_map(path: str = _ACTORS_YAML) -> Dict[str, Dict[str, Any]]:
+    """Load the declared actor->identity map (alias -> identity record)."""
+    with open(path, "r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    identities = data.get("identities") or {}
+    alias_map: Dict[str, Dict[str, Any]] = {}
+    for identity_id, record in identities.items():
+        record = dict(record or {})
+        record["id"] = identity_id
+        for alias in record.get("aliases") or [identity_id]:
+            alias_map[str(alias)] = record
+    return alias_map
+
+
+def resolve_actor(
+    actor: str, *, actors_path: str = _ACTORS_YAML
+) -> Dict[str, Any]:
+    """Resolve an actor string (PR author, directive sender, approval signer,
+    heartbeat source) to exactly one declared identity record.
+
+    Fails closed: an actor string not declared in ``actors.yaml`` raises
+    ``ActorUnresolvedError`` (``actor-unresolved:<string>``). If the resolved
+    record declares ``delegatesTo``, the target must itself be a declared
+    identity; an undeclared target raises ``DelegationUndeclaredError``
+    (``delegation-undeclared:<actor>-><target>``).
+    """
+    alias_map = _load_actor_map(actors_path)
+    record = alias_map.get(actor)
+    if record is None:
+        raise ActorUnresolvedError(actor)
+    delegates_to = record.get("delegatesTo")
+    if delegates_to is not None and delegates_to not in alias_map:
+        raise DelegationUndeclaredError(actor, delegates_to)
+    return record
