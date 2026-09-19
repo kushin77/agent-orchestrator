@@ -48,7 +48,7 @@ expect_refused() { # expect_refused <name> <finding> <cmd...>
   local name="$1" want="$2"; shift 2
   local out rc
   out="$("$@" 2>&1)"; rc=$?
-  if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "$want"; then
+  if [ "$rc" -eq 1 ] && [[ "$out" == *"$want"* ]]; then
     echo "  OK    REFUSED $name — $want"
   elif [ "$rc" -eq 0 ]; then
     echo "  FAIL  $name was ACCEPTED (a judge every role can slip past is a formality)" >&2
@@ -110,7 +110,7 @@ fi
 echo "== missing table is CANNOT-ASSESS, never a pass =="
 out="$($judge --role fleet --class code-author --tier L0 --tiers-path "$work/no-such-file.yaml" 2>&1)"
 rc=$?
-if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q "CANNOT-ASSESS"; then
+if [ "$rc" -eq 2 ] && [[ "$out" == *"CANNOT-ASSESS"* ]]; then
   echo "  OK    CANNOT-ASSESS on a missing tiers table (rc=2)"
 else
   echo "  FAIL  missing tiers table did not yield CANNOT-ASSESS (rc=$rc)" >&2
