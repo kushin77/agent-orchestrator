@@ -228,5 +228,7 @@ scratch copy — the stale-head skip dropped, the merged-tree check dropped, the
 fan-out bound dropped, the local-marker distinction dropped, and the kept
 transcript dropped — are all caught. The lessons themselves are `LESSON-0009`..
 `LESSON-0014` and `LESSON-0015` (closed on landed foundations) and
-`SUGGEST-0014`..`SUGGEST-0017` (open until this PR's squash sha lands, then
-closed as lessons) in `governance/lessons/ledger.jsonl`, all under `RCA-0019`.
+`SUGGEST-0014`..`SUGGEST-0018` (open until their PR's squash sha lands, then
+closed as lessons) in `governance/lessons/ledger.jsonl`, all under `RCA-0019`;
+`SUGGEST-0018` is lesson 11 (#1384) and closes on this file's own landed
+sha.
