@@ -102,7 +102,7 @@ Secret Manager (`gcloud secrets versions access`) and exports it as `GH_TOKEN`
 for the poster, which falls back from `gh` to a raw authenticated `curl` call
 when `gh` is absent.
 
-### A missing token skips the POST — the gate still runs and still reports its rc
+### An unreadable token skips the POST — the gate still runs and still reports its rc
 
 The build must not spend the gate's verdict to publish it. Cloud Build resolves
 `availableSecrets` **before any step runs**, so declaring the PAT there made an
@@ -111,17 +111,26 @@ red build said nothing about the code under review (measured: build
 `27b692b8-0da5-483b-89d9-8f4e348dd806`, `Secret [ao-gate-status-token] not found
 or has no versions`). Issue #1350 settles the order: the gate always runs and
 always reports its own rc, and a token that cannot be read is logged and skipped
-—
-
-```
-gate-status: SKIPPED -- no ao-gate-status-token secret; the gate verdict is NOT posted (see issue #1350)
-```
-
 — without failing the step. The step exits with the **gate's** rc, so a skipped
 POST is never mistaken for a verdict on the code, and a red gate still fails the
 build (a POST can never turn one green). The one path that stays CANNOT-ASSESS
 is the opposite case: a token that *was* available and a POST that then failed
 produced no check where one was possible, so that exits `2` by name.
+
+**There are TWO independent boundaries, and the step names the one that blocked
+it** — an unqualified "no secret" message would become false the moment the
+secret exists on a runner that cannot read it:
+
+| message | meaning | remedy |
+|---|---|---|
+| `SKIPPED -- this runner image carries no gcloud, so the token cannot be read here at all` | the step's image is `python:3.14`, which has **no gcloud** (measured: `docker run --rm python:3.14 bash -lc 'command -v gcloud'` → empty) | a step/image change, i.e. the **venue shape** tracked by #1361 — *not* creating the secret |
+| `SKIPPED -- no ao-gate-status-token secret` | gcloud is present, the secret could not be read | create the secret + grant the build SA (below) |
+
+The image is deliberately **not** changed here. The step's image decides which
+checks can assess in this venue, and that shape is #1361's, not this change's: 
+swapping it to a cloud-sdk image to pick up gcloud would change which of the 12
+venue-limited checks answer `CANNOT-ASSESS` in CI.
+
 
 The trade is named rather than hidden: **while the secret is absent, this build
 produces no `ao/gate-of-record` status**, so the required check has no
@@ -132,12 +141,16 @@ produces no `ao/gate-of-record` status**, so the required check has no
 
 1. **secret** — create `ao-gate-status-token` and grant the build SA read
    access (commands below);
-2. **trigger** — promote the `verify` trigger out of `disabled: true`
+2. **a runner that can read it** — the `verify` step's image must carry
+   `gcloud`, which `python:3.14` does not (see the table above). That is a venue
+   question, tracked by #1361, so creating the secret alone does **not** give
+   this build a producer;
+3. **trigger** — promote the `verify` trigger out of `disabled: true`
    (the existing flag-gate, unchanged by this change);
-3. **observation** — read the posted status back with
+4. **observation** — read the posted status back with
    `bash scripts/gate-status.sh show --sha <sha>`.
 
-Until (1) and (2) are done, this repository's `ao/gate-of-record` check has no
+Until all four hold, this repository's `ao/gate-of-record` check has no
 *automatic* producer, and the fleet merges under the documented operator
 override (`enforce_admins: false` in
 `governance/platform/branch-protection.yaml`) rather than by satisfying it.
