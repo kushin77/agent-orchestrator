@@ -1,0 +1,18 @@
+{
+  "doc": "lesson 8 (#1378): a foreign (cloud-build) red the runner never itself ran is re-queued, not refused forever",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 16,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 16,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "cloud-build",
+      "state": "red"
+    }
+  ]
+}
