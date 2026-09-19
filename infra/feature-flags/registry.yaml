@@ -318,6 +318,20 @@ surfaces:
       fleet/console.py snapshot() served at GET /api/fleet/snapshot, the
       push channel GET /api/fleet/stream (SSE), and the history endpoint
       GET /api/fleet/events. Offline (no tmux, no TTY, no network egress).
+  edge_cutover:
+    default: off
+    promoted: false
+    service: portal
+    tf_flag: enable_portal
+    description: >
+      Edge fronting for ai.purebliss.app (issue #731, deferred by PR #926 to
+      this lane per docs/EDGE-CUTOVER.md §8): the retirement of the GCP edge
+      route as code (create_gcp_edge_route defaults false) in favor of the
+      Cloudflare tunnel to the shared-services run half. Registered here so
+      the surface is promotable through the ordered go-live ladder; the
+      run-half tunnel/DNS/ingress itself stays outside this repo
+      (docs/EDGE-CUTOVER.md §7). scripts/check-edge-cutover.sh is the
+      dedicated gate.
   portal_surfaces:
     default: off
     promoted: false
