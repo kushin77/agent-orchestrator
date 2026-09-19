@@ -25,7 +25,7 @@ if str(PACKAGE) not in sys.path:
 # earlier-collected suite before this directory's test modules do their own
 # bare imports, so they resolve against THIS package's files (issues #699,
 # #702, #1042).
-for _name in ("model", "cli", "sources"):
+for _name in ("model", "cli", "sources", "builder"):
     sys.modules.pop(_name, None)
 
 SCHEMA_RELPATH = Path("docs/contracts/paperclip/ticket.schema.json")
