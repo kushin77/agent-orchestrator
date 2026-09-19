@@ -101,6 +101,14 @@ contains() { # contains <haystack> <needle> — bash-native, so it cannot SIGPIP
 # every registered runtime's OWN producer on a scratch fleet and requires seven
 # FRESH beats and then `runtime-stale:deepseek-sister` BY NAME on every run, so
 # "beat, then stopped" is proven red whatever this host's real tree holds.
+#
+# In `make verify` the artifact is also always FRESH where it is judged: the probe
+# that writes it is `check-fleet-runner-preflight.sh` (an admitted spawn through
+# `terminal.run_once`), and discovery puts that check BEFORE this one, so the beat
+# cannot read as "beat, then stopped" inside a gate run. Run this check ALONE on a
+# tree whose last preflight was over an hour ago and that one beat IS past the
+# window — which is the honest verdict (b) deliberately keeps, and
+# `reframe_controls`' `stopped-stays-red` arm proves it is not swallowed here.
 
 # never_beaten <root> — the registered runtimes with no beat at all here: absent
 # from the gate's own reader AND with no beat file on disk. A TORN file is a
