@@ -22,6 +22,13 @@ THE LESSONS THIS FILE ENCODES (each a named control in tests/test_transports.py)
   10. The poster is `scripts/gate-status.sh`, whose context equals the one
      branch protection requires; a PARKED rc (10/11) is not a gate outcome
      (the mapper refuses it) and is never posted.
+  11. A red recorded as `rc 1` and nothing else is NOT evidence (issue #1384).
+     The worktree is removed when the run ends, so `.verify/verify.log` and the
+     gate's own attestation die with it and the failing check's NAME becomes
+     unknowable without re-running 15 minutes of gate by hand. Every verify
+     therefore KEEPS a BOUNDED transcript of itself (`.fleet/runner/logs/
+     <pr>-<sha>.log`) and records the failing check names + the gate's own
+     summary line in the marker and the ledger row.
 
 All transports are injected: `git`, `sh` and `post_status` are callables, so
 the tests drive this module with fakes and no test ever touches the real repo.
@@ -32,6 +39,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import subprocess
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -50,6 +58,49 @@ PR_REFSPEC = "+refs/pull/{pr}/head:refs/remotes/origin/pr/{pr}"
 
 #: The file a held worktree keeps open for the whole run (lesson 6).
 HOLD_FILE = ".ao-runner-held"
+
+# --- evidence bounds (lesson 11, issue #1384) ----------------------------------
+#: A red recorded as `rc 1` and nothing else cannot be diagnosed or contested:
+#: the worktree it ran in is removed, so the failing check's NAME is unknowable
+#: without re-running the whole gate by hand. Every verify therefore keeps a
+#: bounded transcript of itself beside its rc, and the names of the checks that
+#: failed ride in the marker and the ledger row.
+#:
+#: THE BOUND, stated once and enforced in `_tail`/`prune_evidence_logs`:
+#:   * the kept transcript is the LAST `EVIDENCE_LOG_MAX_BYTES` bytes of the run
+#:     — the verdict, the skip-ratchet note and the failing check's own output
+#:     are what a reader needs, and the gate prints its summary LAST, so a tail
+#:     always carries it; the number of dropped bytes is written in the header;
+#:   * the log directory keeps only the newest `EVIDENCE_LOG_KEEP` files;
+#:   * at most `MAX_FAILING_CHECKS` names and `MAX_SUMMARY_CHARS` characters of
+#:     the summary line ride in the marker + ledger.
+#: `.fleet/runner/` is runtime state (gitignored) that outlives the process, so
+#: an unbounded tail is its own defect: the rung verifies every open head, every
+#: few minutes, forever.
+EVIDENCE_LOG_MAX_BYTES = 256 * 1024
+EVIDENCE_LOG_KEEP = 120
+MAX_FAILING_CHECKS = 10
+MAX_SUMMARY_CHARS = 240
+#: Where a verify's transcript is kept, relative to the runner dir.
+EVIDENCE_LOG_DIR = "logs"
+
+#: The generated root and artifacts `scripts/verify.sh` writes INSIDE a verified
+#: worktree — and which die with it, which is why they are read before removal.
+VERIFY_DIR = ".verify"
+ATTESTATION_NAME = "attestation.json"
+TRANSCRIPT_NAME = "verify.log"
+
+#: The summary line, taken from the END of the transcript: `verify:` also prefixes
+#: the skip ratchet's own note earlier in the run, and the composite's summary is
+#: printed last.
+SUMMARY_RE = re.compile(r"^verify: (PASS|FAIL|CANNOT-ASSESS|PARKED)\b")
+#: A failing check line (`<name>: FAIL` / `<name>: NOT-OK`) — the FALLBACK for a
+#: run whose attestation is absent (a venue-invalid run writes none). The
+#: attestation is preferred: it names checks from the gate's own record instead of
+#: from a line shape that merely looks like one.
+FAIL_LINE_RE = re.compile(r"^(?P<name>[a-z][a-z0-9]*(?:-[a-z0-9]+)*): (?P<verdict>FAIL|NOT-OK)\b")
+#: Words that prefix the composite's OWN lines, never a check name.
+NOT_CHECKS = frozenset({"verify", "gate", "attestation", "make"})
 
 
 @dataclass(frozen=True)
@@ -96,6 +147,197 @@ def real_command(binary: str) -> Command:
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# --- the kept transcript (lesson 11, issue #1384) -------------------------------
+def _tail(text: str, cap: int) -> tuple[str, int]:
+    """The LAST `cap` bytes of `text`, and how many bytes were dropped.
+
+    Bytes, not lines: the bound has to hold for a transcript with one enormous
+    line (a pytest failure dump) exactly as it holds for a long one. A split
+    multi-byte character at the boundary is decoded with `errors="replace"` — a
+    transcript is evidence, and mangling one byte of it at the cut is honest
+    where silently keeping more than the bound is not.
+
+    `cap <= 0` keeps NOTHING, and is spelled out because it is not what slicing
+    says: `data[-0:]` is `data[0:]`, i.e. every byte (measured — the gate's
+    MUTANT-5, which sets the bound to 0, was NOT caught until this arm existed;
+    a bound of zero that keeps everything is a bound that fails OPEN).
+    """
+    data = text.encode("utf-8", errors="replace")
+    if cap <= 0:
+        return "", len(data)
+    if len(data) <= cap:
+        return data.decode("utf-8", errors="replace"), 0
+    return data[-cap:].decode("utf-8", errors="replace"), len(data) - cap
+
+
+def _mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def prune_evidence_logs(log_dir: Path, keep: int = EVIDENCE_LOG_KEEP) -> list[str]:
+    """Keep only the newest `keep` kept transcripts; returns the names removed.
+
+    The directory is retained ACROSS cycles (that is the point — a red has to
+    outlive the process that found it), so it is a bound like any other: a long
+    night of verifies must not fill the box. A file that cannot be stat'ed or
+    removed is skipped rather than raising — pruning is housekeeping, and it is
+    never allowed to turn a verify's outcome into a crash.
+    """
+    try:
+        files = [path for path in log_dir.iterdir() if path.is_file()]
+    except OSError:
+        return []
+    if len(files) <= keep:
+        return []
+    files.sort(key=lambda path: (_mtime(path), path.name))
+    removed: list[str] = []
+    for path in files[: len(files) - keep]:
+        try:
+            path.unlink()
+            removed.append(path.name)
+        except OSError:
+            continue
+    return removed
+
+
+def parse_verify_evidence(stdout: str, stderr: str = "", attestation: dict | None = None) -> dict:
+    """What a red needs in order to be diagnosed later: the gate's own summary
+    line, and the NAMES of the checks that failed (bounded).
+
+    The attestation (`.verify/attestation.json`, written by `scripts/verify.sh`)
+    is preferred — it carries a machine-readable verdict per check, so the names
+    come from the gate's own record. The transcript is the fallback (a
+    venue-invalid run writes no attestation), and WHICH source was used is
+    recorded by name so a reader never has to guess the provenance.
+
+    An empty `failing_checks` is a real answer, not a missing one: the measured
+    #1405 shape is `verify: FAIL (0 of 215 checks failed ... skip ratchet FAIL: 1
+    unnamed skip)` — the run is red and NO check failed. The summary line carries
+    that, and the planner renders the empty set `none-named` rather than blank.
+    """
+    transcript = (stdout or "") + ("\n" + stderr if stderr else "")
+    summary = ""
+    for line in transcript.splitlines():
+        if SUMMARY_RE.match(line.strip()):
+            summary = line.strip()[:MAX_SUMMARY_CHARS]
+
+    failing: list[str] = []
+    source = "none"
+    notes: list[str] = []
+    checks = attestation.get("checks") if isinstance(attestation, dict) else None
+    if isinstance(checks, list):
+        source = "attestation"
+        for check in checks:
+            if not isinstance(check, dict) or str(check.get("status")) != "FAIL":
+                continue
+            name = str(check.get("name") or "").strip()
+            if name and name not in failing:
+                failing.append(name)
+    else:
+        # A GAP, named: the gate's own record could not be read (a venue-invalid
+        # run writes none at all), so the names below come from line shapes.
+        notes.append("attestation-has-no-checks" if isinstance(attestation, dict) else "attestation-absent")
+
+    if not failing:
+        for line in transcript.splitlines():
+            match = FAIL_LINE_RE.match(line.strip())
+            if not match or match.group("name") in NOT_CHECKS:
+                continue
+            if match.group("name") not in failing:
+                failing.append(match.group("name"))
+        if failing and source == "none":
+            source = "transcript"
+
+    # The note names a GAP in the evidence, never a normal outcome: a green run
+    # legitimately names no failing check, and an attestation that assessed and
+    # found nothing failing is silent about it — `failing_checks: []` says so.
+    total = len(failing)
+    kept = failing[:MAX_FAILING_CHECKS]
+    if total > len(kept):
+        notes.append(f"failing-checks-truncated:{total}")
+    if not total and source == "none":
+        notes.append("transcript-empty" if not transcript.strip() else "no-check-named")
+    return {
+        "verify_summary": summary,
+        "failing_checks": kept,
+        "failing_source": source,
+        "failing_note": ",".join(notes),
+        "failing_total": total,
+    }
+
+
+def retain_verify_evidence(*, runner_dir: Path, pr: int, sha: str, worktree: Path, result: Result) -> dict:
+    """Keep a bounded transcript of ONE verify and name what it can about a red.
+
+    Called INSIDE the held worktree: `.verify/` is removed with it, so the
+    attestation and the transcript are read here or lost. Writes
+    `.fleet/runner/logs/<pr>-<sha>.log` (the last `EVIDENCE_LOG_MAX_BYTES` bytes
+    of the transcript behind a header naming the bound and the dropped byte
+    count), prunes the directory to its newest `EVIDENCE_LOG_KEEP` files, and
+    returns the record the marker + ledger carry.
+
+    Keyed by (pr, sha) like every other piece of evidence: a pushed head writes
+    its OWN file and can never inherit the previous head's tail.
+
+    A missing or unreadable artifact is a NAMED note (`attestation-absent`,
+    `attestation-unreadable:<why>`, `transcript-absent`), never a silent green.
+    """
+    runner_dir = Path(runner_dir)
+    verify_dir = Path(worktree) / VERIFY_DIR
+
+    attestation: dict | None = None
+    try:
+        loaded = json.loads((verify_dir / ATTESTATION_NAME).read_text(encoding="utf-8"))
+        attestation = loaded if isinstance(loaded, dict) else None
+    except OSError:
+        pass
+    except ValueError:
+        attestation = None
+
+    transcript = ""
+    try:
+        transcript = (verify_dir / TRANSCRIPT_NAME).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        pass
+    if not transcript:
+        # The tee'd stdout/stderr of the run itself: the same bytes, in memory.
+        transcript = (result.out or "") + ("\n" + result.err if result.err else "")
+
+    parsed = parse_verify_evidence(transcript, attestation=attestation)
+    kept, dropped = _tail(transcript, EVIDENCE_LOG_MAX_BYTES)
+
+    log_dir = runner_dir / EVIDENCE_LOG_DIR
+    log_path = log_dir / f"{pr}-{sha}.log"
+    # The header is PROVENANCE, never evidence: it names what the file is and how
+    # it was bounded. The summary line and the failing checks stay in the
+    # transcript below it, so a truncated tail can never be confused with a run
+    # whose names were dropped.
+    header = (
+        f"# verify evidence — pr {pr} head {sha} rc {result.rc} kept {now_iso()}\n"
+        f"# bound: the LAST {EVIDENCE_LOG_MAX_BYTES} byte(s) of the transcript; {dropped} byte(s) dropped\n"
+        f"# names: from {parsed['failing_source'] or 'none'}"
+        f"{'; ' + parsed['failing_note'] if parsed['failing_note'] else ''}\n"
+        f"# --- transcript tail ---\n"
+    )
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(header + kept, encoding="utf-8")
+    prune_evidence_logs(log_dir)
+
+    return {
+        "failing_checks": parsed["failing_checks"],
+        "failing_total": parsed["failing_total"],
+        "failing_source": parsed["failing_source"],
+        "verify_summary": parsed["verify_summary"],
+        "evidence_log": f"{EVIDENCE_LOG_DIR}/{log_path.name}",
+        "evidence_bytes": len((header + kept).encode("utf-8", errors="replace")),
+        "evidence_truncated": dropped > 0,
+        "evidence_note": parsed["failing_note"],
+    }
 
 
 # --- the ledger (lesson 9) -----------------------------------------------------
@@ -249,10 +491,20 @@ def run_verify(
     master_tip = tip_result.out.strip() if tip_result.ok else None
 
     removed = False
+    evidence: dict = {}
     try:
         with HeldWorktree(git, repo=repo, path=worktree, sha=sha) as held:
             result = sh(["bash", "scripts/verify.sh", "verify"], cwd=held.path, timeout=timeout)
             rc = int(result.rc)
+            # INSIDE the worktree, because `.verify/` is removed with it (lesson
+            # 11, #1384): after this line the failing check's name is gone.
+            try:
+                evidence = retain_verify_evidence(runner_dir=runner_dir, pr=pr, sha=sha, worktree=held.path, result=result)
+            except OSError as exc:
+                # Retaining evidence is housekeeping; it is never allowed to lose
+                # the verdict or crash the cycle. A tail that could not be kept is
+                # NAMED — a missing tail is never a green and never a silence.
+                evidence = {"evidence_note": f"evidence-retain-failed:{type(exc).__name__}"}
         removed = held.removed
     except RuntimeError as exc:
         detail = str(exc)
@@ -261,6 +513,7 @@ def run_verify(
 
     state = state_of_verify_rc(rc)
     detail = f"verify rc {rc} ({state})"
+    failing = [str(name) for name in (evidence.get("failing_checks") or [])]
     gate_rc = gate_rc_of(rc)
     posted = False
     if gate_rc is None:
@@ -273,10 +526,31 @@ def run_verify(
     # A head verify is head-level evidence: `base_tip` stays None so the
     # merged-tree seam judges it at merge time (lesson 3). The tip is recorded
     # in the detail for the reader.
+    evidence_fields = {
+        "failing_checks": failing,
+        "failing_total": int(evidence.get("failing_total") or 0),
+        "verify_summary": str(evidence.get("verify_summary") or ""),
+        "evidence_log": str(evidence.get("evidence_log") or ""),
+        "evidence_bytes": int(evidence.get("evidence_bytes") or 0),
+        "evidence_truncated": bool(evidence.get("evidence_truncated")),
+        "evidence_source": str(evidence.get("failing_source") or ""),
+        "evidence_note": str(evidence.get("evidence_note") or ""),
+    }
     marker = write_local_marker(
-        marker_dir, pr, sha, rc, base_tip=None, detail=f"{detail}; master was {(master_tip or '?')[:12]}", recorded_at=now()
+        marker_dir,
+        pr,
+        sha,
+        rc,
+        base_tip=None,
+        detail=f"{detail}; master was {(master_tip or '?')[:12]}",
+        recorded_at=now(),
+        failing_checks=failing,
+        verify_summary=evidence_fields["verify_summary"],
+        evidence_log=evidence_fields["evidence_log"],
     )
-    ledger.record("verify", pr=pr, sha=sha, rc=rc, state=state, detail=detail, posted=posted, worktree_removed=removed)
+    ledger.record(
+        "verify", pr=pr, sha=sha, rc=rc, state=state, detail=detail, posted=posted, worktree_removed=removed, **evidence_fields
+    )
     return VerifyOutcome(pr, sha, rc, state, posted, removed, detail, str(marker))
 
 

@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 from fleet.runner.model import (
     CANNOT_ASSESS,
@@ -212,8 +213,11 @@ def from_local_markers(directory: Path) -> list[Evidence]:
     """Evidence from `.fleet/runner/local-green/<pr>-<sha>` marker files.
 
     Each marker is a small JSON document written by `verify.py` (rc, base_tip,
-    recorded_at). A marker that cannot be parsed is CANNOT-ASSESS by name, not
-    skipped: an unreadable record must never silently become "no evidence".
+    recorded_at, failing_checks). A marker that cannot be parsed is
+    CANNOT-ASSESS by name, not skipped: an unreadable record must never silently
+    become "no evidence" — and that includes a `failing_checks` that is not a
+    list of names, which is exactly the shape a reader would otherwise mistake
+    for "the run named no failing check" (issue #1384).
     """
     out: list[Evidence] = []
     if not directory.is_dir():
@@ -232,8 +236,9 @@ def from_local_markers(directory: Path) -> list[Evidence]:
             detail = str(data.get("detail") or f"verify rc {rc}")
             base_tip = data.get("base_tip")
             recorded_at = str(data.get("recorded_at") or "")
+            failing_checks = marker_failing_checks(data)
         except (OSError, ValueError, KeyError, TypeError):
-            state, detail, base_tip, recorded_at = CANNOT_ASSESS, f"marker-unreadable:{stem}", None, ""
+            state, detail, base_tip, recorded_at, failing_checks = CANNOT_ASSESS, f"marker-unreadable:{stem}", None, "", ()
         out.append(
             Evidence(
                 pr=int(pr_text),
@@ -243,21 +248,64 @@ def from_local_markers(directory: Path) -> list[Evidence]:
                 base_tip=base_tip,
                 detail=detail,
                 recorded_at=recorded_at,
+                failing_checks=failing_checks,
             )
         )
     return out
 
 
+def marker_failing_checks(data: dict) -> tuple[str, ...]:
+    """The check names a marker recorded, or a REFUSAL when the shape is wrong.
+
+    Absent is fine (a marker written before issue #1384, or a run that named
+    nothing): it reads as the empty tuple, which is what `none-named` renders.
+    Present-but-wrong is a `TypeError` so the caller's parse guard turns the
+    whole record into CANNOT-ASSESS by name — the alternative (coercing it to
+    "no failing checks") would launder a corrupt record into a plausible one.
+    """
+    raw = data.get("failing_checks")
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or any(not isinstance(name, str) for name in raw):
+        raise TypeError("failing_checks is not a list of check names")
+    return tuple(raw)
+
+
 def write_local_marker(
-    directory: Path, pr: int, sha: str, rc: int, *, base_tip: str | None, detail: str, recorded_at: str
+    directory: Path,
+    pr: int,
+    sha: str,
+    rc: int,
+    *,
+    base_tip: str | None,
+    detail: str,
+    recorded_at: str,
+    failing_checks: Iterable[str] = (),
+    verify_summary: str = "",
+    evidence_log: str = "",
 ) -> Path:
     """Record a local verify outcome. PARKED rcs are recorded too — as `parked`,
-    which the planner re-queues (lesson 2) — never as a verdict."""
+    which the planner re-queues (lesson 2) — never as a verdict.
+
+    `failing_checks` is what the PLAN consumes (it becomes the red's name), while
+    `verify_summary` (the gate's own `verify: FAIL (...)` line) and `evidence_log`
+    (the kept transcript, `.fleet/runner/logs/<pr>-<sha>.log`) are carried for the
+    reader: a red whose record is `{"rc": 1}` alone cannot be diagnosed or
+    contested once the worktree is gone (issue #1384).
+    """
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{pr}-{sha}"
     path.write_text(
         json.dumps(
-            {"rc": int(rc), "base_tip": base_tip, "detail": detail, "recorded_at": recorded_at},
+            {
+                "rc": int(rc),
+                "base_tip": base_tip,
+                "detail": detail,
+                "recorded_at": recorded_at,
+                "failing_checks": [str(name) for name in failing_checks],
+                "verify_summary": str(verify_summary),
+                "evidence_log": str(evidence_log),
+            },
             sort_keys=True,
         )
         + "\n",
