@@ -1,0 +1,36 @@
+{
+  "schema": "ao.cloudbuild.live-inventory/v1",
+  "why": "The LIVE half of the declared-vs-live control (issue #1415). `disabled: true` in a *-trigger.yaml is a DECLARATION; until this file existed nothing in `make verify` read what the project actually runs, so `check-cloudbuild.sh` was green while every control-plane trigger was ENABLED. This is a RECORDED measurement, not a live call: the gate compares the declarations against it offline and deterministically, and never claims to have contacted GCP. Refresh it with the command below and commit the result -- a refusal in the gate names this file and that command.",
+  "project": "purebliss-ghl",
+  "captured_at": "2026-09-19T16:06:56Z",
+  "captured_by": "dev-machine@purebliss-ghl.iam.gserviceaccount.com",
+  "command": "gcloud builds triggers list --project=purebliss-ghl --format=json",
+  "scope": "every trigger whose repository is kushin77/agent-orchestrator (repositoryEventConfig.repository ends /repositories/agent-orchestrator), projected to the fields this control needs; raw capture sha256 a5d5263e56d2a3d13ea61e064f35efdad7ada41247bafaed61bd0f7598b607a4",
+  "disabled_field": "Cloud Build omits `disabled` entirely when the trigger is ENABLED (measured against this same capture: disabled=true IS present on two unrelated triggers). `false` below is that absence, normalised -- it is not a field the API returned as false.",
+  "triggers": [
+    {
+      "name": "control-plane-apply",
+      "id": "421859bf-5bfc-428b-90bf-0553411e8fc6",
+      "disabled": false,
+      "filename": "infra/cloudbuild/apply.yaml",
+      "shape": "repositoryEventConfig",
+      "promoted_flag": "_ENABLE_APPLY=\"true\" (the declaration at infra/cloudbuild/apply-trigger.yaml ships \"false\")"
+    },
+    {
+      "name": "control-plane-web-image",
+      "id": "5318c321-b6ea-40d0-bd33-5dc04ac740d6",
+      "disabled": false,
+      "filename": "infra/cloudbuild/web-image.yaml",
+      "shape": "repositoryEventConfig",
+      "promoted_flag": "none -- this declaration carries no _ENABLE_* key; the trigger state is the only switch"
+    },
+    {
+      "name": "control-plane-verify",
+      "id": "09e761b1-969e-44be-8fcf-14eb9c40db22",
+      "disabled": false,
+      "filename": "infra/cloudbuild/verify.yaml",
+      "shape": "repositoryEventConfig",
+      "promoted_flag": "_ENABLE_VERIFY=\"true\" (the declaration at infra/cloudbuild/verify-trigger.yaml ships \"false\")"
+    }
+  ]
+}

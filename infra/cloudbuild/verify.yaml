@@ -14,27 +14,29 @@
 options:
   logging: CLOUD_LOGGING_ONLY
 
-# issue #1350: the now-required check `ao/gate-of-record` (#1342) needs a
-# producer. This step posts the gate's own rc with `scripts/gate-status.sh`,
-# authenticated by a fine-grained PAT (`statuses:write` only) held in Secret
-# Manager -- Cloud Build has no `gh` login, so the token is READ INSIDE THE STEP
-# and handed to the poster as GH_TOKEN (scripts/gate-status.sh falls back to a
-# raw authenticated `curl` when `gh` is absent).
+# THIS VENUE POSTS NOTHING (issue #1415). Until this change the box-side runner
+# rung posted `ao/gate-of-record` for every verified head while this build posted
+# a SECOND status for the SAME commit (issue #1354 added the step). Two producers
+# of one required context is the drift class #1342/#1382 exists for -- and the
+# second one describes the same `make verify` invocation the first one does:
+# `scripts/verify.sh` already publishes its own verdict through the ONE poster,
+# `scripts/gate-status.sh`. So the poster step is gone, that script is still the
+# one poster, and the runner is the single producer.
 #
-# THE POST IS BEST-EFFORT; THE GATE IS NOT. Cloud Build resolves
-# `availableSecrets` BEFORE any step runs, so declaring the PAT there made an
-# absent secret hard-fail the entire build at step 0: the gate never ran, and
-# the red build said nothing about the code under review (measured: build
+# KEPT FROM #1350, because the lesson still binds: this build's job is to run the
+# gate and report ITS OWN rc on the code under review. A build that dies before
+# the gate has said nothing about that code, and a build that fails because it
+# could not publish (an absent token, an image without `gh`) is the same mistake
+# wearing a producer's clothes -- so nothing here reads a secret, and nothing
+# here can fail for a reason other than the gate's verdict.
+#
+# The historical refusal is kept on the record because it is why the shape is
+# what it is: declaring the PAT through `availableSecrets` made an absent secret
+# hard-fail the build at step 0 (measured: build
 # 27b692b8-0da5-483b-89d9-8f4e348dd806, `Secret [ao-gate-status-token] not found
-# or has no versions`). Issue #1350 settles which of the two a build must
-# sacrifice: the gate always runs and always reports its own rc, and a missing
-# token is logged and skipped WITHOUT failing the step. The trade is named, not
-# hidden -- while the secret is absent this build produces no
-# `ao/gate-of-record` status, so the required check has no *automatic* producer
-# and merges ride the documented operator override (see README.md, "The verify
-# runner posts `ao/gate-of-record`", and docs/RELEASE-PLAN.md section 5).
-# Nothing is fetched through `availableSecrets`, so no secret is required for
-# this build to run.
+# or has no versions`), so the gate never ran and the red said nothing about the
+# code. Nothing is fetched through `availableSecrets` and no secret is required
+# for this build to run.
 
 steps:
   # Toolchain attestation + the gate itself, in one step: Cloud Build steps
@@ -143,124 +145,10 @@ steps:
 
         # `make verify` is the gate of record, run through the same entrypoint
         # the Makefile uses. Its rc is CAPTURED (the `|| rc=$?` guard keeps
-        # `set -e` from ending the step here) because a step that dies on a red
-        # gate could never publish "red".
+        # `set -e` from ending the step here) so the step ends with the GATE's
+        # own verdict, never with the shell's first failure -- and with no poster
+        # below, that rc IS this build's outcome (issue #1415).
         rc=0
         bash scripts/verify.sh verify || rc=$?
 
-        # Best-effort token (issue #1350): read the statuses:write PAT from
-        # Secret Manager HERE, never through `availableSecrets` -- that block is
-        # resolved before step 0, so a missing secret would end the build before
-        # the gate above ever ran. However it comes up empty, the fetch is EMPTY
-        # and never fatal: `|| true` under `set -e` is what makes it non-fatal,
-        # and `command -v` keeps an absent CLI from printing a bare "not found".
-        #
-        # WHICH boundary blocked it is NAMED, not assumed. There are TWO, they
-        # have different remedies, and the unqualified "no secret" message this
-        # replaced would become FALSE the moment the secret exists on a runner
-        # that cannot read it:
-        #   * `no-gcloud-in-this-image` -- this step runs on python:3.14, which
-        #     carries no gcloud at all (measured: `docker run --rm python:3.14
-        #     bash -lc 'command -v gcloud'` -> empty). Creating the secret does
-        #     NOT give this step a producer. The image is deliberately NOT
-        #     changed here: the step's image decides which checks can assess in
-        #     this venue, and that shape belongs to #1361, not to this lane.
-        #   * `secret-absent` -- gcloud is there, the secret could not be read.
-        #
-        # The boundary is re-probed where it is reported rather than carried in a
-        # new variable: a new name would be one more dollar-template this file
-        # offers the submission validator, and `command -v` is free.
-        GH_TOKEN=""
-        if command -v gcloud >/dev/null 2>&1; then
-          GH_TOKEN="$(gcloud secrets versions access latest --secret=ao-gate-status-token --project="$PROJECT_ID" 2>/dev/null || true)"
-        fi
-        export GH_TOKEN
-
-        # --- the commit under review -----------------------------------------
-        # $COMMIT_SHA is NOT the PR head on a pull_request-triggered build:
-        # Cloud Build populates that built-in for push/tag triggers, and on THIS
-        # trigger it is empty (measured: build
-        # e6df118d-a395-477d-957b-9603be327b86, whose own checkout log reads
-        # `GitCommit: df02b015...` while this step still saw the built-in empty)
-        # -- so requiring it withdrew the producer at the very moment the check
-        # became required.
-        #
-        # The gate's OWN record is the honest subject: `make verify` writes
-        # `.verify/attestation.json` carrying the sha it MEASURED and the rc it
-        # reached, and Cloud Build's FETCHSOURCE checks out that same commit. The
-        # sha therefore comes from the record, never from the trigger type. A
-        # PARKED or crashed gate writes no attestation, so there is no verdict to
-        # publish and this step says so by name instead of inventing one.
-        #
-        # `dry-run` resolves the record BEFORE the external boundary (the token)
-        # is consulted, and writes nothing -- it is what puts the sha this run is
-        # about into the build log, so the resolution is readable evidence rather
-        # than a claim.
-        #
-        # The path is spelled LITERALLY here and below, with no shell variable:
-        # the submission-time validator reads bare dollar-templates in this file,
-        # comments included (the class that refused the token template, build
-        # 05734838-0cc3-4b35-bd2b-ab5e909fc3a3), so introducing a new one -- or
-        # naming that one -- for a fixed path buys nothing and risks exactly that
-        # failure.
-        if ! bash scripts/gate-status.sh dry-run --attestation .verify/attestation.json --sha "${COMMIT_SHA:-}"; then
-          echo "gate-status: CANNOT-ASSESS -- the gate's own record (.verify/attestation.json) does not"
-          echo "  name a publishable commit, so this build has no verdict to post."
-          exit 2
-        fi
-
-        # No token: skip posting BY NAME and hand back the GATE's own rc. A
-        # build that cannot publish the check is not a verdict on the code under
-        # review, so an unreadable token must not become the step's outcome. The
-        # message names the boundary that actually blocked it, so the log says
-        # which remedy applies rather than the one the author assumed.
-        #
-        # The braces-with-default form is DELIBERATE. Cloud Build validates every
-        # dollar-template in this file at SUBMISSION time and refuses a key that
-        # is neither a built-in substitution nor a declared one, naming it in the
-        # refusal -- which kills the build BEFORE step 0, this issue's own failure
-        # class (measured: build 05734838-0cc3-4b35-bd2b-ab5e909fc3a3). So this
-        # file never spells the token variable as a bare dollar-template --
-        # not even here in a comment, which the validator reads too. PROJECT_ID
-        # and COMMIT_SHA ARE built-ins, so they may be spelled that way.
-        if [ -z "${GH_TOKEN:-}" ]; then
-          if command -v gcloud >/dev/null 2>&1; then
-            echo "gate-status: SKIPPED -- no ao-gate-status-token secret; the gate verdict is NOT posted (see issue #1350)"
-            echo "  create the secret and grant the build SA read access to give this build a producer (see README.md)."
-          else
-            echo "gate-status: SKIPPED -- this runner image carries no gcloud, so the token cannot be read"
-            echo "  here at all: creating ao-gate-status-token is NOT sufficient for this venue. The gate"
-            echo "  verdict is NOT posted (issue #1350; the venue shape is #1361)."
-          fi
-          exit "$rc"
-        fi
-
-        # scripts/gate-status.sh owns the tri-state mapping (0 OK / 1 NOT-OK / 2
-        # CANNOT-ASSESS -> success / failure / error) -- rc 2 is never posted as
-        # success. Both the rc and the sha are taken from the gate's own record
-        # in ONE move, so a published outcome can never belong to a commit other
-        # than the one that was measured. A POST that fails once the token WAS
-        # available produced no check at all, so it is CANNOT-ASSESS (2) by name
-        # rather than a silent skip.
-        #
-        # The built-in is passed ALONGSIDE the record as a CROSS-CHECK, never as
-        # the source: it is empty on pull_request triggers -- the empty value is
-        # read as "no claim" -- and when it IS populated a disagreement is
-        # REFUSED, because an rc belongs only to the commit that was measured.
-        #
-        # --venue-run marks this post as the VENUE OF RECORD reporting its own
-        # verdict (issue #1400). It is this build's own id -- a built-in
-        # substitution, so it is allowed here by name like PROJECT_ID -- and it
-        # is load-bearing: the poster refuses to publish a green for a commit
-        # whose venue run is red or still RUNNING, and THIS run is still running
-        # while it posts. Without the marker this step would refuse its own
-        # verdict and the required check would lose its only automatic producer.
-        if ! bash scripts/gate-status.sh post --attestation .verify/attestation.json --sha "${COMMIT_SHA:-}" --venue-run "$BUILD_ID"; then
-          echo "gate-status: CANNOT-ASSESS -- the gate ran (rc $rc) but its status was not published"
-          echo "  for the commit it measured; the build is not reported as a gated run."
-          exit 2
-        fi
-
-        # The check-run must stay truthful to the gate: exit with verify's OWN
-        # rc, never the poster's -- publishing must never flip a red gate green.
         exit "$rc"
