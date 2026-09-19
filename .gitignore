@@ -89,6 +89,13 @@ governance/board/violations.jsonl
 .fleet/lifecycle/
 # Session heartbeats: one per running lane, swept by governance/reconcile (#304)
 .fleet/sessions/
+# Runtime liveness beats (issue #1412): one `{runtime, commit, state, ts}` record
+# per registered runtime, rewritten as each producer fires — fleet/hooks/claude-beat.sh,
+# fleet/terminal.py::beat_runtime, `python3 -m fleet.beats post`, and the hermes /
+# paperclip adapter verbs. The judge is scripts/check-runtime-liveness.sh; the
+# contract is fleet/runtimes.yaml. Runtime state, never committed: a beat in
+# history would be read as a runtime that is running.
+.fleet/runtime-beats/
 # Watchdog remedy ledger (tracked module: fleet/watchdog.py, issue #773): one
 # record per rung holding its attempt count and escalation, plus the
 # one-per-incident escalation artifacts. Runtime state, never committed.

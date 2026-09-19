@@ -128,6 +128,66 @@ def _append_detail(base: str, detail: str) -> str:
     return base + DETAIL_SEP + flat[: room - 1] + DETAIL_CUT
 
 
+# --- the venue of record's ability to DELIVER a verdict (issue #1467) --------
+#
+# `scripts/gate-status.sh` publishes `ao/gate-of-record` for a commit only while
+# the venue of record's own run for that commit does not contradict it. That guard
+# is right -- issue #1400 measured a box-side green standing while the venue's run
+# was still in flight, and that run then concluded red -- but it is right only
+# while the venue can DELIVER a verdict at all.
+#
+# Measured 2026-09-19 (#1467): the venue of record's runner image carries neither
+# `gh` nor `gcloud`, so its poster step exits 2 for want of a credential and
+# publishes NOTHING -- not even the red. The ordered rule therefore had no
+# satisfier at either end: the local producer "may not satisfy it first", and the
+# venue cannot go at all. Every PR head stayed BLOCKED, and the required check
+# became a merge freeze whose only exit was the admin bypass
+# (`enforce_admins=false`) that scripts/check-branch-protection.sh exists to
+# prevent.
+#
+# Whether a venue can DELIVER is a fact about the VENUE, and it is MEASURED from
+# the venue's own record rather than asserted here: the venue's own poster step
+# either reached the API -- it prints `gate-status: posted <context>=<state> ...`
+# -- or said, in its own words, why it could not (`gate-status: SKIPPED ...` from
+# `infra/cloudbuild/verify.yaml`, or `gate-status: CANNOT-ASSESS ...` from the
+# poster's own token seam). A record that says NEITHER is `unassessable`, and the
+# guard stands: "I could not read the venue" must never become "therefore the
+# venue does not matter".
+#
+# The classifier lives here, not in the poster, so all three outcomes and the
+# precedence between them are provoked OFFLINE by `--self-test`.
+VENUE_DELIVERED = "gate-status: posted "
+VENUE_REFUSED = ("gate-status: SKIPPED ", "gate-status: CANNOT-ASSESS ")
+
+
+# `publishes` / `cannot` / `unassessable`, with the line that decided it so a
+# refusal can quote the venue's own words instead of paraphrasing them.
+#
+# The quoted line is the venue's LATEST refusal, not its first: within one venue
+# run the gate's own publisher speaks before the recipe's post step does, and it
+# is the LAST speaker whose statement is about the venue's ability to deliver
+# ("this runner image carries no gcloud ... creating ao-gate-status-token is NOT
+# sufficient for this venue") rather than about one producer's failure inside it.
+# Measured on build 38ece2de-1412-4ae8-acd7-fe7bfd2055e2, where both lines appear.
+def venue_log_capability(log_text: str) -> tuple[str, str]:
+    """Classify the venue of record's OWN record of whether it could deliver."""
+    refused = ""
+    for raw in str(log_text).splitlines():
+        line = raw.strip()
+        if line.startswith(VENUE_DELIVERED):
+            # DELIVERED WINS. A venue whose own poster reached the API for this
+            # run can deliver, whatever else the log carries -- the gate's own
+            # publisher refusing separately is a second producer's failure, not
+            # the venue's inability, and reading it as one would let a venue that
+            # is demonstrably delivering lose its precedence.
+            return "publishes", line
+        if line.startswith(VENUE_REFUSED):
+            refused = line
+    if refused:
+        return "cannot", refused
+    return "unassessable", ""
+
+
 def self_test() -> int:
     """Assert the whole table. Called by scripts/check-gate-status.sh."""
     problems = []
@@ -182,6 +242,44 @@ def self_test() -> int:
         if DESCRIPTION_MAX - len(summarize(rc)) - len(DETAIL_SEP) < 1:
             problems.append(f"rc {rc}'s outcome string leaves no room for a detail inside the API's cap")
 
+    # The venue-of-record capability classifier (#1467). All three outcomes are
+    # provoked here, offline, plus the precedence between them -- because the
+    # direction that fails open is "a venue that cannot deliver loses its
+    # precedence", and the direction that would be a false green is "a venue that
+    # CAN deliver is treated as if it could not".
+    #
+    # The refusal fixture is the REAL venue's own two lines, quoted from build
+    # 38ece2de-1412-4ae8-acd7-fe7bfd2055e2 (issue #1467): both the gate's own
+    # publisher and the recipe's post step are the venue saying so about itself.
+    unable_to_deliver = (
+        "verify: NOTE -- the gate of record was NOT published for 390ddd77a67f (the poster exited 2):\n"
+        "gate-status: CANNOT-ASSESS \u2014 gh not found and no GH_TOKEN/GITHUB_TOKEN in env; status not posted\n"
+        "gate-status: SKIPPED -- this runner image carries no gcloud, so the token cannot be read\n"
+        "  here at all: creating ao-gate-status-token is NOT sufficient for this venue.\n")
+    got_cap = venue_log_capability(unable_to_deliver)
+    if got_cap[0] != "cannot":
+        problems.append(
+            f"a venue whose own poster skipped for want of a credential was classified {got_cap[0]!r}, expected 'cannot'")
+    if "no gcloud" not in got_cap[1]:
+        problems.append(
+            f"the 'cannot' verdict does not quote the venue's LATEST word about its own ability: {got_cap[1]!r}")
+    if "CANNOT-ASSESS" in got_cap[1]:
+        problems.append(
+            f"the 'cannot' verdict quoted an earlier producer's failure instead of the venue's own final word: {got_cap[1]!r}")
+    got_cap = venue_log_capability("gate-status: posted ao/gate-of-record=failure for 390ddd77a67f (make verify: FAIL)\n")
+    if got_cap[0] != "publishes":
+        problems.append(f"a venue whose own poster reached the API was classified {got_cap[0]!r}, expected 'publishes'")
+    got_cap = venue_log_capability(
+        "gate-status: SKIPPED -- no ao-gate-status-token secret\n"
+        "gate-status: posted ao/gate-of-record=success for 390ddd77a67f (make verify: PASS)\n")
+    if got_cap[0] != "publishes":
+        problems.append("a refusal EARLIER in the venue's log outranked the venue's own successful POST")
+    for silent in ("check-shell-patterns: OK -- nothing to report\n", "", "   \n\n"):
+        got_cap = venue_log_capability(silent)
+        if got_cap[0] != "unassessable":
+            problems.append(
+                f"a venue record carrying neither a POST nor a refusal was classified {got_cap[0]!r}, expected 'unassessable' (fail closed): {silent!r}")
+
     for problem in problems:
         print(f"  FAIL  {problem}", file=sys.stderr)
     if problems:
@@ -190,14 +288,30 @@ def self_test() -> int:
     for rc, want in sorted(expected.items()):
         print(f"      rc {rc} -> {want}")
     print("  OK  a detail is appended, bounded and flattened, and can never displace the outcome")
+    print("  OK  the venue's own record decides whether it can deliver, and an unreadable"
+          " one is 'unassessable' rather than a licence to ignore the venue")
     return 0
 
 
 def main(argv: list[str]) -> int:
     if len(argv) == 2 and argv[1] == "--self-test":
         return self_test()
+    # The poster's seam (#1467): classify the venue of record's OWN build record.
+    # The payload is a FILE in argv, never stdin -- `python3 -` reads its PROGRAM
+    # from stdin, so a piped payload would be handed to the interpreter instead.
+    if len(argv) == 3 and argv[1] == "--venue-capability":
+        try:
+            with open(argv[2], encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError as exc:
+            print(f"gate-status-map: CANNOT-ASSESS -- the venue record could not be read: {exc}", file=sys.stderr)
+            return 2
+        verdict, reason = venue_log_capability(text)
+        print(verdict)
+        print(reason)
+        return 0
     if len(argv) != 2:
-        print("usage: gate-status-map.py <rc> | --self-test", file=sys.stderr)
+        print("usage: gate-status-map.py <rc> | --self-test | --venue-capability <log-file>", file=sys.stderr)
         return 2
     try:
         rc = int(argv[1])
