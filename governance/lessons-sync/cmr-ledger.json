@@ -743,6 +743,72 @@
       "reason": "no-hub-counterpart",
       "record_ref": "#1356",
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0020",
+      "reason": "no-hub-counterpart",
+      "record_ref": "pr-wave-2026-09-18-lessons-mining",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0020",
+      "reason": "no-hub-counterpart",
+      "record_ref": "pr-wave-2026-09-18-lessons-mining",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0025",
+      "reason": "no-hub-counterpart",
+      "record_ref": "c46882200b80e59efb073caec161d1d9d4ff602e",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0016",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1300",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0017",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1335",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0018",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1287",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0019",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1285",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0020",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1353",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0021",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1120",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0022",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1097",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0023",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1111",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     }
   ]
 }
