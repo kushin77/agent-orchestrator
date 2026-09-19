@@ -744,11 +744,37 @@ if [ -f "$POSTER" ]; then
   #     must cut it deliberately: keep the outcome string, mark the cut. The API's
   #     own limit is pinned here as a literal -- it is an external fact, not a
   #     number this repository gets to choose.
+  #
+  # Measured in CHARACTERS, matching the unit GitHub's description cap and the
+  # producer's own len() use (scripts/gate-status-map.py) -- not bytes. Bash's
+  # `${#var}` counts BYTES under a C/POSIX locale (as on the python:3.14 Cloud
+  # Build runner), so a 140-char description containing the multi-byte "\u2026" cut
+  # mark measures 142 there and this arm false-reds (#1382). python3's len() on
+  # a decoded str is locale-independent and agrees with the producer. Both the
+  # positive and negative arms below call this ONE helper, so the fix and its
+  # proof share the same measurement -- a helper redefined only in the negative
+  # arm would prove nothing about the path the positive arm runs.
+  desc_len() { python3 -c 'import sys; print(len(sys.argv[1]))' "$1"; }
+
   cut_mark="$(python3 -c 'print("\u2026", end="")')"
   det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 2 --detail "$(printf 'c%.0s' $(seq 1 500))" 2>&1)"
   det_desc="$(desc_of "$det_out")"
+  det_desc_len="$(desc_len "$det_desc")"
   darm "a 500-character detail still fits the API's 140-character description cap" \
-    "<=140" "$([ "${#det_desc}" -le 140 ] && echo '<=140' || echo ">140 (${#det_desc})")"
+    "<=140" "$([ "$det_desc_len" -le 140 ] && echo '<=140' || echo ">140 ($det_desc_len)")"
+
+  # Negative control: the measurement above must still CATCH a genuinely
+  # oversized description -- proof this repo's convention requires alongside
+  # the fix. A fixture of plain ASCII would measure the same under bytes and
+  # characters and discriminate nothing, so this one reuses the real, actual
+  # 140-char CANNOT-ASSESS description plus one more copy of the multi-byte
+  # cut mark: 141 characters / 143 bytes, genuinely over the cap in EITHER
+  # unit, so a regression back to byte-counting cannot make this arm pass by
+  # accident.
+  oversized_desc="${det_desc}${cut_mark}"
+  oversized_len="$(desc_len "$oversized_desc")"
+  darm "a genuinely oversized description is still measured as over the cap" \
+    ">140 ($((det_desc_len + 1)))" "$([ "$oversized_len" -le 140 ] && echo '<=140' || echo ">140 ($oversized_len)")"
   case "$det_desc" in
     "make verify: CANNOT-ASSESS (not a pass)"*"$cut_mark")
       echo "  OK    and the truncation is MARKED, and the outcome string is what survived it" ;;
