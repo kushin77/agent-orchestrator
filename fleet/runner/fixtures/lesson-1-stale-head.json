@@ -1,0 +1,26 @@
+{
+  "doc": "lesson 1: a pushed head invalidates prior evidence; the live build for the old head is cancelled and the new head verified",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 7,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 7,
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source": "cloud-build",
+      "state": "green"
+    }
+  ],
+  "builds": [
+    {
+      "id": "cb-old",
+      "pr": 7,
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "status": "pending"
+    }
+  ]
+}

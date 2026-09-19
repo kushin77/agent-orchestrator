@@ -659,6 +659,90 @@
       "reason": "no-hub-counterpart",
       "record_ref": "#1052",
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "INC-0019",
+      "reason": "no-hub-counterpart",
+      "record_ref": "pr-runner-prototype-2026-09-18",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "RCA-0019",
+      "reason": "no-hub-counterpart",
+      "record_ref": "pr-runner-prototype-2026-09-18",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "CA-0024",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1356",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0009",
+      "reason": "no-hub-counterpart",
+      "record_ref": "ffc446aaa6f8c509bf746c03360f1a76d4ee2623",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0010",
+      "reason": "no-hub-counterpart",
+      "record_ref": "9b315f5a5669eced4a41bd4cbd8a6472c745ab9f",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0011",
+      "reason": "no-hub-counterpart",
+      "record_ref": "9f62c0d6c18f9051fe8c108a2b60f47149085e6a",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0012",
+      "reason": "no-hub-counterpart",
+      "record_ref": "83ff32dbcf40fe42c4ccbdcb3a41e5b4a48944f6",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0013",
+      "reason": "no-hub-counterpart",
+      "record_ref": "8a4df3ad8e7e9a669a4c7b7dee3599218c2ccd4f",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0014",
+      "reason": "no-hub-counterpart",
+      "record_ref": "335c9a347d44d9d420eb21208d90772953acc68b",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "LESSON-0015",
+      "reason": "no-hub-counterpart",
+      "record_ref": "52fe84d6e714eee522190c1fb8f0fe507673eb4a",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0014",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1356",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0015",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1356",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0016",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1356",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0017",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1356",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     }
   ]
 }

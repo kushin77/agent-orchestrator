@@ -65,6 +65,7 @@ control-plane/cockpit
 governance/merge
 governance/dispatch
 fleet
+fleet/runner
 governance/knowledge
 governance/modules
 governance/modules/sync

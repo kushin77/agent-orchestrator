@@ -261,6 +261,32 @@ variables:
     secret: false
     required_by: [deploy, ops]
     readers: [infra/fleet/promote_portal.py]
+  # -- PR runner (issue #1343, parent #1295) -----------------------------------
+  - name: AO_RUNNER_HOST_ROLE
+    purpose: >-
+      the host role for the PR runner rung: `primary` on the shared-services
+      pair (192.168.168.42) renders and runs `fleet/runner/cli.py run --once
+      --apply`; the default `standby` renders nothing and cli.py refuses
+      `host-role-not-primary`. Declared in infra/fleet/env_contract.py.
+    secret: false
+    required_by: [deploy, ops]
+    readers: [fleet/cron.py, fleet/runner/cli.py, infra/fleet/env_contract.py]
+  - name: AO_RUNNER_CAPACITY
+    purpose: >-
+      the PR runner's parallel-verify width. Empty means min(8, nproc // 2);
+      a positive integer declares it; `--capacity` overrides per run. The
+      effective width is backed off under load / below the memory floor
+      (fleet/runner/capacity.py) and ledgered as `capacity`.
+    secret: false
+    required_by: [ops]
+    readers: [fleet/runner/capacity.py, infra/fleet/env_contract.py]
+  - name: AO_RUNNER_MEM_FLOOR_GB
+    purpose: >-
+      the MemAvailable floor in GB below which the PR runner halves its
+      fan-out before each cycle (`capacity-backoff:memory`). Default 8.
+    secret: false
+    required_by: [ops]
+    readers: [fleet/runner/capacity.py, infra/fleet/env_contract.py]
 
   - name: KEYDB_HOST
     purpose: >-

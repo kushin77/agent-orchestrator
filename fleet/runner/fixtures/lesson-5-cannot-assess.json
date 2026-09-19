@@ -1,0 +1,24 @@
+{
+  "doc": "lesson 5a: CANNOT-ASSESS is never counted green",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 11,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 11,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "local-marker",
+      "state": "cannot-assess"
+    },
+    {
+      "pr": 11,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "gate-status",
+      "state": "cannot-assess"
+    }
+  ]
+}
