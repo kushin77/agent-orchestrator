@@ -18,7 +18,9 @@
 # still reads `PASS`. The skip ratchet below therefore asserts the run's skip set
 # against a NAMED, SHRINK-ONLY record (scripts/skip-budget.json): every skip must
 # be a standing gap against an open issue, or a venue limit against a named
-# precondition path that is absent here; an entry goes STALE the moment its check
+# precondition this venue does not supply -- a repo-relative PATH that is absent,
+# or a COMMAND the venue must be able to run (both MEASURED, never asserted;
+# #1361); an entry goes STALE the moment its check
 # assesses and then fails the run by name; and a skip nobody named is REFUSED.
 # rc-2 semantics are untouched -- what changes is that a permanently blind check
 # can no longer be quoted as part of a green board without being named as a
@@ -1003,9 +1005,12 @@ done
 # never reach N where it matters (measured: `.gitignore:39`). Every skip must be
 # NAMED in that record: a `standing-gap` entry (the check's inputs ARE present
 # and it still cannot assess -- a defect of the check, #1176) against the OPEN
-# issue that tracks it, or a `venue` entry (a NAMED PRECONDITION path of this
-# venue is absent, e.g. an uninitialised vendor/CMR submodule) that is honoured
-# only while that path is absent. Consequences, all of them mechanical:
+# issue that tracks it, or a `venue` entry (a NAMED PRECONDITION this venue does
+# not supply -- a repo-relative PATH that is absent, e.g. an uninitialised
+# vendor/CMR submodule, or a COMMAND the venue must be able to run, e.g.
+# `gh auth status` in a container that installs no gh, #1361) that is honoured
+# only while that precondition is measured NOT supplied. Consequences, all of
+# them mechanical:
 #   * a skip with NO entry is REFUSED by name -- the composite will not publish a
 #     PASS whose skip set is narrated by nobody;
 #   * a `standing-gap` entry is STALE the moment its check assesses: the run

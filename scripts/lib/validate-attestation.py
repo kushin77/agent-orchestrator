@@ -121,6 +121,19 @@ def _semantic_findings(doc: dict) -> list[str]:
             for e in ratchet.get("standing_skips", [])
             if isinstance(e, dict)
         }
+        # A `venue` standing skip must declare WHAT this venue fails to supply
+        # (issues #1199/#1361): the ratchet cannot write one without it (its own
+        # loader refuses the entry), so a record carrying one was NOT produced by
+        # the run it claims to describe.
+        for entry in ratchet.get("standing_skips", []):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("kind") == "venue" and not str(
+                entry.get("precondition") or ""
+            ).strip():
+                findings.append(
+                    f"venue-skip-with-no-precondition:{entry.get('check', '?')}"
+                )
         unbudgeted = {
             str(n) for n in ratchet.get("unbudgeted_skips", []) if isinstance(n, str)
         }

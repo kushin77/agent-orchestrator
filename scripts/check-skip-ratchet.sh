@@ -18,14 +18,22 @@
 #      line: an unnamed skip is refused; a `standing-gap` entry goes stale the
 #      moment its check assesses; a `venue` entry whose precondition IS present
 #      while the check still cannot assess is refused as a defect of the CHECK
-#      (#1176's argument); an entry naming a check that was not discovered is
-#      refused; a missing record is fail-closed; a malformed one is
-#      CANNOT-ASSESS -- never a silent "no exemptions needed", which is how a
-#      control turns into a formality (GR-12).
+#      (#1176's argument); a `venue` precondition is MEASURED in BOTH forms (a
+#      repo-relative path, and a command the venue must be able to run -- the
+#      Cloud Build shape, #1361), so a supplied command is refused exactly as a
+#      supplied path is; a command-shaped declaration, a precondition of neither
+#      form, an entry naming a check that was not discovered, a missing record
+#      (fail-closed) and a malformed one (CANNOT-ASSESS) are each refused by
+#      name -- never a silent "no exemptions needed", which is how a control
+#      turns into a formality (GR-12).
 #   2. THE RECORD IS REAL. The committed `scripts/skip-budget.json` is loaded
 #      through the SAME loader the run uses (no second copy of the rule), and
 #      every entry must name a check this tree actually discovers -- an
-#      exemption for a check that does not exist is stale by name.
+#      exemption for a check that does not exist is stale by name. Every
+#      `{command: ...}` precondition must additionally be a command THIS TREE
+#      RUNS: the record may not invent a probe nothing else measures, and a
+#      planted phantom probe is refused by name so that rule cannot match
+#      nothing.
 #   3. THE RATCHET IS WIRED, NOT INERT (#1164's class: a detector nothing calls
 #      is advisory). The gate asserts that `scripts/verify.sh` INVOKES the
 #      ratchet, consumes its exit code as a failure, carries its record into
@@ -210,6 +218,71 @@ if not findings_for(planted):
         "so it would accept an exemption for a check that does not exist"
     )
 
+# A `{"command": ...}` venue precondition is a MEASUREMENT of the venue, so it
+# must be a command THIS REPOSITORY ALREADY RUNS -- the record may not invent a
+# probe nobody else measures. Ratified against the tree, EXCLUDING the ratchet's
+# own files: a rule that read the record, or the ratchet's own source, would
+# certify itself, and a borrow that reads its own values can never fail.
+RATCHET_FILES = (
+    "scripts/skip-budget.json",
+    "scripts/lib/skip-ratchet.py",
+    "scripts/check-skip-ratchet.sh",
+)
+
+
+def tree_texts():
+    """Every readable file under scripts/, minus the ratchet's own three."""
+    texts = {}
+    for path in sorted((root / "scripts").rglob("*")):
+        if not path.is_file():
+            continue
+        relative = str(path.relative_to(root))
+        if relative in RATCHET_FILES:
+            continue
+        try:
+            if path.stat().st_size > 4_000_000:
+                continue
+            texts[relative] = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+    return texts
+
+
+def command_findings(candidate_entries, texts):
+    """Declared venue command preconditions that no file under scripts/ runs."""
+    out = []
+    for entry in candidate_entries:
+        if entry.get("kind") != "venue" or not isinstance(
+            entry.get("precondition"), dict
+        ):
+            continue
+        command = entry["precondition"].get("command")
+        if not any(command and command in text for text in texts.values()):
+            out.append(
+                "entry '%s' declares the venue command precondition %r, which NO "
+                "file under scripts/ runs -- a precondition the record invents "
+                "cannot be measured by anything" % (entry.get("check"), command)
+            )
+    return out
+
+
+texts = tree_texts()
+findings.extend(command_findings(entries, texts))
+planted_command = [
+    {
+        "check": "branch-protection",
+        "kind": "venue",
+        "issue": 1361,
+        "precondition": {"command": "ao-phantom-probe-1361 --nope"},
+        "reason": "planted",
+    }
+]
+if not command_findings(planted_command, texts):
+    findings.append(
+        "the planted venue command precondition 'ao-phantom-probe-1361 --nope' was "
+        "ACCEPTED -- this rule matches nothing, so any invented probe would pass"
+    )
+
 for finding in findings:
     print("  FAIL  %s" % finding)
 if findings:
@@ -218,13 +291,28 @@ print(
     "  OK    %d committed entry(ies), every one naming a discovered check, and the "
     "planted entry for a non-existent check is refused by name" % len(entries)
 )
+print(
+    "  OK    %d venue command precondition(s), each one a command this tree runs, "
+    "and the planted phantom probe is refused by name"
+    % len(
+        [
+            e
+            for e in entries
+            if e.get("kind") == "venue" and isinstance(e.get("precondition"), dict)
+        ]
+    )
+)
 for entry in entries:
+    declared = entry.get("precondition")
+    if isinstance(declared, dict):
+        declared = "command: %s" % declared.get("command")
     print(
-        "        %s [%s] %s"
+        "        %s [%s] %s  (issue #%s)"
         % (
             entry["check"],
             entry["kind"],
-            entry.get("precondition") or "#%s" % entry.get("issue"),
+            declared,
+            entry.get("issue"),
         )
     )
 PY
@@ -433,6 +521,21 @@ underreported["skip_ratchet"] = {
     "findings": [],
 }
 
+# A `venue` standing skip that declares NO precondition: the shape the ratchet
+# itself cannot write (its loader refuses such an entry), so a record carrying
+# one was not produced by the run it claims to describe.
+venue_without_precondition = dict(base)
+venue_without_precondition["skip_ratchet"] = {
+    "budget": "scripts/skip-budget.json",
+    "budget_entries": 1,
+    "verdict": "OK",
+    "standing_skips": [{"check": "b", "kind": "venue"}],
+    "unbudgeted_skips": [],
+    "stale_entries": [],
+    "unused_venue_entries": [],
+    "findings": [],
+}
+
 scratch = Path(tempfile.mkdtemp(prefix="ao1199-skip-ratchet-acct.", dir="/tmp"))
 findings = []
 
@@ -463,6 +566,11 @@ for doc, label, needle in (
     (ratchet_absent, "ratchet-absent", "skip-ratchet-missing"),
     (fabricated, "fabricated-ok", "verdict-ok-while-carrying-findings"),
     (underreported, "underreported", "skip-not-accounted"),
+    (
+        venue_without_precondition,
+        "venue-with-no-precondition",
+        "venue-skip-with-no-precondition",
+    ),
 ):
     rc, out = run(doc, label)
     if rc == 0:
@@ -478,7 +586,8 @@ if findings:
 shutil.rmtree(scratch, ignore_errors=True)
 print(
     "  OK    an accounted skip and an honestly-red unbudgeted skip both pass, while a "
-    "missing record, a fabricated OK and an under-reported skip are each refused by name"
+    "missing record, a fabricated OK, an under-reported skip and a venue skip that "
+    "declares no precondition are each refused by name"
 )
 PY
 cat "$work/accounting.txt"
@@ -498,13 +607,18 @@ check "the attestation record cannot under-report a skip" \
 #   * a NAMED venue skip -> `verify: PASS` NAMING the standing skip, rc 0, and
 #                           the skip inside attestation.json;
 #   * an UNNAMED skip    -> rc 1, refused by name, with the remedy;
-#   * a STALE exemption  -> rc 1 the moment the check assesses, by name.
+#   * a STALE exemption  -> rc 1 the moment the check assesses, by name;
+#   * a venue COMMAND precondition the venue LACKS -> `verify: PASS` naming it, rc
+#                          0, the shape the Cloud Build container produces (#1361);
+#   * the SAME entry once the venue SUPPLIES that command -> rc 1, refused by name
+#                          (without this arm the guard would be free to pass
+#                          whatever the venue supplies -- the fail-open direction).
 # The gate permit store is a private fixture dir: this is a control, not a
 # competing gate (the box-wide cap is proved by scripts/check-gate-lock.sh).
 echo "== the composite, end to end (fixture checks, the real scripts/verify.sh) =="
 shim_rc=0
 python3 - "$root" "$work" > "$work/shim.txt" 2>&1 <<'PY' || shim_rc=$?
-"""Run the REAL scripts/verify.sh four times on a shim with a fixture check set."""
+"""Run the REAL scripts/verify.sh six times on a shim with a fixture check set."""
 import json
 import os
 import shutil
@@ -700,10 +814,57 @@ expect(
     ],
 )
 
+# 5. a `{"command": ...}` venue precondition this venue does NOT supply: the
+#    exemption bites, so the run is a PASS that NAMES it -- the Cloud Build shape
+#    (#1361), where the tool is absent and the check itself is not the defect.
+mount(((FIXTURE_A, 0), (FIXTURE_B, 2)))
+budget([{"check": FIXTURE_B, "kind": "venue", "issue": 1361,
+         "precondition": {"command": "ao-no-such-tool-1361"}, "reason": "fixture"}])
+rc, text, att, verdict = run("venue command not supplied")
+expect(
+    "a venue COMMAND precondition the venue lacks is honoured, by name",
+    rc, 0, text,
+    [
+        "verify: PASS (1 of 2 checks, 1 skipped: %s" % FIXTURE_B,
+        "verify: standing skip %s -- venue: cannot run 'ao-no-such-tool-1361'" % FIXTURE_B,
+        "the open issue that tracks it is #1361",
+    ],
+    att,
+    [
+        (("skip_ratchet", "verdict"), "OK"),
+        (("skip_ratchet", "standing_skips", 0, "precondition_kind"), "command"),
+        (("skip_ratchet", "standing_skips", 0, "precondition_present"), False),
+    ],
+)
+
+# 6. the SAME entry once the venue SUPPLIES that command: the exemption must stop
+#    biting and the run must REFUSE by name. Without this arm the command form
+#    would be a statement the entry makes about itself, not a measurement.
+mount(((FIXTURE_A, 0), (FIXTURE_B, 2)))
+budget([{"check": FIXTURE_B, "kind": "venue", "issue": 1361,
+         "precondition": {"command": "true"}, "reason": "fixture"}])
+rc, text, att, verdict = run("venue command supplied")
+expect(
+    "the same entry is REFUSED once the venue supplies its command",
+    rc, 1, text,
+    [
+        "venue precondition present but '%s' still cannot assess" % FIXTURE_B,
+        "repair the check rather than widening",
+    ],
+    att,
+    [
+        (("skip_ratchet", "verdict"), "VIOLATION"),
+        (("skip_ratchet", "standing_skips", 0, "precondition_present"), True),
+    ],
+)
+
 if failures:
-    print("  %d of 4 scenario(s) failed" % len(failures))
+    print("  %d of 6 scenario(s) failed" % len(failures))
     raise SystemExit(1)
-print("  OK    four scenarios on the real composite: clean, named, unnamed, stale")
+print(
+    "  OK    six scenarios on the real composite: clean, named, unnamed, stale, a "
+    "venue command the venue lacks, and the same entry with it supplied"
+)
 PY
 cat "$work/shim.txt"
 check "the composite itself names a standing skip and fails on an unnamed one" \
@@ -715,5 +876,5 @@ if [ "$fails" -gt 0 ]; then
   echo "check-skip-ratchet: NOT-OK -- $fails of $checks assertion(s) failed" >&2
   exit 1
 fi
-echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked (12 fixtures, each rc AND each refusal line), the committed record loads through the run's own loader and names discovered checks, scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation), the attestation validator refuses a skip that nothing accounts for, and the REAL composite run on a shim fixture proves all four end states: clean PASS unchanged, a named standing skip named in the verdict line and recorded in attestation.json, an unnamed skip FAILING by name, and a stale exemption FAILING the moment its check assesses"
+echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked (17 fixtures, each rc AND each refusal line), the committed record loads through the run's own loader, names discovered checks, and declares only venue command preconditions this tree actually runs (a planted phantom probe is refused by name), scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation), the attestation validator refuses a skip that nothing accounts for and a venue skip that declares no precondition, and the REAL composite run on a shim fixture proves all six end states: clean PASS unchanged, a named standing skip named in the verdict line and recorded in attestation.json, an unnamed skip FAILING by name, a stale exemption FAILING the moment its check assesses, a venue COMMAND precondition the venue lacks honoured inside a PASS, and the same entry REFUSED once the venue supplies it"
 exit 0

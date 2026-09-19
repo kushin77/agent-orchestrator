@@ -52,7 +52,7 @@
         },
         "standing_skips": {
           "type": "array",
-          "description": "The NAMED skips of this run, each with the kind of blindness it declares.",
+          "description": "The NAMED skips of this run, each with the kind of blindness it declares. A `venue` entry names the precondition this venue fails to supply (issue #1361): either the repo-relative PATH that is absent (`precondition`, with `precondition_kind: path`) or the COMMAND the venue must be able to run (`precondition` carries the command itself, with `precondition_kind: command` and `precondition_present` measuring it) -- scripts/lib/validate-attestation.py refuses a `venue` skip that declares neither.",
           "items": { "type": "object", "required": ["check", "kind"] }
         },
         "unbudgeted_skips": {

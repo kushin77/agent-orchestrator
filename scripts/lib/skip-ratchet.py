@@ -36,19 +36,23 @@ THE RULES (rc-2 semantics themselves are NOT changed)
                present and it still cannot assess -- #1176's argument -- so it
                must point at the open issue that tracks it) or a `venue` entry
                (it cannot assess because a NAMED PRECONDITION of this venue is
-               absent, e.g. `vendor/CMR/sync` in a worktree whose submodule was
-               never initialised). A skipped check with no entry is REFUSED by
+               not supplied: either a repo-relative PATH that is absent, e.g.
+               `vendor/CMR/sync` in a worktree whose submodule was never
+               initialised, or a COMMAND the venue must be able to run, e.g.
+               `{"command": "gh auth status"}` in a container that installs no
+               `gh` -- #1361). A skipped check with no entry is REFUSED by
                name: the composite will not publish a PASS whose skip set is
                narrated by nobody.
   * SHRINKING  a `standing-gap` entry is STALE the moment its check assesses --
                the run FAILS naming the entry, and the entry must be deleted.
                The list can only shrink and cannot outlive its fix.
-  * PRECISE    a `venue` entry is honoured only while its precondition is
-               absent. If the precondition IS present and the check still
-               cannot assess, that is a defect of the CHECK, not of the venue,
-               and it is refused by name. A `venue` entry that did not bite in
-               this run is reported (`unused_venue_entries`), never silently
-               ignored.
+  * PRECISE    a `venue` entry is honoured only while its precondition is NOT
+               supplied -- measured, not asserted, for both forms (a path is
+               absent; a command exits non-zero or cannot be run). If the
+               precondition IS supplied and the check still cannot assess, that
+               is a defect of the CHECK, not of the venue, and it is refused by
+               name. A `venue` entry that did not bite in this run is reported
+               (`unused_venue_entries`), never silently ignored.
 
   Fail-closed everywhere: a MISSING budget file means "no exemptions" (every
   skip is then unnamed and refused); a MALFORMED one is CANNOT-ASSESS, never a
@@ -69,6 +73,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -82,6 +87,29 @@ BUDGET_SCHEMA = "ao.verify.skip-budget/v1"
 STANDING_GAP = "standing-gap"
 VENUE = "venue"
 KINDS = (STANDING_GAP, VENUE)
+
+# --- venue preconditions (issues #1199/#1351, #1361) --------------------------
+#
+# A `venue` precondition is a NAMED, MEASURED property the check needs and this
+# venue does not supply. It has exactly two forms, and the second exists because
+# the first cannot express the Cloud Build verify container (#1361), which is not
+# a worktree missing a path but a bare image missing TOOLS:
+#
+#   "precondition": "vendor/CMR/sync"              a repo-relative PATH
+#   "precondition": {"command": "gh auth status"}  a command the venue must RUN
+#
+# The command form is the check's OWN probe, quoted verbatim -- the budget may
+# not invent a precondition nobody else measures, which
+# `scripts/check-skip-ratchet.sh` ratifies against the tree. Both forms are
+# MEASUREMENTS, never assertions: they are taken here, and the precondition
+# counts as supplied only when the measurement says so.
+VENUE_COMMAND_TIMEOUT = 10
+
+# A command precondition is an ARGUMENT VECTOR, never a shell line: no shell is
+# involved in running it. Refusing these characters keeps that true, and turns a
+# shell-shaped declaration into a malformed-budget finding -- the fail-closed
+# direction, never a silently-unparsed probe.
+_SHELL_METACHARACTERS = "|&;<>(){}`$\\\"'\n\r"
 
 OK = 0
 VIOLATION = 1
@@ -150,30 +178,129 @@ def load_budget(path: Path) -> Tuple[List[dict], List[str]]:
                     % (i, name)
                 )
         else:
-            pre = entry.get("precondition")
-            if not isinstance(pre, str) or not pre:
-                findings.append("entry[%d] (%s) is a venue with no precondition" % (i, name))
-            elif os.path.isabs(pre) or ".." in Path(pre).parts:
+            findings.extend(precondition_findings(i, name, entry.get("precondition")))
+            if "issue" in entry and not (
+                isinstance(entry["issue"], int)
+                and not isinstance(entry["issue"], bool)
+                and entry["issue"] > 0
+            ):
                 findings.append(
-                    "entry[%d] (%s) precondition %r must be a repo-relative path"
-                    % (i, name, pre)
+                    "entry[%d] (%s) names issue %r, which is not a positive integer "
+                    "(a venue entry MAY name the open issue that tracks the gap)"
+                    % (i, name, entry["issue"])
                 )
     return entries, findings
 
 
+def precondition_findings(index: int, name: str, value) -> List[str]:
+    """Shape findings for one venue `precondition`. An empty list is acceptable."""
+    if value is None:
+        return ["entry[%d] (%s) is a venue with no precondition" % (index, name)]
+    if isinstance(value, dict):
+        if list(value.keys()) != ["command"]:
+            return [
+                "entry[%d] (%s) precondition object must carry exactly one key, "
+                "'command' (got %s)"
+                % (index, name, ", ".join(sorted(str(k) for k in value.keys())) or "none")
+            ]
+        command = value.get("command")
+        if not isinstance(command, str) or not command.strip():
+            return [
+                "entry[%d] (%s) precondition command must be a non-empty string"
+                % (index, name)
+            ]
+        bad = sorted({char for char in command if char in _SHELL_METACHARACTERS})
+        if bad:
+            return [
+                "entry[%d] (%s) precondition command %r carries shell metacharacter(s) "
+                "%s -- a precondition is an argument vector, never a shell line"
+                % (index, name, command, " ".join(repr(char) for char in bad))
+            ]
+        try:
+            argv = shlex.split(command)
+        except ValueError as exc:
+            return [
+                "entry[%d] (%s) precondition command %r does not parse (%s)"
+                % (index, name, command, exc)
+            ]
+        if not argv:
+            return [
+                "entry[%d] (%s) precondition command %r parses to an empty command"
+                % (index, name, command)
+            ]
+        return []
+    if not isinstance(value, str) or not value:
+        return [
+            "entry[%d] (%s) precondition must be a repo-relative path or a "
+            "{\"command\": ...} object" % (index, name)
+        ]
+    if os.path.isabs(value) or ".." in Path(value).parts:
+        return [
+            "entry[%d] (%s) precondition %r must be a repo-relative path"
+            % (index, name, value)
+        ]
+    return []
+
+
+def precondition_argv(value) -> List[str]:
+    """The argv a `{"command": ...}` precondition runs (already shape-checked)."""
+    return shlex.split(value["command"])
+
+
+def precondition_kind(value) -> str:
+    """`path` for a repo-relative path, `command` for a command the venue runs."""
+    return "command" if isinstance(value, dict) else "path"
+
+
+def precondition_label(value) -> str:
+    """How a declared precondition reads in a verdict line and in the record."""
+    return value["command"] if isinstance(value, dict) else value
+
+
+def precondition_present(value, root: Path) -> bool:
+    """Is this venue's declared precondition SUPPLIED here? A measurement.
+
+    An unreadable path or an unrunnable/timed-out command counts as NOT
+    supplied -- the same direction the path form has always taken (`exists()` is
+    False when the stat itself fails), and the direction that keeps the refusal
+    honest: the entry is honoured now, and the moment the venue supplies the
+    precondition the check must assess or the run is refused by name.
+    """
+    if isinstance(value, dict):
+        try:
+            proc = subprocess.run(
+                precondition_argv(value),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=VENUE_COMMAND_TIMEOUT,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return proc.returncode == 0
+    try:
+        return (root / value).exists()
+    except OSError:
+        return False
+
+
 def entry_record(entry: dict, root: Path) -> dict:
-    """One entry as it appears in the run's record."""
+    """One entry as it appears in the run's record.
+
+    The probe happens HERE, and `evaluate` calls this only for a check that
+    actually SKIPPED -- so a venue precondition is measured only when the
+    blindness it excuses is real, and an entry that did not bite costs nothing.
+    """
     kind = entry["kind"]
-    precondition = entry.get("precondition") if kind == VENUE else None
+    declared = entry.get("precondition") if kind == VENUE else None
     return {
         "check": entry["check"],
         "kind": kind,
         "issue": entry.get("issue") if isinstance(entry.get("issue"), int) else None,
-        "precondition": precondition,
+        "precondition": precondition_label(declared) if declared is not None else None,
+        "precondition_kind": precondition_kind(declared) if declared is not None else None,
         "precondition_present": (
-            bool(precondition) and (root / precondition).exists()
-            if precondition
-            else None
+            precondition_present(declared, root) if declared is not None else None
         ),
         "reason": entry.get("reason", ""),
     }
@@ -251,18 +378,35 @@ def evaluate(
         if entry["kind"] == VENUE:
             precondition = record["precondition"]
             if record["precondition_present"]:
+                supplied = (
+                    "the venue can run %r" % precondition
+                    if record["precondition_kind"] == "command"
+                    else "its inputs ARE present (%s)" % precondition
+                )
                 refused.append(
-                    "venue precondition present but '%s' still cannot assess -- its "
-                    "inputs ARE present (%s), so this is a defect of the check, not "
-                    "of the venue (#1176); repair the check rather than widening %s"
-                    % (name, precondition, budget_label)
+                    "venue precondition present but '%s' still cannot assess -- %s, so "
+                    "this is a defect of the check, not of the venue (#1176); repair "
+                    "the check rather than widening %s"
+                    % (name, supplied, budget_label)
                 )
                 continue
-            lines.append(
-                "verify: standing skip %s -- venue: %s absent (the declared "
-                "precondition of this venue), so no verdict is available here"
-                % (name, precondition)
+            tracked = (
+                " (the open issue that tracks it is #%s)" % record["issue"]
+                if record.get("issue")
+                else ""
             )
+            if record["precondition_kind"] == "command":
+                lines.append(
+                    "verify: standing skip %s -- venue: cannot run %r (the declared "
+                    "precondition of this venue), so no verdict is available here%s"
+                    % (name, precondition, tracked)
+                )
+            else:
+                lines.append(
+                    "verify: standing skip %s -- venue: %s absent (the declared "
+                    "precondition of this venue), so no verdict is available here%s"
+                    % (name, precondition, tracked)
+                )
         else:
             lines.append(
                 "verify: standing skip %s -- standing gap tracked by #%s: %s"
@@ -502,6 +646,59 @@ def self_test() -> int:
                 scratch, "named-venue-absent-precondition", 0, "venue: vendor/CMR/sync absent",
                 results=[("module-registry", 2)], names=["module-registry"],
                 entries=[{"check": "module-registry", "kind": VENUE, "precondition": "vendor/CMR/sync", "reason": "the pin is unreadable here"}],
+            )
+        )
+        # The COMMAND form of a venue precondition (#1361): the Cloud Build
+        # container is not a worktree missing a path -- it is an image missing
+        # TOOLS. Both directions are asserted, because one direction alone would
+        # leave the guard free to pass regardless of what the venue supplies.
+        results.append(
+            _case(
+                scratch, "venue-command-precondition-not-supplied", 0,
+                "cannot run 'ao-no-such-tool-1361'",
+                results=[("branch-protection", 2)], names=["branch-protection"],
+                entries=[{"check": "branch-protection", "kind": VENUE, "issue": 1361,
+                          "precondition": {"command": "ao-no-such-tool-1361"},
+                          "reason": "no gh in this container"}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "venue-command-precondition-names-its-issue", 0,
+                "the open issue that tracks it is #1361",
+                results=[("branch-protection", 2)], names=["branch-protection"],
+                entries=[{"check": "branch-protection", "kind": VENUE, "issue": 1361,
+                          "precondition": {"command": "ao-no-such-tool-1361"},
+                          "reason": "no gh in this container"}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "venue-command-precondition-supplied-refused", 1,
+                "venue precondition present but 'branch-protection' still cannot assess",
+                results=[("branch-protection", 2)], names=["branch-protection"],
+                entries=[{"check": "branch-protection", "kind": VENUE, "issue": 1361,
+                          "precondition": {"command": "true"},
+                          "reason": "the command IS runnable here"}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "venue-command-metacharacter-refused", 2,
+                "carries shell metacharacter(s)",
+                results=[("branch-protection", 2)], names=["branch-protection"],
+                entries=[{"check": "branch-protection", "kind": VENUE,
+                          "precondition": {"command": "gh auth status | tee /tmp/x"},
+                          "reason": "a shell line, not an argument vector"}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "venue-precondition-of-the-wrong-type-refused", 2,
+                "must be a repo-relative path or a",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{"check": "module-registry", "kind": VENUE,
+                          "precondition": 42, "reason": "neither form"}],
             )
         )
         results.append(_case(scratch, "unnamed-skip-refused", 1, "unnamed skip 'newsurface'", results=[("newsurface", 2)], names=["newsurface"]))
