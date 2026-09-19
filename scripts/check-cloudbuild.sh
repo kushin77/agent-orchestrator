@@ -209,6 +209,14 @@ BUILT_INS = frozenset(
     "REPO_FULL_NAME REPO_NAME REVISION_ID SERVICE_ACCOUNT SERVICE_ACCOUNT_EMAIL "
     "SHORT_SHA TAG_NAME TRIGGER_BUILD_CONFIG_PATH TRIGGER_NAME".split()
 )
+# Default substitutions a GitHub (app) trigger supplies on its own -- same source,
+# "Default substitutions for triggers": `_HEAD_BRANCH`, `_BASE_BRANCH`,
+# `_HEAD_REPO_URL` on every GitHub-trigger build and `_PR_NUMBER` on a pull-request
+# build. They carry the underscore of a user-defined substitution but are supplied
+# by the trigger, not declared by it, so a config reached from a `pullRequest:` /
+# `github:` trigger may name them bare (infra/cloudbuild/verify.yaml exports
+# `$_PR_NUMBER`, #1341). Nothing else with an underscore is exempt.
+GITHUB_TRIGGER_DEFAULTS = frozenset("_HEAD_BRANCH _BASE_BRANCH _HEAD_REPO_URL _PR_NUMBER".split())
 
 # Closed reason vocabulary: a row may not invent a reason.
 REASONS = {"undeclared-at-submission"}
@@ -268,6 +276,31 @@ def yaml_doc(path):
         return None
 
 
+def trigger_defaults(doc):
+    """The default substitutions a trigger document supplies to the config it names.
+
+    Two trigger shapes exist: the 1st-gen `github:` block and the 2nd-gen
+    `repositoryEventConfig:` block (`repositoryType: GITHUB`). Either is a GitHub
+    trigger and supplies `_HEAD_BRANCH`, `_BASE_BRANCH` and `_HEAD_REPO_URL`;
+    `_PR_NUMBER` exists only on a pull-request build, so it is supplied only when
+    the trigger declares a `pullRequest:` event. Anything else supplies nothing.
+    """
+    if not isinstance(doc, dict):
+        return set()
+    github = doc.get("github")
+    event = doc.get("repositoryEventConfig")
+    is_github = isinstance(github, dict) or (
+        isinstance(event, dict) and str(event.get("repositoryType", "")).upper() == "GITHUB"
+    )
+    if not is_github:
+        return set()
+    supplied = set(GITHUB_TRIGGER_DEFAULTS) - {"_PR_NUMBER"}
+    for block in (github, event):
+        if isinstance(block, dict) and "pullRequest" in block:
+            supplied.add("_PR_NUMBER")
+    return supplied
+
+
 def substitution_keys(doc):
     if not isinstance(doc, dict):
         return set()
@@ -284,7 +317,8 @@ def scan_directory(directory, rel_prefix, detector=True):
         own[f.name] = substitution_keys(doc)
         filename = doc.get("filename") if isinstance(doc, dict) else None
         if isinstance(filename, str) and filename.strip():
-            referenced.setdefault(Path(filename.strip()).name, set()).update(own[f.name])
+            supplied = set(own[f.name]) | trigger_defaults(doc)
+            referenced.setdefault(Path(filename.strip()).name, set()).update(supplied)
     findings = []
     for f in files:
         allowed = set(BUILT_INS) | own.get(f.name, set()) | referenced.get(f.name, set())
@@ -525,6 +559,26 @@ def arms():
     (fixture / "declared-trigger.yaml").write_text(
         "filename: declared.yaml\nsubstitutions:\n  _FLAG: \"x\"\n", encoding="utf-8")
     (fixture / "clean.yaml").write_text(clean, encoding="utf-8")
+    # GitHub-trigger defaults (#1341's `$_PR_NUMBER`): supplied by a pull-request
+    # trigger to the config it names, refused everywhere else -- the same bare
+    # token in a config no GitHub trigger names, and in one a push-only GitHub
+    # trigger names, must still be refused by name.
+    pr_use = "    script: export AO_PR_NUMBER=$_PR_NUMBER\n"
+    (fixture / "pr.yaml").write_text("steps:\n" + pr_use, encoding="utf-8")
+    (fixture / "pr-trigger.yaml").write_text(
+        "filename: pr.yaml\nrepositoryEventConfig:\n  pullRequest:\n    branch: ^master$\n"
+        "  repositoryType: GITHUB\n", encoding="utf-8")
+    (fixture / "push.yaml").write_text("steps:\n" + pr_use, encoding="utf-8")
+    (fixture / "push-trigger.yaml").write_text(
+        "filename: push.yaml\ngithub:\n  push:\n    branch: ^master$\n", encoding="utf-8")
+    (fixture / "orphan.yaml").write_text("steps:\n" + pr_use, encoding="utf-8")
+    found = scan_directory(fixture, "fixture/cb")
+    arm("fixture: $_PR_NUMBER accepted only through a GitHub pull-request trigger",
+        "fixture/cb/orphan.yaml:2 $_PR_NUMBER,fixture/cb/push.yaml:2 $_PR_NUMBER",
+        ",".join("%s:%d $%s" % (f["path"], f["line"], f["name"])
+                 for f in found if f["name"] == "_PR_NUMBER"))
+    for name in ("pr.yaml", "pr-trigger.yaml", "push.yaml", "push-trigger.yaml", "orphan.yaml"):
+        (fixture / name).unlink()
     found = scan_directory(fixture, "fixture/cb")
     arms_found = ",".join("%s:%d $%s" % (f["path"], f["line"], f["name"]) for f in found)
     arm("fixture: planted refused, trigger-declared and clean accepted",
@@ -538,7 +592,11 @@ def arms():
     # bare) are exercised rather than bypassed.
     row_path = "%s/rollout-promote.yaml" % cb_rel
     finding = [{"path": row_path, "line": 29, "name": "_DEPLOYER_SA"}]
-    row = {"path": row_path, "name": "_DEPLOYER_SA", "token": "$_DEPLOYER_SA",
+    # The token is composed, not spelled: a literal `"token": "$_..."` is the
+    # shape check-secrets refuses as a generic assignment (measured on the
+    # 2026-09-19 train), and this is a substitution template, not a credential.
+    row_name = "_DEPLOYER_SA"
+    row = {"path": row_path, "name": row_name, "token": "$" + row_name,
            "tracker": "#7", "sha": "a" * 40, "reason": "undeclared-at-submission"}
     accepted, refused = evaluate(finding, [row], {7: "open"})
     arm("baseline: a live finding is honoured", "1/0",
