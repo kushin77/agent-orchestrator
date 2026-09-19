@@ -93,6 +93,7 @@ from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
 from governance.lifecycle.report import (  # noqa: E402
     DEDUPED,
     FILED,
+    OBSOLETE_BY_CLOSE,
     BoardReporter,
     GhFiler,
     board_report_findings,
@@ -134,6 +135,8 @@ def _print_board_reports(reports: list) -> None:
             print(f"board: filed #{board_report.number} for {board_report.key}")
         elif board_report.action == DEDUPED:
             print(f"board: already filed (#{board_report.number}) for {board_report.key}")
+        elif board_report.action == OBSOLETE_BY_CLOSE:
+            print(f"board: obsolete-by-close — {board_report.key}")
         else:
             print(f"board: dry-run — would file for {board_report.key}")
 

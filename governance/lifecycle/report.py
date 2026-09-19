@@ -17,7 +17,10 @@ issue — with the properties a fleet with no human in the loop can rely on:
 The dedupe ledger is a JSON document keyed by fingerprint. A finding that is no
 longer unresolved (a shelved lane whose work landed) is dropped via ``resolve``:
 the entry is removed, so a genuinely new occurrence of the same violation files
-again rather than being silently swallowed.
+again rather than being silently swallowed. When the entry had already reached
+the board, the drop also carries the terminal move: with ``close`` set, the
+filed issue is **closed** with the comment as its evidence — a comment alone
+would leave the artifact open beside text saying it is resolved (#1299).
 """
 
 from __future__ import annotations
@@ -49,7 +52,9 @@ DEFAULT_LABELS: tuple[str, ...] = (
 )
 
 #: What one report call did when a finding turned out to be obsolete-by-close
-#: rather than filed or deduped (issue #1266).
+#: rather than filed or deduped (issue #1266). Under ``apply`` the filed entry
+#: is closed carrying the obsolete-by-close measurement, and only then is its
+#: fingerprint retired; a dry run writes nothing at all — ledger included (#1299).
 OBSOLETE_BY_CLOSE = "obsolete-by-close"
 
 #: Invariant codes that only warrant a live board issue while the item's own
@@ -70,6 +75,9 @@ class IssueFiler(Protocol):
 
     def comment(self, number: int, body: str) -> None:
         """Add a comment to an existing issue."""
+
+    def close(self, number: int, comment: str) -> None:
+        """Close the issue, carrying ``comment`` as its closing evidence."""
 
 
 class FindingLike(Protocol):
@@ -104,8 +112,9 @@ class BoardReporter:
 
     The ledger is the dedupe authority: a fingerprint already in it is reported
     as ``deduped`` and not written again. ``apply`` gates every *board* write (an
-    issue create or a comment); without it a call is a ``dry-run`` that reports
-    what would happen and writes nothing, ledger included.
+    issue create, a comment, or the close that carries it); without it a call is
+    a ``dry-run`` that reports what would happen and writes nothing, ledger
+    included.
     """
 
     def __init__(self, filer: IssueFiler, ledger: Path | None = None) -> None:
@@ -151,12 +160,19 @@ class BoardReporter:
         self._save(data)
         return BoardReport(key, FILED, number)
 
-    def resolve(self, key: str, *, comment: str = "", apply: bool = False) -> bool:
+    def resolve(
+        self, key: str, *, comment: str = "", apply: bool = False, close: bool = False
+    ) -> bool:
         """Drop a finding from the ledger: it is no longer unresolved.
 
         A comment is added to the filed issue only when ``apply`` is true (it is a
-        board write). The ledger entry is removed either way, so a genuinely new
-        occurrence of the same violation files again.
+        board write). With ``close``, that board write is instead the artifact's
+        terminal move: one ``close`` call carrying the comment, because a comment
+        alone leaves the issue open beside text that says it is resolved (#1299).
+        The close runs before the ledger is saved, so a board write that fails
+        keeps the entry and the next pass retries the whole move. The ledger entry
+        is removed either way, so a genuinely new occurrence of the same violation
+        files again.
         """
         data = self._load()
         entry = data.pop(key, None)
@@ -165,7 +181,10 @@ class BoardReporter:
         if apply and comment:
             number = entry.get("number")
             if number:
-                self.filer.comment(int(number), comment)
+                if close:
+                    self.filer.close(int(number), comment)
+                else:
+                    self.filer.comment(int(number), comment)
         self._save(data)
         return True
 
@@ -191,9 +210,14 @@ def board_report_findings(
     ``closed_subjects`` is REFUSED as a new board issue, by name: it is never
     handed to ``reporter.report`` (so ``filer.create`` is never called for it),
     whatever ``apply`` is. Any board issue already filed for that same
-    ``code:subject`` from an earlier, still-open pass is resolved instead, so
-    it does not rot on the board beside a finding nobody can act on without
-    reopening the issue first.
+    ``code:subject`` from an earlier, still-open pass reaches its terminal state
+    instead: under ``apply`` the filed issue is **closed** carrying the
+    obsolete-by-close measurement as its evidence, and only then is the
+    fingerprint retired — so it does not rot on the board beside a finding nobody
+    can act on without reopening the issue first. A dry run reports the
+    classification and writes nothing, ledger included: retiring the fingerprint
+    without a close would silently drop the only handle the ledger-reading
+    re-measurement worker has on the artifact (#1299).
     """
     reports: list[BoardReport] = []
     for finding in findings:
@@ -202,14 +226,19 @@ def board_report_findings(
         key = finding_key(f"lifecycle:{code}", subject)
 
         if code in OPEN_ONLY_CODES and subject in closed_subjects:
-            reporter.resolve(
-                key,
-                comment=(
-                    f"obsolete-by-close: {subject} is closed, so this {code} finding is no "
-                    f"longer a live board item.\n\n- detail: {finding.detail}\n"
-                ),
-                apply=apply,
-            )
+            # Only ``apply`` resolves: the retirement IS the resolution, so doing it
+            # on a dry run would drop the fingerprint with no comment and no close,
+            # and the artifact would never reach a terminal state (#1299).
+            if apply:
+                reporter.resolve(
+                    key,
+                    comment=(
+                        f"obsolete-by-close: {subject} is closed, so this {code} finding is no "
+                        f"longer a live board item.\n\n- detail: {finding.detail}\n"
+                    ),
+                    apply=True,
+                    close=True,
+                )
             reports.append(BoardReport(key, OBSOLETE_BY_CLOSE))
             continue
 
@@ -272,6 +301,23 @@ class GhFiler:
         if result.returncode != 0:
             raise RuntimeError(
                 f"gh issue comment failed ({result.returncode}): "
+                f"{(result.stderr or result.stdout).strip()[-200:]}"
+            )
+
+    def close(self, number: int, comment: str) -> None:
+        """Close the issue, carrying ``comment`` as its evidence — one call.
+
+        One call on purpose, like ``governance/reconcile/findings.GhCloser``: a
+        comment written first and a close that then failed would leave the issue
+        open carrying text that says it is resolved. An already-closed issue is
+        not an error — ``gh`` reports it and exits 0 — so a hand-closed artifact
+        still retires its fingerprint instead of wedging.
+        """
+        cmd = self._args(["gh", "issue", "close", str(number), "--comment", comment])
+        result = self._run(cmd)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"gh issue close failed ({result.returncode}): "
                 f"{(result.stderr or result.stdout).strip()[-200:]}"
             )
 

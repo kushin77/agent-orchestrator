@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from governance.lifecycle.audit import Finding
 from governance.lifecycle.closeout import closeout
 from governance.lifecycle.report import BoardReporter, board_report_findings
@@ -39,6 +41,7 @@ class FakeFiler:
     def __init__(self) -> None:
         self.created: list[dict] = []
         self.comments: list[dict] = []
+        self.closed: list[dict] = []
 
     def create(self, title: str, body: str, labels) -> int:
         self.created.append({"title": title, "body": body, "labels": list(labels)})
@@ -46,6 +49,9 @@ class FakeFiler:
 
     def comment(self, number: int, body: str) -> None:
         self.comments.append({"number": number, "body": body})
+
+    def close(self, number: int, body: str) -> None:
+        self.closed.append({"number": number, "body": body})
 
 
 def reporter(filer: FakeFiler, tmp_path) -> BoardReporter:
@@ -145,20 +151,77 @@ def test_verify_evidence_missing_is_not_filed_for_a_closed_issue(tmp_path):
     assert filer.created == [], "a closed issue's evidence gap must not become a new board issue"
 
 
-def test_a_closed_issues_stale_board_entry_is_resolved_not_left_to_rot(tmp_path):
-    """A VERIFY_EVIDENCE_MISSING board issue filed while the item was open must
-    be resolved once the item closes, not left open beside an unfileable finding."""
+def test_a_closed_issues_stale_board_entry_is_closed_with_its_evidence(tmp_path):
+    """#1299: a VERIFY_EVIDENCE_MISSING board issue filed while the item was open
+    must reach a TERMINAL state once the item closes — the issue itself is
+    CLOSED, carrying the obsolete-by-close measurement — and only then is the
+    fingerprint retired, so a genuine recurrence files afresh rather than being
+    swallowed by the stale entry."""
     finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#992", detail="no attestation")
     filer = FakeFiler()
     rep = reporter(filer, tmp_path)
     board_report_findings([finding], rep, apply=True, closed_subjects=frozenset())
-    assert filer.created  # filed while the item was still open
+    assert len(filer.created) == 1  # filed while the item was still open
 
     # The item's issue closes; the next pass re-observes the same finding.
     second = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#992"}))
     assert second[0].action == "obsolete-by-close"
-    # No SECOND issue was created for it.
-    assert len(filer.created) == 1
+    assert len(filer.created) == 1, "no second issue for the closed subject"
+    assert filer.closed and filer.closed[0]["number"] == 2001, "the filed issue must be CLOSED, not merely commented"
+    assert "obsolete-by-close" in filer.closed[0]["body"], "the close carries the clearing measurement"
+
+    # The fingerprint was retired, so a genuine recurrence (issue reopened) files anew.
+    third = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset())
+    assert third[0].action == "filed"
+
+
+def test_a_dry_run_neither_closes_nor_retires_a_stale_entry(tmp_path):
+    """#1299: a dry run writes nothing — ledger included. The previous shape
+    retired the fingerprint with no comment and no close, so the finding vanished
+    silently and the (ledger-reading) re-measurement worker could never close the
+    artifact it no longer knew about."""
+    finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#992", detail="no attestation")
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    board_report_findings([finding], rep, apply=True, closed_subjects=frozenset())
+
+    dry = board_report_findings([finding], rep, apply=False, closed_subjects=frozenset({"#992"}))
+    assert dry[0].action == "obsolete-by-close"
+    assert filer.closed == [] and filer.comments == [], "a dry run must not write to the board"
+
+    # The fingerprint survived the dry run, so the next APPLY pass still closes it.
+    second = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#992"}))
+    assert filer.closed and filer.closed[0]["number"] == 2001
+
+
+def test_a_failed_close_keeps_the_fingerprint_for_the_next_pass(tmp_path):
+    """The board close happens BEFORE the ledger retirement (the order the
+    reconciler's re-measurement documents): a lost board write keeps the entry,
+    so the next pass retries the whole terminal move (#1299)."""
+
+    class FlakyClose(FakeFiler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.refusals = 0
+
+        def close(self, number: int, body: str) -> None:
+            if self.refusals == 0:
+                self.refusals += 1
+                raise RuntimeError("gh issue close refused once")
+            super().close(number, body)
+
+    finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#992", detail="no attestation")
+    filer = FlakyClose()
+    rep = reporter(filer, tmp_path)
+    board_report_findings([finding], rep, apply=True, closed_subjects=frozenset())
+
+    with pytest.raises(RuntimeError, match="refused once"):
+        board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#992"}))
+    assert filer.closed == []
+
+    second = board_report_findings([finding], rep, apply=True, closed_subjects=frozenset({"#992"}))
+    assert second[0].action == "obsolete-by-close"
+    assert filer.closed and filer.closed[0]["number"] == 2001
 
 
 def test_a_forced_file_for_a_closed_issue_is_refused_by_name(tmp_path):
