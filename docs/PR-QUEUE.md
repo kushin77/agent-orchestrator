@@ -189,3 +189,12 @@ Self-test both gates directly:
 bash scripts/check-pr-contract.sh --selftest
 python3 -m pytest governance/tagging/tests -k pr_labels
 ```
+
+**Wired into the runner (issue #1341).** `scripts/verify.sh` is discovered by
+`scripts/check-pr-contract.sh` (a plain `scripts/check-*.sh`) already; a local
+`make verify` sets no PR context, so the check answers its own rc 2
+`pr-context-missing` there — a SKIP, never a fail. On the Cloud Build verify
+trigger (`infra/cloudbuild/verify.yaml`), the runner's own `$_PR_NUMBER`
+substitution is exported as `AO_PR_NUMBER`, and `scripts/verify.sh` forwards it
+to `PR_NUMBER` before the discovered checks run — so on a PR build the gate
+runs with real PR context (still warn-only, per the enforcement flag above).

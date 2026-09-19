@@ -206,3 +206,11 @@ dev_run:
       discipline: dry-run
       command: "scripts/prune-worktrees.sh"
       why: "the worktree reaper (#207/#516, scheduled by #830/#901) is a report by default; --apply is what removes anything."
+    # ao-fleet-promote-portal is deliberately NOT added here: `roles` is
+    # cross-checked against infra/fleet/dev_run.py's own role table
+    # (scripts/check-fleet-cron-dev-run.sh, inventory-role-drift), and that
+    # harness declares no entry for this marker yet — it dispatches only what
+    # config/fleet-jobs.json enables, and this rung stays `enabled: false`
+    # pending the AR credential (docs/AGENTCONSOLE-HOSTING.md §5c). Adding a
+    # role here the harness cannot match would trade one honest gap for a
+    # gate failure; see the PR's "## Wiring needed".

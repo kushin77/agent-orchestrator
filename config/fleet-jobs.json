@@ -57,6 +57,17 @@
       "enabled": false
     },
     {
+      "name": "promote-portal",
+      "marker": "ao-fleet-promote-portal",
+      "schedule": "*/10 * * * *",
+      "command": "/usr/bin/python3 infra/fleet/promote_portal.py run --apply",
+      "user": "",
+      "log": "promote-portal.log",
+      "singleton": true,
+      "enabled": false,
+      "why": "declared but not scheduled (issue #1329/#1336): needs the Artifact Registry reader credential the owner places once per docs/AGENTCONSOLE-HOSTING.md §5c (AO_FLEET_AR_READER_KEY_FILE or AO_FLEET_AR_ACCESS_TOKEN_CMD); flipping this to true is that owner's one-line follow-up."
+    },
+    {
       "name": "scan-pr-failures",
       "marker": "ao-fleet-scan-pr-failures",
       "schedule": "*/15 * * * *",
