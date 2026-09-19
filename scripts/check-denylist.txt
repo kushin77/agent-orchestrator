@@ -15,8 +15,17 @@
 # the gate-of-record's check set — a behavior change, not a bug fix. Everything
 # else is auto-discovered: a NEW `scripts/check-*.sh` is wired into `make
 # verify` the moment it lands, with no hand-edit.
+#
+# ENTRY RECORDS (#1396). An entry that makes a seam INERT says so, by marker, on
+# the line after the entry — because "the wiring reads as done and does nothing"
+# is the same class of defect as one the wiring caused. The marker is asserted,
+# never decorative: `scripts/check-pr-contract.sh --selftest` refuses
+# `denylist-inertness-undeclared` when a denylisted seam loses its record, and
+# `denylist-inertness-record-stale` when the seam becomes live and the record
+# outlives it.
 drift
 negative-controls
 policy-schema
 pr-contract
+# unexercised-seam: #1341 (pr-contract passthrough, inert while denylisted)
 
