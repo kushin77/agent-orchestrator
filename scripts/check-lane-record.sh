@@ -299,7 +299,15 @@ if head is not None:
 if tail is not None:
     (directory / ("%s.result.json" % lane)).write_text(json.dumps(tail, indent=1), encoding="utf-8")
 if variant == "unreadable":
-    (directory / ("%s.brief.json" % lane)).chmod(0)
+    # Unreadable for EVERY uid: a DIRECTORY where the record file is expected, so
+    # the read path raises IsADirectoryError (an OSError) and names the refusal
+    # itself. `chmod 0` is unreadable only to a non-root uid, so in the Cloud
+    # Build venue (container user root) the record stayed readable, the tree
+    # parsed as a clean pair and this arm redded every CI run (measured
+    # 2026-09-19, build d39635a0: "unreadable-record rc=0 (wanted 1)").
+    fixture = directory / ("%s.brief.json" % lane)
+    fixture.unlink()
+    fixture.mkdir()
 PY
 
 build() { # build <variant> -- rebuilds the records tree for one arm
@@ -405,7 +413,8 @@ expect "not-json" 1 "lane-record-not-json:4242/alpha.brief.json"
 build unreadable
 run --root "$tree" evaluate --records "$scratch/records"
 expect "unreadable-record" 1 "lane-record-unreadable:4242/alpha.brief.json"
-chmod 644 "$scratch/records/4242/alpha.brief.json" 2>/dev/null || true
+# the fixture is a directory (unreadable to uid 0 and non-0 alike), so it is dropped, not re-chmodded
+rm -rf "$scratch/records/4242/alpha.brief.json" 2>/dev/null || true
 
 echo "== 6. the vocabulary: a runtime the registry does not carry =="
 build runtime-unregistered
