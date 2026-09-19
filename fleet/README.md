@@ -750,6 +750,13 @@ removes exactly this job and `status`/`disable` act on it alone. The same
 subcommands are reachable from the control plane:
 `python3 fleet/control.py cron <sub>`.
 
+`AO_FLEET_PYTHON` (default `/usr/bin/python3`) sets the interpreter every
+managed line is rendered with, and `AO_FLEET_CRON_PATH` (unset by default)
+emits a single `PATH=...` line at the top of the managed block — issue #1370,
+for a host whose rungs need a venv interpreter or `gh`/`gcloud` off the
+default `PATH`; `status` reports drift by name if the installed crontab no
+longer matches either variable's current value.
+
 ## Fleet monitor (the third rung)
 
 `fleet/monitor.py` is the cron-owned, change-only progress watcher. It polls

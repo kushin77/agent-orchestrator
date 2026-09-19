@@ -224,6 +224,32 @@ VARS: tuple[Var, ...] = (
             "fan-out before each cycle (capacity-backoff:memory)."
         ),
     ),
+    Var(
+        name="AO_FLEET_PYTHON",
+        default="/usr/bin/python3",
+        kind="optional",
+        code="fleet-python-invalid",
+        why=(
+            "issue #1370: the interpreter `fleet/cron.py install` renders every managed "
+            "crontab line with. The runner rung's own verify needs the ~/ao-verify-venv "
+            "Python 3.14 venv, not the box's system /usr/bin/python3 (3.12's "
+            "`Path.glob('**')` silently skips files — #1245's knowledge-index red). "
+            "Optional: any path is accepted, since a container can point this at a venv "
+            "this contract cannot see."
+        ),
+    ),
+    Var(
+        name="AO_FLEET_CRON_PATH",
+        default="",
+        kind="optional",
+        code="fleet-cron-path-invalid",
+        why=(
+            "issue #1370: when set, `fleet/cron.py install` emits exactly one `PATH=...` "
+            "line at the top of the managed crontab block, so every rung inherits it — the "
+            "runner rung needs `gh`/`gcloud` from /snap/bin, which cron's own PATH lacks. "
+            "Empty (default) installs no PATH= line, current behaviour unchanged."
+        ),
+    ),
 )
 
 BY_NAME: dict[str, Var] = {var.name: var for var in VARS}

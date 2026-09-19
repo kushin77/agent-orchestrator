@@ -147,7 +147,9 @@ export PATH=$HOME/ao-verify-venv/bin:$HOME/.local/bin:/snap/bin:$PATH
 cd ~/ao-verify-repo && git fetch origin master && git checkout master && git pull --ff-only
 AO_RUNNER_HOST_ROLE=primary python3 fleet/runner/cli.py run --once          # dry-run merges; verifies + posts
 AO_RUNNER_HOST_ROLE=primary python3 fleet/runner/cli.py run --once --apply  # merges the greens
-AO_RUNNER_HOST_ROLE=primary python3 fleet/cron.py install                   # schedule the rung
+AO_RUNNER_HOST_ROLE=primary AO_FLEET_PYTHON=$HOME/ao-verify-venv/bin/python3 \
+  AO_FLEET_CRON_PATH=$HOME/ao-verify-venv/bin:$HOME/.local/bin:/snap/bin:/usr/bin \
+  python3 fleet/cron.py install                                             # schedule the rung with the venv interpreter + PATH (issue #1370)
 python3 fleet/cron.py status                                                # the ao-fleet-runner line is installed
 pkill -f 'ao-runner/host-verify.sh'; pkill -f 'ao-runner/host-merge.sh'; rm -rf ~/ao-runner   # retire the prototype
 ```
