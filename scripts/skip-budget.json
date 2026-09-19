@@ -75,6 +75,15 @@
       "reason": "`check-module-registry: CANNOT-ASSESS -- the pinned hub catalog is absent; expected vendor/CMR/catalog/mandatory.tsv and vendor/CMR/catalog/modules` -- the venue case this record documented from the start, now naming the open issue that tracks the CI half (#1361)."
     },
     {
+      "check": "reconcile-orphans",
+      "kind": "venue",
+      "issue": 1361,
+      "precondition": {
+        "command": "command -v gh"
+      },
+      "reason": "`check-reconcile-orphans: CANNOT-ASSESS -- gh not found; orphan-pr / orphan-issue-lane / orphan-directive cannot be measured on the real tree` -- `command -v gh` is the check's OWN guard (scripts/check-reconcile-orphans.sh), supplied only in a venue that has gh. The Cloud Build venue installs no gh (#1361). Measured 2026-09-19: three independent heads (a4919733, 81f8d3ff, 4b9a8488) all answered `verify: FAIL (0 of 215 checks failed, 13 skipped ... skip ratchet FAIL: 1 unnamed skip)` for this one unmapped skip, so no pull request could pass control-plane-verify (#1405)."
+    },
+    {
       "check": "repo-settings",
       "kind": "venue",
       "issue": 1361,
