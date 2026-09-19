@@ -55,6 +55,12 @@
 #      attributable lane, refusing the lane-caused one, refusing the red
 #      `verify`, and declaring the measured red in the PR body in the shape the
 #      repo's OWN scripts/check-pr-contract.sh accepts (consumed, not duplicated).
+#  14. the PR context cannot rewrite this fixture's verdict (#1396): the SAME
+#      explicit argv, run with an ambient `PR_NUMBER`/`_PR_NUMBER` naming a
+#      DIFFERENT PR, is byte-identical — and the mutant that restores the
+#      contract's old ambient-first resolution is refused BY NAME for that
+#      ambient PR, so the control measures the precedence instead of agreeing
+#      with whatever the contract now happens to do.
 #
 # NON-VACUITY
 #   Cases 2-6 run the SAME argv against the SAME untouched lane, and differ only
@@ -106,7 +112,20 @@ export EVENTS
 # it turned every dry-run control below into an apply run — rc 0 where 1 or 2 was
 # required, mutating calls recorded, no plan printed — and so reddened the gate
 # of record for the very lane that added it.
-unset GH_PR_STATE GH_MERGE_COMMIT GH_PR_HEAD CONTRACT_MODE AO_LAND_APPLY PREDICATE_MODE
+#
+# The PR context belongs here for the same reason, and it was MEASURED (#1396):
+# `scripts/verify.sh` exported `PR_NUMBER` into the whole composite environment,
+# and `scripts/check-pr-contract.sh` used to let that AMBIENT name outrank its own
+# explicit argv — so the attribution fixture below, which calls the contract with
+# `--body-file`/`--range` against a stub `gh` precisely so that it cannot read the
+# host's GitHub state, was hijacked into the LIVE PR path and answered
+# CANNOT-ASSESS, reddening CI for PR #1344. The contract now ranks argv above the
+# ambient name and this fixture strips every variable the code under test reads,
+# so the verdict below cannot depend on the caller's shell. Either half alone
+# would be enough; both are asserted, because a fixture that is
+# hermetic-by-condition is hermetic only for the caller who happens to be polite.
+unset GH_PR_STATE GH_MERGE_COMMIT GH_PR_HEAD CONTRACT_MODE AO_LAND_APPLY PREDICATE_MODE \
+      PR_NUMBER _PR_NUMBER AO_PR_NUMBER AO_PR_BODY_FILE AO_PR_RANGE AO_PR_CONTRACT_ENFORCE
 
 # --- 1. static assertions ----------------------------------------------------
 echo "== check-landing: the declared, code-native path =="
@@ -902,6 +921,35 @@ if bash scripts/check-pr-contract.sh --body-file "$body" --range master..issue-7
   ok "check-pr-contract ACCEPTS the driver's declaration (the existing mechanism is consumed, not replaced)"
 else
   fail "check-pr-contract refused the driver's own PR body: $(tail -c 300 "$work/out-pr-contract.txt")"
+fi
+# ...and the SAME argv keeps that verdict even when the caller exports a PR
+# context naming a DIFFERENT PR (#1396). This is the provoked control for the
+# hijack measured on PR #1344 — the ambient names are set explicitly here rather
+# than inherited, so the arm measures the contract's precedence, not the shell.
+if PR_NUMBER=1344 _PR_NUMBER=1344 bash scripts/check-pr-contract.sh --body-file "$body" --range master..issue-764 --repo "$at/lane" \
+     > "$work/out-pr-contract-ambient.txt" 2>&1; then
+  if cmp -s "$work/out-pr-contract.txt" "$work/out-pr-contract-ambient.txt"; then
+    ok "an exported PR_NUMBER/\$_PR_NUMBER naming another PR leaves this fixture's verdict byte-identical"
+  else
+    fail "an exported PR_NUMBER changed the fixture's verdict: $(diff "$work/out-pr-contract.txt" "$work/out-pr-contract-ambient.txt" | head -6)"
+  fi
+else
+  fail "an exported PR_NUMBER hijacked the hermetic fixture: $(tail -c 300 "$work/out-pr-contract-ambient.txt")"
+fi
+# ...and the mutant that restores the ambient-first resolution must RED by name,
+# or the control above proves nothing about the precedence it claims to measure.
+ambient_mutant="$work/check-pr-contract.ambient-first.sh"
+sed -e '/^# --- BEGIN #1396 precedence block/,/^# --- END #1396 precedence block/c\PR_NUMBER="${_PR_NUMBER:-${PR_NUMBER:-}}"' \
+    scripts/check-pr-contract.sh > "$ambient_mutant"
+if cmp -s scripts/check-pr-contract.sh "$ambient_mutant"; then
+  fail "the ambient-first mutant is byte-identical to scripts/check-pr-contract.sh; the mutation proved nothing"
+elif PR_NUMBER=1344 _PR_NUMBER=1344 bash "$ambient_mutant" --body-file "$body" --range master..issue-764 --repo "$at/lane" \
+     > "$work/out-pr-contract-mutant.txt" 2>&1; then
+  fail "the ambient-first mutant ACCEPTED the body — the precedence control measures nothing"
+elif grep -q 'PR #1344' "$work/out-pr-contract-mutant.txt"; then
+  ok "the ambient-first mutant IS hijacked, refusing BY NAME for the ambient PR #1344 — the control is load-bearing"
+else
+  fail "the mutant was refused, but not by the hijack (no 'PR #1344' in its answer): $(tail -c 300 "$work/out-pr-contract-mutant.txt")"
 fi
 
 # the lane-caused direction: the SAME lane, a baseline that passes one of them.
