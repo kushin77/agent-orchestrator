@@ -1495,7 +1495,51 @@ class RepoLaneOps:
         return f"deleted origin/{branch}"
 
     def worktree_present(self, path: str) -> bool:
-        return bool(path) and Path(path).exists()
+        """Is the path a worktree — one GIT knows about, not merely a directory?
+
+        ``Path(path).exists()`` answered a different question. Another lane's reaper
+        prunes the admin entry under ``.git/worktrees/`` and can leave the directory
+        dangling, so "the directory is there" was true while ``git worktree remove``
+        refused with ``fatal: '<path>' is not a working tree``. That refusal blocked
+        ``worktree-removed``, which withheld ``lane-archived``, which meant
+        ``forget_lane`` never ran: the record could never reach a terminal state, and
+        7 of 32 records were wedged that way (#1441/#1443).
+
+        Membership in ``git worktree list`` is the SAME notion
+        ``governance/reconcile/orphans.py`` and ``governance/isolation`` already use,
+        so the terminal verb and the walk that prescribes it now agree on what
+        "present" means.
+
+        An unreadable worktree list is CANNOT-ASSESS, never a verdict: reporting
+        "no worktree on disk" because git could not be run would archive a record on
+        the strength of a measurement that never happened.
+        """
+        return bool(path) and path in self._worktrees()
+
+    def worktree_leftover(self, path: str) -> bool:
+        """Does a directory sit at the path without git knowing it as a worktree?
+
+        The shape a reclaim leaves behind. There is no working tree to remove, and the
+        directory is never deleted: with the admin entry gone there is no way to
+        measure what is inside it, and rule 17 forbids trading work for a tidier box.
+        """
+        return bool(path) and Path(path).exists() and path not in self._worktrees()
+
+    def _worktrees(self) -> set[str]:
+        """Every path ``git worktree list`` reports, by absolute path."""
+        try:
+            result = self._git("worktree", "list", "--porcelain")
+        except OSError as exc:
+            raise lane_closeout.LaneUnavailable(f"git could not be run: {exc}") from exc
+        if result.returncode != 0:
+            raise lane_closeout.LaneUnavailable(
+                f"git worktree list failed: {result.stderr.strip()[-200:]}"
+            )
+        return {
+            line[len("worktree ") :]
+            for line in result.stdout.splitlines()
+            if line.startswith("worktree ")
+        }
 
     def foreign_dirt(self, path: str) -> list[str]:
         from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415

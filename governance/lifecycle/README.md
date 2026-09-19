@@ -91,7 +91,10 @@ for the lane branch is MERGED and its landing classifies clean under the shared
 trailer predicate), `issue-closed`, then acts: `branch-reaped` (local + remote,
 each tip recorded to `.fleet/reaped-branches.jsonl` **first** and only when
 content-landed — `governance/isolation/worktree.content_landed`, #1335),
-`worktree-removed` (machine-managed dirt only, #1285/#834), `lane-archived`
+`worktree-removed` (machine-managed dirt only, #1285/#834; a path git no longer
+knows as a worktree is **already torn down** — the step is satisfied by that
+absence, names the leftover path, and neither blocks nor deletes the directory,
+#1441/#1443), `lane-archived`
 (the record, the evidence bundle — PR, landing SHA, reaped tips, the lane
 result's `gate_tails` (#1270) — to `.fleet/lifecycle/lanes/<lane_id>.json`;
 the live record and the session beat are removed). Any step it cannot evidence
