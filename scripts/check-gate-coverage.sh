@@ -6,8 +6,11 @@
 #   Gate coverage in this repo is OPT-IN. `scripts/verify.sh` holds an explicit
 #   `checks=()` array, so a new `scripts/check-*.sh` that nobody registers is
 #   inert: it exists, it looks like a gate, and no gate ever runs it. The same
-#   is true of the pytest corpus: `scripts/pytest-suites.txt` declares 71
-#   suites, but the gate of record only ever runs the ones a gate NAMES.
+#   is true of the pytest corpus: `scripts/pytest-suites.txt` declares 99
+#   suites, but the gate of record only ever runs the ones a gate NAMES. (99 is
+#   a snapshot, never a promise — #526 wrote 71 here, #1458 re-measured it — so
+#   re-measure it rather than trusting this line:
+#   `grep -vcE '^[[:space:]]*(#|$)' scripts/pytest-suites.txt`.)
 #   Nothing complained when the count of unwired check scripts went from 0 (at
 #   the first measurement, 2026-09-14 morning) to 8 (re-measured the same day at
 #   ffb2688, when EPIC #499's chat surface landed six of them). A class that can
