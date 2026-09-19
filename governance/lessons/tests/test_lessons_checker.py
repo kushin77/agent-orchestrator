@@ -444,6 +444,39 @@ def test_a_shallow_clone_downgrades_unresolvable_evidence(report_factory):
     assert len(warnings(report.findings)) == 2
 
 
+def test_a_narrow_checkout_downgrades_unresolvable_evidence(report_factory):
+    """A single-branch fetch (issue #727's venue-blindness class) cannot
+    resolve a commit that only exists on some other branch -- that is a
+    property of the checkout, not proof the citation is wrong (#1178)."""
+    probe = StubProbe(narrow=True, commits=set())
+    records = [
+        incident(1),
+        rca(1),
+        action(1, evidence=[{"kind": "commit", "ref": "deadbee"}]),
+        lesson(1, evidence=[{"kind": "commit", "ref": "deadbee"}]),
+    ]
+    report = report_factory(records, probe=probe)
+    assert only(report, CODE_EVIDENCE_UNRESOLVABLE)
+    assert errors(report.findings) == []
+    assert len(warnings(report.findings)) == 2
+
+
+def test_a_wide_unshallow_checkout_still_reports_the_error(report_factory):
+    """Neither shallow nor narrow: a real defect still FAILS (never softened
+    away just because SOME checkout property could theoretically excuse it)."""
+    probe = StubProbe(shallow=False, narrow=False, commits=set())
+    records = [
+        incident(1),
+        rca(1),
+        action(1, evidence=[{"kind": "commit", "ref": "deadbee"}]),
+        lesson(1, evidence=[{"kind": "commit", "ref": "deadbee"}]),
+    ]
+    report = report_factory(records, probe=probe)
+    assert only(report, CODE_EVIDENCE_UNRESOLVABLE)
+    assert len(errors(report.findings)) == 2
+    assert warnings(report.findings) == []
+
+
 def test_a_commit_evidence_that_is_not_a_sha_is_reported(report_factory):
     records = [
         incident(1),
@@ -738,6 +771,7 @@ def test_git_probe_answers_about_this_repository():
     assert probe.tracked("governance/lessons/ledger.jsonl") is True
     assert probe.tracked("governance/lessons/absent-file.jsonl") is False
     assert probe.shallow in (True, False)
+    assert probe.narrow in (True, False)
 
 
 def test_git_probe_reports_unavailable_outside_a_work_tree(tmp_path):
@@ -746,6 +780,7 @@ def test_git_probe_reports_unavailable_outside_a_work_tree(tmp_path):
     assert probe.tracked("anything") is None
     assert probe.commit_exists("abc1234") is None
     assert probe.shallow is False
+    assert probe.narrow is False
 
 
 def test_report_is_written_as_json(report_factory, tmp_path, clean_records):
