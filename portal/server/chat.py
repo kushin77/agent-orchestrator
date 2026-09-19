@@ -54,6 +54,7 @@ from __future__ import annotations
 import http.client
 import json
 import os
+import sys
 import tempfile
 import time
 import uuid
@@ -64,14 +65,22 @@ from urllib.parse import urlsplit
 
 from portal.server.fleet import surface_enabled
 
+#: The tier ladder is READ from its declared authority (#1494): the issue-#9
+#: AgentProfile catalog `registry/profiles/catalog.yaml` ``tiers``, through its
+#: one reader `registry/profiles/tiers.py`. The portal used to pin a second copy
+#: of the ladder "from the gateway's provider contract"; that copy is gone, so a
+#: rename in the authority is followed here rather than cross-checked later.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from registry.profiles.tiers import authority as _tier_authority  # noqa: E402
+
 #: The registry surface key that gates this endpoint family (issue #500).
 CHAT_SURFACE = "chat"
 
-#: The tier ladder, pinned from the gateway's provider contract
-#: (``gateway/providers/contract.py`` ``TIERS``), which itself consumes it from
-#: the issue-#9 AgentProfile catalog. Cross-checked by
-#: ``scripts/check-chat-ux.sh`` — a rename on either side fails the gate.
-TIERS: tuple[str, ...] = ("LOW", "MED", "HIGH", "MAX")
+#: The tier ladder, in the authority's declared order.
+TIERS: tuple[str, ...] = _tier_authority()
 DEFAULT_TIER = "MED"
 
 #: The pre-flight budget actions, pinned from ``gateway/finops/budget.py``
