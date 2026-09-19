@@ -157,6 +157,20 @@ Those last three rows are why there is no broad rule here: a check that flags 40
 seam consolidation the numbers point at is **#1025** (the money path reads the
 live clock in 11 places behind 6 duplicate seams) — not this canon.
 
+## What #1429 adds — a doctrine-conformance gate, not a source scan
+
+Issue #1429 asked for a conformance check for this file, mirroring
+[`scripts/check-tagging.sh`](../scripts/check-tagging.sh). What ships is
+[`scripts/check-python-patterns-doctrine.sh`](../scripts/check-python-patterns-doctrine.sh)
+— it checks this **document's own claims**, not Python source: that PP-1's
+enforcer (`turn-date-scope` in `scripts/check-chat-finops.sh`) still exists and
+is still wired in `scripts/verify.sh`; that every DECLARED row names an owning
+issue; that every `PP-N` id used anywhere resolves to exactly one row; and that
+no other checker in `scripts/` claims to be the PP-1..PP-4 source scan this
+section still refuses to ship. It does **not** grep Python source for PP-1 —
+that remains unshipped for the reason measured below, and shipping it would
+make this section false the moment it landed.
+
 ## The measured refusal — why no `scripts/check-python-patterns.sh` ships
 
 The brief for #1028 asks for a `scripts/check-python-patterns.sh` in the shape of
