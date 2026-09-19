@@ -96,6 +96,37 @@
 #     `BROKEN` by name, and is a `--check` finding: the destruction must be
 #     visible, never 20 silent skips.
 #
+# ONE MORE GUARANTEE ADDED FOR ISSUE #1337:
+#   * A TREE THE REAPER DID NOT CREATE IS NEVER REMOVED UNLESS OWNERSHIP IS
+#     DECLARED. The two guards above are measurements of an INSTANT, and a tree
+#     can be live while no instant shows it: a harness session working inside a
+#     worktree holds no descriptor between two of its commands and runs no gate,
+#     so neither the /proc scan (#1159) nor the permit store (#1345) can see it —
+#     while `ao-fleet-reap` runs this tool with --apply UNATTENDED from cron.
+#     Measured on this box (2026-09-18, #1337): of 14 trees the sweep called
+#     removable, 9 were `.claude/worktrees/agent-*` and 5 were scratch roots, and
+#     NOT ONE carried a `.fleet/lanes/` record — a working directory destroyed
+#     under a live session, with no commit at risk and no warning either.
+#     Ownership is therefore DECLARED, by one of two things that outlive the
+#     instant: a `.fleet/lanes/` record naming the tree (the lane-claim guard
+#     above, which runs first and is the stronger statement — that lane is
+#     OPEN), or a root listed in the declared reap allowlist read below. A tree
+#     with neither is KEEP, and the KEEP NAMES the reason
+#     (`not-created-by-the-reaper`), because a silence here is indistinguishable
+#     from an honest keep.
+#     IT IS A LIST OF ROOTS, NOT A BLANKET REFUSAL. #1159's acceptance item — "a
+#     genuinely stale, preserved, unclaimed tree is still reaped" — has to keep
+#     holding, so the homes this reaper OWNS are declared rather than guessed
+#     here (that ownership list is what PR #1326 deferred the remedy for, rather
+#     than inventing one). Measured on this box 2026-09-18: all 33 worktrees of
+#     this repository, and all 8 the dry run called removable, lie under exactly
+#     two roots.
+#     AN ABSENT, UNREADABLE, NON-REGULAR OR ROOT-LESS DECLARATION IS
+#     CANNOT-ASSESS (rc 2) and NOTHING is removed. "I could not read the
+#     ownership declaration" and "nothing is declared" are different answers, and
+#     neither of them is "reap it": widening what may be discarded is never the
+#     safe direction for a failure.
+#
 # Exit-code contract: 0 OK / 1 NOT-OK (stale worktrees found in --check, a
 # venue-invalid venue found in --check, or — for --schedule — no installed
 # crontab line invokes this tool) / 2 CANNOT-ASSESS (the question could not be
@@ -161,7 +192,10 @@ gate_stores_file="$scratch.gatestores"
 gate_held="$scratch.gateheld"
 gate_err="$scratch.gateerr"
 venue_roots="$scratch.roots"
-trap 'rm -f "$scratch" "$live_paths" "$live_wts" "$wt_paths" "$live_lanes" "$declared" "$crontab_err" "$gate_stores_file" "$gate_held" "$gate_err" "$venue_roots"' EXIT
+allow="$scratch.allow"
+allow_err="$scratch.allowerr"
+owned_wts="$scratch.owned"
+trap 'rm -f "$scratch" "$live_paths" "$live_wts" "$wt_paths" "$live_lanes" "$declared" "$crontab_err" "$gate_stores_file" "$gate_held" "$gate_err" "$venue_roots" "$allow" "$allow_err" "$owned_wts"' EXIT
 
 # --- is this tool actually scheduled? (issue #830) ---------------------------
 #
@@ -545,6 +579,133 @@ if ! live_lane_worktrees "$root" > "$live_lanes" 2>/dev/null; then
   exit 2
 fi
 
+# --- ownership: was this tree the reaper's to remove? (issue #1337) ----------
+#
+# The guards above are measurements of the INSTANT, and a tree can be live while
+# no instant shows it: a harness session working inside a worktree holds no
+# descriptor between two of its commands and runs no gate, so neither the /proc
+# scan (#1159) nor the permit store (#1345) can see it — while `ao-fleet-reap`
+# runs this tool with --apply UNATTENDED from cron. Measured on this box
+# (2026-09-18, #1337): of 14 trees the sweep called removable, 9 were
+# `.claude/worktrees/agent-*` and 5 were scratch roots, and NOT ONE carried a
+# `.fleet/lanes/` record.
+#
+# So ownership is DECLARED, by one of two things that outlive the instant: a
+# `.fleet/lanes/` record naming the tree (the lane-claim guard above, which runs
+# first — an OPEN lane is the stronger statement), or a root listed in the
+# declared reap allowlist read here. A tree with neither is KEEP, and the KEEP
+# NAMES the reason, because a silence here is indistinguishable from an honest
+# keep.
+#
+# IT IS A LIST OF ROOTS, NOT A BLANKET REFUSAL: #1159's acceptance item — "a
+# genuinely stale, preserved, unclaimed tree is still reaped" — has to keep
+# holding, so the homes this reaper OWNS are declared in ONE file rather than
+# guessed here. The declaration is read from the repository being SCANNED (the
+# same place MACHINE_MANAGED_PATHS is read from), never from a copy.
+#
+# FAIL CLOSED, LOUDLY. An absent, unreadable, non-regular or root-less
+# declaration is CANNOT-ASSESS (rc 2) and NOTHING is removed: "I could not read
+# the ownership declaration" and "nothing is declared" are different answers,
+# and neither is "reap it".
+#
+# The signal is named in ONE place so a check can switch it off and prove the
+# switch matters (GR-12): REAP_OWNERSHIP — "declared" reads the allowlist and
+# enforces it, anything else gates the rule off ENTIRELY (the read AND the
+# refusal), which is exactly the pre-#1337 predicate. A switch that only stopped
+# the read would make the refusal STRONGER with the rule off, and no mutant could
+# then tell the rule from its absence. The path is named once too, and the check's
+# fixtures WRITE their declarations where this line says they are read, so the
+# reader and its harness cannot drift apart.
+REAP_OWNERSHIP="declared"
+REAP_ALLOWLIST="config/reap-allowlist.txt"
+
+reap_root_lines() { # reap_root_lines <relative-base> <declaration> — the declared roots, normalised, one per line
+  python3 - "$1" "$2" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+# A RELATIVE root is relative to the REPOSITORY — its main checkout — never to the
+# worktree this tool happens to be run from. Running it from a lane worktree is
+# the normal case (a lane tests with it), and a root such as `.claude/worktrees`
+# resolved against that lane names a directory that does not exist, silently
+# owning nothing: measured, 23 of 33 trees went unowned that way.
+base = Path(sys.argv[1])
+source = Path(sys.argv[2])
+if not source.is_file():
+    sys.stderr.write("the declared reap allowlist is not a readable file\n")
+    sys.exit(3)
+try:
+    lines = source.read_text(encoding="utf-8").splitlines()
+except OSError as exc:
+    sys.stderr.write(f"the declared reap allowlist cannot be read: {exc}\n")
+    sys.exit(3)
+
+home = os.environ.get("HOME") or ""
+roots = []
+for line in lines:
+    entry = line.strip()
+    if not entry or entry.startswith("#"):
+        continue
+    if entry.startswith("~/"):
+        if not home:
+            continue
+        entry = home + entry[1:]
+    elif not entry.startswith("/"):
+        entry = f"{base}/{entry}"
+    entry = entry.rstrip("/") or "/"
+    if entry == "/":
+        # Deliberate, not accidental: the filesystem root is not a worktree home,
+        # and the awk boundary pass below would silently own nothing under it. A
+        # declaration whose ONLY line is `/` is therefore root-less — rc 2.
+        continue
+    if entry not in roots:
+        roots.append(entry)
+
+if not roots:
+    sys.stderr.write("no usable root line in the declared reap allowlist\n")
+    sys.exit(3)
+for entry in roots:
+    print(entry)
+PY
+}
+
+: > "$allow"
+: > "$owned_wts"
+owned_count=0
+allow_total=0
+allow_existing=0
+allow_missing=""
+reap_ownership_desc="OFF (REAP_OWNERSHIP=$REAP_OWNERSHIP) — this rule is gated off: the declared reap allowlist is not consulted and every worktree is treated as owned, so nothing is refused for want of a declaration"
+if [ "$REAP_OWNERSHIP" = "declared" ]; then
+  # A relative root needs a base: `git worktree list` names the MAIN checkout
+  # first, so the first line of the list this run already built is it, whichever
+  # worktree this tool was started from.
+  allow_base="$(awk 'NR == 1 { print; exit }' "$wt_paths")"
+  [ -n "$allow_base" ] || allow_base="$root"
+  if ! reap_root_lines "$allow_base" "$root/$REAP_ALLOWLIST" > "$allow" 2>"$allow_err"; then
+    echo "prune-worktrees: CANNOT-ASSESS — the reap ownership declaration $REAP_ALLOWLIST cannot be read ($(head -n 1 "$allow_err")); nothing is declared, so nothing is removed" >&2
+    exit 2
+  fi
+  allow_total="$(wc -l < "$allow" | tr -d ' ')"
+  while IFS= read -r declared_root; do
+    if [ -n "$declared_root" ] && [ -d "$declared_root" ]; then
+      allow_existing=$((allow_existing + 1))
+    else
+      allow_missing="$allow_missing $declared_root"
+    fi
+  done < "$allow"
+  # One pass over the worktree list, not one comparison per tree, and ANCHORED ON
+  # A PATH BOUNDARY: a bare prefix test would let ~/ao-worktrees-old be owned by
+  # ~/ao-worktrees, i.e. one root would authorise a tree that is not under it.
+  awk '
+    FNR == NR { if (NF) { root[$0] = 1 }; next }
+    { for (r in root) if ($0 == r || index($0, r "/") == 1) { print $0; break } }
+  ' "$allow" "$wt_paths" > "$owned_wts"
+  owned_count="$(wc -l < "$owned_wts" | tr -d ' ')"
+  reap_ownership_desc="declared ($REAP_ALLOWLIST); $allow_total declared root(s), $allow_existing existing; $owned_count of $wt_count worktree(s) under one"
+fi
+
 landed_in_master() { # landed_in_master <sha> — already part of origin/master
   local sha="$1"
   [ -z "$sha" ] && return 1
@@ -726,6 +887,17 @@ while read -r path sha ref; do
     unsafe=$((unsafe + 1))
     continue
   fi
+  # Ownership (#1337): the LAST keep and the FIRST removal. A tree no lane record
+  # claims and no declared root covers is not this tool's to remove, and the
+  # refusal is NAMED — a silent keep would be indistinguishable from an honest
+  # one, and a live harness session inside that tree would be destroyed unseen.
+  # The whole rule is behind its declared signal (see REAP_OWNERSHIP above), so
+  # gating it off reproduces the predicate this issue replaces.
+  if [ "$REAP_OWNERSHIP" = "declared" ] && ! grep -qxF -- "$path" "$owned_wts"; then
+    printf '  KEEP   %s — not-created-by-the-reaper: no lane record and not under a declared reap root (#1337)\n' "$path"
+    unsafe=$((unsafe + 1))
+    continue
+  fi
   content_equiv=0
   if ! preserved "$sha"; then
     if landed_by_content "$sha"; then
@@ -875,6 +1047,15 @@ printf 'prune-worktrees: liveness: %s; %s live path(s) seen, %s of %s worktree(s
 # can never appear as STALE above; that pairing is what a reader can check.
 printf 'prune-worktrees: gate venues: %s; %s worktree(s) named by a live gate\n' \
   "$gate_signal_desc" "$gate_held_count"
+# The declared ownership, and its size, on every run — so "the reaper was looking
+# at the ownership declaration" is a measurement rather than a claim, and a tree
+# kept for want of one is visible instead of silent (#1337). A declared root that
+# does NOT exist yet is named too: it owns nothing, and a root that owns nothing
+# while every tree is kept is exactly the state a reader has to be able to see.
+printf 'prune-worktrees: reap ownership: %s\n' "$reap_ownership_desc"
+if [ -n "$allow_missing" ]; then
+  printf 'prune-worktrees: reap ownership: declared root(s) that do not exist yet: %s\n' "${allow_missing# }"
+fi
 if [ "$broken" -gt 0 ]; then
   printf 'prune-worktrees: venue-invalid: %s dangling venue(s) named above; a gate run inside one reports false CANNOT-ASSESS verdicts folded into skipped (#1345)\n' "$broken"
 fi

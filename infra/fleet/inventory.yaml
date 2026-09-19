@@ -96,6 +96,10 @@ binaries:
   # dev-run role dispatches — same argument as `/usr/bin/python3` above: the
   # image does not get to change what the schedule's owner writes.
   - bash
+  # the promote-portal rung's `--apply` path (#1329/#1341) recreates the
+  # host's agentconsole container over the Docker CLI, against the socket
+  # `docker-compose.agent-cron.yml` mounts read-only on `agent-cron-rw` only.
+  - docker
 
 # 5. PACKAGES. Every package the image installs, with the reason it is there and
 # a marker of whether it is installed at build time only. Compared BOTH ways
@@ -136,6 +140,11 @@ packages:
     stage: runtime
     gives: gh
     why: "the fleet's issue and PR surface — the GitHub CLI, from GitHub's own apt repository."
+  - install: docker-ce-cli
+    via: apt
+    stage: runtime
+    gives: docker
+    why: "the promote-portal rung's --apply path (#1329/#1341) pulls and recreates the shared-services-agentconsole container over the Docker CLI, against the read-only socket agent-cron-rw mounts. Client only, from Docker's own apt repository — no dockerd in this image."
   - install: PyYAML
     via: pip
     stage: runtime

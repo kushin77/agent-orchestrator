@@ -1,0 +1,18 @@
+{
+  "doc": "lesson 2: EXPIRED/CANCELLED/PARKED are terminal-not-green \u2014 re-queued by name, never awaited",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 8,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "builds": [
+    {
+      "id": "cb-expired",
+      "pr": 8,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "status": "expired"
+    }
+  ]
+}
