@@ -829,6 +829,466 @@ else
   esac
 fi
 
+# 7. THE PRODUCERS THE REQUIRED CONTEXT ACTUALLY NEEDS (#1382).
+#
+#    Sections 5 and 6 ask whether the context has a producer ON THE PATH THAT
+#    MAKES THE PR VERDICT, and whether that producer is live. Both were
+#    satisfied, and the requirement was still not satisfiable -- because a
+#    required status check gates a PULL REQUEST while a status is posted for a
+#    COMMIT, so a SQUASH landing creates a commit no pre-merge status can ever
+#    describe. Measured 2026-09-19: this check read the live producer state and
+#    found `ao/gate-of-record` observed on NONE of the last 20 commits of
+#    `master` while branch protection REQUIRED it. The mechanism was live; the
+#    ordinary lane path and the landing seam simply produced nothing.
+#
+#    So this section asks the two questions those sections cannot:
+#
+#      * the WIRING -- `scripts/verify.sh` (the gate of record itself, the path
+#        every lane takes) and `scripts/merge-pr.sh` (the landing seam) must each
+#        invoke the poster. Answered with this file's OWN predicate (`producer_in`),
+#        so there is one definition of "a producer" here rather than a second
+#        copy of the rule that can drift from the first, and PROVOKED both ways:
+#        a copy with the invocation stripped must be refused by name.
+#      * the BEHAVIOUR -- a producer is only a control if it can REFUSE. Every
+#        arm below drives the REAL file from a scratch venue (byte-identical
+#        copies of the orchestrator surface, the `checks=()` array neutered to
+#        one fixture check, and a RECORDING stand-in for the poster, so nothing
+#        here can post against the real repository): green posts the run's own
+#        rc; a RED run posts rc 1 and never 0; a run that assessed nothing (every
+#        check SKIPped, or nothing discovered at all) posts nothing and names
+#        which of the two it was; a PARKED run posts nothing; a poster that
+#        cannot publish leaves the run's OWN verdict untouched; and the landing
+#        seam publishes for the commit that landed only when the gate of record
+#        is OBSERVED GREEN on the PR head, so an ungated PR stays unproduced.
+#
+#    Three of those arms are load-bearing rather than decorative, and each is
+#    shown to be by a MUTANT that it MUST catch: the park exit removed (A4 must
+#    see the status a permitless run would post), the published rc pinned to 0
+#    (A2 must see the red run reading green), and the landed-green gate dropped
+#    (B2 must see an ungated PR land green). A control whose arms survive their
+#    own mutants is a formality.
+producer_fx=""
+producer_verify="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/verify.sh"
+producer_merge="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/merge-pr.sh"
+for producer_file in "$producer_verify" "$producer_merge"; do
+  if [ ! -f "$producer_file" ]; then
+    echo "check-gate-status: CANNOT-ASSESS — ${producer_file##*/} is missing, so whether the REQUIRED context has a producer on that path cannot be asked" >&2
+    exit 2
+  fi
+done
+for producer_file in "$producer_verify" "$producer_merge"; do
+  if producer_in "$producer_file"; then
+    echo "  OK  ${producer_file##*/} invokes the poster (bash scripts/$fx_name $fx_verb), so the required context has a producer on that path"
+  else
+    echo "check-gate-status: FAIL REQUIRED-BUT-UNPRODUCED — ${producer_file##*/} does NOT invoke the poster: the path that produces the gate of record on the ordinary lane run / the landing seam publishes nothing, so the required context can be REQUIRED and unproducible at the same time (#1382)" >&2
+    fail=1
+  fi
+done
+
+# The wiring arms are provoked on a COPY: the invocation is stripped and the
+# predicate must refuse it, or the arm above proves only that the file exists.
+producer_strip_fx="$(mktemp -d "/tmp/cgs-producer.$(printf 'X%.0s' 1 2 3 4 5 6)" 2>/dev/null)" || producer_strip_fx=""
+if [ -z "$producer_strip_fx" ]; then
+  echo "check-gate-status: CANNOT-ASSESS — no scratch directory for the producer provocation" >&2
+  exit 2
+fi
+producer_fx="$producer_strip_fx"
+trap 'rm -rf "$live_fx" "$producer_fx"' EXIT
+mkdir -p "$producer_fx/scripts"
+for producer_file in "$producer_verify" "$producer_merge"; do
+  producer_base="${producer_file##*/}"
+  sed -E "s#bash \"?\\\$(root|\\\$root)/scripts/${fx_name_re}\"? +${fx_verb}#STRIPPED_producer_invocation#" \
+    "$producer_file" > "$producer_fx/scripts/$producer_base"
+  if producer_in "$producer_fx/scripts/$producer_base"; then
+    echo "check-gate-status: FAIL — the producer provocation did not strip the invocation from $producer_base, so the wiring arm above cannot be shown to be able to fail" >&2
+    fail=1
+  else
+    echo "  OK  the wiring arm is load-bearing: with the invocation stripped from $producer_base, the predicate refuses it"
+  fi
+done
+
+if ! command -v git >/dev/null 2>&1; then
+  echo "check-gate-status: CANNOT-ASSESS — git is not available, so the producer's behaviour cannot be provoked in a venue" >&2
+  exit 2
+fi
+
+python3 - "$root" "$producer_fx/venue" <<'PY'
+"""Drive the REAL scripts/verify.sh and scripts/merge-pr.sh in scratch venues
+and assert that the gate of record's producers can refuse (issue #1382).
+
+Nothing here can post against the real repository: each venue carries a
+RECORDING stand-in for `scripts/gate-status.sh`, and the landing venue drives a
+recording fake `gh`.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2]).resolve()
+work.mkdir(parents=True, exist_ok=True)
+
+SURFACE = (
+    "scripts/verify.sh",
+    "scripts/gate-lock.sh",
+    "scripts/discover-checks.sh",
+    "scripts/lib/skip-ratchet.py",
+    "scripts/lib/validate-attestation.py",
+    "governance/isolation/attestation.schema.json",
+    "fleet/gatelock.py",
+    "fleet/lease.py",
+)
+REAL_POSTER = ("scripts/gate-status.sh", "scripts/gate-status-map.py")
+LANDING = (
+    "scripts/merge-pr.sh",
+    "scripts/check-squash-message.sh",
+    "scripts/pr-queue.sh",
+    "governance/isolation/trailer.py",
+    "governance/isolation/__init__.py",
+)
+ARMS = []
+
+
+def arm(label, ok, detail=""):
+    ARMS.append((label, bool(ok)))
+    print("  %s  %s" % ("OK   " if ok else "FAIL ", label))
+    if detail:
+        print("        %s" % str(detail).splitlines()[0][:300])
+
+
+def staged(what, why):
+    print("check-gate-status: CANNOT-ASSESS — %s: %s" % (what, why), file=sys.stderr)
+    raise SystemExit(2)
+
+
+def git(cwd, *args):
+    return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+
+
+def run(argv, cwd, extra=None):
+    env = dict(os.environ)
+    env.update({
+        "AO_GATE_LOCK_ROOT": str(work / "permits"),
+        "AO_GATE_MAX_CONCURRENT": "1",
+        "AO_AGENT_ID": "gate-status-producer-fixture",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    })
+    if extra:
+        env.update(extra)
+    try:
+        proc = subprocess.run(argv, cwd=str(cwd), capture_output=True, text=True,
+                              timeout=300, env=env)
+    except (OSError, subprocess.SubprocessError) as exc:
+        staged("the fixture could not be run", exc)
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def write(path, text, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    path.chmod(mode)
+
+
+def copy_surface(venue, extra=()):
+    for rel in SURFACE + tuple(extra):
+        source = root / rel
+        if not source.is_file():
+            staged("a venue cannot be staged", "%s is missing from this tree" % rel)
+        target = venue / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+
+
+def neuter(venue, rel="scripts/verify.sh"):
+    """Replace the explicit `checks=()` array with an empty one -- and PROVE the
+    rest of the file is untouched, so the venue runs the real orchestrator."""
+    path = venue / rel
+    text = path.read_text(encoding="utf-8")
+    try:
+        start = text.index("\nchecks=(\n")
+        end = text.index("\n)\n", start)
+    except ValueError:
+        staged("the venue cannot be neutered", "the `checks=()` anchor moved in %s" % rel)
+    body = text[:start] + "\nchecks=()\n" + text[end + 3:]
+    if body.replace("\nchecks=()\n", text[start:end + 3], 1) != text:
+        staged("the venue is not the real file", "%s changed beyond its check array" % rel)
+    path.write_text(body, encoding="utf-8")
+
+
+def venue(name, fixture_rc=None, poster="stub", entries=()):
+    path = work / name
+    shutil.rmtree(path, ignore_errors=True)
+    copy_surface(path, REAL_POSTER if poster == "real" else ())
+    neuter(path)
+    if fixture_rc is not None:
+        write(path / "scripts" / "check-producer-fixture.sh",
+              "#!/usr/bin/env bash\nset -u\necho 'check-producer-fixture: rc %d'\nexit %d\n"
+              % (fixture_rc, fixture_rc), 0o755)
+    write(path / "scripts" / "skip-budget.json",
+          json.dumps({"schema": "ao.verify.skip-budget/v1", "entries": list(entries)}, indent=2) + "\n")
+    if poster == "stub":
+        write(path / "scripts" / "gate-status.sh", STUB, 0o755)
+    subprocess.run(["git", "init", "-q", str(path)], capture_output=True)
+    git(path, "add", "-A")
+    proc = git(path, "-c", "user.name=fixture", "-c", "user.email=f@ao.invalid",
+               "-c", "commit.gpgsign=false", "commit", "-q", "-m", "fixture")
+    if proc.returncode != 0:
+        staged("the venue cannot be staged", "its fixture commit failed: %s" % proc.stderr.strip())
+    return path
+
+
+def head_of(path):
+    return git(path, "rev-parse", "HEAD").stdout.strip()
+
+
+STUB = """#!/usr/bin/env bash
+# A RECORDING stand-in for scripts/gate-status.sh: it records its own argv and
+# exits with a scripted rc, so nothing here can post a real status.
+set -u
+printf '%s\\n' "$*" >> "$AO_CGS_STUB_LOG"
+case "${1:-}" in
+  show) exit "${AO_CGS_STUB_SHOW_RC:-0}" ;;
+  post)
+    if [ "${AO_CGS_STUB_POST_RC:-0}" != "0" ]; then
+      printf 'gate-status: CANNOT-ASSESS -- gh not found and no GH_TOKEN/GITHUB_TOKEN in env; status not posted\\n' >&2
+      exit "$AO_CGS_STUB_POST_RC"
+    fi
+    printf 'gate-status: posted ao/gate-of-record for a fixture (recording stand-in)\\n'
+    exit 0 ;;
+esac
+exit 0
+"""
+
+FAKE_GH = """#!/usr/bin/env bash
+# A RECORDING fake gh for the landing arms. Never touches the network.
+set -u
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "view" ]; then
+  printf '%s' "$AO_CGS_GH_VIEW_JSON"
+  exit 0
+fi
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "merge" ]; then
+  printf '%s\\n' "${3:-}" >> "$AO_CGS_GH_MERGE_LOG"
+  exit "${AO_CGS_GH_MERGE_RC:-0}"
+fi
+echo "fake gh: unexpected invocation: $*" >&2
+exit 1
+"""
+
+
+def run_verify(path, extra=None):
+    log = path / "stub.log"
+    log.write_text("", encoding="utf-8")
+    env = {"AO_CGS_STUB_LOG": str(log)}
+    if extra:
+        env.update(extra)
+    rc, out = run(["bash", "scripts/verify.sh", "verify"], path, env)
+    return rc, out, [x for x in log.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+
+def posts(recorded):
+    return [x for x in recorded if x.startswith("post")]
+
+
+def shows(recorded):
+    return [x for x in recorded if x.startswith("show")]
+
+
+def notes(out):
+    return [x for x in out.splitlines() if "NOTE" in x]
+
+
+def lock(action, path):
+    proc = subprocess.run(
+        ["bash", "scripts/gate-lock.sh", action, "--worktree", str(path)]
+        + (["--mode", "verify", "--owner-pid", str(os.getpid())] if action == "acquire" else []),
+        cwd=str(path), capture_output=True, text=True,
+        env={**os.environ, "AO_GATE_LOCK_ROOT": str(work / "permits"),
+             "AO_GATE_MAX_CONCURRENT": "1", "PYTHONDONTWRITEBYTECODE": "1"})
+    if action == "acquire" and proc.returncode != 0:
+        staged("the fixture could not hold its own worktree lock", proc.stdout + proc.stderr)
+
+
+def mutate(path, rel, old, new):
+    target = path / rel
+    text = target.read_text(encoding="utf-8")
+    if old not in text:
+        staged("the mutant cannot be planted", "the anchor moved in %s: %r" % (rel, old[:50]))
+    target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+def verify_arms():
+    green = venue("green", 0)
+    sha = head_of(green)
+    rc, out, rec = run_verify(green)
+    arm("a green run posts exactly one status, rc 0, for the commit it measured",
+        rc == 0 and len(posts(rec)) == 1 and "--rc 0" in posts(rec)[0] and sha in posts(rec)[0]
+        and not notes(out), "rc=%s posts=%r" % (rc, posts(rec)))
+
+    red = venue("red", 1)
+    rc, out, rec = run_verify(red)
+    arm("a RED run posts rc 1, never 0 -- a red gate cannot read as a pass",
+        rc == 1 and len(posts(rec)) == 1 and "--rc 1" in posts(rec)[0],
+        "rc=%s posts=%r" % (rc, posts(rec)))
+
+    skipped = venue("skipped", 2, entries=[{
+        "check": "producer-fixture", "kind": "standing-gap", "issue": 1382,
+        "reason": "the venue's only check answers rc 2 on purpose"}])
+    rc, out, rec = run_verify(skipped)
+    arm("a run that assessed NOTHING (every check SKIPped) posts nothing, and says which",
+        not posts(rec) and any("every check in this run was SKIPped" in x for x in notes(out)),
+        "rc=%s notices=%r" % (rc, notes(out)[:1]))
+
+    empty = venue("no-checks")
+    rc, out, rec = run_verify(empty)
+    arm("a run that discovered NO check at all posts nothing, and names that reason",
+        not posts(rec) and any("discovered NO check at all" in x for x in notes(out)),
+        "rc=%s notices=%r" % (rc, notes(out)[:1]))
+
+    parked = venue("parked", 0)
+    lock("acquire", parked)
+    rc, out, rec = run_verify(parked)
+    arm("a PARKED run posts NOTHING and exits 10 (it never reaches the producer)",
+        rc == 10 and not rec, "rc=%s poster-corpus=%r" % (rc, rec))
+    lock("release", parked)
+
+    refusing = venue("poster-refuses", 0)
+    rc, out, rec = run_verify(refusing, {"AO_CGS_STUB_POST_RC": "2"})
+    arm("a poster that cannot publish leaves the run's OWN verdict alone (rc 0) and is named",
+        rc == 0 and len(posts(rec)) == 1 and "NOT published" in out,
+        "rc=%s attempt=%r" % (rc, posts(rec)))
+
+    real = venue("real-poster", 0, poster="real")
+    bins = work / "bins-no-gh"
+    bins.mkdir(parents=True, exist_ok=True)
+    for tool in ("bash", "sh", "cat", "tail", "head", "sed", "awk", "grep", "git", "python3",
+                 "mktemp", "dirname", "basename", "date", "hostname", "id", "mkdir", "rm",
+                 "sort", "uniq", "wc", "tr", "env", "tee", "chmod", "cp", "mv", "find", "xargs"):
+        which = shutil.which(tool)
+        if which and not (bins / tool).exists():
+            (bins / tool).symlink_to(which)
+    rc, out, rec = run_verify(real, {"PATH": str(bins), "GH_TOKEN": "", "GITHUB_TOKEN": ""})
+    arm("with gh ABSENT the REAL poster refuses BY NAME and the run keeps its own rc",
+        rc == 0 and "NOT published" in out and "the poster exited 2" in out,
+        "rc=%s notices=%r" % (rc, notes(out)[:1]))
+
+    mutant_park = venue("mutant-park", 0)
+    mutate(mutant_park, "scripts/verify.sh", '  exit "$lock_rc"\n',
+           '  : # MUTANT: the park exit removed\n')
+    lock("acquire", mutant_park)
+    rc, out, rec = run_verify(mutant_park)
+    arm("MUTANT park-exit-removed IS CAUGHT (a run that never got a permit posts)",
+        bool(posts(rec)) or rc != 10, "rc=%s posts=%r" % (rc, posts(rec)))
+    lock("release", mutant_park)
+
+    mutant_rc = venue("mutant-rc", 1)
+    mutate(mutant_rc, "scripts/verify.sh",
+           'publish_gate_of_record "$ATTEST_SHA" "$overall" "$total" "$skipped"',
+           'publish_gate_of_record "$ATTEST_SHA" 0 "$total" "$skipped"')
+    rc, out, rec = run_verify(mutant_rc)
+    arm("MUTANT rc-pinned-to-0 IS CAUGHT (a red run posting rc 0)",
+        bool(posts(rec)) and "--rc 0" in posts(rec)[0], "rc=%s posts=%r" % (rc, posts(rec)))
+
+
+def landing_venue(name, state="MERGED", head_green=True, merge_rc=0):
+    path = work / name
+    shutil.rmtree(path, ignore_errors=True)
+    copy_surface(path, LANDING)
+    write(path / "scripts" / "gate-status.sh", STUB, 0o755)
+    write(path / "bin" / "gh", FAKE_GH, 0o755)
+    subprocess.run(["git", "init", "-q", str(path)], capture_output=True)
+    git(path, "add", "-A")
+    git(path, "-c", "user.name=fixture", "-c", "user.email=f@ao.invalid",
+        "-c", "commit.gpgsign=false", "commit", "-q", "-m", "base")
+    base = head_of(path)
+    git(path, "remote", "add", "origin", str(path))
+    git(path, "update-ref", "refs/remotes/origin/master", base)
+    git(path, "checkout", "-q", "-b", "fixture-head")
+    write(path / "fixture-change.txt", "a change that lands\n")
+    git(path, "add", "-A")
+    git(path, "-c", "user.name=fixture", "-c", "user.email=f@ao.invalid",
+        "-c", "commit.gpgsign=false", "commit", "-q", "-m", "the head that is judged")
+    head = head_of(path)
+    git(path, "checkout", "-q", "master")
+    view = json.dumps({
+        "title": "fix(gate): a fixture title",
+        "body": "What changed.\n\nRefs kushin77/agent-orchestrator#1382\n",
+        "baseRefName": "master",
+        "headRefName": "fixture-head",
+        "headRefOid": head,
+        "state": state,
+        "mergeCommit": {"oid": "1" * 40},
+    })
+    return path, view, "1" * 40, head, head_green, merge_rc
+
+
+def run_landing(path, view, head_green, merge_rc):
+    log = path / "stub.log"
+    log.write_text("", encoding="utf-8")
+    merge_log = path / "merge.log"
+    merge_log.write_text("", encoding="utf-8")
+    rc, out = run(["bash", "scripts/merge-pr.sh", "--pr", "1382"], path, {
+        "PATH": "%s:%s" % (path / "bin", os.environ.get("PATH", "")),
+        "AO_CGS_STUB_LOG": str(log),
+        "AO_CGS_STUB_SHOW_RC": "0" if head_green else "1",
+        "AO_CGS_GH_VIEW_JSON": view,
+        "AO_CGS_GH_MERGE_LOG": str(merge_log),
+        "AO_CGS_GH_MERGE_RC": str(merge_rc),
+        "AO_MERGE_APPLY": "1",
+        "AO_QUEUE_VERIFY_MERGED": "1",
+        "AO_QUEUE_VERIFY_CMD": "exit 0",
+    })
+    return rc, out, [x for x in log.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+
+def landing_arms():
+    path, view, landed, head, green, mrc = landing_venue("landed")
+    rc, out, rec = run_landing(path, view, green, mrc)
+    arm("a landed merge posts exactly one status, rc 0, for the commit that LANDED",
+        rc == 0 and len(posts(rec)) == 1 and landed in posts(rec)[0] and "--rc 0" in posts(rec)[0]
+        and any(head in x for x in shows(rec)), "rc=%s posts=%r" % (rc, posts(rec)))
+
+    path, view, landed, head, green, mrc = landing_venue("ungated")
+    rc, out, rec = run_landing(path, view, False, mrc)
+    arm("an UNGATED PR stays BLOCKED: no green is published for the landed commit",
+        rc == 0 and not posts(rec) and any(head in x for x in shows(rec))
+        and any("not observed green on the PR head" in x for x in notes(out)),
+        "rc=%s posts=%r" % (rc, posts(rec)))
+
+    path, view, landed, head, green, mrc = landing_venue("nothing-landed", state="OPEN", merge_rc=1)
+    rc, out, rec = run_landing(path, view, green, 1)
+    arm("a merge that did NOT land publishes nothing",
+        rc == 1 and not posts(rec) and any("nothing landed to publish for" in x for x in notes(out)),
+        "rc=%s posts=%r" % (rc, posts(rec)))
+
+    path, view, landed, head, green, mrc = landing_venue("mutant-ungated")
+    mutate(path, "scripts/merge-pr.sh", '  if [ "$post_rc" -ne 0 ]; then\n', '  if false; then\n')
+    rc, out, rec = run_landing(path, view, False, mrc)
+    arm("MUTANT landed-green-gate-dropped IS CAUGHT (an ungated PR landing green)",
+        bool(posts(rec)) and any(landed in x for x in posts(rec)))
+
+
+verify_arms()
+landing_arms()
+failed = [label for label, ok in ARMS if not ok]
+if failed:
+    print("check-gate-status: FAIL — %d producer control(s) did not hold: %s"
+          % (len(failed), "; ".join(failed)), file=sys.stderr)
+    raise SystemExit(1)
+print("  OK  %d producer control(s) held, mutants included: the gate of record's "
+      "producers on the ordinary lane path and the landing seam can REFUSE" % len(ARMS))
+PY
+producer_rc=$?
+case "$producer_rc" in
+  0) ;;
+  2) echo "check-gate-status: CANNOT-ASSESS — the producers could not be provoked (see above), so whether they can refuse is not established" >&2
+     cannot_assess=1 ;;
+  *) echo "check-gate-status: FAIL — the gate of record's producers are defective or cannot refuse (see above)" >&2
+     fail=1 ;;
+esac
+
 if [ "$fail" -ne 0 ]; then
   echo "check-gate-status: NOT-OK — a REQUIRED context has no producer, or the mapping or the poster is defective" >&2
   exit 1
@@ -841,5 +1301,5 @@ if [ "$live_rc" -eq 2 ]; then
   echo "check-gate-status: CANNOT-ASSESS — mapping and poster are sound, but the LIVE status was NOT observed"
   exit 2
 fi
-echo "check-gate-status: OK — the mapping is exhaustive and provoked, the REQUIRED context has a producer where the verdict is made, and the poster builds without writing"
+echo "check-gate-status: OK — the mapping is exhaustive and provoked, the REQUIRED context has a producer where the verdict is made and on the ordinary lane path (scripts/verify.sh) and the landing seam (scripts/merge-pr.sh), those producers can REFUSE, and the poster builds without writing"
 exit 0
