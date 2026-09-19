@@ -681,6 +681,106 @@ PY
   done <<<"$out"
 }
 
+# resolve_issue_number — the issue this PR/lane closes, from the body's
+# Refs/Closes/Fixes/Resolves trailer or, failing that, an `issue-<n>` head
+# branch name. Empty when neither names one (nothing to check against).
+resolve_issue_number() { # <body-file> <head-branch>
+  local body="$1" head_branch="${2:-}" n
+  if [ -f "$body" ]; then
+    n="$(grep -oE '(Refs[^#]*#|Closes #|Fixes #|Resolves #)[0-9]+' "$body" 2>/dev/null \
+      | grep -oE '[0-9]+$' | head -1)"
+    [ -n "$n" ] && { printf '%s' "$n"; return 0; }
+  fi
+  n="$(printf '%s' "$head_branch" | grep -oE '(^|[^0-9])issue-[0-9]+' | grep -oE '[0-9]+$' | head -1)"
+  [ -n "$n" ] && printf '%s' "$n"
+}
+
+# check_duplicate_pr — the cheapest of the two 2026-09-18-wave controls
+# (governance/lessons ledger, class "duplicate-pr-for-issue"; PRs #1097 vs
+# #1115, #1131 vs #1106, and #1294's duplicate direct-merge all resolved the
+# same issue from two open PRs, so no PR mutually excluded the other and both
+# advanced in parallel until one won a race). Warn-only, same
+# AO_PR_CONTRACT_ENFORCE switch as the rest of the classification block.
+# Reads the open-PR list from AO_PR_CONTRACT_OPEN_PRS_JSON (a
+# `gh pr list --json number,headRefName,body` capture) when set — this is what
+# --self-test uses — else shells out to `gh` live; with neither reachable it
+# is silently CANNOT-ASSESS for this one finding (not a gate-wide refusal: the
+# PR-body checks around it still run).
+check_duplicate_pr() { # <body-file> <head-branch> <self-pr-number>
+  local body="$1" head_branch="${2:-}" self_num="${3:-}" issue list_json out other
+  issue="$(resolve_issue_number "$body" "$head_branch")"
+  [ -n "$issue" ] || return 0
+  list_json="${AO_PR_CONTRACT_OPEN_PRS_JSON:-}"
+  if [ -n "$list_json" ]; then
+    [ -f "$list_json" ] || return 0
+    out="$(cat "$list_json" 2>/dev/null)"
+  elif command -v gh >/dev/null 2>&1; then
+    out="$( (cd "$repo" && gh pr list --state open --json number,headRefName,body) 2>/dev/null)"
+  else
+    return 0
+  fi
+  [ -n "$out" ] || return 0
+  other="$(AO_ISSUE="$issue" AO_SELF="$self_num" AO_PR_LIST_JSON="$out" python3 - 2>/dev/null <<'PY'
+import json, os, re
+issue = os.environ["AO_ISSUE"]
+self_num = os.environ.get("AO_SELF", "")
+try:
+    data = json.loads(os.environ.get("AO_PR_LIST_JSON") or "[]")
+except Exception:
+    data = []
+pat_body = re.compile(r"(?im)(?:Refs\s+\S*#|Closes\s+#|Fixes\s+#|Resolves\s+#)" + re.escape(issue) + r"\b")
+pat_branch = re.compile(r"(?:^|[^0-9])issue-" + re.escape(issue) + r"(?:[^0-9]|$)")
+for pr in data:
+    num = str(pr.get("number", ""))
+    if num and num == self_num:
+        continue
+    if pat_body.search(pr.get("body") or "") or pat_branch.search(pr.get("headRefName") or ""):
+        print(num)
+        break
+PY
+)"
+  [ -n "$other" ] && class_findings+=("duplicate-pr-for-issue:${issue} (also open PR #${other})")
+}
+
+# check_semantic_merge_review — the second cheapest control: a merge commit in
+# the PR's own range that resolved conflicts across >200 changed lines
+# (`git log --merges` + `git show --shortstat`) must be accompanied by a `##
+# Review` section in the PR body naming the reviewer's verdict (ledger class
+# "review-required-for-semantic-merge"; PRs #1120/#1111 — a semantic-merge
+# rebase that a reviewer pass caught at MEDIUM, with no PR-body obligation
+# forcing that pass to happen). Warn-only, same enforcement switch.
+check_semantic_merge_review() { # <body-file> <range>
+  local body="$1" range="$2" merges m ins del tot biggest=0 biggest_sha=""
+  merges="$(git -C "$repo" log --merges --format=%H "$range" 2>/dev/null)"
+  [ -n "$merges" ] || return 0
+  for m in $merges; do
+    tot=0
+    while read -r n; do
+      [ -n "$n" ] && tot=$((tot + n))
+    done < <(git -C "$repo" show --shortstat --format= "$m" 2>/dev/null | grep -oE '[0-9]+')
+    if [ "$tot" -gt "$biggest" ]; then
+      biggest="$tot"
+      biggest_sha="$m"
+    fi
+  done
+  [ "$biggest" -gt 200 ] || return 0
+  if [ ! -f "$body" ] || ! grep -qiE '^##+[ \t]*Review[ \t]*$' "$body"; then
+    class_findings+=("review-required-for-semantic-merge:${biggest_sha} (${biggest} changed lines, no ## Review section)")
+    return 0
+  fi
+  # a `## Review` heading with nothing under it before the next heading is the
+  # same defect as `pr-classification-missing` above — a title with no verdict.
+  if ! awk '
+    BEGIN{insec=0; nonblank=0}
+    /^##+[ \t]*Review[ \t]*$/{insec=1; next}
+    /^##+[ \t]/{if(insec) exit; next}
+    insec && $0 ~ /[^[:space:]]/ {nonblank=1}
+    END{exit nonblank?0:1}
+  ' "$body" >/dev/null 2>&1; then
+    class_findings+=("review-required-for-semantic-merge:${biggest_sha} (## Review section is empty, no verdict named)")
+  fi
+}
+
 report() { # [label]
   local label="${1:-check-pr-contract}"
   local f
@@ -699,6 +799,8 @@ run_checks() { # <body-file> <range> [<head-branch>] [<surfaces-yaml>]
   local dr
   dr="$(diff_range_for "$2" 2>/dev/null || true)"
   check_classification "$1" "$dr" "${3:-}" "${4:-}"
+  check_duplicate_pr "$1" "${3:-}" "${PR_NUMBER:-}"
+  check_semantic_merge_review "$1" "$2"
 
   local enforce="${AO_PR_CONTRACT_ENFORCE:-0}" cf level
   if [ "${#class_findings[@]}" -gt 0 ]; then
@@ -1577,6 +1679,95 @@ YAML
     printf '  OK    a class at the surface'"'"'s own rung is accepted\n'
   else
     printf '  FAIL  a correctly-classed touch was refused\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # --- duplicate-pr-for-issue (2026-09-18 wave: #1097 vs #1115, #1131 vs
+  # #1106 — two OPEN PRs resolving the same issue, neither excluding the
+  # other). Warn-only, same AO_PR_CONTRACT_ENFORCE switch; fed a fixture
+  # open-PR list so the self-test needs no network / real `gh`.
+  dup_json="$work/open-prs.json"
+  cat >"$dup_json" <<'JSON'
+[{"number": 9999, "headRefName": "issue-1328", "body": "Closes #1328"}]
+JSON
+  PR_NUMBER="1328"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 AO_PR_CONTRACT_OPEN_PRS_JSON="$dup_json" run_checks "$class_good" "$base..$a_sha" "issue-1328" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"duplicate-pr-for-issue:1328"* ]]; then
+    printf '  OK    a second open PR for the same issue is refused by name\n'
+  else
+    printf '  FAIL  a duplicate PR for one issue was not detected\n%s\n' "$out" >&2
+    ok=1
+  fi
+  # negative control: the open-PR list names a different issue — no finding.
+  cat >"$dup_json" <<'JSON'
+[{"number": 9999, "headRefName": "issue-4242", "body": "Closes #4242"}]
+JSON
+  out="$(AO_PR_CONTRACT_ENFORCE=1 AO_PR_CONTRACT_OPEN_PRS_JSON="$dup_json" run_checks "$class_good" "$base..$a_sha" "issue-1328" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" != *"duplicate-pr-for-issue"* ]]; then
+    printf '  OK    a real tree with no duplicate PR is not flagged (negative control)\n'
+  else
+    printf '  FAIL  a false positive: no duplicate exists but one was reported\n%s\n' "$out" >&2
+    ok=1
+  fi
+  PR_NUMBER=""
+
+  # --- review-required-for-semantic-merge (2026-09-18 wave: #1120/#1111 — a
+  # semantic-merge rebase whose reviewer pass caught a MEDIUM, with no PR-body
+  # obligation forcing that pass). Build a real merge commit with >200 changed
+  # lines in the scratch repo and require a non-empty `## Review` section.
+  git -C "$scratch" checkout -q -B side-big "$base" >/dev/null 2>&1
+  seq 1 300 >"$scratch/big.txt"
+  git -C "$scratch" add big.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -qm "$(printf 'side: add a 300-line file\n\nRefs kushin77/agent-orchestrator#1328')" >/dev/null 2>&1
+  side_sha="$(git -C "$scratch" rev-parse HEAD)"
+  git -C "$scratch" checkout -q -B main-big "$base" >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false merge -q --no-ff -m "merge: bring in the 300-line file" "$side_sha" >/dev/null 2>&1
+  merge_sha="$(git -C "$scratch" rev-parse HEAD)"
+
+  no_review="$work/no-review.md"
+  class_good_body >"$no_review"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$no_review" "$base..$merge_sha" "issue-1328" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"review-required-for-semantic-merge:${merge_sha}"* ]]; then
+    printf '  OK    a >200-line semantic merge with no ## Review section is refused\n'
+  else
+    printf '  FAIL  a semantic merge with no review section was accepted\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  empty_review="$work/empty-review.md"
+  { class_good_body; printf '\n## Review\n\n'; } >"$empty_review"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$empty_review" "$base..$merge_sha" "issue-1328" 2>&1)"
+  if [ $? -ne 0 ] && [[ "$out" == *"review-required-for-semantic-merge:${merge_sha}"* ]]; then
+    printf '  OK    an empty ## Review section (a heading with no verdict) is refused\n'
+  else
+    printf '  FAIL  an empty review section was accepted as a verdict\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  with_review="$work/with-review.md"
+  { class_good_body; printf '\n## Review\n\nApproved — reviewer: gate, verdict: LGTM (found one MEDIUM, fixed).\n'; } >"$with_review"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$with_review" "$base..$merge_sha" "issue-1328" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" != *"review-required-for-semantic-merge"* ]]; then
+    printf '  OK    a semantic merge with a filled ## Review section is accepted (negative control)\n'
+  else
+    printf '  FAIL  a real reviewed semantic merge was refused\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # non-vacuity: a small (<=200 line) merge, no Review section, is not flagged.
+  git -C "$scratch" checkout -q -B side-small "$base" >/dev/null 2>&1
+  printf 'tiny\n' >"$scratch/tiny.txt"
+  git -C "$scratch" add tiny.txt >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false commit -qm "$(printf 'side: tiny file\n\nRefs kushin77/agent-orchestrator#1328')" >/dev/null 2>&1
+  small_side_sha="$(git -C "$scratch" rev-parse HEAD)"
+  git -C "$scratch" checkout -q -B main-small "$base" >/dev/null 2>&1
+  git -C "$scratch" -c commit.gpgsign=false merge -q --no-ff -m "merge: bring in the tiny file" "$small_side_sha" >/dev/null 2>&1
+  small_merge_sha="$(git -C "$scratch" rev-parse HEAD)"
+  out="$(AO_PR_CONTRACT_ENFORCE=1 run_checks "$no_review" "$base..$small_merge_sha" "issue-1328" 2>&1)"
+  if [ $? -eq 0 ] && [[ "$out" != *"review-required-for-semantic-merge"* ]]; then
+    printf '  OK    a small merge under the 200-line threshold is not flagged\n'
+  else
+    printf '  FAIL  a small merge tripped the semantic-merge-review control\n%s\n' "$out" >&2
     ok=1
   fi
 
