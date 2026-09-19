@@ -1,5 +1,5 @@
 {
-  "doc": "Fleet cron as code (#241, parent #160). fleet/cron.py RENDERS the multi-job crontab from this file — never hand-edit the installed crontab lines; `fleet/cron.py install` / `reconcile` is the single writer. The pattern is harvested from kushin77/leaderboard config/fleet-jobs.json (see docs/CANNIBALIZATION.md §12 and docs/MECHANICAL-EXECUTION-LAYER.md §6 — REFERENCE, read for shape only; no source copied).",
+  "doc": "Fleet cron as code (#241, parent #160). fleet/cron.py RENDERS the multi-job crontab from this file \u2014 never hand-edit the installed crontab lines; `fleet/cron.py install` / `reconcile` is the single writer. The pattern is harvested from kushin77/leaderboard config/fleet-jobs.json (see docs/CANNIBALIZATION.md \u00a712 and docs/MECHANICAL-EXECUTION-LAYER.md \u00a76 \u2014 REFERENCE, read for shape only; no source copied).",
   "schema": "fleet-jobs-v1",
   "issue": 241,
   "parent": 160,
@@ -75,6 +75,21 @@
       "log": "scan-pr-failures.log",
       "singleton": true,
       "enabled": false
+    },
+    {
+      "name": "runner",
+      "marker": "ao-fleet-runner",
+      "schedule": "*/3 * * * *",
+      "command": "/usr/bin/python3 fleet/runner/cli.py run --once --apply",
+      "user": "",
+      "log": "runner.log",
+      "singleton": true,
+      "enabled": false,
+      "enabled_when": {
+        "env": "AO_RUNNER_HOST_ROLE",
+        "equals": "primary"
+      },
+      "doc": "issue #1343: the shared-services PR runner (docs/PR-RUNNER.md). Role-gated, not flag-gated: installed only where the env contract says AO_RUNNER_HOST_ROLE=primary (the shared-services pair); declared and reconciled everywhere."
     }
   ]
 }

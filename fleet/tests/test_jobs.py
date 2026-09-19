@@ -127,13 +127,34 @@ def test_the_real_manifest_validates_and_gates_the_snapshot_job_off():
         "snapshot-refresh",
         "promote-portal",
         "scan-pr-failures",
+        "runner",
     ]
     assert [job["marker"] for job in disabled] == [
         cron.SNAPSHOT_REFRESH_MARKER,
         cron.PROMOTE_MARKER,
         cron.SCAN_PR_FAILURES_MARKER,
+        cron.RUNNER_MARKER,
     ]
     assert sorted(job["marker"] for job in enabled) == sorted(cron.MARKERS)
+
+
+def test_the_runner_rung_is_role_gated_through_the_env_contract_variable():
+    """Issue #1343: `runner` installs only where AO_RUNNER_HOST_ROLE=primary."""
+    manifest = cron.load_manifest()
+    off = cron.enabled_jobs(manifest, env={})
+    assert "runner" not in [job["name"] for job in off]
+    standby = cron.enabled_jobs(manifest, env={cron.RUNNER_ROLE_ENV: "standby"})
+    assert "runner" not in [job["name"] for job in standby]
+    on = cron.enabled_jobs(manifest, env={cron.RUNNER_ROLE_ENV: cron.RUNNER_ROLE_PRIMARY})
+    assert [job["name"] for job in on][-1] == "runner"
+    line = cron.render_lines(on)[-1]
+    assert line.endswith("# " + cron.RUNNER_MARKER)
+    assert f"env {cron.RUNNER_ROLE_ENV}={cron.RUNNER_ROLE_PRIMARY} /usr/bin/python3 fleet/runner/cli.py run --once --apply" in line
+    assert "flock -n -E 99" in line, "the runner is a singleton"
+    # A malformed condition enables nothing, and is refused by validate_manifest.
+    broken = dict(on[-1], enabled_when={"env": ""})
+    assert not cron.job_enabled(broken, env={cron.RUNNER_ROLE_ENV: cron.RUNNER_ROLE_PRIMARY})
+    assert any("malformed enabled_when" in p for p in cron.validate_manifest({"jobs": [broken]}))
 
 
 def test_validate_manifest_refuses_missing_fields_by_name():

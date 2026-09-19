@@ -1,0 +1,24 @@
+{
+  "doc": "lesson 5b: a host-env red must not block a merge Cloud Build proved \u2014 sources are ranked, both recorded",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 12,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 12,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "local-marker",
+      "state": "red"
+    },
+    {
+      "pr": 12,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "cloud-build",
+      "state": "green"
+    }
+  ]
+}

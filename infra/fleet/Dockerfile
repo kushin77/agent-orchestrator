@@ -77,6 +77,30 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends gh; \
     rm -rf /var/lib/apt/lists/*
 
+# --- docker-ce-cli: the Docker CLI, from Docker's own apt repository --------
+#
+# The promote-portal rung's `--apply` path (issue #1329/#1341, the
+# `agent-cron-rw` service) talks to the HOST's Docker daemon over
+# `/var/run/docker.sock` to pull and recreate the `shared-services-agentconsole`
+# container. `docker-ce-cli` — CLIENT ONLY, no `dockerd` — is the smallest
+# package that gives that binary; it depends on no daemon package, unlike the
+# distro's own `docker.io`, which pulls containerd/runc as if this image ran
+# its own engine. The image already adds one third-party apt repo for the same
+# reason (`gh`, above), so this follows the same reproducible pattern rather
+# than inventing a second one.
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    install -m 0755 -d /etc/apt/keyrings; \
+    curl -fsSL https://download.docker.com/linux/debian/gpg \
+        -o /etc/apt/keyrings/docker.asc; \
+    chmod a+r /etc/apt/keyrings/docker.asc; \
+    codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"; \
+    printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian %s stable\n' "$arch" "$codename" \
+        > /etc/apt/sources.list.d/docker.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends docker-ce-cli; \
+    rm -rf /var/lib/apt/lists/*
+
 # --- claude: the pinned native release, checksum-verified -------------------
 #
 # The CLI is a self-contained linux-x64 binary published per version with a

@@ -140,19 +140,44 @@ probe(
     "enabled=%s MARKERS=%s" % (enabled_markers, sorted(cron.MARKERS)),
 )
 disabled = [j for j in jobs if j.get("enabled") is not True]
+# `runner` (issue #1343) is ROLE-gated, not flag-gated: `enabled: false` plus an
+# `enabled_when` env condition, so it is in the disabled set here (no role in
+# the gate's environment) and installed only on the shared-services primary.
 probe(
     "SHIP-GATED-OFF-SET",
     [j.get("name") for j in disabled]
-    == ["snapshot-refresh", "promote-portal", "scan-pr-failures"]
+    == ["snapshot-refresh", "promote-portal", "scan-pr-failures", "runner"]
     and [j.get("marker") for j in disabled]
-    == [cron.SNAPSHOT_REFRESH_MARKER, cron.PROMOTE_MARKER, cron.SCAN_PR_FAILURES_MARKER],
+    == [
+        cron.SNAPSHOT_REFRESH_MARKER,
+        cron.PROMOTE_MARKER,
+        cron.SCAN_PR_FAILURES_MARKER,
+        cron.RUNNER_MARKER,
+    ],
     "disabled=%s" % [j.get("name") for j in disabled],
 )
 probe(
     "DECLARED-MARKERS-COMPLETE",
     cron.declared_markers(manifest)
     == cron.MARKERS
-    + (cron.SNAPSHOT_REFRESH_MARKER, cron.PROMOTE_MARKER, cron.SCAN_PR_FAILURES_MARKER),
+    + (
+        cron.SNAPSHOT_REFRESH_MARKER,
+        cron.PROMOTE_MARKER,
+        cron.SCAN_PR_FAILURES_MARKER,
+        cron.RUNNER_MARKER,
+    ),
+)
+# The role-gated rung is reachable ONLY through the env contract's variable:
+# with the role set the SAME renderer emits its line (carrying the role
+# inline); without it, nothing is rendered for it.
+runner_on = cron.render_lines(cron.enabled_jobs(manifest, env={cron.RUNNER_ROLE_ENV: cron.RUNNER_ROLE_PRIMARY}))
+runner_off = cron.render_lines(cron.enabled_jobs(manifest, env={cron.RUNNER_ROLE_ENV: "standby"}))
+probe(
+    "RUNNER-REACHABLE-ONLY-ON-PRIMARY",
+    len(runner_on) == len(enabled) + 1
+    and any(entry.endswith("# " + cron.RUNNER_MARKER) and "env %s=%s " % (cron.RUNNER_ROLE_ENV, cron.RUNNER_ROLE_PRIMARY) in entry for entry in runner_on)
+    and len(runner_off) == len(enabled),
+    "%d line(s) with the role primary, %d with standby" % (len(runner_on), len(runner_off)),
 )
 # Reachability, proved BOTH ways (issue #1207). A disabled job is only "wired"
 # if the declaration — not a code path — is what would install it: with the

@@ -81,7 +81,8 @@ superseded. If a doc in this repo contradicts this file, this file wins.
 10. **Autonomous merge (owner mandate 2026-09-07).** In this fleet an agent
     merges its own PRs autonomously **only after** green verification evidence
     (GR-12). Never merge failing work. Verification replaces the human
-    reviewer.
+    reviewer. The runner merges; sessions open PRs (`fleet/runner/`,
+    docs/PR-RUNNER.md, issue #1343).
 11. **Local-code-first (GR-17).** Debug against this checkout first; prefer
     this repo's own code/docs over guessing.
 12. **No-questions (GR-22).** Apply the documented default; escalate only when
