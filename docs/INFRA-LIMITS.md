@@ -70,8 +70,9 @@ it is a failed write wearing a filename.
 ## Thresholds and the guard
 
 `bash scripts/check-infra-limits.sh` enforces the contract against the scratch
-filesystem. Four guards, each able to fail by name, plus four provoked controls
-(three refusals and one positive) that prove each guard can actually fail.
+filesystem. Four guards, each able to fail by name, plus seven provoked controls
+(five refusals, one transient-scan recovery and one positive) that prove each
+guard can actually fail.
 
 | Knob | Default | Meaning |
 |---|---|---|
@@ -79,6 +80,8 @@ filesystem. Four guards, each able to fail by name, plus four provoked controls
 | `AO_INFRA_MIN_FREE_MB` | `2048` | free space the scratch filesystem must keep, in MiB |
 | `AO_INFRA_MIN_FREE_PCT` | `10` | free space floor as a percentage, i.e. at most 90 % used |
 | `AO_INFRA_MAX_SCRATCH_MB` | `4096` | ceiling for a *single* scratch file — the orphan-hog guard |
+| `AO_INFRA_SCAN_ATTEMPTS` | `3` | attempts a scratch scan gets before it is called a failure |
+| `AO_INFRA_SCAN_BACKOFF_MS` | `200` | delay between those attempts, in milliseconds |
 
 Exit-code contract: `0` OK / `1` NOT-OK / `2` CANNOT-ASSESS (a missing scratch
 dir, a malformed knob, or no `df`/`find` to measure with).
@@ -102,6 +105,42 @@ ceiling provokes the orphan-hog refusal, and a floor one MiB above what the
 filesystem actually has provokes the free-space refusal. Provoking a failure must
 be cheap on a machine four lanes share — and a real file over a real ceiling is
 the same failure either way.
+
+### A transient scan failure is suppressed, then retried (issue #1392)
+
+`find` exits `1` on **any** error, and one of them is routine here: a top-level
+`/tmp` entry that vanishes between `readdir` and `stat`, which is exactly what
+four lanes churning scratch directories produce. Measured 2026-09-19: **225 of
+300** `find /tmp -maxdepth 1` scans returned `rc=1` while a neighbour churned
+files at the top level, and **0 of 300** against an unchurned target — one scan
+is a ~59 ms window over ~21,000 entries. The guard used to discard the reason
+(`2>/dev/null`) and fail closed on any non-zero rc, so the race redded the whole
+composite for **every** lane, with nothing in the output saying why.
+
+Three things fix it, each measured rather than assumed. `find`'s own
+`-ignore_readdir_race` is the first: it takes the rate from **225/300 to
+13/300** — a real improvement, but **not sufficient alone**, because a residual
+transient class survives it. It also does not hide a real failure: a target that
+genuinely cannot be read still returns `1` with its own message (measured: an
+absent target, an unreadable directory, and a path under a regular file all
+return `1`, flag or no flag). Second, the scan keeps its stderr. Third, a
+non-zero scan is retried up to `AO_INFRA_SCAN_ATTEMPTS` times with
+`AO_INFRA_SCAN_BACKOFF_MS` between attempts, and is called a failure only when
+**every** attempt failed — which retires the residual class while leaving the
+fail-closed property intact. When it does fail, it names what the tool said:
+
+```
+  FAIL  orphan-hog: cannot scan /tmp (find rc=1: find: '/tmp/x': No such file or directory)
+```
+
+A directory that genuinely cannot be scanned fails every attempt, so the
+fail-closed property is intact. Two controls prove both directions: a target that
+genuinely cannot be scanned still fails by name (C5), and a transient failure a
+retry recovers does not red the gate (C6). Both are **uid-independent** on
+purpose — `chmod 0` is invisible to uid 0, so it provokes nothing in the Cloud
+Build (root) venue, the trap measured in #1381 / #1383. The free-space guard
+carried the same defect class and gets the same treatment, with C7 proving its
+refusal.
 
 ### The write rule on its own
 
