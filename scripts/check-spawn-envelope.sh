@@ -30,8 +30,15 @@
 #   5. `fleet/watchdog.py::run_in_flight()` decides on the RUN MARKER'S OWN
 #      evidence: a leftover marker of a crashed run (loop pid alive, no child, a
 #      stale beat) must NOT hold the lock, a live child must, and a heartbeat
-#      saying `idle` beside a live child is REPORTED rather than silently losing.
-#   6. The one-gate-per-worktree bound is provoked with a REAL second gate: the
+#      saying `idle` beside a live child is REPORTED rather than silently losing.#   * The runtime-beat producer (#1412) posts a beat BEFORE the loop refuses or
+#     spawns, and `beats.ROOT` is a module constant pointing at this repository:
+#     both the suite below and the live-proof spike drive `terminal.run_once` for
+#     real, so un-redirected they would leave a beat here — where
+#     `scripts/check-runtime-liveness.sh` reads it and reports every OTHER
+#     registered runtime `runtime-stale`, making the composite's verdict depend on
+#     which check ran first (#1459). Both are pointed at a tree THIS check owns,
+#     the repository's own beats are snapshotted before and after, and the beat
+#     must be present in that tree — so the spawn path is still driven for real.#   6. The one-gate-per-worktree bound is provoked with a REAL second gate: the
 #      envelope names the worktree, and a second `scripts/gate-lock.sh acquire` in
 #      that same worktree must be REFUSED (rc 10) naming the holder.
 #
@@ -77,7 +84,39 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
+# One global scratch and one EXIT trap (SP-1): `work` is created in section 4,
+# the beat tree here, and nothing below can be reached without both being cleaned.
+beats_tree="/tmp/spawn-envelope-beats.$$.$(date +%s)"
+work=""
+cleanup() {
+  rm -rf "$beats_tree" || true
+  [ -n "$work" ] && rm -rf "$work" || true
+}
+trap cleanup EXIT
+
 fail=0
+
+beats_files() { # beats_files <tree> — each beat file with the size+mtime a rewrite would move
+  if [ -d "$1/.fleet/runtime-beats" ]; then
+    find "$1/.fleet/runtime-beats" -maxdepth 1 -type f -name '*.json' -printf '%f %s %T@\n' 2>/dev/null | sort
+  fi
+}
+
+# The tree this check's producers own: the registry travels with it, so the beat
+# the spawn path posts is really written — checked before it is reached for, and
+# never into the repository the judge reads.
+if ! mkdir -p "$beats_tree/fleet" "$beats_tree/.fleet/runtime-beats" 2>/dev/null; then
+  echo "check-spawn-envelope: CANNOT-ASSESS — cannot create $beats_tree" >&2
+  exit 2
+fi
+if [ -f fleet/runtimes.yaml ]; then
+  cp -a fleet/runtimes.yaml "$beats_tree/fleet/runtimes.yaml" || exit 2
+fi
+
+# The repository's own beats BEFORE anything below runs: compared again before the
+# verdict, so a leaked beat is a NAMED failure here instead of an order-dependent
+# `runtime-stale` in another check (#1459).
+repo_beats_before="$(beats_files "$root")"
 
 # --- 1. the contract is declared institutionally ---------------------------
 # The rule lives in the execution plan (the lane-ownership document), in the gate
@@ -139,7 +178,28 @@ else
   fail=$((fail + 1))
 fi
 
-if ! env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/spawn/tests >/dev/null 2>&1; then
+# The suite drives the REAL loop (`terminal.run_once`), which posts a runtime beat
+# (#1412) BEFORE it refuses or spawns. `beats.ROOT` is a module constant pointing
+# at this repository, so an un-redirected run leaves a beat the liveness judge
+# reads (#1459): the producer is pointed at this check's own tree here, exactly as
+# `fleet/tests/conftest.py` points it for every test. The suite is still run for
+# real — same tests, same assertions, one patched module constant.
+if ! env PYTHONDONTWRITEBYTECODE=1 python3 - "$root" "$beats_tree" <<'PY' >/dev/null 2>&1
+import sys
+from pathlib import Path
+
+code_root, beats_tree = (Path(arg).resolve() for arg in sys.argv[1:3])
+sys.path.insert(0, str(code_root / "fleet"))
+try:
+    import beats
+    beats.ROOT = beats_tree
+except ImportError:  # the producer (#1412) is not in this tree: nothing to redirect
+    pass
+import pytest
+
+raise SystemExit(pytest.main(["-p", "no:cacheprovider", "-q", "governance/spawn/tests"]))
+PY
+then
   echo "  FAIL  governance/spawn/tests does not pass (it carries the fleet-path equality proof)" >&2
   fail=$((fail + 1))
 else
@@ -152,9 +212,8 @@ if ! mkdir -p "$work" 2>/dev/null; then
   echo "check-spawn-envelope: CANNOT-ASSESS — cannot create a scratch directory" >&2
   exit 2
 fi
-trap 'rm -rf "$work"' EXIT
 
-if python3 - "$root" "$work" <<'PY'
+if python3 - "$root" "$work" "$beats_tree" <<'PY'
 """Live proofs for the spawn envelope (issue #793).
 
 Everything here drives the REAL entrypoints — `governance/spawn/cli.py` and
@@ -173,10 +232,23 @@ sys.dont_write_bytecode = True
 
 repo = Path(sys.argv[1]).resolve()
 work = Path(sys.argv[2]).resolve()
+beats_tree = Path(sys.argv[3]).resolve()
 
 sys.path.insert(0, str(repo))
 sys.path.insert(0, str(repo / "fleet"))
 sys.path.insert(0, str(repo / "governance" / "dispatch"))
+
+# The spawn path driven below posts a runtime beat (#1412) BEFORE it refuses or
+# spawns, and `beats.ROOT` is a module constant pointing at the repository `repo`
+# names: un-redirected, these probes leave a beat there and
+# `scripts/check-runtime-liveness.sh` then reports every other registered runtime
+# `runtime-stale` (#1459). Point it at this check's own tree — same redirection
+# `fleet/tests/conftest.py` gives every test.
+try:
+    import beats
+    beats.ROOT = beats_tree
+except ImportError:  # the producer (#1412) is not in this tree
+    pass
 
 from governance.spawn import model, render  # noqa: E402
 
@@ -571,6 +643,31 @@ PY
 then
   :
 else
+  fail=$((fail + 1))
+fi
+
+# --- 4b. the beat the spawn path posts lands in THIS CHECK's tree -------------
+#
+# The redirect is only honest if the producer still RUNS: a probe that skipped the
+# spawn path would leak nothing and prove nothing. So the beat must BE in the tree
+# this check owns — and the repository's own beats must be exactly what they were.
+producer_beats="$(beats_files "$beats_tree")"
+if [ -f fleet/beats.py ]; then
+  if printf '%s\n' "$producer_beats" | grep -q '^deepseek-executor\.json '; then
+    echo "  OK    [beats] the spawn path's runtime beat (#1412) landed in this check's own tree"
+  else
+    echo "  FAIL  [beats] the spawn path left no beat in $beats_tree/.fleet/runtime-beats/ — the redirect is not reaching the producer" >&2
+    fail=$((fail + 1))
+  fi
+else
+  echo "  OK    [beats] #1412's producer is not in this tree, so nothing here can post a beat"
+fi
+
+repo_beats_after="$(beats_files "$root")"
+if [ "$repo_beats_before" = "$repo_beats_after" ]; then
+  echo "  OK    [beats] this check left no runtime beat in the repository"
+else
+  echo "  FAIL  [beats] this check posted a runtime beat into $root/.fleet/runtime-beats/ (before=[$(printf '%s' "$repo_beats_before" | tr '\n' ' ')] after=[$(printf '%s' "$repo_beats_after" | tr '\n' ' ')]) — a stray beat engages scripts/check-runtime-liveness.sh, which then reports every OTHER registered runtime runtime-stale, so the composite's verdict depends on which check ran first (#1459)" >&2
   fail=$((fail + 1))
 fi
 
