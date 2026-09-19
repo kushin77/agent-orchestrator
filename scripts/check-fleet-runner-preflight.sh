@@ -440,7 +440,13 @@ fi
 # must be present, in the tree this check owns.
 producer_beats="$(beats_files "$beats_tree")"
 if [ -f fleet/beats.py ]; then
-  if printf '%s\n' "$producer_beats" | grep -q '^deepseek-executor\.json '; then
+  producer_beat_found=0
+  while IFS= read -r beat_line; do
+    case "$beat_line" in
+      'deepseek-executor.json '*) producer_beat_found=1; break ;;
+    esac
+  done <<<"$producer_beats"
+  if [ "$producer_beat_found" -eq 1 ]; then
     echo "  OK    [beats] the spawn path posted its runtime beat (#1412) into this check's own tree"
   else
     note_fail "[beats] the spawn path's runtime beat is not in $beats_tree/.fleet/runtime-beats/ — the redirect is not reaching the producer"

@@ -95,7 +95,7 @@ printf '{"commit":"%s","runtime":"%s","state":"running","ts":%s}\n' \
   "$probe_id" "$(date +%s)" > "$probe_file" || exit 2
 provoked_out="$(judge_at "$root" 2>&1)"
 provoked_rc=$?
-if [ "$provoked_rc" -eq 1 ] && printf '%s\n' "$provoked_out" | grep -qF "runtime-unregistered:$probe_id"; then
+if [ "$provoked_rc" -eq 1 ] && [[ "$provoked_out" == *"runtime-unregistered:$probe_id"* ]]; then
   echo "  OK    the leak control bites: a beat this tree did not earn reds the judge, BY NAME"
 else
   echo "  FAIL  the leak control did not bite: a stray beat in $probe_dir answered rc=$provoked_rc without naming runtime-unregistered:$probe_id" >&2
@@ -110,7 +110,7 @@ if [ -e "$probe_file" ]; then
 fi
 back_out="$(judge_at "$root" 2>&1)"
 back_rc=$?
-if printf '%s\n' "$back_out" | grep -qF "$probe_id"; then
+if [[ "$back_out" == *"$probe_id"* ]]; then
   echo "  FAIL  the judge still reports the control's probe after its removal" >&2
   fail=$((fail + 1))
 else
@@ -136,7 +136,7 @@ printf '{"commit":"liveness-leak-control","runtime":"%s","state":"running","ts":
   "$first" "$(date +%s)" > "$scratch/.fleet/runtime-beats/$first.json" || exit 2
 scratch_out="$(judge_at "$scratch" 2>&1)"
 scratch_rc=$?
-if [ "$scratch_rc" -eq 1 ] && printf '%s\n' "$scratch_out" | grep -qF "runtime-stale:$second"; then
+if [ "$scratch_rc" -eq 1 ] && [[ "$scratch_out" == *"runtime-stale:$second"* ]]; then
   echo "  OK    one un-earned beat makes every runtime with no beat stale ($second) — the chain #1459 measured"
 else
   echo "  FAIL  the chain did not reproduce in a scratch tree: rc=$scratch_rc for $first beating and $second silent" >&2

@@ -653,7 +653,13 @@ fi
 # this check owns — and the repository's own beats must be exactly what they were.
 producer_beats="$(beats_files "$beats_tree")"
 if [ -f fleet/beats.py ]; then
-  if printf '%s\n' "$producer_beats" | grep -q '^deepseek-executor\.json '; then
+  producer_beat_found=0
+  while IFS= read -r beat_line; do
+    case "$beat_line" in
+      'deepseek-executor.json '*) producer_beat_found=1; break ;;
+    esac
+  done <<<"$producer_beats"
+  if [ "$producer_beat_found" -eq 1 ]; then
     echo "  OK    [beats] the spawn path's runtime beat (#1412) landed in this check's own tree"
   else
     echo "  FAIL  [beats] the spawn path left no beat in $beats_tree/.fleet/runtime-beats/ — the redirect is not reaching the producer" >&2
