@@ -36,6 +36,26 @@ import model as M  # noqa: E402
 import policy as P  # noqa: E402
 import schema as S  # noqa: E402
 
+# NOTE: this is a DIFFERENT staleness policy from
+# governance/dispatch/snapshot.py's DEFAULT_STALENESS_MINUTES (15m, from
+# governance/policy/lease.SNAPSHOT_STALENESS_MINUTES). That one bounds a
+# real-time dispatch CLAIM against the board; `.board/snapshot.json` is
+# refreshed explicitly and by hand, riding whatever other PR happens to touch
+# it (`git log -- .board/snapshot.json` shows real gaps over 48h and no
+# committed cadence). The `ao-fleet-snapshot-refresh` cron liveness rung
+# (fleet/cron.py, issue #1179) that WOULD auto-refresh it on a schedule is
+# declared but deliberately OFF by default
+# (infra/fleet/tests/test_healthz.py asserts it out of ENABLED_MARKERS), so
+# nothing today refreshes this file automatically. Gating the tag-conformance
+# projection at the dispatch path's 15m bar would make this check permanently
+# red rather than catching real drift; issue #1427 names its own threshold —
+# one week — instead of borrowing one built for a different cadence. Past
+# this many minutes with no refresh, `check-tagging.sh` goes red until
+# someone runs the one-line remedy `board --live` already prints:
+# `python3 governance/dispatch/cli.py snapshot --from-github` (then commit
+# the refreshed `.board/snapshot.json`).
+TAGGING_BOARD_STALENESS_MINUTES = 7 * 24 * 60  # 1 week
+
 TAXONOMY_REL = "governance/tagging/taxonomy.yaml"
 RULES_REL = "governance/tagging/rules.yaml"
 CONTROLS_REL = "governance/tagging/controls.yaml"
@@ -364,11 +384,27 @@ def cmd_board(args: argparse.Namespace) -> int:
         else:
             LV.render(projection)
         age = projection.get("snapshot_age_minutes")
-        if args.max_stale_minutes and age is not None and age > args.max_stale_minutes:
+        # `args.max_stale_minutes > 0` — NOT bare truthiness: a threshold of
+        # exactly 0.0 is falsy in Python, so the old `if args.max_stale_minutes
+        # and ...` silently disabled the check whenever the (also 0.0) default
+        # was in effect. Every default caller was drifting undetected; only a
+        # caller who explicitly passed a positive value ever got refused.
+        if (
+            args.max_stale_minutes > 0
+            and age is not None
+            and age > args.max_stale_minutes
+        ):
             print(
-                "tagging-live: FAIL — the snapshot is %.1fm old (limit %dm); the "
+                "tagging-live: FAIL — the snapshot is %.1fm old (limit %.0fm); the "
                 "projection describes a board that has moved"
                 % (age, args.max_stale_minutes)
+            )
+            return NOT_OK
+        if args.max_stale_minutes > 0 and age is None:
+            print(
+                "tagging-live: FAIL — the snapshot at %s has no readable "
+                "generated_at, so its age cannot be bounded by "
+                "--max-stale-minutes %.0f" % (projection.get("snapshot"), args.max_stale_minutes)
             )
             return NOT_OK
         return OK if not args.fail_on_refusal or projection.get("refusal_count", 0) == 0 else NOT_OK
@@ -667,7 +703,15 @@ def build_parser() -> argparse.ArgumentParser:
     board.add_argument("--strict", action="store_true")
     board.add_argument("--live", action="store_true", help="project the board's tag state")
     board.add_argument("--json", action="store_true")
-    board.add_argument("--max-stale-minutes", type=float, default=0.0)
+    # Default comes from the single upstream staleness control (issue #322 /
+    # #1427), the same one governance/dispatch/snapshot.py derives
+    # DEFAULT_STALENESS_MINUTES from — a drifting board is caught by DEFAULT,
+    # not only when a caller remembers to pass a threshold. 0 (or negative)
+    # explicitly opts out of the check, matching the sentinel every caller of
+    # this flag already read from --help.
+    board.add_argument(
+        "--max-stale-minutes", type=float, default=float(TAGGING_BOARD_STALENESS_MINUTES)
+    )
     board.add_argument("--fail-on-refusal", action="store_true")
     board.add_argument("--no-ledger", action="store_true")
 
