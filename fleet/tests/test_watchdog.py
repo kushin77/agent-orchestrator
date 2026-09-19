@@ -1261,3 +1261,56 @@ def test_self_reap_own_gate_lock_folds_an_exception_into_cannot_assess(monkeypat
     assert unassessable is True
     out = capsys.readouterr().out
     assert "CANNOT-ASSESS" in out and "store is unusable" in out
+
+
+# --- issue #1271: bounded restart action for a drifted deepseek-sister ------
+
+
+def test_restart_deepseek_sister_respawns_on_first_drift(monkeypatch):
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name: True)
+    outcome, ok = watchdog.restart_deepseek_sister_on_drift(
+        "old111", "new222", when=1000.0, checkout_root=watchdog.ROOT
+    )
+    assert ok is True
+    assert "respawned" in outcome
+    assert "attempt 1/" in outcome
+
+
+def test_restart_deepseek_sister_escalates_once_then_parks(monkeypatch):
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name: True)
+    cap = watchdog.respawn_attempt_cap()
+    when = 0.0
+    outcome, ok = "", True
+    # `cap` attempts each respawn (ok=True); the (cap+1)-th is the escalation.
+    for attempt in range(cap + 1):
+        # Each attempt reports the SAME unchanged observation, and each call is
+        # made past its own backoff so the attempt is not merely held.
+        when += watchdog.respawn_backoff_seconds(attempt + 1) + 1
+        outcome, ok = watchdog.restart_deepseek_sister_on_drift(
+            "old111", "new222", when=when, checkout_root=watchdog.ROOT
+        )
+    assert ok is False
+    assert "ESCALATED ONCE" in outcome
+
+    # The next call, same unchanged observation, is refused outright: PARKED.
+    when += 1
+    outcome, ok = watchdog.restart_deepseek_sister_on_drift(
+        "old111", "new222", when=when, checkout_root=watchdog.ROOT
+    )
+    assert ok is False
+    assert "PARKED" in outcome
+
+    # A second escalation is not written on top of the first (escalate-once).
+    escalations = list(watchdog.escalation_dir().glob(f"{watchdog.DEEPSEEK_SISTER_RUNG}.*.json"))
+    assert len(escalations) == 1
+
+
+def test_restart_deepseek_sister_resets_the_counter_when_the_beat_moves(monkeypatch):
+    monkeypatch.setattr(watchdog, "respawn", lambda pattern, script, name: True)
+    watchdog.restart_deepseek_sister_on_drift("old111", "new222", when=0.0, checkout_root=watchdog.ROOT)
+    # A later beat reporting a DIFFERENT running commit is progress: attempt 1 again.
+    outcome, ok = watchdog.restart_deepseek_sister_on_drift(
+        "moved333", "new222", when=10_000.0, checkout_root=watchdog.ROOT
+    )
+    assert ok is True
+    assert "attempt 1/" in outcome

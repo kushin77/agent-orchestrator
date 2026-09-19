@@ -1214,6 +1214,69 @@ def bounded_remedy(
     return outcome, ok
 
 
+# ── deepseek-sister: bounded restart on liveness drift (issue #1271) ────────
+#
+# `scripts/check-runtime-liveness.sh` (`fleet/liveness.py`) reds
+# `runtime-drift:deepseek-sister` when the sister's beat reports a commit that
+# trails `origin/master` by more than its budget with no directive in flight —
+# the doctrine gap #1271 was opened for ("`fleet status` reported the DeepSeek
+# sister paused ... for hours; nobody acted"). The remedy is the SAME bounded
+# shape #773/#1105/#830 already gives every other rung: `bounded_remedy` is
+# reused as-is (attempt cap, exponential backoff, escalate-once, park) rather
+# than re-implemented, so a trailing sister gets exactly one respawn per
+# attempt, escalates once after `respawn_attempt_cap()` attempts that changed
+# nothing, and then PARKS until a principal reruns
+# `python3 fleet/watchdog.py rearm --rung deepseek-sister`.
+#
+# The drift record is kept under its own name, `deepseek-sister`, distinct from
+# the local `sister` rung `RUNGS` already tracks: `RUNGS`'s drift compares the
+# running loop's commit against the CHECKOUT's HEAD (is the local process
+# stale relative to the tree it is running from); this compares the sister's
+# POSTED BEAT against `origin/master` (is the fleet-wide liveness view able to
+# see it moving at all) — two different questions that happen to share a
+# remedy.
+DEEPSEEK_SISTER_RUNG = "deepseek-sister"
+DEEPSEEK_SISTER_SCRIPT = "fleet/terminal.sh"
+DEEPSEEK_SISTER_PATTERN = "fleet/terminal.py"
+
+
+def restart_deepseek_sister_on_drift(
+    running_commit: str,
+    baseline_commit: str,
+    *,
+    when: float | None = None,
+    checkout_root: Path | None = None,
+) -> tuple[str, bool]:
+    """Bounded auto-restart for a drifted `deepseek-sister` beat (issue #1271).
+
+    Called with the sister's own reported commit and the `origin/master`
+    baseline the liveness gate compared it against — NOT invoked on every
+    watchdog tick, only when `fleet/liveness.py` has already reported
+    `runtime-drift:deepseek-sister` for this observation, so a healthy or
+    merely-stale sister is never restarted from here.
+    """
+    return bounded_remedy(
+        DEEPSEEK_SISTER_RUNG,
+        DRIFTED,
+        f"runtime-drift:{DEEPSEEK_SISTER_RUNG} — beat commit {_short(running_commit)} trails "
+        f"{_short(baseline_commit)}",
+        running_commit,
+        baseline_commit,
+        "origin/master",
+        None,
+        DEEPSEEK_SISTER_SCRIPT,
+        DEEPSEEK_SISTER_PATTERN,
+        when if when is not None else time.time(),
+        checkout_root,
+    )
+
+
+def cmd_restart_deepseek_sister(args: argparse.Namespace) -> int:
+    outcome, ok = restart_deepseek_sister_on_drift(args.running_commit, args.baseline_commit)
+    print(outcome)
+    return 0 if ok else 1
+
+
 def rung_action(
     name: str,
     pattern: str,
@@ -1635,8 +1698,20 @@ def build_parser() -> argparse.ArgumentParser:
         "rearm",
         help="clear a rung's parked attempt record so the next pass judges it again (#773)",
     )
-    rearm.add_argument("--rung", required=True, choices=[name for name, _p, _s, _b in RUNGS])
+    rearm.add_argument(
+        "--rung",
+        required=True,
+        choices=[name for name, _p, _s, _b in RUNGS] + [DEEPSEEK_SISTER_RUNG],
+    )
     rearm.set_defaults(func=cmd_rearm)
+
+    restart_sister = sub.add_parser(
+        "restart-deepseek-sister",
+        help="bounded restart for a drifted deepseek-sister beat (issue #1271)",
+    )
+    restart_sister.add_argument("--running-commit", required=True)
+    restart_sister.add_argument("--baseline-commit", required=True)
+    restart_sister.set_defaults(func=cmd_restart_deepseek_sister)
     boot = sub.add_parser(
         "bootstrap",
         help="bring a BEHIND checkout forward without needing its own copy of this code (#780)",

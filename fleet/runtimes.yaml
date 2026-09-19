@@ -1,0 +1,60 @@
+# fleet/runtimes.yaml — the runtime registry (issue #1271, from #1301's
+# runtime-agnostic note).
+#
+# Every runtime that beats through `integrations/paperclip/adapters/heartbeat`
+# must be registered here first: `fleet/liveness.py` refuses (`runtime-
+# unregistered:<id>`) a beat whose `runtime` id is not listed, rather than
+# silently accepting an unknown reporter.
+#
+# Fields:
+#   id           — the beat's `runtime` value; stable, kebab-case, unique.
+#   kind         — closed vocabulary: agent | gateway | integration.
+#   transport    — how the runtime is reached: cli | api | terminal | local.
+#   identity     — the model/service family the runtime speaks for.
+#   token_scope  — the credential scope the runtime authenticates under
+#                  (documentation only here; enforcement lives in
+#                  `integrations/paperclip/auth`).
+schema: cmr.runtime-registry/v1
+
+runtimes:
+  - id: claude-session
+    kind: agent
+    transport: cli
+    identity: claude
+    token_scope: session
+
+  - id: claude-subagent
+    kind: agent
+    transport: cli
+    identity: claude
+    token_scope: subagent
+
+  - id: deepseek-sister
+    kind: agent
+    transport: terminal
+    identity: deepseek
+    token_scope: fleet-sister
+
+  - id: deepseek-executor
+    kind: agent
+    transport: api
+    identity: deepseek
+    token_scope: executor
+
+  - id: copilot-agent
+    kind: agent
+    transport: api
+    identity: copilot
+    token_scope: agent
+
+  - id: hermes
+    kind: gateway
+    transport: local
+    identity: hermes
+    token_scope: gateway
+
+  - id: paperclip
+    kind: integration
+    transport: api
+    identity: paperclip
+    token_scope: integration
