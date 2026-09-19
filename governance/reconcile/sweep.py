@@ -629,10 +629,31 @@ class RepoOps:
         # must not reimplement what "forget a lane" means.
         import sys
 
-        sys.path.insert(0, str(self.root / "governance" / "isolation"))
-        import worktree as isolation_worktree  # noqa: PLC0415
+        # The *code* comes from this checkout; only the *data* — the lane record
+        # under ``<root>/.fleet/lanes`` — comes from the reconciled root, the same
+        # split ``active_claims`` makes for the claim ledger. Both halves of the
+        # previous form were wrong, and each was measured (issues #1444/#1446/#1452,
+        # reported by every sweep as a failed `forget-lane` step):
+        #
+        #   * putting ``governance/isolation`` on ``sys.path`` and importing
+        #     ``worktree`` as a TOP-LEVEL module leaves it with no parent package,
+        #     so its own ``from .identity import ...`` raises `ImportError:
+        #     attempted relative import with no known parent package`;
+        #   * resolving that directory under ``self.root`` also aimed the import at
+        #     the audited tree, which carries no ``governance/isolation`` at all
+        #     when the sweep is pointed at a scratch repository — the venue the
+        #     gate proves it on (`ModuleNotFoundError: No module named 'worktree'`).
+        #
+        # Importing the collaborator by its qualified package name keeps
+        # ``worktree.py``'s own relative imports resolvable, and keeps one module
+        # identity for the isolation package instead of a second copy loaded by
+        # filename.
+        checkout = Path(__file__).resolve().parents[2]
+        if str(checkout) not in sys.path:
+            sys.path.insert(0, str(checkout))
+        from governance.isolation.worktree import forget_record  # noqa: PLC0415
 
-        isolation_worktree.forget_record(session_id, self.root)
+        forget_record(session_id, self.root)
         return f"forgot lane record {session_id}"
 
     def release_claim(self, issue: int, agent: str) -> str:
