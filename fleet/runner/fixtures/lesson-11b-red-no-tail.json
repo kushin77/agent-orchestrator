@@ -1,0 +1,18 @@
+{
+  "doc": "lesson 11 (#1384): the PRE-FIX shape — a local red whose record names no check (exactly what `.fleet/runner/local-green/<pr>-<sha>` held: {\"rc\": 1, \"detail\": \"verify rc 1 (red); master was e996eb9534c9\"}). The refusal must name that fact (`none-named`) and must NOT re-queue it: a red the runner itself ran is a verdict.",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 19,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 19,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "local-marker",
+      "state": "red"
+    }
+  ]
+}

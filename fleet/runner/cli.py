@@ -75,6 +75,12 @@ ROLE_ENV = "AO_RUNNER_HOST_ROLE"
 PRIMARY = "primary"
 REPO_SLUG = "kushin77/agent-orchestrator"
 
+#: How much of a red's own `verify: FAIL (...)` summary line `status` quotes. The
+#: ledger keeps up to `verify.MAX_SUMMARY_CHARS`; `status` is a one-line-per-PR
+#: view, so it quotes the head of it and the ledger (plus the kept transcript)
+#: carries the rest (issue #1384).
+STATUS_WHY_CHARS = 160
+
 
 def runner_dir() -> Path:
     fleet_dir = Path(os.environ.get("AO_FLEET_DIR", ROOT / ".fleet"))
@@ -368,6 +374,21 @@ def status_lines(rows: list[dict], holds: dict[int, str]) -> list[str]:
         if "verify" in events:
             v = events["verify"]
             bits.append(f"verify={v.get('state')} rc={v.get('rc')} sha={str(v.get('sha') or '')[:12]} at {v.get('at')}")
+            # A red must be diagnosable from `status` alone (lesson 11, #1384):
+            # WHICH check failed, and the gate's own summary line. `none-named`
+            # is printed rather than omitted — a run that named no failing check
+            # is a fact worth reading, not a blank.
+            if str(v.get("state")) == "red":
+                failing = [str(name) for name in (v.get("failing_checks") or [])]
+                bits.append(f"failing:{','.join(failing) if failing else 'none-named'}")
+                summary = str(v.get("verify_summary") or "").strip()
+                if summary:
+                    bits.append(f"why:{summary[:STATUS_WHY_CHARS]}")
+                if v.get("evidence_log"):
+                    bits.append(f"log:{v['evidence_log']}")
+            note = str(v.get("evidence_note") or "")
+            if note:
+                bits.append(f"evidence:{note}")
         if "post" in events:
             p = events["post"]
             bits.append(f"posted={'ok' if p.get('ok') else 'FAILED'} rc={p.get('rc')}")
@@ -437,14 +458,27 @@ def plan_from_fixture(path: Path, capacity: int = DEFAULT_CAPACITY) -> list[Acti
     """Plan from a JSON fixture (offline): the gate and the docs drive this.
 
     Shape: {"master_tip": sha|null, "prs": [{number, head_sha, mergeable?, draft?}],
-            "evidence": [{pr, sha, source, state, base_tip?}],
+            "evidence": [{pr, sha, source, state, base_tip?, failing_checks?}],
             "builds": [{id, pr, sha, status, kind?}], "holds": {"<pr>": reason},
             "prune": {"ok": bool, "detail": str}, "capacity": int}
     """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     prs = [OpenPR(int(r["number"]), str(r["head_sha"]), mergeable=str(r.get("mergeable", "MERGEABLE")), draft=bool(r.get("draft", False))) for r in data.get("prs", [])]
     table = ev.EvidenceTable(
-        [ev.Evidence(int(r["pr"]), str(r["sha"]), str(r["source"]), str(r["state"]), base_tip=r.get("base_tip")) for r in data.get("evidence", [])]
+        [
+            ev.Evidence(
+                int(r["pr"]),
+                str(r["sha"]),
+                str(r["source"]),
+                str(r["state"]),
+                base_tip=r.get("base_tip"),
+                # #1384: the names a local verify recorded, so a fixture can drive
+                # the red's reason (`verify-red:<pr>:local-marker:<check>`) through
+                # the REAL planner the gate runs.
+                failing_checks=tuple(str(name) for name in (r.get("failing_checks") or [])),
+            )
+            for r in data.get("evidence", [])
+        ]
     )
     builds = [LiveBuild(str(r["id"]), int(r["pr"]), str(r["sha"]), str(r["status"]), kind=str(r.get("kind", "cloud-build"))) for r in data.get("builds", [])]
     holds = {int(k): str(v) for k, v in (data.get("holds") or {}).items()}

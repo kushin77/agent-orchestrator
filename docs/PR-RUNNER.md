@@ -61,7 +61,7 @@ always real (a verify writes nothing to the repository but a commit status).
 |---|---|---|
 | 0 | `cloud-build` | the `control-plane-verify` check-run for the head sha |
 | 1 | `gate-status` | the `ao/gate-of-record` commit status read back for the sha |
-| 2 | `local-marker` | `.fleet/runner/local-green/<pr>-<sha>` written by `verify.py` |
+| 2 | `local-marker` | `.fleet/runner/local-green/<pr>-<sha>` written by `verify.py` (with `failing_checks`, and the kept transcript under `.fleet/runner/logs/`) |
 
 Evidence is keyed by `(pr, head sha)`, never by PR (lesson 1). Any green is
 green; the **best-ranked** green is the basis and every other record is kept
@@ -75,7 +75,61 @@ red with no `local-marker` record for that head at all, in which case it is
 re-queued (`requeue:foreign-red:<pr>:<source>`), since the runner is now the
 sole producer of the required gate and a head it never ran can otherwise
 never turn green (#1378); a red with any local-marker record stays refused
-(`verify-red:<pr>:local-marker`).
+(`verify-red:<pr>:local-marker:<check>`).
+
+## Red evidence: the kept transcript (lesson 11, issue #1384)
+
+A red recorded as `rc 1` is not evidence. Measured 2026-09-19T01:33Z on the
+pair: four heads (#1354 #1371 #1372 #1373) verified `rc=1`, the rung posted
+`ao/gate-of-record=failure` — correct — and `.fleet/runner/local-green/<pr>-<sha>`
+held exactly
+
+```json
+{"rc": 1, "detail": "verify rc 1 (red); master was e996eb9534c9"}
+```
+
+The verify ran in a worktree the runner removes, so `.verify/verify.log` and the
+gate's own `.verify/attestation.json` died with it: **which** check redded was
+unknowable without re-running the whole gate by hand. Every verify therefore
+keeps a bounded transcript of itself at
+`.fleet/runner/logs/<pr>-<sha>.log`, and the marker (and the `verify` ledger row)
+carries `failing_checks` (the names), `verify_summary` (the gate's own
+`verify: FAIL (...)` line), `evidence_log`, `evidence_bytes`,
+`evidence_truncated`, `evidence_source` and `evidence_note`.
+
+**The bound, and why it is a bound.** `.fleet/runner/` is runtime state (it is
+gitignored, but it is kept ACROSS cycles — that is the point, a red has to
+outlive the process that found it), and the rung verifies every open head every
+few minutes forever. So the retention is bounded three ways, in
+`fleet/runner/verify.py`:
+
+| bound | value | effect |
+|---|---|---|
+| `EVIDENCE_LOG_MAX_BYTES` | 256 KiB | the kept transcript is the LAST 256 KiB of the run (the gate prints its verdict and the skip-ratchet note last, so a tail always carries them); the header names the dropped byte count |
+| `EVIDENCE_LOG_KEEP` | 120 files | the log directory keeps only its newest 120 files (oldest pruned first) |
+| `MAX_FAILING_CHECKS` | 10 names | longer than this is recorded as `failing-checks-truncated:<total>` |
+| `MAX_SUMMARY_CHARS` | 240 chars | the summary line kept in the marker + ledger |
+
+A bound of 0 keeps NOTHING, and that is spelled out in the code: `data[-0:]` is
+`data[0:]`, i.e. every byte — the shape of a bound that fails OPEN. The gate's
+MUTANT-5 (the kept transcript dropped) is what caught it.
+
+**Where the names come from, and what happens when they cannot.** The gate's
+own attestation is preferred (it names checks from the gate's own record); the
+transcript is the fallback for a run that writes none (a venue-invalid run), and
+`evidence_source` names which was used. No attestation is a NOTE, never a
+silence: `attestation-absent`, `failing-checks-truncated:<n>`, `no-check-named`,
+`transcript-empty`. An empty `failing_checks` is a real answer — the measured
+#1405 shape is `verify: FAIL (0 of 215 checks failed, 13 skipped: ...; skip
+ratchet FAIL: 1 unnamed skip)`, where NO check failed and the summary line is the
+whole reason.
+
+The planner reads the names from the LOCAL-MARKER record (never from the basis:
+a foreign red's basis is a check-run, whose description carries no check names)
+and refuses `verify-red:<pr>:local-marker:<first-check>` — or `:none-named` when
+the record named none, which is an answer and not a blank. `status` prints the
+same on the red's own line (`failing:<names>`, `why:<summary>`, `log:<path>`),
+and a missing artifact as `evidence:<note>`.
 
 ## The merge (lessons 3 and 4)
 
@@ -115,7 +169,9 @@ Every step is a row in `.fleet/runner/ledger.jsonl` (`cycle-start`, `plan`,
 `merge`, `merge-dry-run`, `refuse`, `defer`, `cancel-stale`, `await`, `hold`,
 `stop`, `cannot-assess`, `note`, `cycle-end`); `status` answers from the ledger,
 not from memory — a `defer` is rendered `deferred:<reason>` so a head the width
-did not take is a PR the status can still explain.
+did not take is a PR the status can still explain, and a `red` is rendered with
+the check names its own run recorded plus the gate's summary line, so a red is
+diagnosable from `status` alone.
 
 ## The status (lesson 10)
 
@@ -165,11 +221,12 @@ ambient environment and are the only role-aware paths.
 ## The gate
 
 `scripts/check-pr-runner.sh` (auto-wired by `scripts/discover-checks.sh`):
-the lesson 1-5 and 7 fixtures refuse by name through the real cli; the
-lesson 6-9 controls run under fakes with pytest's exit codes mapped
-individually; the lesson-10 context parity is asserted; and two mutants of a
-scratch copy — the stale-head skip dropped, the merged-tree check dropped —
-are both caught. The lessons themselves are `LESSON-0009`..`LESSON-0014`
-(closed on landed foundations) and `SUGGEST-0014`..`SUGGEST-0017` (open until
-this PR's squash sha lands, then closed as lessons) in
-`governance/lessons/ledger.jsonl`, all under `RCA-0019`.
+the lesson 1-5, 7, 8 and 11 fixtures refuse by name through the real cli; the
+lesson 6-9 and 11 controls run under fakes with pytest's exit codes mapped
+individually; the lesson-10 context parity is asserted; and five mutants of a
+scratch copy — the stale-head skip dropped, the merged-tree check dropped, the
+fan-out bound dropped, the local-marker distinction dropped, and the kept
+transcript dropped — are all caught. The lessons themselves are `LESSON-0009`..
+`LESSON-0014` and `LESSON-0015` (closed on landed foundations) and
+`SUGGEST-0014`..`SUGGEST-0017` (open until this PR's squash sha lands, then
+closed as lessons) in `governance/lessons/ledger.jsonl`, all under `RCA-0019`.

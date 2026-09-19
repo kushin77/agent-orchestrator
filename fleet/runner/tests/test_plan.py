@@ -1,13 +1,15 @@
 """Named negative controls for the PR runner's pure core (issue #1343).
 
-One test per lesson the 2026-09-18 prototype measured (lessons 1-5 and 10 live
-here; 6-9 are transport lessons and live in test_transports.py). Each test is
-a control: it drives `plan()` with the exact input shape that broke the
-prototype and asserts the planner REFUSES BY NAME.
+One test per lesson the 2026-09-18 prototype measured (lessons 1-5, 10 and the
+planner half of 11 live here; 6-9 and the transport half of 11 are transport
+lessons and live in test_transports.py). Each test is a control: it drives
+`plan()` with the exact input shape that broke the prototype and asserts the
+planner REFUSES BY NAME.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -100,7 +102,29 @@ def test_a_red_verdict_is_not_requeued_it_is_named():
     table = ev.EvidenceTable([Evidence(8, NEW, SOURCE_LOCAL, RED)])
     actions = plan(prs, table, master_tip=TIP)
     assert not kinds(actions, VERIFY) and not kinds(actions, MERGE)
-    assert one(actions, REFUSE, 8).reason == f"verify-red:8:{SOURCE_LOCAL}"
+    # `none-named` is deliberate (issue #1384): a record that named no failing
+    # check says so, rather than leaving the reason to read as "a red, reason
+    # unknown". The old shape's bare `verify-red:8:local-marker` was exactly the
+    # undiagnosable red this issue exists for.
+    assert one(actions, REFUSE, 8).reason == f"verify-red:8:{SOURCE_LOCAL}:none-named"
+
+
+def test_a_local_red_names_the_check_the_runner_itself_saw_fail():
+    """Issue #1384: a red must say WHICH check failed.
+
+    The name is read from the LOCAL-MARKER record, never from the basis: a
+    foreign red's basis is a check-run, whose evidence carries no check names,
+    so a head the box really ran would otherwise refuse without naming a check.
+    """
+    prs = [OpenPR(number=25, head_sha=NEW)]
+    table = ev.EvidenceTable(
+        [
+            Evidence(25, NEW, SOURCE_CLOUD_BUILD, RED),
+            Evidence(25, NEW, SOURCE_LOCAL, RED, failing_checks=("check-shell-patterns", "check-docs")),
+        ]
+    )
+    actions = plan(prs, table, master_tip=TIP)
+    assert one(actions, REFUSE, 25).reason == "verify-red:25:local-marker:check-shell-patterns"
 
 
 # --- lesson 3 ------------------------------------------------------------------
@@ -211,7 +235,7 @@ def test_a_foreign_red_with_a_local_red_record_stays_refused():
     )
     actions = plan(prs, table, master_tip=TIP)
     assert not kinds(actions, VERIFY)
-    assert one(actions, REFUSE, 17).reason == "verify-red:17:local-marker"
+    assert one(actions, REFUSE, 17).reason == "verify-red:17:local-marker:none-named"
 
 
 def test_a_foreign_red_with_a_local_green_merges_instead():
@@ -279,3 +303,32 @@ def test_local_markers_round_trip_and_an_unreadable_marker_is_cannot_assess(tmp_
     assert records[40].state == GREEN and records[40].base_tip == TIP
     assert records[41].state == "parked"
     assert records[42].state == CANNOT_ASSESS and records[42].detail.startswith("marker-unreadable:")
+
+
+def test_a_marker_round_trips_the_failing_checks_and_a_corrupt_one_is_cannot_assess(tmp_path: Path):
+    """Issue #1384, the strict half: the names survive the round trip, and a
+    `failing_checks` that is NOT a list of names makes the whole record
+    CANNOT-ASSESS by name.
+
+    A marker whose names were absent and a marker whose names were corrupt are
+    different claims. Coercing the second into the first would launder a broken
+    record into a plausible one — and `failing_checks: []` is what the planner
+    renders `none-named`, i.e. a red nobody can be asked about.
+    """
+    ev.write_local_marker(
+        tmp_path,
+        43,
+        NEW,
+        1,
+        base_tip=None,
+        detail="verify rc 1 (red)",
+        recorded_at="t3",
+        failing_checks=("check-docs", "check-shell-patterns"),
+        verify_summary="verify: FAIL (2 of 215 checks failed)",
+        evidence_log=f"logs/43-{NEW}.log",
+    )
+    (tmp_path / f"44-{NEW}").write_text(json.dumps({"rc": 1, "failing_checks": "check-docs"}), encoding="utf-8")
+    records = {r.pr: r for r in ev.from_local_markers(tmp_path)}
+    assert records[43].state == RED and records[43].failing_checks == ("check-docs", "check-shell-patterns")
+    assert records[44].state == CANNOT_ASSESS and records[44].detail == f"marker-unreadable:44-{NEW}"
+    assert records[44].failing_checks == ()

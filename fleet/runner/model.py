@@ -88,6 +88,14 @@ class Evidence:
     merge-base the verified tree sat on), when the source knows it. A local
     verify records it; a Cloud Build check-run does not, and `None` means "the
     merged-tree seam decides at merge time" (lesson 3).
+
+    `failing_checks` is the bounded list of check NAMES the run itself saw fail,
+    in the order the gate ran them (issue #1384). Only a local verify can carry
+    it: a check-run / commit-status description is a line of prose. It exists so
+    a RED can be diagnosed and contested after the fact — the worktree is gone,
+    so `rc 1` alone names nothing. An EMPTY tuple is honest and load-bearing: it
+    says the run recorded no failing check, which the planner renders
+    `none-named` rather than leaving blank.
     """
 
     pr: int
@@ -97,6 +105,7 @@ class Evidence:
     base_tip: str | None = None
     detail: str = ""
     recorded_at: str = ""
+    failing_checks: tuple[str, ...] = ()
 
     @property
     def rank(self) -> int:
