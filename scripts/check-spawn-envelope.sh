@@ -192,25 +192,20 @@ fi
 
 # The suite drives the REAL loop (`terminal.run_once`), which posts a runtime beat
 # (#1412) BEFORE it refuses or spawns. `beats.ROOT` is a module constant pointing
-# at this repository, so an un-redirected run leaves a beat the liveness judge
-# reads (#1459): the producer is pointed at this check's own tree here, exactly as
-# `fleet/tests/conftest.py` points it for every test. The suite is still run for
-# real — same tests, same assertions, one patched module constant.
-if ! env PYTHONDONTWRITEBYTECODE=1 python3 - "$root" "$beats_tree" <<'PY' >/dev/null 2>&1
-import sys
-from pathlib import Path
-
-code_root, beats_tree = (Path(arg).resolve() for arg in sys.argv[1:3])
-sys.path.insert(0, str(code_root / "fleet"))
-try:
-    import beats
-    beats.ROOT = beats_tree
-except ImportError:  # the producer (#1412) is not in this tree: nothing to redirect
-    pass
-import pytest
-
-raise SystemExit(pytest.main(["-p", "no:cacheprovider", "-q", "governance/spawn/tests"]))
-PY
+# at this repository, so an un-redirected run leaves a beat where the liveness
+# judge reads it (#1459). The cover is the suite's OWN conftest
+# (`governance/spawn/tests/conftest.py` points `beats.ROOT` at the test's tmp dir
+# and carries the registry so the beat is really written), which is exactly what
+# `fleet/tests/conftest.py` does for the fleet suite — so this runs plain pytest,
+# the way the composite runs it, with NO in-process patch. A patch here would hide
+# the absence of that cover.
+#
+# `--basetemp` puts tmp_path under a tree THIS check owns, which is what makes the
+# beat a WITNESS below: present under that basetemp (the producer really ran) and
+# absent from the repository (the cover works).
+suite_base="$beats_tree/pytest-base"
+if ! env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
+  --basetemp="$suite_base" governance/spawn/tests >/dev/null 2>&1
 then
   echo "  FAIL  governance/spawn/tests does not pass (it carries the fleet-path equality proof)" >&2
   fail=$((fail + 1))
@@ -841,17 +836,25 @@ else
   fail=$((fail + 1))
 fi
 
-# --- 4b. the beat the spawn path posts lands in THIS CHECK's tree -------------
+# --- 4b. the beats this check's own probes post land in a tree IT owns ---------
 #
-# The redirect is only honest if the producer still RUNS: a probe that skipped the
-# spawn path would leak nothing and prove nothing. So the beat must BE in the tree
-# this check owns — and the repository's own beats must be exactly what they were.
-producer_beats="$(beats_files "$beats_tree")"
+# The redirects above are only honest if the producer still RUNS: a probe that
+# skipped the spawn path would leak nothing and prove nothing. The spawn SUITE
+# drives that path for real, so its beat is witnessed here — under `--basetemp`,
+# the tree this check owns — while the repository's own beats must be exactly what
+# they were.
+#
+# Both arms falsify the suite's cover (`governance/spawn/tests/conftest.py`, which
+# points `beats.ROOT` at the test's tmp dir and carries the registry so the beat is
+# really written). Remove that cover and BOTH fail by name: the witness is gone,
+# and the beat appears in the repository. Measured: with the cover neutered, the
+# witness arm reds and the repository arm names `deepseek-executor.json`.
+suite_witness="$(find "$suite_base" -mindepth 1 -name 'deepseek-executor.json' -type f 2>/dev/null | head -3)"
 if [ -f fleet/beats.py ]; then
-  if printf '%s\n' "$producer_beats" | grep -q '^deepseek-executor\.json '; then
-    echo "  OK    [beats] the spawn path's runtime beat (#1412) landed in this check's own tree"
+  if [ -n "$suite_witness" ]; then
+    echo "  OK    [beats] the spawn suite posted its runtime beat (#1412) into the tree this check owns"
   else
-    echo "  FAIL  [beats] the spawn path left no beat in $beats_tree/.fleet/runtime-beats/ — the redirect is not reaching the producer" >&2
+    echo "  FAIL  [beats] no runtime beat under $suite_base — the spawn suite either did not drive the producer, or its conftest cover refuses the beat instead of redirecting it (a redirect carries fleet/runtimes.yaml, so the beat is really written)" >&2
     fail=$((fail + 1))
   fi
 else
