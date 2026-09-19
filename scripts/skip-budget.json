@@ -4,9 +4,12 @@
   "entries": [
     {
       "check": "branch-protection",
-      "kind": "standing-gap",
+      "kind": "venue",
       "issue": 1382,
-      "reason": "`CANNOT-ASSESS REQUIRED-BUT-UNOBSERVED` / `REQUIRED-BUT-GATED-OFF` -- branch protection REQUIRES `ao/gate-of-record` (#1342), the only producers on a PR verdict path (infra/cloudbuild/verify.yaml, the fleet runner rung) ship flag-gated OFF, and so no status is ever present on the commit under test; the check names this rather than passing (#1357). Its inputs ARE present in every venue that can run `gh auth status`, so this is not a venue gap: it is the open gap #1382 tracks (nothing on the ordinary lane path produces the required context). In the Cloud Build venue the same check answers `gh-unauthenticated: gh is not installed` (#1361), also rc 2. This entry goes STALE the moment a promoted producer posts the status and the check assesses -- delete it then."
+      "precondition": {
+        "command": "gh auth status"
+      },
+      "reason": "kind: venue, precondition: gh auth status -- #1394. This check reads the LIVE GitHub protection, and it drives scripts/check-gate-status.sh's producer probe, whose LIVE half needs `gh` too; in a venue without a working `gh` neither can assess, which is a VENUE gap named by the check's own prerequisite. With `gh` supplied it assesses (measured: rc 0 on a box). It was a `standing-gap` because the producer probe could never assess; that probe now reads the live state instead of the import stub's pinned declaration, so the entry would go STALE on every box. Independent of #1382: nothing here is waiting on a producer to exist."
     },
     {
       "check": "cmr-knowledge",
@@ -56,9 +59,12 @@
     },
     {
       "check": "gate-status",
-      "kind": "standing-gap",
+      "kind": "venue",
       "issue": 1382,
-      "reason": "`CANNOT-ASSESS REQUIRED-BUT-GATED-OFF` -- the rc->state mapping and the poster are asserted and sound, and a producer exists on the PR verdict path, but that trigger ships flag-gated OFF (`disabled: true`, #1350) so nothing produces `ao/gate-of-record` until it is promoted out of band; the LIVE status is therefore never observable and the check refuses to call that a pass (#1357). Not a venue gap: `gh auth status` succeeds here and the check still cannot assess. The open issue that tracks the producer gap is #1382; in Cloud Build the same check is `gh-unauthenticated` (#1361), also rc 2. STALE the moment the check assesses -- delete it then."
+      "precondition": {
+        "command": "gh auth status"
+      },
+      "reason": "kind: venue, precondition: gh auth status -- #1394. The producing question is answered in two halves. The TREE half (is a producer REACHED from the path that makes the PR verdict?) needs nothing of the venue, is provable offline, and is unchanged. The LIVE half is READ with `gh` -- the commit under test's statuses, then the most recent default-branch commits -- because the ONLY field the tree carries about liveness is infra/cloudbuild/verify-trigger.yaml's `disabled:`, and this repository PINS that `true` by policy (scripts/check-cloudbuild.sh requires \"must ship disabled: true (GR-5)\"), so a probe that reads it as live state names a condition the tree can never falsify. Measured 2026-09-19: the probe answered `CANNOT-ASSESS REQUIRED-BUT-GATED-OFF` (rc 2) while the live trigger is ENABLED and `ao/gate-of-record` is posted (2adbe48b, 83ff32db, 0dbb0e68). In a venue without a working `gh` the check therefore cannot assess -- that is a VENUE gap, named by the check's own probe, and this entry de-activates itself the moment the venue supplies `gh`. With `gh` supplied the check assesses: rc 0 when the context is observed producing, rc 1 BY NAME when the source WAS read and nothing is producing (a finding about the repository, not an inability to assess -- so not a skip). NOT a `standing-gap`: that kind goes STALE the moment the check assesses, and its reason (\"Not a venue gap: gh auth status succeeds here and the check still cannot assess\") is now false. Known residual, stated not hidden: if `gh auth status` succeeds but the repository/API reads fail, the check answers rc 2 naming the source and this entry is refused as a check defect -- an authenticated-gh-but-unreadable-GitHub anomaly, where the red is right and this second reason is mislabelled."
     },
     {
       "check": "module-brief",
