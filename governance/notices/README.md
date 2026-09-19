@@ -42,33 +42,53 @@ The load-bearing word is **registered**. A list of who must ack, typed once, is
 exactly how a notice stops covering the runtime somebody registers next, which is
 the failure this issue exists for at one remove.
 
-So the set is **derived** ([`runtime_registry.py`](runtime_registry.py)) from two
-declarations the repository already owns, and from nothing else:
+So the set is **read** ([`runtime_registry.py`](runtime_registry.py)) from the
+**one runtime authority** (issue #1412, from #1385), through the one loader
+[`fleet/runtimes.py`](../../fleet/runtimes.py):
 
-1. **`registry/packs/releases/*.yaml`** -- the AgentPack release snapshots. A pack
-   bundles profile ids (`contents.profile[].ref`), and only a pack whose
-   `lifecycle` is `live` registers anything. This is the registry of **registered
-   agent identities**.
-2. **`gateway/catalog/modules/*/module.json`** -- the gateway catalog names the
-   provider that carries an identity (`distribution.package` =
-   `gateway.providers.<provider>`, plus the `class` list, which is how
-   `claude-anthropic` names `claude`).
+1. **`fleet/runtimes.yaml`** -- the contract's `runtimes:` rows. Their `id` is the
+   runtime, their `identity` names the family it speaks for, and the provider is
+   whatever the gateway catalog carries for that identity.
+2. **`gateway/catalog/modules/*/module.json`** -- read only for that provider (and,
+   in a tree **without** a contract, for the pre-contract derivation below).
 
-A registered identity is a **runtime** when the gateway carries a transport for it,
-and a **role** otherwise:
+A tree with no contract at all keeps the pre-contract derivation -- a **live** pack
+(`registry/packs/releases/*.yaml`, `lifecycle: live`) bundles an identity the
+catalog carries a transport for -- because a fixture built before #1376 must still
+be judgeable. That path computes a set from declarations the tree owns; it never
+restates an id list, and it is not consulted when the contract is present.
+
+Measured on this tree (`python3 governance/notices/cli.py runtimes`):
 
 ```console
 $ python3 governance/notices/cli.py runtimes
-notice-acks: runtimes=5 roles=3
-  runtime claude (provider anthropic, transport mailbox:fleet/channel.py)
-  runtime deepseek (provider deepseek, transport mailbox:fleet/channel.py)
+notice-acks: runtimes=7 roles=4
+  runtime claude-session (provider anthropic, transport mailbox:fleet/channel.py)
+  runtime claude-subagent (provider anthropic, transport mailbox:fleet/channel.py)
+  runtime deepseek-sister (provider deepseek, transport mailbox:fleet/channel.py)
+  runtime deepseek-executor (provider deepseek, transport mailbox:fleet/channel.py)
+  runtime copilot-agent (provider copilot, transport mailbox:fleet/channel.py)
   runtime hermes (provider hermes, transport adapter:integrations/hermes/cli.py)
-  runtime ollama (provider ollama, transport mailbox:fleet/channel.py)
   runtime paperclip (provider paperclip, transport adapter:integrations/paperclip/cli.py)
   role coder (registered identity, no transport: owes no ack)
   role data-agent (registered identity, no transport: owes no ack)
+  role ollama (registered identity, no transport: owes no ack)
   role orchestrator (registered identity, no transport: owes no ack)
 ```
+
+Before the reconciliation this module answered with **five of its own ids**
+(`claude`, `deepseek`, `hermes`, `ollama`, `paperclip`) against the contract's
+seven -- two vocabularies, neither authoritative, with every lane record validated
+against whichever one its caller reached. Two differences were real and both are
+now decided by the contract:
+
+* **`copilot-agent`** owes an ack (the contract registers it; the old derivation
+  never saw a `copilot` pack profile);
+* **`ollama`** no longer does: a live pack bundles it and the catalog carries a
+  transport for it, but no contract row registers it, so it is a role here.
+  `contract_gaps()` names it -- a demotion reported, never silently absorbed -- and
+  `fleet/tests/test_runtime_vocabulary.py` pins it, so registering `ollama` is a
+  one-line act that fails the pin instead of leaving this prose stale.
 
 `coder`, `data-agent` and `orchestrator` are identities the fleet **dispatches on**;
 they are not execution surfaces and can acknowledge nothing. Nobody classified them
@@ -76,7 +96,7 @@ by hand -- the intersection did.
 
 **Consequences, and they are the whole point.**
 
-* Adding a runtime is a **registration act** (publish a live pack bundling it), and
+* Adding a runtime is a **registration act** (a row in `fleet/runtimes.yaml`), and
   the moment it lands every standing notice requires its ack. No notice is edited.
 * A notice whose `requires_ack` names ids instead of the registry is **refused by
   name** (`hand-maintained-ack-list`).
