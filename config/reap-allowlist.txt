@@ -1,0 +1,47 @@
+# Reap allowlist (issue #1337) — the roots `scripts/prune-worktrees.sh` may
+# reclaim a worktree FROM.
+#
+# A worktree is removable only when ownership is DECLARED. Either a
+# `.fleet/lanes/` record names it (the lane-claim guard, issue #516), or the
+# worktree lies under a root listed below. A tree with neither is KEEP, and the
+# keep names the reason: `not-created-by-the-reaper`.
+#
+# WHY THIS FILE EXISTS. Every other guard the reaper has is a measurement of an
+# INSTANT — a live process holding the tree (#1159), a live gate holding the
+# venue (#1345). A harness session working inside a worktree holds no descriptor
+# between two of its commands and runs no gate, so no scan of the moment can see
+# it, and `ao-fleet-reap` runs `prune-worktrees.sh --apply` unattended from cron.
+# Measured 2026-09-18 (#1337): of the trees the sweep called removable, 9 were
+# `.claude/worktrees/agent-*` and 5 were scratch roots, and not one carried a
+# `.fleet/lanes/` record — a working directory destroyed under a live session.
+#
+# WHY IT IS A LIST OF ROOTS AND NOT A REFUSAL OF UNNAMED TREES. #1159's own
+# acceptance item — "a genuinely stale, preserved, unclaimed tree is still
+# reaped" — has to keep holding, so the homes the reaper owns are DECLARED here
+# rather than guessed in the tool. Measured on this box 2026-09-18: all 33
+# worktrees of this repository, and all 8 the dry run called removable, lie
+# under exactly the two roots below.
+#
+# GRAMMAR, EXACTLY
+#   * a blank line, or a line whose first non-blank character is `#`, declares
+#     nothing;
+#   * `~/x`  resolves against $HOME (an unusable line if $HOME is empty);
+#   * `/x`   is absolute;
+#   * `x`    resolves against the repository's main checkout (never the
+#           worktree the reaper happens to be run from);
+#   * a trailing `/` is insignificant.
+# A root matches a worktree when the worktree IS the root, or lies UNDER it on a
+# path boundary. An absent, unreadable, non-regular or root-less declaration is
+# CANNOT-ASSESS (rc 2): the reaper then removes NOTHING and says so — "I could
+# not read the declaration" is never "reap it".
+#
+# ADD A LINE ONLY FOR A ROOT THIS FLEET'S REAPER OWNS. A lane opened with a
+# non-default AO_WORKTREE_ROOT is deliberately not covered: its tree is KEEP
+# until someone declares that root here, which is why this file is committed and
+# reviewed rather than configured per session.
+#
+# The lane homes: `governance/isolation` mints a lane worktree under
+# $AO_WORKTREE_ROOT, else ~/ao-worktrees; the agent harness keeps its own under
+# the repository's .claude/worktrees.
+~/ao-worktrees
+.claude/worktrees
