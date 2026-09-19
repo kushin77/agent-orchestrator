@@ -1,0 +1,19 @@
+{
+  "doc": "lesson 3: green against an OLDER master tip is not green for the current one",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 9,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 9,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "local-marker",
+      "state": "green",
+      "base_tip": "dddddddddddddddddddddddddddddddddddddddd"
+    }
+  ]
+}

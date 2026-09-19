@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kushin77/agent-orchestrator/governance/lane-record/schema/lane-record.schema.json",
+  "title": "Lane record (lane-record/v1) -- ONE schema for the lane brief and the lane result",
+  "description": "The record a lane is given and the record a lane returns are the SAME shape, so a brief and its result are readable by every runtime (Claude, DeepSeek, Copilot, paperclip, hermes) and by the merge loop, in the tree, without parsing prose. `$defs.record` is the shared skeleton, `$defs.brief` is the dispatch half and `$defs.result` is the report half, and each half declares that skeleton PLUS its own fields with `additionalProperties: false` -- so a runtime that writes a shape this schema does not allow (a `handback`, a free-form `result` message, an extra `stdout`) is refused by name rather than silently admitted. The half is selected by `kind`, and `governance/lane-record/lane_record.py` is the machine that decides: it validates a document against `$defs/<kind>` and then holds the two halves to each other (the result's runtime is the brief's, its worktree is the assigned one, its files are inside the owned set, every scoped gate carries a tail, and squash_rc is 0 before anything may merge). THE HALVES RESTATE THE SHARED SKELETON RATHER THAN `$ref` IT, and that is measured, not stylistic: the repository's stdlib-only subset validator resolves a local pointer against the document it was HANDED as root, so a half that `$ref`ed `$defs/record` could not be validated as its own root. The three lists are therefore held equal by `lane_record.mirror_problems` in BOTH directions -- a shared field missing from a half, a half's field appearing on the other half, or the version and kind sets drifting are each refused by name (`lane-schema-mirror-drift`) -- which is a stronger guarantee than the `$ref` was, because a `$ref` cannot fail. `runtime` is deliberately a plain string here and a DERIVED set in the machine: the shape is frozen, the vocabulary is not typed, because a list of runtimes typed into a schema is how a runtime registered next week becomes unwritable. Records live under the fleet's runtime state (`.fleet/lane-records/<issue>/<lane>.{brief,result}.json`) and are never committed; the shipped half is this schema, the module and the gate.",
+  "$comment": "This document carries METADATA and $defs ONLY -- no `type`, no `required`, no `$ref`. A document is validated against $defs/brief or $defs/result, selected by its own `kind`, so there is exactly ONE validation path rather than a top-level shape that looks authoritative and is never run. `lane_record.mirror_problems` refuses any validating keyword appearing here, so the single path cannot be quietly widened.",
+  "$defs": {
+    "record": {
+      "title": "The shared skeleton both halves carry",
+      "description": "What makes a brief and a result ONE record: the version, which half it is, which issue and lane it belongs to, which runtime it names, and when it was written. A document missing any of these is not a lane record at all.",
+      "type": "object",
+      "required": ["schema", "kind", "issue", "lane", "runtime", "ts"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "lane-record/v1",
+          "description": "The record version. A record carrying any other value is refused by name (lane-record-schema-version)."
+        },
+        "kind": {
+          "enum": ["brief", "result"],
+          "description": "Which half of the lane record this document is. The value selects the shape the machine validates against, so a runtime writing a third kind (a handback, a result message) is refused by name (lane-record-kind-unknown)."
+        },
+        "issue": {
+          "type": "integer",
+          "description": "The issue this lane exists for. The machine pairs a brief and its result by (issue, lane), so a result with no brief is refused by name (lane-result-no-brief)."
+        },
+        "lane": {
+          "type": "string",
+          "description": "The lane name (the pillar or ownership area, e.g. governance). Together with `issue` it is the identity of the pair, so two briefs for one (issue, lane) are refused by name (lane-record-duplicate)."
+        },
+        "runtime": {
+          "type": "string",
+          "description": "The runtime this record names: on a brief, the runtime the lane is dispatched TO; on a result, the runtime that produced it. Both halves carry the same field, which is what makes the record ONE shape for every runtime. The FIELD's shape is frozen here; which runtimes EXIST is derived (governance/lane-record/runtimes.py) from the registry the repository already owns, so a runtime the registry does not carry is refused by name (lane-runtime-unregistered) and a result whose runtime is not its brief's is refused by name (lane-runtime-mismatch)."
+        },
+        "ts": {
+          "type": "string",
+          "description": "When the record was written, in UTC (YYYY-MM-DDTHH:MM:SSZ). A timestamp with no zone is refused by name (lane-timestamp-malformed), because a record whose age cannot be read cannot be re-checked."
+        },
+        "refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Where the record comes from (the issue, the directive, the PR), so a lane record is a pointer and not a second authority."
+        }
+      }
+    },
+    "brief": {
+      "title": "The lane brief -- the dispatch half",
+      "description": "What every runtime is handed when a lane is dispatched, in ONE shape: the scope it owns, the gates it must run, the verbs it may not use, the worktree it was assigned, and the result shape it owes. Every one of these is a field, so a lane's assignment is readable by the merge loop without parsing the prose that accompanies it.",
+      "type": "object",
+      "required": [
+        "schema",
+        "kind",
+        "issue",
+        "lane",
+        "runtime",
+        "ts",
+        "owned_files",
+        "scoped_gates",
+        "forbidden_verbs",
+        "assigned_worktree",
+        "report_shape"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "lane-record/v1" },
+        "kind": { "const": "brief" },
+        "issue": { "type": "integer" },
+        "lane": { "type": "string" },
+        "runtime": { "type": "string" },
+        "ts": { "type": "string" },
+        "refs": { "type": "array", "items": { "type": "string" } },
+        "owned_files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "The files this lane owns, repo-relative. This is the scope the result is held to: a result touching anything outside this set is refused by name (lane-file-outside-scope). The same path vocabulary the cross-lane half uses (governance/dispatch/model.py FileClaim, scripts/check-lane-collision.sh), so one lane's declaration is readable by both rules."
+        },
+        "scoped_gates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "The gates this lane must run -- its own Verify: command plus make verify. At least one is required: a lane that scopes no gate owes no evidence, which is the hole this rule exists to close. Every gate named here must appear in the result's gate_tails (lane-gate-tail-missing)."
+        },
+        "forbidden_verbs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "The verbs this lane may not run (a direct push to master, a merge, a terraform apply), carried on the brief so the runtime's guardrail has one declaration to honour. This rule measures the field's presence and shape between the halves; the runtime's guardrail is what acts on it."
+        },
+        "assigned_worktree": {
+          "type": "string",
+          "description": "The worktree the lane was assigned (the one governance/isolation/cli.py minted as this session's own git worktree). A result reporting a different worktree is refused by name (lane-worktree-mismatch), and one reporting the shared checkout is refused too (lane-worktree-shared) -- two real cases were measured on 2026-09-18."
+        },
+        "report_shape": {
+          "type": "object",
+          "required": ["fields"],
+          "additionalProperties": false,
+          "properties": {
+            "fields": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string" },
+              "description": "The result fields this brief demands, named in the SCHEMA's own vocabulary. Every name must be a declared property of $defs/result (a brief demanding anything else is refused by name, lane-report-shape-unallowed), and a result omitting a field its own brief demanded is refused by name (lane-report-field-missing). That is what makes the two halves one schema mechanically rather than by convention."
+            }
+          }
+        }
+      }
+    },
+    "result": {
+      "title": "The lane result -- the report half",
+      "description": "What a lane returns, in ONE shape for every runtime: the commit it produced, the files it touched, the tail of every gate it was scoped to run, whether it is mergeable, the exit code of the squash, and the worktree it ran in. A runtime's own hand-back format is not evidence; this record is.",
+      "type": "object",
+      "required": [
+        "schema",
+        "kind",
+        "issue",
+        "lane",
+        "runtime",
+        "ts",
+        "sha",
+        "files_touched",
+        "gate_tails",
+        "mergeable",
+        "squash_rc",
+        "worktree"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "lane-record/v1" },
+        "kind": { "const": "result" },
+        "issue": { "type": "integer" },
+        "lane": { "type": "string" },
+        "runtime": { "type": "string" },
+        "ts": { "type": "string" },
+        "refs": { "type": "array", "items": { "type": "string" } },
+        "sha": {
+          "type": "string",
+          "description": "The commit the lane produced, 40 lowercase hex. A result naming anything else is refused by name (lane-sha-malformed). NAMED BOUNDARY: this rule reads the field, it does not resolve the object in git, because a lane record is written by the lane before the commit is necessarily reachable from this checkout."
+        },
+        "files_touched": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "The files this lane touched, repo-relative. It must be a SUBSET of the brief's owned_files, by the same path vocabulary (lane-file-outside-scope)."
+        },
+        "gate_tails": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "One tail per scoped gate: the last lines the gate printed, so the verdict travels with the record instead of living in a chat message. A gate the brief scoped with no entry here is refused by name (lane-gate-tail-missing); an entry for a gate the brief never scoped is refused too (lane-gate-tail-unscoped); an empty tail is refused (lane-gate-tail-empty), because a tail with nothing in it is not evidence."
+        },
+        "mergeable": {
+          "type": "boolean",
+          "description": "Whether this lane claims it may be merged. The claim is only admitted with green evidence: mergeable true while squash_rc is not 0 is refused by name (lane-squash-not-green)."
+        },
+        "squash_rc": {
+          "type": "integer",
+          "description": "The exit code of the squash, as the lane observed it. 0 is the only value that admits a mergeable claim."
+        },
+        "worktree": {
+          "type": "string",
+          "description": "The worktree the lane actually ran in. It must be the brief's assigned_worktree (lane-worktree-mismatch), and it must not be the shared checkout (lane-worktree-shared)."
+        }
+      }
+    }
+  }
+}
