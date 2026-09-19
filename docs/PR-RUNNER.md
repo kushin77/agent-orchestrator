@@ -36,6 +36,21 @@ MemAvailable is under `AO_RUNNER_MEM_FLOOR_GB` (default 8,
 `capacity-backoff:memory:<gb><floor>`); the `capacity` ledger row carries
 declared/effective/reason and `status` prints it.
 
+The width is a **bound, not a wish**: a head the effective width cannot take is
+`DEFER`red **by name** — `capacity:<pr>:<why>`, in the ledger and in `status`
+(`deferred:capacity:<pr>:<why>`) — and is picked up by the next cycle. A head
+dropped in silence would read as "everything green".
+
+**The width is an injected input, never the machine.** `probe_host()` is a
+parameter of `cycle()` (`load1`, `MemAvailable`, `nproc`), so a caller that needs
+a width states it instead of inheriting one: `fleet/runner/tests` passes
+`calm_host_probe`, the gate pins `plan --fixture --capacity`, and the backoff
+itself is provoked by name
+(`test_a_backed_off_width_defers_the_extra_head_by_name_and_never_loses_it`).
+This is not pedantry — the control that read the live box measured **green on a
+dev box and red on the Cloud Build runner** (7.29 GiB total RAM, below the 8.0 GB
+floor, at a load above nproc), which is a red on the machine, not on the change.
+
 Merges are **dry-run unless `--apply`**: the merged-tree seam runs and
 `scripts/merge-pr.sh` runs in its own dry-run mode. The verify + post half is
 always real (a verify writes nothing to the repository but a commit status).
@@ -90,9 +105,11 @@ python3 fleet/runner/cli.py plan --fixture fleet/runner/fixtures/lesson-1-stale-
 ```
 
 Every step is a row in `.fleet/runner/ledger.jsonl` (`cycle-start`, `plan`,
-`verify`, `post`, `post-skipped`, `merged-tree`, `merge`, `merge-dry-run`,
-`refuse`, `cancel-stale`, `await`, `hold`, `stop`, `cannot-assess`,
-`cycle-end`); `status` answers from the ledger, not from memory.
+`capacity`, `gatelock-prune`, `verify`, `post`, `post-skipped`, `merged-tree`,
+`merge`, `merge-dry-run`, `refuse`, `defer`, `cancel-stale`, `await`, `hold`,
+`stop`, `cannot-assess`, `note`, `cycle-end`); `status` answers from the ledger,
+not from memory — a `defer` is rendered `deferred:<reason>` so a head the width
+did not take is a PR the status can still explain.
 
 ## The status (lesson 10)
 

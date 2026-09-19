@@ -14,11 +14,12 @@
 #   one; this gate PROVOKES every one.
 #
 # WHAT IS MEASURED
-#   A. lessons 1-5 + 7 as PLAN FIXTURES (`fleet/runner/fixtures/*.json`) driven
-#      through the real cli (`plan --fixture`): each must refuse BY NAME —
-#      `stale-head:`, `requeue:expired:`, `merged-tree-stale:`,
+#   A. lessons 1-7 as PLAN FIXTURES (`fleet/runner/fixtures/*.json`) driven
+#      through the real cli (`plan --fixture`, width PINNED): each must refuse BY
+#      NAME — `stale-head:`, `requeue:expired:`, `merged-tree-stale:`,
 #      `via scripts/merge-pr.sh`, `requeue:cannot-assess:`, `green:cloud-build:`,
-#      `gatelock-prune-failed:` — and never emit the action the lesson forbids.
+#      `capacity:`, `gatelock-prune-failed:` — and never emit the action the
+#      lesson forbids.
 #   B. lessons 6-9 as the named negative controls in
 #      `fleet/runner/tests/test_transports.py` (held-and-removed worktree,
 #      prune-before-run, serialised fetch, status-from-ledger), run with pytest's
@@ -26,11 +27,13 @@
 #      CANNOT-ASSESS, 5 = nothing collected is FAIL) and the rootdir pinned.
 #   C. lesson 10: the runner's context, the poster's, the mapper's and the branch
 #      protection's are ONE string (reusing `check-gate-status.sh`'s parity).
-#   D. TWO MUTANTS of a scratch copy, each of which must RED the same control
+#   D. THREE MUTANTS of a scratch copy, each of which must RED the same control
 #      the real tree passes: (1) the stale-head skip dropped in plan.py -> the
 #      old head's build is no longer cancelled; (2) the merged-tree check dropped
-#      in merge.py -> a red merged tree reaches the merge verb. A mutation that
-#      did not change the file is reported as such (a no-op proves nothing).
+#      in merge.py -> a red merged tree reaches the merge verb; (3) the fan-out
+#      bound dropped in plan.py -> a head the width cannot take is no longer
+#      DEFERred by name. A mutation that did not change the file is reported as
+#      such (a no-op proves nothing).
 #
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. No network access.
 #
@@ -84,8 +87,14 @@ contains() {
 }
 
 # plan_fixture <tree> <fixture> -> prints the plan (the cli's own output)
+#
+# The width is PINNED, not inherited: `cli.py`'s default is `min(8, nproc // 2)`,
+# so a fixture's verdict would otherwise depend on the CPU count of the box the
+# gate happens to run on (and a fixture that declares its own `capacity` still
+# wins — see lesson-6-capacity-defer.json). A gate whose expectation is compared
+# against a machine-derived number is not a gate.
 plan_fixture() {
-  env PYTHONDONTWRITEBYTECODE=1 python3 "$1/fleet/runner/cli.py" plan --fixture "$2" 2>&1
+  env PYTHONDONTWRITEBYTECODE=1 python3 "$1/fleet/runner/cli.py" plan --fixture "$2" --capacity 4 2>&1
 }
 
 # expect <label> <output> <must-contain> <must-not-contain|->
@@ -124,11 +133,13 @@ fixture_controls() {
   expect "lesson-5 cannot-assess is never green" "$out" "requeue:cannot-assess:" "merge "
   out="$(plan_fixture "$tree" "$FIX/lesson-5-ranking.json")"
   expect "lesson-5 a Cloud Build green outranks a host-env red" "$out" "green:cloud-build:12" "verify-red"
+  out="$(plan_fixture "$tree" "$FIX/lesson-6-capacity-defer.json")"
+  expect "lesson-6 the fan-out width is a bound: the extra head is deferred by name" "$out" "capacity:41:no-evidence" "requeue:no-evidence:41"
   out="$(plan_fixture "$tree" "$FIX/lesson-7-prune-failed.json")"
   expect "lesson-7 a failed gate-lock prune plans no verify" "$out" "gatelock-prune-failed:" "verify "
 }
 
-echo "== A. plan fixtures (lessons 1-5, 7) refuse by name =="
+echo "== A. plan fixtures (lessons 1-7) refuse by name =="
 CONTROL_FAILS=0
 fixture_controls "$root"
 if [ "$CONTROL_FAILS" -ne 0 ]; then
@@ -169,6 +180,7 @@ for control in test_a_pushed_head_invalidates_prior_evidence_and_cancels_the_sta
                test_fetches_are_serialised_under_one_lock_and_name_explicit_refspecs \
                test_status_answers_what_is_verifying_merged_and_blocked_from_the_ledger \
                test_a_parked_verify_is_never_posted \
+               test_a_backed_off_width_defers_the_extra_head_by_name_and_never_loses_it \
                test_poster_protection_mapper_and_runner_name_the_same_context; do
   if ! grep -q "def $control(" fleet/runner/tests/test_plan.py fleet/runner/tests/test_transports.py; then
     bad "named control missing: $control"
@@ -281,6 +293,21 @@ if mutate "$m2_merge" 's/    if seam.rc != 0:/    if False:/' "MUTANT-2 merged-t
   fi
 fi
 
+# MUTANT 3 — drop the fan-out bound in plan.py: `slots` is never consumed, so
+# every head is verified regardless of width and the head the width could not
+# take is no longer DEFERred by name (it would read as "all heads taken").
+m3_plan="$mutant_tree/fleet/runner/plan.py"
+if mutate "$m3_plan" 's/        if slots > 0:/        if True:/' "MUTANT-3 capacity-bound-dropped"; then
+  rm -rf "$mutant_tree/fleet/runner/__pycache__"
+  CONTROL_FAILS=0
+  m3_out="$(plan_fixture "$mutant_tree" "$FIX/lesson-6-capacity-defer.json")"
+  if contains "$m3_out" "capacity:41:no-evidence"; then
+    bad "MUTANT-3 capacity-bound-dropped was NOT caught: the mutant still defers the extra head :: $(printf '%s' "$m3_out" | tr '\n' ' ')"
+  else
+    ok "MUTANT-3 capacity-bound-dropped is caught (the head the width cannot take is no longer deferred by name)"
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "check-pr-runner: NOT-OK — $fail finding(s); the runner's controls are not all provable" >&2
   exit 1
@@ -289,5 +316,5 @@ if [ "$cannot" -ne 0 ]; then
   echo "check-pr-runner: CANNOT-ASSESS — the transport suite could not run to completion"
   exit 2
 fi
-echo "check-pr-runner: OK — lessons 1-5,7 refuse by name from fixtures, 6-9 hold under fakes, the context is one string, and both mutants are caught"
+echo "check-pr-runner: OK — lessons 1-7 refuse by name from fixtures, 6-9 hold under fakes, the context is one string, and all three mutants are caught"
 exit 0

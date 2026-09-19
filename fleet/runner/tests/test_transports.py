@@ -73,6 +73,24 @@ def held_fds_under(path: Path) -> list[str]:
     return out
 
 
+# --- the fan-out width is an INJECTED input, never the machine ------------------
+#
+# `cli.cycle` reads the live box through `capacity.probe_host()`
+# (load1, MemAvailable, nproc) and backs the width off when the box is loaded or
+# below the 8.0 GB memory floor; `plan()` then DEFERs the heads that width cannot
+# take. A control that lets the machine decide measures green on a dev box and red
+# on the Cloud Build runner (7.29 GiB total RAM at a load above nproc) — a red on
+# the machine, not on the change. Every cycle driven from this file therefore
+# passes `calm_host_probe`; the backoff itself is provoked by name in
+# `test_a_backed_off_width_defers_the_extra_head_by_name_and_never_loses_it`.
+CALM_BOX = (0.4, 64.0, 8)
+
+
+def calm_host_probe():
+    """(load1, MemAvailable GB, nproc) for a box that needs no backoff."""
+    return CALM_BOX
+
+
 # --- lesson 6 ------------------------------------------------------------------
 def test_worktree_is_held_for_the_whole_run_and_removed_by_the_runner_after(tmp_path: Path):
     runner_dir = tmp_path / "runner"
@@ -149,7 +167,7 @@ def test_gatelock_prune_runs_before_any_verify_and_a_failed_prune_plans_none(tmp
 
     t = make_transports(prs=prs, sh_handler=sh_ok, tmp_path=tmp_path)
     base = tmp_path / "runner"
-    rc = cli.cycle(t, base=base, apply=False)
+    rc = cli.cycle(t, base=base, apply=False, host_probe=calm_host_probe)
     names = [argv[:3] for argv in t.sh.argvs()]
     assert names[0] == ["python3", "fleet/gatelock.py", "prune"], "prune is the FIRST shell call of a cycle"
     assert ["python3", "fleet/gatelock.py", "prune", "--apply"] in t.sh.argvs()
@@ -162,7 +180,7 @@ def test_gatelock_prune_runs_before_any_verify_and_a_failed_prune_plans_none(tmp
         return Result(0)
 
     t2 = make_transports(prs=prs, sh_handler=sh_prune_broken, tmp_path=tmp_path)
-    rc2 = cli.cycle(t2, base=tmp_path / "runner2", apply=False)
+    rc2 = cli.cycle(t2, base=tmp_path / "runner2", apply=False, host_probe=calm_host_probe)
     assert not any(argv[:2] == ["bash", "scripts/verify.sh"] for argv in t2.sh.argvs()), "no verify after a failed prune"
     rows = Ledger(tmp_path / "runner2" / "ledger.jsonl").rows()
     assert any(r.get("event") == "refuse" and str(r.get("reason", "")).startswith("gatelock-prune-failed:") for r in rows)
@@ -320,7 +338,7 @@ def test_the_transports_never_spell_the_raw_github_merge_command():
 def test_run_refuses_on_a_non_primary_host_by_name(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     t = make_transports(prs=[], env={"AO_RUNNER_HOST_ROLE": "standby"}, tmp_path=tmp_path)
-    rc = cli.cycle(t, base=tmp_path / "runner", apply=True)
+    rc = cli.cycle(t, base=tmp_path / "runner", apply=True, host_probe=calm_host_probe)
     assert rc == 2
     assert t.sh.calls == [] and not any(argv[:2] == ["pr", "list"] for argv in t.gh.argvs())
     rows = Ledger(tmp_path / "runner" / "ledger.jsonl").rows()
@@ -331,7 +349,7 @@ def test_an_unauthenticated_gh_is_cannot_assess_by_name_not_green(tmp_path: Path
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     t = make_transports(prs=[], tmp_path=tmp_path)
     t.gh = Fake(lambda argv, kw: Result(1, "", "not logged in") if argv[:2] == ["auth", "status"] else None, "gh")
-    rc = cli.cycle(t, base=tmp_path / "runner", apply=True)
+    rc = cli.cycle(t, base=tmp_path / "runner", apply=True, host_probe=calm_host_probe)
     assert rc == 2
     assert any(r.get("reason") == "gh-unauthenticated" for r in Ledger(tmp_path / "runner" / "ledger.jsonl").rows())
 
@@ -355,12 +373,66 @@ def test_a_full_cycle_verifies_posts_and_dry_run_merges_the_green(tmp_path: Path
     t = make_transports(prs=prs, sh_handler=sh_handler, gh_extra=gh_extra, tmp_path=tmp_path)
     base = tmp_path / "runner"
     # cycle 1: both heads verified and posted; nothing merged yet (evidence is read at cycle start)
-    assert cli.cycle(t, base=base, apply=False) == 0
+    assert cli.cycle(t, base=base, apply=False, host_probe=calm_host_probe) == 0
+    # the width this fixture assumes is asserted, not inherited from the box: a
+    # backed-off width DEFERs a head and this control would then read as a red.
+    caprow = [r for r in Ledger(base / "ledger.jsonl").rows() if r.get("event") == "capacity"][-1]
+    assert caprow["effective"] >= 2, f"the fixture declares a calm 2-wide box, got {caprow}"
     posts = [argv for argv in t.sh.argvs() if argv[:2] == ["bash", "scripts/gate-status.sh"]]
     assert sorted(a[4] for a in posts) == sorted([SHA, "d" * 40])
     # cycle 2: local markers make both green -> merged-tree seam + dry-run verb
     t2 = make_transports(prs=prs, sh_handler=sh_handler, gh_extra=gh_extra, tmp_path=tmp_path)
-    assert cli.cycle(t2, base=base, apply=False) == 0
+    assert cli.cycle(t2, base=base, apply=False, host_probe=calm_host_probe) == 0
     verbs = [argv for argv in t2.sh.argvs() if argv[1:2] == ["scripts/merge-pr.sh"]]
     assert sorted(v[3] for v in verbs) == ["20", "21"]
     assert not any(argv[:2] == ["bash", "scripts/verify.sh"] for argv in t2.sh.argvs()), "green heads are not re-verified"
+
+
+def test_a_backed_off_width_defers_the_extra_head_by_name_and_never_loses_it(tmp_path: Path, monkeypatch):
+    """The width is a bound, and what it cannot take is DEFERred BY NAME.
+
+    This is the control that turns the suite's ambient dependence into a
+    provoked one. A box below the memory floor at a load above nproc backs the
+    fan-out off (here 4 -> 1); the planner may then take one head and must name
+    the other `capacity:<pr>:<why>` — in the ledger, in `status`, and in a later
+    cycle it must still be verified. A head dropped in silence is a head that
+    reads as green.
+    """
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    pr_queue_with_seam(tmp_path)
+    prs = [
+        {"number": 40, "headRefOid": SHA, "mergeable": "MERGEABLE", "isDraft": False, "baseRefName": "master"},
+        {"number": 41, "headRefOid": "e" * 40, "mergeable": "MERGEABLE", "isDraft": False, "baseRefName": "master"},
+    ]
+
+    def sh_handler(argv, kw):
+        if argv[:2] == ["bash", "scripts/verify.sh"]:
+            return Result(0, "verify: PASS")
+        if argv[:2] == ["bash", "scripts/gate-status.sh"]:
+            return Result(0, "gate-status: posted")
+        return Result(0)
+
+    base = tmp_path / "runner"
+    loaded = make_transports(prs=prs, sh_handler=sh_handler, tmp_path=tmp_path)
+    assert cli.cycle(loaded, base=base, apply=False, host_probe=lambda: (20.0, 2.0, 8)) == 0
+    rows = Ledger(base / "ledger.jsonl").rows()
+    caprow = [r for r in rows if r.get("event") == "capacity"][-1]
+    assert caprow["declared"] == 4 and caprow["effective"] == 1, caprow
+    assert caprow["reason"].startswith("capacity-backoff:load:") and "memory:" in caprow["reason"], caprow
+
+    # exactly the head the width allowed is verified; the other is named, not dropped
+    posts = [argv for argv in loaded.sh.argvs() if argv[:2] == ["bash", "scripts/gate-status.sh"]]
+    assert [a[4] for a in posts] == [SHA], "only the head the width allowed may be verified"
+    defers = [r for r in rows if r.get("event") == "defer"]
+    assert [r["pr"] for r in defers] == [41], defers
+    assert defers[0]["reason"] == "capacity:41:no-evidence", "the deferred head is NAMED, never dropped"
+    assert bool(defers[0]["sha"])
+    # never counted green: no verify for it, and `status` says why, by name
+    text = "\n".join(cli.status_lines(rows, {}))
+    assert "#41" in text and "deferred:capacity:41:no-evidence" in text, text
+
+    # the bound is a bound, not a loss: the calm cycle still verifies it
+    calm = make_transports(prs=prs, sh_handler=sh_handler, tmp_path=tmp_path)
+    assert cli.cycle(calm, base=base, apply=False, host_probe=calm_host_probe) == 0
+    later = sorted(a[4] for a in calm.sh.argvs() if a[:2] == ["bash", "scripts/gate-status.sh"])
+    assert later == ["e" * 40], "the deferred head is picked up on the calm box, not lost"

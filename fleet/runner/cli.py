@@ -373,6 +373,10 @@ def status_lines(rows: list[dict], holds: dict[int, str]) -> list[str]:
             bits.append(f"posted={'ok' if p.get('ok') else 'FAILED'} rc={p.get('rc')}")
         if "await" in events:
             bits.append(f"awaiting:{events['await'].get('reason')}")
+        if "defer" in events:
+            # A head the width could not take is a PR the runner owes an
+            # explanation for: it is DEFERred by name, never dropped in silence.
+            bits.append(f"deferred:{events['defer'].get('reason')}")
         if "refuse" in events:
             bits.append(f"blocked:{events['refuse'].get('reason')}")
         if "stop" in events:
