@@ -3095,6 +3095,36 @@
       "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
     },
     {
+      "kind": "branch",
+      "name": "issue-1028-canon",
+      "reason": "PARKED and recorded 2026-09-19T21:12Z by the #1485 lane (origin/master 9c2c68fe). The leased exemptions in real-tree-quarantine.json used to carry this artifact; its AGENTS.md rule 17 basis - work that exists nowhere else - was re-measured and then ENDED rather than restated. Measured: tip 88ea96d70a3f2c424dc6e72565be072038caa995 (1 commit off merge-base c9040b9ffe04, 7 paths under governance/lessons/ plus docs/PYTHON-PATTERNS.md); not an ancestor of origin/master (git merge-base --is-ancestor rc 1); carried by no remote-tracking ref (git for-each-ref --contains empty); and not a descendant of origin/issue-1028-canon a1a8b50e8d6e, so its own name could not carry it. Parked with git push origin 88ea96d70a3f:refs/heads/rescue/issue-1028-canon (rc 0, a create) and re-read from origin: origin/rescue/issue-1028-canon = 88ea96d70a3f. The local branch is untouched, so the artifact still needs the owner call #1338 owns: land it under a fresh issue (#1028 is CLOSED) or authorise its deletion."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-830-reaper-schedule",
+      "reason": "PARKED and recorded 2026-09-19T21:12Z by the #1485 lane (origin/master 9c2c68fe), the same disposition as issue-1028-canon. Measured: tip af843aaf82895ab57d184a5bcf690d3e1f3a6d7e (1 commit off c9040b9ffe04, one path, scripts/prune-worktrees.sh); not an ancestor of origin/master; carried by no remote-tracking ref; not a descendant of origin/issue-830-reaper-schedule 3748194c2d40. Parked with git push origin af843aaf8289:refs/heads/rescue/issue-830-reaper-schedule (rc 0, a create) and re-read from origin: origin/rescue/issue-830-reaper-schedule = af843aaf8289. The local branch is untouched; the owner call stays with #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1114-dispatch-master-green",
+      "reason": "Recorded 2026-09-19T21:12Z by the #1485 lane (origin/master 9c2c68fe), after a peer lane preserved the work on a remote (the #1338 per-artifact disposition, PR #1451). Measured: tip d084114b73e84e3037bbecd94c12224aa80f0739 (4 commits off merge-base aa448e68715f, 11 paths across governance/landing/ and fleet/); not an ancestor of origin/master, but now CARRIED by origin/issue-1114-dispatch-master-green = d084114b73e8 (git for-each-ref --contains names it), which the #1311 measurement of 2026-09-18 recorded as no ref at all. The rule 17 basis is therefore gone and the exemption that rested on it was retired in the same commit. The local branch is untouched."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a1b5cf2e0dceac199",
+      "reason": "Recorded 2026-09-19T21:12Z by the #1485 lane (origin/master 9c2c68fe). Its HEAD d084114b73e8 - the same commit as branch issue-1114-dispatch-master-green - is now carried by origin/issue-1114-dispatch-master-green, so the committed work at this HEAD exists off this box. Its own dirt is machine-managed only: git status --porcelain -uall = M .board/focus.json and governance/isolation/worktree.foreign_uncommitted() = [] (empty). No /proc process holds it as cwd and git reports no worktree lock for it. Nothing here needs an exemption; the tree is untouched."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-afc588dba96686e4e",
+      "reason": "Recorded 2026-09-19T21:12Z by the #1485 lane (origin/master 9c2c68fe). HEAD 47ac6de35e04 on branch fix/1042-governance-test-basenames, 4 commits; not an ancestor of origin/master but now CARRIED by origin/fix/1042-governance-test-basenames = 47ac6de35e04 (git for-each-ref --contains names it) - a peer lane preserved it before this record. foreign_uncommitted() = [] (the untracked .fleet/reconcile/ledger.jsonl and .fleet/watchdog.lease are machine-managed), no /proc holder, no worktree lock. The tree is untouched."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ad284eb1ac275c0c6",
+      "reason": "PRESERVED and recorded 2026-09-19T21:12Z by the #1485 lane (origin/master 9c2c68fe). This was the one artifact of the six whose rule 17 claim was still exactly true. Measured: HEAD 9e5a61528752 IS an ancestor of origin/master (its committed work landed), and it held one uncommitted path of its own - governance/ticket/tests/conftest.py, sha256 af180c20a1139a9069042f8dea12c984189acec7097449e5bda2c985c576a83e - which was on no branch and no remote; it differs from master's blob by exactly one token, adding builder to the sys.modules.pop list in the ticket test bootstrap. Preserved with git push origin 6d47b5abdc35:refs/heads/rescue/agent-ad284eb-ticket-conftest, committed on origin/master 9c2c68fe; the blob read back from origin/rescue/agent-ad284eb-ticket-conftest hashes to the same sha256 af180c20a113. The worktree and its file are untouched, so the fix is still in place for whoever owns that file; nothing about it needs an exemption now that it exists off this box."
+    },
+    {
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a85389963264be797",
       "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
