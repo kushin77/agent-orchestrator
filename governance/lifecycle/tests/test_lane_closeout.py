@@ -31,10 +31,16 @@ class FakeOps:
         self.remote = "a" * 40
         self.landed = {self.local: True, self.remote: True}
         self.present = True
+        self.leftover = False
+        self.remove_error = ""
         self.foreign = []
         self.machine = [".board/focus.json"]
         self.tails = {"verify": "verify: PASS"}
         self.calls: list[tuple] = []
+        #: Every port call that has a side effect or that the ORDER depends on,
+        #: in the order it was made. ``calls`` stays the effects-only log the
+        #: older controls assert on ("a dry run writes nothing").
+        self.seen: list[str] = []
         self.__dict__.update(overrides)
 
     def pull_request_for(self, branch):
@@ -53,6 +59,7 @@ class FakeOps:
         return self.remote
 
     def content_landed(self, ref):
+        self.seen.append("content_landed")
         return self.landed.get(ref, False)
 
     def record_reaped(self, **kw):
@@ -69,7 +76,11 @@ class FakeOps:
     def worktree_present(self, path):
         return self.present
 
+    def worktree_leftover(self, path):
+        return self.leftover
+
     def foreign_dirt(self, path):
+        self.seen.append("foreign_dirt")
         return self.foreign
 
     def machine_dirt(self, path):
@@ -77,6 +88,9 @@ class FakeOps:
 
     def remove_worktree(self, path):
         self.calls.append(("remove_worktree", path))
+        self.seen.append("remove_worktree")
+        if self.remove_error:
+            raise RuntimeError(self.remove_error)
         return f"removed {path}"
 
     def gate_tails(self, issue, lane):
@@ -197,6 +211,120 @@ def test_a_legacy_record_without_lane_id_closes_by_its_session_id():
     legacy = {k: v for k, v in RECORD.items() if k not in ("lane_id", "runtime", "opened_at")}
     result = lc.closeout_lane(legacy, FakeOps(), apply=True)
     assert result.ok and result.lane_id == "abc123def456"
+
+
+# --- the dangling leftover: the wedge this verb must not have (#1441/#1443) ----
+#
+# MEASURED on this box (2026-09-19, origin/master d6b3eb8d): another lane's reaper
+# pruned the git admin entry under `.git/worktrees/` and left the directory, so
+# `worktree_present` (then `Path(path).exists()`) said "present" while
+# `git worktree remove` refused `fatal: '<path>' is not a working tree`. The step
+# blocked, `lane-archived` was withheld behind it, `forget_lane` never ran, and 7 of
+# 32 records could never reach a terminal state.
+
+
+def test_a_dangling_worktree_directory_settles_instead_of_wedging():
+    """The defect: a leftover directory is NOT a worktree, and must not wedge."""
+    ops = FakeOps(present=False, leftover=True)
+    result = lc.closeout_lane(RECORD, ops, apply=True, now="2026-09-19T12:00:00Z")
+    assert result.ok and result.blocked == []
+    assert outcomes(result) == {
+        "pr-merged": "skipped", "issue-closed": "skipped", "branch-reaped": "performed",
+        "worktree-removed": "skipped", "lane-archived": "performed",
+    }
+    step = next(step for step in result.steps if step.name == "worktree-removed")
+    assert RECORD["worktree"] in step.detail, step.detail
+    assert "already torn down" in step.detail
+    # the tips are still recorded before anything is deleted (#1335), and the archive
+    # still precedes the record going.
+    names = [call[0] for call in ops.calls]
+    assert "record_reaped" in names and names.index("record_reaped") < names.index("delete_local")
+    assert names.index("archive") < names.index("forget_lane")
+    bundle = next(call[2] for call in ops.calls if call[0] == "archive")
+    assert bundle["evidence"]["worktree_leftover"] is True
+
+
+def test_a_leftover_directory_is_never_deleted_and_never_guessed_about():
+    """Rule 17, as this verb owes it: the directory is left alone, and with the admin
+    entry gone git cannot say whether it holds the lane's work — so the close-out must
+    not pretend it measured that."""
+    ops = FakeOps(present=False, leftover=True)
+    lc.closeout_lane(RECORD, ops, apply=True)
+    assert "remove_worktree" not in ops.seen
+    assert "foreign_dirt" not in ops.seen
+
+
+def test_a_dry_run_names_the_leftover_rather_than_planning_a_removal():
+    ops = FakeOps(present=False, leftover=True)
+    result = lc.closeout_lane(RECORD, ops, apply=False)
+    assert result.ok
+    assert outcomes(result)["worktree-removed"] == "skipped"
+    assert outcomes(result)["lane-archived"] == "planned"
+    assert "already torn down" in next(s for s in result.steps if s.name == "worktree-removed").detail
+    assert ops.calls == []
+
+
+def test_a_removal_git_refuses_as_not_a_working_tree_is_already_torn_down():
+    """The race the read cannot win: the admin entry goes between the presence read
+    and the removal. git is reporting an already-torn-down state, so it may not block."""
+    ops = FakeOps(present=True, remove_error=(
+        "git worktree remove /lanes/ao-1301-abc123de: fatal: "
+        "'/lanes/ao-1301-abc123de' is not a working tree"
+    ))
+    result = lc.closeout_lane(RECORD, ops, apply=True)
+    assert result.ok and result.blocked == []
+    assert outcomes(result)["worktree-removed"] == "skipped"
+    assert outcomes(result)["lane-archived"] == "performed"
+    assert "already torn down" in next(
+        step for step in result.steps if step.name == "worktree-removed"
+    ).detail
+    bundle = next(call[2] for call in ops.calls if call[0] == "archive")
+    assert bundle["evidence"]["worktree_leftover"] is True
+
+
+def test_any_other_removal_failure_is_still_blocked_by_name():
+    """Negative control for the reading above: it is NARROW. A tree git refuses to
+    remove because something holds it is a real refusal and still withholds the
+    archive — the fix must not turn every removal failure into a pass."""
+    ops = FakeOps(present=True, remove_error=(
+        "git worktree remove /lanes/ao-1301-abc123de: fatal: "
+        "'/lanes/ao-1301-abc123de' is locked"
+    ))
+    result = lc.closeout_lane(RECORD, ops, apply=True)
+    assert result.blocked == ["closeout-blocked:worktree-removed"]
+    assert outcomes(result)["lane-archived"] == "withheld"
+    assert [call for call in ops.calls if call[0] in ("archive", "forget_lane")] == []
+
+
+def test_an_unlanded_lane_is_not_reclaimed_even_when_its_worktree_is_a_leftover():
+    """Rule 17's negative control: the leftover reading is about the DIRECTORY, never
+    about the work. A tip that is not content-landed still blocks, and nothing of the
+    lane is touched."""
+    ops = FakeOps(present=False, leftover=True, remote="b" * 40)
+    ops.landed = {"a" * 40: True, "b" * 40: False}
+    result = lc.closeout_lane(RECORD, ops, apply=True)
+    assert result.blocked == ["closeout-blocked:branch-reaped"]
+    assert outcomes(result)["lane-archived"] == "withheld"
+    assert [call for call in ops.calls if call[0] in ("remove_worktree", "archive", "forget_lane")] == []
+
+
+def test_the_lanes_own_dirt_is_read_before_the_tree_is_removed():
+    """#786's order, as this verb owes it: the worktree's evidence is read BEFORE the
+    tree is touched. Removing first would destroy the only tree the item's missing
+    verification could be measured from."""
+    ops = FakeOps(foreign=[])
+    result = lc.closeout_lane(RECORD, ops, apply=True)
+    assert result.ok
+    assert ops.seen.index("foreign_dirt") < ops.seen.index("remove_worktree")
+
+
+def test_dirt_the_lane_owns_keeps_the_tree_and_the_record():
+    """...and when that read finds the lane's own work, the removal never happens."""
+    ops = FakeOps(foreign=["governance/x.py"])
+    result = lc.closeout_lane(RECORD, ops, apply=True)
+    assert result.blocked == ["closeout-blocked:worktree-removed"]
+    assert "remove_worktree" not in ops.seen
+    assert [call for call in ops.calls if call[0] in ("remove_worktree", "archive", "forget_lane")] == []
 
 
 def test_the_archive_lives_in_a_subdirectory_the_issue_journal_reader_cannot_mistake(tmp_path):

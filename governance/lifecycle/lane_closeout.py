@@ -18,7 +18,11 @@ the artifacts the lane bound at creation, in this order:
    (``worktree.content_landed``); a tip that is not content-landed blocks — it
    is never deleted;
 4. ``worktree-removed`` — the lane worktree is removed when its only dirt is
-   machine-managed (#1285/#834); the lane's own uncommitted work blocks;
+   machine-managed (#1285/#834); the lane's own uncommitted work blocks. A path
+   git no longer knows as a worktree — a directory left behind by a reclaim that
+   pruned the admin entry under ``.git/worktrees/`` — is ALREADY TORN DOWN: the
+   step is satisfied by the absence of a working tree, names the leftover path,
+   and neither blocks nor deletes the directory (#1441/#1443).
 5. ``lane-archived`` — the record, the session beat and the evidence bundle are
    written to ``.fleet/lifecycle/lanes/<lane_id>.json`` and the live record and
    beat are removed.
@@ -72,9 +76,40 @@ STEPS = (STEP_PR_MERGED, STEP_ISSUE_CLOSED, STEP_BRANCH_REAPED, STEP_WORKTREE_RE
 
 BLOCKED_PREFIX = "closeout-blocked"
 
+#: What git says when there is NO working tree at the path at all — the admin entry
+#: under ``.git/worktrees/`` is gone (a reclaim pruned it, or ``git worktree prune``
+#: dropped it) while the directory survived. That is git reporting an already-torn-down
+#: state, not a failure to tear one down, so it may not block a lane's close-out
+#: (#1441/#1443). It is matched on git's own words rather than on the exit code,
+#: because the exit code is the same one every other removal failure uses.
+ALREADY_TORN_DOWN = "is not a working tree"
+
 
 class LaneUnavailable(RuntimeError):
     """A source the close-out needs could not be read: CANNOT-ASSESS, never a verdict."""
+
+
+def already_torn_down(exc: BaseException) -> bool:
+    """Did git refuse the removal because there is no working tree there at all?"""
+    return ALREADY_TORN_DOWN in str(exc)
+
+
+def leftover_detail(path: str) -> str:
+    """The step detail for a path that survives with no git worktree admin entry.
+
+    It names the path, the reason, and what was done about it — which is *nothing*:
+    with the admin entry gone git can no longer tell the lane's uncommitted work from
+    a stray file, so the directory is left in place rather than deleted on an
+    unmeasurable guess (AGENTS.md rule 17 — never trade work for a settled record).
+    The step is satisfied by the absence of a working tree, not by the absence of a
+    directory, so the archive is free to proceed.
+    """
+    return (
+        f"already torn down: {path} is a leftover directory with no git worktree admin "
+        "entry (the worktree was reclaimed, or 'git worktree prune' dropped it) — there is "
+        "no working tree to remove, and the directory is left in place rather than deleted "
+        "on an unmeasurable guess"
+    )
 
 
 @dataclass(frozen=True)
@@ -148,7 +183,15 @@ class LaneOps(Protocol):
 
     def delete_remote_branch(self, branch: str) -> str: ...
 
-    def worktree_present(self, path: str) -> bool: ...
+    def worktree_present(self, path: str) -> bool:
+        """Is the path a worktree GIT knows about — not merely a directory that exists?"""
+
+    def worktree_leftover(self, path: str) -> bool:
+        """Does a directory sit at the path without git knowing it as a worktree?
+
+        Only asked when :meth:`worktree_present` is false, so the two can never both
+        be true: a path is registered, a leftover, or gone.
+        """
 
     def foreign_dirt(self, path: str) -> list[str]: ...
 
@@ -244,7 +287,22 @@ def closeout_lane(record: dict, ops: LaneOps, *, apply: bool = False, now: str =
     #    in this gate's own scratch repository), so the worktree goes first
     #    mechanically while the steps are still REPORTED in the contract's
     #    order — and a worktree holding the lane's own work blocks both.
+    #
+    #    PRESENT means git knows the path as a worktree, which is the notion
+    #    `governance/reconcile/orphans.py` (its `git worktree list` membership) and
+    #    `governance/isolation` already use — not merely that a directory survives
+    #    there. `Path(path).exists()` answered the other question, so a leftover
+    #    directory read as "would remove" on the dry run and as "is not a working
+    #    tree" on apply: the step blocked, `lane-archived` was withheld behind it,
+    #    and the record wedged permanently, 7 of 32 records measured on this box
+    #    (#1441/#1443).
     present = bool(worktree) and ops.worktree_present(worktree)
+    leftover = bool(worktree) and not present and ops.worktree_leftover(worktree)
+    #: ``PERFORMED`` is the claim that a tree was really removed, so it is the outcome
+    #: of the removal we performed — ``present`` is only the read we made before it.
+    #: In the race below the read is true and the removal still finds nothing there;
+    #: reporting that as ``performed`` would be a success this verb did not have.
+    removed = False
     machine_note = ""
     if present:
         foreign = ops.foreign_dirt(worktree)
@@ -267,19 +325,30 @@ def closeout_lane(record: dict, ops: LaneOps, *, apply: bool = False, now: str =
             result.steps.append(Step(STEP_BRANCH_REAPED, SKIPPED, f"{branch} exists neither locally nor on origin"))
         if present:
             result.steps.append(Step(STEP_WORKTREE_REMOVED, PLANNED, f"would remove {worktree}{machine_note}"))
+        elif leftover:
+            result.steps.append(Step(STEP_WORKTREE_REMOVED, SKIPPED, leftover_detail(worktree)))
         else:
             result.steps.append(Step(STEP_WORKTREE_REMOVED, SKIPPED, "no worktree on disk"))
     else:
-        worktree_detail = "no worktree on disk"
+        worktree_detail = leftover_detail(worktree) if leftover else "no worktree on disk"
         if present:
             try:
                 worktree_detail = ops.remove_worktree(worktree) + machine_note
+                removed = True
             except Exception as exc:  # noqa: BLE001 - a failed removal is a blocked step, not a crash
-                if reaped:
-                    result.steps.append(Step(STEP_BRANCH_REAPED, WITHHELD, f"withheld: {STEP_WORKTREE_REMOVED} is blocked"))
-                _block(result, STEP_WORKTREE_REMOVED, f"{type(exc).__name__}: {exc}"[:300])
-                _withhold_rest(result, STEP_WORKTREE_REMOVED)
-                return result
+                if not already_torn_down(exc):
+                    if reaped:
+                        result.steps.append(Step(STEP_BRANCH_REAPED, WITHHELD, f"withheld: {STEP_WORKTREE_REMOVED} is blocked"))
+                    _block(result, STEP_WORKTREE_REMOVED, f"{type(exc).__name__}: {exc}"[:300])
+                    _withhold_rest(result, STEP_WORKTREE_REMOVED)
+                    return result
+                # git itself says there is no working tree here: the admin entry went
+                # between the read above and this call (another lane's reaper pruned
+                # it). There is nothing to remove and nothing left to evidence, so the
+                # step is satisfied by that absence — refusing here is what made the
+                # wedge permanent, and there is no second read that could win the race.
+                leftover = True
+                worktree_detail = leftover_detail(worktree)
         branch_detail = f"{branch} exists neither locally nor on origin"
         if reaped:
             details = []
@@ -289,13 +358,17 @@ def closeout_lane(record: dict, ops: LaneOps, *, apply: bool = False, now: str =
                     details.append(ops.delete_local_branch(branch) if where == "local" else ops.delete_remote_branch(branch))
             except Exception as exc:  # noqa: BLE001 - the tip is recorded; the deletion is retried next pass
                 _block(result, STEP_BRANCH_REAPED, f"{type(exc).__name__}: {exc}"[:300])
-                result.steps.append(Step(STEP_WORKTREE_REMOVED, PERFORMED if present else SKIPPED, worktree_detail))
+                result.steps.append(Step(STEP_WORKTREE_REMOVED, PERFORMED if removed else SKIPPED, worktree_detail))
                 result.steps.append(Step(STEP_LANE_ARCHIVED, WITHHELD, f"withheld: {STEP_BRANCH_REAPED} is blocked"))
                 return result
             branch_detail = "; ".join(details)
         result.steps.append(Step(STEP_BRANCH_REAPED, PERFORMED if reaped else SKIPPED, branch_detail))
-        result.steps.append(Step(STEP_WORKTREE_REMOVED, PERFORMED if present else SKIPPED, worktree_detail))
+        result.steps.append(Step(STEP_WORKTREE_REMOVED, PERFORMED if removed else SKIPPED, worktree_detail))
     result.evidence["worktree"] = worktree
+    if leftover:
+        # Recorded so the bundle says WHY the directory outlives the record: the
+        # operator can act on it, and an audit can tell this apart from "no worktree".
+        result.evidence["worktree_leftover"] = True
 
     # 5. the archive: the record plus everything above, then the live record goes.
     bundle = {
