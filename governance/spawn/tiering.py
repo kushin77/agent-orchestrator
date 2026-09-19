@@ -48,6 +48,13 @@ FINDING_ROLE_NOT_ALLOWED = "FINOPS-ROLE-NOT-ALLOWED"
 FINDING_UNKNOWN_TASK_CLASS = "FINOPS-UNKNOWN-TASK-CLASS"
 FINDING_UNKNOWN_TIER = "FINOPS-UNKNOWN-TIER"
 FINDING_UNKNOWN_ROLE = "FINOPS-UNKNOWN-ROLE"
+#: The three findings the SPAWN POINT needs on top of the judge's (#1413): a
+#: declared model the ladder does not carry, a model that contradicts the tier
+#: declared beside it, and a tiers.yaml that cannot be read at all. They live
+#: here because this module owns the ladder; the spawn point only names them.
+FINDING_UNKNOWN_MODEL = "FINOPS-UNKNOWN-MODEL"
+FINDING_MODEL_TIER_CONFLICT = "FINOPS-MODEL-TIER-CONFLICT"
+FINDING_TIERS_UNAVAILABLE = "FINOPS-TIERS-UNAVAILABLE"
 
 #: Runtimes this judge is known to gate (issue #1274: not only the fleet).
 #: The set is descriptive/loggable only — every role is judged against the
@@ -98,6 +105,44 @@ def allowed_tiers(table: TierTable, task_class: str):
         lo = table.higher(lo, table.security_floor)
     hi = cls.max_tier
     return lo, hi
+
+
+def load_table(tiers_path: Optional[Path] = None) -> TierTable:
+    """The loaded ladder, or ``TieringUnavailable`` — the one public loader (#1413).
+
+    The spawn point judges a tier it was TOLD (a spawn record's declared tier, or
+    the rung a declared model sits on), so it needs the table itself rather than
+    one verdict — and it must get it from here, so there is still exactly one
+    reader of ``tiers.yaml``.
+    """
+    return _load_table(tiers_path)
+
+
+def default_tier(task_class: str, table: Optional[TierTable] = None, tiers_path: Optional[Path] = None) -> str:
+    """The cheapest capable tier for a task class: the floor of its own window.
+
+    This is what a spawn that asks for NO tier runs at — the table's own
+    ``defaultTier``, raised to ``security.floorTier`` for a guarded class — so
+    "declared no tier" resolves to a real rung instead of an empty string.
+    Raises ``ValidationError`` for a class the table does not declare.
+    """
+    resolved = table if table is not None else _load_table(tiers_path)
+    return allowed_tiers(resolved, task_class)[0]
+
+
+def tier_for_model(model: str, table: Optional[TierTable] = None, tiers_path: Optional[Path] = None) -> Optional[str]:
+    """The ladder rung a declared MODEL sits on, or None when it sits on none.
+
+    A spawn may name the model it wants (``claude-opus-5``) instead of a tier;
+    the ladder is the only place that model's tier is written down, so it is read
+    from there rather than mapped by a second table.
+    """
+    resolved = table if table is not None else _load_table(tiers_path)
+    for rung in resolved.ladder:
+        for spec in rung.models:
+            if spec.id == model:
+                return rung.key
+    return None
 
 
 def judge(
