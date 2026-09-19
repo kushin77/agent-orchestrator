@@ -19,9 +19,10 @@ hand-edited.
 * the **prune** line — once a day it runs `fleet/prune.py run --apply`, which
   ages out the answered mailbox entries and rotates the append-only ledgers so
   `.fleet/` cannot grow without bound (issue #280); and
-* the **reap** line — once a day it runs `scripts/prune-worktrees.sh --apply`,
-  which reclaims stale LANE WORKTREES (issue #207, #516) so the pile that #516
-  measured does not silently rebuild (issue #830). The tool itself is fail
+* the **reap** line — once a day it runs `scripts/prune-worktrees.sh --branches
+  --apply`, which reclaims stale LANE WORKTREES (issue #207, #516) so the pile
+  that #516 measured does not silently rebuild (issue #830), AND drains LANDED
+  LANE BRANCHES (issue #1118, scheduled by #1360). The tool itself is fail
   closed — claimed, dirty, in-use and unpreserved worktrees are always kept —
   so scheduling it daily is the whole fix; nothing here re-implements its
   judgment.
@@ -192,7 +193,7 @@ _LEGACY_JOBS = (
         "name": "reap",
         "marker": REAP_MARKER,
         "schedule": REAP_SCHEDULE,
-        "command": "bash scripts/prune-worktrees.sh --apply",
+        "command": "bash scripts/prune-worktrees.sh --branches --apply",
         "user": "",
         "log": "reap.log",
         "singleton": False,
@@ -430,14 +431,24 @@ def _marker_of(entry: str) -> str:
 def reap_line() -> str:
     """The worktree-reap line: daily, applying, shelling out to the tool #207 shipped.
 
+    RENDERED FROM THE MANIFEST — never re-spelled here — exactly like `line`,
+    `prune_line` and `reconcile_line` above it. It was the one builder that
+    hard-coded its own command, so the same rung had two declarations that could
+    drift apart, and issue #1360 measured the drift: adding `--branches` to the
+    manifest left this copy re-spelling the old command, and
+    `scripts/check-fleet-jobs.sh` refused it by name (LEGACY-BUILDERS-LOCKSTEP,
+    and CLEAN-TREE-NOOP, which saw a permanently `refreshed` reap line).
+    `_job_by_name` prefers the manifest and falls back to `_LEGACY_JOBS` when it
+    cannot be read, so both paths still render a line.
+
     `prune-worktrees.sh` is fail-closed on its own (claimed/dirty/in-use/
     unpreserved worktrees are always kept), so `--apply` here is safe on the
-    same grounds the daily prune line already relies on.
+    same grounds the daily prune line already relies on — and `--branches` is
+    the half that drains LANDED LANE BRANCHES, without which every landed branch
+    eventually ages past `check-reconcile`'s 24h grace and reds the gate of
+    record for every lane (#1360).
     """
-    return (
-        f"{REAP_SCHEDULE} cd {ROOT} && bash scripts/prune-worktrees.sh --apply "
-        f">> {REAP_LOG} 2>&1 # {REAP_MARKER}"
-    )
+    return render_job(_job_by_name("reap"))
 
 
 def _is_ours(entry: str) -> bool:
