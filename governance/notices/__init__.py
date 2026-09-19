@@ -3,10 +3,11 @@
 A rule between runtimes is a RECORD with a schema and an acknowledgement, never a
 sentence in a chat. This package is the notice half of that:
 
-  * ``runtime_registry`` derives the registered-runtime set from the registry the
-    repository already owns (the AgentPack release snapshots plus the gateway
-    catalog) -- a runtime is REGISTERED, so nobody maintains a list of who must
-    ack;
+  * ``runtime_registry`` reads the registered-runtime set from its ONE authority,
+    the contract ``fleet/runtimes.yaml`` (through the one loader
+    ``fleet/runtimes.py``, issue #1412) -- a runtime is REGISTERED, so nobody
+    maintains a list of who must ack, and this package carries no vocabulary of
+    its own;
   * ``notice_records`` holds the notice/ack records, their refusals, and the
     evaluator the gate drives;
   * ``ledger`` chains every write (a publish, an ack) with the digest of the record

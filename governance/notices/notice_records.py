@@ -337,7 +337,8 @@ def publish(
     if not runtimes:
         raise NoticeError(
             EMPTY_RUNTIME_REGISTRY,
-            "refusing to publish '%s': no live AgentPack registers an identity the "
+            "refusing to publish '%s': nothing is registered -- no `runtimes:` row is "
+            "declared for this tree and no live AgentPack registers an identity the "
             "gateway carries a transport for, so no runtime could ack it" % notice_id,
         )
     if not ID_RE.match(notice_id or ""):
@@ -517,8 +518,9 @@ def evaluate(root: Path | str, fleet_dir: Path | str) -> Report:
     if not runtimes:
         findings.append(Finding(
             EMPTY_RUNTIME_REGISTRY, "(none)",
+            "nothing is registered -- no `runtimes:` row is declared for this tree and "
             "no live AgentPack registers an identity the gateway carries a transport "
-            "for -- nothing is owed, so the rule would pass by matching nothing",
+            "for, so nothing is owed and the rule would pass by matching nothing",
         ))
     for runtime in runtimes:
         if not (Path(root) / runtime.fanout).is_file():
