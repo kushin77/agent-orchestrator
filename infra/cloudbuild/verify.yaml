@@ -88,13 +88,36 @@ steps:
         fi
         export GH_TOKEN
 
-        # $COMMIT_SHA is the PR head on a pull_request-triggered build (Cloud
-        # Build's documented substitution), so this status lands on the commit
-        # branch protection evaluates.
-        if [ -z "${COMMIT_SHA:-}" ]; then
-          echo "gate-status: SKIPPED -- COMMIT_SHA is empty, so no commit status can be attached"
-          echo "  to the commit under review; the gate verdict is NOT posted (see issue #1350)"
-          exit "$rc"
+        # --- the commit under review -----------------------------------------
+        # $COMMIT_SHA is NOT the PR head on a pull_request-triggered build:
+        # Cloud Build populates that built-in for push/tag triggers, and on THIS
+        # trigger it is empty (measured: build
+        # e6df118d-a395-477d-957b-9603be327b86, whose own checkout log reads
+        # `GitCommit: df02b015...` while this step still saw the built-in empty)
+        # -- so requiring it withdrew the producer at the very moment the check
+        # became required.
+        #
+        # The gate's OWN record is the honest subject: `make verify` writes
+        # `.verify/attestation.json` carrying the sha it MEASURED and the rc it
+        # reached, and Cloud Build's FETCHSOURCE checks out that same commit. The
+        # sha therefore comes from the record, never from the trigger type. A
+        # PARKED or crashed gate writes no attestation, so there is no verdict to
+        # publish and this step says so by name instead of inventing one.
+        #
+        # `dry-run` resolves the record BEFORE the external boundary (the token)
+        # is consulted, and writes nothing -- it is what puts the sha this run is
+        # about into the build log, so the resolution is readable evidence rather
+        # than a claim.
+        #
+        # The path is spelled LITERALLY here and below, with no shell variable:
+        # the submission-time validator reads bare dollar-templates in this file
+        # (the same class that refused `$GH_TOKEN`, build
+        # 05734838-0cc3-4b35-bd2b-ab5e909fc3a3), so introducing a new one for a
+        # fixed path buys nothing and risks exactly that failure.
+        if ! bash scripts/gate-status.sh dry-run --attestation .verify/attestation.json --sha "${COMMIT_SHA:-}"; then
+          echo "gate-status: CANNOT-ASSESS -- the gate's own record (.verify/attestation.json) does not"
+          echo "  name a publishable commit, so this build has no verdict to post."
+          exit 2
         fi
 
         # No token: skip posting BY NAME and hand back the GATE's own rc. A
@@ -117,12 +140,19 @@ steps:
 
         # scripts/gate-status.sh owns the tri-state mapping (0 OK / 1 NOT-OK / 2
         # CANNOT-ASSESS -> success / failure / error) -- rc 2 is never posted as
-        # success. A POST that fails once the token WAS available produced no
-        # check at all, so it is CANNOT-ASSESS (2) by name rather than a silent
-        # skip.
-        if ! bash scripts/gate-status.sh post --sha "$COMMIT_SHA" --rc "$rc"; then
+        # success. Both the rc and the sha are taken from the gate's own record
+        # in ONE move, so a published outcome can never belong to a commit other
+        # than the one that was measured. A POST that fails once the token WAS
+        # available produced no check at all, so it is CANNOT-ASSESS (2) by name
+        # rather than a silent skip.
+        #
+        # The built-in is passed ALONGSIDE the record as a CROSS-CHECK, never as
+        # the source: it is empty on pull_request triggers -- the empty value is
+        # read as "no claim" -- and when it IS populated a disagreement is
+        # REFUSED, because an rc belongs only to the commit that was measured.
+        if ! bash scripts/gate-status.sh post --attestation .verify/attestation.json --sha "${COMMIT_SHA:-}"; then
           echo "gate-status: CANNOT-ASSESS -- the gate ran (rc $rc) but its status was not published"
-          echo "  for $COMMIT_SHA; the build is not reported as a gated run."
+          echo "  for the commit it measured; the build is not reported as a gated run."
           exit 2
         fi
 

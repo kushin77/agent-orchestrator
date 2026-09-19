@@ -91,12 +91,21 @@ based on (§1) — to record that #1072 and #1073 landed in between.
   status on the commit under review, and the only producers are the `verify`
   build and a lane invoking `scripts/gate-status.sh post` (#1350/#1354). The
   build config no longer *requires* the token to run (it would otherwise die
-  before step 0 on an absent secret, reporting nothing about the code), so what
-  it publishes now depends on `ao-gate-status-token` existing in Secret Manager:
-  with the secret it posts the gate's own rc, without it the step logs `SKIPPED`
-  and produces nothing (#1350). Until the secret exists, merges pass on the
-  operator override (`enforce_admins: false`) — which is exactly how a required
-  check degrades into a routinely-bypassed one.
+  before step 0 on an absent secret, reporting nothing about the code), and it
+  no longer requires the `$COMMIT_SHA` built-in either — that built-in is empty
+  on a `pull_request` build (measured 2026-09-18: build
+  `e6df118d-a395-477d-957b-9603be327b86`, whose own checkout log reads
+  `GitCommit: df02b015...`), so requiring it skipped the POST while the commit
+  under review was in fact known. The sha now comes from the gate's own
+  `.verify/attestation.json` — the commit it measured — with the built-in passed
+  as a cross-check when it is populated. What it publishes still depends on
+  `ao-gate-status-token` existing in Secret Manager: with the secret it posts
+  the gate's own rc for the commit it measured, without it the step logs
+  `SKIPPED` and produces nothing (#1350). **Confirmed absent 2026-09-18**:
+  `gcloud secrets describe ao-gate-status-token --project=purebliss-ghl` →
+  `NOT_FOUND`. Until the secret exists, merges pass on the operator override
+  (`enforce_admins: false`) — which is exactly how a required check degrades
+  into a routinely-bypassed one.
 - **A fail-closed producer can wedge the queue.** With the context required, a
   producer that stops publishing (expired token, disabled trigger) makes every
   PR unmergeable rather than merely ungated. The escape is the declared policy

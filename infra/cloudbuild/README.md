@@ -67,11 +67,33 @@ by a human in a console.
 The now-required status check `ao/gate-of-record` (#1342) needs a producer on
 the PR head. `verify.yaml`'s `verify` step runs the gate of record (via
 `scripts/verify.sh verify` — the same entrypoint `make verify` uses), captures
-its rc, publishes it with `scripts/gate-status.sh post --sha "$COMMIT_SHA"
---rc "$rc"`, and then exits with that same `$rc`. Publishing can therefore
-never turn a red gate green, and the check-run stays truthful to the gate.
-`$COMMIT_SHA` is the PR head on a pull_request build, so the status lands on
-the commit branch protection actually evaluates.
+its rc, publishes it with `scripts/gate-status.sh post --attestation
+.verify/attestation.json`, and then exits with that same `$rc`. Publishing can
+therefore never turn a red gate green, and the check-run stays truthful to the
+gate.
+
+### The commit under review comes from the gate's own record, not the trigger
+
+`$COMMIT_SHA` is a built-in Cloud Build populates for **push/tag** triggers; on
+a `pull_request`-triggered build it is **empty**. Measured on build
+`e6df118d-a395-477d-957b-9603be327b86`: the build's own checkout log reads
+`GitCommit: df02b015...` while the step saw the built-in empty — so the earlier
+config skipped the POST and reported that the commit under review was
+unresolvable when it was in fact perfectly well known. Requiring that built-in
+withdrew the producer at exactly the moment the check became required.
+
+`make verify` writes `.verify/attestation.json`, which holds **the sha it
+measured** and **the rc it reached**, and Cloud Build's `FETCHSOURCE` checks out
+that same commit. The poster therefore takes both from the record:
+
+- a PARKED or crashed gate writes no attestation, so there is no verdict to
+  publish and the step exits `2` by name rather than inventing one;
+- when `$COMMIT_SHA` *is* populated (push/tag triggers) it is passed alongside
+  as a **cross-check** — a disagreement is refused, because an rc belongs only
+  to the commit that was measured;
+- the step resolves the record with a `dry-run` **before** the token boundary is
+  consulted, so the sha this run is about is readable in the build log instead of
+  merely claimed.
 
 `scripts/gate-status.sh` owns the tri-state mapping (0 OK / 1 NOT-OK /
 2 CANNOT-ASSESS → success / failure / error; CANNOT-ASSESS is never posted as
