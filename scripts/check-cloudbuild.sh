@@ -468,8 +468,9 @@ def report():
               % (refusal["path"], refusal.get("token", ""), refusal["kind"], refusal["detail"]),
               file=sys.stderr)
     files = len(list((root / cb_rel).glob("*.yaml")))
-    print("  templates: %d file(s), %d bare template(s) refused, %d accepted exception(s)"
-          % (files, len(findings), len(accepted)))
+    print("  templates: %d file(s) — %d undeclared bare-template occurrence(s) over %d token(s); "
+          "%d accepted exception(s), %d unbaselined"
+          % (files, len(findings), len(accepted_by_token), len(accepted), len(by_token)))
     return len(errors) + len(by_token) + len(other)
 
 
