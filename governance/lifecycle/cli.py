@@ -83,8 +83,19 @@ def lifecycle_root() -> Path:
 
 
 ROOT = lifecycle_root()
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+
+#: The code root is THIS checkout — never the override. ``governance/`` is a
+#: namespace package, so its ``__path__`` is recomputed from ``sys.path`` on every
+#: submodule import: inserting the *state* root there made ``governance.isolation``
+#: and ``governance.lifecycle`` resolve out of the override, so a lane's fixed copy
+#: imported a stranger's modules instead of its own (#1438 — measured: the shared
+#: checkout's branch has no ``lifecycle.lane_closeout`` and no
+#: ``isolation.worktree.content_landed``, and the verb died with ``ImportError`` /
+#: ``AttributeError`` instead of running the code it was invoked from). The override
+#: says where the state is read and written; it must not say what code runs.
+CODE_ROOT = Path(__file__).resolve().parents[2]
+if str(CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(CODE_ROOT))
 
 from governance.lifecycle import directive, gate, lane_closeout, ledger, live  # noqa: E402
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
