@@ -2828,6 +2828,21 @@
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ac93099db7773c3c9",
       "reason": "measured 2026-09-19: a subagent worktree no lane record names, past the 24h grace; not reclaimed because its HEAD is not content-landed and the walk's reclaim proof answers 'would this lose work', not 'is this in use' (#1440)"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1199",
+      "reason": "measured 2026-09-19 by governance/reconcile's real-tree audit: NOT content-landed, so rule 17 forbids the worker to discard it; recorded (not reclaimed) because the artifact is another lane's and holds unlanded work"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1264",
+      "reason": "measured 2026-09-19 by governance/reconcile's real-tree audit: NOT content-landed, so rule 17 forbids the worker to discard it; recorded (not reclaimed) because the artifact is another lane's and holds unlanded work"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a85389963264be797",
+      "reason": "measured 2026-09-19 by governance/reconcile's real-tree audit: NOT content-landed, so rule 17 forbids the worker to discard it; recorded (not reclaimed) because the artifact is another lane's and holds unlanded work"
     }
   ]
 }
