@@ -186,14 +186,102 @@ if [ "${AO_APPROVAL_REQUIRED:-0}" = "1" ]; then
 fi
 
 echo "merge-pr: merging #$pr_number (gh pr merge --squash --delete-branch); the message was verified above"
+
+# --- publish the gate of record for the commit that LANDED (issue #1382) ------
+# A required status check gates a PULL REQUEST, and a status is posted for a
+# commit. A squash landing therefore creates a commit that NO pre-merge status
+# can ever describe: the green the gate produced names the PR head, and the head
+# is not an ancestor of anything on `master`. Measured 2026-09-19:
+# `scripts/check-gate-status.sh` read the live producer state on this repository
+# and found `ao/gate-of-record` observed on none of the last 20 commits of
+# `master` -- every merge landed a commit the required context said nothing
+# about, while branch protection required it.
+#
+# So the landing seam publishes the context for the commit it landed -- and only
+# when it can rest that green on an OBSERVED one:
+#
+#   * the rc is 0 because the merge-path guards already passed (the rendered
+#     squash message carries its ticket trailer, and pr-queue.sh's merged-tree
+#     evidence check accepted the tree that is landing);
+#   * the EVIDENCE is the gate of record OBSERVED GREEN ON THE PR HEAD, read
+#     back with `scripts/gate-status.sh show`. With no observed green there is
+#     nothing to rest the landed commit's status on, so NOTHING is published and
+#     the refusal is named: an ungated PR must stay unproduced, or this seam
+#     would be a green button for any merge that got past the guards.
+#   * publishing never changes the merge's outcome. The merge already happened;
+#     whether a status could be posted is reported by name, never swallowed.
+#
+# The status this publishes is therefore a claim about the same TREE the head's
+# green was measured on, landing under the same guards that gated the merge --
+# not a second, independent verdict on the landed commit.
+publish_landed_status() {
+  local pr="$1"
+  local view view_rc state landed head_oid post_out post_rc post_reason
+  view="$(gh pr view "$pr" --json state,mergeCommit,headRefOid 2>/dev/null)"
+  view_rc=$?
+  if [ "$view_rc" -ne 0 ]; then
+    printf 'merge-pr: NOTE -- the gate of record was NOT published for a landed commit: #%s could not be read back (gh pr view exited %s), so which commit landed cannot be named\n' \
+      "$pr" "$view_rc"
+    return 0
+  fi
+  state="$(printf '%s' "$view" | python3 -c 'import json,sys; print((json.load(sys.stdin) or {}).get("state") or "")' 2>/dev/null)"
+  landed="$(printf '%s' "$view" | python3 -c 'import json,sys; d=json.load(sys.stdin) or {}; m=d.get("mergeCommit") or {}; print((m.get("oid") if isinstance(m, dict) else "") or "")' 2>/dev/null)"
+  head_oid="$(printf '%s' "$view" | python3 -c 'import json,sys; print((json.load(sys.stdin) or {}).get("headRefOid") or "")' 2>/dev/null)"
+  if [ "$state" != "MERGED" ]; then
+    printf 'merge-pr: NOTE -- the gate of record was NOT published for a landed commit: #%s reads back as state %s, so nothing landed to publish for\n' \
+      "$pr" "${state:-unreadable}"
+    return 0
+  fi
+  case "$landed" in
+    "" | *[!0-9a-f]*)
+      printf 'merge-pr: NOTE -- the gate of record was NOT published: gh reported no readable merge commit for #%s (mergeCommit is %s), so the commit that landed cannot be named\n' \
+        "$pr" "${landed:-empty}"
+      return 0
+      ;;
+  esac
+  if [ "${#landed}" -ne 40 ]; then
+    printf 'merge-pr: NOTE -- the gate of record was NOT published: the reported merge commit for #%s is %s characters, not a full sha\n' \
+      "$pr" "${#landed}"
+    return 0
+  fi
+  if [ -z "$head_oid" ]; then
+    printf 'merge-pr: NOTE -- the gate of record was NOT published for landed commit %s: #%s reports no head commit, so the evidence the landed green would rest on cannot be read\n' \
+      "${landed:0:12}" "$pr"
+    return 0
+  fi
+  post_out="$(bash "$root/scripts/gate-status.sh" show --sha "$head_oid" 2>&1)"
+  post_rc=$?
+  if [ "$post_rc" -ne 0 ]; then
+    printf 'merge-pr: NOTE -- NO green was published for the landed commit %s: the gate of record is not observed green on the PR head %s (%s), and a landed green that no run supports is the fabricated-green class this poster refuses -- an ungated merge stays unproduced\n' \
+      "${landed:0:12}" "${head_oid:0:12}" "$(printf '%s\n' "$post_out" | tail -n 1)"
+    return 0
+  fi
+  post_out="$(bash "$root/scripts/gate-status.sh" post --sha "$landed" --rc 0 2>&1)"
+  post_rc=$?
+  if [ "$post_rc" -eq 0 ]; then
+    printf '%s\n' "$post_out"
+  else
+    post_reason="$(printf '%s\n' "$post_out" | tail -n 1)"
+    printf 'merge-pr: NOTE -- the gate of record was NOT published for the landed commit %s (the poster exited %s): %s\n' \
+      "${landed:0:12}" "$post_rc" "${post_reason:-the poster printed no reason}"
+    printf 'merge-pr: NOTE -- the merge stands and its outcome is unchanged; what is missing is the status, and saying so is the point\n'
+  fi
+  return 0
+}
+
 # A non-zero exit here is a refusal to RE-CHECK, not proof that nothing landed:
 # `gh pr merge --delete-branch` can exit rc 1 after the merge actually succeeded
 # (measured 2026-09-15, #623 — the local branch-prune step collides with the
 # shared checkout that holds `master`). Read `gh pr view <n> --json
-# state,mergeCommit` before acting on it.
+# state,mergeCommit` before acting on it -- which is what publish_landed_status
+# does, in both branches below: a merge that LANDED publishes its status even
+# when `gh` exits non-zero afterwards, and a merge that did NOT land publishes
+# nothing because the state it reads back is not MERGED.
 if gh pr merge "$pr_number" --squash --delete-branch; then
   echo "merge-pr: OK — #$pr_number merged"
+  publish_landed_status "$pr_number"
   exit 0
 fi
 echo "merge-pr: REFUSED — gh pr merge #$pr_number failed; re-check state before retrying" >&2
+publish_landed_status "$pr_number"
 exit 1

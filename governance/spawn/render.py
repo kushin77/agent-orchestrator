@@ -91,6 +91,7 @@ def envelope_block(document: Mapping[str, Any]) -> str:
     a caller that reaches this function is holding an admitted envelope.
     """
     issue = document.get("issue")
+    spawn = document.get("spawn") if isinstance(document.get("spawn"), Mapping) else {}
     permit = document.get("capacity", {}).get("permit", {}) if isinstance(document.get("capacity"), Mapping) else {}
     budget = document.get("budget") if isinstance(document.get("budget"), Mapping) else {}
     focus = document.get("focus") if isinstance(document.get("focus"), Mapping) else {}
@@ -103,6 +104,13 @@ def envelope_block(document: Mapping[str, Any]) -> str:
         ("agent", _text(document, "session", "agent")),
         ("branch", _text(document, "session", "branch")),
         ("worktree", _text(document, "worktree")),
+        (
+            "admission",
+            f"runtime={spawn.get('runtime')} role={spawn.get('role')} tier={spawn.get('tier')} "
+            + (f"model={spawn.get('model')} " if spawn.get("model") else "")
+            + f"class={spawn.get('task_class')} actor={spawn.get('actor')} — judged by the actor, "
+            "FinOps-tier and runtime-allowlist judges BEFORE this lane's worktree existed (#1413)",
+        ),
         ("trailer", f"'{_text(document, 'trailer')}' on EVERY commit (the lane audit checks each one)"),
         ("claim", f"{claim.get('owner')} ({claim.get('state')}, lane {claim.get('lane') or 'n/a'}) — "
                   "the loop owns it: do NOT run claim or release"),

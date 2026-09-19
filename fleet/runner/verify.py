@@ -30,6 +30,14 @@ THE LESSONS THIS FILE ENCODES (each a named control in tests/test_transports.py)
      <pr>-<sha>.log`) and records the failing check names + the gate's own
      summary line in the marker and the ledger row.
 
+The published DESCRIPTION is no longer a fixed string per rc (issue #1407): a
+red now carries the name of the FIRST failing check the run recorded, so the PR
+page says WHY without anyone opening the build log. The detail is a SUFFIX the
+poster appends to a description whose outcome is still `--rc`'s and nothing
+else, so no detail can manufacture a pass on a CANNOT-ASSESS. It is offered to
+the poster ONLY when the poster declares that it takes one, because the seam is
+injected and a producer that predates the detail is still a valid producer.
+
 All transports are injected: `git`, `sh` and `post_status` are callables, so
 the tests drive this module with fakes and no test ever touches the real repo.
 """
@@ -37,6 +45,7 @@ the tests drive this module with fakes and no test ever touches the real repo.
 from __future__ import annotations
 
 import fcntl
+import inspect
 import json
 import os
 import re
@@ -470,7 +479,7 @@ def run_verify(
     runner_dir: Path,
     git: Command,
     sh: Command,
-    post_status: Callable[[str, int], Result],
+    post_status: Callable[..., Result],
     ledger: Ledger,
     now: Callable[[], str] = now_iso,
     timeout: float | None = None,
@@ -519,7 +528,11 @@ def run_verify(
     if gate_rc is None:
         ledger.record("post-skipped", pr=pr, sha=sha, rc=rc, reason=f"parked:{rc}")
     else:
-        post = post_status(sha, gate_rc)
+        # WHY it redded, for the PR page: the first check this run recorded as
+        # failing (#1407). `gate_rc` is decided above and passed through
+        # unchanged, so the detail reaches the description and nothing else. A
+        # green names no failing check, and is posted exactly as it always was.
+        post = post_with_detail(post_status, sha, gate_rc, failing[0] if failing else "")
         posted = post.ok
         ledger.record("post", pr=pr, sha=sha, rc=gate_rc, ok=post.ok, detail=(post.out or post.err).strip()[:200])
 
@@ -571,10 +584,55 @@ def gatelock_prune(sh: Command, *, repo: Path) -> tuple[bool, str]:
     return False, f"rc{result.rc}:{tail[0][:120]}"
 
 
-def real_post_status(sh: Command, repo: Path) -> Callable[[str, int], Result]:
-    """`scripts/gate-status.sh post --sha <sha> --rc <rc>` — the ONE poster."""
+def poster_takes_detail(post_status: Callable[..., Result]) -> bool:
+    """Whether an injected poster declares the optional detail parameter (#1407).
 
-    def post(sha: str, rc: int) -> Result:
-        return sh(["bash", "scripts/gate-status.sh", "post", "--sha", sha, "--rc", str(rc)], cwd=repo)
+    Asked of the CALLABLE rather than assumed. `post_status` is an injected
+    transport, and a poster that declares only `(sha, rc)` is a producer that
+    simply has nothing to say about WHY -- it must keep being called the way it
+    declares, and receive no detail, rather than be broken by a widened seam.
+    """
+    try:
+        parameters = list(inspect.signature(post_status).parameters.values())
+    except (TypeError, ValueError):
+        # A callable whose signature cannot be read is not assumed to accept
+        # more than the original two arguments.
+        return False
+    positional = [
+        p
+        for p in parameters
+        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD, p.VAR_POSITIONAL)
+    ]
+    if any(p.kind is p.VAR_POSITIONAL for p in positional):
+        return True
+    return len(positional) >= 3
+
+
+def post_with_detail(post_status: Callable[..., Result], sha: str, rc: int, detail: str) -> Result:
+    """Publish ONE outcome, offering the reason to a poster that takes one.
+
+    `rc` is decided before this call and is passed through unchanged: the result
+    of the gate is an input here, never an output, so no detail can turn a
+    CANNOT-ASSESS into a pass (the #739 class).
+    """
+    if detail and poster_takes_detail(post_status):
+        return post_status(sha, rc, detail)
+    return post_status(sha, rc)
+
+
+def real_post_status(sh: Command, repo: Path) -> Callable[..., Result]:
+    """`scripts/gate-status.sh post --sha <sha> --rc <rc> [--detail <text>]` — the ONE poster.
+
+    `--detail` names WHY the gate redded; the poster appends it to the status
+    description (bounded there to the API's 140-character cap) so a red PR page
+    is diagnosable without the build log (#1407). It is omitted when empty, so
+    the argv for a producer with nothing to say is byte-identical to before.
+    """
+
+    def post(sha: str, rc: int, detail: str = "") -> Result:
+        argv = ["bash", "scripts/gate-status.sh", "post", "--sha", sha, "--rc", str(rc)]
+        if detail:
+            argv += ["--detail", detail]
+        return sh(argv, cwd=repo)
 
     return post

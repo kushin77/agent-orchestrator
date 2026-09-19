@@ -24,6 +24,18 @@ distinguishable or the status carries no information.
 A mapper that returns `success` for anything it does not recognise is a control
 that cannot fail. So an unrecognised rc is a refusal (exit 2), not a guess.
 
+A DESCRIPTION can also carry a DETAIL (#1407), so a red PR page can name the
+check that failed instead of reading the same fixed string on every red:
+
+    summarize(1)                     -> "make verify: FAIL"      (unchanged)
+    summarize(1, "check-reconcile")  -> "make verify: FAIL -- check-reconcile"
+
+The detail is a SUFFIX on the description and nothing else. The outcome is
+`map_rc`'s, and no detail is an input to it, so no detail can turn a
+CANNOT-ASSESS into a pass -- the #739 false-green class. It is BOUNDED here,
+because GitHub caps a status description at DESCRIPTION_MAX characters and
+would truncate the overflow itself, at a position this module does not choose.
+
 Usage:
     gate-status-map.py <rc>          -> prints the state, exit 0
     gate-status-map.py --self-test   -> asserts the whole table, exit 0/1
@@ -45,6 +57,20 @@ VALID_STATES = frozenset({"error", "failure", "pending", "success"})
 
 CONTEXT = "ao/gate-of-record"
 
+# GitHub caps a commit-status `description` at 140 characters and truncates the
+# overflow ITSELF, so an appended detail without a bound loses its TAIL wherever
+# the API happens to cut -- not the least useful part. The bound is applied here
+# instead, deliberately, and the cut is marked.
+DESCRIPTION_MAX = 140
+
+# Between the fixed outcome string and a supplied detail. Both are ASCII, so the
+# description a reader sees is the description this module built.
+DETAIL_SEP = " -- "
+
+# Appended when a detail had to be cut, so a truncated description never reads as
+# a complete (and therefore wrong) check name.
+DETAIL_CUT = "\u2026"
+
 
 def map_rc(rc: int) -> str:
     """Return the status state for a gate exit code, or raise on an unknown one."""
@@ -59,13 +85,47 @@ def map_rc(rc: int) -> str:
     return state
 
 
-def summarize(rc: int) -> str:
-    """A human description, so the status is readable without the gate log."""
-    return {
+def summarize(rc: int, detail: str | None = None) -> str:
+    """A human description, so the status is readable without the gate log.
+
+    Called with ONE argument this returns exactly the string it always has. A
+    `detail` is appended to that string -- never substituted for it, and never a
+    second source of truth for the outcome, which is `map_rc`'s and is not an
+    input here at all.
+    """
+    base = {
         0: "make verify: PASS",
         1: "make verify: FAIL",
         2: "make verify: CANNOT-ASSESS (not a pass)",
     }.get(rc, f"make verify: unknown outcome ({rc})")
+    if not detail:
+        return base
+    return _append_detail(base, detail)
+
+
+def _append_detail(base: str, detail: str) -> str:
+    """`base` with `detail` appended, bounded to what the status API accepts.
+
+    A status description is ONE line of at most DESCRIPTION_MAX characters, and
+    a detail harvested from a run (a failing check name, a log line) arrives with
+    newlines and indentation, so the whitespace is collapsed first. The fixed
+    outcome string is never the part that is cut: it is what makes the
+    description mean anything, and the head of a check name is the identifying
+    part, so the TAIL is what gives way.
+    """
+    flat = " ".join(str(detail).split())
+    if not flat:
+        return base
+    room = DESCRIPTION_MAX - len(base) - len(DETAIL_SEP)
+    if room < 1:
+        # Unreachable for the outcome strings above, and the self-test proves it
+        # stays unreachable: a future edit that shorts them is caught there, by
+        # name, rather than here. Stated rather than left to crash, because a
+        # description must never exceed the API's cap whatever the inputs are.
+        return base[:DESCRIPTION_MAX]
+    if len(flat) <= room:
+        return base + DETAIL_SEP + flat
+    return base + DETAIL_SEP + flat[: room - 1] + DETAIL_CUT
 
 
 def self_test() -> int:
@@ -97,6 +157,31 @@ def self_test() -> int:
         except ValueError:
             pass
 
+    # The DETAIL seam (#1407). Both halves are asserted, because the second is
+    # the one that would read as a green: a detail that can displace the outcome
+    # string, or turn rc 2 into a pass, is the #739 defect class.
+    for rc in expected:
+        if summarize(rc) != summarize(rc, None) or summarize(rc) != summarize(rc, ""):
+            problems.append(f"rc {rc}: a no-detail call no longer returns the pinned string")
+    wanted = "make verify: FAIL -- check-reconcile"
+    if summarize(1, "check-reconcile") != wanted:
+        problems.append(f"a detail is not appended to the outcome string: {summarize(1, 'check-reconcile')!r} != {wanted!r}")
+    for rc in expected:
+        if not summarize(rc, "success PASS").startswith(summarize(rc)):
+            problems.append(f"rc {rc}: a detail displaced the outcome string it is a suffix of")
+    if "CANNOT-ASSESS" not in summarize(2, "success PASS"):
+        problems.append("a detail naming a pass hid the CANNOT-ASSESS outcome on rc 2 -- the #739 false green")
+    cut = summarize(2, "c" * 500)
+    if len(cut) > DESCRIPTION_MAX:
+        problems.append(f"a 500-character detail produced a {len(cut)}-character description (cap {DESCRIPTION_MAX})")
+    if not cut.startswith(summarize(2)) or not cut.endswith(DETAIL_CUT):
+        problems.append("a truncated description neither keeps its outcome string nor says it was truncated")
+    if summarize(1, "check-a\n  check-b") != "make verify: FAIL -- check-a check-b":
+        problems.append(f"a multi-line detail is not flattened to one line: {summarize(1, 'check-a\n  check-b')!r}")
+    for rc in expected:
+        if DESCRIPTION_MAX - len(summarize(rc)) - len(DETAIL_SEP) < 1:
+            problems.append(f"rc {rc}'s outcome string leaves no room for a detail inside the API's cap")
+
     for problem in problems:
         print(f"  FAIL  {problem}", file=sys.stderr)
     if problems:
@@ -104,6 +189,7 @@ def self_test() -> int:
     print("  OK  the mapping is exhaustive, distinguishable, and refuses the unknown")
     for rc, want in sorted(expected.items()):
         print(f"      rc {rc} -> {want}")
+    print("  OK  a detail is appended, bounded and flattened, and can never displace the outcome")
     return 0
 
 
