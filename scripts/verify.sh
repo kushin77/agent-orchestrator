@@ -42,22 +42,41 @@ cd "$root" || exit 1
 
 mode="${1:-verify}"
 
-# --- PR context passthrough for the discovered pr-contract gate (#1341) -----
-# `scripts/check-pr-contract.sh` is already auto-discovered (below) and reads
-# its own `_PR_NUMBER`/`PR_NUMBER` env fallback when run with no flags — it is
-# NOT hand-wired here. On a runner that has PR context (AO_PR_NUMBER, the
-# convention `scripts/merge-gate.sh` already uses; or a caller-set
-# `_PR_NUMBER`/`PR_NUMBER`), that number is exported as PR_NUMBER so the
-# discovered check judges the real PR body instead of refusing
-# pr-context-missing. An ordinary local run sets none of these, so the check's
-# own rc 2 CANNOT-ASSESS (a SKIP, never a fail — see the tri-state note above)
-# is unchanged.
-if [ -z "${PR_NUMBER:-}" ]; then
-  if [ -n "${AO_PR_NUMBER:-}" ]; then
-    export PR_NUMBER="$AO_PR_NUMBER"
-  elif [ -n "${_PR_NUMBER:-}" ]; then
-    export PR_NUMBER="$_PR_NUMBER"
-  fi
+# --- PR context for the pr-contract gate (#1341) ----------------------------
+# `scripts/check-pr-contract.sh` reads a PR context from `$_PR_NUMBER`/`$PR_NUMBER`
+# when it is run with no flags, and — the part that matters here — gives those
+# AMBIENT names precedence over its own explicit argv. So exporting the context
+# into the composite gate's environment does not merely inform the contract
+# check: it rewrites the meaning of every hermetic fixture in the run that
+# invokes the contract with argv of its own. It was measured, not imagined:
+# `infra/cloudbuild/verify.yaml` exports `AO_PR_NUMBER`, this block exported
+# `PR_NUMBER` from it, and `scripts/check-landing.sh`'s attribution fixture —
+# which calls the contract with an explicit `--body-file`/`--range` against a
+# stub `gh`, precisely so it cannot read the host's GitHub state — was hijacked
+# into the LIVE PR path and answered
+#   check-pr-contract: CANNOT-ASSESS — no non-merge commits between PR #1344's
+#   base ({"state":"MERGED",…}) and its head (…)
+# reddening the gate of record for the whole tree.
+#
+# So the context is NOT exported. It is held in `pr_contract_context` and handed
+# to the ONE check that consumes it, at the point that check runs (below): every
+# other check is run with NO PR context at all — a caller's own
+# `PR_NUMBER`/`_PR_NUMBER` is STRIPPED for them rather than inherited, so the
+# composite cannot be steered by whatever the runner happens to export. A local
+# run provides none of these and the seam is inert.
+#
+# Honest state of the wiring: `pr-contract` is disabled BY NAME in
+# `scripts/check-denylist.txt` (it is a gate/merge-gate signal, not part of
+# `make verify`'s composite), so `make verify` itself does not currently
+# exercise this seam. The seam is correct and scoped for when it does; the
+# inertness is a finding against the denylist, not something this file can fix.
+pr_contract_context=""
+if [ -n "${AO_PR_NUMBER:-}" ]; then
+  pr_contract_context="$AO_PR_NUMBER"
+elif [ -n "${_PR_NUMBER:-}" ]; then
+  pr_contract_context="$_PR_NUMBER"
+elif [ -n "${PR_NUMBER:-}" ]; then
+  pr_contract_context="$PR_NUMBER"
 fi
 
 # --- admission control (issue #724) -----------------------------------------
@@ -800,7 +819,17 @@ for entry in "${checks[@]}"; do
   # carry an evidence tail for THIS check, not the whole run's log.
   check_out="$check_out_dir/${name//\//_}.txt"
   check_start="$(date +%s)"
-  bash -c "$cmd" 2>&1 | tee -a "$log" "$check_out"
+  # Scoped PR context (#1341): the contract check is the only consumer of
+  # `PR_NUMBER` in this tree, so it is the only check that is given one — and
+  # every other check is run with the variable REMOVED, so a hermetic fixture
+  # that passes its own `--body-file`/`--range` cannot be hijacked by the
+  # runner's ambient PR context. See the block above this run for the measured
+  # failure this prevents.
+  if [ "$name" = "pr-contract" ] && [ -n "$pr_contract_context" ]; then
+    PR_NUMBER="$pr_contract_context" bash -c "$cmd" 2>&1 | tee -a "$log" "$check_out"
+  else
+    env -u PR_NUMBER -u _PR_NUMBER bash -c "$cmd" 2>&1 | tee -a "$log" "$check_out"
+  fi
   rc="${PIPESTATUS[0]}"
   check_end="$(date +%s)"
   duration=$((check_end - check_start))
