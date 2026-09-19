@@ -2,12 +2,32 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 from datetime import date
 from pathlib import Path
 
 from governance.reconcile import orphans as o
 
 LANE = {"lane_id": "lane00000001", "session_id": "lane00000001", "issue": 1301, "branch": "issue-1301", "worktree": "/lanes/ao-1301"}
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    assert result.returncode == 0, f"git {args} failed: {result.stderr}"
+    return result.stdout
+
+
+def _scratch_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "main"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "master")
+    _git(repo, "config", "user.email", "gate@example.com")
+    _git(repo, "config", "user.name", "Gate")
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "seed")
+    return repo
 
 
 class FakeOps:
@@ -127,6 +147,36 @@ def test_a_lane_whose_issue_is_closed_is_an_orphan_issue_lane():
     assert [f.name for f in found] == ["lane00000001"]
     assert "close --lane lane00000001" in found[0].remedy
     assert found[0].reclaimable is False, "a lane reaches terminal only through its own close-out"
+
+
+def test_the_walk_run_from_a_lane_worktree_reads_the_fleets_state(tmp_path: Path):
+    """#1436: ``.fleet/`` lives beside the MAIN checkout's git dir and is never
+    checked out into a linked worktree, so the two kinds read from it came back
+    **0** and the three read from git were *inflated* (nothing was left to
+    exclude) when the same walk was run from a lane — the disagreement between
+    the gate's walk and the issue's own ``Verify:`` command. The port's own
+    docstring already required the main checkout; this asserts it is true of a
+    caller that passes a lane.
+    """
+    repo = _scratch_repo(tmp_path)
+    lane = tmp_path / "lane"
+    _git(repo, "worktree", "add", "-q", "-b", "issue-1436", str(lane))
+    (repo / ".fleet" / "lanes").mkdir(parents=True)
+    (repo / ".fleet" / "lanes" / "lane00000001.json").write_text(
+        json.dumps({**LANE, "worktree": str(lane)}), encoding="utf-8"
+    )
+    # The premise the disagreement rests on: a linked worktree has no `.fleet`.
+    assert not (lane / ".fleet").exists()
+
+    assert o.fleet_root(repo) == repo.resolve()
+    assert o.fleet_root(lane) == repo.resolve(), "a lane resolves to the checkout that owns the state"
+    # ...and the consequence: the lane's port reads the FLEET's lane records, so
+    # the lane it names is excluded rather than counted as an orphan.
+    assert [record["lane_id"] for record in o.RepoOrphanOps(lane).lane_records()] == ["lane00000001"]
+    assert o.RepoOrphanOps(lane).root == repo.resolve()
+    # A root git cannot answer for is left alone rather than relocated.
+    stranger = tmp_path / "not-a-repo"
+    assert o.fleet_root(stranger) == stranger
 
 
 def test_a_directive_naming_a_closed_issue_is_an_orphan_directive():
